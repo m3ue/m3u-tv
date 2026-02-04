@@ -109,9 +109,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.MultiTVSample'
+    namespace 'dev.sparkison.tv'
     defaultConfig {
-        applicationId 'com.anonymous.MultiTVSample'
+        applicationId 'dev.sparkison.tv'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

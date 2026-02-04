@@ -44,7 +44,7 @@ if (getRNMinorVersion() >= 75) {
   }
 }
 
-rootProject.name = 'MultiTVSample'
+rootProject.name = 'M3U TV'
 
 dependencyResolutionManagement {
   versionCatalogs {

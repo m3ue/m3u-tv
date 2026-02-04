@@ -28,9 +28,9 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="com.anonymous.MultiTVSample"/>
-        <data android:scheme="com.anonymous.MultiTVSample"/>
-        <data android:scheme="exp+multitvsample"/>
+        <data android:scheme="dev.sparkison.tv"/>
+        <data android:scheme="dev.sparkison.tv"/>
+        <data android:scheme="exp+m3u-tv"/>
       </intent-filter>
     </activity>
     <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false"/>

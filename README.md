@@ -69,24 +69,32 @@ yarn install
 
 ### Running the App
 
+**Prebuild**
+
+Run prebuild to generate the `Android` and `iOS` folders and code.
+
+```bash
+EXPO_TV=1 corepack yarn workspace @m3u-tv/expo-app prebuild --clean
+```
+
 **Web (for development):**
 ```bash
-yarn dev:web
+corepack yarn dev:web
 ```
 
 **Android TV:**
 ```bash
-yarn dev:android
+corepack yarn dev:android
 ```
 
 **Apple TV:**
 ```bash
-yarn dev:ios
+corepack yarn dev:ios
 ```
 
 **Fire TV Vega:**
 ```bash
-yarn dev:vega
+corepack yarn dev:vega
 ```
 
 ## Configuration
