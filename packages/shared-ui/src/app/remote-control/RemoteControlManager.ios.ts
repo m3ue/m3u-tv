@@ -53,12 +53,14 @@ class RemoteControlManager implements RemoteControlManagerInterface {
   };
 
   addKeydownListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
+    console.log(`[iOS Remote] addKeydownListener called, had existing: ${!!this.currentListener}`);
     // Remove any existing listener first to ensure only one is active
     if (this.currentListener) {
       this.eventEmitter.off('keyDown', this.currentListener);
     }
     this.currentListener = listener;
     this.eventEmitter.on('keyDown', listener);
+    console.log(`[iOS Remote] Listener registered successfully`);
     return listener;
   };
 

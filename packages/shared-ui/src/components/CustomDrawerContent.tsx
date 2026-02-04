@@ -1,5 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { scaledPixels } from '../hooks/useScale';
+
+declare const console: { log: (...args: unknown[]) => void };
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { View, StyleSheet, Platform, Text, Image } from 'react-native';
 import { DefaultFocus, SpatialNavigationFocusableView, SpatialNavigationRoot } from 'react-tv-space-navigation';
@@ -13,6 +15,11 @@ import { safeZones, colors } from '../theme';
 export default function CustomDrawerContent(props: any) {
   const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
   const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();
+
+  // Debug logging for menu state
+  useEffect(() => {
+    console.log(`[CustomDrawerContent] isMenuOpen changed to: ${isMenuOpen}`);
+  }, [isMenuOpen]);
   const styles = drawerStyles;
   const drawerItems = [
     { name: 'Home', label: 'Home', icon: '🏠' },
