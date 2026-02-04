@@ -1,7 +1,7 @@
 import { scaledPixels } from '../hooks/useScale';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
-import { View, StyleSheet, Platform, Text } from 'react-native';
-import { DefaultFocus, SpatialNavigationFocusableView, SpatialNavigationRoot } from 'react-tv-space-navigation';
+import { View, StyleSheet, Platform, Text, Image } from 'react-native';
+import { DefaultFocus, SpatialNavigationFocusableView } from 'react-tv-space-navigation';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { DrawerParamList } from '../navigation/types';
@@ -10,7 +10,7 @@ import { safeZones, colors } from '../theme';
 
 export default function CustomDrawerContent(props: any) {
   const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
-  const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();
+  const { toggleMenu } = useMenuContext();
   const styles = drawerStyles;
   const drawerItems = [
     { name: 'Home', label: 'Home', icon: '🏠' },
@@ -20,8 +20,7 @@ export default function CustomDrawerContent(props: any) {
   ] as const;
 
   return (
-    <SpatialNavigationRoot isActive={isMenuOpen}>
-      <View style={styles.drawerContainer}>
+    <View style={styles.drawerContainer}>
         {/* Gradient-like scrim overlay */}
         <View style={styles.scrimOverlay} />
         <DrawerContentScrollView
@@ -33,11 +32,12 @@ export default function CustomDrawerContent(props: any) {
           }}
         >
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>M3U</Text>
-              <Text style={styles.logoTextAccent}>TV</Text>
-            </View>
-            <Text style={styles.tagline}>Your streaming, your way</Text>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.tagline}>m3u tv</Text>
           </View>
           <View style={styles.menuList}>
             {drawerItems.map((item, index) =>
@@ -94,143 +94,134 @@ export default function CustomDrawerContent(props: any) {
           </SpatialNavigationFocusableView>
         </View>
       </View>
-    </SpatialNavigationRoot>
+    </View>
   );
 }
 
 const drawerStyles = StyleSheet.create({
-    drawerContainer: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.85)',
-      overflow: 'visible',
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    overflow: 'visible',
+  },
+  scrimOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    opacity: 0.9,
+  },
+  container: {
+    flex: 1,
+    paddingTop: scaledPixels(safeZones.titleSafe.vertical),
+    overflow: 'visible',
+  },
+  header: {
+    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
+    paddingVertical: scaledPixels(32),
+    marginBottom: scaledPixels(24),
+    borderBottomWidth: scaledPixels(2),
+    borderBottomColor: colors.border,
+  },
+  logo: {
+    alignSelf: 'center',
+    width: scaledPixels(120),
+    height: scaledPixels(120),
+    borderRadius: scaledPixels(16),
+  },
+  tagline: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: scaledPixels(20),
+    marginTop: scaledPixels(8),
+  },
+  menuList: {
+    overflow: 'visible',
+    paddingHorizontal: scaledPixels(8),
+  },
+  menuIcon: {
+    fontSize: scaledPixels(32),
+    marginRight: scaledPixels(16),
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scaledPixels(18),
+    paddingHorizontal: scaledPixels(24),
+    marginHorizontal: scaledPixels(8),
+    marginVertical: scaledPixels(4),
+    borderRadius: scaledPixels(12),
+    minHeight: scaledPixels(68),
+    borderWidth: scaledPixels(2),
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  menuItemFocused: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: scaledPixels(4),
     },
-    scrimOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      opacity: 0.9,
+    shadowOpacity: 0.4,
+    shadowRadius: scaledPixels(8),
+    elevation: 8,
+  },
+  menuText: {
+    color: colors.text,
+    fontSize: scaledPixels(36),
+    fontWeight: '500',
+  },
+  menuTextFocused: {
+    color: colors.textOnPrimary,
+    fontWeight: '600',
+  },
+  footer: {
+    paddingHorizontal: scaledPixels(16),
+    paddingBottom: scaledPixels(safeZones.actionSafe.vertical),
+    paddingTop: scaledPixels(16),
+    borderTopWidth: scaledPixels(1),
+    borderTopColor: colors.border,
+    overflow: 'visible',
+  },
+  settingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scaledPixels(18),
+    paddingHorizontal: scaledPixels(24),
+    marginHorizontal: scaledPixels(8),
+    borderRadius: scaledPixels(12),
+    minHeight: scaledPixels(68),
+    borderWidth: scaledPixels(2),
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  settingsButtonFocused: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: scaledPixels(4),
     },
-    container: {
-      flex: 1,
-      paddingTop: scaledPixels(safeZones.titleSafe.vertical),
-      overflow: 'visible',
-    },
-    header: {
-      paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
-      paddingVertical: scaledPixels(32),
-      marginBottom: scaledPixels(24),
-      borderBottomWidth: scaledPixels(2),
-      borderBottomColor: colors.border,
-    },
-    logoContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    logoText: {
-      color: colors.text,
-      fontSize: scaledPixels(56),
-      fontWeight: '700',
-      letterSpacing: scaledPixels(2),
-    },
-    logoTextAccent: {
-      color: colors.primary,
-      fontSize: scaledPixels(56),
-      fontWeight: '700',
-      letterSpacing: scaledPixels(2),
-    },
-    tagline: {
-      color: colors.textSecondary,
-      fontSize: scaledPixels(20),
-      marginTop: scaledPixels(8),
-    },
-    menuList: {
-      overflow: 'visible',
-      paddingHorizontal: scaledPixels(8),
-    },
-    menuIcon: {
-      fontSize: scaledPixels(32),
-      marginRight: scaledPixels(16),
-    },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: scaledPixels(18),
-      paddingHorizontal: scaledPixels(24),
-      marginHorizontal: scaledPixels(8),
-      marginVertical: scaledPixels(4),
-      borderRadius: scaledPixels(12),
-      minHeight: scaledPixels(68),
-      borderWidth: scaledPixels(2),
-      borderColor: 'transparent',
-      backgroundColor: 'transparent',
-    },
-    menuItemFocused: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: {
-        width: 0,
-        height: scaledPixels(4),
-      },
-      shadowOpacity: 0.4,
-      shadowRadius: scaledPixels(8),
-      elevation: 8,
-    },
-    menuText: {
-      color: colors.text,
-      fontSize: scaledPixels(36),
-      fontWeight: '500',
-    },
-    menuTextFocused: {
-      color: colors.textOnPrimary,
-      fontWeight: '600',
-    },
-    footer: {
-      paddingHorizontal: scaledPixels(16),
-      paddingBottom: scaledPixels(safeZones.actionSafe.vertical),
-      paddingTop: scaledPixels(16),
-      borderTopWidth: scaledPixels(1),
-      borderTopColor: colors.border,
-      overflow: 'visible',
-    },
-    settingsButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: scaledPixels(18),
-      paddingHorizontal: scaledPixels(24),
-      marginHorizontal: scaledPixels(8),
-      borderRadius: scaledPixels(12),
-      minHeight: scaledPixels(68),
-      borderWidth: scaledPixels(2),
-      borderColor: 'transparent',
-      backgroundColor: 'transparent',
-    },
-    settingsButtonFocused: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: {
-        width: 0,
-        height: scaledPixels(4),
-      },
-      shadowOpacity: 0.4,
-      shadowRadius: scaledPixels(8),
-      elevation: 8,
-    },
-    settingsIcon: {
-      fontSize: scaledPixels(32),
-      marginRight: scaledPixels(16),
-    },
-    settingsText: {
-      color: colors.text,
-      fontSize: scaledPixels(36),
-      fontWeight: '500',
-    },
-    settingsTextFocused: {
-      color: colors.textOnPrimary,
-      fontWeight: '600',
-    },
-  });
+    shadowOpacity: 0.4,
+    shadowRadius: scaledPixels(8),
+    elevation: 8,
+  },
+  settingsIcon: {
+    fontSize: scaledPixels(32),
+    marginRight: scaledPixels(16),
+  },
+  settingsText: {
+    color: colors.text,
+    fontSize: scaledPixels(36),
+    fontWeight: '500',
+  },
+  settingsTextFocused: {
+    color: colors.textOnPrimary,
+    fontWeight: '600',
+  },
+});
