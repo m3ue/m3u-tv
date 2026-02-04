@@ -1,17 +1,13 @@
 {
-  "images" : [
+  "images": [
     {
-      "filename" : "icon-1280x768.png",
-      "idiom" : "tv",
-      "scale" : "1x"
-    },
-    {
-      "idiom" : "tv",
-      "scale" : "2x"
+      "filename": "icon-1280x768.png",
+      "idiom": "tv",
+      "scale": "1x"
     }
   ],
-  "info" : {
-    "author" : "xcode",
-    "version" : 1
+  "info": {
+    "version": 1,
+    "author": "expo"
   }
 }

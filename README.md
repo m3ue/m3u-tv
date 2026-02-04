@@ -171,6 +171,14 @@ yarn typecheck
 - [ ] Stream quality selection
 - [ ] Catchup/DVR support
 
-## License
+---
 
-MIT
+## ⚖️ License  
+
+> m3u editor is licensed under **CC BY-NC-SA 4.0**:  
+
+- **BY**: Give credit where credit’s due.  
+- **NC**: No commercial use.  
+- **SA**: Share alike if you remix.  
+
+For full license details, see [LICENSE](https://creativecommons.org/licenses/by-nc-sa/4.0/).
