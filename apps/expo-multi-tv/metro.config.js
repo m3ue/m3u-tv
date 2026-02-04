@@ -23,6 +23,10 @@ config.resolver = {
   },
 };
 
+// Enable faster refresh for monorepo
+config.resetCache = false;
+config.cacheVersion = '1';
+
 // When enabled, the optional code below will allow Metro to resolve
 // and bundle source files with TV-specific extensions
 // (e.g., *.ios.tv.tsx, *.android.tv.tsx, *.tv.tsx)
