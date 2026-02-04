@@ -15,6 +15,7 @@ const KEY_MAPPING: Record<string, SupportedKeys> = {
 
 class RemoteControlManager implements RemoteControlManagerInterface {
   private eventEmitter = mitt<{ keyDown: SupportedKeys }>();
+  private currentListener: ((event: SupportedKeys) => void) | null = null;
 
   constructor() {
     if (Platform.OS === 'web') {
@@ -30,12 +31,20 @@ class RemoteControlManager implements RemoteControlManagerInterface {
   };
 
   addKeydownListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
+    // Remove any existing listener first to ensure only one is active
+    if (this.currentListener) {
+      this.eventEmitter.off('keyDown', this.currentListener);
+    }
+    this.currentListener = listener;
     this.eventEmitter.on('keyDown', listener);
     return listener;
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
     this.eventEmitter.off('keyDown', listener);
+    if (this.currentListener === listener) {
+      this.currentListener = null;
+    }
   };
 
   emitKeyDown = (key: SupportedKeys): void => {

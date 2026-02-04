@@ -1,10 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { SpatialNavigationRoot } from 'react-tv-space-navigation';
-import { Direction } from '@bam.tech/lrud';
 import { useMenuContext } from '../components/MenuContext';
 import CustomDrawerContent from '../components/CustomDrawerContent';
 import { scaledPixels } from '../hooks/useScale';
@@ -35,28 +33,13 @@ function DrawerSyncWrapper() {
 
 export default function DrawerNavigator() {
   const styles = drawerStyles;
-  const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();
-  const navigation = useNavigation();
-
-  const onDirectionHandledWithoutMovement = useCallback(
-    (movement: Direction) => {
-      if (movement === 'right') {
-        navigation.dispatch(DrawerActions.closeDrawer());
-        toggleMenu(false);
-      }
-    },
-    [toggleMenu, navigation],
-  );
 
   const navigationContent = (
-    <SpatialNavigationRoot
-      isActive={isMenuOpen}
-      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-    >
+    <>
       <Drawer.Navigator
         drawerContent={CustomDrawerContent}
         initialRouteName="Home"
-        defaultStatus="open"
+        defaultStatus="closed"
         screenOptions={{
           headerShown: false,
           drawerActiveBackgroundColor: '#6366f1',
@@ -106,7 +89,7 @@ export default function DrawerNavigator() {
         />
       </Drawer.Navigator>
       <DrawerSyncWrapper />
-    </SpatialNavigationRoot>
+    </>
   );
 
   // On TV platforms, don't use GestureHandlerRootView as we use remote control navigation

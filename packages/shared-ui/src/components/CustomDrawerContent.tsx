@@ -1,16 +1,18 @@
+import { useCallback } from 'react';
 import { scaledPixels } from '../hooks/useScale';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { View, StyleSheet, Platform, Text, Image } from 'react-native';
-import { DefaultFocus, SpatialNavigationFocusableView } from 'react-tv-space-navigation';
-import { useNavigation } from '@react-navigation/native';
+import { DefaultFocus, SpatialNavigationFocusableView, SpatialNavigationRoot } from 'react-tv-space-navigation';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { Direction } from '@bam.tech/lrud';
 import { DrawerParamList } from '../navigation/types';
 import { useMenuContext } from '../components/MenuContext';
 import { safeZones, colors } from '../theme';
 
 export default function CustomDrawerContent(props: any) {
   const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
-  const { toggleMenu } = useMenuContext();
+  const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();
   const styles = drawerStyles;
   const drawerItems = [
     { name: 'Home', label: 'Home', icon: '🏠' },
@@ -19,8 +21,22 @@ export default function CustomDrawerContent(props: any) {
     { name: 'Series', label: 'Series', icon: '📽️' },
   ] as const;
 
+  const onDirectionHandledWithoutMovement = useCallback(
+    (movement: Direction) => {
+      if (movement === 'right') {
+        navigation.dispatch(DrawerActions.closeDrawer());
+        toggleMenu(false);
+      }
+    },
+    [toggleMenu, navigation],
+  );
+
   return (
-    <View style={styles.drawerContainer}>
+    <SpatialNavigationRoot
+      isActive={isMenuOpen}
+      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
+    >
+      <View style={styles.drawerContainer}>
         {/* Gradient-like scrim overlay */}
         <View style={styles.scrimOverlay} />
         <DrawerContentScrollView
@@ -46,6 +62,7 @@ export default function CustomDrawerContent(props: any) {
                   <SpatialNavigationFocusableView
                     onSelect={() => {
                       toggleMenu(false);
+                      navigation.dispatch(DrawerActions.closeDrawer());
                       navigation.navigate(item.name as keyof DrawerParamList);
                     }}
                   >
@@ -62,6 +79,7 @@ export default function CustomDrawerContent(props: any) {
                   key={index}
                   onSelect={() => {
                     toggleMenu(false);
+                    navigation.dispatch(DrawerActions.closeDrawer());
                     navigation.navigate(item.name as keyof DrawerParamList);
                   }}
                 >
@@ -82,6 +100,7 @@ export default function CustomDrawerContent(props: any) {
           <SpatialNavigationFocusableView
             onSelect={() => {
               toggleMenu(false);
+              navigation.dispatch(DrawerActions.closeDrawer());
               navigation.navigate('Settings');
             }}
           >
@@ -94,7 +113,7 @@ export default function CustomDrawerContent(props: any) {
           </SpatialNavigationFocusableView>
         </View>
       </View>
-    </View>
+    </SpatialNavigationRoot>
   );
 }
 

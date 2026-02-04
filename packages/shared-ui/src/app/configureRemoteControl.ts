@@ -4,25 +4,33 @@ import RemoteControlManager from './remote-control/RemoteControlManager';
 
 SpatialNavigation.configureRemoteControl({
   remoteControlSubscriber: (callback) => {
-    console.log("Configure remote control");
+    console.log("[ConfigureRemoteControl] Setting up remote control subscriber");
 
-    const mapping: { [key in SupportedKeys]: Directions | null } = {
+    const mapping: { [key in SupportedKeys]?: Directions | null } = {
       [SupportedKeys.Right]: Directions.RIGHT,
       [SupportedKeys.Left]: Directions.LEFT,
       [SupportedKeys.Up]: Directions.UP,
       [SupportedKeys.Down]: Directions.DOWN,
       [SupportedKeys.Enter]: Directions.ENTER,
       [SupportedKeys.Back]: null,
+      [SupportedKeys.PlayPause]: null,
+      [SupportedKeys.Rewind]: null,
+      [SupportedKeys.FastForward]: null,
     };
 
     const remoteControlListener = (keyEvent: SupportedKeys) => {
-      callback(mapping[keyEvent]);
+      console.log(`[ConfigureRemoteControl] Received key: ${keyEvent}, mapped direction: ${mapping[keyEvent]}`);
+      const direction = mapping[keyEvent];
+      if (direction !== undefined) {
+        callback(direction);
+      }
     };
 
     return RemoteControlManager.addKeydownListener(remoteControlListener);
   },
 
   remoteControlUnsubscriber: (remoteControlListener) => {
+    console.log("[ConfigureRemoteControl] Unsubscribing remote control listener");
     RemoteControlManager.removeKeydownListener(remoteControlListener);
   },
 });

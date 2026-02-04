@@ -8,7 +8,7 @@ interface MenuContextType {
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const value = useMemo(() => ({
     isOpen,
