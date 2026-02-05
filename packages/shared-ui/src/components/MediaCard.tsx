@@ -10,7 +10,7 @@ export interface MediaCardProps {
   image?: string;
   isFocused: boolean;
   type: MediaCardType;
-  rating?: number;
+  rating?: number | string;
   year?: string;
 }
 
@@ -52,7 +52,7 @@ const MediaCard = React.memo(({ name, image, isFocused, type, rating, year }: Me
         )}
         {rating !== undefined && rating > 0 && (
           <View style={styles.ratingBadge}>
-            <Text style={styles.ratingText}>★ {rating.toFixed(1)}</Text>
+            <Text style={styles.ratingText}>★ {rating}</Text>
           </View>
         )}
       </View>

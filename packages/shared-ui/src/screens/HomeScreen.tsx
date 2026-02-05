@@ -165,7 +165,7 @@ export default function HomeScreen() {
             image={item.stream_icon}
             isFocused={isFocused}
             type="vod"
-            rating={item.rating_5based}
+            rating={item.rating}
           />
         )}
       </SpatialNavigationFocusableView>
@@ -182,7 +182,7 @@ export default function HomeScreen() {
             image={item.cover}
             isFocused={isFocused}
             type="series"
-            rating={item.rating_5based}
+            rating={item.rating}
             year={item.release_date || item.releaseDate}
           />
         )}
@@ -227,18 +227,19 @@ export default function HomeScreen() {
     <SpatialNavigationRoot isActive={isActive} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
       <View style={styles.container}>
         <PlatformLinearGradient colors={colors.gradientBackground} style={styles.backgroundGradient} />
-        <View style={styles.header}>
-          <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.headerSubtitle}>Your entertainment, anywhere</Text>
-        </View>
 
-        <SpatialNavigationScrollView offsetFromStart={scaledPixels(60)} style={styles.scrollContent}>
+        <SpatialNavigationScrollView offsetFromStart={scaledPixels(280)} style={styles.scrollContent}>
+          <View style={styles.header}>
+            <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+            <Text style={styles.headerSubtitle}>Your entertainment, your way</Text>
+          </View>
+
           {/* Live TV Section */}
           {liveChannels.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Live TV</Text>
               <View style={styles.liveListWrapper}>
-                <SpatialNavigationNode>
+                <SpatialNavigationNode direction="horizontal">
                   <DefaultFocus>
                     <SpatialNavigationVirtualizedList
                       data={liveChannels}
@@ -259,7 +260,7 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Movies</Text>
               <View style={styles.listWrapper}>
-                <SpatialNavigationNode>
+                <SpatialNavigationNode direction="horizontal">
                   <SpatialNavigationVirtualizedList
                     data={movies}
                     orientation="horizontal"
@@ -278,7 +279,7 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>TV Series</Text>
               <View style={styles.listWrapper}>
-                <SpatialNavigationNode>
+                <SpatialNavigationNode direction="horizontal">
                   <SpatialNavigationVirtualizedList
                     data={series}
                     orientation="horizontal"
