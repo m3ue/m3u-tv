@@ -42,7 +42,7 @@ export default function DrawerNavigator() {
         defaultStatus="closed"
         screenOptions={{
           headerShown: false,
-          drawerActiveBackgroundColor: '#6366f1',
+          drawerActiveBackgroundColor: '#ec003f',
           drawerActiveTintColor: '#ffffff',
           drawerInactiveTintColor: '#94a3b8',
           drawerStyle: styles.drawerStyle,
