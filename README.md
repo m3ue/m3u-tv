@@ -1,4 +1,4 @@
-# M3U TV
+# m3u tv
 
 ![logo](./favicon.png)
 
