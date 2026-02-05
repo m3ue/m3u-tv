@@ -21,7 +21,30 @@ const MediaCard = React.memo(
       [image],
     );
 
-    const placeholderEmoji = type === 'live' ? '📺' : type === 'vod' ? '🎬' : '📺';
+    // Live TV uses square card with centered logo
+    if (type === 'live') {
+      return (
+        <View style={[styles.liveCard, isFocused && styles.cardFocused]}>
+          <View style={styles.liveLogoContainer}>
+            {imageSource ? (
+              <Image source={imageSource} style={styles.liveLogo} resizeMode="contain" />
+            ) : (
+              <View style={styles.livePlaceholder}>
+                <Text style={styles.livePlaceholderText}>
+                  {name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.liveTitle} numberOfLines={2}>
+            {name}
+          </Text>
+        </View>
+      );
+    }
+
+    // VOD and Series use tall poster card
+    const placeholderEmoji = type === 'vod' ? '🎬' : '📺';
 
     return (
       <View style={[styles.card, isFocused && styles.cardFocused]}>
@@ -54,11 +77,18 @@ const MediaCard = React.memo(
 
 MediaCard.displayName = 'MediaCard';
 
+// VOD/Series card dimensions (tall poster style)
 export const MEDIA_CARD_WIDTH = scaledPixels(200);
 export const MEDIA_CARD_HEIGHT = scaledPixels(340);
 export const MEDIA_CARD_MARGIN = scaledPixels(20);
 
+// Live TV card dimensions (square style)
+export const LIVE_CARD_WIDTH = scaledPixels(200);
+export const LIVE_CARD_HEIGHT = scaledPixels(200);
+export const LIVE_CARD_MARGIN = scaledPixels(20);
+
 const styles = StyleSheet.create({
+  // VOD/Series card styles
   card: {
     width: MEDIA_CARD_WIDTH,
     height: MEDIA_CARD_HEIGHT,
@@ -126,6 +156,53 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: scaledPixels(14),
     marginTop: scaledPixels(4),
+  },
+
+  // Live TV card styles (square with centered logo)
+  liveCard: {
+    width: LIVE_CARD_WIDTH,
+    height: LIVE_CARD_HEIGHT,
+    marginRight: LIVE_CARD_MARGIN,
+    borderRadius: scaledPixels(16),
+    backgroundColor: colors.card,
+    borderWidth: scaledPixels(3),
+    borderColor: 'transparent',
+    padding: scaledPixels(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveLogoContainer: {
+    width: scaledPixels(80),
+    height: scaledPixels(80),
+    marginBottom: scaledPixels(12),
+    borderRadius: scaledPixels(8),
+    overflow: 'hidden',
+    backgroundColor: colors.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  livePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: scaledPixels(8),
+  },
+  livePlaceholderText: {
+    color: colors.text,
+    fontSize: scaledPixels(32),
+    fontWeight: 'bold',
+  },
+  liveTitle: {
+    color: colors.text,
+    fontSize: scaledPixels(18),
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 

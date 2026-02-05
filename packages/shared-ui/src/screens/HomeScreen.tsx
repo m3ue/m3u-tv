@@ -22,12 +22,18 @@ import { colors, safeZones } from '../theme';
 import PlatformLinearGradient from '../components/PlatformLinearGradient';
 import LoadingIndicator from '../components/LoadingIndicator';
 import FocusablePressable from '../components/FocusablePressable';
-import MediaCard, { MEDIA_CARD_WIDTH, MEDIA_CARD_MARGIN } from '../components/MediaCard';
+import MediaCard, {
+  MEDIA_CARD_WIDTH,
+  MEDIA_CARD_MARGIN,
+  LIVE_CARD_WIDTH,
+  LIVE_CARD_MARGIN,
+} from '../components/MediaCard';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
-// Calculate item size for virtualized list (card width + margin)
+// Calculate item sizes for virtualized lists (card width + margin)
 const ITEM_SIZE = MEDIA_CARD_WIDTH + MEDIA_CARD_MARGIN;
+const LIVE_ITEM_SIZE = LIVE_CARD_WIDTH + LIVE_CARD_MARGIN;
 
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
@@ -256,16 +262,16 @@ export default function HomeScreen() {
           {liveChannels.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Live TV</Text>
-              <View style={styles.listWrapper}>
+              <View style={styles.liveListWrapper}>
                 <SpatialNavigationNode>
                   <DefaultFocus>
                     <SpatialNavigationVirtualizedList
                       data={liveChannels}
                       orientation="horizontal"
                       renderItem={renderLiveItem}
-                      itemSize={ITEM_SIZE}
+                      itemSize={LIVE_ITEM_SIZE}
                       numberOfRenderedItems={8}
-                      numberOfItemsVisibleOnScreen={5}
+                      numberOfItemsVisibleOnScreen={6}
                     />
                   </DefaultFocus>
                 </SpatialNavigationNode>
@@ -384,6 +390,10 @@ const styles = StyleSheet.create({
   },
   listWrapper: {
     height: scaledPixels(380),
+    paddingVertical: scaledPixels(10),
+  },
+  liveListWrapper: {
+    height: scaledPixels(250),
     paddingVertical: scaledPixels(10),
   },
 });
