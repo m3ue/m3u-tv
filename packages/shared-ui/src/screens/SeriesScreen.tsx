@@ -313,8 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   seriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    height: scaledPixels(360),
   },
   seriesCard: {
     width: scaledPixels(180),

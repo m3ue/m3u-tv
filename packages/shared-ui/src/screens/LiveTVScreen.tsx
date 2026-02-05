@@ -305,8 +305,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   channelsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    height: scaledPixels(220),
   },
   channelCard: {
     width: scaledPixels(200),

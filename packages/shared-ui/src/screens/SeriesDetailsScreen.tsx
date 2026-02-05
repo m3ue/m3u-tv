@@ -221,14 +221,16 @@ export default function SeriesDetailsScreen() {
         {seriesInfo?.seasons && seriesInfo.seasons.length > 0 && (
           <View style={styles.seasonsContainer}>
             <SpatialNavigationNode>
-              <SpatialNavigationVirtualizedList
-                data={seriesInfo.seasons}
-                orientation="horizontal"
-                renderItem={renderSeasonItem}
-                itemSize={scaledPixels(160)}
-                numberOfRenderedItems={8}
-                numberOfItemsVisibleOnScreen={6}
-              />
+              <View style={styles.seasonsListWrapper}>
+                <SpatialNavigationVirtualizedList
+                  data={seriesInfo.seasons}
+                  orientation="horizontal"
+                  renderItem={renderSeasonItem}
+                  itemSize={scaledPixels(160)}
+                  numberOfRenderedItems={8}
+                  numberOfItemsVisibleOnScreen={6}
+                />
+              </View>
             </SpatialNavigationNode>
           </View>
         )}
@@ -241,14 +243,16 @@ export default function SeriesDetailsScreen() {
           {currentEpisodes.length > 0 ? (
             <SpatialNavigationScrollView style={styles.episodesList}>
               <SpatialNavigationNode>
-                <SpatialNavigationVirtualizedList
-                  data={currentEpisodes}
-                  orientation="horizontal"
-                  renderItem={renderEpisodeItem}
-                  itemSize={scaledPixels(320)}
-                  numberOfRenderedItems={6}
-                  numberOfItemsVisibleOnScreen={4}
-                />
+                <View style={styles.episodesListWrapper}>
+                  <SpatialNavigationVirtualizedList
+                    data={currentEpisodes}
+                    orientation="horizontal"
+                    renderItem={renderEpisodeItem}
+                    itemSize={scaledPixels(320)}
+                    numberOfRenderedItems={6}
+                    numberOfItemsVisibleOnScreen={4}
+                  />
+                </View>
               </SpatialNavigationNode>
             </SpatialNavigationScrollView>
           ) : (
@@ -306,9 +310,11 @@ const styles = StyleSheet.create({
     maxWidth: '60%',
   },
   seasonsContainer: {
-    height: scaledPixels(70),
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
     marginTop: scaledPixels(20),
+  },
+  seasonsListWrapper: {
+    height: scaledPixels(60),
   },
   seasonTab: {
     paddingHorizontal: scaledPixels(24),
@@ -347,6 +353,9 @@ const styles = StyleSheet.create({
   },
   episodesList: {
     flex: 1,
+  },
+  episodesListWrapper: {
+    height: scaledPixels(280),
   },
   episodeCard: {
     width: scaledPixels(300),

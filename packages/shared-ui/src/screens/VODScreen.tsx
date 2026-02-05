@@ -305,8 +305,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   moviesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    height: scaledPixels(340),
   },
   movieCard: {
     width: scaledPixels(180),
