@@ -89,7 +89,7 @@ export default function MovieDetailsScreen() {
                         <Image source={{ uri: movieBackdrop }} style={styles.backdrop} resizeMode="cover" />
                     )}
                     <PlatformLinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.7)', colors.background]}
+                        colors={['transparent', 'rgba(0,0,0,0.7)']}
                         style={styles.gradient}
                     />
 
@@ -249,7 +249,6 @@ const styles = StyleSheet.create({
         maxWidth: '90%',
     },
     actionsRow: {
-        flexDirection: 'row',
         gap: scaledPixels(16),
         marginBottom: scaledPixels(32),
     },

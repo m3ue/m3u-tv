@@ -106,7 +106,7 @@ const EpisodeDetailModal = ({
           />
         )}
         <PlatformLinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)', colors.background]}
+          colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.2)']}
           style={styles.modalGradient}
         />
 
@@ -251,7 +251,7 @@ export default function SeriesDetailsScreen() {
       {/* Full screen backdrop */}
       {seriesBackdrop && <Image source={{ uri: seriesBackdrop }} style={styles.fullscreenBackdrop} resizeMode="cover" />}
       <PlatformLinearGradient
-        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', colors.background]}
+        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
         style={styles.fullscreenGradient}
       />
 
@@ -660,7 +660,6 @@ const styles = StyleSheet.create({
     marginBottom: scaledPixels(40),
   },
   modalActions: {
-    flexDirection: 'row',
     gap: scaledPixels(20),
   },
   modalPlayButton: {
