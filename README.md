@@ -2,7 +2,7 @@
 
 ![logo](./favicon.png)
 
-Cross-platform TV front-end player for the M3U Editor app. Provides a convenient way to view your content on Android TV, Apple TV and Fire TV.
+Cross-platform TV front-end player for the M3U Editor web app. Provides a convenient way to view your content on Android TV and Apple TV.
 
 ## Features
 
@@ -16,8 +16,6 @@ Cross-platform TV front-end player for the M3U Editor app. Provides a convenient
 
 - Android TV
 - Apple TV (tvOS)
-- Fire TV (Fire OS)
-- Fire TV (Vega OS)
 - Web browsers
 
 ## Tech Stack
@@ -58,7 +56,6 @@ m3u-tv/
 - Yarn v4.5.0
 - For Android TV: Android Studio with TV emulator
 - For Apple TV: Xcode with tvOS simulator
-- For Fire TV: Fire TV device or emulator
 
 ### Installation
 
@@ -93,12 +90,6 @@ corepack yarn dev:android
 
 ```bash
 corepack yarn dev:ios
-```
-
-**Fire TV Vega:**
-
-```bash
-corepack yarn dev:vega
 ```
 
 ## Configuration

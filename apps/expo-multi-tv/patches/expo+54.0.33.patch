@@ -1,0 +1,32 @@
+diff --git a/ios/AppDelegates/EXAppDelegateWrapper.h b/ios/AppDelegates/EXAppDelegateWrapper.h
+index 1234567..abcdefg 100644
+--- a/ios/AppDelegates/EXAppDelegateWrapper.h
++++ b/ios/AppDelegates/EXAppDelegateWrapper.h
+@@ -11,7 +11,11 @@ NS_ASSUME_NONNULL_BEGIN
+ @end
+
+ __deprecated_msg("EXAppDelegateWrapper is deprecated. Migrate your AppDelegate to Swift and use ExpoAppDelegate instead. EXAppDelegateWrapper will be removed in SDK 55.")
++#if TARGET_OS_TV
++@interface EXAppDelegateWrapper : NSObject <UIApplicationDelegate, UISceneDelegate>
++#else
+ @interface EXAppDelegateWrapper : NSObject <UIApplicationDelegate, UISceneDelegate, RCTReactNativeFactoryDelegate>
++#endif
+
+ @property (nonatomic, strong, readonly) EXReactDelegateWrapper *reactDelegate;
+
+diff --git a/ios/AppDelegates/EXAppDelegateWrapper.mm b/ios/AppDelegates/EXAppDelegateWrapper.mm
+index 1234567..abcdefg 100644
+--- a/ios/AppDelegates/EXAppDelegateWrapper.mm
++++ b/ios/AppDelegates/EXAppDelegateWrapper.mm
+@@ -74,7 +74,11 @@
+
+ - (NSDictionary<NSString *, Class<RCTComponentViewProtocol>> *)thirdPartyFabricComponents
+ {
++#if TARGET_OS_TV
++  return @{};
++#else
+   return self.dependencyProvider.thirdPartyFabricComponents;
++#endif
+ }
+
+ #pragma mark - RCTHostDelegate
