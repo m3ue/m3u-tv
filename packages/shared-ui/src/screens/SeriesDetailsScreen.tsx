@@ -405,6 +405,6 @@ const styles = StyleSheet.create({
     left: scaledPixels(safeZones.actionSafe.horizontal),
   },
   backButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // Don't set backgroundColor here - let FocusablePressable handle focus states
   },
 });
