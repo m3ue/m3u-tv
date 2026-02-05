@@ -123,8 +123,8 @@ export default function MovieDetailsScreen() {
                                     </Text>
                                 )}
 
-                                <View style={styles.actionsRow}>
-                                    <SpatialNavigationNode>
+                                <SpatialNavigationNode direction="horizontal">
+                                    <View style={styles.actionsRow}>
                                         <DefaultFocus>
                                             <FocusablePressable
                                                 text="Play Movie"
@@ -132,16 +132,14 @@ export default function MovieDetailsScreen() {
                                                 style={styles.playButton}
                                             />
                                         </DefaultFocus>
-                                    </SpatialNavigationNode>
 
-                                    <SpatialNavigationNode>
                                         <FocusablePressable
                                             text="Back"
                                             onSelect={() => navigation.goBack()}
                                             style={styles.backButton}
                                         />
-                                    </SpatialNavigationNode>
-                                </View>
+                                    </View>
+                                </SpatialNavigationNode>
 
                                 {(movieDirector || movieCast) && (
                                     <View style={styles.extraInfo}>

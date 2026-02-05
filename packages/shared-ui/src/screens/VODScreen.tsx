@@ -165,7 +165,7 @@ export default function VODScreen() {
 
         {/* Category Tabs */}
         <View style={styles.categoriesContainer}>
-          <SpatialNavigationNode>
+          <SpatialNavigationNode direction="horizontal">
             <DefaultFocus>
               <SpatialNavigationVirtualizedList
                 data={allCategories}
@@ -185,7 +185,7 @@ export default function VODScreen() {
         ) : movies.length > 0 ? (
           <SpatialNavigationScrollView offsetFromStart={scaledPixels(20)} style={styles.scrollView}>
             <View style={styles.section}>
-              <SpatialNavigationNode>
+              <SpatialNavigationNode direction="horizontal">
                 <View style={styles.listWrapper}>
                   <SpatialNavigationVirtualizedList
                     data={movies}

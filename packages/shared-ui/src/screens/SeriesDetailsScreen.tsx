@@ -72,12 +72,14 @@ const EpisodeDetailModal = ({
   episode,
   onClose,
   onPlay,
-  seriesName
+  seriesName,
+  seriesBackdrop
 }: {
   episode: XtreamEpisode | null;
   onClose: () => void;
   onPlay: (episode: XtreamEpisode) => void;
   seriesName: string;
+  seriesBackdrop: string | undefined;
 }) => {
   if (!episode) return null;
 
@@ -91,64 +93,62 @@ const EpisodeDetailModal = ({
     return episode.info?.duration;
   }, [episode.info]);
 
+  const episodeBackdrop = episode.info?.movie_image || seriesBackdrop;
+
   return (
-    <Modal visible={!!episode} transparent animationType="fade" onRequestClose={onClose}>
-      <SpatialNavigationRoot isActive={true}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Image
-              source={{ uri: episode.info?.movie_image }}
-              style={styles.modalImage}
-              resizeMode="cover"
-            />
-            <PlatformLinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)', colors.background]}
-              style={styles.modalGradient}
-            />
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        {episodeBackdrop && (
+          <Image
+            source={{ uri: episodeBackdrop }}
+            style={styles.modalImage}
+            resizeMode="cover"
+          />
+        )}
+        <PlatformLinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)', colors.background]}
+          style={styles.modalGradient}
+        />
 
-            <View style={styles.modalTextContent}>
-              <Text style={styles.modalEpisodeLabel}>
-                Season {episode.season}, Episode {episode.episode_num}
-              </Text>
-              <Text style={styles.modalTitle}>{episode.title}</Text>
+        <View style={styles.modalTextContent}>
+          <Text style={styles.modalEpisodeLabel}>
+            Season {episode.season}, Episode {episode.episode_num}
+          </Text>
+          <Text style={styles.modalTitle}>{episode.title}</Text>
 
-              <View style={styles.modalMetaRow}>
-                {episode.info?.rating && (
-                  <Text style={styles.modalMetaText}>★ {parseFloat(String(episode.info.rating)).toFixed(1)}</Text>
-                )}
-                {formattedDuration && <Text style={styles.modalMetaText}>{formattedDuration}</Text>}
-                {episode.info?.release_date && <Text style={styles.modalMetaText}>{episode.info.release_date}</Text>}
-              </View>
-
-              {episode.info?.plot && (
-                <Text style={styles.modalPlot} numberOfLines={6}>
-                  {episode.info.plot}
-                </Text>
-              )}
-
-              <View style={styles.modalActions}>
-                <SpatialNavigationNode>
-                  <DefaultFocus>
-                    <FocusablePressable
-                      text="Play Episode"
-                      onSelect={() => onPlay(episode)}
-                      style={styles.modalPlayButton}
-                    />
-                  </DefaultFocus>
-                </SpatialNavigationNode>
-                <SpatialNavigationNode>
-                  <FocusablePressable
-                    text="Close"
-                    onSelect={onClose}
-                    style={styles.modalCloseButton}
-                  />
-                </SpatialNavigationNode>
-              </View>
-            </View>
+          <View style={styles.modalMetaRow}>
+            {episode.info?.rating && (
+              <Text style={styles.modalMetaText}>★ {parseFloat(String(episode.info.rating)).toFixed(1)}</Text>
+            )}
+            {formattedDuration && <Text style={styles.modalMetaText}>{formattedDuration}</Text>}
+            {episode.info?.release_date && <Text style={styles.modalMetaText}>{episode.info.release_date}</Text>}
           </View>
+
+          {episode.info?.plot && (
+            <Text style={styles.modalPlot} numberOfLines={6}>
+              {episode.info.plot}
+            </Text>
+          )}
+
+          <SpatialNavigationNode direction="horizontal">
+            <View style={styles.modalActions}>
+              <DefaultFocus>
+                <FocusablePressable
+                  text="Play Episode"
+                  onSelect={() => onPlay(episode)}
+                  style={styles.modalPlayButton}
+                />
+              </DefaultFocus>
+              <FocusablePressable
+                text="Close"
+                onSelect={onClose}
+                style={styles.modalCloseButton}
+              />
+            </View>
+          </SpatialNavigationNode>
         </View>
-      </SpatialNavigationRoot>
-    </Modal>
+      </View>
+    </View>
   );
 };
 
@@ -247,141 +247,158 @@ export default function SeriesDetailsScreen() {
   }
 
   return (
-    <SpatialNavigationRoot isActive={!selectedEpisode}>
-      <View style={styles.container}>
-        {/* Header with backdrop */}
-        <View style={styles.header}>
-          {seriesBackdrop && <Image source={{ uri: seriesBackdrop }} style={styles.backdrop} resizeMode="cover" />}
-          <PlatformLinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)', colors.background]}
-            style={styles.gradient}
-          />
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>{name}</Text>
-            <View style={styles.metaRow}>
-              {seriesYear && <Text style={styles.metaText}>{seriesYear}</Text>}
-              {seriesGenre && <Text style={styles.metaText}>{seriesGenre}</Text>}
-              {seriesRating && seriesRating > 0 && <Text style={styles.metaText}>★ {seriesRating.toFixed(1)}</Text>}
-              {seriesInfo?.seasons && (
-                <Text style={styles.metaText}>
-                  {seriesInfo.seasons.length} Season{seriesInfo.seasons.length > 1 ? 's' : ''}
+    <View style={styles.container}>
+      {/* Full screen backdrop */}
+      {seriesBackdrop && <Image source={{ uri: seriesBackdrop }} style={styles.fullscreenBackdrop} resizeMode="cover" />}
+      <PlatformLinearGradient
+        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', colors.background]}
+        style={styles.fullscreenGradient}
+      />
+
+      <SpatialNavigationRoot isActive={!selectedEpisode}>
+        <View style={styles.contentScrollWrapper}>
+          {/* Header content */}
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <Text style={styles.title}>{name}</Text>
+              <View style={styles.metaRow}>
+                {seriesYear && <Text style={styles.metaText}>{seriesYear}</Text>}
+                {seriesGenre && <Text style={styles.metaText}>{seriesGenre}</Text>}
+                {seriesRating && seriesRating > 0 && <Text style={styles.metaText}>★ {seriesRating.toFixed(1)}</Text>}
+                {seriesInfo?.seasons && (
+                  <Text style={styles.metaText}>
+                    {seriesInfo.seasons.length} Season{seriesInfo.seasons.length > 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+              {seriesPlot && (
+                <Text style={styles.plot} numberOfLines={3}>
+                  {seriesPlot}
                 </Text>
               )}
+
+              {(seriesDirector || seriesCast) && (
+                <View style={styles.extraInfo}>
+                  {seriesDirector && (
+                    <Text style={styles.extraInfoText}>
+                      <Text style={styles.extraInfoLabel}>Director: </Text>
+                      {seriesDirector}
+                    </Text>
+                  )}
+                  {seriesCast && (
+                    <Text style={styles.extraInfoText} numberOfLines={1}>
+                      <Text style={styles.extraInfoLabel}>Cast: </Text>
+                      {seriesCast}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
-            {seriesPlot && (
-              <Text style={styles.plot} numberOfLines={3}>
-                {seriesPlot}
-              </Text>
-            )}
-
-            {(seriesDirector || seriesCast) && (
-              <View style={styles.extraInfo}>
-                {seriesDirector && (
-                  <Text style={styles.extraInfoText}>
-                    <Text style={styles.extraInfoLabel}>Director: </Text>
-                    {seriesDirector}
-                  </Text>
-                )}
-                {seriesCast && (
-                  <Text style={styles.extraInfoText} numberOfLines={1}>
-                    <Text style={styles.extraInfoLabel}>Cast: </Text>
-                    {seriesCast}
-                  </Text>
-                )}
-              </View>
-            )}
           </View>
-        </View>
 
-        {/* Episode Modal */}
-        <EpisodeDetailModal
-          episode={selectedEpisode}
-          onClose={() => setSelectedEpisode(null)}
-          onPlay={handleEpisodePlay}
-          seriesName={name}
-        />
-
-        {/* Back Button - at top of navigation tree */}
-        <View style={styles.backButtonContainer}>
-          <SpatialNavigationNode>
-            <DefaultFocus>
-              <FocusablePressable text="Back" onSelect={() => navigation.goBack()} style={styles.backButton} />
-            </DefaultFocus>
-          </SpatialNavigationNode>
-        </View>
-
-        {/* Season Tabs */}
-        {seriesInfo?.seasons && seriesInfo.seasons.length > 0 && (
-          <View style={styles.seasonsContainer}>
+          {/* Back Button - at top of navigation tree */}
+          <View style={styles.backButtonContainer}>
             <SpatialNavigationNode>
-              <View style={styles.seasonsListWrapper}>
-                <SpatialNavigationVirtualizedList
-                  data={seriesInfo.seasons}
-                  orientation="horizontal"
-                  renderItem={renderSeasonItem}
-                  itemSize={scaledPixels(160)}
-                  numberOfRenderedItems={8}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </View>
+              <DefaultFocus>
+                <FocusablePressable text="Back" onSelect={() => navigation.goBack()} style={styles.backButton} />
+              </DefaultFocus>
             </SpatialNavigationNode>
           </View>
-        )}
 
-        {/* Episodes */}
-        <View style={styles.episodesContainer}>
-          <Text style={styles.episodesTitle}>
-            {currentEpisodes.length} Episode{currentEpisodes.length !== 1 ? 's' : ''}
-          </Text>
-          {currentEpisodes.length > 0 ? (
-            <SpatialNavigationScrollView style={styles.episodesList}>
-              <View style={styles.section}>
-                <SpatialNavigationNode>
-                  <View style={styles.episodesListWrapper}>
-                    <SpatialNavigationVirtualizedList
-                      data={currentEpisodes}
-                      orientation="horizontal"
-                      renderItem={renderEpisodeItem}
-                      itemSize={scaledPixels(320)}
-                      numberOfRenderedItems={6}
-                      numberOfItemsVisibleOnScreen={4}
-                    />
-                  </View>
-                </SpatialNavigationNode>
-              </View>
-            </SpatialNavigationScrollView>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No episodes available</Text>
+          {/* Season Tabs */}
+          {seriesInfo?.seasons && seriesInfo.seasons.length > 0 && (
+            <View style={styles.seasonsContainer}>
+              <SpatialNavigationNode direction="horizontal">
+                <View style={styles.seasonsListWrapper}>
+                  <SpatialNavigationVirtualizedList
+                    data={seriesInfo.seasons}
+                    orientation="horizontal"
+                    renderItem={renderSeasonItem}
+                    itemSize={scaledPixels(160)}
+                    numberOfRenderedItems={8}
+                    numberOfItemsVisibleOnScreen={6}
+                  />
+                </View>
+              </SpatialNavigationNode>
             </View>
           )}
+
+          {/* Episodes */}
+          <View style={styles.episodesContainer}>
+            <Text style={styles.episodesTitle}>
+              {currentEpisodes.length} Episode{currentEpisodes.length !== 1 ? 's' : ''}
+            </Text>
+            {currentEpisodes.length > 0 ? (
+              <SpatialNavigationScrollView style={styles.episodesList}>
+                <View style={styles.section}>
+                  <SpatialNavigationNode direction="horizontal">
+                    <View style={styles.episodesListWrapper}>
+                      <SpatialNavigationVirtualizedList
+                        data={currentEpisodes}
+                        orientation="horizontal"
+                        renderItem={renderEpisodeItem}
+                        itemSize={scaledPixels(320)}
+                        numberOfRenderedItems={6}
+                        numberOfItemsVisibleOnScreen={4}
+                      />
+                    </View>
+                  </SpatialNavigationNode>
+                </View>
+              </SpatialNavigationScrollView>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No episodes available</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    </SpatialNavigationRoot>
+      </SpatialNavigationRoot>
+
+      {/* Episode Overlay (instead of Modal) */}
+      {selectedEpisode && (
+        <SpatialNavigationRoot isActive={true}>
+          <EpisodeDetailModal
+            episode={selectedEpisode}
+            onClose={() => setSelectedEpisode(null)}
+            onPlay={handleEpisodePlay}
+            seriesName={name}
+            seriesBackdrop={seriesBackdrop}
+          />
+        </SpatialNavigationRoot>
+      )}
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  fullscreenBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.4,
+  },
+  fullscreenGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  contentScrollWrapper: {
+    flex: 1,
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
   header: {
-    height: scaledPixels(450),
-    position: 'relative',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.5,
-  },
-  gradient: {
-    ...StyleSheet.absoluteFillObject,
+    height: scaledPixels(400),
+    justifyContent: 'flex-end',
+    paddingBottom: scaledPixels(40),
   },
   headerContent: {
-    position: 'absolute',
-    bottom: scaledPixels(40),
-    left: scaledPixels(safeZones.actionSafe.horizontal),
-    right: scaledPixels(safeZones.actionSafe.horizontal),
+    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   title: {
     color: colors.text,
