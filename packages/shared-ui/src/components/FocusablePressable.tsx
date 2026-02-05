@@ -22,8 +22,16 @@ const FocusablePressable = React.memo(({
   style,
   ...props
 }: CustomPressableProps) => {
+  const handleSelect = React.useCallback(() => {
+    try {
+      onSelect();
+    } catch (err) {
+      console.error('[FocusablePressable] onSelect threw:', err);
+    }
+  }, [text, onSelect]);
+
   return (
-    <SpatialNavigationFocusableView onSelect={onSelect}>
+    <SpatialNavigationFocusableView onSelect={handleSelect}>
       {({ isFocused }) => (
         <Pressable
           {...props}
@@ -32,7 +40,7 @@ const FocusablePressable = React.memo(({
             isFocused && styles.watchButtonFocused,
             style,
           ]}
-          onPress={onSelect}
+          onPress={handleSelect}
         >
           <Text
             style={[

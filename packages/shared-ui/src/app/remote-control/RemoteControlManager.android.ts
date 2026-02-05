@@ -25,6 +25,8 @@ let isInitialized = false;
 class RemoteControlManager implements RemoteControlManagerInterface {
   private eventEmitter = mitt<{ keyDown: SupportedKeys }>();
   private listeners = new Set<(event: SupportedKeys) => void>();
+  // Map original listeners to safe wrapped listeners so we can remove the wrapper later
+  private listenerWrappers = new Map<(event: SupportedKeys) => void, (event: SupportedKeys) => void>();
 
   constructor() {
     this.initialize();
@@ -45,7 +47,12 @@ class RemoteControlManager implements RemoteControlManagerInterface {
     const mappedKey = KEY_CODE_MAPPING[keyEvent.keyCode];
     if (mappedKey) {
       console.log(`[Android Remote] Key: ${mappedKey}, listeners: ${this.listeners.size}`);
-      this.eventEmitter.emit('keyDown', mappedKey);
+      try {
+        this.eventEmitter.emit('keyDown', mappedKey);
+      } catch (err) {
+        // Defensive: log any unexpected error during emit so one bad listener can't break
+        console.error('[Android Remote] Error during emit:', err);
+      }
     }
   };
 
@@ -55,14 +62,34 @@ class RemoteControlManager implements RemoteControlManagerInterface {
       console.log('[Android Remote] Listener already registered, skipping');
       return listener;
     }
+
+    // Wrap the listener so any thrown error is caught and logged, preventing it from
+    // interrupting the event loop and other listeners.
+    const wrapped = (event: SupportedKeys) => {
+      try {
+        listener(event);
+      } catch (err) {
+        console.error('[Android Remote] Listener threw error:', err);
+      }
+    };
+
+    this.listenerWrappers.set(listener, wrapped);
     this.listeners.add(listener);
-    this.eventEmitter.on('keyDown', listener);
+    this.eventEmitter.on('keyDown', wrapped);
     console.log(`[Android Remote] Listener added, total: ${this.listeners.size}`);
     return listener;
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
-    this.eventEmitter.off('keyDown', listener);
+    const wrapped = this.listenerWrappers.get(listener);
+    if (wrapped) {
+      this.eventEmitter.off('keyDown', wrapped);
+      this.listenerWrappers.delete(listener);
+    } else {
+      // Fallback: try to remove the original listener in case it was registered directly
+      this.eventEmitter.off('keyDown', listener);
+    }
+
     this.listeners.delete(listener);
     console.log(`[Android Remote] Listener removed, total: ${this.listeners.size}`);
   };

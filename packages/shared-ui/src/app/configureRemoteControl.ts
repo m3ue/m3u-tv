@@ -27,8 +27,17 @@ if (!isConfigured) {
 
       const remoteControlListener = (keyEvent: SupportedKeys) => {
         const direction = mapping[keyEvent];
-        if (direction !== undefined) {
-          callback(direction);
+        try {
+          // Only forward non-null directions to SpatialNavigation. Mapping values may be
+          // `null` for keys we intentionally ignore (e.g., Back, PlayPause). Calling the
+          // callback with `null` can lead to exceptions inside SpatialNavigation and stop
+          // future input handling, so guard against that here.
+          if (direction !== undefined && direction !== null) {
+            callback(direction);
+          }
+        } catch (err) {
+          // Log and swallow errors to avoid breaking the remote control subscription
+          console.error('[ConfigureRemoteControl] Error delivering remote control event:', err);
         }
       };
 
