@@ -1,4 +1,4 @@
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Image } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useState, useEffect } from 'react';
@@ -207,10 +207,15 @@ export default function HomeScreen() {
       >
         <View style={styles.container}>
           <PlatformLinearGradient
-            colors={['#1e1b4b', '#312e81', '#1e1b4b']}
-            style={styles.welcomeGradient}
+            colors={colors.gradientBackground}
+            style={styles.backgroundGradient}
           />
           <View style={styles.welcomeContainer}>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.welcomeTitle}>Welcome to M3U TV</Text>
             <Text style={styles.welcomeSubtitle}>
               Connect to your Xtream service to start watching Live TV, Movies, and Series
@@ -250,7 +255,11 @@ export default function HomeScreen() {
           style={styles.backgroundGradient}
         />
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>M3U TV</Text>
+          <Image
+            source={require('../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.headerSubtitle}>Your entertainment, anywhere</Text>
         </View>
 
@@ -362,6 +371,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
     paddingTop: scaledPixels(safeZones.actionSafe.vertical),
     paddingBottom: scaledPixels(20),
+    alignItems: 'center',
+  },
+  logo: {
+    width: scaledPixels(120),
+    height: scaledPixels(120),
+    borderRadius: scaledPixels(16),
   },
   headerTitle: {
     color: colors.text,
