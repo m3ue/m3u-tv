@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useNavigation, DrawerActions, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -20,46 +20,12 @@ import { RootStackParamList } from '../navigation/types';
 import { colors, safeZones } from '../theme';
 import LoadingIndicator from '../components/LoadingIndicator';
 import PlatformLinearGradient from '../components/PlatformLinearGradient';
+import MediaCard, { MEDIA_CARD_WIDTH, MEDIA_CARD_MARGIN } from '../components/MediaCard';
 
 type SeriesNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
-const SeriesItem = React.memo(
-  ({ item, isFocused }: { item: XtreamSeries; isFocused: boolean }) => {
-    const imageSource = useMemo(
-      () => (item.cover ? { uri: item.cover } : undefined),
-      [item.cover],
-    );
-
-    return (
-      <View style={[styles.seriesCard, isFocused && styles.seriesCardFocused]}>
-        <View style={styles.seriesPoster}>
-          {imageSource ? (
-            <Image source={imageSource} style={styles.seriesImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.seriesPlaceholder}>
-              <Text style={styles.seriesPlaceholderText}>📺</Text>
-            </View>
-          )}
-          {item.rating_5based > 0 && (
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingText}>★ {item.rating_5based.toFixed(1)}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.seriesInfo}>
-          <Text style={styles.seriesTitle} numberOfLines={2}>
-            {item.name}
-          </Text>
-          {(item.release_date || item.releaseDate) && (
-            <Text style={styles.seriesYear}>
-              {item.release_date || item.releaseDate}
-            </Text>
-          )}
-        </View>
-      </View>
-    );
-  },
-);
+// Calculate item size for virtualized list (card width + margin)
+const ITEM_SIZE = MEDIA_CARD_WIDTH + MEDIA_CARD_MARGIN;
 
 const CategoryTab = React.memo(
   ({
@@ -178,7 +144,16 @@ export default function SeriesScreen() {
   const renderSeriesItem = useCallback(
     ({ item }: { item: XtreamSeries }) => (
       <SpatialNavigationFocusableView onSelect={() => handleSeriesSelect(item)}>
-        {({ isFocused }) => <SeriesItem item={item} isFocused={isFocused} />}
+        {({ isFocused }) => (
+          <MediaCard
+            name={item.name}
+            image={item.cover}
+            isFocused={isFocused}
+            type="series"
+            rating={item.rating_5based}
+            year={item.release_date || item.releaseDate}
+          />
+        )}
       </SpatialNavigationFocusableView>
     ),
     [handleSeriesSelect],
@@ -237,23 +212,25 @@ export default function SeriesScreen() {
         {isLoading ? (
           <LoadingIndicator />
         ) : seriesList.length > 0 ? (
-          <SpatialNavigationScrollView
-            offsetFromStart={scaledPixels(20)}
-            style={styles.seriesContainer}
-          >
-            <SpatialNavigationNode>
-              <View style={styles.seriesGrid}>
-                <SpatialNavigationVirtualizedList
-                  data={seriesList}
-                  orientation="horizontal"
-                  renderItem={renderSeriesItem}
-                  itemSize={scaledPixels(200)}
-                  numberOfRenderedItems={10}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </View>
-            </SpatialNavigationNode>
-          </SpatialNavigationScrollView>
+          <View style={styles.contentArea}>
+            <SpatialNavigationScrollView
+              offsetFromStart={scaledPixels(20)}
+              style={styles.scrollView}
+            >
+              <SpatialNavigationNode>
+                <View style={styles.listWrapper}>
+                  <SpatialNavigationVirtualizedList
+                    data={seriesList}
+                    orientation="horizontal"
+                    renderItem={renderSeriesItem}
+                    itemSize={ITEM_SIZE}
+                    numberOfRenderedItems={10}
+                    numberOfItemsVisibleOnScreen={5}
+                  />
+                </View>
+              </SpatialNavigationNode>
+            </SpatialNavigationScrollView>
+          </View>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No series found</Text>
@@ -316,78 +293,16 @@ const styles = StyleSheet.create({
   categoryTabTextSelected: {
     color: colors.text,
   },
-  seriesContainer: {
+  contentArea: {
     flex: 1,
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
-  seriesGrid: {
-    height: scaledPixels(400),
-    paddingVertical: scaledPixels(20),
+  scrollView: {
+    flex: 1,
   },
-  seriesCard: {
-    width: scaledPixels(180),
-    marginRight: scaledPixels(20),
-    borderRadius: scaledPixels(16),
-    overflow: 'hidden',
-    borderWidth: scaledPixels(2),
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  seriesCardFocused: {
-    borderColor: colors.focusBorder,
-    transform: [{ scale: 1.05 }],
-    shadowColor: colors.focusGlow,
-    shadowOffset: { width: 0, height: scaledPixels(4) },
-    shadowOpacity: 0.3,
-    shadowRadius: scaledPixels(12),
-    elevation: 8,
-  },
-  seriesPoster: {
-    width: '100%',
-    height: scaledPixels(260),
-    backgroundColor: colors.cardElevated,
-    position: 'relative',
-  },
-  seriesImage: {
-    width: '100%',
-    height: '100%',
-  },
-  seriesPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.cardElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  seriesPlaceholderText: {
-    fontSize: scaledPixels(48),
-  },
-  ratingBadge: {
-    position: 'absolute',
-    top: scaledPixels(8),
-    right: scaledPixels(8),
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: scaledPixels(8),
-    paddingVertical: scaledPixels(4),
-    borderRadius: scaledPixels(4),
-  },
-  ratingText: {
-    color: '#fbbf24',
-    fontSize: scaledPixels(16),
-    fontWeight: 'bold',
-  },
-  seriesInfo: {
-    padding: scaledPixels(12),
-  },
-  seriesTitle: {
-    color: colors.text,
-    fontSize: scaledPixels(18),
-    fontWeight: '500',
-  },
-  seriesYear: {
-    color: colors.textSecondary,
-    fontSize: scaledPixels(14),
-    marginTop: scaledPixels(4),
+  listWrapper: {
+    height: scaledPixels(380),
+    paddingVertical: scaledPixels(10),
   },
   notConfigured: {
     flex: 1,

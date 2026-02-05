@@ -1,7 +1,7 @@
-import { StyleSheet, View, Image, Text } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { DrawerActions, useIsFocused } from '@react-navigation/native';
 import { useMenuContext } from '../components/MenuContext';
 import { useXtream } from '../context/XtreamContext';
@@ -17,49 +17,17 @@ import {
 } from 'react-tv-space-navigation';
 import { Direction } from '@bam.tech/lrud';
 import { scaledPixels } from '../hooks/useScale';
-import { RootStackParamList, DrawerParamList } from '../navigation/types';
+import { RootStackParamList } from '../navigation/types';
 import { colors, safeZones } from '../theme';
 import PlatformLinearGradient from '../components/PlatformLinearGradient';
 import LoadingIndicator from '../components/LoadingIndicator';
 import FocusablePressable from '../components/FocusablePressable';
+import MediaCard, { MEDIA_CARD_WIDTH, MEDIA_CARD_MARGIN } from '../components/MediaCard';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
-const ContentCard = React.memo(
-  ({
-    item,
-    isFocused,
-    type,
-  }: {
-    item: { name: string; icon?: string };
-    isFocused: boolean;
-    type: 'live' | 'vod' | 'series';
-  }) => {
-    const imageSource = useMemo(
-      () => (item.icon ? { uri: item.icon } : undefined),
-      [item.icon],
-    );
-
-    return (
-      <View style={[styles.contentCard, isFocused && styles.contentCardFocused]}>
-        {imageSource ? (
-          <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.cardPlaceholder}>
-            <Text style={styles.cardPlaceholderText}>
-              {type === 'live' ? '📺' : type === 'vod' ? '🎬' : '📺'}
-            </Text>
-          </View>
-        )}
-        <View style={styles.cardOverlay}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {item.name}
-          </Text>
-        </View>
-      </View>
-    );
-  },
-);
+// Calculate item size for virtualized list (card width + margin)
+const ITEM_SIZE = MEDIA_CARD_WIDTH + MEDIA_CARD_MARGIN;
 
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
@@ -177,8 +145,9 @@ export default function HomeScreen() {
     ({ item }: { item: XtreamLiveStream }) => (
       <SpatialNavigationFocusableView onSelect={() => handleChannelSelect(item)}>
         {({ isFocused }) => (
-          <ContentCard
-            item={{ name: item.name, icon: item.stream_icon }}
+          <MediaCard
+            name={item.name}
+            image={item.stream_icon}
             isFocused={isFocused}
             type="live"
           />
@@ -192,10 +161,12 @@ export default function HomeScreen() {
     ({ item }: { item: XtreamVodStream }) => (
       <SpatialNavigationFocusableView onSelect={() => handleMovieSelect(item)}>
         {({ isFocused }) => (
-          <ContentCard
-            item={{ name: item.name, icon: item.stream_icon }}
+          <MediaCard
+            name={item.name}
+            image={item.stream_icon}
             isFocused={isFocused}
             type="vod"
+            rating={item.rating_5based}
           />
         )}
       </SpatialNavigationFocusableView>
@@ -207,10 +178,13 @@ export default function HomeScreen() {
     ({ item }: { item: XtreamSeries }) => (
       <SpatialNavigationFocusableView onSelect={() => handleSeriesSelect(item)}>
         {({ isFocused }) => (
-          <ContentCard
-            item={{ name: item.name, icon: item.cover }}
+          <MediaCard
+            name={item.name}
+            image={item.cover}
             isFocused={isFocused}
             type="series"
+            rating={item.rating_5based}
+            year={item.release_date || item.releaseDate}
           />
         )}
       </SpatialNavigationFocusableView>
@@ -282,18 +256,20 @@ export default function HomeScreen() {
           {liveChannels.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Live TV</Text>
-              <SpatialNavigationNode>
-                <DefaultFocus>
-                  <SpatialNavigationVirtualizedList
-                    data={liveChannels}
-                    orientation="horizontal"
-                    renderItem={renderLiveItem}
-                    itemSize={scaledPixels(240)}
-                    numberOfRenderedItems={8}
-                    numberOfItemsVisibleOnScreen={5}
-                  />
-                </DefaultFocus>
-              </SpatialNavigationNode>
+              <View style={styles.listWrapper}>
+                <SpatialNavigationNode>
+                  <DefaultFocus>
+                    <SpatialNavigationVirtualizedList
+                      data={liveChannels}
+                      orientation="horizontal"
+                      renderItem={renderLiveItem}
+                      itemSize={ITEM_SIZE}
+                      numberOfRenderedItems={8}
+                      numberOfItemsVisibleOnScreen={5}
+                    />
+                  </DefaultFocus>
+                </SpatialNavigationNode>
+              </View>
             </View>
           )}
 
@@ -301,16 +277,18 @@ export default function HomeScreen() {
           {movies.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Movies</Text>
-              <SpatialNavigationNode>
-                <SpatialNavigationVirtualizedList
-                  data={movies}
-                  orientation="horizontal"
-                  renderItem={renderMovieItem}
-                  itemSize={scaledPixels(200)}
-                  numberOfRenderedItems={8}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </SpatialNavigationNode>
+              <View style={styles.listWrapper}>
+                <SpatialNavigationNode>
+                  <SpatialNavigationVirtualizedList
+                    data={movies}
+                    orientation="horizontal"
+                    renderItem={renderMovieItem}
+                    itemSize={ITEM_SIZE}
+                    numberOfRenderedItems={8}
+                    numberOfItemsVisibleOnScreen={5}
+                  />
+                </SpatialNavigationNode>
+              </View>
             </View>
           )}
 
@@ -318,16 +296,18 @@ export default function HomeScreen() {
           {series.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>TV Series</Text>
-              <SpatialNavigationNode>
-                <SpatialNavigationVirtualizedList
-                  data={series}
-                  orientation="horizontal"
-                  renderItem={renderSeriesItem}
-                  itemSize={scaledPixels(200)}
-                  numberOfRenderedItems={8}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </SpatialNavigationNode>
+              <View style={styles.listWrapper}>
+                <SpatialNavigationNode>
+                  <SpatialNavigationVirtualizedList
+                    data={series}
+                    orientation="horizontal"
+                    renderItem={renderSeriesItem}
+                    itemSize={ITEM_SIZE}
+                    numberOfRenderedItems={8}
+                    numberOfItemsVisibleOnScreen={5}
+                  />
+                </SpatialNavigationNode>
+              </View>
             </View>
           )}
         </SpatialNavigationScrollView>
@@ -393,8 +373,8 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
-    paddingVertical: scaledPixels(24),
-    height: scaledPixels(400),
+    paddingTop: scaledPixels(16),
+    paddingBottom: scaledPixels(24),
   },
   sectionTitle: {
     color: colors.text,
@@ -402,50 +382,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: scaledPixels(16),
   },
-  contentCard: {
-    width: scaledPixels(220),
-    height: scaledPixels(280),
-    marginRight: scaledPixels(16),
-    borderRadius: scaledPixels(12),
-    overflow: 'hidden',
-    backgroundColor: colors.card,
-    borderWidth: scaledPixels(3),
-    borderColor: 'transparent',
-  },
-  contentCardFocused: {
-    borderColor: colors.focusBorder,
-    transform: [{ scale: 1.05 }],
-    shadowColor: colors.focusGlow,
-    shadowOffset: { width: 0, height: scaledPixels(4) },
-    shadowOpacity: 0.3,
-    shadowRadius: scaledPixels(12),
-    elevation: 8,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cardElevated,
-  },
-  cardPlaceholderText: {
-    fontSize: scaledPixels(48),
-  },
-  cardOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.scrimDark,
-    padding: scaledPixels(12),
-  },
-  cardTitle: {
-    color: colors.text,
-    fontSize: scaledPixels(18),
-    fontWeight: '600',
+  listWrapper: {
+    height: scaledPixels(380),
+    paddingVertical: scaledPixels(10),
   },
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useNavigation, DrawerActions, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -20,39 +20,12 @@ import { RootStackParamList } from '../navigation/types';
 import { colors, safeZones } from '../theme';
 import LoadingIndicator from '../components/LoadingIndicator';
 import PlatformLinearGradient from '../components/PlatformLinearGradient';
+import MediaCard, { MEDIA_CARD_WIDTH, MEDIA_CARD_MARGIN } from '../components/MediaCard';
 
 type VODNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
-const MovieItem = React.memo(
-  ({ item, isFocused }: { item: XtreamVodStream; isFocused: boolean }) => {
-    const imageSource = useMemo(
-      () => (item.stream_icon ? { uri: item.stream_icon } : undefined),
-      [item.stream_icon],
-    );
-
-    return (
-      <View style={[styles.movieCard, isFocused && styles.movieCardFocused]}>
-        <View style={styles.moviePoster}>
-          {imageSource ? (
-            <Image source={imageSource} style={styles.movieImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.moviePlaceholder}>
-              <Text style={styles.moviePlaceholderText}>🎬</Text>
-            </View>
-          )}
-          {item.rating_5based > 0 && (
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingText}>★ {item.rating_5based.toFixed(1)}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.movieTitle} numberOfLines={2}>
-          {item.name}
-        </Text>
-      </View>
-    );
-  },
-);
+// Calculate item size for virtualized list (card width + margin)
+const ITEM_SIZE = MEDIA_CARD_WIDTH + MEDIA_CARD_MARGIN;
 
 const CategoryTab = React.memo(
   ({
@@ -170,7 +143,15 @@ export default function VODScreen() {
   const renderMovieItem = useCallback(
     ({ item }: { item: XtreamVodStream }) => (
       <SpatialNavigationFocusableView onSelect={() => handleMovieSelect(item)}>
-        {({ isFocused }) => <MovieItem item={item} isFocused={isFocused} />}
+        {({ isFocused }) => (
+          <MediaCard
+            name={item.name}
+            image={item.stream_icon}
+            isFocused={isFocused}
+            type="vod"
+            rating={item.rating_5based}
+          />
+        )}
       </SpatialNavigationFocusableView>
     ),
     [handleMovieSelect],
@@ -229,23 +210,25 @@ export default function VODScreen() {
         {isLoading ? (
           <LoadingIndicator />
         ) : movies.length > 0 ? (
-          <SpatialNavigationScrollView
-            offsetFromStart={scaledPixels(20)}
-            style={styles.moviesContainer}
-          >
-            <SpatialNavigationNode>
-              <View style={styles.moviesGrid}>
-                <SpatialNavigationVirtualizedList
-                  data={movies}
-                  orientation="horizontal"
-                  renderItem={renderMovieItem}
-                  itemSize={scaledPixels(200)}
-                  numberOfRenderedItems={10}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </View>
-            </SpatialNavigationNode>
-          </SpatialNavigationScrollView>
+          <View style={styles.contentArea}>
+            <SpatialNavigationScrollView
+              offsetFromStart={scaledPixels(20)}
+              style={styles.scrollView}
+            >
+              <SpatialNavigationNode>
+                <View style={styles.listWrapper}>
+                  <SpatialNavigationVirtualizedList
+                    data={movies}
+                    orientation="horizontal"
+                    renderItem={renderMovieItem}
+                    itemSize={ITEM_SIZE}
+                    numberOfRenderedItems={10}
+                    numberOfItemsVisibleOnScreen={5}
+                  />
+                </View>
+              </SpatialNavigationNode>
+            </SpatialNavigationScrollView>
+          </View>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No movies found</Text>
@@ -308,72 +291,16 @@ const styles = StyleSheet.create({
   categoryTabTextSelected: {
     color: colors.text,
   },
-  moviesContainer: {
+  contentArea: {
     flex: 1,
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
-  moviesGrid: {
+  scrollView: {
+    flex: 1,
+  },
+  listWrapper: {
     height: scaledPixels(380),
-    paddingVertical: scaledPixels(20),
-  },
-  movieCard: {
-    width: scaledPixels(180),
-    marginRight: scaledPixels(20),
-    borderRadius: scaledPixels(16),
-    overflow: 'hidden',
-    borderWidth: scaledPixels(2),
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  movieCardFocused: {
-    borderColor: colors.focusBorder,
-    transform: [{ scale: 1.05 }],
-    shadowColor: colors.focusGlow,
-    shadowOffset: { width: 0, height: scaledPixels(4) },
-    shadowOpacity: 0.3,
-    shadowRadius: scaledPixels(12),
-    elevation: 8,
-  },
-  moviePoster: {
-    width: '100%',
-    height: scaledPixels(260),
-    backgroundColor: colors.cardElevated,
-    position: 'relative',
-  },
-  movieImage: {
-    width: '100%',
-    height: '100%',
-  },
-  moviePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.cardElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moviePlaceholderText: {
-    fontSize: scaledPixels(48),
-  },
-  ratingBadge: {
-    position: 'absolute',
-    top: scaledPixels(8),
-    right: scaledPixels(8),
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: scaledPixels(8),
-    paddingVertical: scaledPixels(4),
-    borderRadius: scaledPixels(4),
-  },
-  ratingText: {
-    color: '#fbbf24',
-    fontSize: scaledPixels(16),
-    fontWeight: 'bold',
-  },
-  movieTitle: {
-    color: colors.text,
-    fontSize: scaledPixels(18),
-    fontWeight: '500',
-    padding: scaledPixels(12),
-    backgroundColor: colors.card,
+    paddingVertical: scaledPixels(10),
   },
   notConfigured: {
     flex: 1,
