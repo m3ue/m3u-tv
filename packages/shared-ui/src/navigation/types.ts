@@ -30,6 +30,14 @@ export type RootStackParamList = {
     name: string;
     icon: string;
     extension: string;
+    plot?: string;
+    rating?: number;
+    year?: string;
+    genre?: string;
+    director?: string;
+    cast?: string;
+    duration?: string;
+    backdrop?: string;
   };
   SeriesDetails: {
     seriesId: number;
@@ -38,6 +46,10 @@ export type RootStackParamList = {
     plot?: string;
     rating?: number;
     year?: string;
+    genre?: string;
+    backdrop?: string;
+    cast?: string;
+    director?: string;
   };
   EpisodePlayer: {
     episodeId: string;

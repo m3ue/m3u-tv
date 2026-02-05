@@ -99,12 +99,12 @@ export default function VODScreen() {
 
   const handleMovieSelect = useCallback(
     (movie: XtreamVodStream) => {
-      const streamUrl = xtreamService.getVodStreamUrl(movie.stream_id, movie.container_extension);
-      navigation.navigate('Player', {
-        movie: streamUrl,
-        headerImage: movie.stream_icon || '',
-        title: movie.name,
-        isLive: false,
+      navigation.navigate('VodDetails', {
+        streamId: movie.stream_id,
+        name: movie.name,
+        icon: movie.stream_icon,
+        extension: movie.container_extension,
+        rating: movie.rating_5based,
       });
     },
     [navigation],

@@ -4,6 +4,7 @@ import DrawerNavigator from './DrawerNavigator';
 import DetailsScreen from '../screens/DetailsScreen';
 import PlayerScreen from '../screens/PlayerScreen';
 import SeriesDetailsScreen from '../screens/SeriesDetailsScreen';
+import MovieDetailsScreen from '../screens/MovieDetailsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -18,6 +19,7 @@ export default function RootNavigator() {
       <Stack.Screen name="Details" component={DetailsScreen} />
       <Stack.Screen name="Player" component={PlayerScreen} />
       <Stack.Screen name="SeriesDetails" component={SeriesDetailsScreen} />
+      <Stack.Screen name="VodDetails" component={MovieDetailsScreen} />
     </Stack.Navigator>
   );
 }

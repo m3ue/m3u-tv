@@ -19,6 +19,7 @@ export { default as LiveTVScreen } from './screens/LiveTVScreen';
 export { default as VODScreen } from './screens/VODScreen';
 export { default as SeriesScreen } from './screens/SeriesScreen';
 export { default as SeriesDetailsScreen } from './screens/SeriesDetailsScreen';
+export { default as MovieDetailsScreen } from './screens/MovieDetailsScreen';
 export { default as SettingsScreen } from './screens/SettingsScreen';
 
 // EPG Components
