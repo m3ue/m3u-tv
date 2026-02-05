@@ -242,18 +242,20 @@ export default function SeriesDetailsScreen() {
           </Text>
           {currentEpisodes.length > 0 ? (
             <SpatialNavigationScrollView style={styles.episodesList}>
-              <SpatialNavigationNode>
-                <View style={styles.episodesListWrapper}>
-                  <SpatialNavigationVirtualizedList
-                    data={currentEpisodes}
-                    orientation="horizontal"
-                    renderItem={renderEpisodeItem}
-                    itemSize={scaledPixels(320)}
-                    numberOfRenderedItems={6}
-                    numberOfItemsVisibleOnScreen={4}
-                  />
-                </View>
-              </SpatialNavigationNode>
+              <View style={styles.section}>
+                <SpatialNavigationNode>
+                  <View style={styles.episodesListWrapper}>
+                    <SpatialNavigationVirtualizedList
+                      data={currentEpisodes}
+                      orientation="horizontal"
+                      renderItem={renderEpisodeItem}
+                      itemSize={scaledPixels(320)}
+                      numberOfRenderedItems={6}
+                      numberOfItemsVisibleOnScreen={4}
+                    />
+                  </View>
+                </SpatialNavigationNode>
+              </View>
             </SpatialNavigationScrollView>
           ) : (
             <View style={styles.emptyState}>
@@ -363,7 +365,6 @@ const styles = StyleSheet.create({
   },
   episodesContainer: {
     flex: 1,
-    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
     marginTop: scaledPixels(28),
   },
   episodesTitle: {
@@ -371,9 +372,13 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(28),
     fontWeight: 'bold',
     marginBottom: scaledPixels(20),
+    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   episodesList: {
     flex: 1,
+  },
+  section: {
+    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   episodesListWrapper: {
     height: scaledPixels(300),

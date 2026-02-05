@@ -210,11 +210,11 @@ export default function VODScreen() {
         {isLoading ? (
           <LoadingIndicator />
         ) : movies.length > 0 ? (
-          <View style={styles.contentArea}>
-            <SpatialNavigationScrollView
-              offsetFromStart={scaledPixels(20)}
-              style={styles.scrollView}
-            >
+          <SpatialNavigationScrollView
+            offsetFromStart={scaledPixels(20)}
+            style={styles.scrollView}
+          >
+            <View style={styles.section}>
               <SpatialNavigationNode>
                 <View style={styles.listWrapper}>
                   <SpatialNavigationVirtualizedList
@@ -227,8 +227,8 @@ export default function VODScreen() {
                   />
                 </View>
               </SpatialNavigationNode>
-            </SpatialNavigationScrollView>
-          </View>
+            </View>
+          </SpatialNavigationScrollView>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>No movies found</Text>
@@ -291,12 +291,11 @@ const styles = StyleSheet.create({
   categoryTabTextSelected: {
     color: colors.text,
   },
-  contentArea: {
-    flex: 1,
-    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
-  },
   scrollView: {
     flex: 1,
+  },
+  section: {
+    paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   listWrapper: {
     height: scaledPixels(380),

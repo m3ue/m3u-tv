@@ -231,20 +231,22 @@ export default function LiveTVScreen() {
         ) : channels.length > 0 ? (
           <SpatialNavigationScrollView
             offsetFromStart={scaledPixels(20)}
-            style={styles.channelsContainer}
+            style={styles.scrollView}
           >
-            <SpatialNavigationNode>
-              <View style={styles.channelsGrid}>
-                <SpatialNavigationVirtualizedList
-                  data={channels}
-                  orientation="horizontal"
-                  renderItem={renderChannelItem}
-                  itemSize={scaledPixels(220)}
-                  numberOfRenderedItems={10}
-                  numberOfItemsVisibleOnScreen={6}
-                />
-              </View>
-            </SpatialNavigationNode>
+            <View style={styles.section}>
+              <SpatialNavigationNode>
+                <View style={styles.channelsGrid}>
+                  <SpatialNavigationVirtualizedList
+                    data={channels}
+                    orientation="horizontal"
+                    renderItem={renderChannelItem}
+                    itemSize={scaledPixels(220)}
+                    numberOfRenderedItems={10}
+                    numberOfItemsVisibleOnScreen={6}
+                  />
+                </View>
+              </SpatialNavigationNode>
+            </View>
           </SpatialNavigationScrollView>
         ) : (
           <View style={styles.emptyState}>
@@ -308,8 +310,10 @@ const styles = StyleSheet.create({
   categoryTabTextSelected: {
     color: colors.text,
   },
-  channelsContainer: {
+  scrollView: {
     flex: 1,
+  },
+  section: {
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   channelsGrid: {
