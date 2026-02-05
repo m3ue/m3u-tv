@@ -107,6 +107,20 @@ export default function SettingsScreen() {
           <Text style={styles.title}>Settings</Text>
           <SpatialNavigationScrollView style={styles.scrollView}>
             <View style={styles.scrollContent}>
+              {/* About Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <View style={styles.infoContainer}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>App</Text>
+                    <Text style={styles.infoValue}>M3U TV</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Version</Text>
+                    <Text style={styles.infoValue}>1.0.0</Text>
+                  </View>
+                </View>
+              </View>
               {/* Connection Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Xtream Connection</Text>
@@ -264,21 +278,6 @@ export default function SettingsScreen() {
                     </SpatialNavigationNode>
                   </View>
                 )}
-              </View>
-
-              {/* About Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About</Text>
-                <View style={styles.infoContainer}>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>App</Text>
-                    <Text style={styles.infoValue}>M3U TV</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Version</Text>
-                    <Text style={styles.infoValue}>1.0.0</Text>
-                  </View>
-                </View>
               </View>
             </View>
           </SpatialNavigationScrollView>
