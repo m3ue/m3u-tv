@@ -1,10 +1,7 @@
 package dev.sparkison.tv
+import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
-// @generated begin react-native-keyevent-import - expo prebuild (DO NOT MODIFY) sync-623c552ef74f8e382965ed2451e2658312c33112
-import android.view.KeyEvent
-import com.github.kevinejohn.keyevent.KeyEventModule
-// @generated end react-native-keyevent-import
 import android.os.Bundle
 
 import com.facebook.react.ReactActivity
@@ -15,50 +12,14 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
-// @generated begin react-native-keyevent-body - expo prebuild (DO NOT MODIFY) sync-4e643b1f863a7b24063f5e26e0cc2645f10e8742
-override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-   // // Uncomment this if key events should only trigger once when key is held down
-  // if (event.getRepeatCount() == 0) {
-  //   KeyEventModule.getInstance().onKeyDownEvent(keyCode, event)
-  // }
-
-  // // This will trigger the key repeat if the key is held down
-  // // Comment this out if uncommenting the above
-  KeyEventModule.getInstance().onKeyDownEvent(keyCode, event)
-
-  // // Uncomment this if you want the default keyboard behavior
-  // return super.onKeyDown(keyCode, event)
-
-  // // The default keyboard behaviour wll be overridden
-  // // This is similar to what e.preventDefault() does in a browser
-  // // comment this if uncommenting the above
-  super.onKeyDown(keyCode, event)
-  return true
-}
-
-override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-  KeyEventModule.getInstance().onKeyUpEvent(keyCode, event)
-
-  // // Uncomment this if you want the default keyboard behavior
-  // return super.onKeyUp(keyCode, event)
-
-  // // The default keyboard behaviour wll be overridden
-  // // This is similar to what e.preventDefault() does in a browser
-  // // comment this if uncommenting the above
-  super.onKeyUp(keyCode, event)
-  return true
-}
-
-override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent): Boolean {
-    KeyEventModule.getInstance().onKeyMultipleEvent(keyCode, repeatCount, event)
-    return super.onKeyMultiple(keyCode, repeatCount, event)
-}
-// @generated end react-native-keyevent-body
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
-    setTheme(R.style.AppTheme);
+    // setTheme(R.style.AppTheme);
+    // @generated begin expo-splashscreen - expo prebuild (DO NOT MODIFY) sync-f3ff59a738c56c9a6119210cb55f0b613eb8b6af
+    SplashScreenManager.registerOnActivity(this)
+    // @generated end expo-splashscreen
     super.onCreate(null)
   }
 
