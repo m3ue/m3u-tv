@@ -265,6 +265,10 @@ export default function HomeScreen() {
       onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
     >
       <View style={styles.container}>
+        <PlatformLinearGradient
+          colors={colors.gradientBackground}
+          style={styles.backgroundGradient}
+        />
         <View style={styles.header}>
           <Text style={styles.headerTitle}>M3U TV</Text>
           <Text style={styles.headerSubtitle}>Your entertainment, anywhere</Text>
@@ -337,6 +341,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
   welcomeGradient: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -386,8 +393,8 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
-    paddingVertical: scaledPixels(16),
-    height: scaledPixels(380),
+    paddingVertical: scaledPixels(24),
+    height: scaledPixels(400),
   },
   sectionTitle: {
     color: colors.text,
@@ -407,12 +414,12 @@ const styles = StyleSheet.create({
   },
   contentCardFocused: {
     borderColor: colors.focusBorder,
-    transform: [{ scale: 1.08 }],
-    shadowColor: colors.focus,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: scaledPixels(15),
-    elevation: 10,
+    transform: [{ scale: 1.05 }],
+    shadowColor: colors.focusGlow,
+    shadowOffset: { width: 0, height: scaledPixels(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: scaledPixels(12),
+    elevation: 8,
   },
   cardImage: {
     width: '100%',

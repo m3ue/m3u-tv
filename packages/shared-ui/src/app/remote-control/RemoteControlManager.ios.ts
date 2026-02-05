@@ -18,13 +18,27 @@ const KEY_MAPPING: Record<string, SupportedKeys> = {
   swipeDown: SupportedKeys.Down
 };
 
+// Track if we've already set up the TVEventHandler to prevent duplicate listeners on hot reload
+let isInitialized = false;
+
 class RemoteControlManager implements RemoteControlManagerInterface {
   private eventEmitter = mitt<{ keyDown: SupportedKeys }>();
-  private tvEventSubscription: EventSubscription;
-  private currentListener: ((event: SupportedKeys) => void) | null = null;
+  private tvEventSubscription: EventSubscription | null = null;
+  private listeners = new Set<(event: SupportedKeys) => void>();
 
   constructor() {
+    this.initialize();
+  }
+
+  private initialize(): void {
+    // Prevent duplicate TVEventHandler listeners on hot reload
+    if (isInitialized) {
+      console.log('[iOS Remote] Already initialized, skipping TVEventHandler setup');
+      return;
+    }
+    isInitialized = true;
     this.tvEventSubscription = TVEventHandler.addListener(this.handleKeyDown);
+    console.log('[iOS Remote] TVEventHandler initialized');
   }
 
   private handleKeyDown = (evt: HWEvent): void => {
@@ -32,43 +46,36 @@ class RemoteControlManager implements RemoteControlManagerInterface {
 
     const eventKeyAction = (evt as any).eventKeyAction;
 
-    // Log ALL incoming events to debug what the remote is sending
-    console.log(`[iOS Remote] Raw event received: eventType="${evt.eventType}", eventKeyAction=${eventKeyAction}`);
-
     // Only process keyUp events (eventKeyAction=1) for more reliable detection
     // Some events like directional presses fire both keyDown (0) and keyUp (1)
     // For select/enter, we only want to trigger once per press
     if (eventKeyAction !== undefined && eventKeyAction !== 1) {
-      console.log(`[iOS Remote] Skipping keyDown event (action=${eventKeyAction}), waiting for keyUp`);
       return;
     }
 
     const mappedKey = KEY_MAPPING[evt.eventType];
     if (mappedKey) {
-      console.log(`[iOS Remote] Mapped to: ${mappedKey}, emitting event`);
+      console.log(`[iOS Remote] Key: ${mappedKey}, listeners: ${this.listeners.size}`);
       this.eventEmitter.emit('keyDown', mappedKey);
-    } else {
-      console.log(`[iOS Remote] No mapping found for eventType: "${evt.eventType}"`);
     }
   };
 
   addKeydownListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
-    console.log(`[iOS Remote] addKeydownListener called, had existing: ${!!this.currentListener}`);
-    // Remove any existing listener first to ensure only one is active
-    if (this.currentListener) {
-      this.eventEmitter.off('keyDown', this.currentListener);
+    // Support multiple listeners - don't remove existing ones
+    if (this.listeners.has(listener)) {
+      console.log('[iOS Remote] Listener already registered, skipping');
+      return listener;
     }
-    this.currentListener = listener;
+    this.listeners.add(listener);
     this.eventEmitter.on('keyDown', listener);
-    console.log(`[iOS Remote] Listener registered successfully`);
+    console.log(`[iOS Remote] Listener added, total: ${this.listeners.size}`);
     return listener;
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
     this.eventEmitter.off('keyDown', listener);
-    if (this.currentListener === listener) {
-      this.currentListener = null;
-    }
+    this.listeners.delete(listener);
+    console.log(`[iOS Remote] Listener removed, total: ${this.listeners.size}`);
   };
 
   emitKeyDown = (key: SupportedKeys): void => {
@@ -76,7 +83,13 @@ class RemoteControlManager implements RemoteControlManagerInterface {
   };
 
   cleanup = (): void => {
-    this.tvEventSubscription.remove();
+    if (this.tvEventSubscription) {
+      this.tvEventSubscription.remove();
+      this.tvEventSubscription = null;
+    }
+    this.listeners.clear();
+    this.eventEmitter.all.clear();
+    isInitialized = false;
   };
 }
 

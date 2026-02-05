@@ -2,35 +2,44 @@ import { Directions, SpatialNavigation } from 'react-tv-space-navigation';
 import { SupportedKeys } from './remote-control/SupportedKeys';
 import RemoteControlManager from './remote-control/RemoteControlManager';
 
-SpatialNavigation.configureRemoteControl({
-  remoteControlSubscriber: (callback) => {
-    console.log("[ConfigureRemoteControl] Setting up remote control subscriber");
+// Prevent duplicate configuration on hot reload
+let isConfigured = false;
 
-    const mapping: { [key in SupportedKeys]?: Directions | null } = {
-      [SupportedKeys.Right]: Directions.RIGHT,
-      [SupportedKeys.Left]: Directions.LEFT,
-      [SupportedKeys.Up]: Directions.UP,
-      [SupportedKeys.Down]: Directions.DOWN,
-      [SupportedKeys.Enter]: Directions.ENTER,
-      [SupportedKeys.Back]: null,
-      [SupportedKeys.PlayPause]: null,
-      [SupportedKeys.Rewind]: null,
-      [SupportedKeys.FastForward]: null,
-    };
+if (!isConfigured) {
+  isConfigured = true;
+  console.log('[ConfigureRemoteControl] Configuring spatial navigation remote control');
 
-    const remoteControlListener = (keyEvent: SupportedKeys) => {
-      console.log(`[ConfigureRemoteControl] Received key: ${keyEvent}, mapped direction: ${mapping[keyEvent]}`);
-      const direction = mapping[keyEvent];
-      if (direction !== undefined) {
-        callback(direction);
-      }
-    };
+  SpatialNavigation.configureRemoteControl({
+    remoteControlSubscriber: (callback) => {
+      console.log('[ConfigureRemoteControl] Setting up remote control subscriber');
 
-    return RemoteControlManager.addKeydownListener(remoteControlListener);
-  },
+      const mapping: { [key in SupportedKeys]?: Directions | null } = {
+        [SupportedKeys.Right]: Directions.RIGHT,
+        [SupportedKeys.Left]: Directions.LEFT,
+        [SupportedKeys.Up]: Directions.UP,
+        [SupportedKeys.Down]: Directions.DOWN,
+        [SupportedKeys.Enter]: Directions.ENTER,
+        [SupportedKeys.Back]: null,
+        [SupportedKeys.PlayPause]: null,
+        [SupportedKeys.Rewind]: null,
+        [SupportedKeys.FastForward]: null,
+      };
 
-  remoteControlUnsubscriber: (remoteControlListener) => {
-    console.log("[ConfigureRemoteControl] Unsubscribing remote control listener");
-    RemoteControlManager.removeKeydownListener(remoteControlListener);
-  },
-});
+      const remoteControlListener = (keyEvent: SupportedKeys) => {
+        const direction = mapping[keyEvent];
+        if (direction !== undefined) {
+          callback(direction);
+        }
+      };
+
+      return RemoteControlManager.addKeydownListener(remoteControlListener);
+    },
+
+    remoteControlUnsubscriber: (remoteControlListener) => {
+      console.log('[ConfigureRemoteControl] Unsubscribing remote control listener');
+      RemoteControlManager.removeKeydownListener(remoteControlListener);
+    },
+  });
+} else {
+  console.log('[ConfigureRemoteControl] Already configured, skipping');
+}

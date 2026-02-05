@@ -19,6 +19,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { RootStackParamList } from '../navigation/types';
 import { colors, safeZones } from '../theme';
 import LoadingIndicator from '../components/LoadingIndicator';
+import PlatformLinearGradient from '../components/PlatformLinearGradient';
 
 type VODNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
@@ -194,6 +195,10 @@ export default function VODScreen() {
       onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
     >
       <View style={styles.container}>
+        <PlatformLinearGradient
+          colors={colors.gradientBackground}
+          style={styles.backgroundGradient}
+        />
         <View style={styles.header}>
           <Text style={styles.title}>Movies</Text>
           <Text style={styles.subtitle}>
@@ -256,6 +261,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
   header: {
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
     paddingTop: scaledPixels(safeZones.actionSafe.vertical),
@@ -305,30 +313,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(safeZones.actionSafe.horizontal),
   },
   moviesGrid: {
-    height: scaledPixels(340),
+    height: scaledPixels(380),
+    paddingVertical: scaledPixels(20),
   },
   movieCard: {
     width: scaledPixels(180),
-    marginRight: scaledPixels(16),
-    marginBottom: scaledPixels(16),
-    borderRadius: scaledPixels(12),
+    marginRight: scaledPixels(20),
+    borderRadius: scaledPixels(16),
     overflow: 'hidden',
-    borderWidth: scaledPixels(3),
-    borderColor: 'transparent',
+    borderWidth: scaledPixels(2),
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   movieCardFocused: {
     borderColor: colors.focusBorder,
-    transform: [{ scale: 1.08 }],
-    shadowColor: colors.focus,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: scaledPixels(15),
-    elevation: 10,
+    transform: [{ scale: 1.05 }],
+    shadowColor: colors.focusGlow,
+    shadowOffset: { width: 0, height: scaledPixels(4) },
+    shadowOpacity: 0.3,
+    shadowRadius: scaledPixels(12),
+    elevation: 8,
   },
   moviePoster: {
     width: '100%',
     height: scaledPixels(260),
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardElevated,
     position: 'relative',
   },
   movieImage: {

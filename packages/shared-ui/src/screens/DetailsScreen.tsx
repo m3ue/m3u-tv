@@ -1,11 +1,12 @@
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StyleSheet, View, Image, Text } from 'react-native';
-import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationRoot, DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
 import { scaledPixels } from '../hooks/useScale';
 import { useCallback, useMemo } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import FocusablePressable from '../components/FocusablePressable';
+import PlatformLinearGradient from '../components/PlatformLinearGradient';
 import { RootStackParamList } from '../navigation/types';
 import { safeZones, colors } from '../theme';
 
@@ -65,6 +66,20 @@ export default function DetailsScreen() {
     <SpatialNavigationRoot isActive={isFocused}>
       <View style={detailsStyles.container}>
         <Image source={imageSource} style={detailsStyles.backgroundImage} />
+        <PlatformLinearGradient
+          colors={['transparent', 'rgba(10,10,15,0.6)', 'rgba(10,10,15,0.95)', colors.background]}
+          style={detailsStyles.gradientOverlay}
+        />
+        {/* Back Button */}
+        <View style={detailsStyles.backButtonContainer}>
+          <SpatialNavigationNode>
+            <FocusablePressable
+              text="Back"
+              onSelect={() => navigation.goBack()}
+              style={detailsStyles.backButton}
+            />
+          </SpatialNavigationNode>
+        </View>
         <View style={detailsStyles.contentContainer}>
           <View style={detailsStyles.topContent}>
             <Text style={detailsStyles.title}>{title}</Text>
@@ -136,7 +151,19 @@ const detailsStyles = StyleSheet.create({
       position: 'absolute',
       width: '100%',
       height: '100%',
-      opacity: 0.25,
+      opacity: 0.6,
+    },
+    gradientOverlay: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    backButtonContainer: {
+      position: 'absolute',
+      top: scaledPixels(safeZones.actionSafe.vertical),
+      left: scaledPixels(safeZones.actionSafe.horizontal),
+      zIndex: 10,
+    },
+    backButton: {
+      // Let FocusablePressable handle focus states
     },
     contentContainer: {
       flex: 1,

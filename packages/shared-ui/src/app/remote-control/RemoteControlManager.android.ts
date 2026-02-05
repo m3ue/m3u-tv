@@ -19,42 +19,52 @@ const KEY_CODE_MAPPING: Record<number, SupportedKeys> = {
   90: SupportedKeys.FastForward,
 };
 
+// Track if we've already set up the KeyEvent listener to prevent duplicate listeners on hot reload
+let isInitialized = false;
+
 class RemoteControlManager implements RemoteControlManagerInterface {
   private eventEmitter = mitt<{ keyDown: SupportedKeys }>();
-  private currentListener: ((event: SupportedKeys) => void) | null = null;
+  private listeners = new Set<(event: SupportedKeys) => void>();
 
   constructor() {
+    this.initialize();
+  }
+
+  private initialize(): void {
+    // Prevent duplicate KeyEvent listeners on hot reload
+    if (isInitialized) {
+      console.log('[Android Remote] Already initialized, skipping KeyEvent setup');
+      return;
+    }
+    isInitialized = true;
     KeyEvent.onKeyDownListener(this.handleKeyDown);
+    console.log('[Android Remote] KeyEvent initialized');
   }
 
   private handleKeyDown = (keyEvent: { keyCode: number }): void => {
-    // Log ALL incoming key codes to debug what the remote is sending
-    console.log(`[Android Remote] Raw keyCode received: ${keyEvent.keyCode}`);
-
     const mappedKey = KEY_CODE_MAPPING[keyEvent.keyCode];
     if (mappedKey) {
-      console.log(`[Android Remote] Mapped to: ${mappedKey}`);
+      console.log(`[Android Remote] Key: ${mappedKey}, listeners: ${this.listeners.size}`);
       this.eventEmitter.emit('keyDown', mappedKey);
-    } else {
-      console.log(`[Android Remote] No mapping found for keyCode: ${keyEvent.keyCode}`);
     }
   };
 
   addKeydownListener = (listener: (event: SupportedKeys) => void): ((event: SupportedKeys) => void) => {
-    // Remove any existing listener first to ensure only one is active
-    if (this.currentListener) {
-      this.eventEmitter.off('keyDown', this.currentListener);
+    // Support multiple listeners - don't remove existing ones
+    if (this.listeners.has(listener)) {
+      console.log('[Android Remote] Listener already registered, skipping');
+      return listener;
     }
-    this.currentListener = listener;
+    this.listeners.add(listener);
     this.eventEmitter.on('keyDown', listener);
+    console.log(`[Android Remote] Listener added, total: ${this.listeners.size}`);
     return listener;
   };
 
   removeKeydownListener = (listener: (event: SupportedKeys) => void): void => {
     this.eventEmitter.off('keyDown', listener);
-    if (this.currentListener === listener) {
-      this.currentListener = null;
-    }
+    this.listeners.delete(listener);
+    console.log(`[Android Remote] Listener removed, total: ${this.listeners.size}`);
   };
 
   emitKeyDown = (key: SupportedKeys): void => {
@@ -63,6 +73,9 @@ class RemoteControlManager implements RemoteControlManagerInterface {
 
   cleanup = (): void => {
     KeyEvent.removeKeyDownListener();
+    this.listeners.clear();
+    this.eventEmitter.all.clear();
+    isInitialized = false;
   };
 }
 
