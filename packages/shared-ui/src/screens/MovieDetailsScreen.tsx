@@ -64,7 +64,9 @@ export default function MovieDetailsScreen() {
 
     const movieDuration = useMemo(() => {
         if (movieInfo?.info?.duration_secs) {
-            const totalSecs = parseInt(movieInfo.info.duration_secs);
+            const totalSecs = typeof movieInfo.info.duration_secs === 'string'
+                ? parseInt(movieInfo.info.duration_secs, 10)
+                : movieInfo.info.duration_secs;
             const h = Math.floor(totalSecs / 3600);
             const m = Math.floor((totalSecs % 3600) / 60);
             return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -123,7 +125,7 @@ export default function MovieDetailsScreen() {
                                     </Text>
                                 )}
 
-                                <SpatialNavigationNode direction="horizontal">
+                                <SpatialNavigationNode orientation="horizontal">
                                     <View style={styles.actionsRow}>
                                         <DefaultFocus>
                                             <FocusablePressable

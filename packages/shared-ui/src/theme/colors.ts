@@ -47,8 +47,8 @@ export const colors = {
   scrimDark: 'rgba(0, 0, 0, 0.85)',
 
   // Gradients (as array for LinearGradient)
-  gradientBackground: ['#0a0a0f', '#12121a', '#0a0a0f'],
-  gradientCard: ['#1a1a24', '#242430'],
-  gradientPrimary: ['#ec003f', '#e12afb'],
-  gradientOverlay: ['transparent', 'rgba(0,0,0,0.7)', '#0a0a0f'],
+  gradientBackground: ['#0a0a0f', '#12121a', '#0a0a0f'] as const,
+  gradientCard: ['#1a1a24', '#242430'] as const,
+  gradientPrimary: ['#ec003f', '#e12afb'] as const,
+  gradientOverlay: ['transparent', 'rgba(0,0,0,0.7)', '#0a0a0f'] as const,
 };

@@ -50,7 +50,7 @@ const MediaCard = React.memo(({ name, image, isFocused, type, rating, year }: Me
             <Text style={styles.placeholderText}>{placeholderEmoji}</Text>
           </View>
         )}
-        {rating !== undefined && rating > 0 && (
+        {rating !== undefined && Number(rating) > 0 && (
           <View style={styles.ratingBadge}>
             <Text style={styles.ratingText}>★ {rating}</Text>
           </View>

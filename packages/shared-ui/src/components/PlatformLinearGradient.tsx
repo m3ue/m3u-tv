@@ -7,11 +7,11 @@ import { LinearGradient } from 'expo-linear-gradient';
  */
 
 interface PlatformLinearGradientProps {
-  colors: string[];
+  colors: readonly [string, string, ...string[]];
   style?: StyleProp<ViewStyle>;
   start?: { x: number; y: number };
   end?: { x: number; y: number };
-  locations?: number[];
+  locations?: readonly [number, number, ...number[]];
   children?: ReactNode;
 }
 

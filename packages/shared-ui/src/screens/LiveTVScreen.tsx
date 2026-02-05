@@ -181,8 +181,6 @@ export default function LiveTVScreen() {
                 orientation="horizontal"
                 renderItem={renderCategoryItem}
                 itemSize={scaledPixels(200)}
-                numberOfRenderedItems={8}
-                numberOfItemsVisibleOnScreen={6}
               />
             </DefaultFocus>
           </SpatialNavigationNode>
@@ -201,8 +199,6 @@ export default function LiveTVScreen() {
                     orientation="horizontal"
                     renderItem={renderChannelItem}
                     itemSize={scaledPixels(220)}
-                    numberOfRenderedItems={10}
-                    numberOfItemsVisibleOnScreen={6}
                   />
                 </View>
               </SpatialNavigationNode>

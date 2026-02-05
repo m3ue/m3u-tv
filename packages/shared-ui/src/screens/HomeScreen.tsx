@@ -239,15 +239,13 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Live TV</Text>
               <View style={styles.liveListWrapper}>
-                <SpatialNavigationNode direction="horizontal">
+                <SpatialNavigationNode orientation="horizontal">
                   <DefaultFocus>
                     <SpatialNavigationVirtualizedList
                       data={liveChannels}
                       orientation="horizontal"
                       renderItem={renderLiveItem}
                       itemSize={LIVE_ITEM_SIZE}
-                      numberOfRenderedItems={8}
-                      numberOfItemsVisibleOnScreen={6}
                     />
                   </DefaultFocus>
                 </SpatialNavigationNode>
@@ -260,14 +258,12 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Movies</Text>
               <View style={styles.listWrapper}>
-                <SpatialNavigationNode direction="horizontal">
+                <SpatialNavigationNode orientation="horizontal">
                   <SpatialNavigationVirtualizedList
                     data={movies}
                     orientation="horizontal"
                     renderItem={renderMovieItem}
                     itemSize={ITEM_SIZE}
-                    numberOfRenderedItems={8}
-                    numberOfItemsVisibleOnScreen={5}
                   />
                 </SpatialNavigationNode>
               </View>
@@ -279,14 +275,12 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>TV Series</Text>
               <View style={styles.listWrapper}>
-                <SpatialNavigationNode direction="horizontal">
+                <SpatialNavigationNode orientation="horizontal">
                   <SpatialNavigationVirtualizedList
                     data={series}
                     orientation="horizontal"
                     renderItem={renderSeriesItem}
                     itemSize={ITEM_SIZE}
-                    numberOfRenderedItems={8}
-                    numberOfItemsVisibleOnScreen={5}
                   />
                 </SpatialNavigationNode>
               </View>

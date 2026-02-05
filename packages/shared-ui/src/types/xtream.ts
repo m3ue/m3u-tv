@@ -99,9 +99,11 @@ export interface XtreamVodInfo {
     rating_count_kinopoisk?: number;
     country?: string;
     genre?: string;
-    duration_secs?: number;
+    duration_secs?: string | number;
     duration?: string;
     bitrate?: number;
+    rating?: string | number;
+    backdrop_path?: string[];
     video?: {
       index?: number;
       codec_name?: string;

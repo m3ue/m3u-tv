@@ -127,6 +127,7 @@ export default function EPGTimeline({ streamId, channelName, onProgramSelect }: 
 
       <SpatialNavigationScrollView style={styles.programList}>
         <SpatialNavigationNode orientation="vertical">
+          <>
           {programs.map((program, index) => (
             <SpatialNavigationFocusableView key={program.id || index} onSelect={() => onProgramSelect?.(program)}>
               {({ isFocused }) => (
@@ -134,6 +135,7 @@ export default function EPGTimeline({ streamId, channelName, onProgramSelect }: 
               )}
             </SpatialNavigationFocusableView>
           ))}
+          </>
         </SpatialNavigationNode>
       </SpatialNavigationScrollView>
     </View>

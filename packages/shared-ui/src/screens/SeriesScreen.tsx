@@ -174,8 +174,6 @@ export default function SeriesScreen() {
                 orientation="horizontal"
                 renderItem={renderCategoryItem}
                 itemSize={scaledPixels(200)}
-                numberOfRenderedItems={8}
-                numberOfItemsVisibleOnScreen={6}
               />
             </DefaultFocus>
           </SpatialNavigationNode>
@@ -194,8 +192,6 @@ export default function SeriesScreen() {
                     orientation="horizontal"
                     renderItem={renderSeriesItem}
                     itemSize={ITEM_SIZE}
-                    numberOfRenderedItems={10}
-                    numberOfItemsVisibleOnScreen={5}
                   />
                 </View>
               </SpatialNavigationNode>

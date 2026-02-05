@@ -187,6 +187,7 @@ export default function SettingsScreen() {
                     )}
 
                     <SpatialNavigationNode orientation="vertical">
+                      <>
                       <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Server URL</Text>
                         <DefaultFocus>
@@ -260,8 +261,8 @@ export default function SettingsScreen() {
                         text={isLoading ? 'Connecting...' : 'Connect'}
                         onSelect={handleConnect}
                         style={styles.connectButton}
-                        disabled={isLoading}
                       />
+                      </>
                     </SpatialNavigationNode>
                   </View>
                 )}

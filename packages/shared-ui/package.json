@@ -11,13 +11,33 @@
     "clean": "rm -rf node_modules"
   },
   "peerDependencies": {
+    "@bam.tech/lrud": "*",
     "@react-native-async-storage/async-storage": "*",
+    "@react-navigation/drawer": "*",
     "@react-navigation/native": "*",
+    "@react-navigation/native-stack": "*",
+    "expo-linear-gradient": "*",
+    "mitt": "*",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-video": "*",
+    "react-tv-space-navigation": "*"
   },
   "devDependencies": {
-    "@types/react": "~18.2.45",
-    "typescript": "~5.3.3"
+    "@bam.tech/lrud": "*",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/drawer": "^6.6.15",
+    "@react-navigation/native": "^6.0.2",
+    "@react-navigation/native-stack": "^6.11.0",
+    "@types/react": "~19.0.0",
+    "expo-linear-gradient": "~14.0.2",
+    "mitt": "*",
+    "react": "19.0.0",
+    "react-native": "npm:react-native-tvos@~0.76.6-0",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-pixel-perfect": "^1.0.2",
+    "react-native-video": "^6.8.0",
+    "react-tv-space-navigation": "^6.0.0-beta1",
+    "typescript": "~5.7.3"
   }
 }

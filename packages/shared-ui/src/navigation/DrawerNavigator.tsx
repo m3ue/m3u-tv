@@ -49,7 +49,6 @@ export default function DrawerNavigator() {
           drawerLabelStyle: styles.drawerLabelStyle,
           drawerType: 'front',
           swipeEnabled: false,
-          animationEnabled: false,
         }}
       >
         <Drawer.Screen

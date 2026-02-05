@@ -130,7 +130,7 @@ const EpisodeDetailModal = ({
             </Text>
           )}
 
-          <SpatialNavigationNode direction="horizontal">
+          <SpatialNavigationNode orientation="horizontal">
             <View style={styles.modalActions}>
               <DefaultFocus>
                 <FocusablePressable
@@ -308,15 +308,13 @@ export default function SeriesDetailsScreen() {
           {/* Season Tabs */}
           {seriesInfo?.seasons && seriesInfo.seasons.length > 0 && (
             <View style={styles.seasonsContainer}>
-              <SpatialNavigationNode direction="horizontal">
+              <SpatialNavigationNode orientation="horizontal">
                 <View style={styles.seasonsListWrapper}>
                   <SpatialNavigationVirtualizedList
                     data={seriesInfo.seasons}
                     orientation="horizontal"
                     renderItem={renderSeasonItem}
                     itemSize={scaledPixels(160)}
-                    numberOfRenderedItems={8}
-                    numberOfItemsVisibleOnScreen={6}
                   />
                 </View>
               </SpatialNavigationNode>
@@ -331,15 +329,13 @@ export default function SeriesDetailsScreen() {
             {currentEpisodes.length > 0 ? (
               <SpatialNavigationScrollView style={styles.episodesList}>
                 <View style={styles.section}>
-                  <SpatialNavigationNode direction="horizontal">
+                  <SpatialNavigationNode orientation="horizontal">
                     <View style={styles.episodesListWrapper}>
                       <SpatialNavigationVirtualizedList
                         data={currentEpisodes}
                         orientation="horizontal"
                         renderItem={renderEpisodeItem}
                         itemSize={scaledPixels(320)}
-                        numberOfRenderedItems={6}
-                        numberOfItemsVisibleOnScreen={4}
                       />
                     </View>
                   </SpatialNavigationNode>
