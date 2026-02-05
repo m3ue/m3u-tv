@@ -14,66 +14,57 @@ export interface MediaCardProps {
   year?: string;
 }
 
-const MediaCard = React.memo(
-  ({ name, image, isFocused, type, rating, year }: MediaCardProps) => {
-    const imageSource = useMemo(
-      () => (image ? { uri: image } : undefined),
-      [image],
-    );
+const MediaCard = React.memo(({ name, image, isFocused, type, rating, year }: MediaCardProps) => {
+  const imageSource = useMemo(() => (image ? { uri: image } : undefined), [image]);
 
-    // Live TV uses square card with centered logo
-    if (type === 'live') {
-      return (
-        <View style={[styles.liveCard, isFocused && styles.cardFocused]}>
-          <View style={styles.liveLogoContainer}>
-            {imageSource ? (
-              <Image source={imageSource} style={styles.liveLogo} resizeMode="contain" />
-            ) : (
-              <View style={styles.livePlaceholder}>
-                <Text style={styles.livePlaceholderText}>
-                  {name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.liveTitle} numberOfLines={2}>
-            {name}
-          </Text>
-        </View>
-      );
-    }
-
-    // VOD and Series use tall poster card
-    const placeholderEmoji = type === 'vod' ? '🎬' : '📺';
-
+  // Live TV uses square card with centered logo
+  if (type === 'live') {
     return (
-      <View style={[styles.card, isFocused && styles.cardFocused]}>
-        <View style={styles.posterContainer}>
+      <View style={[styles.liveCard, isFocused && styles.cardFocused]}>
+        <View style={styles.liveLogoContainer}>
           {imageSource ? (
-            <Image source={imageSource} style={styles.posterImage} resizeMode="cover" />
+            <Image source={imageSource} style={styles.liveLogo} resizeMode="contain" />
           ) : (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>{placeholderEmoji}</Text>
-            </View>
-          )}
-          {rating !== undefined && rating > 0 && (
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingText}>★ {rating.toFixed(1)}</Text>
+            <View style={styles.livePlaceholder}>
+              <Text style={styles.livePlaceholderText}>{name.charAt(0).toUpperCase()}</Text>
             </View>
           )}
         </View>
-        <View style={styles.infoContainer}>
-          <Text style={styles.title} numberOfLines={2}>
-            {name}
-          </Text>
-          {year && (
-            <Text style={styles.year}>{year}</Text>
-          )}
-        </View>
+        <Text style={styles.liveTitle} numberOfLines={2}>
+          {name}
+        </Text>
       </View>
     );
-  },
-);
+  }
+
+  // VOD and Series use tall poster card
+  const placeholderEmoji = type === 'vod' ? '🎬' : '📺';
+
+  return (
+    <View style={[styles.card, isFocused && styles.cardFocused]}>
+      <View style={styles.posterContainer}>
+        {imageSource ? (
+          <Image source={imageSource} style={styles.posterImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>{placeholderEmoji}</Text>
+          </View>
+        )}
+        {rating !== undefined && rating > 0 && (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>★ {rating.toFixed(1)}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.infoContainer}>
+        <Text style={styles.title} numberOfLines={2}>
+          {name}
+        </Text>
+        {year && <Text style={styles.year}>{year}</Text>}
+      </View>
+    </View>
+  );
+});
 
 MediaCard.displayName = 'MediaCard';
 

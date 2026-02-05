@@ -16,26 +16,11 @@ interface PlatformLinearGradientProps {
   children?: ReactNode;
 }
 
-const PlatformLinearGradient: React.FC<PlatformLinearGradientProps> = ({
-  colors,
-  style,
-  children,
-}) => {
+const PlatformLinearGradient: React.FC<PlatformLinearGradientProps> = ({ colors, style, children }) => {
   // Use the last color in the gradient array as the solid background
-  const fallbackColor = colors && colors.length > 0
-    ? colors[colors.length - 1]
-    : 'rgba(0, 0, 0, 0.6)';
+  const fallbackColor = colors && colors.length > 0 ? colors[colors.length - 1] : 'rgba(0, 0, 0, 0.6)';
 
-  return (
-    <View
-      style={[
-        style as StyleProp<ViewStyle>,
-        { backgroundColor: fallbackColor },
-      ]}
-    >
-      {children}
-    </View>
-  );
+  return <View style={[style as StyleProp<ViewStyle>, { backgroundColor: fallbackColor }]}>{children}</View>;
 };
 
 export default PlatformLinearGradient;

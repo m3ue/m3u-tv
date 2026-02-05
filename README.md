@@ -78,21 +78,25 @@ EXPO_TV=1 corepack yarn workspace @m3u-tv/expo-app prebuild --clean
 ```
 
 **Web (for development):**
+
 ```bash
 corepack yarn dev:web
 ```
 
 **Android TV:**
+
 ```bash
 corepack yarn dev:android
 ```
 
 **Apple TV:**
+
 ```bash
 corepack yarn dev:ios
 ```
 
 **Fire TV Vega:**
+
 ```bash
 corepack yarn dev:vega
 ```
@@ -113,25 +117,30 @@ The app will authenticate and fetch your content categories. Credentials are sto
 ## Screens Overview
 
 ### Home
+
 - Welcome screen with quick access to content
 - Shows preview rows of Live TV, Movies, and Series when connected
 
 ### Live TV
+
 - Grid of live channels organized by category
 - Category filter tabs at the top
 - Select a channel to start playback
 
 ### Movies (VOD)
+
 - Grid of movies organized by category
 - Shows ratings and posters
 - Select a movie to start playback
 
 ### Series
+
 - Grid of TV series organized by category
 - Select a series to view seasons and episodes
 - Episode browser with thumbnails
 
 ### Settings
+
 - Xtream API connection management
 - Connection status and statistics
 
@@ -186,12 +195,12 @@ Here’s how you can join the party:
 
 ---
 
-## ⚖️ License  
+## ⚖️ License
 
-> m3u editor is licensed under **CC BY-NC-SA 4.0**:  
+> m3u editor is licensed under **CC BY-NC-SA 4.0**:
 
-- **BY**: Give credit where credit’s due.  
-- **NC**: No commercial use.  
-- **SA**: Share alike if you remix.  
+- **BY**: Give credit where credit’s due.
+- **NC**: No commercial use.
+- **SA**: Share alike if you remix.
 
 For full license details, see [LICENSE](https://creativecommons.org/licenses/by-nc-sa/4.0/).

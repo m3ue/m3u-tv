@@ -1,8 +1,5 @@
 import { IMediaSessionId, ITimeValue } from '@amazon-devices/kepler-media-controls';
-import {
-  KeplerMediaControlHandler,
-  VideoPlayer,
-} from '@amazon-devices/react-native-w3cmedia';
+import { KeplerMediaControlHandler, VideoPlayer } from '@amazon-devices/react-native-w3cmedia';
 
 const SKIP_INTERVAL_SECONDS = 10;
 

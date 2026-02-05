@@ -10,16 +10,15 @@ const MenuContext = createContext<MenuContextType | undefined>(undefined);
 export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const value = useMemo(() => ({
-    isOpen,
-    toggleMenu: setIsOpen,
-  }), [isOpen]);
-
-  return (
-    <MenuContext.Provider value={value}>
-      {children}
-    </MenuContext.Provider>
+  const value = useMemo(
+    () => ({
+      isOpen,
+      toggleMenu: setIsOpen,
+    }),
+    [isOpen],
   );
+
+  return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;
 };
 
 export const useMenuContext = (): MenuContextType => {

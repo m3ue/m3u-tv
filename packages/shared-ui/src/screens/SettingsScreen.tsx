@@ -144,15 +144,11 @@ export default function SettingsScreen() {
                       </View>
                       <View style={styles.infoRow}>
                         <Text style={styles.infoLabel}>Expires</Text>
-                        <Text style={styles.infoValue}>
-                          {formatDate(authResponse.user_info.exp_date)}
-                        </Text>
+                        <Text style={styles.infoValue}>{formatDate(authResponse.user_info.exp_date)}</Text>
                       </View>
                       <View style={styles.infoRow}>
                         <Text style={styles.infoLabel}>Max Connections</Text>
-                        <Text style={styles.infoValue}>
-                          {authResponse.user_info.max_connections}
-                        </Text>
+                        <Text style={styles.infoValue}>{authResponse.user_info.max_connections}</Text>
                       </View>
                     </View>
 
@@ -202,10 +198,7 @@ export default function SettingsScreen() {
                             {({ isFocused: inputFocused }) => (
                               <TextInput
                                 ref={serverInputRef}
-                                style={[
-                                  styles.textInput,
-                                  inputFocused && styles.textInputFocused,
-                                ]}
+                                style={[styles.textInput, inputFocused && styles.textInputFocused]}
                                 value={server}
                                 onChangeText={setServer}
                                 placeholder="http://example.com:8080"
@@ -228,10 +221,7 @@ export default function SettingsScreen() {
                           {({ isFocused: inputFocused }) => (
                             <TextInput
                               ref={usernameInputRef}
-                              style={[
-                                styles.textInput,
-                                inputFocused && styles.textInputFocused,
-                              ]}
+                              style={[styles.textInput, inputFocused && styles.textInputFocused]}
                               value={username}
                               onChangeText={setUsername}
                               placeholder="Enter username"
@@ -253,10 +243,7 @@ export default function SettingsScreen() {
                           {({ isFocused: inputFocused }) => (
                             <TextInput
                               ref={passwordInputRef}
-                              style={[
-                                styles.textInput,
-                                inputFocused && styles.textInputFocused,
-                              ]}
+                              style={[styles.textInput, inputFocused && styles.textInputFocused]}
                               value={password}
                               onChangeText={setPassword}
                               placeholder="Enter password"

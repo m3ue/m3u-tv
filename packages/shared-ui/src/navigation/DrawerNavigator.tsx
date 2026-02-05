@@ -98,11 +98,7 @@ export default function DrawerNavigator() {
   }
 
   // On mobile/web, use GestureHandlerRootView for swipe gestures
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      {navigationContent}
-    </GestureHandlerRootView>
-  );
+  return <GestureHandlerRootView style={{ flex: 1 }}>{navigationContent}</GestureHandlerRootView>;
 }
 
 const drawerStyles = StyleSheet.create({

@@ -23,15 +23,7 @@ type SeriesDetailsNavigationProp = NativeStackNavigationProp<RootStackParamList,
 type SeriesDetailsRouteProp = RouteProp<RootStackParamList, 'SeriesDetails'>;
 
 const EpisodeItem = React.memo(
-  ({
-    episode,
-    isFocused,
-    seriesName,
-  }: {
-    episode: XtreamEpisode;
-    isFocused: boolean;
-    seriesName: string;
-  }) => {
+  ({ episode, isFocused, seriesName }: { episode: XtreamEpisode; isFocused: boolean; seriesName: string }) => {
     const imageSource = useMemo(
       () => (episode.info?.movie_image ? { uri: episode.info.movie_image } : undefined),
       [episode.info?.movie_image],
@@ -55,9 +47,7 @@ const EpisodeItem = React.memo(
           <Text style={styles.episodeTitle} numberOfLines={1}>
             {episode.title}
           </Text>
-          {episode.info?.duration && (
-            <Text style={styles.episodeDuration}>{episode.info.duration}</Text>
-          )}
+          {episode.info?.duration && <Text style={styles.episodeDuration}>{episode.info.duration}</Text>}
         </View>
       </View>
     );
@@ -65,22 +55,8 @@ const EpisodeItem = React.memo(
 );
 
 const SeasonTab = React.memo(
-  ({
-    season,
-    isSelected,
-    isFocused,
-  }: {
-    season: XtreamSeason;
-    isSelected: boolean;
-    isFocused: boolean;
-  }) => (
-    <View
-      style={[
-        styles.seasonTab,
-        isSelected && styles.seasonTabSelected,
-        isFocused && styles.seasonTabFocused,
-      ]}
-    >
+  ({ season, isSelected, isFocused }: { season: XtreamSeason; isSelected: boolean; isFocused: boolean }) => (
+    <View style={[styles.seasonTab, isSelected && styles.seasonTabSelected, isFocused && styles.seasonTabFocused]}>
       <Text style={[styles.seasonTabText, isSelected && styles.seasonTabTextSelected]}>
         Season {season.season_number}
       </Text>
@@ -123,10 +99,7 @@ export default function SeriesDetailsScreen() {
 
   const handleEpisodeSelect = useCallback(
     (episode: XtreamEpisode) => {
-      const streamUrl = xtreamService.getSeriesStreamUrl(
-        episode.id,
-        episode.container_extension,
-      );
+      const streamUrl = xtreamService.getSeriesStreamUrl(episode.id, episode.container_extension);
       navigation.navigate('Player', {
         movie: streamUrl,
         headerImage: episode.info?.movie_image || cover,
@@ -141,11 +114,7 @@ export default function SeriesDetailsScreen() {
     ({ item }: { item: XtreamSeason }) => (
       <SpatialNavigationFocusableView onSelect={() => setSelectedSeason(item.season_number)}>
         {({ isFocused }) => (
-          <SeasonTab
-            season={item}
-            isSelected={selectedSeason === item.season_number}
-            isFocused={isFocused}
-          />
+          <SeasonTab season={item} isSelected={selectedSeason === item.season_number} isFocused={isFocused} />
         )}
       </SpatialNavigationFocusableView>
     ),
@@ -155,9 +124,7 @@ export default function SeriesDetailsScreen() {
   const renderEpisodeItem = useCallback(
     ({ item }: { item: XtreamEpisode }) => (
       <SpatialNavigationFocusableView onSelect={() => handleEpisodeSelect(item)}>
-        {({ isFocused }) => (
-          <EpisodeItem episode={item} isFocused={isFocused} seriesName={name} />
-        )}
+        {({ isFocused }) => <EpisodeItem episode={item} isFocused={isFocused} seriesName={name} />}
       </SpatialNavigationFocusableView>
     ),
     [handleEpisodeSelect, name],
@@ -176,9 +143,7 @@ export default function SeriesDetailsScreen() {
       <View style={styles.container}>
         {/* Header with backdrop */}
         <View style={styles.header}>
-          {cover && (
-            <Image source={{ uri: cover }} style={styles.backdrop} resizeMode="cover" />
-          )}
+          {cover && <Image source={{ uri: cover }} style={styles.backdrop} resizeMode="cover" />}
           <PlatformLinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)', colors.background]}
             style={styles.gradient}
@@ -187,9 +152,7 @@ export default function SeriesDetailsScreen() {
             <Text style={styles.title}>{name}</Text>
             <View style={styles.metaRow}>
               {year && <Text style={styles.metaText}>{year}</Text>}
-              {rating && rating > 0 && (
-                <Text style={styles.metaText}>★ {rating.toFixed(1)}</Text>
-              )}
+              {rating && rating > 0 && <Text style={styles.metaText}>★ {rating.toFixed(1)}</Text>}
               {seriesInfo?.seasons && (
                 <Text style={styles.metaText}>
                   {seriesInfo.seasons.length} Season{seriesInfo.seasons.length > 1 ? 's' : ''}
@@ -208,11 +171,7 @@ export default function SeriesDetailsScreen() {
         <View style={styles.backButtonContainer}>
           <SpatialNavigationNode>
             <DefaultFocus>
-              <FocusablePressable
-                text="Back"
-                onSelect={() => navigation.goBack()}
-                style={styles.backButton}
-              />
+              <FocusablePressable text="Back" onSelect={() => navigation.goBack()} style={styles.backButton} />
             </DefaultFocus>
           </SpatialNavigationNode>
         </View>

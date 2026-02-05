@@ -43,19 +43,19 @@ export default function TVScreen() {
 }
 
 const tvStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#000',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
-      paddingVertical: scaledPixels(safeZones.titleSafe.vertical),
-    },
-    title: {
-      fontSize: scaledPixels(32),
-      fontWeight: 'bold',
-      color: '#fff',
-      textAlign: 'center',
-      marginBottom: scaledPixels(20),
-    },
-  });
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
+    paddingVertical: scaledPixels(safeZones.titleSafe.vertical),
+  },
+  title: {
+    fontSize: scaledPixels(32),
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: scaledPixels(20),
+  },
+});

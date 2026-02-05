@@ -23,58 +23,33 @@ import PlatformLinearGradient from '../components/PlatformLinearGradient';
 
 type LiveTVNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DrawerNavigator'>;
 
-const ChannelItem = React.memo(
-  ({ item, isFocused }: { item: XtreamLiveStream; isFocused: boolean }) => {
-    const imageSource = useMemo(
-      () => (item.stream_icon ? { uri: item.stream_icon } : undefined),
-      [item.stream_icon],
-    );
+const ChannelItem = React.memo(({ item, isFocused }: { item: XtreamLiveStream; isFocused: boolean }) => {
+  const imageSource = useMemo(() => (item.stream_icon ? { uri: item.stream_icon } : undefined), [item.stream_icon]);
 
-    return (
-      <View style={[styles.channelCard, isFocused && styles.channelCardFocused]}>
-        <View style={styles.channelIcon}>
-          {imageSource ? (
-            <Image source={imageSource} style={styles.channelImage} resizeMode="contain" />
-          ) : (
-            <View style={styles.channelPlaceholder}>
-              <Text style={styles.channelPlaceholderText}>
-                {item.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.channelName} numberOfLines={2}>
-          {item.name}
-        </Text>
+  return (
+    <View style={[styles.channelCard, isFocused && styles.channelCardFocused]}>
+      <View style={styles.channelIcon}>
+        {imageSource ? (
+          <Image source={imageSource} style={styles.channelImage} resizeMode="contain" />
+        ) : (
+          <View style={styles.channelPlaceholder}>
+            <Text style={styles.channelPlaceholderText}>{item.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
       </View>
-    );
-  },
-);
+      <Text style={styles.channelName} numberOfLines={2}>
+        {item.name}
+      </Text>
+    </View>
+  );
+});
 
 const CategoryTab = React.memo(
-  ({
-    category,
-    isSelected,
-    isFocused,
-  }: {
-    category: XtreamCategory;
-    isSelected: boolean;
-    isFocused: boolean;
-  }) => (
+  ({ category, isSelected, isFocused }: { category: XtreamCategory; isSelected: boolean; isFocused: boolean }) => (
     <View
-      style={[
-        styles.categoryTab,
-        isSelected && styles.categoryTabSelected,
-        isFocused && styles.categoryTabFocused,
-      ]}
+      style={[styles.categoryTab, isSelected && styles.categoryTabSelected, isFocused && styles.categoryTabFocused]}
     >
-      <Text
-        style={[
-          styles.categoryTabText,
-          isSelected && styles.categoryTabTextSelected,
-        ]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.categoryTabText, isSelected && styles.categoryTabTextSelected]} numberOfLines={1}>
         {category.category_name}
       </Text>
     </View>
@@ -156,11 +131,7 @@ export default function LiveTVScreen() {
     ({ item }: { item: XtreamCategory }) => (
       <SpatialNavigationFocusableView onSelect={() => setSelectedCategory(item.category_id)}>
         {({ isFocused }) => (
-          <CategoryTab
-            category={item}
-            isSelected={selectedCategory === item.category_id}
-            isFocused={isFocused}
-          />
+          <CategoryTab category={item} isSelected={selectedCategory === item.category_id} isFocused={isFocused} />
         )}
       </SpatialNavigationFocusableView>
     ),
@@ -181,24 +152,16 @@ export default function LiveTVScreen() {
       <View style={styles.container}>
         <View style={styles.notConfigured}>
           <Text style={styles.notConfiguredTitle}>Not Connected</Text>
-          <Text style={styles.notConfiguredText}>
-            Please configure your Xtream connection in Settings
-          </Text>
+          <Text style={styles.notConfiguredText}>Please configure your Xtream connection in Settings</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <SpatialNavigationRoot
-      isActive={isActive}
-      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-    >
+    <SpatialNavigationRoot isActive={isActive} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
       <View style={styles.container}>
-        <PlatformLinearGradient
-          colors={colors.gradientBackground}
-          style={styles.backgroundGradient}
-        />
+        <PlatformLinearGradient colors={colors.gradientBackground} style={styles.backgroundGradient} />
         <View style={styles.header}>
           <Text style={styles.title}>Live TV</Text>
           <Text style={styles.subtitle}>
@@ -229,10 +192,7 @@ export default function LiveTVScreen() {
         {isLoading ? (
           <LoadingIndicator />
         ) : channels.length > 0 ? (
-          <SpatialNavigationScrollView
-            offsetFromStart={scaledPixels(20)}
-            style={styles.scrollView}
-          >
+          <SpatialNavigationScrollView offsetFromStart={scaledPixels(20)} style={styles.scrollView}>
             <View style={styles.section}>
               <SpatialNavigationNode>
                 <View style={styles.channelsGrid}>

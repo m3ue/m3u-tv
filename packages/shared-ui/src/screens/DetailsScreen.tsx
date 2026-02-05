@@ -27,7 +27,7 @@ export default function DetailsScreen() {
     rating,
     ratingCount,
     contentRating,
-    duration
+    duration,
   } = route.params;
 
   const isFocused = useIsFocused();
@@ -36,10 +36,7 @@ export default function DetailsScreen() {
   const imageSource = useMemo(() => ({ uri: headerImage }), [headerImage]);
 
   // Memoize button style to prevent unnecessary re-renders
-  const buttonStyle = useMemo(
-    () => ({ paddingHorizontal: scaledPixels(30) }),
-    [],
-  );
+  const buttonStyle = useMemo(() => ({ paddingHorizontal: scaledPixels(30) }), []);
 
   // Format duration from seconds to human-readable format
   const formattedDuration = useMemo(() => {
@@ -73,11 +70,7 @@ export default function DetailsScreen() {
         {/* Back Button */}
         <View style={detailsStyles.backButtonContainer}>
           <SpatialNavigationNode>
-            <FocusablePressable
-              text="Back"
-              onSelect={() => navigation.goBack()}
-              style={detailsStyles.backButton}
-            />
+            <FocusablePressable text="Back" onSelect={() => navigation.goBack()} style={detailsStyles.backButton} />
           </SpatialNavigationNode>
         </View>
         <View style={detailsStyles.contentContainer}>
@@ -86,18 +79,10 @@ export default function DetailsScreen() {
 
             {/* Metadata row */}
             <View style={detailsStyles.metadataRow}>
-              {releaseYear && (
-                <Text style={detailsStyles.metadataText}>{releaseYear}</Text>
-              )}
-              {contentRating && (
-                <Text style={detailsStyles.metadataText}>{contentRating}</Text>
-              )}
-              {formattedDuration && (
-                <Text style={detailsStyles.metadataText}>{formattedDuration}</Text>
-              )}
-              {ratingDisplay && (
-                <Text style={detailsStyles.metadataText}>{ratingDisplay}</Text>
-              )}
+              {releaseYear && <Text style={detailsStyles.metadataText}>{releaseYear}</Text>}
+              {contentRating && <Text style={detailsStyles.metadataText}>{contentRating}</Text>}
+              {formattedDuration && <Text style={detailsStyles.metadataText}>{formattedDuration}</Text>}
+              {ratingDisplay && <Text style={detailsStyles.metadataText}>{ratingDisplay}</Text>}
             </View>
 
             {/* Genres */}
@@ -129,11 +114,7 @@ export default function DetailsScreen() {
               </View>
             </View>
             <DefaultFocus>
-              <FocusablePressable
-                text={'Watch now'}
-                onSelect={navigate}
-                style={buttonStyle}
-              />
+              <FocusablePressable text={'Watch now'} onSelect={navigate} style={buttonStyle} />
             </DefaultFocus>
           </View>
         </View>
@@ -143,138 +124,138 @@ export default function DetailsScreen() {
 }
 
 const detailsStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    backgroundImage: {
-      position: 'absolute',
-      width: '100%',
-      height: '100%',
-      opacity: 0.6,
-    },
-    gradientOverlay: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    backButtonContainer: {
-      position: 'absolute',
-      top: scaledPixels(safeZones.actionSafe.vertical),
-      left: scaledPixels(safeZones.actionSafe.horizontal),
-      zIndex: 10,
-    },
-    backButton: {
-      // Let FocusablePressable handle focus states
-    },
-    contentContainer: {
-      flex: 1,
-      paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
-      paddingTop: scaledPixels(safeZones.titleSafe.vertical),
-      paddingBottom: scaledPixels(safeZones.actionSafe.vertical),
-      justifyContent: 'flex-end',
-    },
-    topContent: {
-      flex: 1,
-      justifyContent: 'center',
-    },
-    bottomContent: {
-      paddingBottom: scaledPixels(20),
-    },
-    title: {
-      fontSize: scaledPixels(64),
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: scaledPixels(24),
-      textShadowColor: 'rgba(0, 0, 0, 0.9)',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 12,
-    },
-    description: {
-      fontSize: scaledPixels(28),
-      color: colors.text,
-      marginBottom: scaledPixels(32),
-      width: '65%',
-      lineHeight: scaledPixels(40),
-      textShadowColor: 'rgba(0, 0, 0, 0.9)',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 8,
-    },
-    metadataRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: scaledPixels(16),
-      gap: scaledPixels(16),
-    },
-    metadataText: {
-      fontSize: scaledPixels(22),
-      color: colors.textSecondary,
-      fontWeight: '600',
-      textShadowColor: 'rgba(0, 0, 0, 0.8)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 4,
-    },
-    genresContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: scaledPixels(20),
-      gap: scaledPixels(12),
-    },
-    genreTag: {
-      backgroundColor: colors.cardElevated,
-      paddingHorizontal: scaledPixels(16),
-      paddingVertical: scaledPixels(8),
-      borderRadius: scaledPixels(20),
-      borderWidth: scaledPixels(1),
-      borderColor: colors.focusBorder,
-    },
-    genreText: {
-      fontSize: scaledPixels(18),
-      color: colors.text,
-      fontWeight: '600',
-    },
-    crewContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: scaledPixels(40),
-      gap: scaledPixels(48),
-    },
-    crewMember: {
-      marginBottom: scaledPixels(16),
-    },
-    crewRole: {
-      fontSize: scaledPixels(20),
-      color: colors.textSecondary,
-      fontWeight: '600',
-      marginBottom: scaledPixels(4),
-      textShadowColor: 'rgba(0, 0, 0, 0.8)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 4,
-    },
-    crewName: {
-      fontSize: scaledPixels(28),
-      color: colors.text,
-      fontWeight: 'bold',
-      textShadowColor: 'rgba(0, 0, 0, 0.8)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 6,
-    },
-    watchButton: {
-      backgroundColor: colors.cardElevated,
-      paddingVertical: scaledPixels(20),
-      paddingHorizontal: scaledPixels(40),
-      borderRadius: scaledPixels(8),
-      alignSelf: 'flex-start',
-    },
-    watchButtonFocused: {
-      backgroundColor: colors.focusBackground,
-    },
-    watchButtonText: {
-      color: colors.text,
-      fontSize: scaledPixels(24),
-      fontWeight: 'bold',
-    },
-    watchButtonTextFocused: {
-      color: colors.textOnPrimary,
-      fontSize: scaledPixels(24),
-      fontWeight: 'bold',
-    },
-  });
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.6,
+  },
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backButtonContainer: {
+    position: 'absolute',
+    top: scaledPixels(safeZones.actionSafe.vertical),
+    left: scaledPixels(safeZones.actionSafe.horizontal),
+    zIndex: 10,
+  },
+  backButton: {
+    // Let FocusablePressable handle focus states
+  },
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
+    paddingTop: scaledPixels(safeZones.titleSafe.vertical),
+    paddingBottom: scaledPixels(safeZones.actionSafe.vertical),
+    justifyContent: 'flex-end',
+  },
+  topContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bottomContent: {
+    paddingBottom: scaledPixels(20),
+  },
+  title: {
+    fontSize: scaledPixels(64),
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: scaledPixels(24),
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+  },
+  description: {
+    fontSize: scaledPixels(28),
+    color: colors.text,
+    marginBottom: scaledPixels(32),
+    width: '65%',
+    lineHeight: scaledPixels(40),
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: scaledPixels(16),
+    gap: scaledPixels(16),
+  },
+  metadataText: {
+    fontSize: scaledPixels(22),
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  genresContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: scaledPixels(20),
+    gap: scaledPixels(12),
+  },
+  genreTag: {
+    backgroundColor: colors.cardElevated,
+    paddingHorizontal: scaledPixels(16),
+    paddingVertical: scaledPixels(8),
+    borderRadius: scaledPixels(20),
+    borderWidth: scaledPixels(1),
+    borderColor: colors.focusBorder,
+  },
+  genreText: {
+    fontSize: scaledPixels(18),
+    color: colors.text,
+    fontWeight: '600',
+  },
+  crewContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: scaledPixels(40),
+    gap: scaledPixels(48),
+  },
+  crewMember: {
+    marginBottom: scaledPixels(16),
+  },
+  crewRole: {
+    fontSize: scaledPixels(20),
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: scaledPixels(4),
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  crewName: {
+    fontSize: scaledPixels(28),
+    color: colors.text,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  watchButton: {
+    backgroundColor: colors.cardElevated,
+    paddingVertical: scaledPixels(20),
+    paddingHorizontal: scaledPixels(40),
+    borderRadius: scaledPixels(8),
+    alignSelf: 'flex-start',
+  },
+  watchButtonFocused: {
+    backgroundColor: colors.focusBackground,
+  },
+  watchButtonText: {
+    color: colors.text,
+    fontSize: scaledPixels(24),
+    fontWeight: 'bold',
+  },
+  watchButtonTextFocused: {
+    color: colors.textOnPrimary,
+    fontSize: scaledPixels(24),
+    fontWeight: 'bold',
+  },
+});

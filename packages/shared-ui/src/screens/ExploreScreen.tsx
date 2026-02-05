@@ -40,17 +40,17 @@ export default function ExploreScreen() {
 }
 
 const exploreStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#000',
-      paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
-      paddingVertical: scaledPixels(safeZones.titleSafe.vertical),
-    },
-    title: {
-      fontSize: scaledPixels(32),
-      fontWeight: 'bold',
-      alignSelf: 'center',
-      color: '#fff',
-      marginBottom: scaledPixels(20),
-    },
-  });
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    paddingHorizontal: scaledPixels(safeZones.titleSafe.horizontal),
+    paddingVertical: scaledPixels(safeZones.titleSafe.vertical),
+  },
+  title: {
+    fontSize: scaledPixels(32),
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    color: '#fff',
+    marginBottom: scaledPixels(20),
+  },
+});

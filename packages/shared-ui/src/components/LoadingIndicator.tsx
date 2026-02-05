@@ -1,5 +1,5 @@
-import React from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 const LoadingIndicator = React.memo(() => {
   const styles = loadingIndicatorStyles;
@@ -11,11 +11,11 @@ const LoadingIndicator = React.memo(() => {
 });
 
 const loadingIndicatorStyles = StyleSheet.create({
-    loadingContainer: {
-      ...StyleSheet.absoluteFillObject,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-  });
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default LoadingIndicator;

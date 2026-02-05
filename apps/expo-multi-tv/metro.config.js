@@ -6,18 +6,12 @@ const path = require('path');
 const config = getDefaultConfig(__dirname); // eslint-disable-line no-undef
 
 // Configure Metro to work with Yarn workspaces
-config.watchFolders = [
-  path.resolve(__dirname, '../../packages/shared-ui'),
-  path.resolve(__dirname, '../..'),
-];
+config.watchFolders = [path.resolve(__dirname, '../../packages/shared-ui'), path.resolve(__dirname, '../..')];
 
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
-  nodeModulesPaths: [
-    path.resolve(__dirname, 'node_modules'),
-    path.resolve(__dirname, '../../node_modules'),
-  ],
+  nodeModulesPaths: [path.resolve(__dirname, 'node_modules'), path.resolve(__dirname, '../../node_modules')],
   extraNodeModules: {
     '@m3u-tv/shared-ui': path.resolve(__dirname, '../../packages/shared-ui/src'),
   },
@@ -36,10 +30,7 @@ config.cacheVersion = '1';
 //
 if (process.env?.EXPO_TV === '1') {
   const originalSourceExts = config.resolver.sourceExts;
-  const tvSourceExts = [
-    ...originalSourceExts.map((e) => `tv.${e}`),
-    ...originalSourceExts,
-  ];
+  const tvSourceExts = [...originalSourceExts.map((e) => `tv.${e}`), ...originalSourceExts];
   config.resolver.sourceExts = tvSourceExts;
 }
 

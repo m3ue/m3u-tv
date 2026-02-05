@@ -8,12 +8,12 @@ const KEY_CODE_MAPPING: Record<number, SupportedKeys> = {
   22: SupportedKeys.Right,
   20: SupportedKeys.Down,
   19: SupportedKeys.Up,
-  66: SupportedKeys.Enter,   // KEYCODE_ENTER
-  23: SupportedKeys.Enter,   // KEYCODE_DPAD_CENTER
-  96: SupportedKeys.Enter,   // KEYCODE_NUMPAD_ENTER
-  160: SupportedKeys.Enter,  // KEYCODE_BUTTON_A (gamepad)
+  66: SupportedKeys.Enter, // KEYCODE_ENTER
+  23: SupportedKeys.Enter, // KEYCODE_DPAD_CENTER
+  96: SupportedKeys.Enter, // KEYCODE_NUMPAD_ENTER
+  160: SupportedKeys.Enter, // KEYCODE_BUTTON_A (gamepad)
   67: SupportedKeys.Back,
-  4: SupportedKeys.Back,     // KEYCODE_BACK
+  4: SupportedKeys.Back, // KEYCODE_BACK
   85: SupportedKeys.PlayPause,
   89: SupportedKeys.Rewind,
   90: SupportedKeys.FastForward,

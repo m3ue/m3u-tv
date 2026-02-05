@@ -48,7 +48,7 @@ const CATALOG_URL = 'https://giolaq.github.io/scrap-tv-feed/catalog.json';
 
 // Transform catalog item to CardData format
 export const transformCatalogItem = (item: CatalogItem): CardData => {
-  const videoSource = item.sources.find(s => s.type === 'video/mp4') || item.sources[0];
+  const videoSource = item.sources.find((s) => s.type === 'video/mp4') || item.sources[0];
 
   return {
     id: item.id,

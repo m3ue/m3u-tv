@@ -150,14 +150,7 @@ export default function HomeScreen() {
   const renderLiveItem = useCallback(
     ({ item }: { item: XtreamLiveStream }) => (
       <SpatialNavigationFocusableView onSelect={() => handleChannelSelect(item)}>
-        {({ isFocused }) => (
-          <MediaCard
-            name={item.name}
-            image={item.stream_icon}
-            isFocused={isFocused}
-            type="live"
-          />
-        )}
+        {({ isFocused }) => <MediaCard name={item.name} image={item.stream_icon} isFocused={isFocused} type="live" />}
       </SpatialNavigationFocusableView>
     ),
     [handleChannelSelect],
@@ -201,32 +194,18 @@ export default function HomeScreen() {
   // Not connected state
   if (!isConfigured && !contextLoading) {
     return (
-      <SpatialNavigationRoot
-        isActive={isActive}
-        onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-      >
+      <SpatialNavigationRoot isActive={isActive} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
         <View style={styles.container}>
-          <PlatformLinearGradient
-            colors={colors.gradientBackground}
-            style={styles.backgroundGradient}
-          />
+          <PlatformLinearGradient colors={colors.gradientBackground} style={styles.backgroundGradient} />
           <View style={styles.welcomeContainer}>
-            <Image
-              source={require('../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.welcomeTitle}>Welcome to M3U TV</Text>
             <Text style={styles.welcomeSubtitle}>
               Connect to your Xtream service to start watching Live TV, Movies, and Series
             </Text>
             <SpatialNavigationNode>
               <DefaultFocus>
-                <FocusablePressable
-                  text="Go to Settings"
-                  onSelect={navigateToSettings}
-                  style={styles.welcomeButton}
-                />
+                <FocusablePressable text="Go to Settings" onSelect={navigateToSettings} style={styles.welcomeButton} />
               </DefaultFocus>
             </SpatialNavigationNode>
           </View>
@@ -245,28 +224,15 @@ export default function HomeScreen() {
   }
 
   return (
-    <SpatialNavigationRoot
-      isActive={isActive}
-      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-    >
+    <SpatialNavigationRoot isActive={isActive} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
       <View style={styles.container}>
-        <PlatformLinearGradient
-          colors={colors.gradientBackground}
-          style={styles.backgroundGradient}
-        />
+        <PlatformLinearGradient colors={colors.gradientBackground} style={styles.backgroundGradient} />
         <View style={styles.header}>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.headerSubtitle}>Your entertainment, anywhere</Text>
         </View>
 
-        <SpatialNavigationScrollView
-          offsetFromStart={scaledPixels(60)}
-          style={styles.scrollContent}
-        >
+        <SpatialNavigationScrollView offsetFromStart={scaledPixels(60)} style={styles.scrollContent}>
           {/* Live TV Section */}
           {liveChannels.length > 0 && (
             <View style={styles.section}>

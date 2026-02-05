@@ -9,13 +9,13 @@ const KEY_MAPPING: Record<string, SupportedKeys> = {
   up: SupportedKeys.Up,
   down: SupportedKeys.Down,
   select: SupportedKeys.Enter,
-  longSelect: SupportedKeys.Enter,  // Long press on center button
+  longSelect: SupportedKeys.Enter, // Long press on center button
   playPause: SupportedKeys.PlayPause,
   menu: SupportedKeys.Back,
   swipeLeft: SupportedKeys.Left,
   swipeRight: SupportedKeys.Right,
   swipeUp: SupportedKeys.Up,
-  swipeDown: SupportedKeys.Down
+  swipeDown: SupportedKeys.Down,
 };
 
 // Track if we've already set up the TVEventHandler to prevent duplicate listeners on hot reload

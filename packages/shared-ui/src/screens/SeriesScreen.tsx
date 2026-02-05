@@ -28,26 +28,11 @@ type SeriesNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Drawe
 const ITEM_SIZE = MEDIA_CARD_WIDTH + MEDIA_CARD_MARGIN;
 
 const CategoryTab = React.memo(
-  ({
-    category,
-    isSelected,
-    isFocused,
-  }: {
-    category: XtreamCategory;
-    isSelected: boolean;
-    isFocused: boolean;
-  }) => (
+  ({ category, isSelected, isFocused }: { category: XtreamCategory; isSelected: boolean; isFocused: boolean }) => (
     <View
-      style={[
-        styles.categoryTab,
-        isSelected && styles.categoryTabSelected,
-        isFocused && styles.categoryTabFocused,
-      ]}
+      style={[styles.categoryTab, isSelected && styles.categoryTabSelected, isFocused && styles.categoryTabFocused]}
     >
-      <Text
-        style={[styles.categoryTabText, isSelected && styles.categoryTabTextSelected]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.categoryTabText, isSelected && styles.categoryTabTextSelected]} numberOfLines={1}>
         {category.category_name}
       </Text>
     </View>
@@ -130,11 +115,7 @@ export default function SeriesScreen() {
     ({ item }: { item: XtreamCategory }) => (
       <SpatialNavigationFocusableView onSelect={() => setSelectedCategory(item.category_id)}>
         {({ isFocused }) => (
-          <CategoryTab
-            category={item}
-            isSelected={selectedCategory === item.category_id}
-            isFocused={isFocused}
-          />
+          <CategoryTab category={item} isSelected={selectedCategory === item.category_id} isFocused={isFocused} />
         )}
       </SpatialNavigationFocusableView>
     ),
@@ -164,24 +145,16 @@ export default function SeriesScreen() {
       <View style={styles.container}>
         <View style={styles.notConfigured}>
           <Text style={styles.notConfiguredTitle}>Not Connected</Text>
-          <Text style={styles.notConfiguredText}>
-            Please configure your Xtream connection in Settings
-          </Text>
+          <Text style={styles.notConfiguredText}>Please configure your Xtream connection in Settings</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <SpatialNavigationRoot
-      isActive={isActive}
-      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-    >
+    <SpatialNavigationRoot isActive={isActive} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
       <View style={styles.container}>
-        <PlatformLinearGradient
-          colors={colors.gradientBackground}
-          style={styles.backgroundGradient}
-        />
+        <PlatformLinearGradient colors={colors.gradientBackground} style={styles.backgroundGradient} />
         <View style={styles.header}>
           <Text style={styles.title}>TV Series</Text>
           <Text style={styles.subtitle}>
@@ -212,10 +185,7 @@ export default function SeriesScreen() {
         {isLoading ? (
           <LoadingIndicator />
         ) : seriesList.length > 0 ? (
-          <SpatialNavigationScrollView
-            offsetFromStart={scaledPixels(20)}
-            style={styles.scrollView}
-          >
+          <SpatialNavigationScrollView offsetFromStart={scaledPixels(20)} style={styles.scrollView}>
             <View style={styles.section}>
               <SpatialNavigationNode>
                 <View style={styles.listWrapper}>

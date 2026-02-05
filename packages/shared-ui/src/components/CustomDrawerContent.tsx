@@ -39,10 +39,7 @@ export default function CustomDrawerContent(props: any) {
   );
 
   return (
-    <SpatialNavigationRoot
-      isActive={isMenuOpen}
-      onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-    >
+    <SpatialNavigationRoot isActive={isMenuOpen} onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
       <View style={styles.drawerContainer}>
         {/* Gradient-like scrim overlay */}
         <View style={styles.scrimOverlay} />
@@ -55,11 +52,7 @@ export default function CustomDrawerContent(props: any) {
           }}
         >
           <View style={styles.header}>
-            <Image
-              source={require('../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.tagline}>m3u tv</Text>
           </View>
           <View style={styles.menuList}>

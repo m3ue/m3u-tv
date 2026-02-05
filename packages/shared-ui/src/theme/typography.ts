@@ -5,13 +5,13 @@ export const typography = {
   },
   // Optimized for 10-foot viewing distance (TV best practices)
   fontSize: {
-    xs: 16,    // Minimum readable size for TV
-    sm: 20,    // Small text, captions
-    md: 24,    // Body text
-    lg: 28,    // Subheadings
-    xl: 36,    // Headings
-    xxl: 48,   // Large headings
-    xxxl: 56,  // Hero titles
+    xs: 16, // Minimum readable size for TV
+    sm: 20, // Small text, captions
+    md: 24, // Body text
+    lg: 28, // Subheadings
+    xl: 36, // Headings
+    xxl: 48, // Large headings
+    xxxl: 56, // Hero titles
   },
   // Line heights for better readability
   lineHeight: {

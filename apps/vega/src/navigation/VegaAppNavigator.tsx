@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
-import { NavigationContainer, DarkTheme } from '@amazon-devices/react-navigation__native';
-import { Platform } from 'react-native';
-import { GestureHandlerRootView } from '@amazon-devices/react-native-gesture-handler';
-import { MenuProvider } from '@m3u-tv/shared-ui';
+import React, {useEffect} from 'react';
+import {
+  NavigationContainer,
+  DarkTheme,
+} from '@amazon-devices/react-navigation__native';
+import {Platform} from 'react-native';
+import {GestureHandlerRootView} from '@amazon-devices/react-native-gesture-handler';
+import {MenuProvider} from '@m3u-tv/shared-ui';
 import VegaRootNavigator from './VegaRootNavigator';
 
 export interface VegaAppNavigatorProps {
@@ -10,7 +13,10 @@ export interface VegaAppNavigatorProps {
   onReady?: () => void;
 }
 
-export default function VegaAppNavigator({ fontsLoaded = true, onReady }: VegaAppNavigatorProps) {
+export default function VegaAppNavigator({
+  fontsLoaded = true,
+  onReady,
+}: VegaAppNavigatorProps) {
   useEffect(() => {
     // Import remote control config for TV platforms
     if (Platform.isTV) {
@@ -34,7 +40,7 @@ export default function VegaAppNavigator({ fontsLoaded = true, onReady }: VegaAp
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{flex: 1}}>
       <NavigationContainer theme={DarkTheme}>
         <MenuProvider>
           <VegaRootNavigator />

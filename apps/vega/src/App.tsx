@@ -8,4 +8,3 @@ import '../../../packages/shared-ui/src/app/configureRemoteControl';
 export const App = () => {
   return <VegaAppNavigator fontsLoaded={true} />;
 };
- 

@@ -64,46 +64,49 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
-  const connect = useCallback(async (credentials: XtreamCredentials): Promise<boolean> => {
-    try {
-      setLoading(true);
-      xtreamService.setCredentials(credentials);
+  const connect = useCallback(
+    async (credentials: XtreamCredentials): Promise<boolean> => {
+      try {
+        setLoading(true);
+        xtreamService.setCredentials(credentials);
 
-      const authResponse = await xtreamService.authenticate();
+        const authResponse = await xtreamService.authenticate();
 
-      if (authResponse.user_info.auth !== 1) {
-        setError('Authentication failed. Please check your credentials.');
+        if (authResponse.user_info.auth !== 1) {
+          setError('Authentication failed. Please check your credentials.');
+          return false;
+        }
+
+        // Save credentials
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+
+        // Fetch initial categories
+        const [liveCategories, vodCategories, seriesCategories] = await Promise.all([
+          xtreamService.getLiveCategories(),
+          xtreamService.getVodCategories(),
+          xtreamService.getSeriesCategories(),
+        ]);
+
+        setState((prev) => ({
+          ...prev,
+          isConfigured: true,
+          isLoading: false,
+          error: null,
+          authResponse,
+          liveCategories,
+          vodCategories,
+          seriesCategories,
+        }));
+
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to connect';
+        setError(message);
         return false;
       }
-
-      // Save credentials
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
-
-      // Fetch initial categories
-      const [liveCategories, vodCategories, seriesCategories] = await Promise.all([
-        xtreamService.getLiveCategories(),
-        xtreamService.getVodCategories(),
-        xtreamService.getSeriesCategories(),
-      ]);
-
-      setState((prev) => ({
-        ...prev,
-        isConfigured: true,
-        isLoading: false,
-        error: null,
-        authResponse,
-        liveCategories,
-        vodCategories,
-        seriesCategories,
-      }));
-
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to connect';
-      setError(message);
-      return false;
-    }
-  }, [setLoading, setError]);
+    },
+    [setLoading, setError],
+  );
 
   const disconnect = useCallback(async () => {
     await AsyncStorage.removeItem(STORAGE_KEY);
@@ -203,11 +206,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
     clearError,
   };
 
-  return (
-    <XtreamContext.Provider value={value}>
-      {children}
-    </XtreamContext.Provider>
-  );
+  return <XtreamContext.Provider value={value}>{children}</XtreamContext.Provider>;
 }
 
 export function useXtream(): XtreamContextValue {

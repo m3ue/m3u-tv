@@ -7,6 +7,6 @@ export type DrawerParamList = {
 
 export type RootStackParamList = {
   Main: undefined;
-  Details: { itemId: string };
-  Player: { videoId: string };
+  Details: {itemId: string};
+  Player: {videoId: string};
 };

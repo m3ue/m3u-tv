@@ -11,49 +11,72 @@ const path = require('path');
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  watchFolders: [
-    path.resolve(__dirname, '../../packages/shared-ui'),
-  ],
+  watchFolders: [path.resolve(__dirname, '../../packages/shared-ui')],
   resolver: {
     unstable_enableSymlinks: true,
-    sourceExts: ['vega.tsx', 'vega.ts', 'vega.js', 'tsx', 'ts', 'jsx', 'js', 'json'],
+    sourceExts: [
+      'vega.tsx',
+      'vega.ts',
+      'vega.js',
+      'tsx',
+      'ts',
+      'jsx',
+      'js',
+      'json',
+    ],
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
       path.resolve(__dirname, '../../node_modules'),
     ],
-    extraNodeModules: (function() {
+    extraNodeModules: (function () {
       const modules = {
-        'react': path.resolve(__dirname, 'node_modules/react'),
+        react: path.resolve(__dirname, 'node_modules/react'),
         'react-native': path.resolve(__dirname, 'node_modules/react-native'),
-        '@babel/runtime': path.resolve(__dirname, 'node_modules/@babel/runtime'),
+        '@babel/runtime': path.resolve(
+          __dirname,
+          'node_modules/@babel/runtime',
+        ),
       };
 
       // Map navigation packages to Amazon Devices ports for Vega
       const navigationMappings = {
         '@react-navigation/native': '@amazon-devices/react-navigation__native',
-        '@react-navigation/native-stack': '@amazon-devices/react-navigation__native-stack',
+        '@react-navigation/native-stack':
+          '@amazon-devices/react-navigation__native-stack',
         '@react-navigation/drawer': '@amazon-devices/react-navigation__drawer',
         '@react-navigation/core': '@amazon-devices/react-navigation__core',
-        '@react-navigation/routers': '@amazon-devices/react-navigation__routers',
-        '@react-navigation/elements': '@amazon-devices/react-navigation__elements',
+        '@react-navigation/routers':
+          '@amazon-devices/react-navigation__routers',
+        '@react-navigation/elements':
+          '@amazon-devices/react-navigation__elements',
       };
 
       // Map system libs to Amazon Devices versions
       const systemMappings = {
-        'react-native-gesture-handler': '@amazon-devices/react-native-gesture-handler',
+        'react-native-gesture-handler':
+          '@amazon-devices/react-native-gesture-handler',
         'react-native-reanimated': '@amazon-devices/react-native-reanimated',
-        'react-native-safe-area-context': '@amazon-devices/react-native-safe-area-context',
+        'react-native-safe-area-context':
+          '@amazon-devices/react-native-safe-area-context',
         'react-native-screens': '@amazon-devices/react-native-screens',
       };
 
       // Apply mappings - ensure we're resolving to vega's node_modules
-      Object.keys(navigationMappings).forEach(key => {
-        const target = path.resolve(__dirname, 'node_modules', navigationMappings[key]);
+      Object.keys(navigationMappings).forEach((key) => {
+        const target = path.resolve(
+          __dirname,
+          'node_modules',
+          navigationMappings[key],
+        );
         modules[key] = target;
       });
 
-      Object.keys(systemMappings).forEach(key => {
-        const target = path.resolve(__dirname, 'node_modules', systemMappings[key]);
+      Object.keys(systemMappings).forEach((key) => {
+        const target = path.resolve(
+          __dirname,
+          'node_modules',
+          systemMappings[key],
+        );
         modules[key] = target;
       });
 
@@ -64,23 +87,43 @@ const config = {
     blockList: [
       // Block standard react-navigation packages from parent node_modules
       new RegExp(
-        path.resolve(__dirname, '..', 'node_modules', '@react-navigation').replace(/[/\\]/g, '[/\\\\]')
+        path
+          .resolve(__dirname, '..', 'node_modules', '@react-navigation')
+          .replace(/[/\\]/g, '[/\\\\]'),
       ),
       // Block standard gesture handler from parent node_modules
       new RegExp(
-        path.resolve(__dirname, '..', 'node_modules', 'react-native-gesture-handler').replace(/[/\\]/g, '[/\\\\]')
+        path
+          .resolve(
+            __dirname,
+            '..',
+            'node_modules',
+            'react-native-gesture-handler',
+          )
+          .replace(/[/\\]/g, '[/\\\\]'),
       ),
       // Block standard reanimated from parent node_modules
       new RegExp(
-        path.resolve(__dirname, '..', 'node_modules', 'react-native-reanimated').replace(/[/\\]/g, '[/\\\\]')
+        path
+          .resolve(__dirname, '..', 'node_modules', 'react-native-reanimated')
+          .replace(/[/\\]/g, '[/\\\\]'),
       ),
       // Block standard screens from parent node_modules
       new RegExp(
-        path.resolve(__dirname, '..', 'node_modules', 'react-native-screens').replace(/[/\\]/g, '[/\\\\]')
+        path
+          .resolve(__dirname, '..', 'node_modules', 'react-native-screens')
+          .replace(/[/\\]/g, '[/\\\\]'),
       ),
       // Block standard safe-area-context from parent node_modules
       new RegExp(
-        path.resolve(__dirname, '..', 'node_modules', 'react-native-safe-area-context').replace(/[/\\]/g, '[/\\\\]')
+        path
+          .resolve(
+            __dirname,
+            '..',
+            'node_modules',
+            'react-native-safe-area-context',
+          )
+          .replace(/[/\\]/g, '[/\\\\]'),
       ),
     ],
   },

@@ -41,17 +41,20 @@ export default function PlayerScreen() {
     }, 5000);
   }, []);
 
-  const seek = useCallback((time: number) => {
-    if (time < 0) {
-      time = 0;
-    } else if (time > durationRef.current) {
-      time = durationRef.current;
-    }
-    videoRef.current?.seek(time);
-    currentTimeRef.current = time;
-    setCurrentTime(time);
-    showControls();
-  }, [showControls]);
+  const seek = useCallback(
+    (time: number) => {
+      if (time < 0) {
+        time = 0;
+      } else if (time > durationRef.current) {
+        time = durationRef.current;
+      }
+      videoRef.current?.seek(time);
+      currentTimeRef.current = time;
+      setCurrentTime(time);
+      showControls();
+    },
+    [showControls],
+  );
 
   const togglePausePlay = useCallback(() => {
     setPaused((prev) => !prev);
@@ -131,14 +134,14 @@ export default function PlayerScreen() {
 }
 
 const playerStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#000',
-    },
-    controlsContainer: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'space-between',
-      zIndex: 1,
-    },
-  });
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  controlsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'space-between',
+    zIndex: 1,
+  },
+});

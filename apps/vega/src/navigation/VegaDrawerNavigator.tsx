@@ -1,17 +1,27 @@
-import { useCallback, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { createDrawerNavigator } from '@amazon-devices/react-navigation__drawer';
-import { useNavigation, DrawerActions } from '@amazon-devices/react-navigation__native';
-import { SpatialNavigationRoot } from 'react-tv-space-navigation';
-import { Direction } from '@bam.tech/lrud';
-import { useMenuContext, scaledPixels, HomeScreen, ExploreScreen, TVScreen, SettingsScreen } from '@m3u-tv/shared-ui';
+import {useCallback, useEffect} from 'react';
+import {StyleSheet, View} from 'react-native';
+import {createDrawerNavigator} from '@amazon-devices/react-navigation__drawer';
+import {
+  useNavigation,
+  DrawerActions,
+} from '@amazon-devices/react-navigation__native';
+import {SpatialNavigationRoot} from 'react-tv-space-navigation';
+import {Direction} from '@bam.tech/lrud';
+import {
+  useMenuContext,
+  scaledPixels,
+  HomeScreen,
+  ExploreScreen,
+  TVScreen,
+  SettingsScreen,
+} from '@m3u-tv/shared-ui';
 import VegaCustomDrawerContent from '../components/VegaCustomDrawerContent';
-import { DrawerParamList } from './types';
+import {DrawerParamList} from './types';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
 function DrawerSyncWrapper() {
-  const { isOpen: isMenuOpen } = useMenuContext();
+  const {isOpen: isMenuOpen} = useMenuContext();
   const navigation = useNavigation();
 
   // Open drawer on mount if menu context says it should be open
@@ -26,7 +36,7 @@ function DrawerSyncWrapper() {
 
 export default function VegaDrawerNavigator() {
   const styles = drawerStyles;
-  const { isOpen: isMenuOpen, toggleMenu } = useMenuContext();
+  const {isOpen: isMenuOpen, toggleMenu} = useMenuContext();
   const navigation = useNavigation();
 
   const onDirectionHandledWithoutMovement = useCallback(
@@ -40,11 +50,10 @@ export default function VegaDrawerNavigator() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{flex: 1}}>
       <SpatialNavigationRoot
         isActive={isMenuOpen}
-        onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}
-      >
+        onDirectionHandledWithoutMovement={onDirectionHandledWithoutMovement}>
         <Drawer.Navigator
           drawerContent={VegaCustomDrawerContent}
           initialRouteName="Home"
@@ -62,8 +71,7 @@ export default function VegaDrawerNavigator() {
             swipeEnabled: false,
             // Disable animations to avoid Reanimated worklet issues on TV
             animationEnabled: false,
-          }}
-        >
+          }}>
           <Drawer.Screen
             name="Home"
             component={HomeScreen}
@@ -100,14 +108,14 @@ export default function VegaDrawerNavigator() {
 }
 
 const drawerStyles = StyleSheet.create({
-    drawerStyle: {
-      width: scaledPixels(300),
-      backgroundColor: '#2c3e50',
-      paddingTop: scaledPixels(0),
-    },
-    drawerLabelStyle: {
-      fontSize: scaledPixels(18),
-      fontWeight: 'bold',
-      marginLeft: scaledPixels(10),
-    },
-  });
+  drawerStyle: {
+    width: scaledPixels(300),
+    backgroundColor: '#2c3e50',
+    paddingTop: scaledPixels(0),
+  },
+  drawerLabelStyle: {
+    fontSize: scaledPixels(18),
+    fontWeight: 'bold',
+    marginLeft: scaledPixels(10),
+  },
+});

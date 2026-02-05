@@ -17,15 +17,7 @@ interface EPGTimelineProps {
 }
 
 const ProgramItem = React.memo(
-  ({
-    program,
-    isFocused,
-    isNowPlaying,
-  }: {
-    program: XtreamEpgListing;
-    isFocused: boolean;
-    isNowPlaying: boolean;
-  }) => {
+  ({ program, isFocused, isNowPlaying }: { program: XtreamEpgListing; isFocused: boolean; isNowPlaying: boolean }) => {
     const startTime = new Date(program.start_timestamp * 1000);
     const endTime = new Date(program.stop_timestamp * 1000);
 
@@ -120,9 +112,7 @@ export default function EPGTimeline({ streamId, channelName, onProgramSelect }: 
           <Text style={styles.headerSubtitle}>Program Guide</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            {error || 'No program information available'}
-          </Text>
+          <Text style={styles.emptyText}>{error || 'No program information available'}</Text>
         </View>
       </View>
     );
@@ -138,16 +128,9 @@ export default function EPGTimeline({ streamId, channelName, onProgramSelect }: 
       <SpatialNavigationScrollView style={styles.programList}>
         <SpatialNavigationNode orientation="vertical">
           {programs.map((program, index) => (
-            <SpatialNavigationFocusableView
-              key={program.id || index}
-              onSelect={() => onProgramSelect?.(program)}
-            >
+            <SpatialNavigationFocusableView key={program.id || index} onSelect={() => onProgramSelect?.(program)}>
               {({ isFocused }) => (
-                <ProgramItem
-                  program={program}
-                  isFocused={isFocused}
-                  isNowPlaying={isNowPlaying(program)}
-                />
+                <ProgramItem program={program} isFocused={isFocused} isNowPlaying={isNowPlaying(program)} />
               )}
             </SpatialNavigationFocusableView>
           ))}

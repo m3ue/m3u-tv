@@ -128,14 +128,10 @@ export class VideoHandler {
    */
   preBufferVideo = async (componentInstance?: IComponentInstance) => {
     await this.destroyVideoElements();
-    console.info(
-      '[VideoHandler] - preBufferVideo - Attempt to prebuffer Video Player',
-    );
+    console.info('[VideoHandler] - preBufferVideo - Attempt to prebuffer Video Player');
 
     if (this.videoRef.current == null) {
-      console.info(
-        '[VideoHandler] - preBufferVideo - Current video is null, create new Video Player',
-      );
+      console.info('[VideoHandler] - preBufferVideo - Current video is null, create new Video Player');
       this.videoRef.current = new VideoPlayer();
     }
     (global as any).gmedia = this.videoRef.current;
@@ -143,16 +139,11 @@ export class VideoHandler {
     // KMC (Kepler Media Controls) integration
     if (componentInstance) {
       try {
-        console.info(
-          '[VideoHandler] - preBufferVideo - KMC: set Media Control Focus',
-        );
+        console.info('[VideoHandler] - preBufferVideo - KMC: set Media Control Focus');
         const { AppOverrideMediaControlHandler } = await import('./AppOverrideMediaControlHandler.kepler');
         await this.videoRef.current.setMediaControlFocus(
           componentInstance,
-          new AppOverrideMediaControlHandler(
-            this.videoRef.current as VideoPlayer,
-            false,
-          ),
+          new AppOverrideMediaControlHandler(this.videoRef.current as VideoPlayer, false),
         );
       } catch (error) {
         console.error('[VideoHandler] - Error during KMC execution', error);
@@ -191,17 +182,10 @@ export class VideoHandler {
   /**
    * Loads static media content (MP4 files)
    */
-  loadStaticMediaPlayer = (video: {
-    src: string;
-    autoplay: boolean;
-    pause: () => void;
-    load: () => void;
-  }) => {
+  loadStaticMediaPlayer = (video: { src: string; autoplay: boolean; pause: () => void; load: () => void }) => {
     video.src = this.videoUri;
     video.pause();
-    console.log(
-      `[VideoHandler] - loadStaticMediaPlayer - Loading with: ${video.src}`,
-    );
+    console.log(`[VideoHandler] - loadStaticMediaPlayer - Loading with: ${video.src}`);
     video.load();
   };
 
@@ -305,10 +289,7 @@ export class VideoHandler {
    * Sets up all video event listeners
    */
   setupEventListeners = () => {
-    this.videoRef.current?.addEventListener(
-      'loadedmetadata',
-      this.onLoadedMetadata,
-    );
+    this.videoRef.current?.addEventListener('loadedmetadata', this.onLoadedMetadata);
     this.videoRef.current?.addEventListener('timeupdate', this.onTimeUpdate);
     this.videoRef.current?.addEventListener('ended', this.onEnded);
     this.videoRef.current?.addEventListener('error', this.onError);
@@ -322,10 +303,7 @@ export class VideoHandler {
    * Removes all video event listeners
    */
   removeEventListeners = () => {
-    this.videoRef.current?.removeEventListener(
-      'loadedmetadata',
-      this.onLoadedMetadata,
-    );
+    this.videoRef.current?.removeEventListener('loadedmetadata', this.onLoadedMetadata);
     this.videoRef.current?.removeEventListener('timeupdate', this.onTimeUpdate);
     this.videoRef.current?.removeEventListener('ended', this.onEnded);
     this.videoRef.current?.removeEventListener('error', this.onError);
@@ -356,8 +334,7 @@ export class VideoHandler {
       // Deinitialize the main video player
       if (this.videoRef.current) {
         console.log('[VideoHandler] - Deinitializing media synchronously');
-        const result: MediaPlayerDeInitStatus =
-          this.videoRef.current.deinitializeSync(timeout);
+        const result: MediaPlayerDeInitStatus = this.videoRef.current.deinitializeSync(timeout);
 
         if (result !== 'success') {
           console.error(`[VideoHandler] - Deinitialize sync failed - ${result}`);
