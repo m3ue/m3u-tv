@@ -204,6 +204,19 @@ export default function SeriesDetailsScreen() {
           </View>
         </View>
 
+        {/* Back Button - at top of navigation tree */}
+        <View style={styles.backButtonContainer}>
+          <SpatialNavigationNode>
+            <DefaultFocus>
+              <FocusablePressable
+                text="Back"
+                onSelect={() => navigation.goBack()}
+                style={styles.backButton}
+              />
+            </DefaultFocus>
+          </SpatialNavigationNode>
+        </View>
+
         {/* Season Tabs */}
         {seriesInfo?.seasons && seriesInfo.seasons.length > 0 && (
           <View style={styles.seasonsContainer}>
@@ -225,9 +238,9 @@ export default function SeriesDetailsScreen() {
           <Text style={styles.episodesTitle}>
             {currentEpisodes.length} Episode{currentEpisodes.length !== 1 ? 's' : ''}
           </Text>
-          <SpatialNavigationScrollView style={styles.episodesList}>
-            <SpatialNavigationNode>
-              <DefaultFocus>
+          {currentEpisodes.length > 0 ? (
+            <SpatialNavigationScrollView style={styles.episodesList}>
+              <SpatialNavigationNode>
                 <SpatialNavigationVirtualizedList
                   data={currentEpisodes}
                   orientation="horizontal"
@@ -236,20 +249,13 @@ export default function SeriesDetailsScreen() {
                   numberOfRenderedItems={6}
                   numberOfItemsVisibleOnScreen={4}
                 />
-              </DefaultFocus>
-            </SpatialNavigationNode>
-          </SpatialNavigationScrollView>
-        </View>
-
-        {/* Back Button */}
-        <View style={styles.backButtonContainer}>
-          <SpatialNavigationNode>
-            <FocusablePressable
-              text="Back"
-              onSelect={() => navigation.goBack()}
-              style={styles.backButton}
-            />
-          </SpatialNavigationNode>
+              </SpatialNavigationNode>
+            </SpatialNavigationScrollView>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No episodes available</Text>
+            </View>
+          )}
         </View>
       </View>
     </SpatialNavigationRoot>
@@ -406,5 +412,15 @@ const styles = StyleSheet.create({
   },
   backButton: {
     // Don't set backgroundColor here - let FocusablePressable handle focus states
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scaledPixels(40),
+  },
+  emptyStateText: {
+    color: colors.textSecondary,
+    fontSize: scaledPixels(24),
   },
 });

@@ -207,40 +207,44 @@ export default function VODScreen() {
         {/* Category Tabs */}
         <View style={styles.categoriesContainer}>
           <SpatialNavigationNode>
-            <SpatialNavigationVirtualizedList
-              data={allCategories}
-              orientation="horizontal"
-              renderItem={renderCategoryItem}
-              itemSize={scaledPixels(200)}
-              numberOfRenderedItems={8}
-              numberOfItemsVisibleOnScreen={6}
-            />
+            <DefaultFocus>
+              <SpatialNavigationVirtualizedList
+                data={allCategories}
+                orientation="horizontal"
+                renderItem={renderCategoryItem}
+                itemSize={scaledPixels(200)}
+                numberOfRenderedItems={8}
+                numberOfItemsVisibleOnScreen={6}
+              />
+            </DefaultFocus>
           </SpatialNavigationNode>
         </View>
 
         {/* Movies Grid */}
         {isLoading ? (
           <LoadingIndicator />
-        ) : (
+        ) : movies.length > 0 ? (
           <SpatialNavigationScrollView
             offsetFromStart={scaledPixels(20)}
             style={styles.moviesContainer}
           >
             <SpatialNavigationNode>
-              <DefaultFocus>
-                <View style={styles.moviesGrid}>
-                  <SpatialNavigationVirtualizedList
-                    data={movies}
-                    orientation="horizontal"
-                    renderItem={renderMovieItem}
-                    itemSize={scaledPixels(200)}
-                    numberOfRenderedItems={10}
-                    numberOfItemsVisibleOnScreen={6}
-                  />
-                </View>
-              </DefaultFocus>
+              <View style={styles.moviesGrid}>
+                <SpatialNavigationVirtualizedList
+                  data={movies}
+                  orientation="horizontal"
+                  renderItem={renderMovieItem}
+                  itemSize={scaledPixels(200)}
+                  numberOfRenderedItems={10}
+                  numberOfItemsVisibleOnScreen={6}
+                />
+              </View>
             </SpatialNavigationNode>
           </SpatialNavigationScrollView>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No movies found</Text>
+          </View>
         )}
       </View>
     </SpatialNavigationRoot>
@@ -375,6 +379,15 @@ const styles = StyleSheet.create({
     marginBottom: scaledPixels(16),
   },
   notConfiguredText: {
+    color: colors.textSecondary,
+    fontSize: scaledPixels(24),
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
     color: colors.textSecondary,
     fontSize: scaledPixels(24),
   },

@@ -11,7 +11,7 @@ import { Direction } from '@bam.tech/lrud';
 import { scaledPixels } from '../hooks/useScale';
 import { colors, safeZones } from '../theme';
 import FocusablePressable from '../components/FocusablePressable';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useMenuContext } from '../components/MenuContext';
 import { useXtream } from '../context/XtreamContext';
 
@@ -36,6 +36,11 @@ export default function SettingsScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  // Refs for TextInputs to programmatically focus them
+  const serverInputRef = useRef<TextInput>(null);
+  const usernameInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
   // Clear error when leaving screen
   useEffect(() => {
@@ -178,9 +183,11 @@ export default function SettingsScreen() {
                           <SpatialNavigationFocusableView
                             onFocus={() => setFocusedInput('server')}
                             onBlur={() => setFocusedInput(null)}
+                            onSelect={() => serverInputRef.current?.focus()}
                           >
                             {({ isFocused: inputFocused }) => (
                               <TextInput
+                                ref={serverInputRef}
                                 style={[
                                   styles.textInput,
                                   inputFocused && styles.textInputFocused,
@@ -202,9 +209,11 @@ export default function SettingsScreen() {
                         <SpatialNavigationFocusableView
                           onFocus={() => setFocusedInput('username')}
                           onBlur={() => setFocusedInput(null)}
+                          onSelect={() => usernameInputRef.current?.focus()}
                         >
                           {({ isFocused: inputFocused }) => (
                             <TextInput
+                              ref={usernameInputRef}
                               style={[
                                 styles.textInput,
                                 inputFocused && styles.textInputFocused,
@@ -225,9 +234,11 @@ export default function SettingsScreen() {
                         <SpatialNavigationFocusableView
                           onFocus={() => setFocusedInput('password')}
                           onBlur={() => setFocusedInput(null)}
+                          onSelect={() => passwordInputRef.current?.focus()}
                         >
                           {({ isFocused: inputFocused }) => (
                             <TextInput
+                              ref={passwordInputRef}
                               style={[
                                 styles.textInput,
                                 inputFocused && styles.textInputFocused,

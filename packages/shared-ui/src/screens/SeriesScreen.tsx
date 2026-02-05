@@ -215,40 +215,44 @@ export default function SeriesScreen() {
         {/* Category Tabs */}
         <View style={styles.categoriesContainer}>
           <SpatialNavigationNode>
-            <SpatialNavigationVirtualizedList
-              data={allCategories}
-              orientation="horizontal"
-              renderItem={renderCategoryItem}
-              itemSize={scaledPixels(200)}
-              numberOfRenderedItems={8}
-              numberOfItemsVisibleOnScreen={6}
-            />
+            <DefaultFocus>
+              <SpatialNavigationVirtualizedList
+                data={allCategories}
+                orientation="horizontal"
+                renderItem={renderCategoryItem}
+                itemSize={scaledPixels(200)}
+                numberOfRenderedItems={8}
+                numberOfItemsVisibleOnScreen={6}
+              />
+            </DefaultFocus>
           </SpatialNavigationNode>
         </View>
 
         {/* Series Grid */}
         {isLoading ? (
           <LoadingIndicator />
-        ) : (
+        ) : seriesList.length > 0 ? (
           <SpatialNavigationScrollView
             offsetFromStart={scaledPixels(20)}
             style={styles.seriesContainer}
           >
             <SpatialNavigationNode>
-              <DefaultFocus>
-                <View style={styles.seriesGrid}>
-                  <SpatialNavigationVirtualizedList
-                    data={seriesList}
-                    orientation="horizontal"
-                    renderItem={renderSeriesItem}
-                    itemSize={scaledPixels(200)}
-                    numberOfRenderedItems={10}
-                    numberOfItemsVisibleOnScreen={6}
-                  />
-                </View>
-              </DefaultFocus>
+              <View style={styles.seriesGrid}>
+                <SpatialNavigationVirtualizedList
+                  data={seriesList}
+                  orientation="horizontal"
+                  renderItem={renderSeriesItem}
+                  itemSize={scaledPixels(200)}
+                  numberOfRenderedItems={10}
+                  numberOfItemsVisibleOnScreen={6}
+                />
+              </View>
             </SpatialNavigationNode>
           </SpatialNavigationScrollView>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No series found</Text>
+          </View>
         )}
       </View>
     </SpatialNavigationRoot>
@@ -390,6 +394,15 @@ const styles = StyleSheet.create({
     marginBottom: scaledPixels(16),
   },
   notConfiguredText: {
+    color: colors.textSecondary,
+    fontSize: scaledPixels(24),
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
     color: colors.textSecondary,
     fontSize: scaledPixels(24),
   },
