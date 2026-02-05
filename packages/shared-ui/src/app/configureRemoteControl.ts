@@ -2,11 +2,14 @@ import { Directions, SpatialNavigation } from 'react-tv-space-navigation';
 import { SupportedKeys } from './remote-control/SupportedKeys';
 import RemoteControlManager from './remote-control/RemoteControlManager';
 
-// Prevent duplicate configuration on hot reload
-let isConfigured = false;
+// Prevent duplicate configuration across hot reloads by storing the flag on the global object
+const GLOBAL_KEY = '__spatialRemoteConfigured';
+const _global = global as any;
+let isConfigured = _global[GLOBAL_KEY] ?? false;
 
 if (!isConfigured) {
   isConfigured = true;
+  _global[GLOBAL_KEY] = true;
   console.log('[ConfigureRemoteControl] Configuring spatial navigation remote control');
 
   SpatialNavigation.configureRemoteControl({

@@ -62,4 +62,30 @@ class RemoteControlManager implements RemoteControlManagerInterface {
   };
 }
 
-export default new RemoteControlManager();
+// Ensure the manager is a global singleton so it survives Fast Refresh and
+// we don't lose native listener state when modules are reloaded.
+const GLOBAL_KEY = '__keplerRemoteControlManager';
+const _global = global as any;
+let keplerRemoteControlManager: RemoteControlManager;
+if (_global[GLOBAL_KEY]) {
+  keplerRemoteControlManager = _global[GLOBAL_KEY];
+  console.log('[RemoteControlManager.kepler] Reusing existing global RemoteControlManager instance');
+} else {
+  keplerRemoteControlManager = new RemoteControlManager();
+  _global[GLOBAL_KEY] = keplerRemoteControlManager;
+  console.log('[RemoteControlManager.kepler] Created new global RemoteControlManager instance');
+}
+
+// On HMR dispose, don't destroy the global singleton (preserve native hooks for the
+// running app). Log for visibility.
+if ((module as any).hot) {
+  (module as any).hot.dispose(() => {
+    try {
+      console.log('[RemoteControlManager.kepler] HMR dispose - leaving singleton intact');
+    } catch (err) {
+      console.error('[RemoteControlManager.kepler] HMR dispose handler failed:', err);
+    }
+  });
+}
+
+export default keplerRemoteControlManager;

@@ -106,4 +106,30 @@ class RemoteControlManager implements RemoteControlManagerInterface {
   };
 }
 
-export default new RemoteControlManager();
+// Ensure the manager is a global singleton so it survives Fast Refresh and
+// we don't lose native listener state when modules are reloaded.
+const GLOBAL_KEY = '__androidRemoteControlManager';
+const _global = global as any;
+let androidRemoteControlManager: RemoteControlManager;
+if (_global[GLOBAL_KEY]) {
+  androidRemoteControlManager = _global[GLOBAL_KEY];
+  console.log('[Android Remote] Reusing existing global RemoteControlManager instance');
+} else {
+  androidRemoteControlManager = new RemoteControlManager();
+  _global[GLOBAL_KEY] = androidRemoteControlManager;
+  console.log('[Android Remote] Created new global RemoteControlManager instance');
+}
+
+// On HMR dispose, don't destroy the global singleton (preserve native hooks for the
+// running app). Log for visibility.
+if ((module as any).hot) {
+  (module as any).hot.dispose(() => {
+    try {
+      console.log('[Android Remote] HMR dispose - leaving singleton intact');
+    } catch (err) {
+      console.error('[Android Remote] HMR dispose handler failed:', err);
+    }
+  });
+}
+
+export default androidRemoteControlManager;
