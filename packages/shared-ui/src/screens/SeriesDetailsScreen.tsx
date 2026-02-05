@@ -106,7 +106,7 @@ const EpisodeDetailModal = ({
           />
         )}
         <PlatformLinearGradient
-          colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.2)']}
+          colors={['transparent', 'rgba(0,0,0,0.4)', colors.background]}
           style={styles.modalGradient}
         />
 
@@ -251,7 +251,7 @@ export default function SeriesDetailsScreen() {
       {/* Full screen backdrop */}
       {seriesBackdrop && <Image source={{ uri: seriesBackdrop }} style={styles.fullscreenBackdrop} resizeMode="cover" />}
       <PlatformLinearGradient
-        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
+        colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', colors.background]}
         style={styles.fullscreenGradient}
       />
 

@@ -1,10 +1,9 @@
 import React, { ReactNode } from 'react';
-import { View, ViewStyle, StyleProp } from 'react-native';
+import { ViewStyle, StyleProp } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
- * Simple gradient replacement component
- * Uses the last color in the gradient array as a solid background
- * Does NOT use expo-linear-gradient to avoid platform compatibility issues
+ * Platform-agnostic gradient component
  */
 
 interface PlatformLinearGradientProps {
@@ -16,11 +15,25 @@ interface PlatformLinearGradientProps {
   children?: ReactNode;
 }
 
-const PlatformLinearGradient: React.FC<PlatformLinearGradientProps> = ({ colors, style, children }) => {
-  // Use the last color in the gradient array as the solid background
-  const fallbackColor = colors && colors.length > 0 ? colors[colors.length - 1] : 'rgba(0, 0, 0, 0.6)';
-
-  return <View style={[style as StyleProp<ViewStyle>, { backgroundColor: fallbackColor }]}>{children}</View>;
+const PlatformLinearGradient: React.FC<PlatformLinearGradientProps> = ({
+  colors,
+  style,
+  start,
+  end,
+  locations,
+  children,
+}) => {
+  return (
+    <LinearGradient
+      colors={colors}
+      style={style}
+      start={start}
+      end={end}
+      locations={locations}
+    >
+      {children}
+    </LinearGradient>
+  );
 };
 
 export default PlatformLinearGradient;
