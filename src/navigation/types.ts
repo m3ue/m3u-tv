@@ -12,8 +12,10 @@ export type RootStackParamList = {
     type: 'live' | 'vod' | 'series';
   };
   Details: {
-    item: XtreamLiveStream | XtreamVodStream | XtreamSeries;
-    type: 'live' | 'vod' | 'series';
+    item: XtreamVodStream;
+  };
+  SeriesDetails: {
+    item: XtreamSeries;
   };
 };
 

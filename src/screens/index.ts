@@ -4,3 +4,6 @@ export { LiveTVScreen } from './LiveTVScreen';
 export { EPGScreen } from './EPGScreen';
 export { VODScreen } from './VODScreen';
 export { SeriesScreen } from './SeriesScreen';
+export { MovieDetailsScreen } from './MovieDetailsScreen';
+export { SeriesDetailsScreen } from './SeriesDetailsScreen';
+export { PlayerScreen } from './PlayerScreen';

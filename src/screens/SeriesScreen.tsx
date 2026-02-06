@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
   ActivityIndicator,
 } from 'react-native';
@@ -12,6 +11,11 @@ import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamSeries } from '../types/xtream';
+import { scaledPixels } from '../hooks/useScale';
+import { FocusablePressable } from '../components/FocusablePressable';
+import { SpatialNavigationNode } from 'react-tv-space-navigation';
+
+const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 
 export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
   const { isConfigured, seriesCategories, series, fetchSeries } = useXtream();
@@ -31,12 +35,13 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
   };
 
   const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
-    <TouchableOpacity
-      style={[
+    <FocusablePressable
+      style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
+        isFocused && styles.categoryButtonFocused,
       ]}
-      onPress={() => setSelectedCategory(item.category_id)}
+      onSelect={() => setSelectedCategory(item.category_id)}
     >
       <Text
         style={[
@@ -47,17 +52,18 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
       >
         {item.category_name}
       </Text>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   const renderSeriesItem = ({ item }: { item: XtreamSeries }) => (
-    <TouchableOpacity
-      style={styles.seriesCard}
-      onPress={() => {
-        navigation.getParent()?.navigate('Details', {
-          item,
-          type: 'series',
-        });
+    <FocusablePressable
+      style={({ isFocused }) => [
+        styles.seriesCard,
+        isFocused && styles.seriesCardFocused,
+      ]}
+      onSelect={() => {
+        // @ts-ignore
+        navigation.navigate('SeriesDetails', { item });
       }}
     >
       <Image
@@ -66,19 +72,21 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
         resizeMode="cover"
       />
       <View style={styles.seriesInfo}>
-        <Text style={styles.seriesName} numberOfLines={2}>
+        <Text style={styles.seriesName} numberOfLines={1}>
           {item.name}
         </Text>
-        {item.rating_5based > 0 && (
-          <Text style={styles.seriesRating}>★ {item.rating_5based.toFixed(1)}</Text>
-        )}
-        {(item.release_date || item.releaseDate) && (
-          <Text style={styles.seriesYear}>
-            {(item.release_date || item.releaseDate)?.substring(0, 4)}
-          </Text>
-        )}
+        <View style={styles.seriesMeta}>
+          {item.rating_5based > 0 && (
+            <Text style={styles.seriesRating}>★ {item.rating_5based.toFixed(1)}</Text>
+          )}
+          {(item.release_date || item.releaseDate) && (
+            <Text style={styles.seriesYear}>
+              {(item.release_date || item.releaseDate)?.substring(0, 4)}
+            </Text>
+          )}
+        </View>
       </View>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   if (!isConfigured) {
@@ -92,31 +100,39 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
   return (
     <View style={styles.container}>
       {/* Category selector */}
-      <FlatList
-        horizontal
-        data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
-        keyExtractor={(item) => item.category_id || 'all'}
-        renderItem={renderCategoryItem}
-        style={styles.categoryList}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryListContent}
-      />
+      <View style={styles.categoryListContainer}>
+        <SpatialNavigationNode orientation="horizontal">
+          <FlatList
+            horizontal
+            data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
+            keyExtractor={(item) => item.category_id || 'all'}
+            renderItem={renderCategoryItem}
+            style={styles.categoryList}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryListContent}
+          />
+        </SpatialNavigationNode>
+      </View>
 
       {/* Series grid */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={series}
-          keyExtractor={(item) => String(item.series_id)}
-          renderItem={renderSeriesItem}
-          numColumns={5}
-          contentContainerStyle={styles.seriesGrid}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <View style={styles.gridContent}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <SpatialNavigationNode orientation="vertical">
+            <FlatList
+              data={series}
+              keyExtractor={(item) => String(item.series_id)}
+              renderItem={renderSeriesItem}
+              numColumns={6}
+              contentContainerStyle={styles.seriesGrid}
+              showsVerticalScrollIndicator={false}
+            />
+          </SpatialNavigationNode>
+        )}
+      </View>
     </View>
   );
 }
@@ -134,10 +150,10 @@ const styles = StyleSheet.create({
   },
   message: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.lg,
+    fontSize: scaledPixels(24),
   },
-  categoryList: {
-    maxHeight: 60,
+  categoryListContainer: {
+    height: scaledPixels(80),
     backgroundColor: colors.backgroundElevated,
   },
   categoryListContent: {

@@ -7,27 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		10E72FF27EE514C042233EAA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		148D3062786206E89E4B6549 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D178AC981DA487C817DF35B6 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		B14C6C1FD965B034064D56DE /* libPods-M3UTV.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4946C7A5BEDE5373BF519067 /* libPods-M3UTV.a */; };
+		6A4CBFEF03DA32239700537A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		DC90D47F6DD4B30BD11116B3 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5C061B05047F61492C2FA7 /* ExpoModulesProvider.swift */; };
+		DECE482830A3603F1DAE0101 /* libPods-M3UTV.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-M3UTV.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07F961A680F5B00A75B9A /* M3UTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = M3UTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = M3UTV/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = M3UTV/Info.plist; sourceTree = "<group>"; };
-		4946C7A5BEDE5373BF519067 /* libPods-M3UTV.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-M3UTV.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		63441FDF8A9900B6072B6F70 /* Pods-M3UTV.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.debug.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.debug.xcconfig"; sourceTree = "<group>"; };
-		6F5C061B05047F61492C2FA7 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-M3UTV/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-M3UTV/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.debug.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = M3UTV/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B656EE225EE980C18C5361BA /* Pods-M3UTV.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.release.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.release.xcconfig"; sourceTree = "<group>"; };
+		AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = M3UTV/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D178AC981DA487C817DF35B6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = M3UTV/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.release.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.release.xcconfig"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = M3UTV/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* M3UTV-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "M3UTV-Bridging-Header.h"; path = "M3UTV/M3UTV-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B14C6C1FD965B034064D56DE /* libPods-M3UTV.a in Frameworks */,
+				DECE482830A3603F1DAE0101 /* libPods-M3UTV.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				D178AC981DA487C817DF35B6 /* PrivacyInfo.xcprivacy */,
+				AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */,
 			);
 			name = M3UTV;
 			sourceTree = "<group>";
@@ -62,9 +62,17 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4946C7A5BEDE5373BF519067 /* libPods-M3UTV.a */,
+				01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		658797C913A2DD3D228BE110 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				D5BE06A1FF568C4B0E562561 /* M3UTV */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -81,8 +89,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				ED8A048628E0DEEA473520C0 /* Pods */,
-				C480E162C00577A7FF72A923 /* ExpoModulesProviders */,
+				E9868BF1A83F77508A68228C /* Pods */,
+				658797C913A2DD3D228BE110 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -106,27 +114,19 @@
 			path = M3UTV/Supporting;
 			sourceTree = "<group>";
 		};
-		C480E162C00577A7FF72A923 /* ExpoModulesProviders */ = {
+		D5BE06A1FF568C4B0E562561 /* M3UTV */ = {
 			isa = PBXGroup;
 			children = (
-				E3CFD90877BE3B76A641DC4D /* M3UTV */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
-		E3CFD90877BE3B76A641DC4D /* M3UTV */ = {
-			isa = PBXGroup;
-			children = (
-				6F5C061B05047F61492C2FA7 /* ExpoModulesProvider.swift */,
+				1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */,
 			);
 			name = M3UTV;
 			sourceTree = "<group>";
 		};
-		ED8A048628E0DEEA473520C0 /* Pods */ = {
+		E9868BF1A83F77508A68228C /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				63441FDF8A9900B6072B6F70 /* Pods-M3UTV.debug.xcconfig */,
-				B656EE225EE980C18C5361BA /* Pods-M3UTV.release.xcconfig */,
+				3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */,
+				EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "M3UTV" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				4214887639DA2B77E747568B /* [Expo] Configure project */,
+				985A54C6B37D62722D98A538 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				51782CE86E4603122FE114F9 /* [CP] Embed Pods Frameworks */,
+				D5F2501D54983AE3A0D202A5 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				148D3062786206E89E4B6549 /* PrivacyInfo.xcprivacy in Resources */,
+				10E72FF27EE514C042233EAA /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,7 +242,37 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		4214887639DA2B77E747568B /* [Expo] Configure project */ = {
+		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		985A54C6B37D62722D98A538 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -266,7 +296,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-M3UTV/expo-configure-project.sh\"\n";
 		};
-		51782CE86E4603122FE114F9 /* [CP] Embed Pods Frameworks */ = {
+		D5F2501D54983AE3A0D202A5 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -288,34 +318,6 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-resources.sh",
-				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -324,7 +326,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				DC90D47F6DD4B30BD11116B3 /* ExpoModulesProvider.swift in Sources */,
+				6A4CBFEF03DA32239700537A /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,7 +335,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 63441FDF8A9900B6072B6F70 /* Pods-M3UTV.debug.xcconfig */;
+			baseConfigurationReference = 3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
@@ -372,7 +374,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B656EE225EE980C18C5361BA /* Pods-M3UTV.release.xcconfig */;
+			baseConfigurationReference = EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;

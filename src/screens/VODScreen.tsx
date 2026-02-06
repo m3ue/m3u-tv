@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
   ActivityIndicator,
 } from 'react-native';
@@ -12,6 +11,11 @@ import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamVodStream } from '../types/xtream';
+import { scaledPixels } from '../hooks/useScale';
+import { FocusablePressable } from '../components/FocusablePressable';
+import { SpatialNavigationNode } from 'react-tv-space-navigation';
+
+const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 
 export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
   const { isConfigured, vodCategories, vodStreams, fetchVodStreams } = useXtream();
@@ -31,12 +35,13 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
   };
 
   const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
-    <TouchableOpacity
-      style={[
+    <FocusablePressable
+      style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
+        isFocused && styles.categoryButtonFocused,
       ]}
-      onPress={() => setSelectedCategory(item.category_id)}
+      onSelect={() => setSelectedCategory(item.category_id)}
     >
       <Text
         style={[
@@ -47,18 +52,18 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
       >
         {item.category_name}
       </Text>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   const renderMovieItem = ({ item }: { item: XtreamVodStream }) => (
-    <TouchableOpacity
-      style={styles.movieCard}
-      onPress={() => {
-        navigation.getParent()?.navigate('Player', {
-          streamUrl: `movie/${item.stream_id}.${item.container_extension}`,
-          title: item.name,
-          type: 'vod',
-        });
+    <FocusablePressable
+      style={({ isFocused }) => [
+        styles.movieCard,
+        isFocused && styles.movieCardFocused,
+      ]}
+      onSelect={() => {
+        // @ts-ignore
+        navigation.navigate('Details', { item });
       }}
     >
       <Image
@@ -67,14 +72,14 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
         resizeMode="cover"
       />
       <View style={styles.movieInfo}>
-        <Text style={styles.movieName} numberOfLines={2}>
+        <Text style={styles.movieName} numberOfLines={1}>
           {item.name}
         </Text>
         {item.rating_5based > 0 && (
           <Text style={styles.movieRating}>★ {item.rating_5based.toFixed(1)}</Text>
         )}
       </View>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   if (!isConfigured) {
@@ -88,31 +93,39 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
   return (
     <View style={styles.container}>
       {/* Category selector */}
-      <FlatList
-        horizontal
-        data={[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories]}
-        keyExtractor={(item) => item.category_id || 'all'}
-        renderItem={renderCategoryItem}
-        style={styles.categoryList}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryListContent}
-      />
+      <View style={styles.categoryListContainer}>
+        <SpatialNavigationNode orientation="horizontal">
+          <FlatList
+            horizontal
+            data={[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories]}
+            keyExtractor={(item) => item.category_id || 'all'}
+            renderItem={renderCategoryItem}
+            style={styles.categoryList}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryListContent}
+          />
+        </SpatialNavigationNode>
+      </View>
 
       {/* Movies grid */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={vodStreams}
-          keyExtractor={(item) => String(item.stream_id)}
-          renderItem={renderMovieItem}
-          numColumns={5}
-          contentContainerStyle={styles.movieGrid}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <View style={styles.gridContent}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <SpatialNavigationNode orientation="vertical">
+            <FlatList
+              data={vodStreams}
+              keyExtractor={(item) => String(item.stream_id)}
+              renderItem={renderMovieItem}
+              numColumns={6}
+              contentContainerStyle={styles.movieGrid}
+              showsVerticalScrollIndicator={false}
+            />
+          </SpatialNavigationNode>
+        )}
+      </View>
     </View>
   );
 }
@@ -130,34 +143,46 @@ const styles = StyleSheet.create({
   },
   message: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.lg,
+    fontSize: scaledPixels(24),
   },
-  categoryList: {
-    maxHeight: 60,
+  categoryListContainer: {
+    height: scaledPixels(80),
     backgroundColor: colors.backgroundElevated,
   },
+  categoryList: {
+    flex: 1,
+  },
   categoryListContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: scaledPixels(20),
+    alignItems: 'center',
   },
   categoryButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: scaledPixels(25),
+    paddingVertical: scaledPixels(12),
     backgroundColor: colors.card,
-    borderRadius: 20,
-    marginRight: spacing.sm,
+    borderRadius: scaledPixels(25),
+    marginHorizontal: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   categoryButtonActive: {
+    backgroundColor: 'rgba(236, 0, 63, 0.2)',
+    borderColor: colors.primary,
+  },
+  categoryButtonFocused: {
     backgroundColor: colors.primary,
+    transform: [{ scale: 1.1 }],
   },
   categoryText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(18),
   },
   categoryTextActive: {
-    color: colors.textOnPrimary,
-    fontWeight: typography.fontWeight.semibold,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  gridContent: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -165,31 +190,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   movieGrid: {
-    padding: spacing.md,
+    padding: scaledPixels(20),
   },
   movieCard: {
-    flex: 1,
-    margin: spacing.xs,
+    width: (1920 - SIDEBAR_WIDTH_COLLAPSED - scaledPixels(100)) / 6,
+    margin: scaledPixels(10),
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: scaledPixels(12),
     overflow: 'hidden',
-    maxWidth: '20%',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  movieCardFocused: {
+    borderColor: colors.primary,
+    transform: [{ scale: 1.05 }],
+    zIndex: 10,
   },
   moviePoster: {
     width: '100%',
     aspectRatio: 2 / 3,
   },
   movieInfo: {
-    padding: spacing.sm,
+    padding: scaledPixels(12),
   },
   movieName: {
     color: colors.text,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: scaledPixels(16),
+    fontWeight: '500',
   },
   movieRating: {
     color: colors.warning,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
+    fontSize: scaledPixels(14),
+    marginTop: scaledPixels(4),
   },
 });

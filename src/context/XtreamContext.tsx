@@ -33,6 +33,11 @@ interface XtreamContextValue extends XtreamState {
   fetchLiveStreams: (categoryId?: string) => Promise<XtreamLiveStream[]>;
   fetchVodStreams: (categoryId?: string) => Promise<XtreamVodStream[]>;
   fetchSeries: (categoryId?: string) => Promise<XtreamSeries[]>;
+  fetchVodInfo: (vodId: number) => Promise<XtreamVodInfo>;
+  fetchSeriesInfo: (seriesId: number) => Promise<XtreamSeriesInfo>;
+  getLiveStreamUrl: (streamId: number, format?: string) => string;
+  getVodStreamUrl: (streamId: number, extension?: string) => string;
+  getSeriesStreamUrl: (episodeId: string, extension?: string) => string;
   clearError: () => void;
 }
 
@@ -194,6 +199,26 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const fetchVodInfo = useCallback(async (vodId: number) => {
+    return await xtreamService.getVodInfo(vodId);
+  }, []);
+
+  const fetchSeriesInfo = useCallback(async (seriesId: number) => {
+    return await xtreamService.getSeriesInfo(seriesId);
+  }, []);
+
+  const getLiveStreamUrl = useCallback((streamId: number, format?: string) => {
+    return xtreamService.getLiveStreamUrl(streamId, format);
+  }, []);
+
+  const getVodStreamUrl = useCallback((streamId: number, extension?: string) => {
+    return xtreamService.getVodStreamUrl(streamId, extension);
+  }, []);
+
+  const getSeriesStreamUrl = useCallback((episodeId: string, extension?: string) => {
+    return xtreamService.getSeriesStreamUrl(episodeId, extension);
+  }, []);
+
   const value: XtreamContextValue = {
     ...state,
     connect,
@@ -203,6 +228,11 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
     fetchLiveStreams,
     fetchVodStreams,
     fetchSeries,
+    fetchVodInfo,
+    fetchSeriesInfo,
+    getLiveStreamUrl,
+    getVodStreamUrl,
+    getSeriesStreamUrl,
     clearError,
   };
 

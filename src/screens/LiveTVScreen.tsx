@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
   ActivityIndicator,
 } from 'react-native';
@@ -12,9 +11,13 @@ import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
+import { scaledPixels } from '../hooks/useScale';
+import { FocusablePressable } from '../components/FocusablePressable';
+import { SpatialNavigationNode } from 'react-tv-space-navigation';
 
 export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
-  const { isConfigured, liveCategories, liveStreams, fetchLiveStreams } = useXtream();
+  const { isConfigured, liveCategories, fetchLiveStreams, getLiveStreamUrl } = useXtream();
+  const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,17 +29,19 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
 
   const loadStreams = async () => {
     setIsLoading(true);
-    await fetchLiveStreams(selectedCategory);
+    const streams = await fetchLiveStreams(selectedCategory);
+    setLiveStreams(streams);
     setIsLoading(false);
   };
 
   const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
-    <TouchableOpacity
-      style={[
+    <FocusablePressable
+      style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
+        isFocused && styles.categoryButtonFocused,
       ]}
-      onPress={() => setSelectedCategory(item.category_id)}
+      onSelect={() => setSelectedCategory(item.category_id)}
     >
       <Text
         style={[
@@ -47,16 +52,20 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
       >
         {item.category_name}
       </Text>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   const renderStreamItem = ({ item }: { item: XtreamLiveStream }) => (
-    <TouchableOpacity
-      style={styles.channelCard}
-      onPress={() => {
-        // Navigate to player
-        navigation.getParent()?.navigate('Player', {
-          streamUrl: `live/${item.stream_id}`,
+    <FocusablePressable
+      style={({ isFocused }) => [
+        styles.channelCard,
+        isFocused && styles.channelCardFocused
+      ]}
+      onSelect={() => {
+        const streamUrl = getLiveStreamUrl(item.stream_id);
+        // @ts-ignore
+        navigation.navigate('Player', {
+          streamUrl,
           title: item.name,
           type: 'live',
         });
@@ -70,7 +79,7 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
       <Text style={styles.channelName} numberOfLines={2}>
         {item.name}
       </Text>
-    </TouchableOpacity>
+    </FocusablePressable>
   );
 
   if (!isConfigured) {
@@ -84,31 +93,39 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
   return (
     <View style={styles.container}>
       {/* Category selector */}
-      <FlatList
-        horizontal
-        data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
-        keyExtractor={(item) => item.category_id || 'all'}
-        renderItem={renderCategoryItem}
-        style={styles.categoryList}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryListContent}
-      />
+      <View style={styles.categoryListContainer}>
+        <SpatialNavigationNode orientation="horizontal">
+          <FlatList
+            horizontal
+            data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
+            keyExtractor={(item) => item.category_id || 'all'}
+            renderItem={renderCategoryItem}
+            style={styles.categoryList}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryListContent}
+          />
+        </SpatialNavigationNode>
+      </View>
 
       {/* Channels grid */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={liveStreams}
-          keyExtractor={(item) => String(item.stream_id)}
-          renderItem={renderStreamItem}
-          numColumns={4}
-          contentContainerStyle={styles.channelGrid}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <View style={styles.gridContainer}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <SpatialNavigationNode orientation="vertical">
+            <FlatList
+              data={liveStreams}
+              keyExtractor={(item) => String(item.stream_id)}
+              renderItem={renderStreamItem}
+              numColumns={6}
+              contentContainerStyle={styles.channelGrid}
+              showsVerticalScrollIndicator={false}
+            />
+          </SpatialNavigationNode>
+        )}
+      </View>
     </View>
   );
 }
@@ -120,40 +137,51 @@ const styles = StyleSheet.create({
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   message: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.lg,
+    fontSize: scaledPixels(24),
   },
-  categoryList: {
-    maxHeight: 60,
+  categoryListContainer: {
+    height: scaledPixels(80),
     backgroundColor: colors.backgroundElevated,
   },
+  categoryList: {
+    flex: 1,
+  },
   categoryListContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: scaledPixels(20),
+    alignItems: 'center',
   },
   categoryButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: scaledPixels(25),
+    paddingVertical: scaledPixels(12),
     backgroundColor: colors.card,
-    borderRadius: 20,
-    marginRight: spacing.sm,
+    borderRadius: scaledPixels(25),
+    marginHorizontal: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   categoryButtonActive: {
+    backgroundColor: 'rgba(236, 0, 63, 0.2)',
+    borderColor: colors.primary,
+  },
+  categoryButtonFocused: {
     backgroundColor: colors.primary,
+    transform: [{ scale: 1.1 }],
   },
   categoryText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(18),
   },
   categoryTextActive: {
-    color: colors.textOnPrimary,
-    fontWeight: typography.fontWeight.semibold,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  gridContainer: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -161,22 +189,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   channelGrid: {
-    padding: spacing.md,
+    padding: scaledPixels(20),
   },
   channelCard: {
     flex: 1,
-    margin: spacing.xs,
+    margin: scaledPixels(10),
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: spacing.md,
+    borderRadius: scaledPixels(12),
+    padding: scaledPixels(15),
     alignItems: 'center',
-    maxWidth: '25%',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    maxWidth: '16.6%',
+  },
+  channelCardFocused: {
+    borderColor: colors.primary,
+    transform: [{ scale: 1.05 }],
+    zIndex: 10,
   },
   channelIcon: {
-    width: 80,
-    height: 60,
-    marginBottom: spacing.sm,
-    borderRadius: 4,
+    width: scaledPixels(80),
+    height: scaledPixels(80),
+    marginBottom: scaledPixels(10),
   },
   channelName: {
     color: colors.text,
