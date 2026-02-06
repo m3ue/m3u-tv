@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
+import { scaledPixels } from '../hooks/useScale';
+import { FocusablePressable } from '../components/FocusablePressable';
 import { DrawerScreenPropsType } from '../navigation/types';
 
 export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
@@ -25,12 +28,23 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
       <View style={styles.container}>
         <Text style={styles.title}>Welcome to M3U TV</Text>
         <Text style={styles.subtitle}>Connect to your Xtream service to get started</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Text style={styles.settingsButtonText}>Go to Settings</Text>
-        </TouchableOpacity>
+        <SpatialNavigationNode orientation="horizontal">
+          <DefaultFocus>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.settingsButton,
+                isFocused && styles.buttonFocused,
+              ]}
+              onSelect={() => navigation.navigate('Settings')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
+                  Go to Settings
+                </Text>
+              )}
+            </FocusablePressable>
+          </DefaultFocus>
+        </SpatialNavigationNode>
       </View>
     );
   }
@@ -55,32 +69,64 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         </View>
       </View>
 
-      <View style={styles.menuContainer}>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('LiveTV')}
-        >
-          <Text style={styles.menuButtonText}>Live TV</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('EPG')}
-        >
-          <Text style={styles.menuButtonText}>EPG Guide</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('VOD')}
-        >
-          <Text style={styles.menuButtonText}>Movies</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('Series')}
-        >
-          <Text style={styles.menuButtonText}>TV Series</Text>
-        </TouchableOpacity>
-      </View>
+      <SpatialNavigationNode orientation="horizontal">
+        <View style={styles.menuContainer}>
+          <DefaultFocus>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.menuButton,
+                isFocused && styles.menuButtonFocused,
+              ]}
+              onSelect={() => navigation.navigate('LiveTV')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                  Live TV
+                </Text>
+              )}
+            </FocusablePressable>
+          </DefaultFocus>
+          <FocusablePressable
+            style={({ isFocused }) => [
+              styles.menuButton,
+              isFocused && styles.menuButtonFocused,
+            ]}
+            onSelect={() => navigation.navigate('EPG')}
+          >
+            {({ isFocused }) => (
+              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                EPG Guide
+              </Text>
+            )}
+          </FocusablePressable>
+          <FocusablePressable
+            style={({ isFocused }) => [
+              styles.menuButton,
+              isFocused && styles.menuButtonFocused,
+            ]}
+            onSelect={() => navigation.navigate('VOD')}
+          >
+            {({ isFocused }) => (
+              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                Movies
+              </Text>
+            )}
+          </FocusablePressable>
+          <FocusablePressable
+            style={({ isFocused }) => [
+              styles.menuButton,
+              isFocused && styles.menuButtonFocused,
+            ]}
+            onSelect={() => navigation.navigate('Series')}
+          >
+            {({ isFocused }) => (
+              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                TV Series
+              </Text>
+            )}
+          </FocusablePressable>
+        </View>
+      </SpatialNavigationNode>
     </View>
   );
 }
@@ -89,7 +135,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
+    padding: scaledPixels(40),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -101,77 +147,100 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    marginTop: spacing.md,
+    fontSize: scaledPixels(24),
+    marginTop: scaledPixels(20),
   },
   title: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: scaledPixels(48),
+    fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: scaledPixels(8),
   },
   subtitle: {
-    fontSize: typography.fontSize.md,
+    fontSize: scaledPixels(24),
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: scaledPixels(60),
   },
   settingsButton: {
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
+    paddingHorizontal: scaledPixels(40),
+    paddingVertical: scaledPixels(20),
+    borderRadius: scaledPixels(12),
+    borderWidth: 3,
+    borderColor: 'transparent',
   },
   settingsButtonText: {
     color: colors.textOnPrimary,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: scaledPixels(24),
+    fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    gap: scaledPixels(20),
+    marginBottom: scaledPixels(60),
     flexWrap: 'wrap',
   },
   statCard: {
     backgroundColor: colors.card,
-    padding: spacing.lg,
-    borderRadius: 12,
+    padding: scaledPixels(30),
+    borderRadius: scaledPixels(16),
     alignItems: 'center',
-    minWidth: 120,
+    minWidth: scaledPixels(180),
   },
   statNumber: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: scaledPixels(48),
+    fontWeight: 'bold',
     color: colors.primary,
   },
   statLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(18),
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+    marginTop: scaledPixels(8),
     textAlign: 'center',
   },
   menuContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: spacing.md,
+    gap: scaledPixels(20),
   },
   menuButton: {
     backgroundColor: colors.cardElevated,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderRadius: 12,
-    minWidth: 150,
+    paddingHorizontal: scaledPixels(40),
+    paddingVertical: scaledPixels(30),
+    borderRadius: scaledPixels(16),
+    minWidth: scaledPixels(200),
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 3,
     borderColor: colors.border,
+  },
+  menuButtonFocused: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    transform: [{ scale: 1.08 }],
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  buttonFocused: {
+    transform: [{ scale: 1.08 }],
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
   },
   menuButtonText: {
     color: colors.text,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: scaledPixels(24),
+    fontWeight: '500',
+  },
+  buttonTextFocused: {
+    color: colors.textOnPrimary,
   },
 });

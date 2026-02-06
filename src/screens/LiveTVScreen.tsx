@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
@@ -192,30 +192,35 @@ const styles = StyleSheet.create({
     padding: scaledPixels(20),
   },
   channelCard: {
-    flex: 1,
-    margin: scaledPixels(10),
+    width: scaledPixels(200),
+    height: scaledPixels(200),
+    margin: scaledPixels(12),
     backgroundColor: colors.card,
     borderRadius: scaledPixels(12),
     padding: scaledPixels(15),
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: 'transparent',
-    maxWidth: '16.6%',
   },
   channelCardFocused: {
     borderColor: colors.primary,
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.08 }],
     zIndex: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
   },
   channelIcon: {
-    width: scaledPixels(80),
-    height: scaledPixels(80),
+    width: scaledPixels(120),
+    height: scaledPixels(120),
     marginBottom: scaledPixels(10),
   },
   channelName: {
     color: colors.text,
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(16),
     textAlign: 'center',
   },
 });

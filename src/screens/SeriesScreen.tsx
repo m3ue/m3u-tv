@@ -8,14 +8,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { SpatialNavigationNode } from 'react-tv-space-navigation';
 
-const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
+// Card dimensions for consistent sizing (same as VOD)
+const CARD_WIDTH = scaledPixels(200);
+const CARD_MARGIN = scaledPixels(12);
 
 export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
   const { isConfigured, seriesCategories, series, fetchSeries } = useXtream();
@@ -156,28 +158,40 @@ const styles = StyleSheet.create({
     height: scaledPixels(80),
     backgroundColor: colors.backgroundElevated,
   },
+  categoryList: {
+    flex: 1,
+  },
   categoryListContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: scaledPixels(20),
+    alignItems: 'center',
   },
   categoryButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: scaledPixels(25),
+    paddingVertical: scaledPixels(12),
     backgroundColor: colors.card,
-    borderRadius: 20,
-    marginRight: spacing.sm,
+    borderRadius: scaledPixels(25),
+    marginHorizontal: scaledPixels(8),
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   categoryButtonActive: {
+    backgroundColor: 'rgba(236, 0, 63, 0.2)',
+    borderColor: colors.primary,
+  },
+  categoryButtonFocused: {
     backgroundColor: colors.primary,
+    transform: [{ scale: 1.1 }],
   },
   categoryText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(18),
   },
   categoryTextActive: {
-    color: colors.textOnPrimary,
-    fontWeight: typography.fontWeight.semibold,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  gridContent: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -185,36 +199,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   seriesGrid: {
-    padding: spacing.md,
+    padding: scaledPixels(20),
   },
   seriesCard: {
-    flex: 1,
-    margin: spacing.xs,
+    width: CARD_WIDTH,
+    margin: CARD_MARGIN,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: scaledPixels(12),
     overflow: 'hidden',
-    maxWidth: '20%',
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  seriesCardFocused: {
+    borderColor: colors.primary,
+    transform: [{ scale: 1.08 }],
+    zIndex: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
   },
   seriesPoster: {
     width: '100%',
     aspectRatio: 2 / 3,
   },
   seriesInfo: {
-    padding: spacing.sm,
+    padding: scaledPixels(12),
   },
   seriesName: {
     color: colors.text,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: scaledPixels(16),
+    fontWeight: '500',
+  },
+  seriesMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaledPixels(8),
+    marginTop: scaledPixels(4),
   },
   seriesRating: {
     color: colors.warning,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
+    fontSize: scaledPixels(14),
   },
   seriesYear: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginTop: 2,
+    fontSize: scaledPixels(14),
   },
 });

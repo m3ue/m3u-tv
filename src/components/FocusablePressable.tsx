@@ -1,15 +1,15 @@
 import React from 'react';
-import { Pressable, StyleSheet, ViewStyle, View, Text, TextStyle } from 'react-native';
+import { Pressable, ViewStyle, View, StyleProp } from 'react-native';
 import { SpatialNavigationFocusableView } from 'react-tv-space-navigation';
-import { colors } from '../theme/colors';
-import { scaledPixels } from '../hooks/useScale';
+
+type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => StyleProp<ViewStyle>);
 
 interface FocusablePressableProps {
     onSelect?: () => void;
     onFocus?: () => void;
     onBlur?: () => void;
     children: React.ReactNode | ((props: { isFocused: boolean }) => React.ReactNode);
-    style?: ViewStyle | ((props: { isFocused: boolean }) => ViewStyle);
+    style?: StyleType;
     containerStyle?: ViewStyle;
 }
 

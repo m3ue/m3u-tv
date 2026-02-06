@@ -8,14 +8,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamVodStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { SpatialNavigationNode } from 'react-tv-space-navigation';
 
-const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
+// Card dimensions for consistent sizing
+const CARD_WIDTH = scaledPixels(200);
+const CARD_MARGIN = scaledPixels(12);
 
 export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
   const { isConfigured, vodCategories, vodStreams, fetchVodStreams } = useXtream();
@@ -193,18 +195,23 @@ const styles = StyleSheet.create({
     padding: scaledPixels(20),
   },
   movieCard: {
-    width: (1920 - SIDEBAR_WIDTH_COLLAPSED - scaledPixels(100)) / 6,
-    margin: scaledPixels(10),
+    width: CARD_WIDTH,
+    margin: CARD_MARGIN,
     backgroundColor: colors.card,
     borderRadius: scaledPixels(12),
     overflow: 'hidden',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: 'transparent',
   },
   movieCardFocused: {
     borderColor: colors.primary,
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.08 }],
     zIndex: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
   },
   moviePoster: {
     width: '100%',
