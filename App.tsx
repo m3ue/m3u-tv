@@ -23,15 +23,16 @@ export default function App() {
       SpatialNavigation.configureRemoteControl({
         remoteControlSubscriber: (callback) => {
           console.log('[App] Subscriber called. TVEventHandler type:', typeof TVEventHandler);
-          
+
           let subscription: any = null;
           try {
             // In RN TVOS 0.81, TVEventHandler is a singleton with an addListener method
             const TVHandler: any = TVEventHandler;
-            
+
             if (TVHandler && typeof TVHandler.addListener === 'function') {
               console.log('[App] Using TVEventHandler.addListener');
               subscription = TVHandler.addListener((event: any) => {
+                console.log('[App] TV Event:', event?.eventType);
                 if (!event || !event.eventType) return;
 
                 const mapping: Record<string, Directions> = {

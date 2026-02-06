@@ -11,13 +11,14 @@ import {
     SpatialNavigationNode,
     DefaultFocus,
 } from 'react-tv-space-navigation';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
+import { useNavigationState } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
 import { DrawerParamList } from '../navigation/types';
 import { FocusablePressable } from './FocusablePressable';
+import { navigationRef } from '../navigation/AppNavigator';
 
 const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
@@ -41,7 +42,6 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SideBar = () => {
-    const navigation = useNavigation<any>();
     const { isExpanded, setExpanded } = useMenu();
 
     const currentRouteName = useNavigationState(state => {
@@ -76,7 +76,12 @@ export const SideBar = () => {
                     {MENU_ITEMS.map((item, index) => (
                         <FocusablePressable
                             key={item.id}
-                            onSelect={() => navigation.navigate('Main', { screen: item.id })}
+                            onSelect={() => {
+                                if (navigationRef.isReady()) {
+                                    // @ts-ignore - We know these routes exist in the nested navigator
+                                    navigationRef.navigate(item.id);
+                                }
+                            }}
                             style={({ isFocused }) => [
                                 styles.menuItem,
                                 isFocused && styles.menuItemFocused,
