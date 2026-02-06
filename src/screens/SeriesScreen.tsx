@@ -13,7 +13,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid } from 'react-tv-space-navigation';
 
 // Card dimensions for consistent sizing (same as VOD)
 const CARD_WIDTH = scaledPixels(200);
@@ -127,16 +127,13 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
-            <SpatialNavigationNode>
-              <FlatList
-                data={series}
-                keyExtractor={(item) => String(item.series_id)}
-                renderItem={renderSeriesItem}
-                numColumns={6}
-                contentContainerStyle={styles.seriesGrid}
-                showsVerticalScrollIndicator={false}
-              />
-            </SpatialNavigationNode>
+            <SpatialNavigationVirtualizedGrid
+              data={series}
+              renderItem={renderSeriesItem}
+              numberOfColumns={6}
+              itemHeight={scaledPixels(390)}
+              style={styles.seriesGrid}
+            />
           )}
         </View>
       </View>

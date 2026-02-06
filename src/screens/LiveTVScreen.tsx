@@ -13,7 +13,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid } from 'react-tv-space-navigation';
 
 export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
   const { isConfigured, liveCategories, fetchLiveStreams, getLiveStreamUrl } = useXtream();
@@ -115,16 +115,13 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
-            <SpatialNavigationNode orientation="vertical">
-              <FlatList
-                data={liveStreams}
-                keyExtractor={(item) => String(item.stream_id)}
-                renderItem={renderStreamItem}
-                numColumns={6}
-                contentContainerStyle={styles.channelGrid}
-                showsVerticalScrollIndicator={false}
-              />
-            </SpatialNavigationNode>
+            <SpatialNavigationVirtualizedGrid
+              data={liveStreams}
+              renderItem={renderStreamItem}
+              numberOfColumns={6}
+              itemHeight={scaledPixels(224)}
+              style={styles.channelGrid}
+            />
           )}
         </View>
       </View>

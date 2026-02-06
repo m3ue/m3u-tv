@@ -13,7 +13,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamVodStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid } from 'react-tv-space-navigation';
 
 // Card dimensions for consistent sizing
 const CARD_WIDTH = scaledPixels(200);
@@ -120,16 +120,13 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
-            <SpatialNavigationNode>
-              <FlatList
-                data={vodStreams}
-                keyExtractor={(item) => String(item.stream_id)}
-                renderItem={renderMovieItem}
-                numColumns={6}
-                contentContainerStyle={styles.movieGrid}
-                showsVerticalScrollIndicator={false}
-              />
-            </SpatialNavigationNode>
+            <SpatialNavigationVirtualizedGrid
+              data={vodStreams}
+              renderItem={renderMovieItem}
+              numberOfColumns={6}
+              itemHeight={scaledPixels(390)}
+              style={styles.movieGrid}
+            />
           )}
         </View>
       </View>
