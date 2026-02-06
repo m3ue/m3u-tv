@@ -20,33 +20,12 @@ Cross-platform TV front-end player for the M3U Editor web app. Provides a conven
 
 ## Tech Stack
 
-- React Native 0.74 (react-native-tvos)
-- Expo SDK 51
+- React Native 0.81 (react-native-tvos)
+- Expo SDK 54
 - TypeScript
-- React Navigation 6
-- react-tv-space-navigation for TV focus management
-- react-native-video for playback
-
-## Project Structure
-
-```
-m3u-tv/
-├── apps/
-│   ├── expo-multi-tv/    # Main TV app (Expo)
-│   └── vega/             # Fire TV Vega variant
-├── packages/
-│   └── shared-ui/        # Shared components, screens, services
-│       ├── src/
-│       │   ├── components/   # Reusable UI components
-│       │   ├── context/      # React contexts (Xtream)
-│       │   ├── navigation/   # Navigation configuration
-│       │   ├── screens/      # App screens
-│       │   ├── services/     # API services (Xtream)
-│       │   ├── theme/        # Colors, typography, spacing
-│       │   └── types/        # TypeScript types
-│       └── package.json
-└── package.json
-```
+- React Navigation 7
+- react-tv-space-navigation 6 for TV focus management
+- expo-video for playback
 
 ## Getting Started
 
