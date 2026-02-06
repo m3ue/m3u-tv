@@ -8,7 +8,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
@@ -151,30 +151,32 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
 
                                 <View style={styles.modalButtons}>
                                     <SpatialNavigationNode orientation="horizontal">
-                                        <DefaultFocus>
+                                        <>
+                                            <DefaultFocus>
+                                                <FocusablePressable
+                                                    onSelect={() => {
+                                                        if (selectedEpisode) handlePlayEpisode(selectedEpisode);
+                                                        setIsModalVisible(false);
+                                                    }}
+                                                    style={({ isFocused }) => [
+                                                        styles.modalPlayButton,
+                                                        isFocused && styles.buttonFocused
+                                                    ]}
+                                                >
+                                                    <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
+                                                    <Text style={styles.buttonText}>Play Episode</Text>
+                                                </FocusablePressable>
+                                            </DefaultFocus>
                                             <FocusablePressable
-                                                onSelect={() => {
-                                                    if (selectedEpisode) handlePlayEpisode(selectedEpisode);
-                                                    setIsModalVisible(false);
-                                                }}
+                                                onSelect={() => setIsModalVisible(false)}
                                                 style={({ isFocused }) => [
-                                                    styles.modalPlayButton,
+                                                    styles.modalCloseButton,
                                                     isFocused && styles.buttonFocused
                                                 ]}
                                             >
-                                                <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
-                                                <Text style={styles.buttonText}>Play Episode</Text>
+                                                <Text style={styles.buttonText}>Close</Text>
                                             </FocusablePressable>
-                                        </DefaultFocus>
-                                        <FocusablePressable
-                                            onSelect={() => setIsModalVisible(false)}
-                                            style={({ isFocused }) => [
-                                                styles.modalCloseButton,
-                                                isFocused && styles.buttonFocused
-                                            ]}
-                                        >
-                                            <Text style={styles.buttonText}>Close</Text>
-                                        </FocusablePressable>
+                                        </>
                                     </SpatialNavigationNode>
                                 </View>
                             </View>
