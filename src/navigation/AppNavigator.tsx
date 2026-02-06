@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, StyleSheet } from 'react-native';
@@ -24,18 +24,28 @@ import { navigationRef } from './navigationRef';
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const MainStack = createNativeStackNavigator<DrawerParamList>();
 
+// Custom theme that uses our app colors to prevent any color mismatches
+const AppTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.background,
+    card: colors.card,
+    border: colors.border,
+  },
+};
+
 function MainNavigator() {
   return (
     <SpatialNavigationNode orientation="horizontal">
       <View style={styles.mainContainer}>
-        <View style={{ width: undefined }}>
-          <SideBar />
-        </View>
+        <SideBar />
         <SpatialNavigationNode>
           <View style={styles.contentContainer}>
             <MainStack.Navigator
               screenOptions={{
                 headerShown: false,
+                headerTransparent: true,
                 animation: 'none',
                 contentStyle: { backgroundColor: colors.background },
               }}
@@ -57,10 +67,11 @@ function MainNavigator() {
 export function AppNavigator() {
   console.log('AppNavigator: Rendering');
   return (
-    <NavigationContainer theme={DarkTheme} ref={navigationRef}>
+    <NavigationContainer theme={AppTheme} ref={navigationRef}>
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,
+          headerTransparent: true,
           contentStyle: { backgroundColor: colors.background },
         }}
       >
@@ -100,5 +111,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    backgroundColor: colors.background,
   },
 });

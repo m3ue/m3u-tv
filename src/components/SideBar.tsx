@@ -123,7 +123,7 @@ export const SideBar = () => {
 const styles = StyleSheet.create({
     container: {
         height: '100%',
-
+        backgroundColor: colors.background,
         paddingVertical: scaledPixels(40),
         overflow: 'hidden',
         zIndex: 100,

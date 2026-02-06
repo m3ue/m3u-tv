@@ -13,7 +13,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
-import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
 // Card dimensions for consistent sizing (same as VOD)
 const CARD_WIDTH = scaledPixels(200);
@@ -104,20 +104,16 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
       <View style={styles.container}>
         {/* Category selector */}
         <View style={styles.categoryListContainer}>
-          <SpatialNavigationNode orientation="horizontal">
-            <FlatList
-              horizontal
-              data={[
-                { category_id: '', category_name: 'All Series', parent_id: 0 },
-                ...seriesCategories,
-              ]}
-              keyExtractor={(item) => item.category_id || 'all'}
-              renderItem={renderCategoryItem}
-              style={styles.categoryList}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryListContent}
-            />
-          </SpatialNavigationNode>
+          <SpatialNavigationVirtualizedList
+            data={[
+              { category_id: '', category_name: 'All Series', parent_id: 0 },
+              ...seriesCategories,
+            ]}
+            renderItem={renderCategoryItem}
+            itemSize={scaledPixels(195)}
+            style={styles.categoryList}
+            orientation="horizontal"
+          />
         </View>
 
         {/* Series grid */}
@@ -157,8 +153,13 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(24),
   },
   categoryListContainer: {
+    paddingVertical: scaledPixels(10),
+    paddingHorizontal: scaledPixels(10),
+    marginLeft: scaledPixels(25),
     height: scaledPixels(80),
+    borderRadius: scaledPixels(50),
     backgroundColor: colors.backgroundElevated,
+    zIndex: 5,
   },
   categoryList: {
     flex: 1,
@@ -173,6 +174,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),
+    width: scaledPixels(180),
+    alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
   },
