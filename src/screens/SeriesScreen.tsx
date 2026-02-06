@@ -158,10 +158,14 @@ const styles = StyleSheet.create({
   categoryListContainer: {
     paddingVertical: scaledPixels(10),
     paddingHorizontal: scaledPixels(10),
-    marginLeft: scaledPixels(25),
+    marginHorizontal: scaledPixels(25),
+    marginTop: scaledPixels(25),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
     backgroundColor: colors.backgroundElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
     zIndex: 5,
   },
   categoryList: {
@@ -170,6 +174,7 @@ const styles = StyleSheet.create({
   categoryListContent: {
     paddingHorizontal: scaledPixels(20),
     alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),
@@ -177,9 +182,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),
+    marginVertical: scaledPixels(4),
     width: scaledPixels(180),
     alignItems: 'center',
     overflow: 'hidden',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
