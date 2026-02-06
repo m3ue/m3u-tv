@@ -2,7 +2,7 @@
 
 ![logo](./favicon.png)
 
-Cross-platform TV front-end player for the M3U Editor app. Provides a convenient way to view your content on Android TV, Apple TV and Fire TV.
+Cross-platform TV front-end player for the M3U Editor web app. Provides a convenient way to view your content on Android TV and Apple TV.
 
 ## Features
 
@@ -16,39 +16,16 @@ Cross-platform TV front-end player for the M3U Editor app. Provides a convenient
 
 - Android TV
 - Apple TV (tvOS)
-- Fire TV (Fire OS)
-- Fire TV (Vega OS)
 - Web browsers
 
 ## Tech Stack
 
-- React Native 0.74 (react-native-tvos)
-- Expo SDK 51
+- React Native 0.81 (react-native-tvos)
+- Expo SDK 54
 - TypeScript
-- React Navigation 6
-- react-tv-space-navigation for TV focus management
-- react-native-video for playback
-
-## Project Structure
-
-```
-m3u-tv/
-├── apps/
-│   ├── expo-multi-tv/    # Main TV app (Expo)
-│   └── vega/             # Fire TV Vega variant
-├── packages/
-│   └── shared-ui/        # Shared components, screens, services
-│       ├── src/
-│       │   ├── components/   # Reusable UI components
-│       │   ├── context/      # React contexts (Xtream)
-│       │   ├── navigation/   # Navigation configuration
-│       │   ├── screens/      # App screens
-│       │   ├── services/     # API services (Xtream)
-│       │   ├── theme/        # Colors, typography, spacing
-│       │   └── types/        # TypeScript types
-│       └── package.json
-└── package.json
-```
+- React Navigation 7
+- react-tv-space-navigation 6 for TV focus management
+- expo-video for playback
 
 ## Getting Started
 
@@ -58,7 +35,6 @@ m3u-tv/
 - Yarn v4.5.0
 - For Android TV: Android Studio with TV emulator
 - For Apple TV: Xcode with tvOS simulator
-- For Fire TV: Fire TV device or emulator
 
 ### Installation
 
@@ -69,36 +45,30 @@ yarn install
 
 ### Running the App
 
-**Prebuild**
+**Prebuild (optional)**
 
-Run prebuild to generate the `Android` and `iOS` folders and code.
+Run prebuild to generate the `Android` and `iOS` folders and native code.
 
 ```bash
-EXPO_TV=1 corepack yarn workspace @m3u-tv/expo-app prebuild --clean
+EXPO_TV=1 corepack yarn prebuild --clean
 ```
 
-**Web (for development):**
+**Web (experimental, navigation does not work well in web):**
 
 ```bash
-corepack yarn dev:web
+corepack yarn web
 ```
 
 **Android TV:**
 
 ```bash
-corepack yarn dev:android
+corepack yarn android
 ```
 
 **Apple TV:**
 
 ```bash
-corepack yarn dev:ios
-```
-
-**Fire TV Vega:**
-
-```bash
-corepack yarn dev:vega
+corepack yarn ios
 ```
 
 ## Configuration
