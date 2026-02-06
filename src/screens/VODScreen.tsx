@@ -45,15 +45,18 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
       ]}
       onSelect={() => setSelectedCategory(item.category_id)}
     >
-      <Text
-        style={[
-          styles.categoryText,
-          selectedCategory === item.category_id && styles.categoryTextActive,
-        ]}
-        numberOfLines={1}
-      >
-        {item.category_name}
-      </Text>
+      {({ isFocused }) => (
+        <Text
+          style={[
+            styles.categoryText,
+            selectedCategory === item.category_id && styles.categoryTextActive,
+            isFocused && styles.categoryTextFocused,
+          ]}
+          numberOfLines={1}
+        >
+          {item.category_name}
+        </Text>
+      )}
     </FocusablePressable>
   );
 
@@ -186,6 +189,10 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(18),
   },
   categoryTextActive: {
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  categoryTextFocused: {
     color: colors.text,
     fontWeight: 'bold',
   },
