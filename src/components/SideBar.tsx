@@ -69,7 +69,7 @@ export const SideBar = () => {
         >
             <View style={[styles.container, { width }]}>
                 <View style={styles.logoContainer}>
-                    <Image source={require('../../assets/logo.png')} style={{ width: scaledPixels(60), height: scaledPixels(60) }} />
+                    <Image source={require('../../assets/images/logo.png')} style={{ width: scaledPixels(60), height: scaledPixels(60) }} />
                     {isExpanded && (
                         <Text style={styles.logoText}>
                             M3U TV
