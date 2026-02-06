@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, StyleSheet } from 'react-native';
@@ -17,9 +17,9 @@ import {
 } from '../screens';
 import { SideBar } from '../components/SideBar';
 import { colors } from '../theme';
+import { scaledPixels } from '../hooks/useScale';
 import { RootStackParamList, DrawerParamList } from './types';
-
-export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+import { navigationRef } from './navigationRef';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const MainStack = createNativeStackNavigator<DrawerParamList>();

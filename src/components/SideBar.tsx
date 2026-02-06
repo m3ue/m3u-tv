@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -18,7 +18,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
 import { DrawerParamList } from '../navigation/types';
 import { FocusablePressable } from './FocusablePressable';
-import { navigationRef } from '../navigation/AppNavigator';
+import { navigationRef } from '../navigation/navigationRef';
 
 const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
@@ -69,7 +69,7 @@ export const SideBar = () => {
         >
             <View style={[styles.container, { width }]}>
                 <View style={styles.logoContainer}>
-                    <Icon name="Play" size={scaledPixels(40)} color={colors.primary} />
+                    <Image source={require('../../assets/logo.png')} style={{ width: scaledPixels(60), height: scaledPixels(60) }} />
                     {isExpanded && (
                         <Text style={styles.logoText}>
                             M3U TV
@@ -84,7 +84,10 @@ export const SideBar = () => {
                             onFocus={() => console.log(`[SideBar] Item focused: ${item.id}`)}
                             onSelect={() => {
                                 console.log(`[SideBar] onSelect triggered for: ${item.id}`);
-                                navigation.navigate(item.id);
+                                if (navigationRef.isReady()) {
+                                    // @ts-ignore
+                                    navigationRef.navigate('Main', { screen: item.id });
+                                }
                             }}
                             style={({ isFocused }) => [
                                 styles.menuItem,
@@ -120,9 +123,7 @@ export const SideBar = () => {
 const styles = StyleSheet.create({
     container: {
         height: '100%',
-        backgroundColor: colors.backgroundElevated,
-        borderRightWidth: 1,
-        borderRightColor: colors.border,
+
         paddingVertical: scaledPixels(40),
         overflow: 'hidden',
         zIndex: 100,
@@ -130,7 +131,7 @@ const styles = StyleSheet.create({
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: scaledPixels(30),
+        paddingHorizontal: scaledPixels(20),
         marginBottom: scaledPixels(60),
     },
     logoText: {
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: scaledPixels(20),
-        paddingHorizontal: scaledPixels(34),
+        paddingHorizontal: scaledPixels(24),
         marginVertical: scaledPixels(5),
         borderRadius: scaledPixels(8),
         marginHorizontal: scaledPixels(10),
