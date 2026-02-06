@@ -9,16 +9,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import {
     SpatialNavigationNode,
-    SpatialNavigationFocusableView,
     DefaultFocus,
-    useSpatialNavigatorFocusableAccessibilityProps
 } from 'react-tv-space-navigation';
-import { useNavigation, useRoute, useNavigationState } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
 import { DrawerParamList } from '../navigation/types';
+import { FocusablePressable } from './FocusablePressable';
 
 const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
@@ -44,88 +43,67 @@ const MENU_ITEMS: MenuItem[] = [
 export const SideBar = () => {
     const navigation = useNavigation<any>();
     const { isExpanded, setExpanded } = useMenu();
-    const expansion = useSharedValue(0);
 
     const currentRouteName = useNavigationState(state => {
         if (!state) return 'Home';
-        const route = state.routes[state.index];
-        if (route.name === 'Main' && route.state) {
-            return route.state.routes[route.state.index || 0]?.name || 'Home';
+        let route: any = state.routes[state.index];
+        while (route?.state && typeof route.state.index === 'number') {
+            route = route.state.routes[route.state.index];
         }
-        return route.name;
+        return route?.name || 'Home';
     });
 
-    useEffect(() => {
-        expansion.value = withSpring(isExpanded ? 1 : 0, { damping: 20, stiffness: 100 });
-    }, [isExpanded]);
-
-    const sidebarAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            width: interpolate(
-                expansion.value,
-                [0, 1],
-                [SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED],
-                Extrapolate.CLAMP
-            ),
-        };
-    });
-
-    const labelAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            opacity: expansion.value,
-            transform: [
-                { translateX: interpolate(expansion.value, [0, 1], [-20, 0]) }
-            ],
-            display: expansion.value > 0.1 ? 'flex' : 'none',
-        };
-    });
+    const width = isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
 
     return (
         <SpatialNavigationNode
             onFocus={() => setExpanded(true)}
             onBlur={() => setExpanded(false)}
             orientation="vertical"
+            isFocusable={false}
         >
-            <Animated.View style={[styles.container, sidebarAnimatedStyle]}>
+            <View style={[styles.container, { width }]}>
                 <View style={styles.logoContainer}>
                     <Icon name="Play" size={scaledPixels(40)} color={colors.primary} />
                     {isExpanded && (
-                        <Animated.Text style={[styles.logoText, labelAnimatedStyle]}>
+                        <Text style={styles.logoText}>
                             M3U TV
-                        </Animated.Text>
+                        </Text>
                     )}
                 </View>
 
                 <View style={styles.menuContainer}>
                     {MENU_ITEMS.map((item, index) => (
-                        <SpatialNavigationFocusableView
+                        <FocusablePressable
                             key={item.id}
-                            onSelect={() => navigation.navigate(item.id)}
+                            onSelect={() => navigation.navigate('Main', { screen: item.id })}
+                            style={({ isFocused }) => [
+                                styles.menuItem,
+                                isFocused && styles.menuItemFocused,
+                                currentRouteName === item.id && !isFocused && styles.menuItemActive
+                            ]}
                         >
                             {({ isFocused }) => (
-                                <View style={[
-                                    styles.menuItem,
-                                    isFocused && styles.menuItemFocused,
-                                    currentRouteName === item.id && !isFocused && styles.menuItemActive
-                                ]}>
+                                <>
                                     <Icon
                                         name={item.icon}
                                         size={scaledPixels(32)}
                                         color={isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary)}
                                     />
-                                    <Animated.Text style={[
-                                        styles.menuLabel,
-                                        labelAnimatedStyle,
-                                        { color: isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary) }
-                                    ]}>
-                                        {item.label}
-                                    </Animated.Text>
-                                </View>
+                                    {isExpanded && (
+                                        <Text style={[
+                                            styles.menuLabel,
+                                            { color: isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary) }
+                                        ]}>
+                                            {item.label}
+                                        </Text>
+                                    )}
+                                </>
                             )}
-                        </SpatialNavigationFocusableView>
+                        </FocusablePressable>
                     ))}
                 </View>
-            </Animated.View>
+            </View>
         </SpatialNavigationNode>
     );
 };

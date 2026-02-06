@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, StyleSheet } from 'react-native';
 import { SpatialNavigationNode } from 'react-tv-space-navigation';
@@ -26,7 +26,7 @@ function ContentNavigator() {
     <ContentStack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: 'transparent' },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <ContentStack.Screen name="Home" component={HomeScreen} />
@@ -41,20 +41,19 @@ function ContentNavigator() {
 
 function MainLayout() {
   return (
-    <SpatialNavigationNode orientation="horizontal">
-      <View style={styles.mainContainer}>
-        <SideBar />
-        <View style={styles.contentContainer}>
-          <ContentNavigator />
-        </View>
+    <View style={styles.mainContainer}>
+      <SideBar />
+      <View style={styles.contentContainer}>
+        <ContentNavigator />
       </View>
-    </SpatialNavigationNode>
+    </View>
   );
 }
 
 export function AppNavigator() {
+  console.log('AppNavigator: Rendering');
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={DarkTheme}>
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,

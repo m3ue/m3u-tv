@@ -26,3 +26,4 @@ devices.json
 .npmrc
 __*
 .expo
+.yarn/install-state.gz

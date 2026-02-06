@@ -7,27 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		10E72FF27EE514C042233EAA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */; };
+		0FEBDA702098AE0A2E6AC472 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 49262E79C317D17B81123059 /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2D84D6CB030003B5296AC889 /* libPods-M3UTV.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D03017B8044343DD0EC056C6 /* libPods-M3UTV.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		6A4CBFEF03DA32239700537A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */; };
+		3FC44226D9646B5DC5FB2D1B /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72180B4E2EA2E4E00281D82F /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		DECE482830A3603F1DAE0101 /* libPods-M3UTV.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-M3UTV.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		09001264DD6E8AF8134CF02D /* Pods-M3UTV.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.debug.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.debug.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* M3UTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = M3UTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = M3UTV/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = M3UTV/Info.plist; sourceTree = "<group>"; };
-		1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-M3UTV/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.debug.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.debug.xcconfig"; sourceTree = "<group>"; };
+		298511B88E2F72B4B99D09E0 /* Pods-M3UTV.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.release.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.release.xcconfig"; sourceTree = "<group>"; };
+		49262E79C317D17B81123059 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = M3UTV/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		72180B4E2EA2E4E00281D82F /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-M3UTV/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = M3UTV/SplashScreen.storyboard; sourceTree = "<group>"; };
-		AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = M3UTV/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		D03017B8044343DD0EC056C6 /* libPods-M3UTV.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-M3UTV.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-M3UTV.release.xcconfig"; path = "Target Support Files/Pods-M3UTV/Pods-M3UTV.release.xcconfig"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = M3UTV/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* M3UTV-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "M3UTV-Bridging-Header.h"; path = "M3UTV/M3UTV-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DECE482830A3603F1DAE0101 /* libPods-M3UTV.a in Frameworks */,
+				2D84D6CB030003B5296AC889 /* libPods-M3UTV.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				AD92C6FE2F3AFDDDF0E65495 /* PrivacyInfo.xcprivacy */,
+				49262E79C317D17B81123059 /* PrivacyInfo.xcprivacy */,
 			);
 			name = M3UTV;
 			sourceTree = "<group>";
@@ -62,17 +62,19 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				01D1430ABF6A19ED709CAE88 /* libPods-M3UTV.a */,
+				D03017B8044343DD0EC056C6 /* libPods-M3UTV.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		658797C913A2DD3D228BE110 /* ExpoModulesProviders */ = {
+		48E0D7A62CC72DD708274D24 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				D5BE06A1FF568C4B0E562561 /* M3UTV */,
+				09001264DD6E8AF8134CF02D /* Pods-M3UTV.debug.xcconfig */,
+				298511B88E2F72B4B99D09E0 /* Pods-M3UTV.release.xcconfig */,
 			);
-			name = ExpoModulesProviders;
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -89,8 +91,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				E9868BF1A83F77508A68228C /* Pods */,
-				658797C913A2DD3D228BE110 /* ExpoModulesProviders */,
+				48E0D7A62CC72DD708274D24 /* Pods */,
+				CB1E021BF760C6985A3CC4CC /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -114,22 +116,20 @@
 			path = M3UTV/Supporting;
 			sourceTree = "<group>";
 		};
-		D5BE06A1FF568C4B0E562561 /* M3UTV */ = {
+		CB1E021BF760C6985A3CC4CC /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				1C4FF09C0D06B1AEC6D2321D /* ExpoModulesProvider.swift */,
+				D00D68AF8444B319CF561E1F /* M3UTV */,
 			);
-			name = M3UTV;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
-		E9868BF1A83F77508A68228C /* Pods */ = {
+		D00D68AF8444B319CF561E1F /* M3UTV */ = {
 			isa = PBXGroup;
 			children = (
-				3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */,
-				EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */,
+				72180B4E2EA2E4E00281D82F /* ExpoModulesProvider.swift */,
 			);
-			name = Pods;
-			path = Pods;
+			name = M3UTV;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "M3UTV" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				985A54C6B37D62722D98A538 /* [Expo] Configure project */,
+				D87258348DFC9E6E205979DC /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				D5F2501D54983AE3A0D202A5 /* [CP] Embed Pods Frameworks */,
+				000E030135411EADE36A5578 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,13 +196,35 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				10E72FF27EE514C042233EAA /* PrivacyInfo.xcprivacy in Resources */,
+				0FEBDA702098AE0A2E6AC472 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		000E030135411EADE36A5578 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -272,7 +294,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		985A54C6B37D62722D98A538 /* [Expo] Configure project */ = {
+		D87258348DFC9E6E205979DC /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -296,28 +318,6 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-M3UTV/expo-configure-project.sh\"\n";
 		};
-		D5F2501D54983AE3A0D202A5 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-M3UTV/Pods-M3UTV-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -326,7 +326,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				6A4CBFEF03DA32239700537A /* ExpoModulesProvider.swift in Sources */,
+				3FC44226D9646B5DC5FB2D1B /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -335,7 +335,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3339E95006E1E3021445F55F /* Pods-M3UTV.debug.xcconfig */;
+			baseConfigurationReference = 09001264DD6E8AF8134CF02D /* Pods-M3UTV.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
@@ -374,7 +374,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = EE43C70129E972520EC250E7 /* Pods-M3UTV.release.xcconfig */;
+			baseConfigurationReference = 298511B88E2F72B4B99D09E0 /* Pods-M3UTV.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVAppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
