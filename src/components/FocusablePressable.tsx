@@ -30,7 +30,6 @@ export const FocusablePressable = ({
             {({ isFocused }) => (
                 <View style={containerStyle}>
                     <Pressable
-                        onPress={onSelect}
                         style={[
                             typeof style === 'function' ? style({ isFocused }) : style
                         ]}

@@ -12,6 +12,9 @@ import {
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
+import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { FocusablePressable } from '../components/FocusablePressable';
+import { scaledPixels } from '../hooks/useScale';
 
 export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>) {
   const {
@@ -57,104 +60,123 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
 
   if (isConfigured && authResponse) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Connection Status</Text>
+      <SpatialNavigationNode>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <Text style={styles.title}>Connection Status</Text>
 
-        <View style={styles.statusCard}>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Status</Text>
-            <Text style={[styles.statusValue, styles.connected]}>Connected</Text>
+          <View style={styles.statusCard}>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Status</Text>
+              <Text style={[styles.statusValue, styles.connected]}>Connected</Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Username</Text>
+              <Text style={styles.statusValue}>{authResponse.user_info.username}</Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Expires</Text>
+              <Text style={styles.statusValue}>
+                {new Date(parseInt(authResponse.user_info.exp_date) * 1000).toLocaleDateString()}
+              </Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Max Connections</Text>
+              <Text style={styles.statusValue}>{authResponse.user_info.max_connections}</Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Active Connections</Text>
+              <Text style={styles.statusValue}>{authResponse.user_info.active_cons}</Text>
+            </View>
           </View>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Username</Text>
-            <Text style={styles.statusValue}>{authResponse.user_info.username}</Text>
-          </View>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Expires</Text>
-            <Text style={styles.statusValue}>
-              {new Date(parseInt(authResponse.user_info.exp_date) * 1000).toLocaleDateString()}
-            </Text>
-          </View>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Max Connections</Text>
-            <Text style={styles.statusValue}>{authResponse.user_info.max_connections}</Text>
-          </View>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Active Connections</Text>
-            <Text style={styles.statusValue}>{authResponse.user_info.active_cons}</Text>
-          </View>
-        </View>
 
-        <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
-          <Text style={styles.disconnectButtonText}>Disconnect</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <SpatialNavigationNode>
+            <DefaultFocus>
+              <FocusablePressable
+                style={({ isFocused }) => [
+                  styles.disconnectButton,
+                  isFocused && styles.buttonFocused,
+                ]}
+                onSelect={handleDisconnect}
+              >
+                <Text style={styles.disconnectButtonText}>Disconnect</Text>
+              </FocusablePressable>
+            </DefaultFocus>
+          </SpatialNavigationNode>
+        </ScrollView>
+      </SpatialNavigationNode>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Xtream API Settings</Text>
-      <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
+    <SpatialNavigationNode>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Xtream API Settings</Text>
+        <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Server URL</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="http://example.com:8080"
-          placeholderTextColor={colors.textTertiary}
-          value={server}
-          onChangeText={setServer}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter username"
-          placeholderTextColor={colors.textTertiary}
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter password"
-          placeholderTextColor={colors.textTertiary}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.connectButton, isLoading && styles.buttonDisabled]}
-        onPress={handleConnect}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <Text style={styles.connectButtonText}>Connect</Text>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         )}
-      </TouchableOpacity>
-    </ScrollView>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Server URL</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="http://example.com:8080"
+            placeholderTextColor={colors.textTertiary}
+            value={server}
+            onChangeText={setServer}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Username</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter username"
+            placeholderTextColor={colors.textTertiary}
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter password"
+            placeholderTextColor={colors.textTertiary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <SpatialNavigationNode>
+          <FocusablePressable
+            style={({ isFocused }) => [
+              styles.connectButton,
+              isFocused && styles.buttonFocused,
+              isLoading && styles.buttonDisabled,
+            ]}
+            onSelect={handleConnect}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={colors.textOnPrimary} />
+            ) : (
+              <Text style={styles.connectButtonText}>Connect</Text>
+            )}
+          </FocusablePressable>
+        </SpatialNavigationNode>
+      </ScrollView>
+    </SpatialNavigationNode>
   );
 }
 
@@ -220,6 +242,16 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+  buttonFocused: {
+    transform: [{ scale: 1.05 }],
+    borderColor: colors.primary,
+    borderWidth: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
   },
   statusCard: {
     backgroundColor: colors.card,

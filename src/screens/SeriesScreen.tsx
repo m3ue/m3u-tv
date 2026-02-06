@@ -100,42 +100,44 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Category selector */}
-      <View style={styles.categoryListContainer}>
-        <SpatialNavigationNode orientation="horizontal">
-          <FlatList
-            horizontal
-            data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
-            keyExtractor={(item) => item.category_id || 'all'}
-            renderItem={renderCategoryItem}
-            style={styles.categoryList}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryListContent}
-          />
-        </SpatialNavigationNode>
-      </View>
-
-      {/* Series grid */}
-      <View style={styles.gridContent}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <SpatialNavigationNode orientation="vertical">
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        {/* Category selector */}
+        <View style={styles.categoryListContainer}>
+          <SpatialNavigationNode orientation="horizontal">
             <FlatList
-              data={series}
-              keyExtractor={(item) => String(item.series_id)}
-              renderItem={renderSeriesItem}
-              numColumns={6}
-              contentContainerStyle={styles.seriesGrid}
-              showsVerticalScrollIndicator={false}
+              horizontal
+              data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
+              keyExtractor={(item) => item.category_id || 'all'}
+              renderItem={renderCategoryItem}
+              style={styles.categoryList}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryListContent}
             />
           </SpatialNavigationNode>
-        )}
+        </View>
+
+        {/* Series grid */}
+        <View style={styles.gridContent}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <SpatialNavigationNode orientation="vertical">
+              <FlatList
+                data={series}
+                keyExtractor={(item) => String(item.series_id)}
+                renderItem={renderSeriesItem}
+                numColumns={6}
+                contentContainerStyle={styles.seriesGrid}
+                showsVerticalScrollIndicator={false}
+              />
+            </SpatialNavigationNode>
+          )}
+        </View>
       </View>
-    </View>
+    </SpatialNavigationNode>
   );
 }
 

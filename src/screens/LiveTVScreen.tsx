@@ -91,42 +91,44 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Category selector */}
-      <View style={styles.categoryListContainer}>
-        <SpatialNavigationNode orientation="horizontal">
-          <FlatList
-            horizontal
-            data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
-            keyExtractor={(item) => item.category_id || 'all'}
-            renderItem={renderCategoryItem}
-            style={styles.categoryList}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryListContent}
-          />
-        </SpatialNavigationNode>
-      </View>
-
-      {/* Channels grid */}
-      <View style={styles.gridContainer}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <SpatialNavigationNode orientation="vertical">
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        {/* Category selector */}
+        <View style={styles.categoryListContainer}>
+          <SpatialNavigationNode orientation="horizontal">
             <FlatList
-              data={liveStreams}
-              keyExtractor={(item) => String(item.stream_id)}
-              renderItem={renderStreamItem}
-              numColumns={6}
-              contentContainerStyle={styles.channelGrid}
-              showsVerticalScrollIndicator={false}
+              horizontal
+              data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
+              keyExtractor={(item) => item.category_id || 'all'}
+              renderItem={renderCategoryItem}
+              style={styles.categoryList}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryListContent}
             />
           </SpatialNavigationNode>
-        )}
+        </View>
+
+        {/* Channels grid */}
+        <View style={styles.gridContainer}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <SpatialNavigationNode orientation="vertical">
+              <FlatList
+                data={liveStreams}
+                keyExtractor={(item) => String(item.stream_id)}
+                renderItem={renderStreamItem}
+                numColumns={6}
+                contentContainerStyle={styles.channelGrid}
+                showsVerticalScrollIndicator={false}
+              />
+            </SpatialNavigationNode>
+          )}
+        </View>
       </View>
-    </View>
+    </SpatialNavigationNode>
   );
 }
 

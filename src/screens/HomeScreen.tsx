@@ -50,84 +50,86 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to M3U TV</Text>
-      <Text style={styles.subtitle}>Your streaming service is connected</Text>
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        <Text style={styles.title}>Welcome to M3U TV</Text>
+        <Text style={styles.subtitle}>Your streaming service is connected</Text>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{liveCategories.length}</Text>
-          <Text style={styles.statLabel}>Live TV Categories</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{liveCategories.length}</Text>
+            <Text style={styles.statLabel}>Live TV Categories</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{vodCategories.length}</Text>
+            <Text style={styles.statLabel}>Movie Categories</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{seriesCategories.length}</Text>
+            <Text style={styles.statLabel}>Series Categories</Text>
+          </View>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{vodCategories.length}</Text>
-          <Text style={styles.statLabel}>Movie Categories</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{seriesCategories.length}</Text>
-          <Text style={styles.statLabel}>Series Categories</Text>
-        </View>
-      </View>
 
-      <SpatialNavigationNode orientation="horizontal">
-        <View style={styles.menuContainer}>
-          <DefaultFocus>
+        <SpatialNavigationNode orientation="horizontal">
+          <View style={styles.menuContainer}>
+            <DefaultFocus>
+              <FocusablePressable
+                style={({ isFocused }) => [
+                  styles.menuButton,
+                  isFocused && styles.menuButtonFocused,
+                ]}
+                onSelect={() => navigation.navigate('LiveTV')}
+              >
+                {({ isFocused }) => (
+                  <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                    Live TV
+                  </Text>
+                )}
+              </FocusablePressable>
+            </DefaultFocus>
             <FocusablePressable
               style={({ isFocused }) => [
                 styles.menuButton,
                 isFocused && styles.menuButtonFocused,
               ]}
-              onSelect={() => navigation.navigate('LiveTV')}
+              onSelect={() => navigation.navigate('EPG')}
             >
               {({ isFocused }) => (
                 <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                  Live TV
+                  EPG Guide
                 </Text>
               )}
             </FocusablePressable>
-          </DefaultFocus>
-          <FocusablePressable
-            style={({ isFocused }) => [
-              styles.menuButton,
-              isFocused && styles.menuButtonFocused,
-            ]}
-            onSelect={() => navigation.navigate('EPG')}
-          >
-            {({ isFocused }) => (
-              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                EPG Guide
-              </Text>
-            )}
-          </FocusablePressable>
-          <FocusablePressable
-            style={({ isFocused }) => [
-              styles.menuButton,
-              isFocused && styles.menuButtonFocused,
-            ]}
-            onSelect={() => navigation.navigate('VOD')}
-          >
-            {({ isFocused }) => (
-              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                Movies
-              </Text>
-            )}
-          </FocusablePressable>
-          <FocusablePressable
-            style={({ isFocused }) => [
-              styles.menuButton,
-              isFocused && styles.menuButtonFocused,
-            ]}
-            onSelect={() => navigation.navigate('Series')}
-          >
-            {({ isFocused }) => (
-              <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                TV Series
-              </Text>
-            )}
-          </FocusablePressable>
-        </View>
-      </SpatialNavigationNode>
-    </View>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.menuButton,
+                isFocused && styles.menuButtonFocused,
+              ]}
+              onSelect={() => navigation.navigate('VOD')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                  Movies
+                </Text>
+              )}
+            </FocusablePressable>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.menuButton,
+                isFocused && styles.menuButtonFocused,
+              ]}
+              onSelect={() => navigation.navigate('Series')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                  TV Series
+                </Text>
+              )}
+            </FocusablePressable>
+          </View>
+        </SpatialNavigationNode>
+      </View>
+    </SpatialNavigationNode>
   );
 }
 

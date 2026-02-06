@@ -22,33 +22,35 @@ import { RootStackParamList, DrawerParamList } from './types';
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
-const Drawer = createDrawerNavigator<DrawerParamList>();
+const MainStack = createNativeStackNavigator<DrawerParamList>();
 
 function MainNavigator() {
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <SideBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerType: 'permanent',
-        swipeEnabled: false,
-        drawerStyle: {
-          width: undefined, // Let the Sidebar control its own width
-          backgroundColor: 'transparent',
-          borderRightWidth: 0,
-        },
-        sceneContainerStyle: {
-          backgroundColor: colors.background,
-        },
-      }}
-    >
-      <Drawer.Screen name="Home" component={HomeScreen} />
-      <Drawer.Screen name="LiveTV" component={LiveTVScreen} />
-      <Drawer.Screen name="EPG" component={EPGScreen} />
-      <Drawer.Screen name="VOD" component={VODScreen} />
-      <Drawer.Screen name="Series" component={SeriesScreen} />
-      <Drawer.Screen name="Settings" component={SettingsScreen} />
-    </Drawer.Navigator>
+    <SpatialNavigationNode orientation="horizontal">
+      <View style={styles.mainContainer}>
+        <View style={{ width: undefined }}>
+          <SideBar />
+        </View>
+        <SpatialNavigationNode>
+          <View style={styles.contentContainer}>
+            <MainStack.Navigator
+              screenOptions={{
+                headerShown: false,
+                animation: 'none',
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <MainStack.Screen name="Home" component={HomeScreen} />
+              <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
+              <MainStack.Screen name="EPG" component={EPGScreen} />
+              <MainStack.Screen name="VOD" component={VODScreen} />
+              <MainStack.Screen name="Series" component={SeriesScreen} />
+              <MainStack.Screen name="Settings" component={SettingsScreen} />
+            </MainStack.Navigator>
+          </View>
+        </SpatialNavigationNode>
+      </View>
+    </SpatialNavigationNode>
   );
 }
 

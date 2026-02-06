@@ -6,6 +6,9 @@ import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
+import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { FocusablePressable } from '../components/FocusablePressable';
+import { scaledPixels } from '../hooks/useScale';
 
 const { width, height } = Dimensions.get('window');
 
@@ -139,11 +142,13 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   }
 
   return (
-    <View style={styles.container}>
-      <Epg {...getEpgProps()}>
-        <Layout {...getLayoutProps()} />
-      </Epg>
-    </View>
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        <Epg {...getEpgProps()}>
+          <Layout {...getLayoutProps()} />
+        </Epg>
+      </View>
+    </SpatialNavigationNode>
   );
 }
 

@@ -11,7 +11,7 @@ import {
     SpatialNavigationNode,
     DefaultFocus,
 } from 'react-tv-space-navigation';
-import { useNavigationState } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
@@ -43,6 +43,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 export const SideBar = () => {
     const { isExpanded, setExpanded } = useMenu();
+    const navigation = useNavigation<any>();
 
     const currentRouteName = useNavigationState(state => {
         if (!state) return 'Home';
@@ -52,6 +53,10 @@ export const SideBar = () => {
         }
         return route?.name || 'Home';
     });
+
+    useEffect(() => {
+        console.log('[SideBar] Active screen changed to:', currentRouteName);
+    }, [currentRouteName]);
 
     const width = isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
 
@@ -76,11 +81,10 @@ export const SideBar = () => {
                     {MENU_ITEMS.map((item, index) => (
                         <FocusablePressable
                             key={item.id}
+                            onFocus={() => console.log(`[SideBar] Item focused: ${item.id}`)}
                             onSelect={() => {
-                                if (navigationRef.isReady()) {
-                                    // @ts-ignore - We know these routes exist in the nested navigator
-                                    navigationRef.navigate(item.id);
-                                }
+                                console.log(`[SideBar] onSelect triggered for: ${item.id}`);
+                                navigation.navigate(item.id);
                             }}
                             style={({ isFocused }) => [
                                 styles.menuItem,
@@ -142,10 +146,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: scaledPixels(20),
-        paddingHorizontal: scaledPixels(20),
+        paddingHorizontal: scaledPixels(34),
         marginVertical: scaledPixels(5),
         borderRadius: scaledPixels(8),
         marginHorizontal: scaledPixels(10),
+        minHeight: scaledPixels(70),
     },
     menuItemFocused: {
         backgroundColor: colors.primary,
