@@ -21,7 +21,7 @@ function CustomDrawerContent() {
   return (
     <View style={styles.drawerContent}>
       <View style={styles.drawerHeader}>
-        <Text style={styles.drawerTitle}>Planby TV</Text>
+        <Text style={styles.drawerTitle}>M3U TV</Text>
       </View>
     </View>
   );

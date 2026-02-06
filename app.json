@@ -3,15 +3,15 @@
     "name": "M3U TV",
     "slug": "m3u-tv",
     "scheme": "dev.sparkison.tv",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0a0f"
+      "backgroundColor": "#000000"
     },
     "android": {
       "package": "dev.sparkison.tv",
@@ -19,7 +19,7 @@
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0a0a0f"
+        "backgroundColor": "#000000"
       }
     },
     "ios": {
@@ -30,13 +30,22 @@
       [
         "@react-native-tvos/config-tv",
         {
-          "androidTVBanner": "./assets/adaptive-icon.png"
+          "androidTVBanner": "./assets/tv_icons/icon-400x240.png",
+          "appleTVImages": {
+            "icon": "./assets/tv_icons/icon-1280x768.png",
+            "iconSmall": "./assets/tv_icons/icon-400x240.png",
+            "iconSmall2x": "./assets/tv_icons/icon-800x480.png",
+            "topShelf": "./assets/tv_icons/icon-1920x720.png",
+            "topShelf2x": "./assets/tv_icons/icon-3840x1440.png",
+            "topShelfWide": "./assets/tv_icons/icon-2320x720.png",
+            "topShelfWide2x": "./assets/tv_icons/icon-4640x1440.png"
+          }
         }
       ],
       "expo-build-properties"
     ],
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./favicon.png"
     }
   }
 }

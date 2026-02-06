@@ -23,7 +23,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   if (!isConfigured) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Welcome to Planby TV</Text>
+        <Text style={styles.title}>Welcome to M3U TV</Text>
         <Text style={styles.subtitle}>Connect to your Xtream service to get started</Text>
         <TouchableOpacity
           style={styles.settingsButton}
@@ -37,7 +37,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Planby TV</Text>
+      <Text style={styles.title}>Welcome to M3U TV</Text>
       <Text style={styles.subtitle}>Your streaming service is connected</Text>
 
       <View style={styles.statsContainer}>
