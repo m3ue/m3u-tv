@@ -113,7 +113,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
     width: width,
-    height: height - 120,
+    height: height - scaledPixels(120),
   });
 
   if (!isConfigured) {
@@ -162,16 +162,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: scaledPixels(spacing.lg),
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    marginTop: spacing.md,
+    fontSize: scaledPixels(typography.fontSize.md),
+    marginTop: scaledPixels(spacing.md),
   },
   message: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.lg,
+    fontSize: scaledPixels(typography.fontSize.lg),
     textAlign: 'center',
   },
 });

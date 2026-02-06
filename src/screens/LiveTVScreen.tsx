@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),
-    paddingVertical: scaledPixels(12),
+    paddingVertical: scaledPixels(10),
     backgroundColor: colors.card,
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),
