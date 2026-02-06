@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import { useEpg, Epg, Layout } from '@nessprim/planby-native-pro';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator, useWindowDimensions, Pressable } from 'react-native';
+import {
+  useEpg,
+  Epg,
+  Layout,
+  ProgramBox,
+  ProgramContent,
+  useProgram,
+  ProgramItem as PlanbyProgramItem
+} from '@nessprim/planby-native-pro';
 import { useXtream } from '../context/XtreamContext';
 import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography } from '../theme';
@@ -10,11 +18,13 @@ import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
-const { width, height } = Dimensions.get('window');
-
 interface Channel {
   uuid: string;
+  title: string;
   logo: string;
+  displayOrder?: number;
+  groupTree?: boolean;
+  parentChannelUuid?: string | null;
 }
 
 interface EpgProgram {
@@ -25,6 +35,127 @@ interface EpgProgram {
   since: string;
   till: string;
   image: string;
+  status?: string;
+  images?: string[];
+  utc?: boolean;
+  timeZone?: string;
+}
+
+const formatISO = (date: Date) => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
+};
+
+const decodeBase64 = (str: string) => {
+  try {
+    // Basic Base64 decoding for React Native
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let output = '';
+    str = str.replace(/[^A-Za-z0-9+/=]/g, '');
+    for (let i = 0; i < str.length;) {
+      const enc1 = chars.indexOf(str.charAt(i++));
+      const enc2 = chars.indexOf(str.charAt(i++));
+      const enc3 = chars.indexOf(str.charAt(i++));
+      const enc4 = chars.indexOf(str.charAt(i++));
+      const chr1 = (enc1 << 2) | (enc2 >> 4);
+      const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+      const chr3 = ((enc3 & 3) << 6) | enc4;
+      output += String.fromCharCode(chr1);
+      if (enc3 !== 64) output += String.fromCharCode(chr2);
+      if (enc4 !== 64) output += String.fromCharCode(chr3);
+    }
+    // Simple UTF-8 decoding
+    return decodeURIComponent(escape(output));
+  } catch (e) {
+    return str; // Return original if decoding fails
+  }
+};
+
+const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) => {
+  const { styles, formatTime, set12HoursTimeFormat } = useProgram({
+    program,
+    isVerticalMode,
+    ...rest,
+  });
+
+  const { data } = program;
+  const { title, since, till } = data;
+
+  return (
+    <ProgramBox width={styles.width} style={styles.position}>
+      <Pressable focusable style={({ focused }) => [
+        {
+          flex: 1,
+          backgroundColor: focused ? colors.primary : colors.card,
+          borderRadius: 8,
+          borderWidth: focused ? 2 : 1,
+          borderColor: focused ? colors.border : colors.border,
+          margin: 2,
+          padding: 8,
+          justifyContent: 'center',
+        }
+      ]}>
+        <View>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: colors.text,
+              fontSize: scaledPixels(20),
+              fontWeight: 'bold',
+            }}
+          >
+            {title}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: scaledPixels(16), marginTop: 4 }}>
+            {formatTime(since, set12HoursTimeFormat()).toLowerCase()} - {formatTime(till, set12HoursTimeFormat()).toLowerCase()}
+          </Text>
+        </View>
+      </Pressable>
+    </ProgramBox>
+  );
+};
+
+function EpgContent({ channels, epgData, startDate, endDate }: {
+  channels: Channel[],
+  epgData: EpgProgram[],
+  startDate: string,
+  endDate: string
+}) {
+  const { width, height } = useWindowDimensions();
+
+  const { getEpgProps, getLayoutProps } = useEpg({
+    channels,
+    epg: epgData,
+    startDate,
+    endDate,
+    width,
+    height: height - scaledPixels(120),
+    isBaseTimeFormat: true,
+    sidebarWidth: scaledPixels(260),
+    itemHeight: scaledPixels(130),
+    itemOverscan: 20,
+    fetchZone: {
+      enabled: false,
+      timeSlots: 6,
+      channelsPerSlot: 10,
+      onFetchZone: () => { },
+    },
+  });
+
+  return (
+    <Epg {...getEpgProps()}>
+      <Layout
+        {...getLayoutProps()}
+        renderProgram={(props) => <ProgramItem {...props} />}
+      />
+    </Epg>
+  );
 }
 
 export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
@@ -49,9 +180,13 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
         const channelsToShow = streams.slice(0, 20);
 
         // Transform channels for Planby
-        const planbyChannels: Channel[] = channelsToShow.map((stream: XtreamLiveStream) => ({
+        const planbyChannels: Channel[] = channelsToShow.map((stream: XtreamLiveStream, index: number) => ({
           uuid: String(stream.stream_id),
+          title: stream.name || 'Unknown Channel',
           logo: stream.stream_icon || 'https://via.placeholder.com/50',
+          displayOrder: index + 1,
+          groupTree: false,
+          parentChannelUuid: null,
         }));
         setChannels(planbyChannels);
 
@@ -70,18 +205,28 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
         // Transform EPG data for Planby
         const transformedEpg: EpgProgram[] = [];
         epgResults.forEach(({ streamId, listings }) => {
+          if (!listings || !Array.isArray(listings)) return;
+
           listings.forEach((listing: XtreamEpgListing) => {
-            const startDate = new Date(listing.start_timestamp * 1000);
-            const endDate = new Date(listing.stop_timestamp * 1000);
+            if (!listing || !listing.id || !listing.start_timestamp || !listing.stop_timestamp) return;
+
+            const startDateObj = new Date(listing.start_timestamp * 1000);
+            const endDateObj = new Date(listing.stop_timestamp * 1000);
+
+            if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) return;
 
             transformedEpg.push({
-              id: listing.id,
+              id: String(listing.id),
               channelUuid: String(streamId),
-              title: listing.title,
-              description: listing.description || '',
-              since: startDate.toISOString(),
-              till: endDate.toISOString(),
+              title: decodeBase64(String(listing.title || 'No Title')),
+              description: decodeBase64(String(listing.description || '')),
+              since: formatISO(startDateObj),
+              till: formatISO(endDateObj),
               image: 'https://via.placeholder.com/100',
+              status: 'active',
+              images: ['https://via.placeholder.com/100'],
+              utc: false,
+              timeZone: '',
             });
           });
         });
@@ -97,24 +242,19 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     loadEPG();
   }, [isConfigured, fetchLiveStreams, liveStreams]);
 
-  const memoizedChannels = useMemo(() => channels, [channels]);
-  const memoizedEpg = useMemo(() => epgData, [epgData]);
+  // Calculate start and end dates for the EPG range
+  const { startDate, endDate } = useMemo(() => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const mm = pad(now.getMonth() + 1);
+    const dd = pad(now.getDate());
 
-  // Calculate start and end dates for today
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setHours(0, 0, 0, 0);
-  const endDate = new Date(today);
-  endDate.setHours(23, 59, 59, 999);
-
-  const { getEpgProps, getLayoutProps } = useEpg({
-    channels: memoizedChannels,
-    epg: memoizedEpg,
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    width: width,
-    height: height - scaledPixels(120),
-  });
+    return {
+      startDate: `${yyyy}-${mm}-${dd}T00:00:00`,
+      endDate: `${yyyy}-${mm}-${dd}T24:00:00`
+    };
+  }, []);
 
   if (!isConfigured) {
     return (
@@ -144,9 +284,12 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   return (
     <SpatialNavigationNode>
       <View style={styles.container}>
-        <Epg {...getEpgProps()}>
-          <Layout {...getLayoutProps()} />
-        </Epg>
+        <EpgContent
+          channels={channels}
+          epgData={epgData}
+          startDate={startDate}
+          endDate={endDate}
+        />
       </View>
     </SpatialNavigationNode>
   );
@@ -156,6 +299,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    padding: scaledPixels(40),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   centerContainer: {
     flex: 1,
