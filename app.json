@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "M3U TV",
+    "slug": "m3u-tv",
+    "scheme": "dev.sparkison.tv",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0f"
+    },
+    "android": {
+      "package": "dev.sparkison.tv",
+      "isTV": true,
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0f"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "dev.sparkison.tv",
+      "supportsTablet": true
+    },
+    "plugins": [
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "androidTVBanner": "./assets/adaptive-icon.png"
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
