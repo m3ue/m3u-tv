@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: scaledPixels(20),
-        paddingHorizontal: scaledPixels(34),
+        paddingHorizontal: scaledPixels(20),
         marginVertical: scaledPixels(5),
         borderRadius: scaledPixels(8),
         marginHorizontal: scaledPixels(10),
