@@ -117,7 +117,7 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
             <SpatialNavigationVirtualizedGrid
               data={liveStreams}
               renderItem={renderStreamItem}
-              numberOfColumns={6}
+              numberOfColumns={8}
               itemHeight={scaledPixels(224)}
               style={styles.channelGrid}
             />

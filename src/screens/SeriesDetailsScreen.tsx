@@ -49,7 +49,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
             <ImageBackground
                 source={{ uri: item.cover }}
                 style={styles.backdrop}
-                blurRadius={10}
+                blurRadius={5}
             >
                 <LinearGradient
                     colors={['rgba(0,0,0,0.6)', colors.background]}
@@ -82,12 +82,15 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                                     isFocused && styles.itemFocused
                                                 ]}
                                             >
-                                                <Text style={[
-                                                    styles.seasonText,
-                                                    selectedSeason === String(season.season_number) && styles.seasonTextActive
-                                                ]}>
-                                                    Season {season.season_number}
-                                                </Text>
+                                                {({ isFocused }) => (
+                                                    <Text style={[
+                                                        styles.seasonText,
+                                                        selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                        isFocused && styles.seasonTextActive,
+                                                    ]}>
+                                                        Season {season.season_number}
+                                                    </Text>
+                                                )}
                                             </FocusablePressable>
                                         ))}
                                     </ScrollView>
@@ -262,6 +265,7 @@ const styles = StyleSheet.create({
         borderRadius: scaledPixels(8),
         marginBottom: scaledPixels(10),
         backgroundColor: 'rgba(255,255,255,0.05)',
+        overflow: 'hidden',
     },
     seasonItemActive: {
         backgroundColor: 'rgba(236, 0, 63, 0.2)',
@@ -284,7 +288,6 @@ const styles = StyleSheet.create({
     },
     itemFocused: {
         backgroundColor: colors.primary,
-        transform: [{ scale: 1.02 }],
     },
     episodeMain: {
         flexDirection: 'row',

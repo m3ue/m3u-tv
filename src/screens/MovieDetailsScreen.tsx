@@ -8,6 +8,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
+import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
 
 export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'Details'>) => {
     const { item } = route.params;
@@ -42,71 +43,74 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
     const backdrop = info?.backdrop_path?.[0] || item.stream_icon;
 
     return (
-        <View style={styles.container}>
-            <ImageBackground
-                source={{ uri: backdrop }}
-                style={styles.backdrop}
-                blurRadius={10}
-            >
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.5)', colors.background]}
-                    style={styles.gradient}
+        <SpatialNavigationNode>
+            <View style={styles.container}>
+                <ImageBackground
+                    source={{ uri: backdrop }}
+                    style={styles.backdrop}
                 >
-                    <ScrollView contentContainerStyle={styles.scrollContent}>
-                        <View style={styles.header}>
-                            <Image
-                                source={{ uri: item.stream_icon }}
-                                style={styles.poster}
-                                resizeMode="cover"
-                            />
-                            <View style={styles.mainInfo}>
-                                <Text style={styles.title}>{item.name}</Text>
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
+                        style={styles.gradient}
+                    >
+                        <ScrollView contentContainerStyle={styles.scrollContent}>
+                            <View style={styles.header}>
+                                <Image
+                                    source={{ uri: item.stream_icon }}
+                                    style={styles.poster}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.mainInfo}>
+                                    <Text style={styles.title}>{item.name}</Text>
 
-                                <View style={styles.metaRow}>
-                                    {info?.release_date && <Text style={styles.metaText}>{info.release_date.split('-')[0]}</Text>}
-                                    {info?.duration && <Text style={styles.metaText}>{info.duration}</Text>}
-                                    {info?.rating && <Text style={styles.rating}>★ {info.rating}</Text>}
-                                </View>
+                                    <View style={styles.metaRow}>
+                                        {info?.release_date && <Text style={styles.metaText}>{info.release_date.split('-')[0]}</Text>}
+                                        {info?.duration && <Text style={styles.metaText}>{info.duration}</Text>}
+                                        {info?.rating && <Text style={styles.rating}>★ {info.rating}</Text>}
+                                    </View>
 
-                                {info?.genre && <Text style={styles.genre}>{info.genre}</Text>}
+                                    {info?.genre && <Text style={styles.genre}>{info.genre}</Text>}
 
-                                <View style={styles.buttonRow}>
-                                    <FocusablePressable
-                                        onSelect={handlePlay}
-                                        style={({ isFocused }) => [
-                                            styles.playButton,
-                                            isFocused && styles.buttonFocused
-                                        ]}
-                                    >
-                                        <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
-                                        <Text style={styles.buttonText}>Watch Now</Text>
-                                    </FocusablePressable>
+                                    <View style={styles.buttonRow}>
+                                        <DefaultFocus>
+                                            <FocusablePressable
+                                                onSelect={handlePlay}
+                                                style={({ isFocused }) => [
+                                                    styles.playButton,
+                                                    isFocused && styles.buttonFocused
+                                                ]}
+                                            >
+                                                <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
+                                                <Text style={styles.buttonText}>Watch Now</Text>
+                                            </FocusablePressable>
+                                        </DefaultFocus>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
 
-                        <View style={styles.detailsSection}>
-                            <Text style={styles.sectionTitle}>Plot Summary</Text>
-                            <Text style={styles.plot}>{info?.plot || 'No summary available.'}</Text>
+                            <View style={styles.detailsSection}>
+                                <Text style={styles.sectionTitle}>Plot Summary</Text>
+                                <Text style={styles.plot}>{info?.plot || 'No summary available.'}</Text>
 
-                            {info?.director && (
-                                <View style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>Director</Text>
-                                    <Text style={styles.detailValue}>{info.director}</Text>
-                                </View>
-                            )}
+                                {info?.director && (
+                                    <View style={styles.detailItem}>
+                                        <Text style={styles.detailLabel}>Director</Text>
+                                        <Text style={styles.detailValue}>{info.director}</Text>
+                                    </View>
+                                )}
 
-                            {info?.actors && (
-                                <View style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>Cast</Text>
-                                    <Text style={styles.detailValue}>{info.actors}</Text>
-                                </View>
-                            )}
-                        </View>
-                    </ScrollView>
-                </LinearGradient>
-            </ImageBackground>
-        </View>
+                                {info?.actors && (
+                                    <View style={styles.detailItem}>
+                                        <Text style={styles.detailLabel}>Cast</Text>
+                                        <Text style={styles.detailValue}>{info.actors}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </ScrollView>
+                    </LinearGradient>
+                </ImageBackground>
+            </View>
+        </SpatialNavigationNode>
     );
 };
 
