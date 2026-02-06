@@ -107,7 +107,10 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
           <SpatialNavigationNode orientation="horizontal">
             <FlatList
               horizontal
-              data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
+              data={[
+                { category_id: '', category_name: 'All Series', parent_id: 0 },
+                ...seriesCategories,
+              ]}
               keyExtractor={(item) => item.category_id || 'all'}
               renderItem={renderCategoryItem}
               style={styles.categoryList}
@@ -124,7 +127,7 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
-            <SpatialNavigationNode orientation="vertical">
+            <SpatialNavigationNode>
               <FlatList
                 data={series}
                 keyExtractor={(item) => String(item.series_id)}
