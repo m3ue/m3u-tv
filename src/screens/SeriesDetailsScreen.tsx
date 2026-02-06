@@ -8,7 +8,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationNode } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
@@ -61,7 +61,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                 <Text style={styles.title}>{item.name}</Text>
                                 <View style={styles.metaRow}>
                                     {item.release_date && <Text style={styles.metaText}>{item.release_date.split('-')[0]}</Text>}
-                                    <Text style={styles.rating}>★ {item.rating_5based.toFixed(1)}</Text>
+                                    <Text style={styles.rating}>★ {item.rating}</Text>
                                 </View>
                                 <Text style={styles.plot} numberOfLines={3}>{item.plot}</Text>
                             </View>

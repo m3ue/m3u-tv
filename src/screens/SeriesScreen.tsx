@@ -78,8 +78,8 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
           {item.name}
         </Text>
         <View style={styles.seriesMeta}>
-          {item.rating_5based > 0 && (
-            <Text style={styles.seriesRating}>★ {item.rating_5based.toFixed(1)}</Text>
+          {item.rating && (
+            <Text style={styles.seriesRating}>★ {item.rating}</Text>
           )}
           {(item.release_date || item.releaseDate) && (
             <Text style={styles.seriesYear}>

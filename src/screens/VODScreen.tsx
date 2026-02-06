@@ -77,8 +77,8 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
         <Text style={styles.movieName} numberOfLines={1}>
           {item.name}
         </Text>
-        {item.rating_5based > 0 && (
-          <Text style={styles.movieRating}>★ {item.rating_5based.toFixed(1)}</Text>
+        {item.rating && (
+          <Text style={styles.movieRating}>★ {item.rating}</Text>
         )}
       </View>
     </FocusablePressable>
