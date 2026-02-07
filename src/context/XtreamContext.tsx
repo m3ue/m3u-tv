@@ -11,7 +11,7 @@ import {
 } from '../types/xtream';
 import * as SecureStore from 'expo-secure-store';
 
-const STORAGE_KEY = '@planby_tv_credentials';
+const STORAGE_KEY = 'm3ue_tv_credentials';
 
 interface XtreamState {
   isConfigured: boolean;
