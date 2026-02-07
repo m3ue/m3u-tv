@@ -3503,6 +3503,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"expo-secure-store@npm:~15.0.8":
+  version: 15.0.8
+  resolution: "expo-secure-store@npm:15.0.8"
+  peerDependencies:
+    expo: "*"
+  checksum: 10c0/c3a581aae66990c442e566c677cd884f623e33ab43015e7c1be9c6fe46fbf0dfc57c6213ec12984c86455485d0b22524e37b8d24e19acfa8b7d0d83be914496b
+  languageName: node
+  linkType: hard
+
 "expo-server@npm:^1.0.5":
   version: 1.0.5
   resolution: "expo-server@npm:1.0.5"
@@ -4545,6 +4554,7 @@ __metadata:
     expo: "npm:^54.0.20"
     expo-build-properties: "npm:~1.0.9"
     expo-linear-gradient: "npm:~15.0.8"
+    expo-secure-store: "npm:~15.0.8"
     expo-status-bar: "npm:~3.0.8"
     expo-video: "npm:^3.0.15"
     lucide-react-native: "npm:^0.563.0"

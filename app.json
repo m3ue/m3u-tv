@@ -42,7 +42,8 @@
           }
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-secure-store"
     ],
     "web": {
       "favicon": "./favicon.png"

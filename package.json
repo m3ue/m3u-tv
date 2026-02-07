@@ -23,6 +23,7 @@
     "expo": "^54.0.20",
     "expo-build-properties": "~1.0.9",
     "expo-linear-gradient": "~15.0.8",
+    "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.8",
     "expo-video": "^3.0.15",
     "lucide-react-native": "^0.563.0",

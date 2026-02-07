@@ -9,6 +9,7 @@ import {
   XtreamVodStream,
   XtreamSeries,
 } from '../types/xtream';
+import * as SecureStore from 'expo-secure-store';
 
 const STORAGE_KEY = '@planby_tv_credentials';
 
@@ -83,7 +84,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
         }
 
         // Save credentials
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+        await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(credentials));
 
         // Fetch initial categories
         const [liveCategories, vodCategories, seriesCategories] = await Promise.all([
@@ -114,7 +115,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
   );
 
   const disconnect = useCallback(async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await SecureStore.deleteItemAsync(STORAGE_KEY);
     setState({
       isConfigured: false,
       isLoading: false,
@@ -131,7 +132,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
 
   const loadSavedCredentials = useCallback(async (): Promise<boolean> => {
     try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      const saved = await SecureStore.getItemAsync(STORAGE_KEY);
       if (saved) {
         const credentials: XtreamCredentials = JSON.parse(saved);
         return await connect(credentials);
