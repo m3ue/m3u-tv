@@ -11,7 +11,7 @@ import {
 } from '@nessprim/planby-native-pro';
 import { useXtream } from '../context/XtreamContext';
 import { xtreamService } from '../services/XtreamService';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
 import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
@@ -121,11 +121,12 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
   );
 };
 
-function EpgContent({ channels, epgData, startDate, endDate }: {
+function EpgContent({ channels, epgData, startDate, endDate, isLoading }: {
   channels: Channel[],
   epgData: EpgProgram[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  isLoading: boolean
 }) {
   const { width, height } = useWindowDimensions();
 
@@ -136,17 +137,13 @@ function EpgContent({ channels, epgData, startDate, endDate }: {
     endDate,
     width,
     height,
+    theme: epgTheme,
     isBaseTimeFormat: true,
     isCurrentTime: true,
     isInitialScrollToNow: true,
     sidebarWidth: scaledPixels(100),
     itemHeight: scaledPixels(100),
     itemOverscan: 20,
-    // overlap: {
-    //   enabled: true,
-    //   layerOverlapLevel: 1,
-    //   mode: 'stack'
-    // },
     fetchZone: {
       enabled: false,
       timeSlots: 3,
@@ -156,7 +153,7 @@ function EpgContent({ channels, epgData, startDate, endDate }: {
   });
 
   return (
-    <Epg {...getEpgProps()}>
+    <Epg {...getEpgProps()} isLoading={isLoading}>
       <Layout
         {...getLayoutProps()}
         renderProgram={(props) => <ProgramItem {...props} />}
@@ -271,15 +268,6 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     );
   }
 
-  if (isLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading EPG data...</Text>
-      </View>
-    );
-  }
-
   if (channels.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -296,6 +284,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
           epgData={epgData}
           startDate={startDate}
           endDate={endDate}
+          isLoading={isLoading}
         />
       </View>
     </SpatialNavigationNode>
