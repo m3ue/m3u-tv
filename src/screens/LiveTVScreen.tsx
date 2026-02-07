@@ -3,8 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
@@ -13,10 +11,11 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
+import { LiveTVCard } from '../components/LiveTVCard';
 import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
-export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
-  const { isConfigured, liveCategories, fetchLiveStreams, getLiveStreamUrl } = useXtream();
+export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
+  const { isConfigured, liveCategories, fetchLiveStreams } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,30 +58,7 @@ export function LiveTVScreen({ navigation }: DrawerScreenPropsType<'LiveTV'>) {
   );
 
   const renderStreamItem = ({ item }: { item: XtreamLiveStream }) => (
-    <FocusablePressable
-      style={({ isFocused }) => [
-        styles.channelCard,
-        isFocused && styles.channelCardFocused
-      ]}
-      onSelect={() => {
-        const streamUrl = getLiveStreamUrl(item.stream_id);
-        // @ts-ignore
-        navigation.navigate('Player', {
-          streamUrl,
-          title: item.name,
-          type: 'live',
-        });
-      }}
-    >
-      <Image
-        source={{ uri: item.stream_icon || 'https://via.placeholder.com/80' }}
-        style={styles.channelIcon}
-        resizeMode="contain"
-      />
-      <Text style={styles.channelName} numberOfLines={2}>
-        {item.name}
-      </Text>
-    </FocusablePressable>
+    <LiveTVCard item={item} />
   );
 
   if (!isConfigured) {
@@ -207,37 +183,5 @@ const styles = StyleSheet.create({
   },
   channelGrid: {
     padding: scaledPixels(20),
-  },
-  channelCard: {
-    width: scaledPixels(200),
-    height: scaledPixels(200),
-    margin: scaledPixels(12),
-    backgroundColor: colors.card,
-    borderRadius: scaledPixels(12),
-    padding: scaledPixels(15),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  channelCardFocused: {
-    borderColor: colors.primary,
-    transform: [{ scale: 1.08 }],
-    zIndex: 10,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  channelIcon: {
-    width: scaledPixels(120),
-    height: scaledPixels(120),
-    marginBottom: scaledPixels(10),
-  },
-  channelName: {
-    color: colors.text,
-    fontSize: scaledPixels(16),
-    textAlign: 'center',
   },
 });
