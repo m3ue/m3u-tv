@@ -8,7 +8,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 import { TVOverlay } from '../components/TVOverlay';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
@@ -82,57 +82,61 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                 <View style={styles.seasonsColumn}>
                                     <Text style={styles.sectionTitle}>Seasons</Text>
                                     <SpatialNavigationNode>
-                                        <ScrollView showsVerticalScrollIndicator={false}>
-                                            {seriesInfo?.seasons.map((season) => (
-                                                <FocusablePressable
-                                                    key={season.season_number}
-                                                    onSelect={() => setSelectedSeason(String(season.season_number))}
-                                                    style={({ isFocused }) => [
-                                                        styles.seasonItem,
-                                                        selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                                                        isFocused && styles.itemFocused
-                                                    ]}
-                                                >
-                                                    {({ isFocused }) => (
-                                                        <Text style={[
-                                                            styles.seasonText,
-                                                            selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                                                            isFocused && styles.seasonTextActive,
-                                                        ]}>
-                                                            Season {season.season_number}
-                                                        </Text>
-                                                    )}
-                                                </FocusablePressable>
-                                            ))}
-                                        </ScrollView>
+                                        <SpatialNavigationScrollView>
+                                            <SpatialNavigationView direction="vertical">
+                                                {seriesInfo?.seasons.map((season) => (
+                                                    <FocusablePressable
+                                                        key={season.season_number}
+                                                        onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                        style={({ isFocused }) => [
+                                                            styles.seasonItem,
+                                                            selectedSeason === String(season.season_number) && styles.seasonItemActive,
+                                                            isFocused && styles.itemFocused
+                                                        ]}
+                                                    >
+                                                        {({ isFocused }) => (
+                                                            <Text style={[
+                                                                styles.seasonText,
+                                                                selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                                isFocused && styles.seasonTextActive,
+                                                            ]}>
+                                                                Season {season.season_number}
+                                                            </Text>
+                                                        )}
+                                                    </FocusablePressable>
+                                                ))}
+                                            </SpatialNavigationView>
+                                        </SpatialNavigationScrollView>
                                     </SpatialNavigationNode>
                                 </View>
 
                                 <View style={styles.episodesColumn}>
                                     <Text style={styles.sectionTitle}>Episodes</Text>
                                     <SpatialNavigationNode>
-                                        <FlatList
-                                            data={episodes}
-                                            keyExtractor={(ep) => ep.id}
-                                            renderItem={({ item: ep }) => (
-                                                <FocusablePressable
-                                                    onSelect={() => openModal(ep)}
-                                                    style={({ isFocused }) => [
-                                                        styles.episodeItem,
-                                                        isFocused && styles.itemFocused
-                                                    ]}
-                                                >
-                                                    <View style={styles.episodeMain}>
-                                                        <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
-                                                        <View style={styles.episodeInfo}>
-                                                            <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                        <SpatialNavigationView direction="vertical" style={styles.episodesColumn}>
+                                            <SpatialNavigationVirtualizedList
+                                                data={episodes}
+                                                itemSize={scaledPixels(80)}
+                                                orientation="vertical"
+                                                renderItem={({ item: ep }) => (
+                                                    <FocusablePressable
+                                                        onSelect={() => openModal(ep)}
+                                                        style={({ isFocused }) => [
+                                                            styles.episodeItem,
+                                                            isFocused && styles.itemFocused
+                                                        ]}
+                                                    >
+                                                        <View style={styles.episodeMain}>
+                                                            <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
+                                                            <View style={styles.episodeInfo}>
+                                                                <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                            </View>
+                                                            <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
                                                         </View>
-                                                        <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.textTertiary} />
-                                                    </View>
-                                                </FocusablePressable>
-                                            )}
-                                            showsVerticalScrollIndicator={false}
-                                        />
+                                                    </FocusablePressable>
+                                                )}
+                                            />
+                                        </SpatialNavigationView>
                                     </SpatialNavigationNode>
                                 </View>
                             </View>
@@ -250,6 +254,7 @@ const styles = StyleSheet.create({
     },
     episodesColumn: {
         flex: 1,
+        overflow: 'hidden',
     },
     sectionTitle: {
         fontSize: scaledPixels(24),
@@ -295,7 +300,7 @@ const styles = StyleSheet.create({
     },
     episodeNumber: {
         fontSize: scaledPixels(24),
-        color: colors.textTertiary,
+        color: colors.text,
         width: scaledPixels(50),
         fontWeight: 'bold',
     },
@@ -306,6 +311,7 @@ const styles = StyleSheet.create({
         fontSize: scaledPixels(22),
         color: colors.text,
         fontWeight: '500',
+        flex: 1,
     },
     modalContent: {
         width: '60%',
