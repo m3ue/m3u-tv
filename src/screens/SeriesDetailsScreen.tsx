@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground, useWindowDimensions } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
@@ -18,6 +18,8 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
     const [selectedEpisode, setSelectedEpisode] = useState<XtreamEpisode | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+
+    const { width, height } = useWindowDimensions();
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -123,7 +125,8 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                                         onSelect={() => openModal(ep)}
                                                         style={({ isFocused }) => [
                                                             styles.episodeItem,
-                                                            isFocused && styles.itemFocused
+                                                            isFocused && styles.itemFocused,
+                                                            { width: width - scaledPixels(450) }
                                                         ]}
                                                     >
                                                         <View style={styles.episodeMain}>
