@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, FlatList, Modal, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
@@ -8,7 +8,8 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode, SpatialNavigationRoot, useLockSpatialNavigation } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
+import { TVOverlay } from '../components/TVOverlay';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
@@ -17,7 +18,6 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
     const [selectedEpisode, setSelectedEpisode] = useState<XtreamEpisode | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
-    const { lock, unlock } = useLockSpatialNavigation();
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -39,13 +39,11 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     const openModal = useCallback((episode: XtreamEpisode) => {
         setSelectedEpisode(episode);
         setIsModalVisible(true);
-        lock();
-    }, [lock]);
+    }, []);
 
     const closeModal = useCallback(() => {
         setIsModalVisible(false);
-        unlock();
-    }, [unlock]);
+    }, []);
 
     const handlePlayEpisode = useCallback((episode: XtreamEpisode) => {
         const streamUrl = getSeriesStreamUrl(episode.id, episode.container_extension);
@@ -118,10 +116,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                         keyExtractor={(ep) => ep.id}
                                         renderItem={({ item: ep }) => (
                                             <FocusablePressable
-                                                onSelect={() => {
-                                                    setSelectedEpisode(ep);
-                                                    setIsModalVisible(true);
-                                                }}
+                                                onSelect={() => openModal(ep)}
                                                 style={({ isFocused }) => [
                                                     styles.episodeItem,
                                                     isFocused && styles.itemFocused
@@ -146,61 +141,52 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                 </LinearGradient>
             </ImageBackground>
 
-            {/* Episode Details Modal */}
-            <Modal
-                visible={isModalVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setIsModalVisible(false)}
-            >
-                <SpatialNavigationNode>
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Image
-                                source={{ uri: selectedEpisode?.info?.movie_image || item.cover }}
-                                style={styles.modalImage}
-                                resizeMode="cover"
-                            />
-                            <View style={styles.modalBody}>
-                                <Text style={styles.modalTitle}>{selectedEpisode?.title}</Text>
-                                <Text style={styles.modalMeta}>Episode {selectedEpisode?.episode_num}</Text>
-                                <Text style={styles.modalPlot}>{selectedEpisode?.info?.plot || 'No description available for this episode.'}</Text>
+            {/* Episode Details Overlay */}
+            <TVOverlay visible={isModalVisible} onClose={closeModal}>
+                <View style={styles.modalContent}>
+                    <Image
+                        source={{ uri: selectedEpisode?.info?.movie_image || item.cover }}
+                        style={styles.modalImage}
+                        resizeMode="cover"
+                    />
+                    <View style={styles.modalBody}>
+                        <Text style={styles.modalTitle}>{selectedEpisode?.title}</Text>
+                        <Text style={styles.modalMeta}>Episode {selectedEpisode?.episode_num}</Text>
+                        <Text style={styles.modalPlot}>{selectedEpisode?.info?.plot || 'No description available for this episode.'}</Text>
 
-                                <View style={styles.modalButtons}>
-                                    <SpatialNavigationNode orientation="horizontal">
-                                        <>
-                                            <DefaultFocus>
-                                                <FocusablePressable
-                                                    onSelect={() => {
-                                                        if (selectedEpisode) handlePlayEpisode(selectedEpisode);
-                                                        setIsModalVisible(false);
-                                                    }}
-                                                    style={({ isFocused }) => [
-                                                        styles.modalPlayButton,
-                                                        isFocused && styles.buttonFocused
-                                                    ]}
-                                                >
-                                                    <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
-                                                    <Text style={styles.buttonText}>Play Episode</Text>
-                                                </FocusablePressable>
-                                            </DefaultFocus>
-                                            <FocusablePressable
-                                                onSelect={() => setIsModalVisible(false)}
-                                                style={({ isFocused }) => [
-                                                    styles.modalCloseButton,
-                                                    isFocused && styles.buttonFocused
-                                                ]}
-                                            >
-                                                <Text style={styles.buttonText}>Close</Text>
-                                            </FocusablePressable>
-                                        </>
-                                    </SpatialNavigationNode>
-                                </View>
-                            </View>
+                        <View style={styles.modalButtons}>
+                            <SpatialNavigationNode orientation="horizontal">
+                                <>
+                                    <DefaultFocus>
+                                        <FocusablePressable
+                                            onSelect={() => {
+                                                if (selectedEpisode) handlePlayEpisode(selectedEpisode);
+                                                closeModal();
+                                            }}
+                                            style={({ isFocused }) => [
+                                                styles.modalPlayButton,
+                                                isFocused && styles.buttonFocused
+                                            ]}
+                                        >
+                                            <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
+                                            <Text style={styles.buttonText}>Play Episode</Text>
+                                        </FocusablePressable>
+                                    </DefaultFocus>
+                                    <FocusablePressable
+                                        onSelect={closeModal}
+                                        style={({ isFocused }) => [
+                                            styles.modalCloseButton,
+                                            isFocused && styles.buttonFocused
+                                        ]}
+                                    >
+                                        <Text style={styles.buttonText}>Close</Text>
+                                    </FocusablePressable>
+                                </>
+                            </SpatialNavigationNode>
                         </View>
                     </View>
-                </SpatialNavigationNode>
-            </Modal>
+                </View>
+            </TVOverlay>
         </View>
     );
 };
@@ -320,12 +306,6 @@ const styles = StyleSheet.create({
         fontSize: scaledPixels(22),
         color: colors.text,
         fontWeight: '500',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     modalContent: {
         width: '60%',
