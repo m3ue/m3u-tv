@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   },
   message: {
     color: colors.textSecondary,
-    fontSize: scaledPixels(typography.fontSize.lg),
+    fontSize: scaledPixels(24),
     textAlign: 'center',
   },
 });
