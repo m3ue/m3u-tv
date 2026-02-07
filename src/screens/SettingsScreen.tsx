@@ -12,7 +12,7 @@ import {
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
-import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
@@ -64,7 +64,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   if (isConfigured && authResponse) {
     return (
       <SpatialNavigationNode>
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
           <View style={styles.infoContainer}>
             <Text style={styles.title}>Welcome to M3U TV</Text>
             <Text style={styles.subtitle}>Your streaming server is connected</Text>
@@ -188,14 +188,14 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               </FocusablePressable>
             </DefaultFocus>
           </SpatialNavigationNode>
-        </ScrollView>
+        </SpatialNavigationScrollView>
       </SpatialNavigationNode>
     );
   }
 
   return (
     <SpatialNavigationNode>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Xtream API Settings</Text>
         <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
 
@@ -265,7 +265,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
             }
           </FocusablePressable>
         </SpatialNavigationNode>
-      </ScrollView>
+      </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
 }
