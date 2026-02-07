@@ -8,7 +8,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationRoot, useLockSpatialNavigation } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
@@ -17,6 +17,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
     const [selectedEpisode, setSelectedEpisode] = useState<XtreamEpisode | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const { lock, unlock } = useLockSpatialNavigation();
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -34,6 +35,17 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     }, [item.series_id]);
 
     const episodes = seriesInfo?.episodes[selectedSeason || ''] || [];
+
+    const openModal = useCallback((episode: XtreamEpisode) => {
+        setSelectedEpisode(episode);
+        setIsModalVisible(true);
+        lock();
+    }, [lock]);
+
+    const closeModal = useCallback(() => {
+        setIsModalVisible(false);
+        unlock();
+    }, [unlock]);
 
     const handlePlayEpisode = useCallback((episode: XtreamEpisode) => {
         const streamUrl = getSeriesStreamUrl(episode.id, episode.container_extension);
@@ -67,6 +79,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                             </View>
                         </View>
 
+                        <SpatialNavigationNode orientation="horizontal">
                         <View style={styles.navigationSection}>
                             <View style={styles.seasonsColumn}>
                                 <Text style={styles.sectionTitle}>Seasons</Text>
@@ -128,6 +141,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                 </SpatialNavigationNode>
                             </View>
                         </View>
+                        </SpatialNavigationNode>
                     </View>
                 </LinearGradient>
             </ImageBackground>
