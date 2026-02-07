@@ -78,64 +78,64 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                         </View>
 
                         <SpatialNavigationNode orientation="horizontal">
-                        <View style={styles.navigationSection}>
-                            <View style={styles.seasonsColumn}>
-                                <Text style={styles.sectionTitle}>Seasons</Text>
-                                <SpatialNavigationNode>
-                                    <ScrollView showsVerticalScrollIndicator={false}>
-                                        {seriesInfo?.seasons.map((season) => (
-                                            <FocusablePressable
-                                                key={season.season_number}
-                                                onSelect={() => setSelectedSeason(String(season.season_number))}
-                                                style={({ isFocused }) => [
-                                                    styles.seasonItem,
-                                                    selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                                                    isFocused && styles.itemFocused
-                                                ]}
-                                            >
-                                                {({ isFocused }) => (
-                                                    <Text style={[
-                                                        styles.seasonText,
-                                                        selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                                                        isFocused && styles.seasonTextActive,
-                                                    ]}>
-                                                        Season {season.season_number}
-                                                    </Text>
-                                                )}
-                                            </FocusablePressable>
-                                        ))}
-                                    </ScrollView>
-                                </SpatialNavigationNode>
-                            </View>
+                            <View style={styles.navigationSection}>
+                                <View style={styles.seasonsColumn}>
+                                    <Text style={styles.sectionTitle}>Seasons</Text>
+                                    <SpatialNavigationNode>
+                                        <ScrollView showsVerticalScrollIndicator={false}>
+                                            {seriesInfo?.seasons.map((season) => (
+                                                <FocusablePressable
+                                                    key={season.season_number}
+                                                    onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                    style={({ isFocused }) => [
+                                                        styles.seasonItem,
+                                                        selectedSeason === String(season.season_number) && styles.seasonItemActive,
+                                                        isFocused && styles.itemFocused
+                                                    ]}
+                                                >
+                                                    {({ isFocused }) => (
+                                                        <Text style={[
+                                                            styles.seasonText,
+                                                            selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                            isFocused && styles.seasonTextActive,
+                                                        ]}>
+                                                            Season {season.season_number}
+                                                        </Text>
+                                                    )}
+                                                </FocusablePressable>
+                                            ))}
+                                        </ScrollView>
+                                    </SpatialNavigationNode>
+                                </View>
 
-                            <View style={styles.episodesColumn}>
-                                <Text style={styles.sectionTitle}>Episodes</Text>
-                                <SpatialNavigationNode>
-                                    <FlatList
-                                        data={episodes}
-                                        keyExtractor={(ep) => ep.id}
-                                        renderItem={({ item: ep }) => (
-                                            <FocusablePressable
-                                                onSelect={() => openModal(ep)}
-                                                style={({ isFocused }) => [
-                                                    styles.episodeItem,
-                                                    isFocused && styles.itemFocused
-                                                ]}
-                                            >
-                                                <View style={styles.episodeMain}>
-                                                    <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
-                                                    <View style={styles.episodeInfo}>
-                                                        <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                <View style={styles.episodesColumn}>
+                                    <Text style={styles.sectionTitle}>Episodes</Text>
+                                    <SpatialNavigationNode>
+                                        <FlatList
+                                            data={episodes}
+                                            keyExtractor={(ep) => ep.id}
+                                            renderItem={({ item: ep }) => (
+                                                <FocusablePressable
+                                                    onSelect={() => openModal(ep)}
+                                                    style={({ isFocused }) => [
+                                                        styles.episodeItem,
+                                                        isFocused && styles.itemFocused
+                                                    ]}
+                                                >
+                                                    <View style={styles.episodeMain}>
+                                                        <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
+                                                        <View style={styles.episodeInfo}>
+                                                            <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                        </View>
+                                                        <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.textTertiary} />
                                                     </View>
-                                                    <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.textTertiary} />
-                                                </View>
-                                            </FocusablePressable>
-                                        )}
-                                        showsVerticalScrollIndicator={false}
-                                    />
-                                </SpatialNavigationNode>
+                                                </FocusablePressable>
+                                            )}
+                                            showsVerticalScrollIndicator={false}
+                                        />
+                                    </SpatialNavigationNode>
+                                </View>
                             </View>
-                        </View>
                         </SpatialNavigationNode>
                     </View>
                 </LinearGradient>

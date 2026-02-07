@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { xtreamService } from '../services/XtreamService';
 import {
   XtreamCredentials,
@@ -8,6 +7,8 @@ import {
   XtreamLiveStream,
   XtreamVodStream,
   XtreamSeries,
+  XtreamVodInfo,
+  XtreamSeriesInfo,
 } from '../types/xtream';
 import * as SecureStore from 'expo-secure-store';
 
