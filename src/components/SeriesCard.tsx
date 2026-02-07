@@ -56,7 +56,6 @@ const styles = StyleSheet.create({
     margin: CARD_MARGIN,
     backgroundColor: colors.card,
     borderRadius: scaledPixels(12),
-    overflow: 'hidden',
     borderWidth: 3,
     borderColor: 'transparent',
   },
@@ -72,6 +71,7 @@ const styles = StyleSheet.create({
   },
   seriesPoster: {
     width: '100%',
+    borderRadius: scaledPixels(12),
     aspectRatio: 2 / 3,
   },
   seriesInfo: {
