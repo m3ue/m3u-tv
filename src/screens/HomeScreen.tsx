@@ -52,82 +52,6 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   return (
     <SpatialNavigationNode>
       <View style={styles.container}>
-        <Text style={styles.title}>Welcome to M3U TV</Text>
-        <Text style={styles.subtitle}>Your streaming service is connected</Text>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{liveCategories.length}</Text>
-            <Text style={styles.statLabel}>Live TV Categories</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{vodCategories.length}</Text>
-            <Text style={styles.statLabel}>Movie Categories</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{seriesCategories.length}</Text>
-            <Text style={styles.statLabel}>Series Categories</Text>
-          </View>
-        </View>
-
-        <SpatialNavigationNode orientation="horizontal">
-          <View style={styles.menuContainer}>
-            <DefaultFocus>
-              <FocusablePressable
-                style={({ isFocused }) => [
-                  styles.menuButton,
-                  isFocused && styles.menuButtonFocused,
-                ]}
-                onSelect={() => navigation.navigate('LiveTV')}
-              >
-                {({ isFocused }) => (
-                  <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                    Live TV
-                  </Text>
-                )}
-              </FocusablePressable>
-            </DefaultFocus>
-            <FocusablePressable
-              style={({ isFocused }) => [
-                styles.menuButton,
-                isFocused && styles.menuButtonFocused,
-              ]}
-              onSelect={() => navigation.navigate('EPG')}
-            >
-              {({ isFocused }) => (
-                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                  EPG Guide
-                </Text>
-              )}
-            </FocusablePressable>
-            <FocusablePressable
-              style={({ isFocused }) => [
-                styles.menuButton,
-                isFocused && styles.menuButtonFocused,
-              ]}
-              onSelect={() => navigation.navigate('VOD')}
-            >
-              {({ isFocused }) => (
-                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                  Movies
-                </Text>
-              )}
-            </FocusablePressable>
-            <FocusablePressable
-              style={({ isFocused }) => [
-                styles.menuButton,
-                isFocused && styles.menuButtonFocused,
-              ]}
-              onSelect={() => navigation.navigate('Series')}
-            >
-              {({ isFocused }) => (
-                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                  TV Series
-                </Text>
-              )}
-            </FocusablePressable>
-          </View>
-        </SpatialNavigationNode>
       </View>
     </SpatialNavigationNode>
   );
@@ -178,57 +102,6 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(24),
     fontWeight: '600',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: scaledPixels(20),
-    marginBottom: scaledPixels(60),
-    flexWrap: 'wrap',
-  },
-  statCard: {
-    backgroundColor: colors.card,
-    padding: scaledPixels(30),
-    borderRadius: scaledPixels(16),
-    alignItems: 'center',
-    minWidth: scaledPixels(180),
-  },
-  statNumber: {
-    fontSize: scaledPixels(48),
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  statLabel: {
-    fontSize: scaledPixels(18),
-    color: colors.textSecondary,
-    marginTop: scaledPixels(8),
-    textAlign: 'center',
-  },
-  menuContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: scaledPixels(20),
-  },
-  menuButton: {
-    backgroundColor: colors.cardElevated,
-    paddingHorizontal: scaledPixels(40),
-    paddingVertical: scaledPixels(30),
-    borderRadius: scaledPixels(16),
-    minWidth: scaledPixels(200),
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.border,
-  },
-  menuButtonFocused: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    transform: [{ scale: 1.08 }],
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 15,
-    elevation: 10,
-  },
   buttonFocused: {
     transform: [{ scale: 1.08 }],
     shadowColor: colors.primary,
@@ -236,11 +109,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 15,
     elevation: 10,
-  },
-  menuButtonText: {
-    color: colors.text,
-    fontSize: scaledPixels(24),
-    fontWeight: '500',
   },
   buttonTextFocused: {
     color: colors.textOnPrimary,
