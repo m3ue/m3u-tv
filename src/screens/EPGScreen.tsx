@@ -135,12 +135,18 @@ function EpgContent({ channels, epgData, startDate, endDate }: {
     startDate,
     endDate,
     width,
-    height: height,
+    height,
     isBaseTimeFormat: true,
     isCurrentTime: true,
-    // sidebarWidth: scaledPixels(260),
-    itemHeight: scaledPixels(80),
+    isInitialScrollToNow: true,
+    sidebarWidth: scaledPixels(100),
+    itemHeight: scaledPixels(100),
     itemOverscan: 20,
+    // overlap: {
+    //   enabled: true,
+    //   layerOverlapLevel: 1,
+    //   mode: 'stack'
+    // },
     fetchZone: {
       enabled: false,
       timeSlots: 3,
@@ -181,7 +187,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
         const channelsToShow = streams.slice(0, 20);
 
         // Transform channels for Planby
-        const planbyChannels: Channel[] = channelsToShow.map((stream: XtreamLiveStream, index: number) => ({
+        const channels: Channel[] = channelsToShow.map((stream: XtreamLiveStream, index: number) => ({
           uuid: String(stream.stream_id),
           title: stream.name || 'Unknown Channel',
           logo: stream.stream_icon || 'https://via.placeholder.com/50',
@@ -189,7 +195,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
           groupTree: false,
           parentChannelUuid: null,
         }));
-        setChannels(planbyChannels);
+        setChannels(channels);
 
         // Fetch EPG data for each channel
         const epgPromises = channelsToShow.map(async (stream: XtreamLiveStream) => {
@@ -300,7 +306,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-    padding: scaledPixels(40),
+    marginLeft: scaledPixels(100),
     justifyContent: 'center',
     alignItems: 'center',
   },

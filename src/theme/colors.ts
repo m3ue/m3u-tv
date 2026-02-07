@@ -14,7 +14,7 @@ export const colors = {
 
   // Text colors with proper contrast (WCAG AAA compliant)
   text: '#FFFFFF',
-  textSecondary: '#a1a1aa',
+  textSecondary: '#c4c4d0',
   textTertiary: '#71717a',
   textOnPrimary: '#FFFFFF',
 

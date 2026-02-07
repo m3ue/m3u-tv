@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     genre: {
-        color: colors.primary,
+        color: colors.text,
         fontSize: scaledPixels(18),
         marginBottom: scaledPixels(30),
     },

@@ -141,7 +141,7 @@ yarn typecheck
 
 ## Future Enhancements
 
-- [ ] Enhanced EPG with timeline view (planby integration)
+- [x] Enhanced EPG with timeline view (planby integration)
 - [ ] Search functionality
 - [ ] Favorites/Watchlist
 - [ ] Continue watching

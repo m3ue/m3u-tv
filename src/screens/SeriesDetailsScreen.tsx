@@ -52,7 +52,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                 blurRadius={5}
             >
                 <LinearGradient
-                    colors={['rgba(0,0,0,0.6)', colors.background]}
+                    colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
                     style={styles.gradient}
                 >
                     <View style={styles.content}>
