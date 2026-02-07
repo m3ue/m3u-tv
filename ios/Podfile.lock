@@ -59,6 +59,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoSecureStore (15.0.8):
+    - ExpoModulesCore
   - ExpoVideo (3.0.15):
     - ExpoModulesCore
   - FBLazyVector (0.81.5-2)
@@ -2048,6 +2050,7 @@ DEPENDENCIES:
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
+  - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoVideo (from `../node_modules/expo-video/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2142,6 +2145,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-linear-gradient/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
+  ExpoSecureStore:
+    :path: "../node_modules/expo-secure-store/ios"
   ExpoVideo:
     :path: "../node_modules/expo-video/ios"
   FBLazyVector:
@@ -2303,6 +2308,7 @@ SPEC CHECKSUMS:
   ExpoKeepAwake: 44bf6715bc1d2ddb17afe19d927cd039cda123f0
   ExpoLinearGradient: 814a21fc4056c3cf606e4f19e31e47074c5b5a86
   ExpoModulesCore: 77496909fd3c800f97f7f2007dd26aeac4bb3798
+  ExpoSecureStore: decd2943fa19fa6f02c5ef3689f9ba5012ad6a6d
   ExpoVideo: e28c2c362c591adb82c344690d64b770d29909b3
   FBLazyVector: 5d1300313dc2ad5c18f892e6a2ab820d561c70d0
   hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172

@@ -81,9 +81,7 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
           {item.name}
         </Text>
         <View style={styles.seriesMeta}>
-          {item.rating && (
-            <Text style={styles.seriesRating}>★ {item.rating}</Text>
-          )}
+          <Text style={styles.seriesRating}>★ {item.rating || 'N/A'}</Text>
           {(item.release_date || item.releaseDate) && (
             <Text style={styles.seriesYear}>
               {(item.release_date || item.releaseDate)?.substring(0, 4)}
@@ -129,7 +127,7 @@ export function SeriesScreen({ navigation }: DrawerScreenPropsType<'Series'>) {
             <SpatialNavigationVirtualizedGrid
               data={series}
               renderItem={renderSeriesItem}
-              numberOfColumns={6}
+              numberOfColumns={8}
               itemHeight={scaledPixels(390)}
               style={styles.seriesGrid}
             />
@@ -162,7 +160,7 @@ const styles = StyleSheet.create({
     marginTop: scaledPixels(25),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -178,7 +176,7 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),
-    paddingVertical: scaledPixels(12),
+    paddingVertical: scaledPixels(10),
     backgroundColor: colors.card,
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),

@@ -93,12 +93,16 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
             <DefaultFocus>
               <FocusablePressable
                 style={({ isFocused }) => [
-                  styles.disconnectButton,
-                  isFocused && styles.buttonFocused,
+                  styles.settingsButton,
+                  isFocused && styles.settingsButtonFocused,
                 ]}
                 onSelect={handleDisconnect}
               >
-                <Text style={styles.disconnectButtonText}>Disconnect</Text>
+                {({ isFocused }) => (
+                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
+                    Disconnect
+                  </Text>
+                )}
               </FocusablePressable>
             </DefaultFocus>
           </SpatialNavigationNode>
@@ -162,17 +166,21 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
         <SpatialNavigationNode>
           <FocusablePressable
             style={({ isFocused }) => [
-              styles.connectButton,
-              isFocused && styles.buttonFocused,
+              styles.settingsButton,
+              isFocused && styles.settingsButtonFocused,
               isLoading && styles.buttonDisabled,
             ]}
             onSelect={handleConnect}
           >
-            {isLoading ? (
-              <ActivityIndicator color={colors.textOnPrimary} />
-            ) : (
-              <Text style={styles.connectButtonText}>Connect</Text>
-            )}
+            {({ isFocused }) =>
+              isLoading ? (
+                <ActivityIndicator color={colors.textOnPrimary} />
+              ) : (
+                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
+                  Connect
+                </Text>
+              )
+            }
           </FocusablePressable>
         </SpatialNavigationNode>
       </ScrollView>
@@ -186,108 +194,108 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
+    padding: scaledPixels(spacing.lg),
+    maxWidth: scaledPixels(800),
+    width: '100%',
+    alignSelf: 'center',
   },
   title: {
-    fontSize: typography.fontSize.xl,
+    fontSize: scaledPixels(typography.fontSize.xl),
     fontWeight: typography.fontWeight.bold,
     color: colors.text,
-    marginBottom: spacing.xs,
+    marginBottom: scaledPixels(spacing.xs),
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: typography.fontSize.md,
+    fontSize: scaledPixels(typography.fontSize.md),
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    marginBottom: scaledPixels(spacing.lg),
+    textAlign: 'center',
   },
   errorContainer: {
     backgroundColor: colors.error + '20',
-    padding: spacing.md,
-    borderRadius: 8,
-    marginBottom: spacing.md,
+    padding: scaledPixels(spacing.md),
+    borderRadius: scaledPixels(8),
+    marginBottom: scaledPixels(spacing.md),
     borderWidth: 1,
     borderColor: colors.error,
   },
   errorText: {
     color: colors.error,
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(typography.fontSize.sm),
   },
   inputContainer: {
-    marginBottom: spacing.md,
+    marginBottom: scaledPixels(spacing.md),
   },
   label: {
-    fontSize: typography.fontSize.sm,
+    fontSize: scaledPixels(typography.fontSize.sm),
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: scaledPixels(spacing.xs),
   },
   input: {
     backgroundColor: colors.card,
-    borderRadius: 8,
-    padding: spacing.md,
-    fontSize: typography.fontSize.md,
+    borderRadius: scaledPixels(8),
+    padding: scaledPixels(spacing.md),
+    fontSize: scaledPixels(typography.fontSize.md),
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  connectButton: {
-    backgroundColor: colors.primary,
-    padding: spacing.md,
-    borderRadius: 8,
+  settingsButton: {
+    backgroundColor: colors.cardElevated,
+    paddingHorizontal: scaledPixels(40),
+    paddingVertical: scaledPixels(20),
+    borderRadius: scaledPixels(16),
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: scaledPixels(spacing.md),
+    borderWidth: 3,
+    borderColor: colors.border,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  connectButtonText: {
-    color: colors.textOnPrimary,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+  settingsButtonText: {
+    color: colors.text,
+    fontSize: scaledPixels(24),
+    fontWeight: '500',
   },
-  buttonFocused: {
-    transform: [{ scale: 1.05 }],
+  settingsButtonFocused: {
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
-    borderWidth: 2,
+    transform: [{ scale: 1.08 }],
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  buttonTextFocused: {
+    color: colors.textOnPrimary,
   },
   statusCard: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    borderRadius: scaledPixels(12),
+    padding: scaledPixels(spacing.lg),
+    marginBottom: scaledPixels(spacing.lg),
   },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: scaledPixels(spacing.sm),
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   statusLabel: {
-    fontSize: typography.fontSize.md,
+    fontSize: scaledPixels(typography.fontSize.md),
     color: colors.textSecondary,
   },
   statusValue: {
-    fontSize: typography.fontSize.md,
+    fontSize: scaledPixels(typography.fontSize.md),
     color: colors.text,
     fontWeight: typography.fontWeight.medium,
   },
   connected: {
     color: colors.success,
-  },
-  disconnectButton: {
-    backgroundColor: colors.error,
-    padding: spacing.md,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  disconnectButtonText: {
-    color: colors.textOnPrimary,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
   },
 });

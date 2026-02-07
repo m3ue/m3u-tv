@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { View, Text, TVEventHandler } from 'react-native';
+import { View, Text, TVEventHandler, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -14,6 +14,8 @@ import {
 import { XtreamProvider } from './src/context/XtreamContext';
 import { MenuProvider } from './src/context/MenuContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
+
+LogBox.ignoreLogs(['Persistent storage is not supported on tvOS']);
 
 export default function App() {
   useEffect(() => {

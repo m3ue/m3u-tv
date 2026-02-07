@@ -80,9 +80,7 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
         <Text style={styles.movieName} numberOfLines={1}>
           {item.name}
         </Text>
-        {item.rating && (
-          <Text style={styles.movieRating}>★ {item.rating}</Text>
-        )}
+        <Text style={styles.movieRating}>★ {item.rating || 'N/A'}</Text>
       </View>
     </FocusablePressable>
   );
@@ -122,7 +120,7 @@ export function VODScreen({ navigation }: DrawerScreenPropsType<'VOD'>) {
             <SpatialNavigationVirtualizedGrid
               data={vodStreams}
               renderItem={renderMovieItem}
-              numberOfColumns={6}
+              numberOfColumns={8}
               itemHeight={scaledPixels(390)}
               style={styles.movieGrid}
             />
@@ -155,7 +153,7 @@ const styles = StyleSheet.create({
     marginTop: scaledPixels(25),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -171,7 +169,7 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),
-    paddingVertical: scaledPixels(12),
+    paddingVertical: scaledPixels(10),
     backgroundColor: colors.card,
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),
