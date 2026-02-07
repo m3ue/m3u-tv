@@ -93,11 +93,11 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
         {
           flex: 1,
           backgroundColor: focused ? colors.primary : colors.card,
-          borderRadius: 8,
-          borderWidth: focused ? 2 : 1,
-          borderColor: focused ? colors.border : colors.border,
-          margin: 2,
-          padding: 8,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: colors.border,
+          margin: 1,
+          padding: 4,
           justifyContent: 'center',
         }
       ]}>
@@ -135,14 +135,15 @@ function EpgContent({ channels, epgData, startDate, endDate }: {
     startDate,
     endDate,
     width,
-    height: height - scaledPixels(120),
+    height: height,
     isBaseTimeFormat: true,
-    sidebarWidth: scaledPixels(260),
-    itemHeight: scaledPixels(130),
+    isCurrentTime: true,
+    // sidebarWidth: scaledPixels(260),
+    itemHeight: scaledPixels(80),
     itemOverscan: 20,
     fetchZone: {
       enabled: false,
-      timeSlots: 6,
+      timeSlots: 3,
       channelsPerSlot: 10,
       onFetchZone: () => { },
     },
@@ -298,14 +299,14 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     padding: scaledPixels(40),
     justifyContent: 'center',
     alignItems: 'center',
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: scaledPixels(spacing.lg),

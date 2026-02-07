@@ -145,11 +145,11 @@ const styles = StyleSheet.create({
   categoryListContainer: {
     paddingVertical: scaledPixels(10),
     paddingHorizontal: scaledPixels(10),
-    marginHorizontal: scaledPixels(25),
+    marginHorizontal: scaledPixels(40),
     marginTop: scaledPixels(25),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

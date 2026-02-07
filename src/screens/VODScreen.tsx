@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     marginTop: scaledPixels(25),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
