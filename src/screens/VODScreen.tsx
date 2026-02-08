@@ -70,42 +70,42 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
     );
   }
 
-  return (
-    <SpatialNavigationNode isActive={isFocused}>
-      {isFocused ? (
-        <View style={styles.container}>
-          {/* Category selector */}
-          <View style={styles.categoryListContainer}>
-            <SpatialNavigationVirtualizedList
-              data={[
-                { category_id: '', category_name: 'All Movies', parent_id: 0 },
-                ...vodCategories,
-              ]}
-              renderItem={renderCategoryItem}
-              itemSize={scaledPixels(195)}
-              style={styles.categoryList}
-              orientation="horizontal"
-            />
-          </View>
+  if (!isFocused) return null;
 
-          {/* Movies grid */}
-          <View style={styles.gridContent}>
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : (
-              <SpatialNavigationVirtualizedGrid
-                data={vodStreams}
-                renderItem={renderMovieItem}
-                numberOfColumns={8}
-                itemHeight={scaledPixels(390)}
-                style={styles.movieGrid}
-              />
-            )}
-          </View>
+  return (
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        {/* Category selector */}
+        <View style={styles.categoryListContainer}>
+          <SpatialNavigationVirtualizedList
+            data={[
+              { category_id: '', category_name: 'All Movies', parent_id: 0 },
+              ...vodCategories,
+            ]}
+            renderItem={renderCategoryItem}
+            itemSize={scaledPixels(195)}
+            style={styles.categoryList}
+            orientation="horizontal"
+          />
         </View>
-      ) : null}
+
+        {/* Movies grid */}
+        <View style={styles.gridContent}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <SpatialNavigationVirtualizedGrid
+              data={vodStreams}
+              renderItem={renderMovieItem}
+              numberOfColumns={8}
+              itemHeight={scaledPixels(390)}
+              style={styles.movieGrid}
+            />
+          )}
+        </View>
+      </View>
     </SpatialNavigationNode>
   );
 }

@@ -71,39 +71,39 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     );
   }
 
-  return (
-    <SpatialNavigationNode isActive={isFocused}>
-      {isFocused ? (
-        <View style={styles.container}>
-          {/* Category selector */}
-          <View style={styles.categoryListContainer}>
-            <SpatialNavigationVirtualizedList
-              data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
-              renderItem={renderCategoryItem}
-              itemSize={scaledPixels(195)}
-              style={styles.categoryList}
-              orientation="horizontal"
-            />
-          </View>
+  if (!isFocused) return null;
 
-          {/* Channels grid */}
-          <View style={styles.gridContainer}>
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : (
-              <SpatialNavigationVirtualizedGrid
-                data={liveStreams}
-                renderItem={renderStreamItem}
-                numberOfColumns={8}
-                itemHeight={scaledPixels(224)}
-                style={styles.channelGrid}
-              />
-            )}
-          </View>
+  return (
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        {/* Category selector */}
+        <View style={styles.categoryListContainer}>
+          <SpatialNavigationVirtualizedList
+            data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
+            renderItem={renderCategoryItem}
+            itemSize={scaledPixels(195)}
+            style={styles.categoryList}
+            orientation="horizontal"
+          />
         </View>
-      ) : null}
+
+        {/* Channels grid */}
+        <View style={styles.gridContainer}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <SpatialNavigationVirtualizedGrid
+              data={liveStreams}
+              renderItem={renderStreamItem}
+              numberOfColumns={8}
+              itemHeight={scaledPixels(224)}
+              style={styles.channelGrid}
+            />
+          )}
+        </View>
+      </View>
     </SpatialNavigationNode>
   );
 }

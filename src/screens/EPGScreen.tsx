@@ -325,20 +325,20 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     );
   }
 
+  if (!isFocused) return null;
+
   return (
-    <SpatialNavigationNode isActive={isFocused}>
-      {isFocused ? (
-        <View style={styles.container}>
-          <EpgContent
-            channels={channels}
-            epgData={epgData}
-            startDate={startDate}
-            endDate={endDate}
-            isLoading={isLoading}
-            onFetchZone={handleFetchZone}
-          />
-        </View>
-      ) : null}
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        <EpgContent
+          channels={channels}
+          epgData={epgData}
+          startDate={startDate}
+          endDate={endDate}
+          isLoading={isLoading}
+          onFetchZone={handleFetchZone}
+        />
+      </View>
     </SpatialNavigationNode>
   );
 }

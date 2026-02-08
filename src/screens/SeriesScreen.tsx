@@ -69,42 +69,42 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
     );
   }
 
-  return (
-    <SpatialNavigationNode isActive={isFocused}>
-      {isFocused ? (
-        <View style={styles.container}>
-          {/* Category selector */}
-          <View style={styles.categoryListContainer}>
-            <SpatialNavigationVirtualizedList
-              data={[
-                { category_id: '', category_name: 'All Series', parent_id: 0 },
-                ...seriesCategories,
-              ]}
-              renderItem={renderCategoryItem}
-              itemSize={scaledPixels(195)}
-              style={styles.categoryList}
-              orientation="horizontal"
-            />
-          </View>
+  if (!isFocused) return null;
 
-          {/* Series grid */}
-          <View style={styles.gridContent}>
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : (
-              <SpatialNavigationVirtualizedGrid
-                data={series}
-                renderItem={renderSeriesItem}
-                numberOfColumns={8}
-                itemHeight={scaledPixels(390)}
-                style={styles.seriesGrid}
-              />
-            )}
-          </View>
+  return (
+    <SpatialNavigationNode>
+      <View style={styles.container}>
+        {/* Category selector */}
+        <View style={styles.categoryListContainer}>
+          <SpatialNavigationVirtualizedList
+            data={[
+              { category_id: '', category_name: 'All Series', parent_id: 0 },
+              ...seriesCategories,
+            ]}
+            renderItem={renderCategoryItem}
+            itemSize={scaledPixels(195)}
+            style={styles.categoryList}
+            orientation="horizontal"
+          />
         </View>
-      ) : null}
+
+        {/* Series grid */}
+        <View style={styles.gridContent}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <SpatialNavigationVirtualizedGrid
+              data={series}
+              renderItem={renderSeriesItem}
+              numberOfColumns={8}
+              itemHeight={scaledPixels(390)}
+              style={styles.seriesGrid}
+            />
+          )}
+        </View>
+      </View>
     </SpatialNavigationNode>
   );
 }

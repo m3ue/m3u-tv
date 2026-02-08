@@ -88,62 +88,62 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
     );
   }
 
+  if (!isFocused) return null;
+
   return (
-    <SpatialNavigationNode isActive={isFocused}>
-      {isFocused ? (
-        <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
-          {/* Live TV Row */}
-          {liveStreams.length > 0 && (
-            <View style={styles.rowContainer}>
-              <Text style={styles.rowTitle}>Live TV</Text>
-              <View style={styles.liveTvRowList}>
-                <SpatialNavigationVirtualizedList
-                  data={liveStreams}
-                  renderItem={({ item }: { item: XtreamLiveStream }) => (
-                    <LiveTVCard item={item} />
-                  )}
-                  itemSize={scaledPixels(224)}
-                  orientation="horizontal"
-                />
-              </View>
+    <SpatialNavigationNode>
+      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+        {/* Live TV Row */}
+        {liveStreams.length > 0 && (
+          <View style={styles.rowContainer}>
+            <Text style={styles.rowTitle}>Live TV</Text>
+            <View style={styles.liveTvRowList}>
+              <SpatialNavigationVirtualizedList
+                data={liveStreams}
+                renderItem={({ item }: { item: XtreamLiveStream }) => (
+                  <LiveTVCard item={item} />
+                )}
+                itemSize={scaledPixels(224)}
+                orientation="horizontal"
+              />
             </View>
-          )}
+          </View>
+        )}
 
-          {/* Movies Row */}
-          {vodStreams.length > 0 && (
-            <View style={styles.rowContainer}>
-              <Text style={styles.rowTitle}>Movies</Text>
-              <View style={styles.posterRowList}>
-                <SpatialNavigationVirtualizedList
-                  data={vodStreams}
-                  renderItem={({ item }: { item: XtreamVodStream }) => (
-                    <MovieCard item={item} />
-                  )}
-                  itemSize={scaledPixels(224)}
-                  orientation="horizontal"
-                />
-              </View>
+        {/* Movies Row */}
+        {vodStreams.length > 0 && (
+          <View style={styles.rowContainer}>
+            <Text style={styles.rowTitle}>Movies</Text>
+            <View style={styles.posterRowList}>
+              <SpatialNavigationVirtualizedList
+                data={vodStreams}
+                renderItem={({ item }: { item: XtreamVodStream }) => (
+                  <MovieCard item={item} />
+                )}
+                itemSize={scaledPixels(224)}
+                orientation="horizontal"
+              />
             </View>
-          )}
+          </View>
+        )}
 
-          {/* Series Row */}
-          {seriesList.length > 0 && (
-            <View style={styles.rowContainer}>
-              <Text style={styles.rowTitle}>Series</Text>
-              <View style={styles.posterRowList}>
-                <SpatialNavigationVirtualizedList
-                  data={seriesList}
-                  renderItem={({ item }: { item: XtreamSeries }) => (
-                    <SeriesCard item={item} />
-                  )}
-                  itemSize={scaledPixels(224)}
-                  orientation="horizontal"
-                />
-              </View>
+        {/* Series Row */}
+        {seriesList.length > 0 && (
+          <View style={styles.rowContainer}>
+            <Text style={styles.rowTitle}>Series</Text>
+            <View style={styles.posterRowList}>
+              <SpatialNavigationVirtualizedList
+                data={seriesList}
+                renderItem={({ item }: { item: XtreamSeries }) => (
+                  <SeriesCard item={item} />
+                )}
+                itemSize={scaledPixels(224)}
+                orientation="horizontal"
+              />
             </View>
-          )}
-        </SpatialNavigationScrollView>
-      ) : null}
+          </View>
+        )}
+      </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
 }

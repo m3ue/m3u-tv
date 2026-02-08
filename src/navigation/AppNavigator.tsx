@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, StyleSheet } from 'react-native';
 import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { useIsFocused } from '@react-navigation/native';
 import {
   HomeScreen,
   SettingsScreen,
@@ -36,8 +37,9 @@ const AppTheme: Theme = {
 };
 
 function MainNavigator() {
+  const isFocused = useIsFocused();
   return (
-    <SpatialNavigationNode orientation="horizontal">
+    <SpatialNavigationNode orientation="horizontal" isActive={isFocused}>
       <View style={styles.mainContainer}>
         <SideBar />
         <SpatialNavigationNode>

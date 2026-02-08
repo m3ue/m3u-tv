@@ -64,28 +64,28 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   };
 
   if (isConfigured && authResponse) {
+    if (!isFocused) return null;
     return (
-      <SpatialNavigationNode isActive={isFocused}>
-        {isFocused ? (
-          <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <View style={styles.infoContainer}>
-              <Text style={styles.title}>Welcome to M3U TV</Text>
-              <Text style={styles.subtitle}>Your streaming server is connected</Text>
+      <SpatialNavigationNode>
+        <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <View style={styles.infoContainer}>
+            <Text style={styles.title}>Welcome to M3U TV</Text>
+            <Text style={styles.subtitle}>Your streaming server is connected</Text>
 
-              <View style={styles.statsContainer}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>{liveCategories.length}</Text>
-                  <Text style={styles.statLabel}>Live TV Categories</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>{vodCategories.length}</Text>
-                  <Text style={styles.statLabel}>Movie Categories</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statNumber}>{seriesCategories.length}</Text>
-                  <Text style={styles.statLabel}>Series Categories</Text>
-                </View>
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{liveCategories.length}</Text>
+                <Text style={styles.statLabel}>Live TV Categories</Text>
               </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{vodCategories.length}</Text>
+                <Text style={styles.statLabel}>Movie Categories</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{seriesCategories.length}</Text>
+                <Text style={styles.statLabel}>Series Categories</Text>
+              </View>
+            </View>
 
             <SpatialNavigationNode orientation="horizontal">
               <View style={styles.menuContainer}>
@@ -191,67 +191,99 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               </FocusablePressable>
             </DefaultFocus>
           </SpatialNavigationNode>
-          </SpatialNavigationScrollView>
-        ) : null}
-          <Text style={styles.label}>Server URL</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="http://example.com:8080"
-            placeholderTextColor={colors.textTertiary}
-            value={server}
-            onChangeText={setServer}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+        </SpatialNavigationScrollView>
+      </SpatialNavigationNode>
+    );
+  }
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter username"
-            placeholderTextColor={colors.textTertiary}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+  if (!isFocused) return null;
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter password"
-            placeholderTextColor={colors.textTertiary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+  return (
+    <SpatialNavigationNode>
+      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Connection Settings</Text>
+        <Text style={styles.subtitle}>Enter your Xtream codes details</Text>
 
-        <SpatialNavigationNode>
+        <View style={styles.form}>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Server URL</Text>
+            <DefaultFocus>
+              <FocusablePressable
+                style={({ isFocused }) => [
+                  styles.inputContainer,
+                  isFocused && styles.inputFocused,
+                ]}
+              >
+                <TextInput
+                  style={styles.input}
+                  value={server}
+                  onChangeText={setServer}
+                  placeholder="http://example.com:8080"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </FocusablePressable>
+            </DefaultFocus>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Username</Text>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.inputContainer,
+                isFocused && styles.inputFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Username"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </FocusablePressable>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <FocusablePressable
+              style={({ isFocused }) => [
+                styles.inputContainer,
+                isFocused && styles.inputFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </FocusablePressable>
+          </View>
+
           <FocusablePressable
             style={({ isFocused }) => [
-              styles.settingsButton,
-              isFocused && styles.settingsButtonFocused,
-              isLoading && styles.buttonDisabled,
+              styles.connectButton,
+              isFocused && styles.buttonFocused,
             ]}
             onSelect={handleConnect}
           >
-            {({ isFocused }) =>
-              isLoading ? (
-                <ActivityIndicator color={colors.textOnPrimary} />
-              ) : (
-                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
-                  Connect
-                </Text>
-              )
-            }
+            {isLoading ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.buttonText}>Connect</Text>
+            )}
           </FocusablePressable>
-        </SpatialNavigationNode>
+        </View>
       </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
@@ -303,6 +335,36 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(typography.fontSize.sm),
     color: colors.textSecondary,
     marginBottom: scaledPixels(spacing.xs),
+  },
+  form: {
+    width: '100%',
+    maxWidth: scaledPixels(500),
+    alignSelf: 'center',
+  },
+  inputGroup: {
+    marginBottom: scaledPixels(spacing.md),
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    transform: [{ scale: 1.02 }],
+  },
+  connectButton: {
+    backgroundColor: colors.primary,
+    padding: scaledPixels(spacing.md),
+    borderRadius: scaledPixels(8),
+    alignItems: 'center',
+    marginTop: scaledPixels(spacing.lg),
+  },
+  buttonFocused: {
+    borderColor: colors.text,
+    borderWidth: 2,
+    transform: [{ scale: 1.05 }],
+  },
+  buttonText: {
+    color: colors.textOnPrimary || '#FFFFFF',
+    fontSize: scaledPixels(typography.fontSize.md),
+    fontWeight: typography.fontWeight.bold,
   },
   input: {
     backgroundColor: colors.card,
