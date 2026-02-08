@@ -27,9 +27,7 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": false,
-          "NSAllowsLocalNetworking": true,
-          "NSAllowsArbitraryLoadsForMedia": true
+          "NSAllowsArbitraryLoads": true
         }
       }
     },

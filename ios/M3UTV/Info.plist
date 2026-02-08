@@ -41,10 +41,6 @@
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
-      <false/>
-      <key>NSAllowsLocalNetworking</key>
-      <true/>
-      <key>NSAllowsArbitraryLoadsForMedia</key>
       <true/>
     </dict>
     <key>NSFaceIDUsageDescription</key>
