@@ -24,7 +24,14 @@
     },
     "ios": {
       "bundleIdentifier": "dev.sparkison.tv",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true,
+          "NSAllowsArbitraryLoadsForMedia": true
+        }
+      }
     },
     "plugins": [
       [

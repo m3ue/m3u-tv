@@ -44,6 +44,8 @@
       <false/>
       <key>NSAllowsLocalNetworking</key>
       <true/>
+      <key>NSAllowsArbitraryLoadsForMedia</key>
+      <true/>
     </dict>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
