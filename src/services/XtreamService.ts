@@ -158,6 +158,17 @@ class XtreamService {
     return this.fetchJson<XtreamShortEpg>(url);
   }
 
+  async getEpgBatch(streamIds: number[], date?: string): Promise<Record<string, XtreamShortEpg>> {
+    const params: Record<string, string> = {
+      stream_ids: streamIds.join(','),
+    };
+    if (date) {
+      params.date = date;
+    }
+    const url = this.getApiUrl('get_epg_batch', params);
+    return this.fetchJson<Record<string, XtreamShortEpg>>(url);
+  }
+
   // Helper methods to transform data for UI
   transformLiveStream(stream: XtreamLiveStream, categoryName?: string): ContentItem {
     return {

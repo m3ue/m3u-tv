@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator, useWindowDimensions, Pressable } from 'react-native';
 import {
   useEpg,
@@ -82,6 +82,41 @@ const decodeBase64 = (str: string) => {
   }
 };
 
+const transformListingsToEpgPrograms = (
+  streamId: string | number,
+  listings: XtreamEpgListing[]
+): EpgProgram[] => {
+  const programs: EpgProgram[] = [];
+  if (!listings || !Array.isArray(listings)) return programs;
+
+  listings.forEach((listing) => {
+    if (!listing || !listing.id || !listing.start_timestamp || !listing.stop_timestamp) return;
+
+    const startDateObj = new Date(Number(listing.start_timestamp) * 1000);
+    const endDateObj = new Date(Number(listing.stop_timestamp) * 1000);
+
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) return;
+
+    programs.push({
+      id: `${streamId}-${listing.id}`,
+      channelUuid: String(streamId),
+      title: decodeBase64(String(listing.title || 'No Title')),
+      description: decodeBase64(String(listing.description || '')),
+      since: formatISO(startDateObj),
+      till: formatISO(endDateObj),
+      image: 'https://via.placeholder.com/100',
+    });
+  });
+
+  return programs;
+};
+
+const getTodayDateStr = () => {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+};
+
 const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) => {
   const { isLive, isMinWidth, styles, formatTime, set12HoursTimeFormat } = useProgram({
     program,
@@ -101,7 +136,7 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
           flex: 1,
           borderRadius: 4,
           borderWidth: focused ? 2 : 0,
-          borderColor: focused ? colors.primary : 'transparent',
+          borderColor: focused ? "#00bc7d" : 'transparent',
         }
       ]}>
         <ProgramContent width={styles.width} isLive={isLive}>
@@ -120,12 +155,13 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
   );
 };
 
-function EpgContent({ channels, epgData, startDate, endDate, isLoading }: {
+function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZone }: {
   channels: Channel[],
   epgData: EpgProgram[],
   startDate: string,
   endDate: string,
-  isLoading: boolean
+  isLoading: boolean,
+  onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void,
 }) {
   const { width, height } = useWindowDimensions();
 
@@ -144,10 +180,10 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading }: {
     itemHeight: scaledPixels(100),
     itemOverscan: 20,
     fetchZone: {
-      enabled: false,
-      timeSlots: 3,
+      enabled: true,
+      timeSlots: 6,
       channelsPerSlot: 10,
-      onFetchZone: () => { },
+      onFetchZone,
     },
   });
 
@@ -166,6 +202,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   const [isLoading, setIsLoading] = useState(true);
   const [epgData, setEpgData] = useState<EpgProgram[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const fetchedStreamIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const loadEPG = async () => {
@@ -179,11 +216,8 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
           streams = await fetchLiveStreams();
         }
 
-        // Take first 20 channels for EPG display
-        const channelsToShow = streams.slice(0, 20);
-
-        // Transform channels for Planby
-        const channels: Channel[] = channelsToShow.map((stream: XtreamLiveStream, index: number) => ({
+        // Transform ALL channels for Planby (EPG data loaded lazily via fetchZone)
+        const transformedChannels: Channel[] = streams.map((stream: XtreamLiveStream, index: number) => ({
           uuid: String(stream.stream_id),
           title: stream.name || 'Unknown Channel',
           logo: stream.stream_icon || 'https://via.placeholder.com/50',
@@ -191,47 +225,25 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
           groupTree: false,
           parentChannelUuid: null,
         }));
-        setChannels(channels);
+        setChannels(transformedChannels);
 
-        // Fetch EPG data for each channel
-        const epgPromises = channelsToShow.map(async (stream: XtreamLiveStream) => {
-          try {
-            const epg = await xtreamService.getSimpleDataTable(stream.stream_id);
-            return { streamId: stream.stream_id, listings: epg.epg_listings || [] };
-          } catch {
-            return { streamId: stream.stream_id, listings: [] };
-          }
-        });
+        // Batch fetch EPG for the first visible channels only
+        const initialBatchSize = 10;
+        const initialStreamIds = streams
+          .slice(0, initialBatchSize)
+          .map((s: XtreamLiveStream) => s.stream_id);
 
-        const epgResults = await Promise.all(epgPromises);
+        // Mark as fetched BEFORE the async call to prevent fetchZone race condition
+        initialStreamIds.forEach((id) => fetchedStreamIds.current.add(String(id)));
 
-        // Transform EPG data for Planby
+        const dateStr = getTodayDateStr();
+        const batchResult = await xtreamService.getEpgBatch(initialStreamIds, dateStr);
+
         const transformedEpg: EpgProgram[] = [];
-        epgResults.forEach(({ streamId, listings }) => {
-          if (!listings || !Array.isArray(listings)) return;
-
-          listings.forEach((listing: XtreamEpgListing) => {
-            if (!listing || !listing.id || !listing.start_timestamp || !listing.stop_timestamp) return;
-
-            const startDateObj = new Date(listing.start_timestamp * 1000);
-            const endDateObj = new Date(listing.stop_timestamp * 1000);
-
-            if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) return;
-
-            transformedEpg.push({
-              id: String(listing.id),
-              channelUuid: String(streamId),
-              title: decodeBase64(String(listing.title || 'No Title')),
-              description: decodeBase64(String(listing.description || '')),
-              since: formatISO(startDateObj),
-              till: formatISO(endDateObj),
-              image: 'https://via.placeholder.com/100',
-              status: 'active',
-              images: ['https://via.placeholder.com/100'],
-              utc: false,
-              timeZone: '',
-            });
-          });
+        Object.entries(batchResult).forEach(([streamId, data]) => {
+          transformedEpg.push(
+            ...transformListingsToEpgPrograms(streamId, data.epg_listings || [])
+          );
         });
 
         setEpgData(transformedEpg);
@@ -244,6 +256,46 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
     loadEPG();
   }, [isConfigured, fetchLiveStreams, liveStreams]);
+
+  const handleFetchZone = useCallback(async (data: {
+    since: string;
+    till: string;
+    channelsToFetchData: string[];
+  }) => {
+    const { channelsToFetchData } = data;
+    if (!channelsToFetchData || channelsToFetchData.length === 0) return;
+
+    // Skip channels we've already fetched
+    const unfetched = channelsToFetchData.filter(
+      (uuid) => !fetchedStreamIds.current.has(uuid)
+    );
+    if (unfetched.length === 0) return;
+
+    // Mark as fetched BEFORE the async call to prevent concurrent duplicate fetches
+    unfetched.forEach((uuid) => fetchedStreamIds.current.add(uuid));
+
+    try {
+      const streamIds = unfetched.map((uuid) => Number(uuid));
+      const sinceDate = new Date(data.since);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const dateStr = `${sinceDate.getFullYear()}-${pad(sinceDate.getMonth() + 1)}-${pad(sinceDate.getDate())}`;
+
+      const batchResult = await xtreamService.getEpgBatch(streamIds, dateStr);
+
+      const newPrograms: EpgProgram[] = [];
+      Object.entries(batchResult).forEach(([streamId, epg]) => {
+        newPrograms.push(
+          ...transformListingsToEpgPrograms(streamId, epg.epg_listings || [])
+        );
+      });
+
+      if (newPrograms.length > 0) {
+        setEpgData((prev) => [...prev, ...newPrograms]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch EPG zone:', error);
+    }
+  }, []);
 
   // Calculate start and end dates for the EPG range
   const { startDate, endDate } = useMemo(() => {
@@ -284,6 +336,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
           startDate={startDate}
           endDate={endDate}
           isLoading={isLoading}
+          onFetchZone={handleFetchZone}
         />
       </View>
     </SpatialNavigationNode>
