@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, Text, Platform } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { RootStackScreenProps } from '../navigation/types';
@@ -15,18 +15,12 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         player.play();
     });
 
-    useEffect(() => {
-        return () => {
-            player.pause();
-        };
-    }, [player]);
-
     return (
         <View style={styles.container}>
             <VideoView
                 style={styles.video}
                 player={player}
-                allowsFullscreen
+                fullscreenOptions={{ enable: true }}
                 allowsPictureInPicture
             />
 
