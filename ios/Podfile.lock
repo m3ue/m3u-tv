@@ -61,8 +61,6 @@ PODS:
     - Yoga
   - ExpoSecureStore (15.0.8):
     - ExpoModulesCore
-  - ExpoVideo (3.0.15):
-    - ExpoModulesCore
   - FBLazyVector (0.81.5-2)
   - hermes-engine (0.81.5):
     - hermes-engine/Pre-built (= 0.81.5)
@@ -1414,6 +1412,78 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-video (6.19.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-video/Video (= 6.19.0)
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - react-native-video/Fabric (6.19.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - react-native-video/Video (6.19.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-video/Fabric
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - react-native-vlc-media-player (1.0.38):
+    - MobileVLCKit (= 3.5.1)
+    - React
+    - TVVLCKit (= 3.5.1)
   - React-NativeModulesApple (0.81.5-2):
     - hermes-engine
     - React-callinvoker
@@ -1971,6 +2041,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNVectorIcons (9.2.0):
+    - React-Core
   - RNWorklets (0.5.1):
     - hermes-engine
     - RCTRequired
@@ -2039,6 +2111,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - TVVLCKit (3.5.1)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2051,7 +2124,6 @@ DEPENDENCIES:
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
-  - ExpoVideo (from `../node_modules/expo-video/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2089,6 +2161,8 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
+  - react-native-video (from `../node_modules/react-native-video`)
+  - react-native-vlc-media-player (from `../node_modules/react-native-vlc-media-player`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2125,8 +2199,13 @@ DEPENDENCIES:
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
+  - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
+
+SPEC REPOS:
+  trunk:
+    - TVVLCKit
 
 EXTERNAL SOURCES:
   EXConstants:
@@ -2147,8 +2226,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoSecureStore:
     :path: "../node_modules/expo-secure-store/ios"
-  ExpoVideo:
-    :path: "../node_modules/expo-video/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2222,6 +2299,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
+  react-native-video:
+    :path: "../node_modules/react-native-video"
+  react-native-vlc-media-player:
+    :path: "../node_modules/react-native-vlc-media-player"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2294,6 +2375,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-screens"
   RNSVG:
     :path: "../node_modules/react-native-svg"
+  RNVectorIcons:
+    :path: "../node_modules/react-native-vector-icons"
   RNWorklets:
     :path: "../node_modules/react-native-worklets"
   Yoga:
@@ -2309,7 +2392,6 @@ SPEC CHECKSUMS:
   ExpoLinearGradient: 814a21fc4056c3cf606e4f19e31e47074c5b5a86
   ExpoModulesCore: 77496909fd3c800f97f7f2007dd26aeac4bb3798
   ExpoSecureStore: decd2943fa19fa6f02c5ef3689f9ba5012ad6a6d
-  ExpoVideo: e28c2c362c591adb82c344690d64b770d29909b3
   FBLazyVector: 5d1300313dc2ad5c18f892e6a2ab820d561c70d0
   hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
   RCTDeprecation: 557c789999d670a92cb15568411e066fc259ee16
@@ -2346,6 +2428,8 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 2b7e6b2bce9dbf28f73921ef1d284978161daabf
   React-microtasksnativemodule: e431d2dd8765c6cf3181d0e4428b00ae37e76c21
   react-native-safe-area-context: 53f796cb6c814661bbe99fbdfd0585d07b996cdd
+  react-native-video: 7d647772ca655da8e1974bfc7e2648337a6d1361
+  react-native-vlc-media-player: 0f9860bded57cd6764ac55b5c0e97347069cb40a
   React-NativeModulesApple: fcee6fdb3ec32eaa764d2501f45d918c8063f15f
   React-oscompat: bf0a479d997b5a43ac78c01b45423936a9f22fcc
   React-perflogger: 209617600b9dd741245634bb71241a924bd20e6b
@@ -2382,7 +2466,9 @@ SPEC CHECKSUMS:
   RNReanimated: b81b622c5959419d1ccee7c33774e58fc8769266
   RNScreens: dd61bc3a3e6f6901ad833efa411917d44827cf51
   RNSVG: 79a0b05f08879a46686e647c3f0796dddb372fc7
+  RNVectorIcons: fcc2f6cb32f5735b586e66d14103a74ce6ad61f8
   RNWorklets: 2f71e969464dbd0bbda68cc055759af2b160c793
+  TVVLCKit: a9ab3e8d62ad2d02b7c89101d214f36ad874d45a
   Yoga: 15575381d4fafb10ff249d4419a03a61a3945190
 
 PODFILE CHECKSUM: b61edba430e5e8ba2e7668080dc8f264b7c2b99a

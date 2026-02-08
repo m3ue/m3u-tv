@@ -2862,6 +2862,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"cliui@npm:^7.0.2":
+  version: 7.0.4
+  resolution: "cliui@npm:7.0.4"
+  dependencies:
+    string-width: "npm:^4.2.0"
+    strip-ansi: "npm:^6.0.0"
+    wrap-ansi: "npm:^7.0.0"
+  checksum: 10c0/6035f5daf7383470cef82b3d3db00bec70afb3423538c50394386ffbbab135e26c3689c41791f911fa71b62d13d3863c712fdd70f0fbdffd938a1e6fd09aac00
+  languageName: node
+  linkType: hard
+
 "cliui@npm:^8.0.1":
   version: 8.0.1
   resolution: "cliui@npm:8.0.1"
@@ -3528,17 +3539,6 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/b35ed996a3da45a657075447bbf687dad4e7d5321129182e58737ea0fa4aeb8bb145bbe20967abd6823587a738e4c6fd62c41d18d8c11094ff926e2079c02fc2
-  languageName: node
-  linkType: hard
-
-"expo-video@npm:^3.0.15":
-  version: 3.0.15
-  resolution: "expo-video@npm:3.0.15"
-  peerDependencies:
-    expo: "*"
-    react: "*"
-    react-native: "*"
-  checksum: 10c0/34b0b7f53cf5cb2ada0de39b8cf9e7e8b2528fbe78fddc5ae8d261b3c0a06170894bc218262a913d11197ef7497e350252b6f0f321c77e51ec26100be9f08dae
   languageName: node
   linkType: hard
 
@@ -4494,7 +4494,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loose-envify@npm:^1.0.0":
+"loose-envify@npm:^1.0.0, loose-envify@npm:^1.4.0":
   version: 1.4.0
   resolution: "loose-envify@npm:1.4.0"
   dependencies:
@@ -4556,7 +4556,6 @@ __metadata:
     expo-linear-gradient: "npm:~15.0.8"
     expo-secure-store: "npm:~15.0.8"
     expo-status-bar: "npm:~3.0.8"
-    expo-video: "npm:^3.0.15"
     lucide-react-native: "npm:^0.563.0"
     react: "npm:19.1.0"
     react-native: "npm:react-native-tvos@0.81-stable"
@@ -4566,6 +4565,8 @@ __metadata:
     react-native-safe-area-context: "npm:~5.6.0"
     react-native-screens: "npm:~4.16.0"
     react-native-svg: "npm:^15.15.2"
+    react-native-video: "npm:^6.19.0"
+    react-native-vlc-media-player: "npm:^1.0.98"
     react-native-worklets: "npm:0.5.1"
     react-tv-space-navigation: "npm:^6.0.0-beta1"
     typescript: "npm:~5.9.2"
@@ -5195,7 +5196,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"object-assign@npm:^4.0.1":
+"object-assign@npm:^4.0.1, object-assign@npm:^4.1.1":
   version: 4.1.1
   resolution: "object-assign@npm:4.1.1"
   checksum: 10c0/1f4df9945120325d041ccf7b86f31e8bcc14e73d29171e37a7903050e96b81323784ec59f93f102ec635bcf6fa8034ba3ea0a8c7e69fa202b87ae3b6cec5a414
@@ -5507,6 +5508,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"prop-types@npm:^15.5.6, prop-types@npm:^15.7.2":
+  version: 15.8.1
+  resolution: "prop-types@npm:15.8.1"
+  dependencies:
+    loose-envify: "npm:^1.4.0"
+    object-assign: "npm:^4.1.1"
+    react-is: "npm:^16.13.1"
+  checksum: 10c0/59ece7ca2fb9838031d73a48d4becb9a7cc1ed10e610517c7d8f19a1e02fa47f7c27d557d8a5702bec3cfeccddc853579832b43f449e54635803f277b1c78077
+  languageName: node
+  linkType: hard
+
 "punycode@npm:^2.1.1":
   version: 2.3.1
   resolution: "punycode@npm:2.3.1"
@@ -5600,7 +5612,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-is@npm:^16.7.0":
+"react-is@npm:^16.13.1, react-is@npm:^16.7.0":
   version: 16.13.1
   resolution: "react-is@npm:16.13.1"
   checksum: 10c0/33977da7a5f1a287936a0c85639fec6ca74f4f15ef1e59a6bc20338fc73dc69555381e211f7a3529b8150a1f71e4225525b41b60b52965bda53ce7d47377ada1
@@ -5708,6 +5720,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-slider@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "react-native-slider@npm:0.11.0"
+  dependencies:
+    prop-types: "npm:^15.5.6"
+  checksum: 10c0/903e231f384674b1ec0a39728df10baab9e3beff270b047ac9187a9fe4d5ae5b751a88c40547b91d2d071462073129bd90bccdc4dda2be7b16bf9678d27d1b79
+  languageName: node
+  linkType: hard
+
 "react-native-svg@npm:^15.15.2":
   version: 15.15.2
   resolution: "react-native-svg@npm:15.15.2"
@@ -5719,6 +5740,39 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/0f00371a9f84ca55255602ce3f475e8ea58bbcbbccdb600002932c25ffc26de3725083d995ba2a508bd496f381fbefd6ebf70d2bc33bef93ebaa1b3080aa5dc8
+  languageName: node
+  linkType: hard
+
+"react-native-vector-icons@npm:^9.2.0":
+  version: 9.2.0
+  resolution: "react-native-vector-icons@npm:9.2.0"
+  dependencies:
+    prop-types: "npm:^15.7.2"
+    yargs: "npm:^16.1.1"
+  bin:
+    fa5-upgrade: bin/fa5-upgrade.sh
+    generate-icon: bin/generate-icon.js
+  checksum: 10c0/6a6c415195cfde49f3148e8568ffecb4b272e0ff6fe808fd2fd956834f3bdb2dbeac513b06be20497cce376a832909dfcba72431dc25e4aea076700cc34d8757
+  languageName: node
+  linkType: hard
+
+"react-native-video@npm:^6.19.0":
+  version: 6.19.0
+  resolution: "react-native-video@npm:6.19.0"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/ff06f37fb97707486e11ce46d01d50651759928784bdf5ff06191022a2a676440d1ecbc8fc41e5ce8fafa9cd45cf218d639f5fe99751c6b98c10f05b1c59fb35
+  languageName: node
+  linkType: hard
+
+"react-native-vlc-media-player@npm:^1.0.98":
+  version: 1.0.98
+  resolution: "react-native-vlc-media-player@npm:1.0.98"
+  dependencies:
+    react-native-slider: "npm:^0.11.0"
+    react-native-vector-icons: "npm:^9.2.0"
+  checksum: 10c0/0fc27c645de8a5170f5c47d59069dd514c77e6970288d00753247fc92d1bc2319b0a45c2dbe15cb5224b2eb180bd267ddaed3cea7d5f0656ba9de31fa64096ee
   languageName: node
   linkType: hard
 
@@ -6963,10 +7017,32 @@ __metadata:
   languageName: node
   linkType: hard
 
+"yargs-parser@npm:^20.2.2":
+  version: 20.2.9
+  resolution: "yargs-parser@npm:20.2.9"
+  checksum: 10c0/0685a8e58bbfb57fab6aefe03c6da904a59769bd803a722bb098bd5b0f29d274a1357762c7258fb487512811b8063fb5d2824a3415a0a4540598335b3b086c72
+  languageName: node
+  linkType: hard
+
 "yargs-parser@npm:^21.1.1":
   version: 21.1.1
   resolution: "yargs-parser@npm:21.1.1"
   checksum: 10c0/f84b5e48169479d2f402239c59f084cfd1c3acc197a05c59b98bab067452e6b3ea46d4dd8ba2985ba7b3d32a343d77df0debd6b343e5dae3da2aab2cdf5886b2
+  languageName: node
+  linkType: hard
+
+"yargs@npm:^16.1.1":
+  version: 16.2.0
+  resolution: "yargs@npm:16.2.0"
+  dependencies:
+    cliui: "npm:^7.0.2"
+    escalade: "npm:^3.1.1"
+    get-caller-file: "npm:^2.0.5"
+    require-directory: "npm:^2.1.1"
+    string-width: "npm:^4.2.0"
+    y18n: "npm:^5.0.5"
+    yargs-parser: "npm:^20.2.2"
+  checksum: 10c0/b1dbfefa679848442454b60053a6c95d62f2d2e21dd28def92b647587f415969173c6e99a0f3bab4f1b67ee8283bf735ebe3544013f09491186ba9e8a9a2b651
   languageName: node
   linkType: hard
 
