@@ -6,6 +6,11 @@ import {
   Layout,
   ProgramBox,
   ProgramContent,
+  ProgramFlex,
+  ProgramStack,
+  ProgramTitle,
+  ProgramText,
+  ProgramImage,
   useProgram,
   ProgramItem as PlanbyProgramItem
 } from '@nessprim/planby-native-pro';
@@ -78,44 +83,38 @@ const decodeBase64 = (str: string) => {
 };
 
 const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) => {
-  const { styles, formatTime, set12HoursTimeFormat } = useProgram({
+  const { isLive, isMinWidth, styles, formatTime, set12HoursTimeFormat } = useProgram({
     program,
     isVerticalMode,
     ...rest,
   });
 
   const { data } = program;
-  const { title, since, till } = data;
+  const { image, title, since, till } = data;
+  const sinceTime = formatTime(since, set12HoursTimeFormat()).toLowerCase();
+  const tillTime = formatTime(till, set12HoursTimeFormat()).toLowerCase();
 
   return (
     <ProgramBox width={styles.width} style={styles.position}>
       <Pressable focusable style={({ focused }) => [
         {
           flex: 1,
-          backgroundColor: focused ? colors.primary : colors.card,
           borderRadius: 4,
-          borderWidth: 1,
-          borderColor: colors.border,
-          margin: 1,
-          padding: 4,
-          justifyContent: 'center',
+          borderWidth: focused ? 2 : 0,
+          borderColor: focused ? colors.primary : 'transparent',
         }
       ]}>
-        <View>
-          <Text
-            numberOfLines={2}
-            style={{
-              color: colors.text,
-              fontSize: scaledPixels(20),
-              fontWeight: 'bold',
-            }}
-          >
-            {title}
-          </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: scaledPixels(16), marginTop: 4 }}>
-            {formatTime(since, set12HoursTimeFormat()).toLowerCase()} - {formatTime(till, set12HoursTimeFormat()).toLowerCase()}
-          </Text>
-        </View>
+        <ProgramContent width={styles.width} isLive={isLive}>
+          <ProgramFlex>
+            {isLive && isMinWidth && <ProgramImage src={image} alt="Preview" />}
+            <ProgramStack>
+              <ProgramTitle>{title}</ProgramTitle>
+              <ProgramText>
+                {sinceTime} - {tillTime}
+              </ProgramText>
+            </ProgramStack>
+          </ProgramFlex>
+        </ProgramContent>
       </Pressable>
     </ProgramBox>
   );

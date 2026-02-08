@@ -3,16 +3,16 @@ import { colors } from "./colors";
 export const epgTheme = {
     primary: {
         600: "#1a202c",
-        900: "#171923",
+        900: colors.backgroundElevated,
     },
     grey: { 300: "#d1d1d1" },
     white: "#fff",
     teal: {
-        100: "#38B2AC",
+        100: "#00d492",
     },
     green: {
-        200: "#389493",
-        300: "#2C7A7B",
+        200: "#00d492",
+        300: "#00bc7d",
     },
     loader: {
         teal: colors.primary,
@@ -28,15 +28,15 @@ export const epgTheme = {
     },
     gradient: {
         blue: {
-            300: "#002eb3",
-            600: "#002360",
-            900: "#051937",
+            300: "#00bc7d",
+            600: "#007a55",
+            900: "#004f3b"
         },
     },
     text: {
         grey: {
-            300: "#a0aec0",
-            500: "#718096",
+            300: colors.text,
+            500: colors.textSecondary,
         },
     },
     timeline: {
@@ -47,7 +47,7 @@ export const epgTheme = {
     grid: {
         item: "#7180961a",
         divider: "#7180961a",
-        highlight: "#38B2AC",
+        highlight: colors.primary,
     },
     program: {
         border: "#171923",
