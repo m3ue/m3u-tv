@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, ImageBackground } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
@@ -9,14 +9,21 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
 
 export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'Details'>) => {
     const isFocused = useIsFocused();
     const { item } = route.params;
+    const playButtonRef = useRef<SpatialNavigationNodeRef>(null);
     const { fetchVodInfo, getVodStreamUrl } = useXtream();
     const [movieInfo, setMovieInfo] = useState<XtreamVodInfo | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (isFocused) {
+            playButtonRef.current?.focus();
+        }
+    }, [isFocused]);
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -44,8 +51,10 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
     const info = movieInfo?.info;
     const backdrop = info?.backdrop_path?.[0] || item.stream_icon;
 
+    if (!isFocused) return null;
+
     return (
-        <SpatialNavigationNode isActive={isFocused}>
+        <SpatialNavigationNode>
             <View style={styles.container}>
                 <ImageBackground
                     source={{ uri: backdrop }}
@@ -55,7 +64,10 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
                         colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
                         style={styles.gradient}
                     >
-                        <ScrollView contentContainerStyle={styles.scrollContent}>
+                        <SpatialNavigationScrollView
+                            offsetFromStart={scaledPixels(60)}
+                            contentContainerStyle={styles.scrollContent}
+                        >
                             <View style={styles.header}>
                                 <Image
                                     source={{ uri: item.stream_icon }}
@@ -76,6 +88,7 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
                                     <View style={styles.buttonRow}>
                                         <DefaultFocus>
                                             <FocusablePressable
+                                                ref={playButtonRef}
                                                 onSelect={handlePlay}
                                                 style={({ isFocused }) => [
                                                     styles.playButton,
@@ -108,7 +121,7 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
                                     </View>
                                 )}
                             </View>
-                        </ScrollView>
+                        </SpatialNavigationScrollView>
                     </LinearGradient>
                 </ImageBackground>
             </View>

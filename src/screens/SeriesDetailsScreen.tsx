@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground, useWindowDimensions } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
@@ -9,16 +9,23 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const isFocused = useIsFocused();
     const { item } = route.params;
+    const seasonListRef = useRef<SpatialNavigationNodeRef>(null);
     const { fetchSeriesInfo, getSeriesStreamUrl } = useXtream();
     const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
 
     const { width, height } = useWindowDimensions();
+
+    useEffect(() => {
+        if (isFocused && seriesInfo?.seasons && seriesInfo.seasons.length > 0) {
+            seasonListRef.current?.focus();
+        }
+    }, [isFocused, seriesInfo]);
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -46,8 +53,10 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
         });
     }, [navigation, getSeriesStreamUrl]);
 
+    if (!isFocused) return null;
+
     return (
-        <SpatialNavigationNode isActive={isFocused}>
+        <SpatialNavigationNode>
             <View style={styles.container}>
                 <ImageBackground
                     source={{ uri: item.cover }}
@@ -75,31 +84,34 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                     <View style={styles.seasonsColumn}>
                                         <Text style={styles.sectionTitle}>Seasons</Text>
                                         <SpatialNavigationNode>
-                                            <SpatialNavigationScrollView>
-                                                <SpatialNavigationView direction="vertical">
-                                                    {seriesInfo?.seasons.map((season) => (
-                                                        <FocusablePressable
-                                                            key={season.season_number}
-                                                            onSelect={() => setSelectedSeason(String(season.season_number))}
-                                                            style={({ isFocused }) => [
-                                                                styles.seasonItem,
-                                                                selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                                                                isFocused && styles.itemFocused
-                                                            ]}
-                                                        >
-                                                            {({ isFocused }) => (
-                                                                <Text style={[
-                                                                    styles.seasonText,
-                                                                    selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                                                                    isFocused && styles.seasonTextActive,
-                                                                ]}>
-                                                                    Season {season.season_number}
-                                                                </Text>
-                                                            )}
-                                                        </FocusablePressable>
-                                                    ))}
-                                                </SpatialNavigationView>
-                                            </SpatialNavigationScrollView>
+                                            <DefaultFocus>
+                                                <SpatialNavigationScrollView>
+                                                    <SpatialNavigationView direction="vertical">
+                                                        {seriesInfo?.seasons.map((season, index) => (
+                                                            <FocusablePressable
+                                                                key={season.season_number}
+                                                                ref={index === 0 ? seasonListRef : undefined}
+                                                                onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                                style={({ isFocused }) => [
+                                                                    styles.seasonItem,
+                                                                    selectedSeason === String(season.season_number) && styles.seasonItemActive,
+                                                                    isFocused && styles.itemFocused
+                                                                ]}
+                                                            >
+                                                                {({ isFocused }) => (
+                                                                    <Text style={[
+                                                                        styles.seasonText,
+                                                                        selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                                        isFocused && styles.seasonTextActive,
+                                                                    ]}>
+                                                                        Season {season.season_number}
+                                                                    </Text>
+                                                                )}
+                                                            </FocusablePressable>
+                                                        ))}
+                                                    </SpatialNavigationView>
+                                                </SpatialNavigationScrollView>
+                                            </DefaultFocus>
                                         </SpatialNavigationNode>
                                     </View>
 
