@@ -3,7 +3,7 @@ import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, StyleSheet } from 'react-native';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
 import { useIsFocused } from '@react-navigation/native';
 import {
   HomeScreen,
@@ -43,23 +43,25 @@ function MainNavigator() {
       <View style={styles.mainContainer}>
         <SideBar />
         <SpatialNavigationNode>
-          <View style={styles.contentContainer}>
-            <MainStack.Navigator
-              screenOptions={{
-                headerShown: false,
-                headerTransparent: true,
-                animation: 'none',
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            >
-              <MainStack.Screen name="Home" component={HomeScreen} />
-              <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
-              <MainStack.Screen name="EPG" component={EPGScreen} />
-              <MainStack.Screen name="VOD" component={VODScreen} />
-              <MainStack.Screen name="Series" component={SeriesScreen} />
-              <MainStack.Screen name="Settings" component={SettingsScreen} />
-            </MainStack.Navigator>
-          </View>
+          <DefaultFocus>
+            <View style={styles.contentContainer}>
+              <MainStack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  headerTransparent: true,
+                  animation: 'none',
+                  contentStyle: { backgroundColor: colors.background },
+                }}
+              >
+                <MainStack.Screen name="Home" component={HomeScreen} />
+                <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
+                <MainStack.Screen name="EPG" component={EPGScreen} />
+                <MainStack.Screen name="VOD" component={VODScreen} />
+                <MainStack.Screen name="Series" component={SeriesScreen} />
+                <MainStack.Screen name="Settings" component={SettingsScreen} />
+              </MainStack.Navigator>
+            </View>
+          </DefaultFocus>
         </SpatialNavigationNode>
       </View>
     </SpatialNavigationNode>
