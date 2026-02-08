@@ -12,7 +12,7 @@ import {
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
-import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
@@ -25,6 +25,9 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
     connect,
     disconnect,
     clearError,
+    liveCategories,
+    vodCategories,
+    seriesCategories,
   } = useXtream();
 
   const [server, setServer] = useState('');
@@ -61,7 +64,86 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   if (isConfigured && authResponse) {
     return (
       <SpatialNavigationNode>
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <View style={styles.infoContainer}>
+            <Text style={styles.title}>Welcome to M3U TV</Text>
+            <Text style={styles.subtitle}>Your streaming server is connected</Text>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{liveCategories.length}</Text>
+                <Text style={styles.statLabel}>Live TV Categories</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{vodCategories.length}</Text>
+                <Text style={styles.statLabel}>Movie Categories</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{seriesCategories.length}</Text>
+                <Text style={styles.statLabel}>Series Categories</Text>
+              </View>
+            </View>
+
+            <SpatialNavigationNode orientation="horizontal">
+              <View style={styles.menuContainer}>
+                <DefaultFocus>
+                  <FocusablePressable
+                    style={({ isFocused }) => [
+                      styles.menuButton,
+                      isFocused && styles.menuButtonFocused,
+                    ]}
+                    onSelect={() => navigation.navigate('LiveTV')}
+                  >
+                    {({ isFocused }) => (
+                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                        Live TV
+                      </Text>
+                    )}
+                  </FocusablePressable>
+                </DefaultFocus>
+                <FocusablePressable
+                  style={({ isFocused }) => [
+                    styles.menuButton,
+                    isFocused && styles.menuButtonFocused,
+                  ]}
+                  onSelect={() => navigation.navigate('EPG')}
+                >
+                  {({ isFocused }) => (
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                      EPG Guide
+                    </Text>
+                  )}
+                </FocusablePressable>
+                <FocusablePressable
+                  style={({ isFocused }) => [
+                    styles.menuButton,
+                    isFocused && styles.menuButtonFocused,
+                  ]}
+                  onSelect={() => navigation.navigate('VOD')}
+                >
+                  {({ isFocused }) => (
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                      Movies
+                    </Text>
+                  )}
+                </FocusablePressable>
+                <FocusablePressable
+                  style={({ isFocused }) => [
+                    styles.menuButton,
+                    isFocused && styles.menuButtonFocused,
+                  ]}
+                  onSelect={() => navigation.navigate('Series')}
+                >
+                  {({ isFocused }) => (
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
+                      TV Series
+                    </Text>
+                  )}
+                </FocusablePressable>
+              </View>
+            </SpatialNavigationNode>
+          </View>
+
           <Text style={styles.title}>Connection Status</Text>
 
           <View style={styles.statusCard}>
@@ -106,14 +188,14 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               </FocusablePressable>
             </DefaultFocus>
           </SpatialNavigationNode>
-        </ScrollView>
+        </SpatialNavigationScrollView>
       </SpatialNavigationNode>
     );
   }
 
   return (
     <SpatialNavigationNode>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Xtream API Settings</Text>
         <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
 
@@ -183,7 +265,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
             }
           </FocusablePressable>
         </SpatialNavigationNode>
-      </ScrollView>
+      </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
 }
@@ -195,9 +277,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: scaledPixels(spacing.lg),
-    maxWidth: scaledPixels(800),
+    maxWidth: scaledPixels(1000),
     width: '100%',
     alignSelf: 'center',
+  },
+  infoContainer: {
+    marginBottom: scaledPixels(40),
   },
   title: {
     fontSize: scaledPixels(typography.fontSize.xl),
@@ -297,5 +382,61 @@ const styles = StyleSheet.create({
   },
   connected: {
     color: colors.success,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: scaledPixels(20),
+    marginBottom: scaledPixels(60),
+    flexWrap: 'wrap',
+  },
+  statCard: {
+    backgroundColor: colors.card,
+    padding: scaledPixels(30),
+    borderRadius: scaledPixels(16),
+    alignItems: 'center',
+    minWidth: scaledPixels(180),
+  },
+  statNumber: {
+    fontSize: scaledPixels(48),
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  statLabel: {
+    fontSize: scaledPixels(18),
+    color: colors.textSecondary,
+    marginTop: scaledPixels(8),
+    textAlign: 'center',
+  },
+  menuContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: scaledPixels(20),
+  },
+  menuButton: {
+    backgroundColor: colors.cardElevated,
+    paddingHorizontal: scaledPixels(40),
+    paddingVertical: scaledPixels(30),
+    borderRadius: scaledPixels(16),
+    minWidth: scaledPixels(200),
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.border,
+  },
+  menuButtonFocused: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    transform: [{ scale: 1.08 }],
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  menuButtonText: {
+    color: colors.text,
+    fontSize: scaledPixels(24),
+    fontWeight: '500',
   },
 });

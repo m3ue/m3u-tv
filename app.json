@@ -24,7 +24,12 @@
     },
     "ios": {
       "bundleIdentifier": "dev.sparkison.tv",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "plugins": [
       [
@@ -42,7 +47,14 @@
           }
         }
       ],
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
       "expo-secure-store"
     ],
     "web": {

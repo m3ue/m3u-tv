@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, FlatList, Modal, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground, useWindowDimensions } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
@@ -8,15 +8,15 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
     const { fetchSeriesInfo, getSeriesStreamUrl } = useXtream();
     const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
-    const [selectedEpisode, setSelectedEpisode] = useState<XtreamEpisode | null>(null);
-    const [isModalVisible, setIsModalVisible] = useState(false);
+
+    const { width, height } = useWindowDimensions();
 
     useEffect(() => {
         const loadInfo = async () => {
@@ -67,126 +67,85 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                             </View>
                         </View>
 
-                        <View style={styles.navigationSection}>
-                            <View style={styles.seasonsColumn}>
-                                <Text style={styles.sectionTitle}>Seasons</Text>
-                                <SpatialNavigationNode>
-                                    <ScrollView showsVerticalScrollIndicator={false}>
-                                        {seriesInfo?.seasons.map((season) => (
-                                            <FocusablePressable
-                                                key={season.season_number}
-                                                onSelect={() => setSelectedSeason(String(season.season_number))}
-                                                style={({ isFocused }) => [
-                                                    styles.seasonItem,
-                                                    selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                                                    isFocused && styles.itemFocused
-                                                ]}
-                                            >
-                                                {({ isFocused }) => (
-                                                    <Text style={[
-                                                        styles.seasonText,
-                                                        selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                                                        isFocused && styles.seasonTextActive,
-                                                    ]}>
-                                                        Season {season.season_number}
-                                                    </Text>
+                        <SpatialNavigationNode orientation="horizontal">
+                            <View style={styles.navigationSection}>
+                                <View style={styles.seasonsColumn}>
+                                    <Text style={styles.sectionTitle}>Seasons</Text>
+                                    <SpatialNavigationNode>
+                                        <SpatialNavigationScrollView>
+                                            <SpatialNavigationView direction="vertical">
+                                                {seriesInfo?.seasons.map((season) => (
+                                                    <FocusablePressable
+                                                        key={season.season_number}
+                                                        onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                        style={({ isFocused }) => [
+                                                            styles.seasonItem,
+                                                            selectedSeason === String(season.season_number) && styles.seasonItemActive,
+                                                            isFocused && styles.itemFocused
+                                                        ]}
+                                                    >
+                                                        {({ isFocused }) => (
+                                                            <Text style={[
+                                                                styles.seasonText,
+                                                                selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                                isFocused && styles.seasonTextActive,
+                                                            ]}>
+                                                                Season {season.season_number}
+                                                            </Text>
+                                                        )}
+                                                    </FocusablePressable>
+                                                ))}
+                                            </SpatialNavigationView>
+                                        </SpatialNavigationScrollView>
+                                    </SpatialNavigationNode>
+                                </View>
+
+                                <View style={styles.episodesColumn}>
+                                    <Text style={styles.sectionTitle}>Episodes</Text>
+                                    <SpatialNavigationNode>
+                                        <SpatialNavigationView direction="vertical" style={styles.episodesColumn}>
+                                            <SpatialNavigationVirtualizedList
+                                                data={episodes}
+                                                itemSize={scaledPixels(200)}
+                                                orientation="vertical"
+                                                renderItem={({ item: ep }) => (
+                                                    <FocusablePressable
+                                                        onSelect={() => handlePlayEpisode(ep)}
+                                                        style={({ isFocused }) => [
+                                                            styles.episodeItem,
+                                                            isFocused && styles.itemFocused,
+                                                            { width: width - scaledPixels(450) }
+                                                        ]}
+                                                    >
+                                                        <View style={styles.episodeMain}>
+                                                            <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
+                                                            <Image
+                                                                source={{ uri: ep.info?.movie_image || item.cover }}
+                                                                style={styles.episodeImage}
+                                                                resizeMode="cover"
+                                                            />
+                                                            <View style={styles.episodeInfo}>
+                                                                <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                                <View style={styles.metaRow}>
+                                                                    {ep.info?.rating && <Text style={styles.metaRating}>{`★ ${ep.info.rating}`}</Text>}
+                                                                    {ep.info?.release_date && <Text style={styles.metaText}>{ep.info.release_date.split('-')[0]}</Text>}
+                                                                    {ep.info?.duration && <Text style={styles.metaText}>{ep.info.duration}</Text>}
+                                                                </View>
+                                                                <Text style={styles.episodePlot} numberOfLines={3}>{ep.info?.plot || 'No description available for this episode.'}</Text>
+                                                            </View>
+                                                            <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
+                                                        </View>
+                                                    </FocusablePressable>
                                                 )}
-                                            </FocusablePressable>
-                                        ))}
-                                    </ScrollView>
-                                </SpatialNavigationNode>
-                            </View>
-
-                            <View style={styles.episodesColumn}>
-                                <Text style={styles.sectionTitle}>Episodes</Text>
-                                <SpatialNavigationNode>
-                                    <FlatList
-                                        data={episodes}
-                                        keyExtractor={(ep) => ep.id}
-                                        renderItem={({ item: ep }) => (
-                                            <FocusablePressable
-                                                onSelect={() => {
-                                                    setSelectedEpisode(ep);
-                                                    setIsModalVisible(true);
-                                                }}
-                                                style={({ isFocused }) => [
-                                                    styles.episodeItem,
-                                                    isFocused && styles.itemFocused
-                                                ]}
-                                            >
-                                                <View style={styles.episodeMain}>
-                                                    <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
-                                                    <View style={styles.episodeInfo}>
-                                                        <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
-                                                    </View>
-                                                    <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.textTertiary} />
-                                                </View>
-                                            </FocusablePressable>
-                                        )}
-                                        showsVerticalScrollIndicator={false}
-                                    />
-                                </SpatialNavigationNode>
-                            </View>
-                        </View>
-                    </View>
-                </LinearGradient>
-            </ImageBackground>
-
-            {/* Episode Details Modal */}
-            <Modal
-                visible={isModalVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setIsModalVisible(false)}
-            >
-                <SpatialNavigationNode>
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Image
-                                source={{ uri: selectedEpisode?.info?.movie_image || item.cover }}
-                                style={styles.modalImage}
-                                resizeMode="cover"
-                            />
-                            <View style={styles.modalBody}>
-                                <Text style={styles.modalTitle}>{selectedEpisode?.title}</Text>
-                                <Text style={styles.modalMeta}>Episode {selectedEpisode?.episode_num}</Text>
-                                <Text style={styles.modalPlot}>{selectedEpisode?.info?.plot || 'No description available for this episode.'}</Text>
-
-                                <View style={styles.modalButtons}>
-                                    <SpatialNavigationNode orientation="horizontal">
-                                        <>
-                                            <DefaultFocus>
-                                                <FocusablePressable
-                                                    onSelect={() => {
-                                                        if (selectedEpisode) handlePlayEpisode(selectedEpisode);
-                                                        setIsModalVisible(false);
-                                                    }}
-                                                    style={({ isFocused }) => [
-                                                        styles.modalPlayButton,
-                                                        isFocused && styles.buttonFocused
-                                                    ]}
-                                                >
-                                                    <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
-                                                    <Text style={styles.buttonText}>Play Episode</Text>
-                                                </FocusablePressable>
-                                            </DefaultFocus>
-                                            <FocusablePressable
-                                                onSelect={() => setIsModalVisible(false)}
-                                                style={({ isFocused }) => [
-                                                    styles.modalCloseButton,
-                                                    isFocused && styles.buttonFocused
-                                                ]}
-                                            >
-                                                <Text style={styles.buttonText}>Close</Text>
-                                            </FocusablePressable>
-                                        </>
+                                            />
+                                        </SpatialNavigationView>
                                     </SpatialNavigationNode>
                                 </View>
                             </View>
-                        </View>
+                        </SpatialNavigationNode>
                     </View>
-                </SpatialNavigationNode>
-            </Modal>
+                </LinearGradient>
+            </ImageBackground>
         </View>
     );
 };
@@ -223,11 +182,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: scaledPixels(15),
+        gap: scaledPixels(20),
     },
     metaText: {
         color: colors.textSecondary,
-        fontSize: scaledPixels(20),
-        marginRight: scaledPixels(20),
+        fontSize: scaledPixels(18),
+    },
+    metaRating: {
+        color: '#ffcc00',
+        fontSize: scaledPixels(18),
+        fontWeight: 'bold',
     },
     rating: {
         color: '#ffcc00',
@@ -250,6 +214,7 @@ const styles = StyleSheet.create({
     },
     episodesColumn: {
         flex: 1,
+        overflow: 'hidden',
     },
     sectionTitle: {
         fontSize: scaledPixels(24),
@@ -266,6 +231,8 @@ const styles = StyleSheet.create({
         marginBottom: scaledPixels(10),
         backgroundColor: 'rgba(255,255,255,0.05)',
         overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
     seasonItemActive: {
         backgroundColor: 'rgba(236, 0, 63, 0.2)',
@@ -285,86 +252,41 @@ const styles = StyleSheet.create({
         borderRadius: scaledPixels(8),
         marginBottom: scaledPixels(10),
         padding: scaledPixels(20),
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
     itemFocused: {
-        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     episodeMain: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: scaledPixels(20),
+        height: scaledPixels(150),
     },
     episodeNumber: {
         fontSize: scaledPixels(24),
-        color: colors.textTertiary,
+        color: colors.text,
         width: scaledPixels(50),
         fontWeight: 'bold',
     },
     episodeInfo: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
         flex: 1,
     },
     episodeTitle: {
-        fontSize: scaledPixels(22),
-        color: colors.text,
-        fontWeight: '500',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.85)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        width: '60%',
-        backgroundColor: colors.backgroundElevated,
-        borderRadius: scaledPixels(15),
-        overflow: 'hidden',
-        flexDirection: 'row',
-        maxHeight: '80%',
-    },
-    modalImage: {
-        width: '40%',
-        aspectRatio: 2 / 3,
-    },
-    modalBody: {
-        flex: 1,
-        padding: scaledPixels(40),
-    },
-    modalTitle: {
-        fontSize: scaledPixels(32),
-        color: colors.text,
-        fontWeight: 'bold',
-        marginBottom: scaledPixels(10),
-    },
-    modalMeta: {
-        fontSize: scaledPixels(20),
-        color: colors.primary,
-        fontWeight: 'bold',
-        marginBottom: scaledPixels(20),
-    },
-    modalPlot: {
-        fontSize: scaledPixels(18),
+        fontSize: scaledPixels(24),
         color: colors.textSecondary,
-        lineHeight: scaledPixels(26),
-        marginBottom: scaledPixels(40),
     },
-    modalButtons: {
-        flexDirection: 'row',
-        marginTop: 'auto',
-    },
-    modalPlayButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: scaledPixels(15),
-        paddingHorizontal: scaledPixels(30),
+    episodeImage: {
+        width: scaledPixels(200),
+        aspectRatio: 3 / 2,
         borderRadius: scaledPixels(8),
-        marginRight: scaledPixels(20),
     },
-    modalCloseButton: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingVertical: scaledPixels(15),
-        paddingHorizontal: scaledPixels(30),
-        borderRadius: scaledPixels(8),
+    episodePlot: {
+        fontSize: scaledPixels(20),
+        color: colors.text,
     },
     buttonFocused: {
         borderWidth: 2,
