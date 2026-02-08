@@ -2,7 +2,7 @@
 
 ![logo](./favicon.png)
 
-Cross-platform TV front-end player for the M3U Editor web app. Provides a convenient way to view your content on Android TV and Apple TV.
+Cross-platform TV front-end player for the [M3U Editor web app](https://github.com/m3ue/m3u-editor). Provides a convenient way to view your content on Android TV and Apple TV.
 
 ## Features
 
