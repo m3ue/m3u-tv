@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Text, Animated } from 'react-native';
+import { View, StyleSheet, Text, Animated, Pressable, TVEventHandler, BackHandler, Platform } from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
+import { SpatialNavigationFocusableView, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
 import { RootStackScreenProps } from '../navigation/types';
 import { colors } from '../theme';
-import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { scaledPixels } from '../hooks/useScale';
-import { DefaultFocus, SpatialNavigationView, SpatialNavigationNode } from 'react-tv-space-navigation';
 
 const OVERLAY_TIMEOUT = 8000;
 const SEEK_STEP = 10; // seconds
@@ -41,6 +40,9 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const initialBackend = useMemo(() => getInitialBackend(streamUrl), [streamUrl]);
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
 
+    // Focus refs
+    const playButtonRef = useRef<SpatialNavigationNodeRef>(null);
+
     // Playback state
     const [paused, setPaused] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -49,13 +51,28 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
     // Refs
     const nativeRef = useRef<VideoRef>(null);
-    const vlcSeekTo = useRef<number | undefined>(undefined);
-    const [vlcSeekValue, setVlcSeekValue] = useState<number | undefined>(undefined);
+    const vlcRef = useRef<any>(null);
+    const [vlcSeekValue, setVlcSeekValue] = useState<number>(-1);
+    const seekingRef = useRef(false);
+    const seekLockoutTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Overlay state
     const [overlayVisible, setOverlayVisible] = useState(true);
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+    // Use refs so the TVEventHandler callback always has current values
+    const overlayVisibleRef = useRef(overlayVisible);
+    const pausedRef = useRef(paused);
+    const currentTimeRef = useRef(currentTime);
+    const durationRef = useRef(duration);
+    const backendRef = useRef(backend);
+
+    useEffect(() => { overlayVisibleRef.current = overlayVisible; }, [overlayVisible]);
+    useEffect(() => { pausedRef.current = paused; }, [paused]);
+    useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+    useEffect(() => { durationRef.current = duration; }, [duration]);
+    useEffect(() => { backendRef.current = backend; }, [backend]);
 
     // --- Player error handling ---
 
@@ -76,35 +93,19 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     }, []);
 
     const handleNativeProgress = useCallback((data: OnProgressData) => {
-        setCurrentTime(data.currentTime);
+        if (!seekingRef.current) {
+            setCurrentTime(data.currentTime);
+        }
     }, []);
 
     const handleVlcProgress = useCallback((event: { currentTime: number; duration: number }) => {
-        setCurrentTime(event.currentTime / 1000); // VLC reports in ms
-        if (event.duration > 0) {
-            setDuration(event.duration / 1000);
+        if (!seekingRef.current) {
+            setCurrentTime(event.currentTime / 1000); // VLC reports in ms
+            if (event.duration > 0) {
+                setDuration(event.duration / 1000);
+            }
         }
     }, []);
-
-    // --- Playback controls ---
-
-    const togglePlayPause = useCallback(() => {
-        setPaused((prev) => !prev);
-        resetHideTimer();
-    }, []);
-
-    const seekBy = useCallback((offset: number) => {
-        const target = Math.max(0, Math.min(currentTime + offset, duration));
-        if (backend === 'native') {
-            nativeRef.current?.seek(target);
-        } else {
-            // VLC seek expects a value in seconds
-            vlcSeekTo.current = target;
-            setVlcSeekValue(target);
-        }
-        setCurrentTime(target);
-        resetHideTimer();
-    }, [currentTime, duration, backend]);
 
     // --- Overlay logic ---
 
@@ -125,12 +126,132 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         setOverlayVisible(true);
         fadeAnim.setValue(1);
         resetHideTimer();
+        // Give it a tiny delay to ensure the nodes are rendered before focusing
+        setTimeout(() => {
+            playButtonRef.current?.focus();
+        }, 50);
     }, [fadeAnim, resetHideTimer]);
 
     useEffect(() => {
         resetHideTimer();
+        // Set initial focus to play button
+        if (overlayVisible) {
+            playButtonRef.current?.focus();
+        }
         return () => clearTimeout(hideTimer.current);
-    }, [resetHideTimer]);
+    }, [resetHideTimer]); // Only on mount to establish focus tree
+
+    // --- Playback controls (using refs for stable callback) ---
+
+    const doSeek = useCallback((offset: number) => {
+        const ct = currentTimeRef.current;
+        const dur = durationRef.current;
+        if (dur <= 0) {
+            console.log('[Player] Seek ignored: duration is 0 or live');
+            return;
+        }
+
+        const target = Math.max(0, Math.min(ct + offset, dur));
+        console.log(`[Player] Seeking to ${target}s (current: ${ct}s, offset: ${offset}s, backend: ${backendRef.current})`);
+
+        // Lock out progress updates during seek to prevent jumping back
+        seekingRef.current = true;
+        setCurrentTime(target);
+
+        if (seekLockoutTimer.current) clearTimeout(seekLockoutTimer.current);
+        seekLockoutTimer.current = setTimeout(() => {
+            seekingRef.current = false;
+        }, 2500); // 2.5s lockout to ensure buffer is stable
+
+        if (backendRef.current === 'native') {
+            nativeRef.current?.seek(target);
+        } else {
+            // VLC expects milliseconds.
+            // We set it, then clear it back to -1 so it doesn't stay at a value that might re-trigger
+            const targetMs = Math.floor(target * 1000);
+            setVlcSeekValue(targetMs);
+            // Longer delay before resetting to -1, or maybe don't reset if -1 causes issues
+            setTimeout(() => setVlcSeekValue(-1), 500);
+        }
+    }, []);
+
+    const doTogglePlayPause = useCallback(() => {
+        setPaused((prev) => !prev);
+    }, []);
+
+    // --- TVEventHandler: direct d-pad control ---
+
+    // --- TV Events & Back Handling ---
+
+    useEffect(() => {
+        const backAction = () => {
+            if (overlayVisibleRef.current) {
+                hideOverlayAnim();
+                return true;
+            }
+            navigation.goBack();
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        const TVHandler: any = TVEventHandler;
+        if (!TVHandler) return () => backHandler.remove();
+
+        const listener = (event: any) => {
+            if (!event?.eventType) return;
+
+            // If overlay is hidden, any button press (except back/menu) shows it
+            if (!overlayVisibleRef.current) {
+                if (['back', 'menu'].includes(event.eventType)) {
+                    navigation.goBack();
+                    return;
+                }
+                showOverlay();
+                return;
+            }
+
+            // If overlay is visible, handle back/menu to hide it
+            if (['back', 'menu'].includes(event.eventType)) {
+                hideOverlayAnim();
+                return;
+            }
+
+            // Standard transport controls (physical buttons on remote)
+            if (event.eventType === 'playPause') doTogglePlayPause();
+            if (event.eventType === 'fastForward') doSeek(SEEK_STEP);
+            if (event.eventType === 'rewind') doSeek(-SEEK_STEP);
+
+            resetHideTimer();
+        };
+
+        let subscription: any;
+        if (typeof TVHandler.addListener === 'function') {
+            subscription = TVHandler.addListener(listener);
+        } else if (typeof TVHandler === 'function') {
+            const instance = new TVHandler();
+            instance.enable(null, (_: any, event: any) => listener(event));
+            subscription = { remove: () => instance.disable() };
+        }
+
+        return () => {
+            backHandler.remove();
+            subscription?.remove();
+        };
+    }, [navigation, showOverlay, hideOverlayAnim, resetHideTimer, doTogglePlayPause, doSeek]);
+
+    const nativeSource = useMemo(() => ({
+        uri: streamUrl,
+        headers: { 'User-Agent': USER_AGENT },
+    }), [streamUrl]);
+
+    const vlcSource = useMemo(() => ({
+        uri: streamUrl,
+        initOptions: [
+            '--network-caching=3000',
+            `--http-user-agent=${USER_AGENT}`,
+        ],
+    }), [streamUrl]);
 
     // Progress bar percentage
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -141,10 +262,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             {backend === 'native' ? (
                 <Video
                     ref={nativeRef}
-                    source={{
-                        uri: streamUrl,
-                        headers: { 'User-Agent': USER_AGENT },
-                    }}
+                    source={nativeSource}
                     style={styles.video}
                     resizeMode={ResizeMode.CONTAIN}
                     controls={false}
@@ -152,17 +270,16 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                     onLoad={handleNativeLoad}
                     onProgress={handleNativeProgress}
                     onError={handleNativeError}
+                    onSeek={() => {
+                        console.log('[Player] Native seek completed');
+                        seekingRef.current = false;
+                    }}
                     progressUpdateInterval={500}
                 />
             ) : (
                 <VLCPlayer
-                    source={{
-                        uri: streamUrl,
-                        initOptions: [
-                            '--network-caching=3000',
-                            `--http-user-agent=${USER_AGENT}`,
-                        ],
-                    }}
+                    ref={vlcRef}
+                    source={vlcSource}
                     style={styles.video}
                     autoplay={true}
                     paused={paused}
@@ -174,25 +291,30 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
             {/* Controls overlay */}
             {overlayVisible && (
-                <Animated.View
-                    style={[styles.overlay, { opacity: fadeAnim }]}
-                    pointerEvents="box-none"
-                >
-                    {/* Top bar: back + title */}
-                    <View style={styles.header}>
-                        <SpatialNavigationNode>
-                            <FocusablePressable
+                <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+                    <View style={styles.overlayInner}>
+                        {/* Top bar: back + title */}
+                        <View style={styles.header}>
+                            <SpatialNavigationFocusableView
                                 onSelect={() => navigation.goBack()}
-                                style={styles.backButton}
+                                onFocus={() => {
+                                    console.log('[Player] Back focused');
+                                    resetHideTimer();
+                                }}
                             >
-                                <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
-                            </FocusablePressable>
-                        </SpatialNavigationNode>
-                        <Text style={styles.title} numberOfLines={1}>{title}</Text>
-                    </View>
+                                {({ isFocused }) => (
+                                    <View style={[
+                                        styles.backButton,
+                                        isFocused && styles.controlButtonFocused,
+                                    ]}>
+                                        <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                                    </View>
+                                )}
+                            </SpatialNavigationFocusableView>
+                            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                        </View>
 
-                    {/* Bottom bar: controls + progress */}
-                    <SpatialNavigationView direction="vertical">
+                        {/* Bottom bar: controls + progress */}
                         <View style={styles.controlsBar}>
                             {/* Progress bar (VOD/series only) */}
                             {!isLive && duration > 0 && (
@@ -208,64 +330,69 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             {/* Transport controls */}
                             <View style={styles.transportRow}>
                                 {!isLive && (
-                                    <SpatialNavigationNode>
-                                        <FocusablePressable
-                                            onSelect={() => seekBy(-SEEK_STEP)}
-                                            style={({ isFocused }) => [
+                                    <SpatialNavigationFocusableView
+                                        onSelect={() => doSeek(-SEEK_STEP)}
+                                        onFocus={() => {
+                                            console.log('[Player] Rewind focused');
+                                            resetHideTimer();
+                                        }}
+                                    >
+                                        {({ isFocused }) => (
+                                            <View style={[
                                                 styles.controlButton,
                                                 isFocused && styles.controlButtonFocused,
-                                            ]}
-                                        >
-                                            <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
-                                        </FocusablePressable>
-                                    </SpatialNavigationNode>
+                                            ]}>
+                                                <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
+                                            </View>
+                                        )}
+                                    </SpatialNavigationFocusableView>
                                 )}
 
-                                <SpatialNavigationNode>
-                                    <DefaultFocus>
-                                        <FocusablePressable
-                                            onSelect={togglePlayPause}
-                                            style={({ isFocused }) => [
-                                                styles.controlButton,
-                                                styles.playButton,
-                                                isFocused && styles.controlButtonFocused,
-                                            ]}
-                                        >
+                                <SpatialNavigationFocusableView
+                                    ref={playButtonRef}
+                                    onSelect={doTogglePlayPause}
+                                    onFocus={() => {
+                                        console.log('[Player] Play focused');
+                                        resetHideTimer();
+                                    }}
+                                >
+                                    {({ isFocused }) => (
+                                        <View style={[
+                                            styles.controlButton,
+                                            styles.playButton,
+                                            isFocused && styles.controlButtonFocused,
+                                        ]}>
                                             <Icon
                                                 name={paused ? 'Play' : 'Pause'}
                                                 size={scaledPixels(36)}
                                                 color={colors.text}
                                             />
-                                        </FocusablePressable>
-                                    </DefaultFocus>
-                                </SpatialNavigationNode>
+                                        </View>
+                                    )}
+                                </SpatialNavigationFocusableView>
 
                                 {!isLive && (
-                                    <SpatialNavigationNode>
-                                        <FocusablePressable
-                                            onSelect={() => seekBy(SEEK_STEP)}
-                                            style={({ isFocused }) => [
+                                    <SpatialNavigationFocusableView
+                                        onSelect={() => doSeek(SEEK_STEP)}
+                                        onFocus={() => {
+                                            console.log('[Player] Forward focused');
+                                            resetHideTimer();
+                                        }}
+                                    >
+                                        {({ isFocused }) => (
+                                            <View style={[
                                                 styles.controlButton,
                                                 isFocused && styles.controlButtonFocused,
-                                            ]}
-                                        >
-                                            <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
-                                        </FocusablePressable>
-                                    </SpatialNavigationNode>
+                                            ]}>
+                                                <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                            </View>
+                                        )}
+                                    </SpatialNavigationFocusableView>
                                 )}
                             </View>
                         </View>
-                    </SpatialNavigationView>
+                    </View>
                 </Animated.View>
-            )}
-
-            {/* Invisible focusable to bring overlay back */}
-            {!overlayVisible && (
-                <View style={styles.tapZone} pointerEvents="box-none">
-                    <FocusablePressable onSelect={showOverlay} style={styles.tapZone}>
-                        <View />
-                    </FocusablePressable>
-                </View>
             )}
         </View>
     );
@@ -281,8 +408,11 @@ const styles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'space-between',
         padding: scaledPixels(40),
+    },
+    overlayInner: {
+        flex: 1,
+        justifyContent: 'space-between' as const,
     },
     header: {
         flexDirection: 'row',
@@ -350,8 +480,5 @@ const styles = StyleSheet.create({
     },
     controlButtonFocused: {
         backgroundColor: colors.primary,
-    },
-    tapZone: {
-        ...StyleSheet.absoluteFillObject,
     },
 });
