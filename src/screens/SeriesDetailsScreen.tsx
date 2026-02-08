@@ -122,7 +122,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                                             <Image
                                                                 source={{ uri: ep.info?.movie_image || item.cover }}
                                                                 style={styles.episodeImage}
-                                                                resizeMode="contain"
+                                                                resizeMode="cover"
                                                             />
                                                             <View style={styles.episodeInfo}>
                                                                 <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
@@ -282,6 +282,7 @@ const styles = StyleSheet.create({
     episodeImage: {
         width: scaledPixels(200),
         aspectRatio: 3 / 2,
+        borderRadius: scaledPixels(8),
     },
     episodePlot: {
         fontSize: scaledPixels(20),
