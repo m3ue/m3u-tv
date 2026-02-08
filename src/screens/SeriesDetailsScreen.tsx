@@ -126,6 +126,11 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                                             />
                                                             <View style={styles.episodeInfo}>
                                                                 <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                                <View style={styles.metaRow}>
+                                                                    {ep.info?.rating && <Text style={styles.metaRating}>{`★ ${ep.info.rating}`}</Text>}
+                                                                    {ep.info?.release_date && <Text style={styles.metaText}>{ep.info.release_date.split('-')[0]}</Text>}
+                                                                    {ep.info?.duration && <Text style={styles.metaText}>{ep.info.duration}</Text>}
+                                                                </View>
                                                                 <Text style={styles.episodePlot} numberOfLines={3}>{ep.info?.plot || 'No description available for this episode.'}</Text>
                                                             </View>
                                                             <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
@@ -177,11 +182,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: scaledPixels(15),
+        gap: scaledPixels(20),
     },
     metaText: {
         color: colors.textSecondary,
-        fontSize: scaledPixels(20),
-        marginRight: scaledPixels(20),
+        fontSize: scaledPixels(18),
+    },
+    metaRating: {
+        color: '#ffcc00',
+        fontSize: scaledPixels(18),
+        fontWeight: 'bold',
     },
     rating: {
         color: '#ffcc00',
@@ -268,7 +278,6 @@ const styles = StyleSheet.create({
     episodeTitle: {
         fontSize: scaledPixels(24),
         color: colors.textSecondary,
-        marginTop: scaledPixels(32),
     },
     episodeImage: {
         width: scaledPixels(200),
@@ -277,8 +286,6 @@ const styles = StyleSheet.create({
     episodePlot: {
         fontSize: scaledPixels(20),
         color: colors.text,
-        lineHeight: scaledPixels(26),
-        marginBottom: scaledPixels(40),
     },
     buttonFocused: {
         borderWidth: 2,
