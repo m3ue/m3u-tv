@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     },
     seasonItemActive: {
         backgroundColor: 'rgba(236, 0, 63, 0.2)',
-        borderLeftWidth: 6,
+        borderLeftWidth: 4,
         borderLeftColor: colors.primary,
     },
     seasonText: {
