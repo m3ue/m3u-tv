@@ -9,15 +9,12 @@ import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
-import { TVOverlay } from '../components/TVOverlay';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const { item } = route.params;
     const { fetchSeriesInfo, getSeriesStreamUrl } = useXtream();
     const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
-    const [selectedEpisode, setSelectedEpisode] = useState<XtreamEpisode | null>(null);
-    const [isModalVisible, setIsModalVisible] = useState(false);
 
     const { width, height } = useWindowDimensions();
 
@@ -37,15 +34,6 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     }, [item.series_id]);
 
     const episodes = seriesInfo?.episodes[selectedSeason || ''] || [];
-
-    const openModal = useCallback((episode: XtreamEpisode) => {
-        setSelectedEpisode(episode);
-        setIsModalVisible(true);
-    }, []);
-
-    const closeModal = useCallback(() => {
-        setIsModalVisible(false);
-    }, []);
 
     const handlePlayEpisode = useCallback((episode: XtreamEpisode) => {
         const streamUrl = getSeriesStreamUrl(episode.id, episode.container_extension);
@@ -118,11 +106,11 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                         <SpatialNavigationView direction="vertical" style={styles.episodesColumn}>
                                             <SpatialNavigationVirtualizedList
                                                 data={episodes}
-                                                itemSize={scaledPixels(80)}
+                                                itemSize={scaledPixels(200)}
                                                 orientation="vertical"
                                                 renderItem={({ item: ep }) => (
                                                     <FocusablePressable
-                                                        onSelect={() => openModal(ep)}
+                                                        onSelect={() => handlePlayEpisode(ep)}
                                                         style={({ isFocused }) => [
                                                             styles.episodeItem,
                                                             isFocused && styles.itemFocused,
@@ -131,8 +119,14 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                                                     >
                                                         <View style={styles.episodeMain}>
                                                             <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
+                                                            <Image
+                                                                source={{ uri: ep.info?.movie_image || item.cover }}
+                                                                style={styles.episodeImage}
+                                                                resizeMode="contain"
+                                                            />
                                                             <View style={styles.episodeInfo}>
                                                                 <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                                <Text style={styles.episodePlot} numberOfLines={3}>{ep.info?.plot || 'No description available for this episode.'}</Text>
                                                             </View>
                                                             <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
                                                         </View>
@@ -147,53 +141,6 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                     </View>
                 </LinearGradient>
             </ImageBackground>
-
-            {/* Episode Details Overlay */}
-            <TVOverlay visible={isModalVisible} onClose={closeModal}>
-                <View style={styles.modalContent}>
-                    <Image
-                        source={{ uri: selectedEpisode?.info?.movie_image || item.cover }}
-                        style={styles.modalImage}
-                        resizeMode="cover"
-                    />
-                    <View style={styles.modalBody}>
-                        <Text style={styles.modalTitle}>{selectedEpisode?.title}</Text>
-                        <Text style={styles.modalMeta}>Episode {selectedEpisode?.episode_num}</Text>
-                        <Text style={styles.modalPlot}>{selectedEpisode?.info?.plot || 'No description available for this episode.'}</Text>
-
-                        <View style={styles.modalButtons}>
-                            <SpatialNavigationNode orientation="horizontal">
-                                <>
-                                    <DefaultFocus>
-                                        <FocusablePressable
-                                            onSelect={() => {
-                                                if (selectedEpisode) handlePlayEpisode(selectedEpisode);
-                                                closeModal();
-                                            }}
-                                            style={({ isFocused }) => [
-                                                styles.modalPlayButton,
-                                                isFocused && styles.buttonFocused
-                                            ]}
-                                        >
-                                            <Icon name="Play" size={scaledPixels(24)} color={colors.text} />
-                                            <Text style={styles.buttonText}>Play Episode</Text>
-                                        </FocusablePressable>
-                                    </DefaultFocus>
-                                    <FocusablePressable
-                                        onSelect={closeModal}
-                                        style={({ isFocused }) => [
-                                            styles.modalCloseButton,
-                                            isFocused && styles.buttonFocused
-                                        ]}
-                                    >
-                                        <Text style={styles.buttonText}>Close</Text>
-                                    </FocusablePressable>
-                                </>
-                            </SpatialNavigationNode>
-                        </View>
-                    </View>
-                </View>
-            </TVOverlay>
         </View>
     );
 };
@@ -274,10 +221,12 @@ const styles = StyleSheet.create({
         marginBottom: scaledPixels(10),
         backgroundColor: 'rgba(255,255,255,0.05)',
         overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
     seasonItemActive: {
         backgroundColor: 'rgba(236, 0, 63, 0.2)',
-        borderLeftWidth: 4,
+        borderLeftWidth: 6,
         borderLeftColor: colors.primary,
     },
     seasonText: {
@@ -293,13 +242,17 @@ const styles = StyleSheet.create({
         borderRadius: scaledPixels(8),
         marginBottom: scaledPixels(10),
         padding: scaledPixels(20),
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
     itemFocused: {
-        backgroundColor: colors.primary,
+        borderColor: colors.primary,
     },
     episodeMain: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: scaledPixels(20),
+        height: scaledPixels(150),
     },
     episodeNumber: {
         fontSize: scaledPixels(24),
@@ -308,66 +261,24 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     episodeInfo: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
         flex: 1,
     },
     episodeTitle: {
-        fontSize: scaledPixels(22),
-        color: colors.text,
-        fontWeight: '500',
-        flex: 1,
-    },
-    modalContent: {
-        width: '60%',
-        backgroundColor: colors.backgroundElevated,
-        borderRadius: scaledPixels(15),
-        overflow: 'hidden',
-        flexDirection: 'row',
-        maxHeight: '80%',
-    },
-    modalImage: {
-        width: '40%',
-        aspectRatio: 2 / 3,
-    },
-    modalBody: {
-        flex: 1,
-        padding: scaledPixels(40),
-    },
-    modalTitle: {
-        fontSize: scaledPixels(32),
-        color: colors.text,
-        fontWeight: 'bold',
-        marginBottom: scaledPixels(10),
-    },
-    modalMeta: {
-        fontSize: scaledPixels(20),
-        color: colors.primary,
-        fontWeight: 'bold',
-        marginBottom: scaledPixels(20),
-    },
-    modalPlot: {
-        fontSize: scaledPixels(18),
+        fontSize: scaledPixels(24),
         color: colors.textSecondary,
+        marginTop: scaledPixels(32),
+    },
+    episodeImage: {
+        width: scaledPixels(200),
+        aspectRatio: 3 / 2,
+    },
+    episodePlot: {
+        fontSize: scaledPixels(20),
+        color: colors.text,
         lineHeight: scaledPixels(26),
         marginBottom: scaledPixels(40),
-    },
-    modalButtons: {
-        flexDirection: 'row',
-        marginTop: 'auto',
-    },
-    modalPlayButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.primary,
-        paddingVertical: scaledPixels(15),
-        paddingHorizontal: scaledPixels(30),
-        borderRadius: scaledPixels(8),
-        marginRight: scaledPixels(20),
-    },
-    modalCloseButton: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingVertical: scaledPixels(15),
-        paddingHorizontal: scaledPixels(30),
-        borderRadius: scaledPixels(8),
     },
     buttonFocused: {
         borderWidth: 2,
