@@ -131,25 +131,21 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
 
   return (
     <ProgramBox width={styles.width} style={styles.position}>
-      <Pressable focusable style={({ focused }) => [
-        {
-          flex: 1,
-          borderRadius: 4,
-          borderWidth: focused ? 2 : 0,
-          borderColor: focused ? "#00bc7d" : 'transparent',
-        }
-      ]}>
-        <ProgramContent width={styles.width} isLive={isLive}>
-          <ProgramFlex>
-            {isLive && isMinWidth && <ProgramImage src={image} alt="Preview" />}
-            <ProgramStack>
-              <ProgramTitle>{title}</ProgramTitle>
-              <ProgramText>
-                {sinceTime} - {tillTime}
-              </ProgramText>
-            </ProgramStack>
-          </ProgramFlex>
-        </ProgramContent>
+      <Pressable focusable>
+        {({ focused }) => (
+          <ProgramContent width={styles.width} isLive={isLive} style={{ borderWidth: focused ? 2 : 0, borderColor: focused ? "#00bc7d" : 'transparent' }}>
+            <ProgramFlex>
+              {isLive && isMinWidth && <ProgramImage src={image} alt="Preview" />}
+              <ProgramStack>
+                <ProgramTitle>{title}</ProgramTitle>
+                <ProgramText>
+                  {sinceTime} - {tillTime}
+                </ProgramText>
+              </ProgramStack>
+            </ProgramFlex>
+          </ProgramContent>
+        )}
+
       </Pressable>
     </ProgramBox>
   );

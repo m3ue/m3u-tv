@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Text, Animated } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
@@ -11,19 +11,52 @@ import { scaledPixels } from '../hooks/useScale';
 const OVERLAY_TIMEOUT = 5000;
 
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
-    const { streamUrl, title } = route.params;
+    const { streamUrl, title, type } = route.params;
     const [overlayVisible, setOverlayVisible] = useState(true);
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-    const player = useVideoPlayer(streamUrl, (player) => {
+    console.log(`[Player] Loading ${type} stream: ${title}`);
+    console.log(`[Player] URL: ${streamUrl}`);
+
+    const source = useMemo(() => ({
+        uri: streamUrl,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+        metadata: {
+            title: title,
+            artist: 'M3U TV',
+        }
+    }), [streamUrl, title]);
+
+    const player = useVideoPlayer(source, (player) => {
         player.loop = false;
         player.play();
+        console.log('[Player] Initialized');
     });
+
+    // Use effect to handle potential playback issues and ensure playing
+    useEffect(() => {
+        const subscription = player.addListener('statusChange', ({ status }) => {
+            if (status === 'readyToPlay') {
+                player.play();
+            }
+        });
+        return () => subscription.remove();
+    }, [player]);
 
     // Debug: log status changes
     useEventListener(player, 'statusChange', ({ status, error }) => {
-        console.log('[Player] Status:', status, error ? `Error: ${error.message}` : '');
+        console.log('[Player] Status Change:', status);
+        if (error) {
+            console.error('[Player] Error details:', {
+                message: error.message,
+                code: error.code,
+                domain: (error as any).domain,
+                userInfo: (error as any).userInfo
+            });
+        }
     });
 
     useEventListener(player, 'playingChange', ({ isPlaying }) => {
@@ -56,8 +89,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             <VideoView
                 style={styles.video}
                 player={player}
-                nativeControls
+                nativeControls={true}
                 contentFit="contain"
+                allowsFullscreen={true}
+                allowsPictureInPicture={false}
+                startsPictureInPictureAutomatically={false}
             />
 
             {overlayVisible && (
