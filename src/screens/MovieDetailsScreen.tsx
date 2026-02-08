@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, ImageBackground } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
@@ -11,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DefaultFocus, SpatialNavigationNode } from 'react-tv-space-navigation';
 
 export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'Details'>) => {
+    const isFocused = useIsFocused();
     const { item } = route.params;
     const { fetchVodInfo, getVodStreamUrl } = useXtream();
     const [movieInfo, setMovieInfo] = useState<XtreamVodInfo | null>(null);
@@ -43,7 +45,7 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
     const backdrop = info?.backdrop_path?.[0] || item.stream_icon;
 
     return (
-        <SpatialNavigationNode>
+        <SpatialNavigationNode isActive={isFocused}>
             <View style={styles.container}>
                 <ImageBackground
                     source={{ uri: backdrop }}

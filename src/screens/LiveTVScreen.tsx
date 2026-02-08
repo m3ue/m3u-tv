@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
@@ -15,6 +16,7 @@ import { LiveTVCard } from '../components/LiveTVCard';
 import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
+  const isFocused = useIsFocused();
   const { isConfigured, liveCategories, fetchLiveStreams } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
@@ -70,36 +72,38 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   }
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        {/* Category selector */}
-        <View style={styles.categoryListContainer}>
-          <SpatialNavigationVirtualizedList
-            data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
-            renderItem={renderCategoryItem}
-            itemSize={scaledPixels(195)}
-            style={styles.categoryList}
-            orientation="horizontal"
-          />
-        </View>
-
-        {/* Channels grid */}
-        <View style={styles.gridContainer}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <SpatialNavigationVirtualizedGrid
-              data={liveStreams}
-              renderItem={renderStreamItem}
-              numberOfColumns={8}
-              itemHeight={scaledPixels(224)}
-              style={styles.channelGrid}
+    <SpatialNavigationNode isActive={isFocused}>
+      {isFocused ? (
+        <View style={styles.container}>
+          {/* Category selector */}
+          <View style={styles.categoryListContainer}>
+            <SpatialNavigationVirtualizedList
+              data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
+              renderItem={renderCategoryItem}
+              itemSize={scaledPixels(195)}
+              style={styles.categoryList}
+              orientation="horizontal"
             />
-          )}
+          </View>
+
+          {/* Channels grid */}
+          <View style={styles.gridContainer}>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <SpatialNavigationVirtualizedGrid
+                data={liveStreams}
+                renderItem={renderStreamItem}
+                numberOfColumns={8}
+                itemHeight={scaledPixels(224)}
+                style={styles.channelGrid}
+              />
+            )}
+          </View>
         </View>
-      </View>
+      ) : null}
     </SpatialNavigationNode>
   );
 }

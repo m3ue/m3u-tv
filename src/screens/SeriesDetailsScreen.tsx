@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, FlatList, ImageBackground, useWindowDimensions } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
@@ -11,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
+    const isFocused = useIsFocused();
     const { item } = route.params;
     const { fetchSeriesInfo, getSeriesStreamUrl } = useXtream();
     const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
@@ -45,8 +47,9 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     }, [navigation, getSeriesStreamUrl]);
 
     return (
-        <View style={styles.container}>
-            <ImageBackground
+        <SpatialNavigationNode isActive={isFocused}>
+            <View style={styles.container}>
+                <ImageBackground
                 source={{ uri: item.cover }}
                 style={styles.backdrop}
                 blurRadius={5}
@@ -147,6 +150,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                 </LinearGradient>
             </ImageBackground>
         </View>
+        </SpatialNavigationNode>
     );
 };
 

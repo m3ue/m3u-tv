@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
@@ -17,6 +18,7 @@ import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
 export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>) {
+  const isFocused = useIsFocused();
   const {
     isConfigured,
     isLoading,
@@ -63,26 +65,27 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
 
   if (isConfigured && authResponse) {
     return (
-      <SpatialNavigationNode>
-        <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.infoContainer}>
-            <Text style={styles.title}>Welcome to M3U TV</Text>
-            <Text style={styles.subtitle}>Your streaming server is connected</Text>
+      <SpatialNavigationNode isActive={isFocused}>
+        {isFocused ? (
+          <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
+            <View style={styles.infoContainer}>
+              <Text style={styles.title}>Welcome to M3U TV</Text>
+              <Text style={styles.subtitle}>Your streaming server is connected</Text>
 
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{liveCategories.length}</Text>
-                <Text style={styles.statLabel}>Live TV Categories</Text>
+              <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{liveCategories.length}</Text>
+                  <Text style={styles.statLabel}>Live TV Categories</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{vodCategories.length}</Text>
+                  <Text style={styles.statLabel}>Movie Categories</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statNumber}>{seriesCategories.length}</Text>
+                  <Text style={styles.statLabel}>Series Categories</Text>
+                </View>
               </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{vodCategories.length}</Text>
-                <Text style={styles.statLabel}>Movie Categories</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{seriesCategories.length}</Text>
-                <Text style={styles.statLabel}>Series Categories</Text>
-              </View>
-            </View>
 
             <SpatialNavigationNode orientation="horizontal">
               <View style={styles.menuContainer}>
@@ -188,24 +191,8 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               </FocusablePressable>
             </DefaultFocus>
           </SpatialNavigationNode>
-        </SpatialNavigationScrollView>
-      </SpatialNavigationNode>
-    );
-  }
-
-  return (
-    <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Xtream API Settings</Text>
-        <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <View style={styles.inputContainer}>
+          </SpatialNavigationScrollView>
+        ) : null}
           <Text style={styles.label}>Server URL</Text>
           <TextInput
             style={styles.input}

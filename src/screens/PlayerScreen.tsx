@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler, Platform } from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
-import { SpatialNavigationFocusableView, SpatialNavigationNodeRef, SpatialNavigationRoot } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, SpatialNavigationNodeRef, SpatialNavigationRoot } from 'react-tv-space-navigation';
 import { RootStackScreenProps } from '../navigation/types';
 import { colors } from '../theme';
 import { Icon } from '../components/Icon';
 import { scaledPixels } from '../hooks/useScale';
+import { FocusablePressable } from '../components/FocusablePressable';
 
 const OVERLAY_TIMEOUT = 8000;
 const SEEK_STEP = 10; // seconds
@@ -300,103 +301,95 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                     <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
                         <View style={styles.overlayInner}>
                             {/* Top bar: back + title */}
-                            <View style={styles.header}>
-                                <SpatialNavigationFocusableView
-                                    onSelect={() => navigation.goBack()}
-                                    onFocus={() => {
-                                        console.log('[Player] Back focused');
-                                        resetHideTimer();
-                                    }}
-                                >
-                                    {({ isFocused }) => (
-                                        <View style={[
-                                            styles.backButton,
-                                            isFocused && styles.controlButtonFocused,
-                                        ]}>
-                                            <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
-                                        </View>
-                                    )}
-                                </SpatialNavigationFocusableView>
-                                <Text style={styles.title} numberOfLines={1}>{title}</Text>
-                            </View>
-
-                            {/* Bottom bar: controls + progress */}
-                            <View style={styles.controlsBar}>
-                                {/* Progress bar (VOD/series only) */}
-                                {!isLive && duration > 0 && (
-                                    <View style={styles.progressContainer}>
-                                        <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                                        <View style={styles.progressTrack}>
-                                            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                                        </View>
-                                        <Text style={styles.timeText}>{formatTime(duration)}</Text>
-                                    </View>
-                                )}
-
-                                {/* Transport controls */}
-                                <View style={styles.transportRow}>
-                                    {!isLive && (
-                                        <SpatialNavigationFocusableView
-                                            onSelect={() => doSeek(-SEEK_STEP)}
-                                            onFocus={() => {
-                                                console.log('[Player] Rewind focused');
-                                                resetHideTimer();
-                                            }}
-                                        >
-                                            {({ isFocused }) => (
-                                                <View style={[
-                                                    styles.controlButton,
-                                                    isFocused && styles.controlButtonFocused,
-                                                ]}>
-                                                    <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
-                                                </View>
-                                            )}
-                                        </SpatialNavigationFocusableView>
-                                    )}
-
-                                    <SpatialNavigationFocusableView
-                                        ref={playButtonRef}
-                                        onSelect={doTogglePlayPause}
+                            <SpatialNavigationNode>
+                                <View style={styles.header}>
+                                    <FocusablePressable
+                                        onSelect={() => navigation.goBack()}
                                         onFocus={() => {
-                                            console.log('[Player] Play focused');
+                                            console.log('[Player] Back focused');
                                             resetHideTimer();
                                         }}
+                                        style={({ isFocused }) => [
+                                            styles.backButton,
+                                            isFocused && styles.controlButtonFocused,
+                                        ]}
                                     >
-                                        {({ isFocused }) => (
-                                            <View style={[
+                                        <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                                    </FocusablePressable>
+                                    <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                                </View>
+                            </SpatialNavigationNode>
+
+                            {/* Bottom bar: controls + progress */}
+                            <SpatialNavigationNode>
+                                <View style={styles.controlsBar}>
+                                    {/* Progress bar (VOD/series only) */}
+                                    {!isLive && duration > 0 && (
+                                        <View style={styles.progressContainer}>
+                                            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                                            <View style={styles.progressTrack}>
+                                                <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                                            </View>
+                                            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                                        </View>
+                                    )}
+
+                                    {/* Transport controls */}
+                                    <View style={styles.transportRow}>
+                                        {!isLive && (
+                                            <FocusablePressable
+                                                onSelect={() => doSeek(-SEEK_STEP)}
+                                                onFocus={() => {
+                                                    console.log('[Player] Rewind focused');
+                                                    resetHideTimer();
+                                                }}
+                                                style={({ isFocused }) => [
+                                                    styles.controlButton,
+                                                    isFocused && styles.controlButtonFocused,
+                                                ]}
+                                            >
+                                                <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
+                                            </FocusablePressable>
+                                        )}
+
+                                        <FocusablePressable
+                                            ref={playButtonRef}
+                                            onSelect={doTogglePlayPause}
+                                            onFocus={() => {
+                                                console.log('[Player] Play focused');
+                                                resetHideTimer();
+                                            }}
+                                            style={({ isFocused }) => [
                                                 styles.controlButton,
                                                 styles.playButton,
                                                 isFocused && styles.controlButtonFocused,
-                                            ]}>
-                                                <Icon
-                                                    name={paused ? 'Play' : 'Pause'}
-                                                    size={scaledPixels(36)}
-                                                    color={colors.text}
-                                                />
-                                            </View>
-                                        )}
-                                    </SpatialNavigationFocusableView>
-
-                                    {!isLive && (
-                                        <SpatialNavigationFocusableView
-                                            onSelect={() => doSeek(SEEK_STEP)}
-                                            onFocus={() => {
-                                                console.log('[Player] Forward focused');
-                                                resetHideTimer();
-                                            }}
+                                            ]}
                                         >
-                                            {({ isFocused }) => (
-                                                <View style={[
+                                            <Icon
+                                                name={paused ? 'Play' : 'Pause'}
+                                                size={scaledPixels(36)}
+                                                color={colors.text}
+                                            />
+                                        </FocusablePressable>
+
+                                        {!isLive && (
+                                            <FocusablePressable
+                                                onSelect={() => doSeek(SEEK_STEP)}
+                                                onFocus={() => {
+                                                    console.log('[Player] Forward focused');
+                                                    resetHideTimer();
+                                                }}
+                                                style={({ isFocused }) => [
                                                     styles.controlButton,
                                                     isFocused && styles.controlButtonFocused,
-                                                ]}>
-                                                    <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
-                                                </View>
-                                            )}
-                                        </SpatialNavigationFocusableView>
-                                    )}
+                                                ]}
+                                            >
+                                                <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                            </FocusablePressable>
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
+                            </SpatialNavigationNode>
                         </View>
                     </Animated.View>
                 )}

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
@@ -15,6 +16,7 @@ import { SeriesCard } from '../components/SeriesCard';
 import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
 
 export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
+  const isFocused = useIsFocused();
   const { isConfigured, seriesCategories, series, fetchSeries } = useXtream();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,39 +70,41 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   }
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        {/* Category selector */}
-        <View style={styles.categoryListContainer}>
-          <SpatialNavigationVirtualizedList
-            data={[
-              { category_id: '', category_name: 'All Series', parent_id: 0 },
-              ...seriesCategories,
-            ]}
-            renderItem={renderCategoryItem}
-            itemSize={scaledPixels(195)}
-            style={styles.categoryList}
-            orientation="horizontal"
-          />
-        </View>
-
-        {/* Series grid */}
-        <View style={styles.gridContent}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <SpatialNavigationVirtualizedGrid
-              data={series}
-              renderItem={renderSeriesItem}
-              numberOfColumns={8}
-              itemHeight={scaledPixels(390)}
-              style={styles.seriesGrid}
+    <SpatialNavigationNode isActive={isFocused}>
+      {isFocused ? (
+        <View style={styles.container}>
+          {/* Category selector */}
+          <View style={styles.categoryListContainer}>
+            <SpatialNavigationVirtualizedList
+              data={[
+                { category_id: '', category_name: 'All Series', parent_id: 0 },
+                ...seriesCategories,
+              ]}
+              renderItem={renderCategoryItem}
+              itemSize={scaledPixels(195)}
+              style={styles.categoryList}
+              orientation="horizontal"
             />
-          )}
+          </View>
+
+          {/* Series grid */}
+          <View style={styles.gridContent}>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <SpatialNavigationVirtualizedGrid
+                data={series}
+                renderItem={renderSeriesItem}
+                numberOfColumns={8}
+                itemHeight={scaledPixels(390)}
+                style={styles.seriesGrid}
+              />
+            )}
+          </View>
         </View>
-      </View>
+      ) : null}
     </SpatialNavigationNode>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator, useWindowDimensions, Pressable } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import {
   useEpg,
   Epg,
@@ -194,6 +195,7 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
 }
 
 export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
+  const isFocused = useIsFocused();
   const { isConfigured, liveStreams, fetchLiveStreams } = useXtream();
   const [isLoading, setIsLoading] = useState(true);
   const [epgData, setEpgData] = useState<EpgProgram[]>([]);
@@ -324,17 +326,19 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   }
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        <EpgContent
-          channels={channels}
-          epgData={epgData}
-          startDate={startDate}
-          endDate={endDate}
-          isLoading={isLoading}
-          onFetchZone={handleFetchZone}
-        />
-      </View>
+    <SpatialNavigationNode isActive={isFocused}>
+      {isFocused ? (
+        <View style={styles.container}>
+          <EpgContent
+            channels={channels}
+            epgData={epgData}
+            startDate={startDate}
+            endDate={endDate}
+            isLoading={isLoading}
+            onFetchZone={handleFetchZone}
+          />
+        </View>
+      ) : null}
     </SpatialNavigationNode>
   );
 }

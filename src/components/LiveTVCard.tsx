@@ -24,6 +24,7 @@ export function LiveTVCard({ item }: LiveTVCardProps) {
         isFocused && styles.channelCardFocused,
       ]}
       onSelect={() => {
+        console.log(`[LiveTVCard] Selected: ${item.name} (${item.stream_id})`);
         const streamUrl = getLiveStreamUrl(item.stream_id);
         navigation.navigate('Player', {
           streamUrl,

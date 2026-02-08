@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationVirtualizedList, DefaultFocus } from 'react-tv-space-navigation';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -12,6 +13,8 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream';
 
 export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
+  const isFocused = useIsFocused();
+  useEffect(() => { console.log(`[HomeScreen] isFocused: ${isFocused}`); }, [isFocused]);
   const { isConfigured, isLoading, loadSavedCredentials, fetchLiveStreams, fetchVodStreams, fetchSeries } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [vodStreams, setVodStreams] = useState<XtreamVodStream[]>([]);
@@ -86,59 +89,61 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   }
 
   return (
-    <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
-        {/* Live TV Row */}
-        {liveStreams.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Live TV</Text>
-            <View style={styles.liveTvRowList}>
-              <SpatialNavigationVirtualizedList
-                data={liveStreams}
-                renderItem={({ item }: { item: XtreamLiveStream }) => (
-                  <LiveTVCard item={item} />
-                )}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
+    <SpatialNavigationNode isActive={isFocused}>
+      {isFocused ? (
+        <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+          {/* Live TV Row */}
+          {liveStreams.length > 0 && (
+            <View style={styles.rowContainer}>
+              <Text style={styles.rowTitle}>Live TV</Text>
+              <View style={styles.liveTvRowList}>
+                <SpatialNavigationVirtualizedList
+                  data={liveStreams}
+                  renderItem={({ item }: { item: XtreamLiveStream }) => (
+                    <LiveTVCard item={item} />
+                  )}
+                  itemSize={scaledPixels(224)}
+                  orientation="horizontal"
+                />
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Movies Row */}
-        {vodStreams.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Movies</Text>
-            <View style={styles.posterRowList}>
-              <SpatialNavigationVirtualizedList
-                data={vodStreams}
-                renderItem={({ item }: { item: XtreamVodStream }) => (
-                  <MovieCard item={item} />
-                )}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
+          {/* Movies Row */}
+          {vodStreams.length > 0 && (
+            <View style={styles.rowContainer}>
+              <Text style={styles.rowTitle}>Movies</Text>
+              <View style={styles.posterRowList}>
+                <SpatialNavigationVirtualizedList
+                  data={vodStreams}
+                  renderItem={({ item }: { item: XtreamVodStream }) => (
+                    <MovieCard item={item} />
+                  )}
+                  itemSize={scaledPixels(224)}
+                  orientation="horizontal"
+                />
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Series Row */}
-        {seriesList.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Series</Text>
-            <View style={styles.posterRowList}>
-              <SpatialNavigationVirtualizedList
-                data={seriesList}
-                renderItem={({ item }: { item: XtreamSeries }) => (
-                  <SeriesCard item={item} />
-                )}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
+          {/* Series Row */}
+          {seriesList.length > 0 && (
+            <View style={styles.rowContainer}>
+              <Text style={styles.rowTitle}>Series</Text>
+              <View style={styles.posterRowList}>
+                <SpatialNavigationVirtualizedList
+                  data={seriesList}
+                  renderItem={({ item }: { item: XtreamSeries }) => (
+                    <SeriesCard item={item} />
+                  )}
+                  itemSize={scaledPixels(224)}
+                  orientation="horizontal"
+                />
+              </View>
             </View>
-          </View>
-        )}
-      </SpatialNavigationScrollView>
+          )}
+        </SpatialNavigationScrollView>
+      ) : null}
     </SpatialNavigationNode>
   );
 }
