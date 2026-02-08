@@ -7,6 +7,7 @@ import { colors } from '../theme';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { scaledPixels } from '../hooks/useScale';
+import { DefaultFocus, SpatialNavigationView, SpatialNavigationNode } from 'react-tv-space-navigation';
 
 const OVERLAY_TIMEOUT = 8000;
 const SEEK_STEP = 10; // seconds
@@ -55,10 +56,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const [overlayVisible, setOverlayVisible] = useState(true);
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    console.log(`[Player] Loading ${type} stream: ${title}`);
-    console.log(`[Player] URL: ${streamUrl}`);
-    console.log(`[Player] Backend: ${backend}`);
 
     // --- Player error handling ---
 
@@ -183,70 +180,82 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 >
                     {/* Top bar: back + title */}
                     <View style={styles.header}>
-                        <FocusablePressable
-                            onSelect={() => navigation.goBack()}
-                            style={styles.backButton}
-                        >
-                            <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
-                        </FocusablePressable>
+                        <SpatialNavigationNode>
+                            <FocusablePressable
+                                onSelect={() => navigation.goBack()}
+                                style={styles.backButton}
+                            >
+                                <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                            </FocusablePressable>
+                        </SpatialNavigationNode>
                         <Text style={styles.title} numberOfLines={1}>{title}</Text>
                     </View>
 
                     {/* Bottom bar: controls + progress */}
-                    <View style={styles.controlsBar}>
-                        {/* Progress bar (VOD/series only) */}
-                        {!isLive && duration > 0 && (
-                            <View style={styles.progressContainer}>
-                                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                                <View style={styles.progressTrack}>
-                                    <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                    <SpatialNavigationView direction="vertical">
+                        <View style={styles.controlsBar}>
+                            {/* Progress bar (VOD/series only) */}
+                            {!isLive && duration > 0 && (
+                                <View style={styles.progressContainer}>
+                                    <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                                    <View style={styles.progressTrack}>
+                                        <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                                    </View>
+                                    <Text style={styles.timeText}>{formatTime(duration)}</Text>
                                 </View>
-                                <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                            )}
+
+                            {/* Transport controls */}
+                            <View style={styles.transportRow}>
+                                {!isLive && (
+                                    <SpatialNavigationNode>
+                                        <FocusablePressable
+                                            onSelect={() => seekBy(-SEEK_STEP)}
+                                            style={({ isFocused }) => [
+                                                styles.controlButton,
+                                                isFocused && styles.controlButtonFocused,
+                                            ]}
+                                        >
+                                            <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
+                                        </FocusablePressable>
+                                    </SpatialNavigationNode>
+                                )}
+
+                                <SpatialNavigationNode>
+                                    <DefaultFocus>
+                                        <FocusablePressable
+                                            onSelect={togglePlayPause}
+                                            style={({ isFocused }) => [
+                                                styles.controlButton,
+                                                styles.playButton,
+                                                isFocused && styles.controlButtonFocused,
+                                            ]}
+                                        >
+                                            <Icon
+                                                name={paused ? 'Play' : 'Pause'}
+                                                size={scaledPixels(36)}
+                                                color={colors.text}
+                                            />
+                                        </FocusablePressable>
+                                    </DefaultFocus>
+                                </SpatialNavigationNode>
+
+                                {!isLive && (
+                                    <SpatialNavigationNode>
+                                        <FocusablePressable
+                                            onSelect={() => seekBy(SEEK_STEP)}
+                                            style={({ isFocused }) => [
+                                                styles.controlButton,
+                                                isFocused && styles.controlButtonFocused,
+                                            ]}
+                                        >
+                                            <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                        </FocusablePressable>
+                                    </SpatialNavigationNode>
+                                )}
                             </View>
-                        )}
-
-                        {/* Transport controls */}
-                        <View style={styles.transportRow}>
-                            {!isLive && (
-                                <FocusablePressable
-                                    onSelect={() => seekBy(-SEEK_STEP)}
-                                    style={({ isFocused }) => [
-                                        styles.controlButton,
-                                        isFocused && styles.controlButtonFocused,
-                                    ]}
-                                >
-                                    <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
-                                </FocusablePressable>
-                            )}
-
-                            <FocusablePressable
-                                onSelect={togglePlayPause}
-                                style={({ isFocused }) => [
-                                    styles.controlButton,
-                                    styles.playButton,
-                                    isFocused && styles.controlButtonFocused,
-                                ]}
-                            >
-                                <Icon
-                                    name={paused ? 'Play' : 'Pause'}
-                                    size={scaledPixels(36)}
-                                    color={colors.text}
-                                />
-                            </FocusablePressable>
-
-                            {!isLive && (
-                                <FocusablePressable
-                                    onSelect={() => seekBy(SEEK_STEP)}
-                                    style={({ isFocused }) => [
-                                        styles.controlButton,
-                                        isFocused && styles.controlButtonFocused,
-                                    ]}
-                                >
-                                    <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
-                                </FocusablePressable>
-                            )}
                         </View>
-                    </View>
+                    </SpatialNavigationView>
                 </Animated.View>
             )}
 
