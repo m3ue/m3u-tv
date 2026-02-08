@@ -11,7 +11,7 @@ import {
     SpatialNavigationNode,
     DefaultFocus,
 } from 'react-tv-space-navigation';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
+import { useNavigation, useNavigationState, useIsFocused } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
@@ -42,6 +42,7 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SideBar = () => {
+    const isFocused = useIsFocused();
     const { isExpanded, setExpanded } = useMenu();
     const navigation = useNavigation<any>();
 
@@ -78,7 +79,7 @@ export const SideBar = () => {
                 </View>
 
                 <View style={styles.menuContainer}>
-                    {MENU_ITEMS.map((item, index) => (
+                    {isFocused && MENU_ITEMS.map((item, index) => (
                         <FocusablePressable
                             key={item.id}
                             onFocus={() => console.log(`[SideBar] Item focused: ${item.id}`)}

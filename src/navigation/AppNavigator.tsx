@@ -39,7 +39,7 @@ const AppTheme: Theme = {
 function MainNavigator() {
   const isFocused = useIsFocused();
   return (
-    <SpatialNavigationNode orientation="horizontal" isActive={isFocused}>
+    <SpatialNavigationNode orientation="horizontal">
       <View style={styles.mainContainer}>
         <SideBar />
         <SpatialNavigationNode>
