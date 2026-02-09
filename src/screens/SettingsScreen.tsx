@@ -346,6 +346,7 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.primary,
+    borderRadius: scaledPixels(12),
     borderWidth: 2,
     transform: [{ scale: 1.02 }],
   },
