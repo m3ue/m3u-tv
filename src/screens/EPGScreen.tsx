@@ -20,7 +20,7 @@ import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
-import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
@@ -146,7 +146,6 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
             </ProgramFlex>
           </ProgramContent>
         )}
-
       </Pressable>
     </ProgramBox>
   );
@@ -196,6 +195,7 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
 
 export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   const isFocused = useIsFocused();
+  useEffect(() => { console.log(`[EPGScreen] isFocused: ${isFocused}`); }, [isFocused]);
   const { isConfigured, liveStreams, fetchLiveStreams } = useXtream();
   const [isLoading, setIsLoading] = useState(true);
   const [epgData, setEpgData] = useState<EpgProgram[]>([]);
@@ -329,16 +329,18 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
   return (
     <SpatialNavigationNode>
-      <View style={styles.container}>
-        <EpgContent
-          channels={channels}
-          epgData={epgData}
-          startDate={startDate}
-          endDate={endDate}
-          isLoading={isLoading}
-          onFetchZone={handleFetchZone}
-        />
-      </View>
+      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+        <DefaultFocus>
+          <EpgContent
+            channels={channels}
+            epgData={epgData}
+            startDate={startDate}
+            endDate={endDate}
+            isLoading={isLoading}
+            onFetchZone={handleFetchZone}
+          />
+        </DefaultFocus>
+      </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
 }
