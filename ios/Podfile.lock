@@ -1834,7 +1834,7 @@ PODS:
     - React-utils (= 0.81.5-2)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.81.5)
-  - RNCAsyncStorage (1.23.1):
+  - RNCAsyncStorage (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1996,7 +1996,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNSVG (15.15.2):
+  - RNSVG (15.12.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2017,9 +2017,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - RNSVG/common (= 15.15.2)
+    - RNSVG/common (= 15.12.1)
     - Yoga
-  - RNSVG/common (15.15.2):
+  - RNSVG/common (15.12.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2461,11 +2461,11 @@ SPEC CHECKSUMS:
   ReactCodegen: 8a79882391b1a46cf3d731a8cd210fa6c4958e33
   ReactCommon: bf12b5efa75b0cebc9f216e1157e35d0af0f8d74
   ReactNativeDependencies: 850e320d56efc7ebca2afc5c158d7d2a6bd0ced4
-  RNCAsyncStorage: 7cc2d364d979b86814ad9f2f582031107d0e79f6
+  RNCAsyncStorage: e85a99325df9eb0191a6ee2b2a842644c7eb29f4
   RNGestureHandler: 6a488ce85c88e82d8610db1108daf04e9b2d5162
   RNReanimated: b81b622c5959419d1ccee7c33774e58fc8769266
   RNScreens: dd61bc3a3e6f6901ad833efa411917d44827cf51
-  RNSVG: 79a0b05f08879a46686e647c3f0796dddb372fc7
+  RNSVG: 2825ee146e0f6a16221e852299943e4cceef4528
   RNVectorIcons: fcc2f6cb32f5735b586e66d14103a74ce6ad61f8
   RNWorklets: 2f71e969464dbd0bbda68cc055759af2b160c793
   TVVLCKit: a9ab3e8d62ad2d02b7c89101d214f36ad874d45a
