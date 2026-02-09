@@ -15,6 +15,7 @@ import Animated, {
 import {
     SpatialNavigationNode,
     DefaultFocus,
+    SpatialNavigationNodeRef,
 } from 'react-tv-space-navigation';
 import { useNavigation, useNavigationState, useIsFocused } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
@@ -63,9 +64,35 @@ export const SideBar = () => {
         return route?.name || 'Home';
     });
 
+    // Also capture the top-level route name (useful for child-detail pages)
+    const topRouteName = useNavigationState(state => {
+        if (!state) return 'Home';
+        return state.routes[state.index]?.name || 'Home';
+    });
+
+    // Refs to each menu item so we can set focus programmatically
+    const menuItemRefs = useRef<Record<string, SpatialNavigationNodeRef | null>>({});
+
     useEffect(() => {
-        console.log('[SideBar] Active screen changed to:', currentRouteName);
-    }, [currentRouteName]);
+        console.log('[SideBar] Active screen changed to:', currentRouteName, 'top:', topRouteName);
+
+        // When navigating, ensure the sidebar highlights the relevant top-level menu item
+        const menuIds = MENU_ITEMS.map((m) => m.id);
+        let targetMenu: string | null = null;
+
+        if (menuIds.includes(topRouteName as any)) {
+            targetMenu = topRouteName;
+        } else if (menuIds.includes(currentRouteName as any)) {
+            targetMenu = currentRouteName;
+        }
+
+        if (targetMenu && menuItemRefs.current[targetMenu]) {
+            // Delay briefly to allow the tree to render before focusing
+            setTimeout(() => {
+                menuItemRefs.current[targetMenu as string]?.focus();
+            }, 120);
+        }
+    }, [currentRouteName, topRouteName]);
 
     // Width Animation
     const animatedWidth = useSharedValue(isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED);
@@ -159,6 +186,7 @@ export const SideBar = () => {
                 <View style={styles.menuContainer}>
                     {MENU_ITEMS.map((item, index) => (
                         <FocusablePressable
+                            ref={(r) => (menuItemRefs.current[item.id] = r)}
                             key={item.id}
                             onFocus={() => {
                                 console.log(`[SideBar] Item focused: ${item.id}`);
