@@ -1,11 +1,16 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring,
+    withRepeat,
+    withSequence,
+    withTiming,
     interpolate,
-    Extrapolate
+    Extrapolate,
+    cancelAnimation,
+    Easing
 } from 'react-native-reanimated';
 import {
     SpatialNavigationNode,
@@ -46,6 +51,9 @@ export const SideBar = () => {
     const { isExpanded, setExpanded } = useMenu();
     const navigation = useNavigation<any>();
 
+    // Timeout ref for debouncing the collapse
+    const collapseTimeout = useRef<NodeJS.Timeout | null>(null);
+
     const currentRouteName = useNavigationState(state => {
         if (!state) return 'Home';
         let route: any = state.routes[state.index];
@@ -59,30 +67,106 @@ export const SideBar = () => {
         console.log('[SideBar] Active screen changed to:', currentRouteName);
     }, [currentRouteName]);
 
-    const width = isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
+    // Width Animation
+    const animatedWidth = useSharedValue(isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED);
+
+    useEffect(() => {
+        animatedWidth.value = withTiming(
+            isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
+            { duration: 300, easing: Easing.inOut(Easing.ease) }
+        );
+    }, [isExpanded]);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            width: animatedWidth.value,
+        };
+    });
+
+    // Logo Animation values
+    const logoScale = useSharedValue(1);
+    const logoOpacity = useSharedValue(1);
+
+    useEffect(() => {
+        if (isExpanded) {
+            // Pulse effect when expanded
+            logoScale.value = withRepeat(
+                withSequence(
+                    withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+                ),
+                -1,
+                true
+            );
+            logoOpacity.value = withRepeat(
+                withSequence(
+                    withTiming(0.8, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+                ),
+                -1,
+                true
+            );
+        } else {
+            cancelAnimation(logoScale);
+            cancelAnimation(logoOpacity);
+            logoScale.value = withTiming(1, { duration: 300 });
+            logoOpacity.value = withTiming(1, { duration: 300 });
+        }
+    }, [isExpanded]);
+
+    const logoAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ scale: logoScale.value }],
+            opacity: logoOpacity.value,
+        };
+    });
+
+    const handleFocus = useCallback(() => {
+        if (collapseTimeout.current) {
+            clearTimeout(collapseTimeout.current);
+            collapseTimeout.current = null;
+        }
+        setExpanded(true);
+    }, [setExpanded]);
+
+    const handleBlur = useCallback(() => {
+        if (collapseTimeout.current) {
+            clearTimeout(collapseTimeout.current);
+        }
+        collapseTimeout.current = setTimeout(() => {
+            setExpanded(false);
+        }, 100);
+    }, [setExpanded]);
 
     return (
         <SpatialNavigationNode
-            onFocus={() => setExpanded(true)}
-            onBlur={() => setExpanded(false)}
             orientation="vertical"
             isFocusable={false}
         >
-            <View style={[styles.container, { width }]}>
+            <Animated.View style={[styles.container, animatedStyle]}>
                 <View style={styles.logoContainer}>
-                    <Image source={require('../../assets/images/logo.png')} style={{ width: scaledPixels(60), height: scaledPixels(60) }} />
+                    <Animated.Image
+                        source={require('../../assets/images/logo.png')}
+                        style={[{ width: scaledPixels(60), height: scaledPixels(60) }, logoAnimatedStyle]}
+                    />
                     {isExpanded && (
-                        <Text style={styles.logoText}>
+                        <Text numberOfLines={1} style={[styles.logoText, { width: scaledPixels(200) }]}>
                             M3U TV
                         </Text>
                     )}
                 </View>
 
                 <View style={styles.menuContainer}>
-                    {isFocused && MENU_ITEMS.map((item, index) => (
+                    {MENU_ITEMS.map((item, index) => (
                         <FocusablePressable
                             key={item.id}
-                            onFocus={() => console.log(`[SideBar] Item focused: ${item.id}`)}
+                            onFocus={() => {
+                                console.log(`[SideBar] Item focused: ${item.id}`);
+                                handleFocus();
+                            }}
+                            onBlur={() => {
+                                handleBlur();
+                            }}
                             onSelect={() => {
                                 console.log(`[SideBar] onSelect triggered for: ${item.id}`);
                                 if (navigationRef.isReady()) {
@@ -104,10 +188,16 @@ export const SideBar = () => {
                                         color={isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary)}
                                     />
                                     {isExpanded && (
-                                        <Text style={[
-                                            styles.menuLabel,
-                                            { color: isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary) }
-                                        ]}>
+                                        <Text
+                                            numberOfLines={1}
+                                            style={[
+                                                styles.menuLabel,
+                                                {
+                                                    color: isFocused ? colors.text : (currentRouteName === item.id ? colors.primary : colors.textSecondary),
+                                                    width: scaledPixels(200)
+                                                }
+                                            ]}
+                                        >
                                             {item.label}
                                         </Text>
                                     )}
@@ -116,7 +206,7 @@ export const SideBar = () => {
                         </FocusablePressable>
                     ))}
                 </View>
-            </View>
+            </Animated.View>
         </SpatialNavigationNode>
     );
 };
