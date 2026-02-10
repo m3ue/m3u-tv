@@ -166,7 +166,7 @@ function EpgContent({
   isLoading: boolean;
   onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void;
 }) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
 
   const { getEpgProps, getLayoutProps } = useEpg({
     channels,
@@ -174,7 +174,7 @@ function EpgContent({
     startDate,
     endDate,
     width,
-    height,
+    height: height,
     theme: epgTheme,
     isBaseTimeFormat: true,
     isCurrentTime: true,
