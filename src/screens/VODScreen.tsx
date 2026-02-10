@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
@@ -12,9 +8,17 @@ import { XtreamCategory, XtreamVodStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { MovieCard } from '../components/MovieCard';
-import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
+import {
+  SpatialNavigationNode,
+  SpatialNavigationVirtualizedGrid,
+  SpatialNavigationVirtualizedList,
+} from 'react-tv-space-navigation';
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    console.log(`[VODScreen] isFocused: ${isFocused}`);
+  }, [isFocused]);
   const { isConfigured, vodCategories, vodStreams, fetchVodStreams } = useXtream();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,9 +59,7 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
     </FocusablePressable>
   );
 
-  const renderMovieItem = ({ item }: { item: XtreamVodStream }) => (
-    <MovieCard item={item} />
-  );
+  const renderMovieItem = ({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />;
 
   if (!isConfigured) {
     return (
@@ -67,16 +69,15 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
     );
   }
 
+  if (!isFocused) return null;
+
   return (
     <SpatialNavigationNode>
       <View style={styles.container}>
         {/* Category selector */}
         <View style={styles.categoryListContainer}>
           <SpatialNavigationVirtualizedList
-            data={[
-              { category_id: '', category_name: 'All Movies', parent_id: 0 },
-              ...vodCategories,
-            ]}
+            data={[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories]}
             renderItem={renderCategoryItem}
             itemSize={scaledPixels(195)}
             style={styles.categoryList}

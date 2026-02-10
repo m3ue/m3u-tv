@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DrawerScreenProps } from '@react-navigation/drawer';
 import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream';
+import { XtreamVodStream, XtreamSeries } from '../types/xtream';
 
 // Root Stack Navigator
 export type RootStackParamList = {
@@ -30,10 +30,7 @@ export type DrawerParamList = {
 };
 
 // Screen Props
-export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
-  RootStackParamList,
-  T
->;
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
 
 export type DrawerScreenPropsType<T extends keyof DrawerParamList> = CompositeScreenProps<
   DrawerScreenProps<DrawerParamList, T>,

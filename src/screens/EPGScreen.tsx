@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator, useWindowDimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Pressable } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import {
   useEpg,
   Epg,
@@ -12,15 +13,14 @@ import {
   ProgramText,
   ProgramImage,
   useProgram,
-  ProgramItem as PlanbyProgramItem
+  ProgramItem as PlanbyProgramItem,
 } from '@nessprim/planby-native-pro';
 import { useXtream } from '../context/XtreamContext';
 import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
-import { SpatialNavigationNode, DefaultFocus } from 'react-tv-space-navigation';
-import { FocusablePressable } from '../components/FocusablePressable';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
 import { scaledPixels } from '../hooks/useScale';
 
 interface Channel {
@@ -82,10 +82,7 @@ const decodeBase64 = (str: string) => {
   }
 };
 
-const transformListingsToEpgPrograms = (
-  streamId: string | number,
-  listings: XtreamEpgListing[]
-): EpgProgram[] => {
+const transformListingsToEpgPrograms = (streamId: string | number, listings: XtreamEpgListing[]): EpgProgram[] => {
   const programs: EpgProgram[] = [];
   if (!listings || !Array.isArray(listings)) return programs;
 
@@ -133,7 +130,11 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
     <ProgramBox width={styles.width} style={styles.position}>
       <Pressable focusable>
         {({ focused }) => (
-          <ProgramContent width={styles.width} isLive={isLive} style={{ borderWidth: focused ? 2 : 0, borderColor: focused ? "#00bc7d" : 'transparent' }}>
+          <ProgramContent
+            width={styles.width}
+            isLive={isLive}
+            style={{ borderWidth: focused ? 2 : 0, borderColor: focused ? '#00bc7d' : 'transparent' }}
+          >
             <ProgramFlex>
               {isLive && isMinWidth && <ProgramImage src={image} alt="Preview" />}
               <ProgramStack>
@@ -145,19 +146,25 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
             </ProgramFlex>
           </ProgramContent>
         )}
-
       </Pressable>
     </ProgramBox>
   );
 };
 
-function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZone }: {
-  channels: Channel[],
-  epgData: EpgProgram[],
-  startDate: string,
-  endDate: string,
-  isLoading: boolean,
-  onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void,
+function EpgContent({
+  channels,
+  epgData,
+  startDate,
+  endDate,
+  isLoading,
+  onFetchZone,
+}: {
+  channels: Channel[];
+  epgData: EpgProgram[];
+  startDate: string;
+  endDate: string;
+  isLoading: boolean;
+  onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void;
 }) {
   const { width, height } = useWindowDimensions();
 
@@ -167,7 +174,7 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
     startDate,
     endDate,
     width,
-    height,
+    height: height,
     theme: epgTheme,
     isBaseTimeFormat: true,
     isCurrentTime: true,
@@ -175,6 +182,10 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
     sidebarWidth: scaledPixels(100),
     itemHeight: scaledPixels(100),
     itemOverscan: 20,
+    mode: {
+      type: 'day',
+      style: 'modern',
+    },
     fetchZone: {
       enabled: true,
       timeSlots: 6,
@@ -185,15 +196,16 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
 
   return (
     <Epg {...getEpgProps()} isLoading={isLoading}>
-      <Layout
-        {...getLayoutProps()}
-        renderProgram={(props) => <ProgramItem {...props} />}
-      />
+      <Layout {...getLayoutProps()} renderProgram={(props) => <ProgramItem {...props} />} />
     </Epg>
   );
 }
 
 export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    console.log(`[EPGScreen] isFocused: ${isFocused}`);
+  }, [isFocused]);
   const { isConfigured, liveStreams, fetchLiveStreams } = useXtream();
   const [isLoading, setIsLoading] = useState(true);
   const [epgData, setEpgData] = useState<EpgProgram[]>([]);
@@ -225,9 +237,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
         // Batch fetch EPG for the first visible channels only
         const initialBatchSize = 10;
-        const initialStreamIds = streams
-          .slice(0, initialBatchSize)
-          .map((s: XtreamLiveStream) => s.stream_id);
+        const initialStreamIds = streams.slice(0, initialBatchSize).map((s: XtreamLiveStream) => s.stream_id);
 
         // Mark as fetched BEFORE the async call to prevent fetchZone race condition
         initialStreamIds.forEach((id) => fetchedStreamIds.current.add(String(id)));
@@ -237,9 +247,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
         const transformedEpg: EpgProgram[] = [];
         Object.entries(batchResult).forEach(([streamId, data]) => {
-          transformedEpg.push(
-            ...transformListingsToEpgPrograms(streamId, data.epg_listings || [])
-          );
+          transformedEpg.push(...transformListingsToEpgPrograms(streamId, data.epg_listings || []));
         });
 
         setEpgData(transformedEpg);
@@ -253,18 +261,12 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     loadEPG();
   }, [isConfigured, fetchLiveStreams, liveStreams]);
 
-  const handleFetchZone = useCallback(async (data: {
-    since: string;
-    till: string;
-    channelsToFetchData: string[];
-  }) => {
+  const handleFetchZone = useCallback(async (data: { since: string; till: string; channelsToFetchData: string[] }) => {
     const { channelsToFetchData } = data;
     if (!channelsToFetchData || channelsToFetchData.length === 0) return;
 
     // Skip channels we've already fetched
-    const unfetched = channelsToFetchData.filter(
-      (uuid) => !fetchedStreamIds.current.has(uuid)
-    );
+    const unfetched = channelsToFetchData.filter((uuid) => !fetchedStreamIds.current.has(uuid));
     if (unfetched.length === 0) return;
 
     // Mark as fetched BEFORE the async call to prevent concurrent duplicate fetches
@@ -280,9 +282,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
       const newPrograms: EpgProgram[] = [];
       Object.entries(batchResult).forEach(([streamId, epg]) => {
-        newPrograms.push(
-          ...transformListingsToEpgPrograms(streamId, epg.epg_listings || [])
-        );
+        newPrograms.push(...transformListingsToEpgPrograms(streamId, epg.epg_listings || []));
       });
 
       if (newPrograms.length > 0) {
@@ -303,7 +303,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
     return {
       startDate: `${yyyy}-${mm}-${dd}T00:00:00`,
-      endDate: `${yyyy}-${mm}-${dd}T24:00:00`
+      endDate: `${yyyy}-${mm}-${dd}T24:00:00`,
     };
   }, []);
 
@@ -323,18 +323,25 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     );
   }
 
+  if (!isFocused) return null;
+
   return (
     <SpatialNavigationNode>
-      <View style={styles.container}>
-        <EpgContent
-          channels={channels}
-          epgData={epgData}
-          startDate={startDate}
-          endDate={endDate}
-          isLoading={isLoading}
-          onFetchZone={handleFetchZone}
-        />
-      </View>
+      <SpatialNavigationScrollView
+        offsetFromStart={scaledPixels(100)}
+        contentContainerStyle={{ paddingVertical: scaledPixels(40) }}
+      >
+        <DefaultFocus>
+          <EpgContent
+            channels={channels}
+            epgData={epgData}
+            startDate={startDate}
+            endDate={endDate}
+            isLoading={isLoading}
+            onFetchZone={handleFetchZone}
+          />
+        </DefaultFocus>
+      </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
 }

@@ -3,12 +3,11 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
   Alert,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
@@ -17,6 +16,7 @@ import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
 export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>) {
+  const isFocused = useIsFocused();
   const {
     isConfigured,
     isLoading,
@@ -47,21 +47,18 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   };
 
   const handleDisconnect = async () => {
-    Alert.alert(
-      'Disconnect',
-      'Are you sure you want to disconnect?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Disconnect',
-          style: 'destructive',
-          onPress: disconnect,
-        },
-      ],
-    );
+    Alert.alert('Disconnect', 'Are you sure you want to disconnect?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: disconnect,
+      },
+    ]);
   };
 
   if (isConfigured && authResponse) {
+    if (!isFocused) return null;
     return (
       <SpatialNavigationNode>
         <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -88,56 +85,36 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               <View style={styles.menuContainer}>
                 <DefaultFocus>
                   <FocusablePressable
-                    style={({ isFocused }) => [
-                      styles.menuButton,
-                      isFocused && styles.menuButtonFocused,
-                    ]}
+                    style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                     onSelect={() => navigation.navigate('LiveTV')}
                   >
                     {({ isFocused }) => (
-                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                        Live TV
-                      </Text>
+                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Live TV</Text>
                     )}
                   </FocusablePressable>
                 </DefaultFocus>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('EPG')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      EPG Guide
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>EPG Guide</Text>
                   )}
                 </FocusablePressable>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('VOD')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      Movies
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Movies</Text>
                   )}
                 </FocusablePressable>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('Series')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      TV Series
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>TV Series</Text>
                   )}
                 </FocusablePressable>
               </View>
@@ -174,16 +151,11 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
           <SpatialNavigationNode>
             <DefaultFocus>
               <FocusablePressable
-                style={({ isFocused }) => [
-                  styles.settingsButton,
-                  isFocused && styles.settingsButtonFocused,
-                ]}
+                style={({ isFocused }) => [styles.settingsButton, isFocused && styles.settingsButtonFocused]}
                 onSelect={handleDisconnect}
               >
                 {({ isFocused }) => (
-                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
-                    Disconnect
-                  </Text>
+                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Disconnect</Text>
                 )}
               </FocusablePressable>
             </DefaultFocus>
@@ -193,78 +165,76 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
     );
   }
 
+  if (!isFocused) return null;
+
   return (
     <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Xtream API Settings</Text>
-        <Text style={styles.subtitle}>Enter your Xtream codes credentials to connect</Text>
+      <SpatialNavigationScrollView
+        offsetFromStart={scaledPixels(100)}
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
+        <Text style={styles.title}>Connection Settings</Text>
+        <Text style={styles.subtitle}>Enter your Xtream codes details</Text>
 
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.form}>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Server URL</Text>
+            <DefaultFocus>
+              <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+                <TextInput
+                  style={styles.input}
+                  value={server}
+                  onChangeText={setServer}
+                  placeholder="http://example.com:8080"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </FocusablePressable>
+            </DefaultFocus>
           </View>
-        )}
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Server URL</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="http://example.com:8080"
-            placeholderTextColor={colors.textTertiary}
-            value={server}
-            onChangeText={setServer}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Username</Text>
+            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Username"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </FocusablePressable>
+          </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter username"
-            placeholderTextColor={colors.textTertiary}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.textSecondary}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </FocusablePressable>
+          </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter password"
-            placeholderTextColor={colors.textTertiary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <SpatialNavigationNode>
           <FocusablePressable
-            style={({ isFocused }) => [
-              styles.settingsButton,
-              isFocused && styles.settingsButtonFocused,
-              isLoading && styles.buttonDisabled,
-            ]}
+            style={({ isFocused }) => [styles.connectButton, isFocused && styles.buttonFocused]}
             onSelect={handleConnect}
           >
-            {({ isFocused }) =>
-              isLoading ? (
-                <ActivityIndicator color={colors.textOnPrimary} />
-              ) : (
-                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
-                  Connect
-                </Text>
-              )
-            }
+            {isLoading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Connect</Text>}
           </FocusablePressable>
-        </SpatialNavigationNode>
+        </View>
       </SpatialNavigationScrollView>
     </SpatialNavigationNode>
   );
@@ -316,6 +286,37 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(typography.fontSize.sm),
     color: colors.textSecondary,
     marginBottom: scaledPixels(spacing.xs),
+  },
+  form: {
+    width: '100%',
+    maxWidth: scaledPixels(500),
+    alignSelf: 'center',
+  },
+  inputGroup: {
+    marginBottom: scaledPixels(spacing.md),
+  },
+  inputFocused: {
+    borderColor: colors.primary,
+    borderRadius: scaledPixels(12),
+    borderWidth: 2,
+    transform: [{ scale: 1.02 }],
+  },
+  connectButton: {
+    backgroundColor: colors.primary,
+    padding: scaledPixels(spacing.md),
+    borderRadius: scaledPixels(8),
+    alignItems: 'center',
+    marginTop: scaledPixels(spacing.lg),
+  },
+  buttonFocused: {
+    borderColor: colors.text,
+    borderWidth: 2,
+    transform: [{ scale: 1.05 }],
+  },
+  buttonText: {
+    color: colors.textOnPrimary || '#FFFFFF',
+    fontSize: scaledPixels(typography.fontSize.md),
+    fontWeight: typography.fontWeight.bold,
   },
   input: {
     backgroundColor: colors.card,

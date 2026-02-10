@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationVirtualizedList, DefaultFocus } from 'react-tv-space-navigation';
+import { useIsFocused } from '@react-navigation/native';
+import {
+  SpatialNavigationNode,
+  SpatialNavigationScrollView,
+  SpatialNavigationVirtualizedList,
+  DefaultFocus,
+} from 'react-tv-space-navigation';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';
@@ -12,6 +18,10 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream';
 
 export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    console.log(`[HomeScreen] isFocused: ${isFocused}`);
+  }, [isFocused]);
   const { isConfigured, isLoading, loadSavedCredentials, fetchLiveStreams, fetchVodStreams, fetchSeries } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [vodStreams, setVodStreams] = useState<XtreamVodStream[]>([]);
@@ -30,11 +40,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
 
   const loadContent = async () => {
     setContentLoading(true);
-    const [live, vod, series] = await Promise.all([
-      fetchLiveStreams(),
-      fetchVodStreams(),
-      fetchSeries(),
-    ]);
+    const [live, vod, series] = await Promise.all([fetchLiveStreams(), fetchVodStreams(), fetchSeries()]);
     setLiveStreams(live);
     setVodStreams(vod);
     setSeriesList(series);
@@ -58,16 +64,11 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         <SpatialNavigationNode orientation="horizontal">
           <DefaultFocus>
             <FocusablePressable
-              style={({ isFocused }) => [
-                styles.settingsButton,
-                isFocused && styles.buttonFocused,
-              ]}
+              style={({ isFocused }) => [styles.settingsButton, isFocused && styles.buttonFocused]}
               onSelect={() => navigation.navigate('Settings')}
             >
               {({ isFocused }) => (
-                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
-                  Go to Settings
-                </Text>
+                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Go to Settings</Text>
               )}
             </FocusablePressable>
           </DefaultFocus>
@@ -85,9 +86,14 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
     );
   }
 
+  if (!isFocused) return null;
+
   return (
     <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+      <SpatialNavigationScrollView
+        offsetFromStart={scaledPixels(100)}
+        contentContainerStyle={{ paddingVertical: scaledPixels(40) }}
+      >
         {/* Live TV Row */}
         {liveStreams.length > 0 && (
           <View style={styles.rowContainer}>
@@ -95,9 +101,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <View style={styles.liveTvRowList}>
               <SpatialNavigationVirtualizedList
                 data={liveStreams}
-                renderItem={({ item }: { item: XtreamLiveStream }) => (
-                  <LiveTVCard item={item} />
-                )}
+                renderItem={({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />}
                 itemSize={scaledPixels(224)}
                 orientation="horizontal"
               />
@@ -112,9 +116,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <View style={styles.posterRowList}>
               <SpatialNavigationVirtualizedList
                 data={vodStreams}
-                renderItem={({ item }: { item: XtreamVodStream }) => (
-                  <MovieCard item={item} />
-                )}
+                renderItem={({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />}
                 itemSize={scaledPixels(224)}
                 orientation="horizontal"
               />
@@ -129,9 +131,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <View style={styles.posterRowList}>
               <SpatialNavigationVirtualizedList
                 data={seriesList}
-                renderItem={({ item }: { item: XtreamSeries }) => (
-                  <SeriesCard item={item} />
-                )}
+                renderItem={({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />}
                 itemSize={scaledPixels(224)}
                 orientation="horizontal"
               />

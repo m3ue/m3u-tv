@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { Text, Image, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FocusablePressable } from './FocusablePressable';
@@ -19,11 +19,9 @@ export function LiveTVCard({ item }: LiveTVCardProps) {
 
   return (
     <FocusablePressable
-      style={({ isFocused }) => [
-        styles.channelCard,
-        isFocused && styles.channelCardFocused,
-      ]}
+      style={({ isFocused }) => [styles.channelCard, isFocused && styles.channelCardFocused]}
       onSelect={() => {
+        console.log(`[LiveTVCard] Selected: ${item.name} (${item.stream_id})`);
         const streamUrl = getLiveStreamUrl(item.stream_id);
         navigation.navigate('Player', {
           streamUrl,

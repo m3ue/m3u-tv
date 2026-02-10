@@ -1,9 +1,15 @@
-const prettier = require('eslint-plugin-prettier');
-
 module.exports = [
   {
+    ignores: [
+      '**/node_modules/**',
+      '**/android/**',
+      '**/ios/**',
+      '**/.expo/**',
+      'planby-native-pro-main/**',
+    ],
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['node_modules/**', 'build/**', 'dist/**'],
     languageOptions: {
       parser: require('@typescript-eslint/parser'),
       parserOptions: {
@@ -13,28 +19,28 @@ module.exports = [
           jsx: true,
         },
       },
-      globals: {
-        React: 'readonly',
-      },
-    },
-    plugins: {
-      '@typescript-eslint': require('@typescript-eslint/eslint-plugin'),
-      react: require('eslint-plugin-react'),
-      prettier: prettier,
     },
     rules: {
-      semi: ['warn', 'always'],
-      'prefer-const': 'error',
-      'react/jsx-filename-extension': ['error', { extensions: ['.tsx'] }],
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'prettier/prettier': [
-        'warn',
+      semi: ['error', 'always'],
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'error',
         {
-          endOfLine: 'auto',
-          usePrettierrc: true,
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'none',
+          caughtErrors: 'none',
         },
       ],
+      'react/jsx-uses-react': 'error',
+      'react/jsx-uses-vars': 'error',
+    },
+    plugins: {
+      react: require('eslint-plugin-react'),
+      '@typescript-eslint': require('@typescript-eslint/eslint-plugin'),
+      'unused-imports': require('eslint-plugin-unused-imports'),
     },
   },
 ];

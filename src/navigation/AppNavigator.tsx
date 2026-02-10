@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import { View, StyleSheet } from 'react-native';
-import { SpatialNavigationNode } from 'react-tv-space-navigation';
+import { View, StyleSheet, BackHandler } from 'react-native';
+import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
+import { useIsFocused, useNavigationState } from '@react-navigation/native';
 import {
   HomeScreen,
   SettingsScreen,
@@ -15,11 +15,11 @@ import {
   MovieDetailsScreen,
   SeriesDetailsScreen,
 } from '../screens';
-import { SideBar } from '../components/SideBar';
+import { SideBar, SIDEBAR_WIDTH_COLLAPSED } from '../components/SideBar';
 import { colors } from '../theme';
-import { scaledPixels } from '../hooks/useScale';
 import { RootStackParamList, DrawerParamList } from './types';
 import { navigationRef } from './navigationRef';
+import { useMenu } from '../context/MenuContext';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const MainStack = createNativeStackNavigator<DrawerParamList>();
@@ -36,12 +36,63 @@ const AppTheme: Theme = {
 };
 
 function MainNavigator() {
+  const isFocused = useIsFocused();
+  const { isSidebarActive, setSidebarActive } = useMenu();
+
+  // Track the current content screen name
+  const currentScreen = useNavigationState((state) => {
+    if (!state) return 'Home';
+    let route: any = state.routes[state.index];
+    while (route?.state && typeof route.state.index === 'number') {
+      route = route.state.routes[route.state.index];
+    }
+    return route?.name || 'Home';
+  });
+
+  // Back button: focus sidebar instead of exiting when on a top-level screen
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isFocused && !isSidebarActive) {
+        setSidebarActive(true);
+        return true; // prevent default (exit app)
+      }
+      return false; // allow default behavior
+    });
+    return () => backHandler.remove();
+  }, [isFocused, isSidebarActive, setSidebarActive]);
+
+  // When sidebar root hits right edge → switch focus to content
+  const handleSidebarBoundary = useCallback(
+    (direction: string) => {
+      if (direction === 'right') {
+        setSidebarActive(false);
+      }
+    },
+    [setSidebarActive],
+  );
+
+  // When content root hits left edge → switch focus to sidebar
+  // EPG uses Planby's native focus (not spatial navigation), so skip for EPG.
+  // The Back button remains the way to reach the sidebar from EPG.
+  const handleContentBoundary = useCallback(
+    (direction: string) => {
+      if (currentScreen === 'EPG') return;
+      if (direction === 'left') {
+        setSidebarActive(true);
+      }
+    },
+    [setSidebarActive, currentScreen],
+  );
+
   return (
-    <SpatialNavigationNode orientation="horizontal">
-      <View style={styles.mainContainer}>
-        <SideBar />
-        <SpatialNavigationNode>
-          <View style={styles.contentContainer}>
+    <View style={styles.mainContainer}>
+      {/* Content area - full width with left margin for collapsed sidebar */}
+      <View style={styles.contentContainer}>
+        <SpatialNavigationRoot
+          isActive={isFocused && !isSidebarActive}
+          onDirectionHandledWithoutMovement={handleContentBoundary}
+        >
+          <DefaultFocus>
             <MainStack.Navigator
               screenOptions={{
                 headerShown: false,
@@ -57,10 +108,18 @@ function MainNavigator() {
               <MainStack.Screen name="Series" component={SeriesScreen} />
               <MainStack.Screen name="Settings" component={SettingsScreen} />
             </MainStack.Navigator>
-          </View>
-        </SpatialNavigationNode>
+          </DefaultFocus>
+        </SpatialNavigationRoot>
       </View>
-    </SpatialNavigationNode>
+
+      {/* Sidebar - absolutely positioned, overlays content when expanded */}
+      <SpatialNavigationRoot
+        isActive={isFocused && isSidebarActive}
+        onDirectionHandledWithoutMovement={handleSidebarBoundary}
+      >
+        <SideBar />
+      </SpatialNavigationRoot>
+    </View>
   );
 }
 
@@ -106,11 +165,11 @@ export function AppNavigator() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    flexDirection: 'row',
     backgroundColor: colors.background,
   },
   contentContainer: {
     flex: 1,
+    marginLeft: SIDEBAR_WIDTH_COLLAPSED,
     backgroundColor: colors.background,
   },
 });

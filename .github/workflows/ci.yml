@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-ci:
+    name: Lint, Typecheck & Audit
+    runs-on: ubuntu-latest
+    env:
+      PLANBY_DEPLOY_KEY: ${{ secrets.PLANBY_DEPLOY_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare Yarn
+        run: corepack prepare yarn@stable --activate
+
+      - name: Cache Yarn
+        uses: actions/cache@v5
+        with:
+          path: |
+            .yarn/cache
+            .yarn/install-state.gz
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies (Yarn)
+        run: yarn install --immutable || yarn install --frozen-lockfile || yarn install
+
+      - name: Run ESLint
+        run: yarn run lint --max-warnings=0
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
