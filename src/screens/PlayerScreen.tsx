@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler, Platform } from 'react-native';
+import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler } from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { SpatialNavigationNode, SpatialNavigationNodeRef, SpatialNavigationRoot } from 'react-tv-space-navigation';

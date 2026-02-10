@@ -22,12 +22,25 @@ module.exports = [
     },
     rules: {
       semi: ['error', 'always'],
-      'no-unused-vars': 'warn',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'error',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'none',
+          caughtErrors: 'none',
+        },
+      ],
       'react/jsx-uses-react': 'error',
       'react/jsx-uses-vars': 'error',
     },
     plugins: {
       react: require('eslint-plugin-react'),
+      '@typescript-eslint': require('@typescript-eslint/eslint-plugin'),
+      'unused-imports': require('eslint-plugin-unused-imports'),
     },
   },
 ];

@@ -4,14 +4,12 @@ import {
   Text,
   StyleSheet,
   Image,
-  ScrollView,
-  FlatList,
   ImageBackground,
   useWindowDimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
 import { XtreamSeriesInfo, XtreamEpisode } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
@@ -36,7 +34,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
   const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
 
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     if (isFocused && seriesInfo?.seasons && seriesInfo.seasons.length > 0) {

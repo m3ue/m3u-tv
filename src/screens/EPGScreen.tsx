@@ -21,7 +21,6 @@ import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
 import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
-import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
 interface Channel {
@@ -64,7 +63,7 @@ const decodeBase64 = (str: string) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
     let output = '';
     str = str.replace(/[^A-Za-z0-9+/=]/g, '');
-    for (let i = 0; i < str.length; ) {
+    for (let i = 0; i < str.length;) {
       const enc1 = chars.indexOf(str.charAt(i++));
       const enc2 = chars.indexOf(str.charAt(i++));
       const enc3 = chars.indexOf(str.charAt(i++));
@@ -167,7 +166,7 @@ function EpgContent({
   isLoading: boolean;
   onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
 
   const { getEpgProps, getLayoutProps } = useEpg({
     channels,

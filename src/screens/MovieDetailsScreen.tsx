@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image, ImageBackground } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
 import { XtreamVodInfo } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
@@ -23,7 +23,6 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
   const playButtonRef = useRef<SpatialNavigationNodeRef>(null);
   const { fetchVodInfo, getVodStreamUrl } = useXtream();
   const [movieInfo, setMovieInfo] = useState<XtreamVodInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (isFocused) {
@@ -39,7 +38,7 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
       } catch (error) {
         console.error('Failed to fetch movie info:', error);
       } finally {
-        setIsLoading(false);
+        // Do something if needed after fetching info (e.g., hide loading state)
       }
     };
     loadInfo();

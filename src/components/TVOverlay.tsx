@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SpatialNavigationRoot, useLockSpatialNavigation } from 'react-tv-space-navigation';
 

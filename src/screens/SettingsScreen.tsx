@@ -3,10 +3,8 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
