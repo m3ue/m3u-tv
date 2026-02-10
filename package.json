@@ -9,8 +9,9 @@
     "ios": "EXPO_TV=1 expo run:ios",
     "web": "expo start --web",
     "prebuild": "EXPO_TV=1 expo prebuild --clean",
+    "audit": "npm audit",
     "clean": "rm -rf node_modules android ios",
-    "lint": "npx eslint . --ext .ts,.tsx",
+    "lint": "eslint --ext .ts,.tsx . --debug",
     "pretty": "npx prettier *.{ts,tsx} --write",
     "typecheck": "tsc --noEmit"
   },
@@ -43,6 +44,11 @@
     "@babel/core": "^7.20.0",
     "@react-native-tvos/config-tv": "^0.1.4",
     "@types/react": "~19.1.10",
+    "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.19.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
     "typescript": "~5.9.2"
   },
   "expo": {
