@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLANBY_DEPLOY_KEY: ${{ secrets.PLANBY_DEPLOY_KEY }}
-      NPM_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
-      NODE_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
+      YARN_NPM_SCOPES_NESSPRIM_NPM_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
       YARN_NPM_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
+
 
     steps:
       - name: Checkout
@@ -35,13 +35,6 @@ jobs:
 
       - name: Prepare Yarn
         run: corepack prepare yarn@stable --activate
-
-      - name: Create ~/.npmrc for GitHub Packages (if provided)
-        if: ${{ env.PLANBY_DEPLOY_KEY != '' }}
-        run: |
-          # Add Planby registry to .npmrc with the provided token
-          printf '@nessprim:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "$PLANBY_DEPLOY_KEY" > ~/.npmrc
-          chmod 600 ~/.npmrc
 
       - name: Cache Yarn
         uses: actions/cache@v5
