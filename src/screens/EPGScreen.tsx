@@ -175,6 +175,10 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
     sidebarWidth: scaledPixels(100),
     itemHeight: scaledPixels(100),
     itemOverscan: 20,
+    mode: {
+      type: 'day',
+      style: 'modern'
+    },
     fetchZone: {
       enabled: true,
       timeSlots: 6,

@@ -3,7 +3,7 @@ import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, StyleSheet, BackHandler } from 'react-native';
 import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigationState } from '@react-navigation/native';
 import {
   HomeScreen,
   SettingsScreen,
@@ -39,6 +39,16 @@ function MainNavigator() {
   const isFocused = useIsFocused();
   const { isSidebarActive, setSidebarActive } = useMenu();
 
+  // Track the current content screen name
+  const currentScreen = useNavigationState(state => {
+    if (!state) return 'Home';
+    let route: any = state.routes[state.index];
+    while (route?.state && typeof route.state.index === 'number') {
+      route = route.state.routes[route.state.index];
+    }
+    return route?.name || 'Home';
+  });
+
   // Back button: focus sidebar instead of exiting when on a top-level screen
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -59,11 +69,14 @@ function MainNavigator() {
   }, [setSidebarActive]);
 
   // When content root hits left edge → switch focus to sidebar
+  // EPG uses Planby's native focus (not spatial navigation), so skip for EPG.
+  // The Back button remains the way to reach the sidebar from EPG.
   const handleContentBoundary = useCallback((direction: string) => {
+    if (currentScreen === 'EPG') return;
     if (direction === 'left') {
       setSidebarActive(true);
     }
-  }, [setSidebarActive]);
+  }, [setSidebarActive, currentScreen]);
 
   return (
     <View style={styles.mainContainer}>
