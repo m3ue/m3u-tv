@@ -16,9 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLANBY_DEPLOY_KEY: ${{ secrets.PLANBY_DEPLOY_KEY }}
-      YARN_NPM_SCOPES_NESSPRIM_NPM_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
-      YARN_NPM_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
-
 
     steps:
       - name: Checkout
