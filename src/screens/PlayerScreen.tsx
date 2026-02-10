@@ -145,11 +145,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
       nativeRef.current?.seek(target);
     } else {
       // VLC expects milliseconds.
-      // We set it, then clear it back to -1 so it doesn't stay at a value that might re-trigger
+      // We set it, then clear it back to undefined so it doesn't stay at a value that might re-trigger
       const targetMs = Math.floor(target * 1000);
       setVlcSeekValue(targetMs);
-      // Longer delay before resetting to -1, or maybe don't reset if -1 causes issues
-      setTimeout(() => setVlcSeekValue(-1), 500);
+      // Longer delay before resetting to undefined, or maybe don't reset if undefined causes issues
+      setTimeout(() => setVlcSeekValue(undefined), 500);
     }
   }, []);
 

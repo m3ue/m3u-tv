@@ -30,13 +30,17 @@ export default function App() {
                 console.log('[App] TV Event:', event?.eventType);
                 if (!event || !event.eventType) return;
 
-                const mapping: Record<string, Directions> = {
+                const mapping: Record<string, Directions | null> = {
                   up: Directions.UP,
                   down: Directions.DOWN,
                   left: Directions.LEFT,
                   right: Directions.RIGHT,
                   select: Directions.ENTER,
                   enter: Directions.ENTER,
+                  // Map back/menu to null to prevent spatial navigation from trying to handle them
+                  // This allows default handling via BackHandler or custom listeners to work without interference
+                  back: null,
+                  menu: null,
                 };
 
                 const direction = mapping[event.eventType];
@@ -50,13 +54,15 @@ export default function App() {
               const instance = new TVHandler();
               instance.enable(null, (_: any, event: any) => {
                 if (!event || !event.eventType) return;
-                const mapping: Record<string, Directions> = {
+                const mapping: Record<string, Directions | null> = {
                   up: Directions.UP,
                   down: Directions.DOWN,
                   left: Directions.LEFT,
                   right: Directions.RIGHT,
                   select: Directions.ENTER,
                   enter: Directions.ENTER,
+                  back: null,
+                  menu: null,
                 };
                 const direction = mapping[event.eventType];
                 if (direction) callback(direction);
