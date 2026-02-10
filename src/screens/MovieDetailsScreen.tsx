@@ -49,7 +49,7 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
     }, [item, navigation, getVodStreamUrl]);
 
     const info = movieInfo?.info;
-    const backdrop = info?.backdrop_path?.[0] || item.stream_icon;
+    const backdrop = info?.backdrop_path?.[0];
 
     if (!isFocused) return null;
 
