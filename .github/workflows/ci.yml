@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLANBY_DEPLOY_KEY: ${{ secrets.PLANBY_DEPLOY_KEY }}
+      NPM_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
+      NODE_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
+      YARN_NPM_AUTH_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
 
     steps:
       - name: Checkout
