@@ -16,7 +16,6 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 - Android TV
 - Apple TV (tvOS)
-- Web browsers
 
 ## Tech Stack
 
@@ -51,12 +50,6 @@ Run prebuild to generate the `Android` and `iOS` folders and native code.
 
 ```bash
 EXPO_TV=1 corepack yarn prebuild --clean
-```
-
-**Web (experimental, navigation does not work well in web):**
-
-```bash
-corepack yarn web
 ```
 
 **Android TV:**
