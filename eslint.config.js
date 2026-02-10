@@ -21,7 +21,13 @@ module.exports = [
       },
     },
     rules: {
-      semi: ['warn', 'always'],
+      semi: ['error', 'always'],
+      'no-unused-vars': 'warn',
+      'react/jsx-uses-react': 'error',
+      'react/jsx-uses-vars': 'error',
+    },
+    plugins: {
+      react: require('eslint-plugin-react'),
     },
   },
 ];

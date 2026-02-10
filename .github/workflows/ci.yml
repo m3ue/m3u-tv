@@ -47,7 +47,7 @@ jobs:
         run: yarn install --immutable || yarn install --frozen-lockfile || yarn install
 
       - name: Run ESLint
-        run: npm run lint
+        run: yarn run lint --max-warnings=0
 
       - name: Typecheck
         run: npm run typecheck

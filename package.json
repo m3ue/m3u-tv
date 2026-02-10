@@ -11,7 +11,8 @@
     "prebuild": "EXPO_TV=1 expo prebuild --clean",
     "audit": "npm audit",
     "clean": "rm -rf node_modules android ios",
-    "lint": "eslint --ext .ts,.tsx . --debug",
+    "lint": "eslint . --debug",
+    "lint:fix": "eslint . --fix",
     "pretty": "npx prettier *.{ts,tsx} --write",
     "typecheck": "tsc --noEmit"
   },
