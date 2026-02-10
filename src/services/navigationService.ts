@@ -1,5 +1,5 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
-import { DrawerParamList } from './navigation/types';
+import { DrawerParamList } from '../navigation/types';
 
 export const contentNavigationRef = createNavigationContainerRef<DrawerParamList>();
 

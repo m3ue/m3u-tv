@@ -2393,14 +2393,14 @@ SPEC CHECKSUMS:
   ExpoModulesCore: 77496909fd3c800f97f7f2007dd26aeac4bb3798
   ExpoSecureStore: decd2943fa19fa6f02c5ef3689f9ba5012ad6a6d
   FBLazyVector: 5d1300313dc2ad5c18f892e6a2ab820d561c70d0
-  hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
+  hermes-engine: 8bb0bdb1bf49c3bbc17cf4c2d02dcc2f706ab555
   RCTDeprecation: 557c789999d670a92cb15568411e066fc259ee16
   RCTRequired: 8973655326bdb283f51f62d347a467b2a7173286
   RCTTypeSafety: 5578c4f15fd41063123b905604e051e3365944d8
   React: a35ab816fc3956b3f5f7bd122f3474435bf036f0
   React-callinvoker: 763dacda0f26da2bd82182b957819f9209662f90
   React-Core: cfe7580e781c9fd5e9f6af5427817cd0e5a37c5b
-  React-Core-prebuilt: 74493f872e95aeff774a0ebc3a7db29f8c31ed4d
+  React-Core-prebuilt: 7c9f75e71145e1425cdd413ae680e65dfba7fc2b
   React-CoreModules: 4ca72566842c4e23744c09d4d64632ebe6d336d0
   React-cxxreact: a7fa9e7d55b8ce62f82bd42354952f11fa7c23d2
   React-debug: 30e84b351c134cb789f3cd428cf3302edeafe628
