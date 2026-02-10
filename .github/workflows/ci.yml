@@ -31,6 +31,15 @@ jobs:
       - name: Prepare Yarn
         run: corepack prepare yarn@stable --activate
 
+      - name: Create ~/.npmrc for GitHub Packages (if provided)
+        if: ${{ secrets.PLANBY_DEPLOY_KEY != '' }}
+        env:
+          NPM_TOKEN: ${{ secrets.PLANBY_DEPLOY_KEY }}
+        run: |
+          # Add Planby registry to .npmrc with the provided token
+          printf '@nessprim:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "$NPM_TOKEN" > ~/.npmrc
+          chmod 600 ~/.npmrc
+
       - name: Cache Yarn
         uses: actions/cache@v5
         with:
