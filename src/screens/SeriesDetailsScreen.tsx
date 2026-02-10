@@ -9,7 +9,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DefaultFocus, SpatialNavigationNode, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
+import { DefaultFocus, SpatialNavigationNode, SpatialNavigationRoot, SpatialNavigationScrollView, SpatialNavigationView, SpatialNavigationVirtualizedList, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
     const isFocused = useIsFocused();
@@ -56,113 +56,115 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     if (!isFocused) return null;
 
     return (
-        <SpatialNavigationNode>
-            <View style={styles.container}>
-                <ImageBackground
-                    source={{ uri: item.cover }}
-                    style={styles.backdrop}
-                    blurRadius={5}
-                >
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
-                        style={styles.gradient}
+        <SpatialNavigationRoot>
+            <SpatialNavigationNode>
+                <View style={styles.container}>
+                    <ImageBackground
+                        source={{ uri: item.cover }}
+                        style={styles.backdrop}
+                        blurRadius={5}
                     >
-                        <View style={styles.content}>
-                            <View style={styles.header}>
-                                <View style={styles.mainInfo}>
-                                    <Text style={styles.title}>{item.name}</Text>
-                                    <View style={styles.metaRow}>
-                                        {item.release_date && <Text style={styles.metaText}>{item.release_date.split('-')[0]}</Text>}
-                                        <Text style={styles.rating}>★ {item.rating}</Text>
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
+                            style={styles.gradient}
+                        >
+                            <View style={styles.content}>
+                                <View style={styles.header}>
+                                    <View style={styles.mainInfo}>
+                                        <Text style={styles.title}>{item.name}</Text>
+                                        <View style={styles.metaRow}>
+                                            {item.release_date && <Text style={styles.metaText}>{item.release_date.split('-')[0]}</Text>}
+                                            <Text style={styles.rating}>★ {item.rating}</Text>
+                                        </View>
+                                        <Text style={styles.plot} numberOfLines={3}>{item.plot}</Text>
                                     </View>
-                                    <Text style={styles.plot} numberOfLines={3}>{item.plot}</Text>
                                 </View>
-                            </View>
 
-                            <SpatialNavigationNode orientation="horizontal">
-                                <View style={styles.navigationSection}>
-                                    <View style={styles.seasonsColumn}>
-                                        <Text style={styles.sectionTitle}>Seasons</Text>
-                                        <SpatialNavigationNode>
-                                            <DefaultFocus>
-                                                <SpatialNavigationScrollView>
-                                                    <SpatialNavigationView direction="vertical">
-                                                        {seriesInfo?.seasons.map((season, index) => (
+                                <SpatialNavigationNode orientation="horizontal">
+                                    <View style={styles.navigationSection}>
+                                        <View style={styles.seasonsColumn}>
+                                            <Text style={styles.sectionTitle}>Seasons</Text>
+                                            <SpatialNavigationNode>
+                                                <DefaultFocus>
+                                                    <SpatialNavigationScrollView>
+                                                        <SpatialNavigationView direction="vertical">
+                                                            {seriesInfo?.seasons.map((season, index) => (
+                                                                <FocusablePressable
+                                                                    key={season.season_number}
+                                                                    ref={index === 0 ? seasonListRef : undefined}
+                                                                    onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                                    style={({ isFocused }) => [
+                                                                        styles.seasonItem,
+                                                                        selectedSeason === String(season.season_number) && styles.seasonItemActive,
+                                                                        isFocused && styles.itemFocused
+                                                                    ]}
+                                                                >
+                                                                    {({ isFocused }) => (
+                                                                        <Text style={[
+                                                                            styles.seasonText,
+                                                                            selectedSeason === String(season.season_number) && styles.seasonTextActive,
+                                                                            isFocused && styles.seasonTextActive,
+                                                                        ]}>
+                                                                            Season {season.season_number}
+                                                                        </Text>
+                                                                    )}
+                                                                </FocusablePressable>
+                                                            ))}
+                                                        </SpatialNavigationView>
+                                                    </SpatialNavigationScrollView>
+                                                </DefaultFocus>
+                                            </SpatialNavigationNode>
+                                        </View>
+
+                                        <View style={styles.episodesColumn}>
+                                            <Text style={styles.sectionTitle}>Episodes</Text>
+                                            <SpatialNavigationNode>
+                                                <SpatialNavigationView direction="vertical" style={styles.episodesColumn}>
+                                                    <SpatialNavigationVirtualizedList
+                                                        data={episodes}
+                                                        itemSize={scaledPixels(200)}
+                                                        orientation="vertical"
+                                                        renderItem={({ item: ep }) => (
                                                             <FocusablePressable
-                                                                key={season.season_number}
-                                                                ref={index === 0 ? seasonListRef : undefined}
-                                                                onSelect={() => setSelectedSeason(String(season.season_number))}
+                                                                onSelect={() => handlePlayEpisode(ep)}
                                                                 style={({ isFocused }) => [
-                                                                    styles.seasonItem,
-                                                                    selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                                                                    isFocused && styles.itemFocused
+                                                                    styles.episodeItem,
+                                                                    isFocused && styles.itemFocused,
+                                                                    { width: width - scaledPixels(450) }
                                                                 ]}
                                                             >
-                                                                {({ isFocused }) => (
-                                                                    <Text style={[
-                                                                        styles.seasonText,
-                                                                        selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                                                                        isFocused && styles.seasonTextActive,
-                                                                    ]}>
-                                                                        Season {season.season_number}
-                                                                    </Text>
-                                                                )}
-                                                            </FocusablePressable>
-                                                        ))}
-                                                    </SpatialNavigationView>
-                                                </SpatialNavigationScrollView>
-                                            </DefaultFocus>
-                                        </SpatialNavigationNode>
-                                    </View>
-
-                                    <View style={styles.episodesColumn}>
-                                        <Text style={styles.sectionTitle}>Episodes</Text>
-                                        <SpatialNavigationNode>
-                                            <SpatialNavigationView direction="vertical" style={styles.episodesColumn}>
-                                                <SpatialNavigationVirtualizedList
-                                                    data={episodes}
-                                                    itemSize={scaledPixels(200)}
-                                                    orientation="vertical"
-                                                    renderItem={({ item: ep }) => (
-                                                        <FocusablePressable
-                                                            onSelect={() => handlePlayEpisode(ep)}
-                                                            style={({ isFocused }) => [
-                                                                styles.episodeItem,
-                                                                isFocused && styles.itemFocused,
-                                                                { width: width - scaledPixels(450) }
-                                                            ]}
-                                                        >
-                                                            <View style={styles.episodeMain}>
-                                                                <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
-                                                                <Image
-                                                                    source={{ uri: ep.info?.movie_image || item.cover }}
-                                                                    style={styles.episodeImage}
-                                                                    resizeMode="cover"
-                                                                />
-                                                                <View style={styles.episodeInfo}>
-                                                                    <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
-                                                                    <View style={styles.metaRow}>
-                                                                        {ep.info?.rating && <Text style={styles.metaRating}>{`★ ${ep.info.rating}`}</Text>}
-                                                                        {ep.info?.release_date && <Text style={styles.metaText}>{ep.info.release_date.split('-')[0]}</Text>}
-                                                                        {ep.info?.duration && <Text style={styles.metaText}>{ep.info.duration}</Text>}
+                                                                <View style={styles.episodeMain}>
+                                                                    <Text style={styles.episodeNumber}>{ep.episode_num}</Text>
+                                                                    <Image
+                                                                        source={{ uri: ep.info?.movie_image || item.cover }}
+                                                                        style={styles.episodeImage}
+                                                                        resizeMode="cover"
+                                                                    />
+                                                                    <View style={styles.episodeInfo}>
+                                                                        <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
+                                                                        <View style={styles.metaRow}>
+                                                                            {ep.info?.rating && <Text style={styles.metaRating}>{`★ ${ep.info.rating}`}</Text>}
+                                                                            {ep.info?.release_date && <Text style={styles.metaText}>{ep.info.release_date.split('-')[0]}</Text>}
+                                                                            {ep.info?.duration && <Text style={styles.metaText}>{ep.info.duration}</Text>}
+                                                                        </View>
+                                                                        <Text style={styles.episodePlot} numberOfLines={3}>{ep.info?.plot || 'No description available for this episode.'}</Text>
                                                                     </View>
-                                                                    <Text style={styles.episodePlot} numberOfLines={3}>{ep.info?.plot || 'No description available for this episode.'}</Text>
+                                                                    <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
                                                                 </View>
-                                                                <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />
-                                                            </View>
-                                                        </FocusablePressable>
-                                                    )}
-                                                />
-                                            </SpatialNavigationView>
-                                        </SpatialNavigationNode>
+                                                            </FocusablePressable>
+                                                        )}
+                                                    />
+                                                </SpatialNavigationView>
+                                            </SpatialNavigationNode>
+                                        </View>
                                     </View>
-                                </View>
-                            </SpatialNavigationNode>
-                        </View>
-                    </LinearGradient>
-                </ImageBackground>
-            </View>
-        </SpatialNavigationNode>
+                                </SpatialNavigationNode>
+                            </View>
+                        </LinearGradient>
+                    </ImageBackground>
+                </View>
+            </SpatialNavigationNode>
+        </SpatialNavigationRoot>
     );
 };
 

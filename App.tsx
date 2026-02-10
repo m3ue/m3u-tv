@@ -1,14 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { View, Text, TVEventHandler, LogBox } from 'react-native';
+import { TVEventHandler, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
-  SpatialNavigationRoot,
   SpatialNavigation,
-  SpatialNavigationNode,
-  SpatialNavigationFocusableView,
-  DefaultFocus,
   Directions
 } from 'react-tv-space-navigation';
 import { XtreamProvider } from './src/context/XtreamContext';
@@ -100,10 +96,8 @@ export default function App() {
       <SafeAreaProvider>
         <XtreamProvider>
           <MenuProvider>
-            <SpatialNavigationRoot>
-              <StatusBar style="light" />
-              <AppNavigator />
-            </SpatialNavigationRoot>
+            <StatusBar style="light" />
+            <AppNavigator />
           </MenuProvider>
         </XtreamProvider>
       </SafeAreaProvider>

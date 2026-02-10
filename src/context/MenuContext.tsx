@@ -4,12 +4,15 @@ interface MenuContextType {
     isExpanded: boolean;
     setExpanded: (expanded: boolean) => void;
     toggleExpanded: () => void;
+    isSidebarActive: boolean;
+    setSidebarActive: (active: boolean) => void;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isSidebarActive, setIsSidebarActive] = useState(false);
 
     const setExpanded = useCallback((expanded: boolean) => {
         setIsExpanded(expanded);
@@ -19,8 +22,12 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsExpanded((prev) => !prev);
     }, []);
 
+    const setSidebarActive = useCallback((active: boolean) => {
+        setIsSidebarActive(active);
+    }, []);
+
     return (
-        <MenuContext.Provider value={{ isExpanded, setExpanded, toggleExpanded }}>
+        <MenuContext.Provider value={{ isExpanded, setExpanded, toggleExpanded, isSidebarActive, setSidebarActive }}>
             {children}
         </MenuContext.Provider>
     );
