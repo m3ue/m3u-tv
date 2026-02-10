@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -13,7 +8,11 @@ import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { LiveTVCard } from '../components/LiveTVCard';
-import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
+import {
+  SpatialNavigationNode,
+  SpatialNavigationVirtualizedGrid,
+  SpatialNavigationVirtualizedList,
+} from 'react-tv-space-navigation';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const isFocused = useIsFocused();
@@ -59,9 +58,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     </FocusablePressable>
   );
 
-  const renderStreamItem = ({ item }: { item: XtreamLiveStream }) => (
-    <LiveTVCard item={item} />
-  );
+  const renderStreamItem = ({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />;
 
   if (!isConfigured) {
     return (

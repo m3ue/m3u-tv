@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -13,7 +8,11 @@ import { XtreamCategory, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { SeriesCard } from '../components/SeriesCard';
-import { SpatialNavigationNode, SpatialNavigationVirtualizedGrid, SpatialNavigationVirtualizedList } from 'react-tv-space-navigation';
+import {
+  SpatialNavigationNode,
+  SpatialNavigationVirtualizedGrid,
+  SpatialNavigationVirtualizedList,
+} from 'react-tv-space-navigation';
 
 export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const isFocused = useIsFocused();
@@ -57,9 +56,7 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
     </FocusablePressable>
   );
 
-  const renderSeriesItem = ({ item }: { item: XtreamSeries }) => (
-    <SeriesCard item={item} />
-  );
+  const renderSeriesItem = ({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />;
 
   if (!isConfigured) {
     return (
@@ -77,10 +74,7 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
         {/* Category selector */}
         <View style={styles.categoryListContainer}>
           <SpatialNavigationVirtualizedList
-            data={[
-              { category_id: '', category_name: 'All Series', parent_id: 0 },
-              ...seriesCategories,
-            ]}
+            data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
             renderItem={renderCategoryItem}
             itemSize={scaledPixels(195)}
             style={styles.categoryList}

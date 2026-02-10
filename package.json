@@ -11,7 +11,7 @@
     "prebuild": "EXPO_TV=1 expo prebuild --clean",
     "clean": "rm -rf node_modules android ios",
     "lint": "npx eslint . --ext .ts,.tsx",
-    "pretty": "npx prettier . --write",
+    "pretty": "npx prettier *.{ts,tsx} --write",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

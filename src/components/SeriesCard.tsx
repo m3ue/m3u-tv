@@ -20,10 +20,7 @@ export function SeriesCard({ item }: SeriesCardProps) {
 
   return (
     <FocusablePressable
-      style={({ isFocused }) => [
-        styles.seriesCard,
-        isFocused && styles.seriesCardFocused,
-      ]}
+      style={({ isFocused }) => [styles.seriesCard, isFocused && styles.seriesCardFocused]}
       onSelect={() => {
         navigation.navigate('SeriesDetails', { item });
       }}
@@ -40,9 +37,7 @@ export function SeriesCard({ item }: SeriesCardProps) {
         <View style={styles.seriesMeta}>
           <Text style={styles.seriesRating}>★ {item.rating || 'N/A'}</Text>
           {(item.release_date || item.releaseDate) && (
-            <Text style={styles.seriesYear}>
-              {(item.release_date || item.releaseDate)?.substring(0, 4)}
-            </Text>
+            <Text style={styles.seriesYear}>{(item.release_date || item.releaseDate)?.substring(0, 4)}</Text>
           )}
         </View>
       </View>

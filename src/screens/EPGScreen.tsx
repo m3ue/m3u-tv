@@ -13,7 +13,7 @@ import {
   ProgramText,
   ProgramImage,
   useProgram,
-  ProgramItem as PlanbyProgramItem
+  ProgramItem as PlanbyProgramItem,
 } from '@nessprim/planby-native-pro';
 import { useXtream } from '../context/XtreamContext';
 import { xtreamService } from '../services/XtreamService';
@@ -64,7 +64,7 @@ const decodeBase64 = (str: string) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
     let output = '';
     str = str.replace(/[^A-Za-z0-9+/=]/g, '');
-    for (let i = 0; i < str.length;) {
+    for (let i = 0; i < str.length; ) {
       const enc1 = chars.indexOf(str.charAt(i++));
       const enc2 = chars.indexOf(str.charAt(i++));
       const enc3 = chars.indexOf(str.charAt(i++));
@@ -83,10 +83,7 @@ const decodeBase64 = (str: string) => {
   }
 };
 
-const transformListingsToEpgPrograms = (
-  streamId: string | number,
-  listings: XtreamEpgListing[]
-): EpgProgram[] => {
+const transformListingsToEpgPrograms = (streamId: string | number, listings: XtreamEpgListing[]): EpgProgram[] => {
   const programs: EpgProgram[] = [];
   if (!listings || !Array.isArray(listings)) return programs;
 
@@ -134,7 +131,11 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
     <ProgramBox width={styles.width} style={styles.position}>
       <Pressable focusable>
         {({ focused }) => (
-          <ProgramContent width={styles.width} isLive={isLive} style={{ borderWidth: focused ? 2 : 0, borderColor: focused ? "#00bc7d" : 'transparent' }}>
+          <ProgramContent
+            width={styles.width}
+            isLive={isLive}
+            style={{ borderWidth: focused ? 2 : 0, borderColor: focused ? '#00bc7d' : 'transparent' }}
+          >
             <ProgramFlex>
               {isLive && isMinWidth && <ProgramImage src={image} alt="Preview" />}
               <ProgramStack>
@@ -151,13 +152,20 @@ const ProgramItem = ({ program, isVerticalMode, ...rest }: PlanbyProgramItem) =>
   );
 };
 
-function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZone }: {
-  channels: Channel[],
-  epgData: EpgProgram[],
-  startDate: string,
-  endDate: string,
-  isLoading: boolean,
-  onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void,
+function EpgContent({
+  channels,
+  epgData,
+  startDate,
+  endDate,
+  isLoading,
+  onFetchZone,
+}: {
+  channels: Channel[];
+  epgData: EpgProgram[];
+  startDate: string;
+  endDate: string;
+  isLoading: boolean;
+  onFetchZone: (data: { since: string; till: string; channelsToFetchData: string[] }) => void;
 }) {
   const { width, height } = useWindowDimensions();
 
@@ -177,7 +185,7 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
     itemOverscan: 20,
     mode: {
       type: 'day',
-      style: 'modern'
+      style: 'modern',
     },
     fetchZone: {
       enabled: true,
@@ -189,17 +197,16 @@ function EpgContent({ channels, epgData, startDate, endDate, isLoading, onFetchZ
 
   return (
     <Epg {...getEpgProps()} isLoading={isLoading}>
-      <Layout
-        {...getLayoutProps()}
-        renderProgram={(props) => <ProgramItem {...props} />}
-      />
+      <Layout {...getLayoutProps()} renderProgram={(props) => <ProgramItem {...props} />} />
     </Epg>
   );
 }
 
 export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   const isFocused = useIsFocused();
-  useEffect(() => { console.log(`[EPGScreen] isFocused: ${isFocused}`); }, [isFocused]);
+  useEffect(() => {
+    console.log(`[EPGScreen] isFocused: ${isFocused}`);
+  }, [isFocused]);
   const { isConfigured, liveStreams, fetchLiveStreams } = useXtream();
   const [isLoading, setIsLoading] = useState(true);
   const [epgData, setEpgData] = useState<EpgProgram[]>([]);
@@ -231,9 +238,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
         // Batch fetch EPG for the first visible channels only
         const initialBatchSize = 10;
-        const initialStreamIds = streams
-          .slice(0, initialBatchSize)
-          .map((s: XtreamLiveStream) => s.stream_id);
+        const initialStreamIds = streams.slice(0, initialBatchSize).map((s: XtreamLiveStream) => s.stream_id);
 
         // Mark as fetched BEFORE the async call to prevent fetchZone race condition
         initialStreamIds.forEach((id) => fetchedStreamIds.current.add(String(id)));
@@ -243,9 +248,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
         const transformedEpg: EpgProgram[] = [];
         Object.entries(batchResult).forEach(([streamId, data]) => {
-          transformedEpg.push(
-            ...transformListingsToEpgPrograms(streamId, data.epg_listings || [])
-          );
+          transformedEpg.push(...transformListingsToEpgPrograms(streamId, data.epg_listings || []));
         });
 
         setEpgData(transformedEpg);
@@ -259,18 +262,12 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
     loadEPG();
   }, [isConfigured, fetchLiveStreams, liveStreams]);
 
-  const handleFetchZone = useCallback(async (data: {
-    since: string;
-    till: string;
-    channelsToFetchData: string[];
-  }) => {
+  const handleFetchZone = useCallback(async (data: { since: string; till: string; channelsToFetchData: string[] }) => {
     const { channelsToFetchData } = data;
     if (!channelsToFetchData || channelsToFetchData.length === 0) return;
 
     // Skip channels we've already fetched
-    const unfetched = channelsToFetchData.filter(
-      (uuid) => !fetchedStreamIds.current.has(uuid)
-    );
+    const unfetched = channelsToFetchData.filter((uuid) => !fetchedStreamIds.current.has(uuid));
     if (unfetched.length === 0) return;
 
     // Mark as fetched BEFORE the async call to prevent concurrent duplicate fetches
@@ -286,9 +283,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
       const newPrograms: EpgProgram[] = [];
       Object.entries(batchResult).forEach(([streamId, epg]) => {
-        newPrograms.push(
-          ...transformListingsToEpgPrograms(streamId, epg.epg_listings || [])
-        );
+        newPrograms.push(...transformListingsToEpgPrograms(streamId, epg.epg_listings || []));
       });
 
       if (newPrograms.length > 0) {
@@ -309,7 +304,7 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
     return {
       startDate: `${yyyy}-${mm}-${dd}T00:00:00`,
-      endDate: `${yyyy}-${mm}-${dd}T24:00:00`
+      endDate: `${yyyy}-${mm}-${dd}T24:00:00`,
     };
   }, []);
 
@@ -333,7 +328,10 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
 
   return (
     <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+      <SpatialNavigationScrollView
+        offsetFromStart={scaledPixels(100)}
+        contentContainerStyle={{ paddingVertical: scaledPixels(40) }}
+      >
         <DefaultFocus>
           <EpgContent
             channels={channels}

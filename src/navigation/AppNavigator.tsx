@@ -40,7 +40,7 @@ function MainNavigator() {
   const { isSidebarActive, setSidebarActive } = useMenu();
 
   // Track the current content screen name
-  const currentScreen = useNavigationState(state => {
+  const currentScreen = useNavigationState((state) => {
     if (!state) return 'Home';
     let route: any = state.routes[state.index];
     while (route?.state && typeof route.state.index === 'number') {
@@ -62,21 +62,27 @@ function MainNavigator() {
   }, [isFocused, isSidebarActive, setSidebarActive]);
 
   // When sidebar root hits right edge → switch focus to content
-  const handleSidebarBoundary = useCallback((direction: string) => {
-    if (direction === 'right') {
-      setSidebarActive(false);
-    }
-  }, [setSidebarActive]);
+  const handleSidebarBoundary = useCallback(
+    (direction: string) => {
+      if (direction === 'right') {
+        setSidebarActive(false);
+      }
+    },
+    [setSidebarActive],
+  );
 
   // When content root hits left edge → switch focus to sidebar
   // EPG uses Planby's native focus (not spatial navigation), so skip for EPG.
   // The Back button remains the way to reach the sidebar from EPG.
-  const handleContentBoundary = useCallback((direction: string) => {
-    if (currentScreen === 'EPG') return;
-    if (direction === 'left') {
-      setSidebarActive(true);
-    }
-  }, [setSidebarActive, currentScreen]);
+  const handleContentBoundary = useCallback(
+    (direction: string) => {
+      if (currentScreen === 'EPG') return;
+      if (direction === 'left') {
+        setSidebarActive(true);
+      }
+    },
+    [setSidebarActive, currentScreen],
+  );
 
   return (
     <View style={styles.mainContainer}>

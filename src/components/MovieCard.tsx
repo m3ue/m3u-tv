@@ -20,10 +20,7 @@ export function MovieCard({ item }: MovieCardProps) {
 
   return (
     <FocusablePressable
-      style={({ isFocused }) => [
-        styles.movieCard,
-        isFocused && styles.movieCardFocused,
-      ]}
+      style={({ isFocused }) => [styles.movieCard, isFocused && styles.movieCardFocused]}
       onSelect={() => {
         navigation.navigate('Details', { item });
       }}

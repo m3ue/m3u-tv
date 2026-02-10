@@ -3,10 +3,7 @@ import React, { useEffect } from 'react';
 import { TVEventHandler, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import {
-  SpatialNavigation,
-  Directions
-} from 'react-tv-space-navigation';
+import { SpatialNavigation, Directions } from 'react-tv-space-navigation';
 import { XtreamProvider } from './src/context/XtreamContext';
 import { MenuProvider } from './src/context/MenuContext';
 import { AppNavigator } from './src/navigation/AppNavigator';

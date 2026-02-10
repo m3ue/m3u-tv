@@ -49,18 +49,14 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   };
 
   const handleDisconnect = async () => {
-    Alert.alert(
-      'Disconnect',
-      'Are you sure you want to disconnect?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Disconnect',
-          style: 'destructive',
-          onPress: disconnect,
-        },
-      ],
-    );
+    Alert.alert('Disconnect', 'Are you sure you want to disconnect?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: disconnect,
+      },
+    ]);
   };
 
   if (isConfigured && authResponse) {
@@ -91,56 +87,36 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
               <View style={styles.menuContainer}>
                 <DefaultFocus>
                   <FocusablePressable
-                    style={({ isFocused }) => [
-                      styles.menuButton,
-                      isFocused && styles.menuButtonFocused,
-                    ]}
+                    style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                     onSelect={() => navigation.navigate('LiveTV')}
                   >
                     {({ isFocused }) => (
-                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                        Live TV
-                      </Text>
+                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Live TV</Text>
                     )}
                   </FocusablePressable>
                 </DefaultFocus>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('EPG')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      EPG Guide
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>EPG Guide</Text>
                   )}
                 </FocusablePressable>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('VOD')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      Movies
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Movies</Text>
                   )}
                 </FocusablePressable>
                 <FocusablePressable
-                  style={({ isFocused }) => [
-                    styles.menuButton,
-                    isFocused && styles.menuButtonFocused,
-                  ]}
+                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
                   onSelect={() => navigation.navigate('Series')}
                 >
                   {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>
-                      TV Series
-                    </Text>
+                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>TV Series</Text>
                   )}
                 </FocusablePressable>
               </View>
@@ -177,16 +153,11 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
           <SpatialNavigationNode>
             <DefaultFocus>
               <FocusablePressable
-                style={({ isFocused }) => [
-                  styles.settingsButton,
-                  isFocused && styles.settingsButtonFocused,
-                ]}
+                style={({ isFocused }) => [styles.settingsButton, isFocused && styles.settingsButtonFocused]}
                 onSelect={handleDisconnect}
               >
                 {({ isFocused }) => (
-                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
-                    Disconnect
-                  </Text>
+                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Disconnect</Text>
                 )}
               </FocusablePressable>
             </DefaultFocus>
@@ -200,7 +171,11 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
 
   return (
     <SpatialNavigationNode>
-      <SpatialNavigationScrollView offsetFromStart={scaledPixels(100)} style={styles.container} contentContainerStyle={styles.content}>
+      <SpatialNavigationScrollView
+        offsetFromStart={scaledPixels(100)}
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
         <Text style={styles.title}>Connection Settings</Text>
         <Text style={styles.subtitle}>Enter your Xtream codes details</Text>
 
@@ -210,12 +185,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Server URL</Text>
             <DefaultFocus>
-              <FocusablePressable
-                style={({ isFocused }) => [
-                  styles.inputContainer,
-                  isFocused && styles.inputFocused,
-                ]}
-              >
+              <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
                 <TextInput
                   style={styles.input}
                   value={server}
@@ -231,12 +201,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Username</Text>
-            <FocusablePressable
-              style={({ isFocused }) => [
-                styles.inputContainer,
-                isFocused && styles.inputFocused,
-              ]}
-            >
+            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
               <TextInput
                 style={styles.input}
                 value={username}
@@ -251,12 +216,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
-            <FocusablePressable
-              style={({ isFocused }) => [
-                styles.inputContainer,
-                isFocused && styles.inputFocused,
-              ]}
-            >
+            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
               <TextInput
                 style={styles.input}
                 value={password}
@@ -271,17 +231,10 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
           </View>
 
           <FocusablePressable
-            style={({ isFocused }) => [
-              styles.connectButton,
-              isFocused && styles.buttonFocused,
-            ]}
+            style={({ isFocused }) => [styles.connectButton, isFocused && styles.buttonFocused]}
             onSelect={handleConnect}
           >
-            {isLoading ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.buttonText}>Connect</Text>
-            )}
+            {isLoading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Connect</Text>}
           </FocusablePressable>
         </View>
       </SpatialNavigationScrollView>

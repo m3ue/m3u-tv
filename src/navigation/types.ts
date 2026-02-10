@@ -30,10 +30,7 @@ export type DrawerParamList = {
 };
 
 // Screen Props
-export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
-  RootStackParamList,
-  T
->;
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
 
 export type DrawerScreenPropsType<T extends keyof DrawerParamList> = CompositeScreenProps<
   DrawerScreenProps<DrawerParamList, T>,
