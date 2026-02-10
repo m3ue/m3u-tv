@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator, useWindowDimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Pressable } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import {
   useEpg,
