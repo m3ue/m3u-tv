@@ -120,10 +120,10 @@ To use with M3U Editor, use your M3U Editor server URL and credentials from a Pl
 
 ### Adding New Features
 
-1. Components go in `packages/shared-ui/src/components/`
-2. Screens go in `packages/shared-ui/src/screens/`
-3. Update navigation types in `packages/shared-ui/src/navigation/types.ts`
-4. Export new items from `packages/shared-ui/src/index.ts`
+1. Components go in `components`
+2. Screens go in `screens`
+3. Update navigation types in `navigation/types.ts`
+4. Export new items from the folders `index.ts`
 
 ### Code Style
 
