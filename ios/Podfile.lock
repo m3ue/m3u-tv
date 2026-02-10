@@ -28,6 +28,8 @@ PODS:
     - Yoga
   - ExpoAsset (12.0.12):
     - ExpoModulesCore
+  - ExpoBlur (15.0.8):
+    - ExpoModulesCore
   - ExpoFileSystem (19.0.21):
     - ExpoModulesCore
   - ExpoFont (14.0.11):
@@ -2118,6 +2120,7 @@ DEPENDENCIES:
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
+  - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
@@ -2214,6 +2217,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
+  ExpoBlur:
+    :path: "../node_modules/expo-blur/ios"
   ExpoFileSystem:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
@@ -2386,6 +2391,7 @@ SPEC CHECKSUMS:
   EXConstants: 3feb66fd1d94202fc1f0946d74e029d8b224b60e
   Expo: 7f5e64b5d18096dcec86814764b526b0cb97811c
   ExpoAsset: d999f3bbd998a750f3b74cb913229848901b926b
+  ExpoBlur: 688c53d5d26575cbb6c72e7fbd4caef8d8cfadf6
   ExpoFileSystem: aefcd337b94b874f88752ebefc52813b84992fad
   ExpoFont: c625dbd97ed57e9089b172b2a7bb99003d074664
   ExpoKeepAwake: 44bf6715bc1d2ddb17afe19d927cd039cda123f0
@@ -2393,14 +2399,14 @@ SPEC CHECKSUMS:
   ExpoModulesCore: 77496909fd3c800f97f7f2007dd26aeac4bb3798
   ExpoSecureStore: decd2943fa19fa6f02c5ef3689f9ba5012ad6a6d
   FBLazyVector: 5d1300313dc2ad5c18f892e6a2ab820d561c70d0
-  hermes-engine: 8bb0bdb1bf49c3bbc17cf4c2d02dcc2f706ab555
+  hermes-engine: 9f4dfe93326146a1c99eb535b1cb0b857a3cd172
   RCTDeprecation: 557c789999d670a92cb15568411e066fc259ee16
   RCTRequired: 8973655326bdb283f51f62d347a467b2a7173286
   RCTTypeSafety: 5578c4f15fd41063123b905604e051e3365944d8
   React: a35ab816fc3956b3f5f7bd122f3474435bf036f0
   React-callinvoker: 763dacda0f26da2bd82182b957819f9209662f90
   React-Core: cfe7580e781c9fd5e9f6af5427817cd0e5a37c5b
-  React-Core-prebuilt: 7c9f75e71145e1425cdd413ae680e65dfba7fc2b
+  React-Core-prebuilt: 74493f872e95aeff774a0ebc3a7db29f8c31ed4d
   React-CoreModules: 4ca72566842c4e23744c09d4d64632ebe6d336d0
   React-cxxreact: a7fa9e7d55b8ce62f82bd42354952f11fa7c23d2
   React-debug: 30e84b351c134cb789f3cd428cf3302edeafe628

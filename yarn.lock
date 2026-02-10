@@ -4268,6 +4268,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"expo-blur@npm:^15.0.8":
+  version: 15.0.8
+  resolution: "expo-blur@npm:15.0.8"
+  peerDependencies:
+    expo: "*"
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/d71f3330928e5fa3be3f8e1ee69736669b4cdbcc2c9f44ac8f552a0279dbcc03cccddf8aed1454d86a00d56b53f855aaec574d0e53898166a22b367586ba1544
+  languageName: node
+  linkType: hard
+
 "expo-build-properties@npm:~1.0.9":
   version: 1.0.10
   resolution: "expo-build-properties@npm:1.0.10"
@@ -5945,6 +5956,7 @@ __metadata:
     eslint-plugin-react: "npm:^7.37.5"
     eslint-plugin-unused-imports: "npm:^4.4.1"
     expo: "npm:^54.0.20"
+    expo-blur: "npm:^15.0.8"
     expo-build-properties: "npm:~1.0.9"
     expo-linear-gradient: "npm:~15.0.8"
     expo-secure-store: "npm:~15.0.8"
