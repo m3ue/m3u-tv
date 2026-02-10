@@ -210,7 +210,7 @@ export const SideBar = () => {
                     </View>
                 </View>
 
-                <BlurView intensity={30} style={StyleSheet.absoluteFill} />
+                <BlurView intensity={30} experimentalBlurMethod={'dimezisBlurView'} style={StyleSheet.absoluteFill} />
             </Animated.View>
         </SpatialNavigationNode>
     );
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     },
     navContainer: {
         flex: 1,
-        backgroundColor: colors.scrimLight,
+        backgroundColor: colors.scrimMedium,
         position: 'relative',
         paddingVertical: scaledPixels(40),
         zIndex: 1
