@@ -19,12 +19,12 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 ## Tech Stack
 
-- React Native 0.81 (react-native-tvos)
-- Expo SDK 54
+- [React Native 0.81](https://github.com/react-native-tvos/react-native-tvos) (react-native-tvos)
+- [Expo SDK 54](https://github.com/expo/expo)
 - TypeScript
-- React Navigation 7
-- react-tv-space-navigation 6 for TV focus management
-- expo-video for playback
+- [React Navigation 7](https://reactnavigation.org/)
+- [react-tv-space-navigation 6](https://github.com/bamlab/react-tv-space-navigation) for TV focus management
+- [react-native-video](https://github.com/TheWidlarzGroup/react-native-video) and [react-native-vlc-media-player](https://github.com/razorRun/react-native-vlc-media-player) for playback
 
 ## Getting Started
 
@@ -39,7 +39,7 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 ```bash
 cd m3u-tv
-yarn install
+corepack yarn install
 ```
 
 ### Running the App
