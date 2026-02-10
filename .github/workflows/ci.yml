@@ -38,8 +38,7 @@ jobs:
         with:
           path: |
             .yarn/cache
-            .yarn/unplugged
-            .pnp.cjs
+            .yarn/install-state.gz
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
