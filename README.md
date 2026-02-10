@@ -128,8 +128,8 @@ To use with M3U Editor, use your M3U Editor server URL and credentials from a Pl
 ### Code Style
 
 ```bash
-yarn format
-yarn typecheck
+yarn pretty
+yarn lint
 ```
 
 ## Future Enhancements
