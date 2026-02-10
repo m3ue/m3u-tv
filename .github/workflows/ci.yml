@@ -25,18 +25,25 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Cache npm
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare Yarn
+        run: corepack prepare yarn@stable --activate
+
+      - name: Cache Yarn
         uses: actions/cache@v5
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          path: |
+            .yarn/cache
+            .yarn/unplugged
+            .pnp.cjs
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-yarn-
 
-      - name: Install dependencies
-        env:
-          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
-        run: npm ci --legacy-peer-deps
+      - name: Install dependencies (Yarn)
+        run: yarn install --immutable || yarn install --frozen-lockfile || yarn install
 
       - name: Run ESLint
         run: npm run lint
