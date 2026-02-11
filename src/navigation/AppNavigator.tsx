@@ -12,6 +12,7 @@ import {
   VODScreen,
   SeriesScreen,
   PlayerScreen,
+  PlayerScreenNew,
   MovieDetailsScreen,
   SeriesDetailsScreen,
 } from '../screens';
@@ -137,7 +138,7 @@ export function AppNavigator() {
         <RootStack.Screen name="Main" component={MainNavigator} />
         <RootStack.Screen
           name="Player"
-          component={PlayerScreen}
+          component={PlayerScreenNew}
           options={{
             animation: 'fade',
             presentation: 'fullScreenModal',
