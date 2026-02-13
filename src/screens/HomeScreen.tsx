@@ -6,7 +6,7 @@ import {
   SpatialNavigationScrollView,
   SpatialNavigationVirtualizedList,
   DefaultFocus,
-} from 'react-tv-space-navigation';
+} from '../lib/tvNavigation';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';

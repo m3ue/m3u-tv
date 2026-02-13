@@ -11,7 +11,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from '../lib/tvNavigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 

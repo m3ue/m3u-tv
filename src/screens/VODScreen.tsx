@@ -12,7 +12,7 @@ import {
   SpatialNavigationNode,
   SpatialNavigationVirtualizedGrid,
   SpatialNavigationVirtualizedList,
-} from 'react-tv-space-navigation';
+} from '../lib/tvNavigation';
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   const isFocused = useIsFocused();

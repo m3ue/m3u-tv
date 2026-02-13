@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SpatialNavigationRoot, useLockSpatialNavigation } from 'react-tv-space-navigation';
+import { SpatialNavigationRoot, useLockSpatialNavigation } from '../lib/tvNavigation';
 
 interface TVOverlayProps {
   visible: boolean;

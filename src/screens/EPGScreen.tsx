@@ -20,7 +20,7 @@ import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from '../lib/tvNavigation';
 import { scaledPixels } from '../hooks/useScale';
 
 interface Channel {

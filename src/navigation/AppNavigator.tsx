@@ -1,8 +1,8 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import { SpatialNavigationRoot, DefaultFocus } from 'react-tv-space-navigation';
+import { SpatialNavigationRoot, DefaultFocus } from '../lib/tvNavigation';
 import { useIsFocused, useNavigationState } from '@react-navigation/native';
 import {
   HomeScreen,
@@ -62,37 +62,11 @@ function MainNavigator() {
     return () => backHandler.remove();
   }, [isFocused, isSidebarActive, setSidebarActive]);
 
-  // When sidebar root hits right edge → switch focus to content
-  const handleSidebarBoundary = useCallback(
-    (direction: string) => {
-      if (direction === 'right') {
-        setSidebarActive(false);
-      }
-    },
-    [setSidebarActive],
-  );
-
-  // When content root hits left edge → switch focus to sidebar
-  // EPG uses Planby's native focus (not spatial navigation), so skip for EPG.
-  // The Back button remains the way to reach the sidebar from EPG.
-  const handleContentBoundary = useCallback(
-    (direction: string) => {
-      if (currentScreen === 'EPG') return;
-      if (direction === 'left') {
-        setSidebarActive(true);
-      }
-    },
-    [setSidebarActive, currentScreen],
-  );
-
   return (
     <View style={styles.mainContainer}>
       {/* Content area - full width with left margin for collapsed sidebar */}
       <View style={styles.contentContainer}>
-        <SpatialNavigationRoot
-          isActive={isFocused && !isSidebarActive}
-          onDirectionHandledWithoutMovement={handleContentBoundary}
-        >
+        <SpatialNavigationRoot isActive={isFocused && !isSidebarActive}>
           <DefaultFocus>
             <MainStack.Navigator
               screenOptions={{
@@ -114,10 +88,7 @@ function MainNavigator() {
       </View>
 
       {/* Sidebar - absolutely positioned, overlays content when expanded */}
-      <SpatialNavigationRoot
-        isActive={isFocused && isSidebarActive}
-        onDirectionHandledWithoutMovement={handleSidebarBoundary}
-      >
+      <SpatialNavigationRoot isActive={isFocused && isSidebarActive}>
         <SideBar />
       </SpatialNavigationRoot>
     </View>

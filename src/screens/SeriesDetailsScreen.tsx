@@ -24,7 +24,7 @@ import {
   SpatialNavigationView,
   SpatialNavigationVirtualizedList,
   SpatialNavigationNodeRef,
-} from 'react-tv-space-navigation';
+} from '../lib/tvNavigation';
 
 export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<'SeriesDetails'>) => {
   const isFocused = useIsFocused();

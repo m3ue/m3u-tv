@@ -12,7 +12,7 @@ import {
   SpatialNavigationNode,
   SpatialNavigationVirtualizedGrid,
   SpatialNavigationVirtualizedList,
-} from 'react-tv-space-navigation';
+} from '../lib/tvNavigation';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const isFocused = useIsFocused();

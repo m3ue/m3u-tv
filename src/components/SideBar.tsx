@@ -9,7 +9,7 @@ import Animated, {
     cancelAnimation,
     Easing,
 } from 'react-native-reanimated';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationNodeRef } from 'react-tv-space-navigation';
+import { SpatialNavigationNode, DefaultFocus, SpatialNavigationNodeRef } from '../lib/tvNavigation';
 import { useNavigationState } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
@@ -42,7 +42,7 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SideBar = () => {
-    const { isExpanded, setExpanded, isSidebarActive } = useMenu();
+    const { isExpanded, setExpanded, isSidebarActive, setSidebarActive } = useMenu();
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -167,6 +167,8 @@ export const SideBar = () => {
                                         if (navigationRef.isReady()) {
                                             // @ts-ignore
                                             navigationRef.navigate('Main', { screen: item.id });
+                                            setExpanded(false);
+                                            setTimeout(() => setSidebarActive(false), 0);
                                         }
                                     }}
                                     style={({ isFocused }) => [

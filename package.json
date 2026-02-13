@@ -39,8 +39,7 @@
     "react-native-svg": "~15.12.1",
     "react-native-video": "^6.19.0",
     "react-native-vlc-media-player": "^1.0.98",
-    "react-native-worklets": "0.5.1",
-    "react-tv-space-navigation": "^6.0.0-beta1"
+    "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

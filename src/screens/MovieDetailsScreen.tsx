@@ -15,7 +15,7 @@ import {
   SpatialNavigationRoot,
   SpatialNavigationScrollView,
   SpatialNavigationNodeRef,
-} from 'react-tv-space-navigation';
+} from '../lib/tvNavigation';
 
 export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'Details'>) => {
   const isFocused = useIsFocused();
