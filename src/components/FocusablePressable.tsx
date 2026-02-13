@@ -54,6 +54,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
       <View style={containerStyle}>
         <Pressable
           ref={pressableRef}
+          collapsable={false}
           focusable
           hasTVPreferredFocus={preferredFocus || forcePreferredFocus}
           nextFocusUp={nextFocusUp}

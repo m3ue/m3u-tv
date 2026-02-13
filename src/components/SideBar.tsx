@@ -92,6 +92,21 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
         }
     }, [isSidebarActive, setExpanded, currentRouteName, topRouteName, setSidebarFocusTag]);
 
+    // Publish a stable sidebar focus target tag even before sidebar is activated,
+    // so content `nextFocusLeft` links can always resolve to a valid sidebar item.
+    useEffect(() => {
+        const id = setTimeout(() => {
+            const preferredTag = menuItemRefs.current[preferredMenuId]?.getNodeHandle();
+            const fallbackTag = menuItemRefs.current['Home']?.getNodeHandle();
+            const tag = preferredTag ?? fallbackTag;
+            if (typeof tag === 'number') {
+                setSidebarFocusTag(tag);
+            }
+        }, 0);
+
+        return () => clearTimeout(id);
+    }, [preferredMenuId, isExpanded, setSidebarFocusTag]);
+
     // Width Animation
     const animatedWidth = useSharedValue(isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED);
 
@@ -147,92 +162,90 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     });
 
     return (
-        <View>
-            <Animated.View style={[styles.container, animatedStyle]}>
-                <View style={styles.navContainer}>
-                    <View style={styles.logoContainer}>
-                        <Animated.Image
-                            source={require('../../assets/images/logo.png')}
-                            style={[{ width: scaledPixels(60), height: scaledPixels(60) }, logoAnimatedStyle]}
-                        />
-                        {isExpanded && (
-                            <Text numberOfLines={1} style={[styles.logoText, { width: scaledPixels(200) }]}>
-                                M3U TV
-                            </Text>
-                        )}
-                    </View>
-
-                    <View style={styles.menuContainer}>
-                        {MENU_ITEMS.map((item) => (
-                            <FocusablePressable
-                                ref={(r) => {
-                                    menuItemRefs.current[item.id] = r;
-                                }}
-                                key={item.id}
-                                preferredFocus={isSidebarActive && preferredMenuId === item.id}
-                                nextFocusRight={contentFocusTag}
-                                onSelect={() => {
-                                    console.log(`[SideBar] onSelect triggered for: ${item.id}`);
-                                    if (navigationRef.isReady()) {
-                                        // @ts-ignore
-                                        navigationRef.navigate('Main', { screen: item.id });
-                                        setExpanded(false);
-                                        setTimeout(() => setSidebarActive(false), 0);
-                                    }
-                                }}
-                                onFocus={() => {
-                                    if (!isSidebarActive) {
-                                        setSidebarActive(true);
-                                    }
-                                    setPreferredMenuId(item.id);
-                                    const tag = menuItemRefs.current[item.id]?.getNodeHandle();
-                                    if (typeof tag === 'number') {
-                                        setSidebarFocusTag(tag);
-                                    }
-                                }}
-                                style={({ isFocused }) => [
-                                    styles.menuItem,
-                                    isFocused && styles.menuItemFocused,
-                                    currentRouteName === item.id && !isFocused && styles.menuItemActive,
-                                ]}
-                            >
-                                {({ isFocused }) => (
-                                    <>
-                                        <Icon
-                                            name={item.icon}
-                                            size={scaledPixels(32)}
-                                            color={
-                                                isFocused ? colors.text : currentRouteName === item.id ? colors.primary : colors.textSecondary
-                                            }
-                                        />
-                                        {isExpanded && (
-                                            <Text
-                                                numberOfLines={1}
-                                                style={[
-                                                    styles.menuLabel,
-                                                    {
-                                                        color: isFocused
-                                                            ? colors.text
-                                                            : currentRouteName === item.id
-                                                                ? colors.primary
-                                                                : colors.textSecondary,
-                                                        width: scaledPixels(200),
-                                                    },
-                                                ]}
-                                            >
-                                                {item.label}
-                                            </Text>
-                                        )}
-                                    </>
-                                )}
-                            </FocusablePressable>
-                        ))}
-                    </View>
+        <Animated.View style={[styles.container, animatedStyle]}>
+            <View style={styles.navContainer}>
+                <View style={styles.logoContainer}>
+                    <Animated.Image
+                        source={require('../../assets/images/logo.png')}
+                        style={[{ width: scaledPixels(60), height: scaledPixels(60) }, logoAnimatedStyle]}
+                    />
+                    {isExpanded && (
+                        <Text numberOfLines={1} style={[styles.logoText, { width: scaledPixels(200) }]}>
+                            M3U TV
+                        </Text>
+                    )}
                 </View>
 
-                <BlurView intensity={30} experimentalBlurMethod={'dimezisBlurView'} style={StyleSheet.absoluteFill} />
-            </Animated.View>
-        </View>
+                <View style={styles.menuContainer}>
+                    {MENU_ITEMS.map((item) => (
+                        <FocusablePressable
+                            ref={(r) => {
+                                menuItemRefs.current[item.id] = r;
+                            }}
+                            key={item.id}
+                            preferredFocus={isSidebarActive && preferredMenuId === item.id}
+                            nextFocusRight={contentFocusTag}
+                            onSelect={() => {
+                                console.log(`[SideBar] onSelect triggered for: ${item.id}`);
+                                if (navigationRef.isReady()) {
+                                    // @ts-ignore
+                                    navigationRef.navigate('Main', { screen: item.id });
+                                    setExpanded(false);
+                                    setTimeout(() => setSidebarActive(false), 0);
+                                }
+                            }}
+                            onFocus={() => {
+                                if (!isSidebarActive) {
+                                    setSidebarActive(true);
+                                }
+                                setPreferredMenuId(item.id);
+                                const tag = menuItemRefs.current[item.id]?.getNodeHandle();
+                                if (typeof tag === 'number') {
+                                    setSidebarFocusTag(tag);
+                                }
+                            }}
+                            style={({ isFocused }) => [
+                                styles.menuItem,
+                                isFocused && styles.menuItemFocused,
+                                currentRouteName === item.id && !isFocused && styles.menuItemActive,
+                            ]}
+                        >
+                            {({ isFocused }) => (
+                                <>
+                                    <Icon
+                                        name={item.icon}
+                                        size={scaledPixels(32)}
+                                        color={
+                                            isFocused ? colors.text : currentRouteName === item.id ? colors.primary : colors.textSecondary
+                                        }
+                                    />
+                                    {isExpanded && (
+                                        <Text
+                                            numberOfLines={1}
+                                            style={[
+                                                styles.menuLabel,
+                                                {
+                                                    color: isFocused
+                                                        ? colors.text
+                                                        : currentRouteName === item.id
+                                                            ? colors.primary
+                                                            : colors.textSecondary,
+                                                    width: scaledPixels(200),
+                                                },
+                                            ]}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                    )}
+                                </>
+                            )}
+                        </FocusablePressable>
+                    ))}
+                </View>
+            </View>
+
+            <BlurView intensity={30} experimentalBlurMethod={'dimezisBlurView'} style={StyleSheet.absoluteFill} />
+        </Animated.View>
     );
 };
 
