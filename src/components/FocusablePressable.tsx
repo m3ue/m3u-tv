@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Pressable, ViewStyle, View, StyleProp, findNodeHandle } from 'react-native';
 
 type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => StyleProp<ViewStyle>);
@@ -40,15 +40,30 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
     ref,
   ) => {
     const pressableRef = useRef<any>(null);
+    const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const [isFocused, setIsFocused] = useState(false);
     const [forcePreferredFocus, setForcePreferredFocus] = useState(false);
 
     useImperativeHandle(ref, () => ({
       focus: () => {
         setForcePreferredFocus(true);
+        if (focusTimerRef.current) {
+          clearTimeout(focusTimerRef.current);
+        }
+        focusTimerRef.current = setTimeout(() => {
+          setForcePreferredFocus(false);
+        }, 250);
       },
       getNodeHandle: () => findNodeHandle(pressableRef.current),
     }));
+
+    useEffect(() => {
+      return () => {
+        if (focusTimerRef.current) {
+          clearTimeout(focusTimerRef.current);
+        }
+      };
+    }, []);
 
     return (
       <View style={containerStyle}>

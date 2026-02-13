@@ -7,4 +7,3 @@ export { SeriesScreen } from './SeriesScreen';
 export { MovieDetailsScreen } from './MovieDetailsScreen';
 export { SeriesDetailsScreen } from './SeriesDetailsScreen';
 export { PlayerScreen } from './PlayerScreen';
-export { PlayerScreenNew } from './PlayerScreenNew';

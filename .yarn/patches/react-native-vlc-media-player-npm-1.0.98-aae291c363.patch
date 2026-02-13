@@ -1,0 +1,13 @@
+diff --git a/VLCPlayer.js b/VLCPlayer.js
+index 9b914420143b8f9b76d5d76e8aab5cc99cfcd5e3..0fe9e817089847f76a10db49c84d9346161c0ecd 100755
+--- a/VLCPlayer.js
++++ b/VLCPlayer.js
+@@ -171,7 +171,7 @@ export default class VLCPlayer extends Component {
+     /* const {
+      source
+      } = this.props;*/
+-    const source = resolveAssetSource(this.props.source) || {};
++    const source = Object.assign({}, resolveAssetSource(this.props.source) || {});
+ 
+     let uri = source.uri || "";
+     if (uri && uri.match(/^\//)) {

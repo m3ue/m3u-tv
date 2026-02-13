@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
-import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
@@ -79,7 +78,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   if (!isFocused) return null;
 
   return (
-    <ScrollView contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
       {/* Live TV Row */}
       {liveStreams.length > 0 && (
         <View style={styles.rowContainer}>
@@ -91,6 +90,8 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
                 <LiveTVCard item={item} />
               )}
               horizontal
+              removeClippedSubviews={false}
+              style={styles.rowList}
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -109,6 +110,8 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
                 <MovieCard item={item} />
               )}
               horizontal
+              removeClippedSubviews={false}
+              style={styles.rowList}
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -127,6 +130,8 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
                 <SeriesCard item={item} />
               )}
               horizontal
+              removeClippedSubviews={false}
+              style={styles.rowList}
               keyExtractor={(item) => String(item.series_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -138,6 +143,13 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    overflow: 'visible',
+  },
+  scrollContent: {
+    paddingVertical: scaledPixels(40),
+    overflow: 'visible',
+  },
   welcomeContainer: {
     flex: 1,
     backgroundColor: colors.background,
@@ -196,6 +208,7 @@ const styles = StyleSheet.create({
   rowContainer: {
     marginBottom: scaledPixels(30),
     paddingHorizontal: scaledPixels(20),
+    overflow: 'visible',
   },
   rowTitle: {
     color: colors.text,
@@ -206,8 +219,13 @@ const styles = StyleSheet.create({
   },
   liveTvRowList: {
     height: scaledPixels(224),
+    overflow: 'visible',
   },
   posterRowList: {
     height: scaledPixels(390),
+    overflow: 'visible',
+  },
+  rowList: {
+    overflow: 'visible',
   },
 });

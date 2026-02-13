@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler, TVFocusGuideView } from 'react-native';
+import {
+    View,
+    StyleSheet,
+    Text,
+    Pressable,
+    ActivityIndicator,
+    Animated,
+    TVEventHandler,
+    BackHandler,
+    Platform,
+    Alert,
+    ActionSheetIOS,
+} from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { RootStackScreenProps } from '../navigation/types';
@@ -9,25 +21,31 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable, FocusablePressableRef } from '../components/FocusablePressable';
 
 const OVERLAY_TIMEOUT = 8000;
-const SEEK_STEP = 10; // seconds
+const SEEK_STEP = 10;
+const TIMELINE_SEEK_STEP = 30;
 const USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
-
-// Formats that AVPlayer can't handle - send directly to VLC
 const VLC_ONLY_EXTENSIONS = ['.avi', '.mkv', '.wmv', '.flv', '.rmvb', '.rm', '.asf', '.divx', '.ogm'];
 
 type PlayerBackend = 'native' | 'vlc';
+type PlayerTrack = { id: number; name: string };
 
 function getInitialBackend(url: string): PlayerBackend {
+    if (Platform.OS !== 'android') {
+        return 'vlc';
+    }
+
     const path = url.split('?')[0].toLowerCase();
     if (VLC_ONLY_EXTENSIONS.some((ext) => path.endsWith(ext))) {
         return 'vlc';
     }
+
     return 'native';
 }
 
 function formatTime(seconds: number): string {
-    const s = Math.max(0, Math.floor(seconds));
+    const safeSeconds = Number.isFinite(seconds) ? seconds : 0;
+    const s = Math.max(0, Math.floor(safeSeconds));
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
@@ -35,185 +53,338 @@ function formatTime(seconds: number): string {
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
+function toErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    if (typeof error === 'object' && error !== null) {
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return 'Unknown playback error';
+        }
+    }
+
+    return 'Unknown playback error';
+}
+
+function showNativeSelect(
+    title: string,
+    options: string[],
+    selectedIndex: number,
+    onPick: (index: number) => void,
+) {
+    if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+            {
+                title,
+                options: [...options, 'Cancel'],
+                cancelButtonIndex: options.length,
+            },
+            (buttonIndex) => {
+                if (buttonIndex < options.length) {
+                    onPick(buttonIndex);
+                }
+            },
+        );
+        return;
+    }
+
+    Alert.alert(
+        title,
+        undefined,
+        [
+            ...options.map((option, index) => ({
+                text: index === selectedIndex ? `✓ ${option}` : option,
+                onPress: () => onPick(index),
+            })),
+            { text: 'Cancel', style: 'cancel' },
+        ],
+        { cancelable: true },
+    );
+}
+
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
     const { streamUrl, title, type } = route.params;
+    const isLive = type === 'live';
+
     const initialBackend = useMemo(() => getInitialBackend(streamUrl), [streamUrl]);
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
 
-    // Focus refs
-    const playButtonRef = useRef<FocusablePressableRef>(null);
     const backButtonRef = useRef<FocusablePressableRef>(null);
     const rewindButtonRef = useRef<FocusablePressableRef>(null);
+    const playButtonRef = useRef<FocusablePressableRef>(null);
     const forwardButtonRef = useRef<FocusablePressableRef>(null);
-    const [backButtonTag, setBackButtonTag] = useState<number>();
-    const [playButtonTag, setPlayButtonTag] = useState<number>();
-    const [rewindButtonTag, setRewindButtonTag] = useState<number>();
-    const [forwardButtonTag, setForwardButtonTag] = useState<number>();
+    const timelineBackButtonRef = useRef<FocusablePressableRef>(null);
+    const timelineForwardButtonRef = useRef<FocusablePressableRef>(null);
+    const audioButtonRef = useRef<FocusablePressableRef>(null);
+    const subtitleButtonRef = useRef<FocusablePressableRef>(null);
 
-    // Playback state
+    const [backButtonTag, setBackButtonTag] = useState<number>();
+    const [rewindButtonTag, setRewindButtonTag] = useState<number>();
+    const [playButtonTag, setPlayButtonTag] = useState<number>();
+    const [forwardButtonTag, setForwardButtonTag] = useState<number>();
+    const [timelineBackButtonTag, setTimelineBackButtonTag] = useState<number>();
+    const [timelineForwardButtonTag, setTimelineForwardButtonTag] = useState<number>();
+    const [audioButtonTag, setAudioButtonTag] = useState<number>();
+    const [subtitleButtonTag, setSubtitleButtonTag] = useState<number>();
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [paused, setPaused] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const isLive = type === 'live';
-
-    // Refs
-    const nativeRef = useRef<VideoRef>(null);
-    const vlcRef = useRef<any>(null);
     const [vlcSeekValue, setVlcSeekValue] = useState<number | undefined>(undefined);
+
+    const [audioTracks, setAudioTracks] = useState<PlayerTrack[]>([]);
+    const [textTracks, setTextTracks] = useState<PlayerTrack[]>([]);
+    const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | undefined>(undefined);
+    const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
+
+    const nativeRef = useRef<VideoRef>(null);
     const seekingRef = useRef(false);
     const seekLockoutTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const exitGuardRef = useRef(false);
 
-    // Overlay state
-    const [overlayVisible, setOverlayVisible] = useState(true);
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    // Use refs so handlers always have current values
-    const overlayVisibleRef = useRef(overlayVisible);
-    const pausedRef = useRef(paused);
     const currentTimeRef = useRef(currentTime);
     const durationRef = useRef(duration);
     const backendRef = useRef(backend);
 
     useEffect(() => {
-        overlayVisibleRef.current = overlayVisible;
-    }, [overlayVisible]);
-    useEffect(() => {
-        pausedRef.current = paused;
-    }, [paused]);
-    useEffect(() => {
         currentTimeRef.current = currentTime;
     }, [currentTime]);
+
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
+
     useEffect(() => {
         backendRef.current = backend;
     }, [backend]);
 
-    // --- Overlay logic ---
+    const [overlayVisible, setOverlayVisible] = useState(true);
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+    const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const overlayVisibleRef = useRef(overlayVisible);
 
-    const resetHideTimer = useCallback(() => {
-        clearTimeout(hideTimer.current);
-        hideTimer.current = setTimeout(hideOverlayAnim, OVERLAY_TIMEOUT);
-    }, []);
+    useEffect(() => {
+        overlayVisibleRef.current = overlayVisible;
+    }, [overlayVisible]);
+
+    const nativeSourceRef = useRef<any>(null);
+    const vlcSourceRef = useRef<any>(null);
+
+    if (!nativeSourceRef.current || nativeSourceRef.current.uri !== streamUrl) {
+        nativeSourceRef.current = {
+            uri: streamUrl,
+            headers: { 'User-Agent': USER_AGENT },
+            isNetwork: true,
+        };
+        vlcSourceRef.current = {
+            uri: streamUrl,
+            initOptions: ['--network-caching=3000', `--http-user-agent=${USER_AGENT}`],
+            isNetwork: true,
+        };
+    }
 
     const hideOverlayAnim = useCallback(() => {
         Animated.timing(fadeAnim, {
             toValue: 0,
             duration: 300,
             useNativeDriver: true,
-        }).start(() => setOverlayVisible(false));
+        }).start(() => {
+            setOverlayVisible(false);
+        });
     }, [fadeAnim]);
+
+    const resetHideTimer = useCallback(() => {
+        clearTimeout(hideTimer.current);
+        hideTimer.current = setTimeout(hideOverlayAnim, OVERLAY_TIMEOUT);
+    }, [hideOverlayAnim]);
 
     const showOverlay = useCallback(() => {
         setOverlayVisible(true);
         fadeAnim.setValue(1);
         resetHideTimer();
-        // Give it a delay to ensure the nodes are rendered before focusing
+
         setTimeout(() => {
-            playButtonRef.current?.focus();
+            backButtonRef.current?.focus();
         }, 150);
     }, [fadeAnim, resetHideTimer]);
 
     useEffect(() => {
         resetHideTimer();
-        // Set initial focus to play button
         if (overlayVisible) {
-            setTimeout(() => playButtonRef.current?.focus(), 150);
+            setTimeout(() => {
+                backButtonRef.current?.focus();
+            }, 150);
         }
+
         return () => clearTimeout(hideTimer.current);
-    }, [resetHideTimer]);
+    }, [overlayVisible, resetHideTimer]);
 
     useEffect(() => {
         if (!overlayVisible) return;
 
         const id = setTimeout(() => {
-            const backTag = backButtonRef.current?.getNodeHandle() ?? undefined;
-            const playTag = playButtonRef.current?.getNodeHandle() ?? undefined;
-            const rewindTag = rewindButtonRef.current?.getNodeHandle() ?? undefined;
-            const forwardTag = forwardButtonRef.current?.getNodeHandle() ?? undefined;
-
-            setBackButtonTag(backTag ?? undefined);
-            setPlayButtonTag(playTag ?? undefined);
-            setRewindButtonTag(rewindTag ?? undefined);
-            setForwardButtonTag(forwardTag ?? undefined);
+            setBackButtonTag(backButtonRef.current?.getNodeHandle() ?? undefined);
+            setRewindButtonTag(rewindButtonRef.current?.getNodeHandle() ?? undefined);
+            setPlayButtonTag(playButtonRef.current?.getNodeHandle() ?? undefined);
+            setForwardButtonTag(forwardButtonRef.current?.getNodeHandle() ?? undefined);
+            setTimelineBackButtonTag(timelineBackButtonRef.current?.getNodeHandle() ?? undefined);
+            setTimelineForwardButtonTag(timelineForwardButtonRef.current?.getNodeHandle() ?? undefined);
+            setAudioButtonTag(audioButtonRef.current?.getNodeHandle() ?? undefined);
+            setSubtitleButtonTag(subtitleButtonRef.current?.getNodeHandle() ?? undefined);
         }, 0);
 
         return () => clearTimeout(id);
     }, [overlayVisible, isLive, paused]);
 
-    // --- Playback controls (using refs for stable callback) ---
-
-    const doSeek = useCallback((offset: number) => {
-        const ct = currentTimeRef.current;
-        const dur = durationRef.current;
-        if (dur <= 0) {
-            console.log('[Player] Seek ignored: duration is 0 or live');
+    const goBackSafe = useCallback(() => {
+        if (exitGuardRef.current) {
             return;
         }
 
-        const target = Math.max(0, Math.min(ct + offset, dur));
-        console.log(`[Player] Seeking to ${target}s (current: ${ct}s, offset: ${offset}s, backend: ${backendRef.current})`);
+        exitGuardRef.current = true;
+        navigation.goBack();
+    }, [navigation]);
 
-        // Lock out progress updates during seek to prevent jumping back
+    const doSeekTo = useCallback((targetSeconds: number) => {
+        const dur = durationRef.current;
+        if (dur <= 0 || isLive) {
+            return;
+        }
+
+        const target = Math.max(0, Math.min(targetSeconds, dur));
         seekingRef.current = true;
         setCurrentTime(target);
 
-        if (seekLockoutTimer.current) clearTimeout(seekLockoutTimer.current);
+        if (seekLockoutTimer.current) {
+            clearTimeout(seekLockoutTimer.current);
+        }
+
         seekLockoutTimer.current = setTimeout(() => {
             seekingRef.current = false;
-        }, 2500); // 2.5s lockout to ensure buffer is stable
+        }, 1500);
 
         if (backendRef.current === 'native') {
             nativeRef.current?.seek(target);
         } else {
-            // VLC expects milliseconds.
-            // We set it, then clear it back to undefined so it doesn't stay at a value that might re-trigger
-            const targetMs = Math.floor(target * 1000);
-            setVlcSeekValue(targetMs);
-            // Longer delay before resetting to undefined, or maybe don't reset if undefined causes issues
-            setTimeout(() => setVlcSeekValue(undefined), 500);
+            setVlcSeekValue(target / dur);
+            setTimeout(() => {
+                setVlcSeekValue(undefined);
+            }, 300);
         }
-    }, []);
+    }, [isLive]);
+
+    const doSeek = useCallback((offset: number) => {
+        doSeekTo(currentTimeRef.current + offset);
+    }, [doSeekTo]);
 
     const doTogglePlayPause = useCallback(() => {
         setPaused((prev) => !prev);
     }, []);
 
-    // --- Backend Handlers ---
+    const openAudioSelector = useCallback(() => {
+        const tracks = audioTracks.length > 0 ? audioTracks : [{ id: -999, name: 'No audio tracks available' }];
+        const options = tracks.map((track) => track.name || `Track ${track.id}`);
+        const selectedIndex = audioTracks.findIndex((track) => track.id === selectedAudioTrack);
+
+        showNativeSelect('Audio Track', options, selectedIndex < 0 ? 0 : selectedIndex, (index) => {
+            if (audioTracks.length === 0) {
+                return;
+            }
+
+            setSelectedAudioTrack(audioTracks[index].id);
+            resetHideTimer();
+        });
+    }, [audioTracks, selectedAudioTrack, resetHideTimer]);
+
+    const openSubtitleSelector = useCallback(() => {
+        const options = ['Off', ...textTracks.map((track) => track.name || `Track ${track.id}`)];
+        const selectedIndex = selectedTextTrack === -1
+            ? 0
+            : Math.max(0, textTracks.findIndex((track) => track.id === selectedTextTrack) + 1);
+
+        showNativeSelect('Subtitle Track', options, selectedIndex, (index) => {
+            if (index === 0) {
+                setSelectedTextTrack(-1);
+            } else {
+                const selectedTrack = textTracks[index - 1];
+                if (selectedTrack) {
+                    setSelectedTextTrack(selectedTrack.id);
+                }
+            }
+
+            resetHideTimer();
+        });
+    }, [textTracks, selectedTextTrack, resetHideTimer]);
 
     const handleNativeLoad = useCallback((data: OnLoadData) => {
-        console.log('[Player] Native loaded, duration:', data.duration);
-        setDuration(data.duration);
+        setError(null);
+        setIsLoading(false);
+        setDuration(data.duration || 0);
     }, []);
 
     const handleNativeProgress = useCallback((data: OnProgressData) => {
         if (!seekingRef.current) {
-            setCurrentTime(data.currentTime);
+            setCurrentTime(data.currentTime || 0);
         }
     }, []);
 
-    const handleNativeError = useCallback((error: OnVideoErrorData) => {
-        console.error('[Player] Native video error:', error);
-        setBackend('vlc'); // Fallback to VLC
+    const handleNativeError = useCallback((nativeError: OnVideoErrorData) => {
+        console.error('[PlayerScreenNew] Native playback error', nativeError);
+
+        if (backendRef.current === 'native') {
+            setBackend('vlc');
+            setError('Native playback failed, retrying with VLC...');
+            setIsLoading(true);
+            return;
+        }
+
+        setIsLoading(false);
+        setError(toErrorMessage(nativeError));
     }, []);
 
-    const handleVlcProgress = useCallback((data: any) => {
+    const handleVlcLoad = useCallback((data: {
+        duration: number;
+        audioTracks?: PlayerTrack[];
+        textTracks?: PlayerTrack[];
+    }) => {
+        setError(null);
+        setIsLoading(false);
+        setDuration(data.duration || 0);
+        setAudioTracks(data.audioTracks ?? []);
+        setTextTracks(data.textTracks ?? []);
+
+        if (data.audioTracks && data.audioTracks.length > 0 && selectedAudioTrack === undefined) {
+            setSelectedAudioTrack(data.audioTracks[0].id);
+        }
+    }, [selectedAudioTrack]);
+
+    const handleVlcProgress = useCallback((data: {
+        currentTime: number;
+        duration: number;
+    }) => {
+        if (isLoading) {
+            setIsLoading(false);
+        }
+
         if (!seekingRef.current) {
-            // VLC provides duration and currentTime in ms
-            if (data.duration && data.duration / 1000 !== durationRef.current) {
-                setDuration(data.duration / 1000);
+            if (typeof data.duration === 'number' && data.duration > 0 && data.duration !== durationRef.current) {
+                setDuration(data.duration);
             }
-            setCurrentTime(data.currentTime / 1000);
+
+            if (typeof data.currentTime === 'number') {
+                setCurrentTime(data.currentTime);
+            }
         }
-    }, []);
+    }, [isLoading]);
 
-    const handleVlcError = useCallback((error: any) => {
-        console.error('[Player] VLC error:', error);
+    const handleVlcError = useCallback((vlcError: unknown) => {
+        console.error('[PlayerScreenNew] VLC playback error', vlcError);
+        setIsLoading(false);
+        setError(toErrorMessage(vlcError));
     }, []);
-
-    // --- TV Events & Back Handling ---
 
     useEffect(() => {
         const backAction = () => {
@@ -221,209 +392,322 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 hideOverlayAnim();
                 return true;
             }
-            navigation.goBack();
+
+            goBackSafe();
             return true;
         };
 
         const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-
         const TVHandler: any = TVEventHandler;
-        if (!TVHandler) return () => backHandler.remove();
+        if (!TVHandler) {
+            return () => {
+                backHandler.remove();
+            };
+        }
 
-        const listener = (event: any) => {
-            if (!event?.eventType) return;
+        const listener = (event: { eventType?: string }) => {
+            if (!event?.eventType) {
+                return;
+            }
 
-            // If overlay is hidden, show it on any button that isn't back/menu
             if (!overlayVisibleRef.current) {
-                if (['back', 'menu'].includes(event.eventType)) {
-                    navigation.goBack();
+                if (event.eventType === 'back' || event.eventType === 'menu') {
+                    goBackSafe();
                     return;
                 }
+
                 showOverlay();
                 return;
             }
 
-            // If overlay is visible, handle back/menu to hide it
-            if (['back', 'menu'].includes(event.eventType)) {
+            if (event.eventType === 'back' || event.eventType === 'menu') {
                 hideOverlayAnim();
                 return;
             }
 
-            // Standard transport controls
-            if (event.eventType === 'playPause') doTogglePlayPause();
-            if (event.eventType === 'fastForward') doSeek(SEEK_STEP);
-            if (event.eventType === 'rewind') doSeek(-SEEK_STEP);
+            if (event.eventType === 'playPause') {
+                doTogglePlayPause();
+                resetHideTimer();
+                return;
+            }
+
+            if (event.eventType === 'fastForward') {
+                doSeek(SEEK_STEP);
+                resetHideTimer();
+                return;
+            }
+
+            if (event.eventType === 'rewind') {
+                doSeek(-SEEK_STEP);
+                resetHideTimer();
+                return;
+            }
 
             resetHideTimer();
         };
 
-        let subscription: any;
+        let subscription: { remove?: () => void } | undefined;
         if (typeof TVHandler.addListener === 'function') {
             subscription = TVHandler.addListener(listener);
         } else if (typeof TVHandler === 'function') {
             const instance = new TVHandler();
-            instance.enable(null, (_: any, event: any) => listener(event));
+            instance.enable(null, (_: unknown, event: { eventType?: string }) => listener(event));
             subscription = { remove: () => instance.disable() };
         }
 
         return () => {
             backHandler.remove();
-            subscription?.remove();
+            subscription?.remove?.();
         };
-    }, [navigation, showOverlay, hideOverlayAnim, resetHideTimer, doTogglePlayPause, doSeek]);
+    }, [doSeek, doTogglePlayPause, goBackSafe, hideOverlayAnim, resetHideTimer, showOverlay]);
 
-    // Use refs for source to ensure stable reference AND avoid React.memo/Hermes freezing
-    // We use Object.assign to ensure the object is not a frozen literal
-    const nativeSourceRef = useRef<any>(null);
-    const vlcSourceRef = useRef<any>(null);
+    useEffect(() => {
+        return () => {
+            if (seekLockoutTimer.current) {
+                clearTimeout(seekLockoutTimer.current);
+            }
+        };
+    }, []);
 
-    if (!nativeSourceRef.current || nativeSourceRef.current.uri !== streamUrl) {
-        nativeSourceRef.current = Object.assign(
-            {},
-            {
-                uri: streamUrl,
-                headers: { 'User-Agent': USER_AGENT },
-                isNetwork: true,
-            },
-        );
-        vlcSourceRef.current = Object.assign(
-            {},
-            {
-                uri: streamUrl,
-                initOptions: ['--network-caching=3000', `--http-user-agent=${USER_AGENT}`],
-                isNetwork: true,
-            },
-        );
-    }
-
-    // Progress bar percentage
-    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const canSeek = !isLive && duration > 0;
+    const progress = canSeek ? (currentTime / duration) * 100 : 0;
+    const selectedAudioLabel = audioTracks.find((track) => track.id === selectedAudioTrack)?.name ?? 'Select';
+    const selectedSubtitleLabel = selectedTextTrack === -1
+        ? 'Off'
+        : (textTracks.find((track) => track.id === selectedTextTrack)?.name ?? 'Select');
 
     return (
         <View style={styles.container}>
-            {/* Video layer */}
             {backend === 'native' ? (
                 <Video
                     ref={nativeRef}
                     source={{ ...nativeSourceRef.current }}
-                    style={styles.video}
+                    style={styles.player}
                     resizeMode={ResizeMode.CONTAIN}
                     controls={false}
                     paused={paused}
                     onLoad={handleNativeLoad}
                     onProgress={handleNativeProgress}
                     onError={handleNativeError}
-                    onSeek={() => {
-                        console.log('[Player] Native seek completed');
-                        seekingRef.current = false;
-                    }}
                     progressUpdateInterval={500}
+                    onEnd={goBackSafe}
                 />
             ) : (
                 <VLCPlayer
-                    ref={vlcRef}
+                    style={styles.player}
                     source={{ ...vlcSourceRef.current }}
-                    style={styles.video}
-                    autoplay={true}
+                    autoplay
                     paused={paused}
                     seek={vlcSeekValue}
+                    audioTrack={selectedAudioTrack}
+                    textTrack={selectedTextTrack}
+                    onBuffering={() => {
+                        setIsLoading(true);
+                        setError(null);
+                    }}
+                    onLoad={handleVlcLoad}
                     onProgress={handleVlcProgress}
                     onError={handleVlcError}
+                    onEnd={goBackSafe}
                 />
             )}
 
-            {/* Controls overlay */}
-            {overlayVisible && (
-                <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-                    <View style={styles.overlayInner}>
-                        {/* Top bar: back + title */}
-                        <View style={styles.header}>
-                            <FocusablePressable
-                                ref={backButtonRef}
-                                nextFocusDown={playButtonTag}
-                                onSelect={() => navigation.goBack()}
-                                onFocus={() => {
-                                    console.log('[Player] Back focused');
-                                    resetHideTimer();
-                                }}
-                                style={({ isFocused }) => [styles.backButton, isFocused && styles.controlButtonFocused]}
-                            >
-                                <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
-                            </FocusablePressable>
-                            <Text style={styles.title} numberOfLines={1}>
-                                {title}
-                            </Text>
-                        </View>
+            {isLoading && !error && (
+                <View style={styles.centerOverlay} pointerEvents="none">
+                    <ActivityIndicator color="#ffffff" size="large" />
+                    <Text style={styles.loadingText}>Loading stream...</Text>
+                    <Text style={styles.loadingSubtext}>Backend: {backend.toUpperCase()}</Text>
+                </View>
+            )}
 
-                        {/* Bottom bar: controls + progress */}
-                        <View style={styles.controlsBar}>
-                            {/* Progress bar (VOD/series only) */}
-                            {!isLive && duration > 0 && (
-                                <View style={styles.progressContainer}>
-                                    <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                                    <View style={styles.progressTrack}>
-                                        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                                    </View>
-                                    <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            {error && (
+                <View style={styles.centerOverlay}>
+                    <Text style={styles.errorTitle}>Playback error</Text>
+                    <Text style={styles.errorText} numberOfLines={6}>
+                        {error}
+                    </Text>
+                </View>
+            )}
+
+            {!overlayVisible && (
+                <Pressable
+                    style={StyleSheet.absoluteFill}
+                    focusable
+                    onPress={showOverlay}
+                    onFocus={showOverlay}
+                />
+            )}
+
+            <Animated.View
+                style={[styles.overlay, { opacity: fadeAnim }]}
+                pointerEvents={overlayVisible ? 'auto' : 'none'}
+            >
+                <View style={styles.overlayInner}>
+                    <View style={styles.header}>
+                        <FocusablePressable
+                            ref={backButtonRef}
+                            nextFocusDown={rewindButtonTag ?? playButtonTag}
+                            onSelect={goBackSafe}
+                            onFocus={resetHideTimer}
+                            style={({ isFocused }) => [
+                                styles.backButton,
+                                isFocused && styles.controlButtonFocused,
+                            ]}
+                        >
+                            <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                        </FocusablePressable>
+
+                        <Text style={styles.title} numberOfLines={1}>
+                            {title}
+                        </Text>
+                    </View>
+
+                    <View style={styles.controlsBar}>
+                        {canSeek && (
+                            <View style={styles.progressContainer}>
+                                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                                <View style={styles.progressTrack}>
+                                    <View style={[styles.progressFill, { width: `${progress}%` }]} />
                                 </View>
-                            )}
+                                <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                            </View>
+                        )}
 
-                            {/* Transport controls */}
-                            <TVFocusGuideView style={styles.transportRow} autoFocus>
-                                {!isLive && (
-                                    <FocusablePressable
-                                        ref={rewindButtonRef}
-                                        nextFocusRight={playButtonTag}
-                                        onSelect={() => doSeek(-SEEK_STEP)}
-                                        onFocus={() => {
-                                            console.log('[Player] Rewind focused');
-                                            resetHideTimer();
-                                        }}
-                                        style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
-                                    >
-                                        <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
-                                    </FocusablePressable>
-                                )}
-
+                        <View style={styles.transportRow}>
+                            {!isLive && (
                                 <FocusablePressable
-                                    ref={playButtonRef}
-                                    preferredFocus
+                                    ref={rewindButtonRef}
                                     nextFocusUp={backButtonTag}
-                                    nextFocusLeft={isLive ? backButtonTag : rewindButtonTag}
-                                    nextFocusRight={isLive ? backButtonTag : forwardButtonTag}
-                                    onSelect={doTogglePlayPause}
-                                    onFocus={() => {
-                                        console.log('[Player] Play focused');
-                                        resetHideTimer();
-                                    }}
+                                    nextFocusRight={playButtonTag}
+                                    nextFocusDown={timelineBackButtonTag ?? audioButtonTag}
+                                    onSelect={() => doSeek(-SEEK_STEP)}
+                                    onFocus={resetHideTimer}
                                     style={({ isFocused }) => [
                                         styles.controlButton,
-                                        styles.playButton,
                                         isFocused && styles.controlButtonFocused,
                                     ]}
                                 >
-                                    <Icon name={paused ? 'Play' : 'Pause'} size={scaledPixels(36)} color={colors.text} />
+                                    <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
+                                </FocusablePressable>
+                            )}
+
+                            <FocusablePressable
+                                ref={playButtonRef}
+                                nextFocusUp={backButtonTag}
+                                nextFocusLeft={isLive ? backButtonTag : rewindButtonTag}
+                                nextFocusRight={isLive ? backButtonTag : forwardButtonTag}
+                                nextFocusDown={timelineBackButtonTag ?? audioButtonTag}
+                                onSelect={doTogglePlayPause}
+                                onFocus={resetHideTimer}
+                                style={({ isFocused }) => [
+                                    styles.controlButton,
+                                    styles.playButton,
+                                    isFocused && styles.controlButtonFocused,
+                                ]}
+                            >
+                                <Icon
+                                    name={paused ? 'Play' : 'Pause'}
+                                    size={scaledPixels(36)}
+                                    color={colors.text}
+                                />
+                            </FocusablePressable>
+
+                            {!isLive && (
+                                <FocusablePressable
+                                    ref={forwardButtonRef}
+                                    nextFocusUp={backButtonTag}
+                                    nextFocusLeft={playButtonTag}
+                                    nextFocusDown={timelineForwardButtonTag ?? audioButtonTag}
+                                    onSelect={() => doSeek(SEEK_STEP)}
+                                    onFocus={resetHideTimer}
+                                    style={({ isFocused }) => [
+                                        styles.controlButton,
+                                        isFocused && styles.controlButtonFocused,
+                                    ]}
+                                >
+                                    <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                </FocusablePressable>
+                            )}
+                        </View>
+
+                        {canSeek && (
+                            <View style={styles.timelineControlRow}>
+                                <FocusablePressable
+                                    ref={timelineBackButtonRef}
+                                    nextFocusUp={playButtonTag}
+                                    nextFocusRight={timelineForwardButtonTag}
+                                    nextFocusDown={audioButtonTag}
+                                    onSelect={() => doSeek(-TIMELINE_SEEK_STEP)}
+                                    onFocus={resetHideTimer}
+                                    style={({ isFocused }) => [
+                                        styles.timelineSeekButton,
+                                        isFocused && styles.controlButtonFocused,
+                                    ]}
+                                >
+                                    <Text style={styles.timelineSeekText}>-30s</Text>
                                 </FocusablePressable>
 
-                                {!isLive && (
-                                    <FocusablePressable
-                                        ref={forwardButtonRef}
-                                        nextFocusLeft={playButtonTag}
-                                        onSelect={() => doSeek(SEEK_STEP)}
-                                        onFocus={() => {
-                                            console.log('[Player] Forward focused');
-                                            resetHideTimer();
-                                        }}
-                                        style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
-                                    >
-                                        <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
-                                    </FocusablePressable>
-                                )}
-                            </TVFocusGuideView>
+                                <FocusablePressable
+                                    ref={timelineForwardButtonRef}
+                                    nextFocusUp={playButtonTag}
+                                    nextFocusLeft={timelineBackButtonTag}
+                                    nextFocusDown={subtitleButtonTag ?? audioButtonTag}
+                                    onSelect={() => doSeek(TIMELINE_SEEK_STEP)}
+                                    onFocus={resetHideTimer}
+                                    style={({ isFocused }) => [
+                                        styles.timelineSeekButton,
+                                        isFocused && styles.controlButtonFocused,
+                                    ]}
+                                >
+                                    <Text style={styles.timelineSeekText}>+30s</Text>
+                                </FocusablePressable>
+                            </View>
+                        )}
+
+                        <View style={styles.trackRow}>
+                            <FocusablePressable
+                                ref={audioButtonRef}
+                                nextFocusUp={timelineBackButtonTag ?? playButtonTag}
+                                nextFocusRight={subtitleButtonTag}
+                                onSelect={openAudioSelector}
+                                onFocus={resetHideTimer}
+                                style={({ isFocused }) => [
+                                    styles.trackButton,
+                                    isFocused && styles.controlButtonFocused,
+                                ]}
+                            >
+                                <Icon name="Languages" size={scaledPixels(18)} color={colors.text} />
+                                <Text style={styles.trackButtonText} numberOfLines={1}>
+                                    Audio
+                                </Text>
+                                <Text style={styles.trackValueText} numberOfLines={1}>
+                                    {selectedAudioLabel}
+                                </Text>
+                            </FocusablePressable>
+
+                            <FocusablePressable
+                                ref={subtitleButtonRef}
+                                nextFocusUp={timelineForwardButtonTag ?? playButtonTag}
+                                nextFocusLeft={audioButtonTag}
+                                onSelect={openSubtitleSelector}
+                                onFocus={resetHideTimer}
+                                style={({ isFocused }) => [
+                                    styles.trackButton,
+                                    isFocused && styles.controlButtonFocused,
+                                ]}
+                            >
+                                <Icon name="Captions" size={scaledPixels(18)} color={colors.text} />
+                                <Text style={styles.trackButtonText} numberOfLines={1}>
+                                    Subtitles
+                                </Text>
+                                <Text style={styles.trackValueText} numberOfLines={1}>
+                                    {selectedSubtitleLabel}
+                                </Text>
+                            </FocusablePressable>
                         </View>
                     </View>
-                </Animated.View>
-            )}
+                </View>
+            </Animated.View>
         </View>
     );
 };
@@ -433,8 +717,37 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000',
     },
-    video: {
+    player: {
         flex: 1,
+    },
+    centerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: scaledPixels(24),
+        backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    loadingText: {
+        marginTop: scaledPixels(12),
+        color: '#ffffff',
+        fontSize: scaledPixels(16),
+    },
+    loadingSubtext: {
+        marginTop: scaledPixels(4),
+        color: '#ffffff',
+        fontSize: scaledPixels(12),
+        opacity: 0.8,
+    },
+    errorTitle: {
+        color: '#ffffff',
+        fontSize: scaledPixels(18),
+        fontWeight: '700',
+        marginBottom: scaledPixels(8),
+    },
+    errorText: {
+        color: '#ffffff',
+        fontSize: scaledPixels(14),
+        textAlign: 'center',
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
@@ -464,15 +777,15 @@ const styles = StyleSheet.create({
         textShadowRadius: 5,
     },
     controlsBar: {
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         borderRadius: scaledPixels(16),
         paddingHorizontal: scaledPixels(24),
         paddingVertical: scaledPixels(16),
+        gap: scaledPixels(12),
     },
     progressContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: scaledPixels(12),
     },
     progressTrack: {
         flex: 1,
@@ -500,6 +813,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scaledPixels(20),
     },
+    timelineControlRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: scaledPixels(12),
+    },
+    timelineSeekButton: {
+        minWidth: scaledPixels(100),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: scaledPixels(16),
+        paddingVertical: scaledPixels(10),
+        borderRadius: scaledPixels(999),
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    timelineSeekText: {
+        color: colors.text,
+        fontSize: scaledPixels(14),
+        fontWeight: '600',
+    },
     controlButton: {
         padding: scaledPixels(12),
         borderRadius: scaledPixels(50),
@@ -510,5 +843,32 @@ const styles = StyleSheet.create({
     },
     controlButtonFocused: {
         backgroundColor: colors.primary,
+    },
+    trackRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: scaledPixels(12),
+    },
+    trackButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scaledPixels(6),
+        paddingHorizontal: scaledPixels(12),
+        paddingVertical: scaledPixels(10),
+        borderRadius: scaledPixels(999),
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        maxWidth: '48%',
+        minWidth: scaledPixels(210),
+    },
+    trackButtonText: {
+        color: colors.text,
+        fontSize: scaledPixels(13),
+        fontWeight: '600',
+    },
+    trackValueText: {
+        color: colors.textSecondary,
+        fontSize: scaledPixels(12),
+        flex: 1,
+        textAlign: 'right',
     },
 });
