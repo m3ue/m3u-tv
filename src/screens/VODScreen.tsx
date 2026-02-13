@@ -12,7 +12,7 @@ import { MovieCard } from '../components/MovieCard';
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   const isFocused = useIsFocused();
-  const { sidebarFocusTag } = useMenu();
+  const { sidebarFocusTag, isSidebarActive, setSidebarActive } = useMenu();
   useEffect(() => {
     console.log(`[VODScreen] isFocused: ${isFocused}`);
   }, [isFocused]);
@@ -35,6 +35,7 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
       nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
+      onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
@@ -58,7 +59,11 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   );
 
   const renderMovieItem = ({ item, index }: { item: XtreamVodStream; index: number }) => (
-    <MovieCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+    <MovieCard
+      item={item}
+      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
+      onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
+    />
   );
 
   if (!isConfigured) {

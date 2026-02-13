@@ -14,14 +14,16 @@ const CARD_MARGIN = scaledPixels(12);
 interface MovieCardProps {
   item: XtreamVodStream;
   nextFocusLeft?: number;
+  onFocus?: () => void;
 }
 
-export function MovieCard({ item, nextFocusLeft }: MovieCardProps) {
+export function MovieCard({ item, nextFocusLeft, onFocus }: MovieCardProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
     <FocusablePressable
       nextFocusLeft={nextFocusLeft}
+      onFocus={onFocus}
       style={({ isFocused }) => [styles.movieCard, isFocused && styles.movieCardFocused]}
       onSelect={() => {
         navigation.navigate('Details', { item });

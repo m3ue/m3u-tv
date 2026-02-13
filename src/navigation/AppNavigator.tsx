@@ -73,6 +73,11 @@ function MainNavigator() {
             collapsable={false}
             style={styles.fill}
             pointerEvents={isFocused && !isSidebarActive ? 'auto' : 'none'}
+            onFocusCapture={() => {
+              if (isSidebarActive) {
+                setSidebarActive(false);
+              }
+            }}
           >
             <MainStack.Navigator
               screenOptions={{
@@ -94,8 +99,13 @@ function MainNavigator() {
       </View>
 
       {/* Sidebar - absolutely positioned, overlays content when expanded */}
-      <View style={styles.sidebarLayer} pointerEvents="box-none">
-        <SideBar contentFocusTag={contentFocusTag} />
+      <View
+        style={styles.sidebarLayer}
+        pointerEvents={isFocused && isSidebarActive ? 'auto' : 'none'}
+      >
+        <TVFocusGuideView style={styles.fill} trapFocusLeft>
+          <SideBar contentFocusTag={contentFocusTag} />
+        </TVFocusGuideView>
       </View>
     </View>
   );

@@ -47,6 +47,7 @@ const MENU_ITEMS: MenuItem[] = [
 export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     const { isExpanded, setExpanded, isSidebarActive, setSidebarActive, setSidebarFocusTag } = useMenu();
     const [preferredMenuId, setPreferredMenuId] = useState<string>('Home');
+    const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -57,12 +58,6 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
         return route?.name || 'Home';
     });
 
-    // Also capture the top-level route name (useful for child-detail pages)
-    const topRouteName = useNavigationState((state) => {
-        if (!state) return 'Home';
-        return state.routes[state.index]?.name || 'Home';
-    });
-
     // Refs to each menu item so we can set focus programmatically
     const menuItemRefs = useRef<Record<string, FocusablePressableRef | null>>({});
 
@@ -70,27 +65,28 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     useEffect(() => {
         if (isSidebarActive) {
             setExpanded(true);
-            // Focus the menu item matching the current screen
-            const menuIds = MENU_ITEMS.map((m) => m.id);
-            let targetMenu: string | null = null;
-            if (menuIds.includes(topRouteName as any)) {
-                targetMenu = topRouteName;
-            } else if (menuIds.includes(currentRouteName as any)) {
-                targetMenu = currentRouteName;
-            }
-            if (targetMenu && menuItemRefs.current[targetMenu]) {
-                setTimeout(() => {
-                    const tag = menuItemRefs.current[targetMenu as string]?.getNodeHandle();
-                    if (typeof tag === 'number') {
-                        setSidebarFocusTag(tag);
-                    }
-                }, 120);
-                setPreferredMenuId(targetMenu);
+            const targetMenu = preferredMenuId;
+            if (targetMenu) {
+                setFocusRequestId(targetMenu);
+                const tag = menuItemRefs.current[targetMenu]?.getNodeHandle();
+                if (typeof tag === 'number') {
+                    setSidebarFocusTag(tag);
+                }
             }
         } else {
             setExpanded(false);
+            setFocusRequestId(null);
         }
-    }, [isSidebarActive, setExpanded, currentRouteName, topRouteName, setSidebarFocusTag]);
+    }, [isSidebarActive, setExpanded, preferredMenuId, setSidebarFocusTag]);
+
+    // Keep preferred item in sync with active route while content is active.
+    useEffect(() => {
+        if (isSidebarActive) return;
+        const isTopLevelMenuRoute = MENU_ITEMS.some((item) => item.id === (currentRouteName as keyof DrawerParamList));
+        if (isTopLevelMenuRoute && preferredMenuId !== currentRouteName) {
+            setPreferredMenuId(currentRouteName);
+        }
+    }, [currentRouteName, isSidebarActive, preferredMenuId]);
 
     // Publish a stable sidebar focus target tag even before sidebar is activated,
     // so content `nextFocusLeft` links can always resolve to a valid sidebar item.
@@ -183,18 +179,20 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                 menuItemRefs.current[item.id] = r;
                             }}
                             key={item.id}
-                            preferredFocus={isSidebarActive && preferredMenuId === item.id}
+                            preferredFocus={isSidebarActive && focusRequestId === item.id}
                             nextFocusRight={contentFocusTag}
                             onSelect={() => {
                                 console.log(`[SideBar] onSelect triggered for: ${item.id}`);
                                 if (navigationRef.isReady()) {
                                     // @ts-ignore
                                     navigationRef.navigate('Main', { screen: item.id });
+                                    setPreferredMenuId(item.id);
+                                    setSidebarActive(false);
                                     setExpanded(false);
-                                    setTimeout(() => setSidebarActive(false), 0);
                                 }
                             }}
                             onFocus={() => {
+                                setFocusRequestId(null);
                                 if (!isSidebarActive) {
                                     setSidebarActive(true);
                                 }
