@@ -1,10 +1,11 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { Pressable, ViewStyle, View, StyleProp } from 'react-native';
+import { Pressable, ViewStyle, View, StyleProp, findNodeHandle } from 'react-native';
 
 type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => StyleProp<ViewStyle>);
 
 export type FocusablePressableRef = {
   focus: () => void;
+  getNodeHandle: () => number | null;
 };
 
 interface FocusablePressableProps {
@@ -12,13 +13,32 @@ interface FocusablePressableProps {
   onFocus?: () => void;
   onBlur?: () => void;
   preferredFocus?: boolean;
+  nextFocusUp?: number;
+  nextFocusDown?: number;
+  nextFocusLeft?: number;
+  nextFocusRight?: number;
   children: React.ReactNode | ((props: { isFocused: boolean }) => React.ReactNode);
   style?: StyleType;
   containerStyle?: ViewStyle;
 }
 
 export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePressableProps>(
-  ({ onSelect, onFocus, onBlur, preferredFocus, children, style, containerStyle }, ref) => {
+  (
+    {
+      onSelect,
+      onFocus,
+      onBlur,
+      preferredFocus,
+      nextFocusUp,
+      nextFocusDown,
+      nextFocusLeft,
+      nextFocusRight,
+      children,
+      style,
+      containerStyle,
+    },
+    ref,
+  ) => {
     const pressableRef = useRef<any>(null);
     const [isFocused, setIsFocused] = useState(false);
 
@@ -26,6 +46,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
       focus: () => {
         pressableRef.current?.focus?.();
       },
+      getNodeHandle: () => findNodeHandle(pressableRef.current),
     }));
 
     return (
@@ -34,6 +55,10 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
           ref={pressableRef}
           focusable
           hasTVPreferredFocus={preferredFocus}
+          nextFocusUp={nextFocusUp}
+          nextFocusDown={nextFocusDown}
+          nextFocusLeft={nextFocusLeft}
+          nextFocusRight={nextFocusRight}
           onPress={onSelect}
           onFocus={() => {
             setIsFocused(true);

@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   ScrollView,
   FlatList,
+  TVFocusGuideView,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
@@ -23,9 +24,13 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
   const isFocused = useIsFocused();
   const { item } = route.params;
   const seasonListRef = useRef<FocusablePressableRef>(null);
+  const firstEpisodeRef = useRef<FocusablePressableRef>(null);
   const { fetchSeriesInfo, getSeriesStreamUrl } = useXtream();
   const [seriesInfo, setSeriesInfo] = useState<XtreamSeriesInfo | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
+  const [firstSeasonTag, setFirstSeasonTag] = useState<number>();
+  const [firstEpisodeTag, setFirstEpisodeTag] = useState<number>();
+  const episodes = seriesInfo?.episodes[selectedSeason || ''] || [];
 
   const { width } = useWindowDimensions();
 
@@ -34,6 +39,18 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
       seasonListRef.current?.focus();
     }
   }, [isFocused, seriesInfo]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const seasonTag = seasonListRef.current?.getNodeHandle() ?? null;
+      const episodeTag = firstEpisodeRef.current?.getNodeHandle() ?? null;
+
+      if (typeof seasonTag === 'number') setFirstSeasonTag(seasonTag);
+      if (typeof episodeTag === 'number') setFirstEpisodeTag(episodeTag);
+    }, 0);
+
+    return () => clearTimeout(id);
+  }, [isFocused, selectedSeason, episodes.length]);
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -49,8 +66,6 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     };
     loadInfo();
   }, [item.series_id]);
-
-  const episodes = seriesInfo?.episodes[selectedSeason || ''] || [];
 
   const handlePlayEpisode = useCallback(
     (episode: XtreamEpisode) => {
@@ -85,7 +100,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
             </View>
 
             <View style={styles.navigationSection}>
-              <View style={styles.seasonsColumn}>
+              <TVFocusGuideView style={styles.seasonsColumn} autoFocus>
                 <Text style={styles.sectionTitle}>Seasons</Text>
                 <ScrollView>
                   {seriesInfo?.seasons.map((season, index) => (
@@ -93,6 +108,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                       key={season.season_number}
                       ref={index === 0 ? seasonListRef : undefined}
                       preferredFocus={index === 0}
+                      nextFocusRight={firstEpisodeTag}
                       onSelect={() => setSelectedSeason(String(season.season_number))}
                       style={({ isFocused }) => [
                         styles.seasonItem,
@@ -114,15 +130,17 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                     </FocusablePressable>
                   ))}
                 </ScrollView>
-              </View>
+              </TVFocusGuideView>
 
-              <View style={styles.episodesColumn}>
+              <TVFocusGuideView style={styles.episodesColumn} autoFocus>
                 <Text style={styles.sectionTitle}>Episodes</Text>
                 <FlatList
                   data={episodes}
                   keyExtractor={(ep) => String(ep.id)}
-                  renderItem={({ item: ep }) => (
+                  renderItem={({ item: ep, index }) => (
                     <FocusablePressable
+                      ref={index === 0 ? firstEpisodeRef : undefined}
+                      nextFocusLeft={firstSeasonTag}
                       onSelect={() => handlePlayEpisode(ep)}
                       style={({ isFocused }) => [
                         styles.episodeItem,
@@ -159,7 +177,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                     </FocusablePressable>
                   )}
                 />
-              </View>
+              </TVFocusGuideView>
             </View>
           </View>
         </LinearGradient>

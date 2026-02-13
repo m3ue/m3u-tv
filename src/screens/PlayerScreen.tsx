@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler } from 'react-native';
+import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler, TVFocusGuideView } from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { RootStackScreenProps } from '../navigation/types';
@@ -42,6 +42,13 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
     // Focus refs
     const playButtonRef = useRef<FocusablePressableRef>(null);
+    const backButtonRef = useRef<FocusablePressableRef>(null);
+    const rewindButtonRef = useRef<FocusablePressableRef>(null);
+    const forwardButtonRef = useRef<FocusablePressableRef>(null);
+    const [backButtonTag, setBackButtonTag] = useState<number>();
+    const [playButtonTag, setPlayButtonTag] = useState<number>();
+    const [rewindButtonTag, setRewindButtonTag] = useState<number>();
+    const [forwardButtonTag, setForwardButtonTag] = useState<number>();
 
     // Playback state
     const [paused, setPaused] = useState(false);
@@ -117,6 +124,24 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         }
         return () => clearTimeout(hideTimer.current);
     }, [resetHideTimer]);
+
+    useEffect(() => {
+        if (!overlayVisible) return;
+
+        const id = setTimeout(() => {
+            const backTag = backButtonRef.current?.getNodeHandle() ?? undefined;
+            const playTag = playButtonRef.current?.getNodeHandle() ?? undefined;
+            const rewindTag = rewindButtonRef.current?.getNodeHandle() ?? undefined;
+            const forwardTag = forwardButtonRef.current?.getNodeHandle() ?? undefined;
+
+            setBackButtonTag(backTag ?? undefined);
+            setPlayButtonTag(playTag ?? undefined);
+            setRewindButtonTag(rewindTag ?? undefined);
+            setForwardButtonTag(forwardTag ?? undefined);
+        }, 0);
+
+        return () => clearTimeout(id);
+    }, [overlayVisible, isLive, paused]);
 
     // --- Playback controls (using refs for stable callback) ---
 
@@ -314,6 +339,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         {/* Top bar: back + title */}
                         <View style={styles.header}>
                             <FocusablePressable
+                                ref={backButtonRef}
+                                nextFocusDown={playButtonTag}
                                 onSelect={() => navigation.goBack()}
                                 onFocus={() => {
                                     console.log('[Player] Back focused');
@@ -342,9 +369,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             )}
 
                             {/* Transport controls */}
-                            <View style={styles.transportRow}>
+                            <TVFocusGuideView style={styles.transportRow} autoFocus>
                                 {!isLive && (
                                     <FocusablePressable
+                                        ref={rewindButtonRef}
+                                        nextFocusRight={playButtonTag}
                                         onSelect={() => doSeek(-SEEK_STEP)}
                                         onFocus={() => {
                                             console.log('[Player] Rewind focused');
@@ -359,6 +388,9 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                 <FocusablePressable
                                     ref={playButtonRef}
                                     preferredFocus
+                                    nextFocusUp={backButtonTag}
+                                    nextFocusLeft={isLive ? backButtonTag : rewindButtonTag}
+                                    nextFocusRight={isLive ? backButtonTag : forwardButtonTag}
                                     onSelect={doTogglePlayPause}
                                     onFocus={() => {
                                         console.log('[Player] Play focused');
@@ -375,6 +407,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
                                 {!isLive && (
                                     <FocusablePressable
+                                        ref={forwardButtonRef}
+                                        nextFocusLeft={playButtonTag}
                                         onSelect={() => doSeek(SEEK_STEP)}
                                         onFocus={() => {
                                             console.log('[Player] Forward focused');
@@ -385,7 +419,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                         <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
                                     </FocusablePressable>
                                 )}
-                            </View>
+                            </TVFocusGuideView>
                         </View>
                     </View>
                 </Animated.View>

@@ -25,6 +25,10 @@ const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
 // Export these for use in screens
 export { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED };
 
+interface SideBarProps {
+    contentFocusTag?: number;
+}
+
 interface MenuItem {
     id: keyof DrawerParamList;
     label: string;
@@ -40,7 +44,7 @@ const MENU_ITEMS: MenuItem[] = [
     { id: 'Settings', label: 'Settings', icon: 'Settings' },
 ];
 
-export const SideBar = () => {
+export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     const { isExpanded, setExpanded, isSidebarActive, setSidebarActive } = useMenu();
 
     const currentRouteName = useNavigationState((state) => {
@@ -160,6 +164,7 @@ export const SideBar = () => {
                                     menuItemRefs.current[item.id] = r;
                                 }}
                                 key={item.id}
+                                nextFocusRight={contentFocusTag}
                                 onSelect={() => {
                                     console.log(`[SideBar] onSelect triggered for: ${item.id}`);
                                     if (navigationRef.isReady()) {
