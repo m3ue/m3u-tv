@@ -45,9 +45,9 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SideBar = ({ contentFocusTag }: SideBarProps) => {
-    const { isExpanded, setExpanded, isSidebarActive, setSidebarActive, setSidebarFocusTag } = useMenu();
+    const { isExpanded, setExpanded, isSidebarActive, setSidebarActive } = useMenu();
     const [preferredMenuId, setPreferredMenuId] = useState<string>('Home');
-    const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
+    const wasSidebarActiveRef = useRef(false);
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -61,23 +61,16 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     // Refs to each menu item so we can set focus programmatically
     const menuItemRefs = useRef<Record<string, FocusablePressableRef | null>>({});
 
-    // Expand/collapse and focus management tied to isSidebarActive
+    // External request to focus sidebar (e.g., back button or explicit activation)
     useEffect(() => {
         if (isSidebarActive) {
             setExpanded(true);
-            const targetMenu = preferredMenuId;
-            if (targetMenu) {
-                setFocusRequestId(targetMenu);
-                const tag = menuItemRefs.current[targetMenu]?.getNodeHandle();
-                if (typeof tag === 'number') {
-                    setSidebarFocusTag(tag);
-                }
-            }
-        } else {
-            setExpanded(false);
-            setFocusRequestId(null);
+            wasSidebarActiveRef.current = true;
+            return;
         }
-    }, [isSidebarActive, setExpanded, preferredMenuId, setSidebarFocusTag]);
+        wasSidebarActiveRef.current = false;
+        setExpanded(false);
+    }, [isSidebarActive, setExpanded, currentRouteName, preferredMenuId]);
 
     // Keep preferred item in sync with active route while content is active.
     useEffect(() => {
@@ -87,21 +80,6 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
             setPreferredMenuId(currentRouteName);
         }
     }, [currentRouteName, isSidebarActive, preferredMenuId]);
-
-    // Publish a stable sidebar focus target tag even before sidebar is activated,
-    // so content `nextFocusLeft` links can always resolve to a valid sidebar item.
-    useEffect(() => {
-        const id = setTimeout(() => {
-            const preferredTag = menuItemRefs.current[preferredMenuId]?.getNodeHandle();
-            const fallbackTag = menuItemRefs.current['Home']?.getNodeHandle();
-            const tag = preferredTag ?? fallbackTag;
-            if (typeof tag === 'number') {
-                setSidebarFocusTag(tag);
-            }
-        }, 0);
-
-        return () => clearTimeout(id);
-    }, [preferredMenuId, isExpanded, setSidebarFocusTag]);
 
     // Width Animation
     const animatedWidth = useSharedValue(isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED);
@@ -179,7 +157,6 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                 menuItemRefs.current[item.id] = r;
                             }}
                             key={item.id}
-                            preferredFocus={isSidebarActive && focusRequestId === item.id}
                             nextFocusRight={contentFocusTag}
                             onSelect={() => {
                                 console.log(`[SideBar] onSelect triggered for: ${item.id}`);
@@ -192,14 +169,9 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                 }
                             }}
                             onFocus={() => {
-                                setFocusRequestId(null);
+                                setExpanded(true);
                                 if (!isSidebarActive) {
                                     setSidebarActive(true);
-                                }
-                                setPreferredMenuId(item.id);
-                                const tag = menuItemRefs.current[item.id]?.getNodeHandle();
-                                if (typeof tag === 'number') {
-                                    setSidebarFocusTag(tag);
                                 }
                             }}
                             style={({ isFocused }) => [
