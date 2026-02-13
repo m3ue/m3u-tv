@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
+import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamSeries } from '../types/xtream';
@@ -11,6 +12,7 @@ import { SeriesCard } from '../components/SeriesCard';
 
 export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const isFocused = useIsFocused();
+  const { sidebarFocusTag } = useMenu();
   const { isConfigured, seriesCategories, series, fetchSeries } = useXtream();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +29,9 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
     setIsLoading(false);
   };
 
-  const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
+  const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
+      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
@@ -51,7 +54,9 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
     </FocusablePressable>
   );
 
-  const renderSeriesItem = ({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />;
+  const renderSeriesItem = ({ item, index }: { item: XtreamSeries; index: number }) => (
+    <SeriesCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+  );
 
   if (!isConfigured) {
     return (

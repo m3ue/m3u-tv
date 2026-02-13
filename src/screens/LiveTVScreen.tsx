@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
+import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
@@ -11,6 +12,7 @@ import { LiveTVCard } from '../components/LiveTVCard';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const isFocused = useIsFocused();
+  const { sidebarFocusTag } = useMenu();
   const { isConfigured, liveCategories, fetchLiveStreams } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
@@ -29,8 +31,9 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     setIsLoading(false);
   };
 
-  const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
+  const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
+      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
@@ -53,7 +56,9 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     </FocusablePressable>
   );
 
-  const renderStreamItem = ({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />;
+  const renderStreamItem = ({ item, index }: { item: XtreamLiveStream; index: number }) => (
+    <LiveTVCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+  );
 
   if (!isConfigured) {
     return (

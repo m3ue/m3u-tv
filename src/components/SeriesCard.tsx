@@ -13,13 +13,15 @@ const CARD_MARGIN = scaledPixels(12);
 
 interface SeriesCardProps {
   item: XtreamSeries;
+  nextFocusLeft?: number;
 }
 
-export function SeriesCard({ item }: SeriesCardProps) {
+export function SeriesCard({ item, nextFocusLeft }: SeriesCardProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
     <FocusablePressable
+      nextFocusLeft={nextFocusLeft}
       style={({ isFocused }) => [styles.seriesCard, isFocused && styles.seriesCardFocused]}
       onSelect={() => {
         navigation.navigate('SeriesDetails', { item });

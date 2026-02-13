@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
+import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
@@ -13,6 +14,7 @@ import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream
 
 export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   const isFocused = useIsFocused();
+  const { sidebarFocusTag } = useMenu();
   useEffect(() => {
     console.log(`[HomeScreen] isFocused: ${isFocused}`);
   }, [isFocused]);
@@ -57,6 +59,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         <Text style={styles.subtitle}>Connect to your Xtream service to get started</Text>
         <FocusablePressable
           preferredFocus
+          nextFocusLeft={sidebarFocusTag}
           style={({ isFocused }) => [styles.settingsButton, isFocused && styles.buttonFocused]}
           onSelect={() => navigation.navigate('Settings')}
         >
@@ -86,7 +89,9 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
           <View style={styles.liveTvRowList}>
             <FlatList
               data={liveStreams}
-              renderItem={({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />}
+              renderItem={({ item, index }: { item: XtreamLiveStream; index: number }) => (
+                <LiveTVCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+              )}
               horizontal
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
@@ -102,7 +107,9 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
           <View style={styles.posterRowList}>
             <FlatList
               data={vodStreams}
-              renderItem={({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />}
+              renderItem={({ item, index }: { item: XtreamVodStream; index: number }) => (
+                <MovieCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+              )}
               horizontal
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
@@ -118,7 +125,9 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
           <View style={styles.posterRowList}>
             <FlatList
               data={seriesList}
-              renderItem={({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />}
+              renderItem={({ item, index }: { item: XtreamSeries; index: number }) => (
+                <SeriesCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+              )}
               horizontal
               keyExtractor={(item) => String(item.series_id)}
               showsHorizontalScrollIndicator={false}

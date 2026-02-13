@@ -11,14 +11,16 @@ import { RootStackParamList } from '../navigation/types';
 
 interface LiveTVCardProps {
   item: XtreamLiveStream;
+  nextFocusLeft?: number;
 }
 
-export function LiveTVCard({ item }: LiveTVCardProps) {
+export function LiveTVCard({ item, nextFocusLeft }: LiveTVCardProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { getLiveStreamUrl } = useXtream();
 
   return (
     <FocusablePressable
+      nextFocusLeft={nextFocusLeft}
       style={({ isFocused }) => [styles.channelCard, isFocused && styles.channelCardFocused]}
       onSelect={() => {
         console.log(`[LiveTVCard] Selected: ${item.name} (${item.stream_id})`);

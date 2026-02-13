@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
+import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamVodStream } from '../types/xtream';
@@ -11,6 +12,7 @@ import { MovieCard } from '../components/MovieCard';
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   const isFocused = useIsFocused();
+  const { sidebarFocusTag } = useMenu();
   useEffect(() => {
     console.log(`[VODScreen] isFocused: ${isFocused}`);
   }, [isFocused]);
@@ -30,8 +32,9 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
     setIsLoading(false);
   };
 
-  const renderCategoryItem = ({ item }: { item: XtreamCategory }) => (
+  const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
+      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
         selectedCategory === item.category_id && styles.categoryButtonActive,
@@ -54,7 +57,9 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
     </FocusablePressable>
   );
 
-  const renderMovieItem = ({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />;
+  const renderMovieItem = ({ item, index }: { item: XtreamVodStream; index: number }) => (
+    <MovieCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+  );
 
   if (!isConfigured) {
     return (

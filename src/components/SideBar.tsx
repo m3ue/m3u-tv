@@ -45,7 +45,7 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SideBar = ({ contentFocusTag }: SideBarProps) => {
-    const { isExpanded, setExpanded, isSidebarActive, setSidebarActive } = useMenu();
+    const { isExpanded, setExpanded, isSidebarActive, setSidebarActive, setSidebarFocusTag } = useMenu();
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -79,6 +79,10 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
             }
             if (targetMenu && menuItemRefs.current[targetMenu]) {
                 setTimeout(() => {
+                    const tag = menuItemRefs.current[targetMenu as string]?.getNodeHandle();
+                    if (typeof tag === 'number') {
+                        setSidebarFocusTag(tag);
+                    }
                     menuItemRefs.current[targetMenu as string]?.focus();
                 }, 120);
             }
@@ -172,6 +176,12 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                         navigationRef.navigate('Main', { screen: item.id });
                                         setExpanded(false);
                                         setTimeout(() => setSidebarActive(false), 0);
+                                    }
+                                }}
+                                onFocus={() => {
+                                    const tag = menuItemRefs.current[item.id]?.getNodeHandle();
+                                    if (typeof tag === 'number') {
+                                        setSidebarFocusTag(tag);
                                     }
                                 }}
                                 style={({ isFocused }) => [
