@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Pressable, ScrollView } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import {
   useEpg,
@@ -20,7 +20,6 @@ import { xtreamService } from '../services/XtreamService';
 import { colors, spacing, typography, epgTheme } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamEpgListing } from '../types/xtream';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from '../lib/tvNavigation';
 import { scaledPixels } from '../hooks/useScale';
 
 interface Channel {
@@ -326,23 +325,16 @@ export function EPGScreen({ navigation }: DrawerScreenPropsType<'EPG'>) {
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <SpatialNavigationScrollView
-        offsetFromStart={scaledPixels(100)}
-        contentContainerStyle={{ paddingVertical: scaledPixels(40) }}
-      >
-        <DefaultFocus>
-          <EpgContent
-            channels={channels}
-            epgData={epgData}
-            startDate={startDate}
-            endDate={endDate}
-            isLoading={isLoading}
-            onFetchZone={handleFetchZone}
-          />
-        </DefaultFocus>
-      </SpatialNavigationScrollView>
-    </SpatialNavigationNode>
+    <ScrollView contentContainerStyle={{ paddingLeft: scaledPixels(100), paddingVertical: scaledPixels(40) }}>
+      <EpgContent
+        channels={channels}
+        epgData={epgData}
+        startDate={startDate}
+        endDate={endDate}
+        isLoading={isLoading}
+        onFetchZone={handleFetchZone}
+      />
+    </ScrollView>
   );
 }
 

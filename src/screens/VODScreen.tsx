@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -8,11 +8,6 @@ import { XtreamCategory, XtreamVodStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { MovieCard } from '../components/MovieCard';
-import {
-  SpatialNavigationNode,
-  SpatialNavigationVirtualizedGrid,
-  SpatialNavigationVirtualizedList,
-} from '../lib/tvNavigation';
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   const isFocused = useIsFocused();
@@ -72,37 +67,37 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        {/* Category selector */}
-        <View style={styles.categoryListContainer}>
-          <SpatialNavigationVirtualizedList
-            data={[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories]}
-            renderItem={renderCategoryItem}
-            itemSize={scaledPixels(195)}
-            style={styles.categoryList}
-            orientation="horizontal"
-          />
-        </View>
-
-        {/* Movies grid */}
-        <View style={styles.gridContent}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <SpatialNavigationVirtualizedGrid
-              data={vodStreams}
-              renderItem={renderMovieItem}
-              numberOfColumns={8}
-              itemHeight={scaledPixels(390)}
-              style={styles.movieGrid}
-            />
-          )}
-        </View>
+    <View style={styles.container}>
+      {/* Category selector */}
+      <View style={styles.categoryListContainer}>
+        <FlatList
+          data={[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories]}
+          renderItem={renderCategoryItem}
+          style={styles.categoryList}
+          horizontal
+          keyExtractor={(item) => String(item.category_id || 'all')}
+          showsHorizontalScrollIndicator={false}
+        />
       </View>
-    </SpatialNavigationNode>
+
+      {/* Movies grid */}
+      <View style={styles.gridContent}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={vodStreams}
+            renderItem={renderMovieItem}
+            numColumns={8}
+            style={styles.movieGrid}
+            keyExtractor={(item) => String(item.stream_id)}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </View>
   );
 }
 

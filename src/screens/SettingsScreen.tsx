@@ -6,12 +6,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors, spacing, typography } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationScrollView } from '../lib/tvNavigation';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 
@@ -60,183 +60,170 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   if (isConfigured && authResponse) {
     if (!isFocused) return null;
     return (
-      <SpatialNavigationNode>
-        <SpatialNavigationScrollView style={styles.container} contentContainerStyle={styles.content}>
-          <View style={styles.infoContainer}>
-            <Text style={styles.title}>Welcome to M3U TV</Text>
-            <Text style={styles.subtitle}>Your streaming server is connected</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.infoContainer}>
+          <Text style={styles.title}>Welcome to M3U TV</Text>
+          <Text style={styles.subtitle}>Your streaming server is connected</Text>
 
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{liveCategories.length}</Text>
-                <Text style={styles.statLabel}>Live TV Categories</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{vodCategories.length}</Text>
-                <Text style={styles.statLabel}>Movie Categories</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{seriesCategories.length}</Text>
-                <Text style={styles.statLabel}>Series Categories</Text>
-              </View>
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{liveCategories.length}</Text>
+              <Text style={styles.statLabel}>Live TV Categories</Text>
             </View>
-
-            <SpatialNavigationNode orientation="horizontal">
-              <View style={styles.menuContainer}>
-                <DefaultFocus>
-                  <FocusablePressable
-                    style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
-                    onSelect={() => navigation.navigate('LiveTV')}
-                  >
-                    {({ isFocused }) => (
-                      <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Live TV</Text>
-                    )}
-                  </FocusablePressable>
-                </DefaultFocus>
-                <FocusablePressable
-                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
-                  onSelect={() => navigation.navigate('EPG')}
-                >
-                  {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>EPG Guide</Text>
-                  )}
-                </FocusablePressable>
-                <FocusablePressable
-                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
-                  onSelect={() => navigation.navigate('VOD')}
-                >
-                  {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Movies</Text>
-                  )}
-                </FocusablePressable>
-                <FocusablePressable
-                  style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
-                  onSelect={() => navigation.navigate('Series')}
-                >
-                  {({ isFocused }) => (
-                    <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>TV Series</Text>
-                  )}
-                </FocusablePressable>
-              </View>
-            </SpatialNavigationNode>
-          </View>
-
-          <Text style={styles.title}>Connection Status</Text>
-
-          <View style={styles.statusCard}>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Status</Text>
-              <Text style={[styles.statusValue, styles.connected]}>Connected</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{vodCategories.length}</Text>
+              <Text style={styles.statLabel}>Movie Categories</Text>
             </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Username</Text>
-              <Text style={styles.statusValue}>{authResponse.user_info.username}</Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Expires</Text>
-              <Text style={styles.statusValue}>
-                {new Date(parseInt(authResponse.user_info.exp_date) * 1000).toLocaleDateString()}
-              </Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Max Connections</Text>
-              <Text style={styles.statusValue}>{authResponse.user_info.max_connections}</Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Active Connections</Text>
-              <Text style={styles.statusValue}>{authResponse.user_info.active_cons}</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{seriesCategories.length}</Text>
+              <Text style={styles.statLabel}>Series Categories</Text>
             </View>
           </View>
 
-          <SpatialNavigationNode>
-            <DefaultFocus>
-              <FocusablePressable
-                style={({ isFocused }) => [styles.settingsButton, isFocused && styles.settingsButtonFocused]}
-                onSelect={handleDisconnect}
-              >
-                {({ isFocused }) => (
-                  <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Disconnect</Text>
-                )}
-              </FocusablePressable>
-            </DefaultFocus>
-          </SpatialNavigationNode>
-        </SpatialNavigationScrollView>
-      </SpatialNavigationNode>
+          <View style={styles.menuContainer}>
+            <FocusablePressable
+              preferredFocus
+              style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
+              onSelect={() => navigation.navigate('LiveTV')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Live TV</Text>
+              )}
+            </FocusablePressable>
+            <FocusablePressable
+              style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
+              onSelect={() => navigation.navigate('EPG')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>EPG Guide</Text>
+              )}
+            </FocusablePressable>
+            <FocusablePressable
+              style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
+              onSelect={() => navigation.navigate('VOD')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>Movies</Text>
+              )}
+            </FocusablePressable>
+            <FocusablePressable
+              style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
+              onSelect={() => navigation.navigate('Series')}
+            >
+              {({ isFocused }) => (
+                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>TV Series</Text>
+              )}
+            </FocusablePressable>
+          </View>
+        </View>
+
+        <Text style={styles.title}>Connection Status</Text>
+
+        <View style={styles.statusCard}>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Status</Text>
+            <Text style={[styles.statusValue, styles.connected]}>Connected</Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Username</Text>
+            <Text style={styles.statusValue}>{authResponse.user_info.username}</Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Expires</Text>
+            <Text style={styles.statusValue}>
+              {new Date(parseInt(authResponse.user_info.exp_date) * 1000).toLocaleDateString()}
+            </Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Max Connections</Text>
+            <Text style={styles.statusValue}>{authResponse.user_info.max_connections}</Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Active Connections</Text>
+            <Text style={styles.statusValue}>{authResponse.user_info.active_cons}</Text>
+          </View>
+        </View>
+
+        <FocusablePressable
+          preferredFocus
+          style={({ isFocused }) => [styles.settingsButton, isFocused && styles.settingsButtonFocused]}
+          onSelect={handleDisconnect}
+        >
+          {({ isFocused }) => (
+            <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Disconnect</Text>
+          )}
+        </FocusablePressable>
+      </ScrollView>
     );
   }
 
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <SpatialNavigationScrollView
-        offsetFromStart={scaledPixels(100)}
-        style={styles.container}
-        contentContainerStyle={styles.content}
-      >
-        <Text style={styles.title}>Connection Settings</Text>
-        <Text style={styles.subtitle}>Enter your Xtream codes details</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingLeft: scaledPixels(100) }]}
+    >
+      <Text style={styles.title}>Connection Settings</Text>
+      <Text style={styles.subtitle}>Enter your Xtream codes details</Text>
 
-        <View style={styles.form}>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <View style={styles.form}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Server URL</Text>
-            <DefaultFocus>
-              <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
-                <TextInput
-                  style={styles.input}
-                  value={server}
-                  onChangeText={setServer}
-                  placeholder="http://example.com:8080"
-                  placeholderTextColor={colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </FocusablePressable>
-            </DefaultFocus>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
-            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
-              <TextInput
-                style={styles.input}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Username"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </FocusablePressable>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Password"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </FocusablePressable>
-          </View>
-
-          <FocusablePressable
-            style={({ isFocused }) => [styles.connectButton, isFocused && styles.buttonFocused]}
-            onSelect={handleConnect}
-          >
-            {isLoading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Connect</Text>}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Server URL</Text>
+          <FocusablePressable preferredFocus style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+            <TextInput
+              style={styles.input}
+              value={server}
+              onChangeText={setServer}
+              placeholder="http://example.com:8080"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </FocusablePressable>
         </View>
-      </SpatialNavigationScrollView>
-    </SpatialNavigationNode>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Username</Text>
+          <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Username"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </FocusablePressable>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Password</Text>
+          <FocusablePressable style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor={colors.textSecondary}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </FocusablePressable>
+        </View>
+
+        <FocusablePressable
+          style={({ isFocused }) => [styles.connectButton, isFocused && styles.buttonFocused]}
+          onSelect={handleConnect}
+        >
+          {isLoading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Connect</Text>}
+        </FocusablePressable>
+      </View>
+    </ScrollView>
   );
 }
 

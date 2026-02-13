@@ -2,12 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, StyleSheet, Text, Animated, TVEventHandler, BackHandler } from 'react-native';
 import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
-import { SpatialNavigationNode, SpatialNavigationNodeRef, SpatialNavigationRoot } from '../lib/tvNavigation';
 import { RootStackScreenProps } from '../navigation/types';
 import { colors } from '../theme';
 import { Icon } from '../components/Icon';
 import { scaledPixels } from '../hooks/useScale';
-import { FocusablePressable } from '../components/FocusablePressable';
+import { FocusablePressable, FocusablePressableRef } from '../components/FocusablePressable';
 
 const OVERLAY_TIMEOUT = 8000;
 const SEEK_STEP = 10; // seconds
@@ -42,7 +41,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
 
     // Focus refs
-    const playButtonRef = useRef<SpatialNavigationNodeRef>(null);
+    const playButtonRef = useRef<FocusablePressableRef>(null);
 
     // Playback state
     const [paused, setPaused] = useState(false);
@@ -276,127 +275,122 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     return (
-        <SpatialNavigationRoot isActive={overlayVisible}>
-            <View style={styles.container}>
-                {/* Video layer */}
-                {backend === 'native' ? (
-                    <Video
-                        ref={nativeRef}
-                        source={{ ...nativeSourceRef.current }}
-                        style={styles.video}
-                        resizeMode={ResizeMode.CONTAIN}
-                        controls={false}
-                        paused={paused}
-                        onLoad={handleNativeLoad}
-                        onProgress={handleNativeProgress}
-                        onError={handleNativeError}
-                        onSeek={() => {
-                            console.log('[Player] Native seek completed');
-                            seekingRef.current = false;
-                        }}
-                        progressUpdateInterval={500}
-                    />
-                ) : (
-                    <VLCPlayer
-                        ref={vlcRef}
-                        source={{ ...vlcSourceRef.current }}
-                        style={styles.video}
-                        autoplay={true}
-                        paused={paused}
-                        seek={vlcSeekValue}
-                        onProgress={handleVlcProgress}
-                        onError={handleVlcError}
-                    />
-                )}
+        <View style={styles.container}>
+            {/* Video layer */}
+            {backend === 'native' ? (
+                <Video
+                    ref={nativeRef}
+                    source={{ ...nativeSourceRef.current }}
+                    style={styles.video}
+                    resizeMode={ResizeMode.CONTAIN}
+                    controls={false}
+                    paused={paused}
+                    onLoad={handleNativeLoad}
+                    onProgress={handleNativeProgress}
+                    onError={handleNativeError}
+                    onSeek={() => {
+                        console.log('[Player] Native seek completed');
+                        seekingRef.current = false;
+                    }}
+                    progressUpdateInterval={500}
+                />
+            ) : (
+                <VLCPlayer
+                    ref={vlcRef}
+                    source={{ ...vlcSourceRef.current }}
+                    style={styles.video}
+                    autoplay={true}
+                    paused={paused}
+                    seek={vlcSeekValue}
+                    onProgress={handleVlcProgress}
+                    onError={handleVlcError}
+                />
+            )}
 
-                {/* Controls overlay */}
-                {overlayVisible && (
-                    <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-                        <View style={styles.overlayInner}>
-                            {/* Top bar: back + title */}
-                            <SpatialNavigationNode>
-                                <View style={styles.header}>
+            {/* Controls overlay */}
+            {overlayVisible && (
+                <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+                    <View style={styles.overlayInner}>
+                        {/* Top bar: back + title */}
+                        <View style={styles.header}>
+                            <FocusablePressable
+                                onSelect={() => navigation.goBack()}
+                                onFocus={() => {
+                                    console.log('[Player] Back focused');
+                                    resetHideTimer();
+                                }}
+                                style={({ isFocused }) => [styles.backButton, isFocused && styles.controlButtonFocused]}
+                            >
+                                <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                            </FocusablePressable>
+                            <Text style={styles.title} numberOfLines={1}>
+                                {title}
+                            </Text>
+                        </View>
+
+                        {/* Bottom bar: controls + progress */}
+                        <View style={styles.controlsBar}>
+                            {/* Progress bar (VOD/series only) */}
+                            {!isLive && duration > 0 && (
+                                <View style={styles.progressContainer}>
+                                    <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                                    <View style={styles.progressTrack}>
+                                        <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                                    </View>
+                                    <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                                </View>
+                            )}
+
+                            {/* Transport controls */}
+                            <View style={styles.transportRow}>
+                                {!isLive && (
                                     <FocusablePressable
-                                        onSelect={() => navigation.goBack()}
+                                        onSelect={() => doSeek(-SEEK_STEP)}
                                         onFocus={() => {
-                                            console.log('[Player] Back focused');
+                                            console.log('[Player] Rewind focused');
                                             resetHideTimer();
                                         }}
-                                        style={({ isFocused }) => [styles.backButton, isFocused && styles.controlButtonFocused]}
+                                        style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
                                     >
-                                        <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
+                                        <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
                                     </FocusablePressable>
-                                    <Text style={styles.title} numberOfLines={1}>
-                                        {title}
-                                    </Text>
-                                </View>
-                            </SpatialNavigationNode>
+                                )}
 
-                            {/* Bottom bar: controls + progress */}
-                            <SpatialNavigationNode>
-                                <View style={styles.controlsBar}>
-                                    {/* Progress bar (VOD/series only) */}
-                                    {!isLive && duration > 0 && (
-                                        <View style={styles.progressContainer}>
-                                            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                                            <View style={styles.progressTrack}>
-                                                <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                                            </View>
-                                            <Text style={styles.timeText}>{formatTime(duration)}</Text>
-                                        </View>
-                                    )}
+                                <FocusablePressable
+                                    ref={playButtonRef}
+                                    preferredFocus
+                                    onSelect={doTogglePlayPause}
+                                    onFocus={() => {
+                                        console.log('[Player] Play focused');
+                                        resetHideTimer();
+                                    }}
+                                    style={({ isFocused }) => [
+                                        styles.controlButton,
+                                        styles.playButton,
+                                        isFocused && styles.controlButtonFocused,
+                                    ]}
+                                >
+                                    <Icon name={paused ? 'Play' : 'Pause'} size={scaledPixels(36)} color={colors.text} />
+                                </FocusablePressable>
 
-                                    {/* Transport controls */}
-                                    <View style={styles.transportRow}>
-                                        {!isLive && (
-                                            <FocusablePressable
-                                                onSelect={() => doSeek(-SEEK_STEP)}
-                                                onFocus={() => {
-                                                    console.log('[Player] Rewind focused');
-                                                    resetHideTimer();
-                                                }}
-                                                style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
-                                            >
-                                                <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
-                                            </FocusablePressable>
-                                        )}
-
-                                        <FocusablePressable
-                                            ref={playButtonRef}
-                                            onSelect={doTogglePlayPause}
-                                            onFocus={() => {
-                                                console.log('[Player] Play focused');
-                                                resetHideTimer();
-                                            }}
-                                            style={({ isFocused }) => [
-                                                styles.controlButton,
-                                                styles.playButton,
-                                                isFocused && styles.controlButtonFocused,
-                                            ]}
-                                        >
-                                            <Icon name={paused ? 'Play' : 'Pause'} size={scaledPixels(36)} color={colors.text} />
-                                        </FocusablePressable>
-
-                                        {!isLive && (
-                                            <FocusablePressable
-                                                onSelect={() => doSeek(SEEK_STEP)}
-                                                onFocus={() => {
-                                                    console.log('[Player] Forward focused');
-                                                    resetHideTimer();
-                                                }}
-                                                style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
-                                            >
-                                                <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
-                                            </FocusablePressable>
-                                        )}
-                                    </View>
-                                </View>
-                            </SpatialNavigationNode>
+                                {!isLive && (
+                                    <FocusablePressable
+                                        onSelect={() => doSeek(SEEK_STEP)}
+                                        onFocus={() => {
+                                            console.log('[Player] Forward focused');
+                                            resetHideTimer();
+                                        }}
+                                        style={({ isFocused }) => [styles.controlButton, isFocused && styles.controlButtonFocused]}
+                                    >
+                                        <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                    </FocusablePressable>
+                                )}
+                            </View>
                         </View>
-                    </Animated.View>
-                )}
-            </View>
-        </SpatialNavigationRoot>
+                    </View>
+                </Animated.View>
+            )}
+        </View>
     );
 };
 

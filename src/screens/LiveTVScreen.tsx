@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -8,11 +8,6 @@ import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { LiveTVCard } from '../components/LiveTVCard';
-import {
-  SpatialNavigationNode,
-  SpatialNavigationVirtualizedGrid,
-  SpatialNavigationVirtualizedList,
-} from '../lib/tvNavigation';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const isFocused = useIsFocused();
@@ -71,37 +66,37 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        {/* Category selector */}
-        <View style={styles.categoryListContainer}>
-          <SpatialNavigationVirtualizedList
-            data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
-            renderItem={renderCategoryItem}
-            itemSize={scaledPixels(195)}
-            style={styles.categoryList}
-            orientation="horizontal"
-          />
-        </View>
-
-        {/* Channels grid */}
-        <View style={styles.gridContainer}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <SpatialNavigationVirtualizedGrid
-              data={liveStreams}
-              renderItem={renderStreamItem}
-              numberOfColumns={8}
-              itemHeight={scaledPixels(224)}
-              style={styles.channelGrid}
-            />
-          )}
-        </View>
+    <View style={styles.container}>
+      {/* Category selector */}
+      <View style={styles.categoryListContainer}>
+        <FlatList
+          data={[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories]}
+          renderItem={renderCategoryItem}
+          style={styles.categoryList}
+          horizontal
+          keyExtractor={(item) => String(item.category_id || 'all')}
+          showsHorizontalScrollIndicator={false}
+        />
       </View>
-    </SpatialNavigationNode>
+
+      {/* Channels grid */}
+      <View style={styles.gridContainer}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={liveStreams}
+            renderItem={renderStreamItem}
+            numColumns={8}
+            style={styles.channelGrid}
+            keyExtractor={(item) => String(item.stream_id)}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </View>
   );
 }
 

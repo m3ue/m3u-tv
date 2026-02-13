@@ -5937,6 +5937,7 @@ __metadata:
     expo-secure-store: "npm:~15.0.8"
     expo-status-bar: "npm:~3.0.8"
     lucide-react-native: "npm:^0.563.0"
+    prettier: "npm:^3.8.1"
     react: "npm:19.1.0"
     react-native: "npm:react-native-tvos@0.81-stable"
     react-native-gesture-handler: "npm:~2.28.0"
@@ -6953,6 +6954,15 @@ __metadata:
   dependencies:
     fast-diff: "npm:^1.1.2"
   checksum: 10c0/91cea965681bc5f62c9d26bd3ca6358b81557261d4802e96ec1cf0acbd99d4b61632d53320cd2c3ec7d7f7805a81345644108a41ef46ddc9688e783a9ac792d1
+  languageName: node
+  linkType: hard
+
+"prettier@npm:^3.8.1":
+  version: 3.8.1
+  resolution: "prettier@npm:3.8.1"
+  bin:
+    prettier: bin/prettier.cjs
+  checksum: 10c0/33169b594009e48f570471271be7eac7cdcf88a209eed39ac3b8d6d78984039bfa9132f82b7e6ba3b06711f3bfe0222a62a1bfb87c43f50c25a83df1b78a2c42
   languageName: node
   linkType: hard
 

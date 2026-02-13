@@ -9,14 +9,13 @@ import Animated, {
     cancelAnimation,
     Easing,
 } from 'react-native-reanimated';
-import { SpatialNavigationNode, DefaultFocus, SpatialNavigationNodeRef } from '../lib/tvNavigation';
 import { useNavigationState } from '@react-navigation/native';
 import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
 import { DrawerParamList } from '../navigation/types';
-import { FocusablePressable } from './FocusablePressable';
+import { FocusablePressable, FocusablePressableRef } from './FocusablePressable';
 import { navigationRef } from '../navigation/navigationRef';
 import { BlurView } from 'expo-blur';
 
@@ -60,7 +59,7 @@ export const SideBar = () => {
     });
 
     // Refs to each menu item so we can set focus programmatically
-    const menuItemRefs = useRef<Record<string, SpatialNavigationNodeRef | null>>({});
+    const menuItemRefs = useRef<Record<string, FocusablePressableRef | null>>({});
 
     // Expand/collapse and focus management tied to isSidebarActive
     useEffect(() => {
@@ -139,7 +138,7 @@ export const SideBar = () => {
     });
 
     return (
-        <SpatialNavigationNode orientation="vertical" isFocusable={false}>
+        <View>
             <Animated.View style={[styles.container, animatedStyle]}>
                 <View style={styles.navContainer}>
                     <View style={styles.logoContainer}>
@@ -155,66 +154,64 @@ export const SideBar = () => {
                     </View>
 
                     <View style={styles.menuContainer}>
-                        <DefaultFocus>
-                            {MENU_ITEMS.map((item) => (
-                                <FocusablePressable
-                                    ref={(r) => {
-                                        menuItemRefs.current[item.id] = r;
-                                    }}
-                                    key={item.id}
-                                    onSelect={() => {
-                                        console.log(`[SideBar] onSelect triggered for: ${item.id}`);
-                                        if (navigationRef.isReady()) {
-                                            // @ts-ignore
-                                            navigationRef.navigate('Main', { screen: item.id });
-                                            setExpanded(false);
-                                            setTimeout(() => setSidebarActive(false), 0);
-                                        }
-                                    }}
-                                    style={({ isFocused }) => [
-                                        styles.menuItem,
-                                        isFocused && styles.menuItemFocused,
-                                        currentRouteName === item.id && !isFocused && styles.menuItemActive,
-                                    ]}
-                                >
-                                    {({ isFocused }) => (
-                                        <>
-                                            <Icon
-                                                name={item.icon}
-                                                size={scaledPixels(32)}
-                                                color={
-                                                    isFocused ? colors.text : currentRouteName === item.id ? colors.primary : colors.textSecondary
-                                                }
-                                            />
-                                            {isExpanded && (
-                                                <Text
-                                                    numberOfLines={1}
-                                                    style={[
-                                                        styles.menuLabel,
-                                                        {
-                                                            color: isFocused
-                                                                ? colors.text
-                                                                : currentRouteName === item.id
-                                                                    ? colors.primary
-                                                                    : colors.textSecondary,
-                                                            width: scaledPixels(200),
-                                                        },
-                                                    ]}
-                                                >
-                                                    {item.label}
-                                                </Text>
-                                            )}
-                                        </>
-                                    )}
-                                </FocusablePressable>
-                            ))}
-                        </DefaultFocus>
+                        {MENU_ITEMS.map((item) => (
+                            <FocusablePressable
+                                ref={(r) => {
+                                    menuItemRefs.current[item.id] = r;
+                                }}
+                                key={item.id}
+                                onSelect={() => {
+                                    console.log(`[SideBar] onSelect triggered for: ${item.id}`);
+                                    if (navigationRef.isReady()) {
+                                        // @ts-ignore
+                                        navigationRef.navigate('Main', { screen: item.id });
+                                        setExpanded(false);
+                                        setTimeout(() => setSidebarActive(false), 0);
+                                    }
+                                }}
+                                style={({ isFocused }) => [
+                                    styles.menuItem,
+                                    isFocused && styles.menuItemFocused,
+                                    currentRouteName === item.id && !isFocused && styles.menuItemActive,
+                                ]}
+                            >
+                                {({ isFocused }) => (
+                                    <>
+                                        <Icon
+                                            name={item.icon}
+                                            size={scaledPixels(32)}
+                                            color={
+                                                isFocused ? colors.text : currentRouteName === item.id ? colors.primary : colors.textSecondary
+                                            }
+                                        />
+                                        {isExpanded && (
+                                            <Text
+                                                numberOfLines={1}
+                                                style={[
+                                                    styles.menuLabel,
+                                                    {
+                                                        color: isFocused
+                                                            ? colors.text
+                                                            : currentRouteName === item.id
+                                                                ? colors.primary
+                                                                : colors.textSecondary,
+                                                        width: scaledPixels(200),
+                                                    },
+                                                ]}
+                                            >
+                                                {item.label}
+                                            </Text>
+                                        )}
+                                    </>
+                                )}
+                            </FocusablePressable>
+                        ))}
                     </View>
                 </View>
 
                 <BlurView intensity={30} experimentalBlurMethod={'dimezisBlurView'} style={StyleSheet.absoluteFill} />
             </Animated.View>
-        </SpatialNavigationNode>
+        </View>
     );
 };
 

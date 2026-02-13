@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import {
-  SpatialNavigationNode,
-  SpatialNavigationScrollView,
-  SpatialNavigationVirtualizedList,
-  DefaultFocus,
-} from '../lib/tvNavigation';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';
@@ -61,18 +55,13 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
       <View style={styles.welcomeContainer}>
         <Text style={styles.title}>Welcome to M3U TV</Text>
         <Text style={styles.subtitle}>Connect to your Xtream service to get started</Text>
-        <SpatialNavigationNode orientation="horizontal">
-          <DefaultFocus>
-            <FocusablePressable
-              style={({ isFocused }) => [styles.settingsButton, isFocused && styles.buttonFocused]}
-              onSelect={() => navigation.navigate('Settings')}
-            >
-              {({ isFocused }) => (
-                <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Go to Settings</Text>
-              )}
-            </FocusablePressable>
-          </DefaultFocus>
-        </SpatialNavigationNode>
+        <FocusablePressable
+          preferredFocus
+          style={({ isFocused }) => [styles.settingsButton, isFocused && styles.buttonFocused]}
+          onSelect={() => navigation.navigate('Settings')}
+        >
+          {({ isFocused }) => <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Go to Settings</Text>}
+        </FocusablePressable>
       </View>
     );
   }
@@ -89,57 +78,55 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <SpatialNavigationScrollView
-        offsetFromStart={scaledPixels(100)}
-        contentContainerStyle={{ paddingVertical: scaledPixels(40) }}
-      >
-        {/* Live TV Row */}
-        {liveStreams.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Live TV</Text>
-            <View style={styles.liveTvRowList}>
-              <SpatialNavigationVirtualizedList
-                data={liveStreams}
-                renderItem={({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
-            </View>
+    <ScrollView contentContainerStyle={{ paddingLeft: scaledPixels(100), paddingVertical: scaledPixels(40) }}>
+      {/* Live TV Row */}
+      {liveStreams.length > 0 && (
+        <View style={styles.rowContainer}>
+          <Text style={styles.rowTitle}>Live TV</Text>
+          <View style={styles.liveTvRowList}>
+            <FlatList
+              data={liveStreams}
+              renderItem={({ item }: { item: XtreamLiveStream }) => <LiveTVCard item={item} />}
+              horizontal
+              keyExtractor={(item) => String(item.stream_id)}
+              showsHorizontalScrollIndicator={false}
+            />
           </View>
-        )}
+        </View>
+      )}
 
-        {/* Movies Row */}
-        {vodStreams.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Movies</Text>
-            <View style={styles.posterRowList}>
-              <SpatialNavigationVirtualizedList
-                data={vodStreams}
-                renderItem={({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
-            </View>
+      {/* Movies Row */}
+      {vodStreams.length > 0 && (
+        <View style={styles.rowContainer}>
+          <Text style={styles.rowTitle}>Movies</Text>
+          <View style={styles.posterRowList}>
+            <FlatList
+              data={vodStreams}
+              renderItem={({ item }: { item: XtreamVodStream }) => <MovieCard item={item} />}
+              horizontal
+              keyExtractor={(item) => String(item.stream_id)}
+              showsHorizontalScrollIndicator={false}
+            />
           </View>
-        )}
+        </View>
+      )}
 
-        {/* Series Row */}
-        {seriesList.length > 0 && (
-          <View style={styles.rowContainer}>
-            <Text style={styles.rowTitle}>Series</Text>
-            <View style={styles.posterRowList}>
-              <SpatialNavigationVirtualizedList
-                data={seriesList}
-                renderItem={({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />}
-                itemSize={scaledPixels(224)}
-                orientation="horizontal"
-              />
-            </View>
+      {/* Series Row */}
+      {seriesList.length > 0 && (
+        <View style={styles.rowContainer}>
+          <Text style={styles.rowTitle}>Series</Text>
+          <View style={styles.posterRowList}>
+            <FlatList
+              data={seriesList}
+              renderItem={({ item }: { item: XtreamSeries }) => <SeriesCard item={item} />}
+              horizontal
+              keyExtractor={(item) => String(item.series_id)}
+              showsHorizontalScrollIndicator={false}
+            />
           </View>
-        )}
-      </SpatialNavigationScrollView>
-    </SpatialNavigationNode>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 

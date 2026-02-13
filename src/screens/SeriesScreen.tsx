@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { colors } from '../theme';
@@ -8,11 +8,6 @@ import { XtreamCategory, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { SeriesCard } from '../components/SeriesCard';
-import {
-  SpatialNavigationNode,
-  SpatialNavigationVirtualizedGrid,
-  SpatialNavigationVirtualizedList,
-} from '../lib/tvNavigation';
 
 export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const isFocused = useIsFocused();
@@ -69,37 +64,37 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   if (!isFocused) return null;
 
   return (
-    <SpatialNavigationNode>
-      <View style={styles.container}>
-        {/* Category selector */}
-        <View style={styles.categoryListContainer}>
-          <SpatialNavigationVirtualizedList
-            data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
-            renderItem={renderCategoryItem}
-            itemSize={scaledPixels(195)}
-            style={styles.categoryList}
-            orientation="horizontal"
-          />
-        </View>
-
-        {/* Series grid */}
-        <View style={styles.gridContent}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <SpatialNavigationVirtualizedGrid
-              data={series}
-              renderItem={renderSeriesItem}
-              numberOfColumns={8}
-              itemHeight={scaledPixels(390)}
-              style={styles.seriesGrid}
-            />
-          )}
-        </View>
+    <View style={styles.container}>
+      {/* Category selector */}
+      <View style={styles.categoryListContainer}>
+        <FlatList
+          data={[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories]}
+          renderItem={renderCategoryItem}
+          style={styles.categoryList}
+          horizontal
+          keyExtractor={(item) => String(item.category_id || 'all')}
+          showsHorizontalScrollIndicator={false}
+        />
       </View>
-    </SpatialNavigationNode>
+
+      {/* Series grid */}
+      <View style={styles.gridContent}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={series}
+            renderItem={renderSeriesItem}
+            numColumns={8}
+            style={styles.seriesGrid}
+            keyExtractor={(item) => String(item.series_id)}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </View>
   );
 }
 

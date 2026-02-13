@@ -2,8 +2,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import { SpatialNavigationRoot, DefaultFocus } from '../lib/tvNavigation';
-import { useIsFocused, useNavigationState } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import {
   HomeScreen,
   SettingsScreen,
@@ -40,16 +39,6 @@ function MainNavigator() {
   const isFocused = useIsFocused();
   const { isSidebarActive, setSidebarActive } = useMenu();
 
-  // Track the current content screen name
-  const currentScreen = useNavigationState((state) => {
-    if (!state) return 'Home';
-    let route: any = state.routes[state.index];
-    while (route?.state && typeof route.state.index === 'number') {
-      route = route.state.routes[route.state.index];
-    }
-    return route?.name || 'Home';
-  });
-
   // Back button: focus sidebar instead of exiting when on a top-level screen
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -66,31 +55,29 @@ function MainNavigator() {
     <View style={styles.mainContainer}>
       {/* Content area - full width with left margin for collapsed sidebar */}
       <View style={styles.contentContainer}>
-        <SpatialNavigationRoot isActive={isFocused && !isSidebarActive}>
-          <DefaultFocus>
-            <MainStack.Navigator
-              screenOptions={{
-                headerShown: false,
-                headerTransparent: true,
-                animation: 'none',
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            >
-              <MainStack.Screen name="Home" component={HomeScreen} />
-              <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
-              <MainStack.Screen name="EPG" component={EPGScreen} />
-              <MainStack.Screen name="VOD" component={VODScreen} />
-              <MainStack.Screen name="Series" component={SeriesScreen} />
-              <MainStack.Screen name="Settings" component={SettingsScreen} />
-            </MainStack.Navigator>
-          </DefaultFocus>
-        </SpatialNavigationRoot>
+        <View style={styles.fill} pointerEvents={isFocused && !isSidebarActive ? 'auto' : 'none'}>
+          <MainStack.Navigator
+            screenOptions={{
+              headerShown: false,
+              headerTransparent: true,
+              animation: 'none',
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <MainStack.Screen name="Home" component={HomeScreen} />
+            <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
+            <MainStack.Screen name="EPG" component={EPGScreen} />
+            <MainStack.Screen name="VOD" component={VODScreen} />
+            <MainStack.Screen name="Series" component={SeriesScreen} />
+            <MainStack.Screen name="Settings" component={SettingsScreen} />
+          </MainStack.Navigator>
+        </View>
       </View>
 
       {/* Sidebar - absolutely positioned, overlays content when expanded */}
-      <SpatialNavigationRoot isActive={isFocused && isSidebarActive}>
+      <View pointerEvents={isFocused && isSidebarActive ? 'auto' : 'none'}>
         <SideBar />
-      </SpatialNavigationRoot>
+      </View>
     </View>
   );
 }
@@ -143,5 +130,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: SIDEBAR_WIDTH_COLLAPSED,
     backgroundColor: colors.background,
+  },
+  fill: {
+    flex: 1,
   },
 });
