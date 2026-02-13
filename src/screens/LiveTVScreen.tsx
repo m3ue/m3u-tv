@@ -12,7 +12,7 @@ import { LiveTVCard } from '../components/LiveTVCard';
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const isFocused = useIsFocused();
-  const { sidebarFocusTag, isSidebarActive, setSidebarActive } = useMenu();
+  const { isSidebarActive, setSidebarActive } = useMenu();
   const { isConfigured, liveCategories, fetchLiveStreams } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
@@ -33,7 +33,6 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
 
   const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
-      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
@@ -60,7 +59,6 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const renderStreamItem = ({ item, index }: { item: XtreamLiveStream; index: number }) => (
     <LiveTVCard
       item={item}
-      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
     />
   );

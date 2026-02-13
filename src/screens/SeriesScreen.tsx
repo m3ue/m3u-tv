@@ -12,7 +12,7 @@ import { SeriesCard } from '../components/SeriesCard';
 
 export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const isFocused = useIsFocused();
-  const { sidebarFocusTag, isSidebarActive, setSidebarActive } = useMenu();
+  const { isSidebarActive, setSidebarActive } = useMenu();
   const { isConfigured, seriesCategories, series, fetchSeries } = useXtream();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +31,6 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
 
   const renderCategoryItem = ({ item, index }: { item: XtreamCategory; index: number }) => (
     <FocusablePressable
-      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
@@ -58,7 +57,6 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const renderSeriesItem = ({ item, index }: { item: XtreamSeries; index: number }) => (
     <SeriesCard
       item={item}
-      nextFocusLeft={index === 0 ? sidebarFocusTag : undefined}
       onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
     />
   );

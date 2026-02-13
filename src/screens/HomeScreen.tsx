@@ -14,7 +14,6 @@ import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream
 
 export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   const isFocused = useIsFocused();
-  const { sidebarFocusTag } = useMenu();
   useEffect(() => {
     console.log(`[HomeScreen] isFocused: ${isFocused}`);
   }, [isFocused]);
@@ -59,7 +58,6 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         <Text style={styles.subtitle}>Connect to your Xtream service to get started</Text>
         <FocusablePressable
           preferredFocus
-          nextFocusLeft={sidebarFocusTag}
           style={({ isFocused }) => [styles.settingsButton, isFocused && styles.buttonFocused]}
           onSelect={() => navigation.navigate('Settings')}
         >
@@ -90,7 +88,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <FlatList
               data={liveStreams}
               renderItem={({ item, index }: { item: XtreamLiveStream; index: number }) => (
-                <LiveTVCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+                <LiveTVCard item={item} />
               )}
               horizontal
               keyExtractor={(item) => String(item.stream_id)}
@@ -108,7 +106,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <FlatList
               data={vodStreams}
               renderItem={({ item, index }: { item: XtreamVodStream; index: number }) => (
-                <MovieCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+                <MovieCard item={item} />
               )}
               horizontal
               keyExtractor={(item) => String(item.stream_id)}
@@ -126,7 +124,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
             <FlatList
               data={seriesList}
               renderItem={({ item, index }: { item: XtreamSeries; index: number }) => (
-                <SeriesCard item={item} nextFocusLeft={index === 0 ? sidebarFocusTag : undefined} />
+                <SeriesCard item={item} />
               )}
               horizontal
               keyExtractor={(item) => String(item.series_id)}
