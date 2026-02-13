@@ -81,7 +81,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   if (!isFocused) return null;
 
   return (
-    <ScrollView contentContainerStyle={{ paddingLeft: scaledPixels(100), paddingVertical: scaledPixels(40) }}>
+    <ScrollView contentContainerStyle={{ paddingVertical: scaledPixels(40) }}>
       {/* Live TV Row */}
       {liveStreams.length > 0 && (
         <View style={styles.rowContainer}>
