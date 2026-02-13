@@ -41,10 +41,11 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
   ) => {
     const pressableRef = useRef<any>(null);
     const [isFocused, setIsFocused] = useState(false);
+    const [forcePreferredFocus, setForcePreferredFocus] = useState(false);
 
     useImperativeHandle(ref, () => ({
       focus: () => {
-        pressableRef.current?.focus?.();
+        setForcePreferredFocus(true);
       },
       getNodeHandle: () => findNodeHandle(pressableRef.current),
     }));
@@ -54,7 +55,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
         <Pressable
           ref={pressableRef}
           focusable
-          hasTVPreferredFocus={preferredFocus}
+          hasTVPreferredFocus={preferredFocus || forcePreferredFocus}
           nextFocusUp={nextFocusUp}
           nextFocusDown={nextFocusDown}
           nextFocusLeft={nextFocusLeft}
@@ -62,6 +63,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
           onPress={onSelect}
           onFocus={() => {
             setIsFocused(true);
+            setForcePreferredFocus(false);
             onFocus?.();
           }}
           onBlur={() => {

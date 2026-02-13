@@ -94,7 +94,7 @@ function MainNavigator() {
       </View>
 
       {/* Sidebar - absolutely positioned, overlays content when expanded */}
-      <View pointerEvents={isFocused && isSidebarActive ? 'auto' : 'none'}>
+      <View style={styles.sidebarLayer} pointerEvents="box-none">
         <SideBar contentFocusTag={contentFocusTag} />
       </View>
     </View>
@@ -152,5 +152,8 @@ const styles = StyleSheet.create({
   },
   fill: {
     flex: 1,
+  },
+  sidebarLayer: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

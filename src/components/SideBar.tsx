@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -46,6 +46,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     const { isExpanded, setExpanded, isSidebarActive, setSidebarActive, setSidebarFocusTag } = useMenu();
+    const [preferredMenuId, setPreferredMenuId] = useState<string>('Home');
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -83,13 +84,13 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                     if (typeof tag === 'number') {
                         setSidebarFocusTag(tag);
                     }
-                    menuItemRefs.current[targetMenu as string]?.focus();
                 }, 120);
+                setPreferredMenuId(targetMenu);
             }
         } else {
             setExpanded(false);
         }
-    }, [isSidebarActive, setExpanded, currentRouteName, topRouteName]);
+    }, [isSidebarActive, setExpanded, currentRouteName, topRouteName, setSidebarFocusTag]);
 
     // Width Animation
     const animatedWidth = useSharedValue(isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED);
@@ -168,6 +169,7 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                     menuItemRefs.current[item.id] = r;
                                 }}
                                 key={item.id}
+                                preferredFocus={isSidebarActive && preferredMenuId === item.id}
                                 nextFocusRight={contentFocusTag}
                                 onSelect={() => {
                                     console.log(`[SideBar] onSelect triggered for: ${item.id}`);
@@ -179,6 +181,10 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                     }
                                 }}
                                 onFocus={() => {
+                                    if (!isSidebarActive) {
+                                        setSidebarActive(true);
+                                    }
+                                    setPreferredMenuId(item.id);
                                     const tag = menuItemRefs.current[item.id]?.getNodeHandle();
                                     if (typeof tag === 'number') {
                                         setSidebarFocusTag(tag);
