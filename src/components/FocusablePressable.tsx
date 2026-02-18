@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Pressable, ViewStyle, View, StyleProp, findNodeHandle } from 'react-native';
+import { Pressable, ViewStyle, StyleProp, findNodeHandle } from 'react-native';
 
 type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => StyleProp<ViewStyle>);
 
@@ -19,7 +19,6 @@ interface FocusablePressableProps {
   nextFocusRight?: number;
   children: React.ReactNode | ((props: { isFocused: boolean }) => React.ReactNode);
   style?: StyleType;
-  containerStyle?: ViewStyle;
 }
 
 export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePressableProps>(
@@ -35,7 +34,6 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
       nextFocusRight,
       children,
       style,
-      containerStyle,
     },
     ref,
   ) => {
@@ -66,31 +64,29 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
     }, []);
 
     return (
-      <View style={containerStyle}>
-        <Pressable
-          ref={pressableRef}
-          collapsable={false}
-          focusable
-          hasTVPreferredFocus={preferredFocus || forcePreferredFocus}
-          nextFocusUp={nextFocusUp}
-          nextFocusDown={nextFocusDown}
-          nextFocusLeft={nextFocusLeft}
-          nextFocusRight={nextFocusRight}
-          onPress={onSelect}
-          onFocus={() => {
-            setIsFocused(true);
-            setForcePreferredFocus(false);
-            onFocus?.();
-          }}
-          onBlur={() => {
-            setIsFocused(false);
-            onBlur?.();
-          }}
-          style={[typeof style === 'function' ? style({ isFocused }) : style]}
-        >
-          {typeof children === 'function' ? children({ isFocused }) : children}
-        </Pressable>
-      </View>
+      <Pressable
+        ref={pressableRef}
+        collapsable={false}
+        focusable
+        hasTVPreferredFocus={preferredFocus || forcePreferredFocus}
+        nextFocusUp={nextFocusUp}
+        nextFocusDown={nextFocusDown}
+        nextFocusLeft={nextFocusLeft}
+        nextFocusRight={nextFocusRight}
+        onPress={onSelect}
+        onFocus={() => {
+          setIsFocused(true);
+          setForcePreferredFocus(false);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          onBlur?.();
+        }}
+        style={[typeof style === 'function' ? style({ isFocused }) : style]}
+      >
+        {typeof children === 'function' ? children({ isFocused }) : children}
+      </Pressable>
     );
   },
 );

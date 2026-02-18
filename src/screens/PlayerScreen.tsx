@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -104,8 +104,16 @@ function showNativeSelect(
 }
 
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
-    const { streamUrl, title, type } = route.params;
+    const { title, type } = route.params;
     const isLive = type === 'live';
+
+
+    // DEBUGGING: Temporary hardcoded stream URL for testing purposes
+    let streamUrl = 'https://ftp.halifax.rwth-aachen.de/blender/demo/movies/Sintel.2010.1080p.mkv';
+    if (isLive) {
+        streamUrl = 'https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/5c12ba66eae03059cbdc77f2/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=3c1b5410-0cf9-11f1-aa0b-e3d711d187f5&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=ffaf6ba5-9e47-4c47-b494-a79be9873606&userId=&serverSideAds=true';
+    }
+
 
     const initialBackend = useMemo(() => getInitialBackend(streamUrl), [streamUrl]);
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
@@ -141,6 +149,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
 
     const nativeRef = useRef<VideoRef>(null);
+    const audioAutoSelectedRef = useRef(false);
     const seekingRef = useRef(false);
     const seekLockoutTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const exitGuardRef = useRef(false);
@@ -222,21 +231,17 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         return () => clearTimeout(hideTimer.current);
     }, [overlayVisible, resetHideTimer]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!overlayVisible) return;
 
-        const id = setTimeout(() => {
-            setBackButtonTag(backButtonRef.current?.getNodeHandle() ?? undefined);
-            setRewindButtonTag(rewindButtonRef.current?.getNodeHandle() ?? undefined);
-            setPlayButtonTag(playButtonRef.current?.getNodeHandle() ?? undefined);
-            setForwardButtonTag(forwardButtonRef.current?.getNodeHandle() ?? undefined);
-            setTimelineBackButtonTag(timelineBackButtonRef.current?.getNodeHandle() ?? undefined);
-            setTimelineForwardButtonTag(timelineForwardButtonRef.current?.getNodeHandle() ?? undefined);
-            setAudioButtonTag(audioButtonRef.current?.getNodeHandle() ?? undefined);
-            setSubtitleButtonTag(subtitleButtonRef.current?.getNodeHandle() ?? undefined);
-        }, 0);
-
-        return () => clearTimeout(id);
+        setBackButtonTag(backButtonRef.current?.getNodeHandle() ?? undefined);
+        setRewindButtonTag(rewindButtonRef.current?.getNodeHandle() ?? undefined);
+        setPlayButtonTag(playButtonRef.current?.getNodeHandle() ?? undefined);
+        setForwardButtonTag(forwardButtonRef.current?.getNodeHandle() ?? undefined);
+        setTimelineBackButtonTag(timelineBackButtonRef.current?.getNodeHandle() ?? undefined);
+        setTimelineForwardButtonTag(timelineForwardButtonRef.current?.getNodeHandle() ?? undefined);
+        setAudioButtonTag(audioButtonRef.current?.getNodeHandle() ?? undefined);
+        setSubtitleButtonTag(subtitleButtonRef.current?.getNodeHandle() ?? undefined);
     }, [overlayVisible, isLive, paused]);
 
     const goBackSafe = useCallback(() => {
@@ -285,16 +290,21 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     }, []);
 
     const openAudioSelector = useCallback(() => {
-        const tracks = audioTracks.length > 0 ? audioTracks : [{ id: -999, name: 'No audio tracks available' }];
-        const options = tracks.map((track) => track.name || `Track ${track.id}`);
-        const selectedIndex = audioTracks.findIndex((track) => track.id === selectedAudioTrack);
+        if (audioTracks.length === 0) {
+            return;
+        }
+
+        const options = ['Disable', ...audioTracks.map((track) => track.name || `Track ${track.id}`)];
+        const selectedIndex = selectedAudioTrack === -1
+            ? 0
+            : audioTracks.findIndex((track) => track.id === selectedAudioTrack) + 1;
 
         showNativeSelect('Audio Track', options, selectedIndex < 0 ? 0 : selectedIndex, (index) => {
-            if (audioTracks.length === 0) {
-                return;
+            if (index === 0) {
+                setSelectedAudioTrack(-1);
+            } else {
+                setSelectedAudioTrack(audioTracks[index - 1].id);
             }
-
-            setSelectedAudioTrack(audioTracks[index].id);
             resetHideTimer();
         });
     }, [audioTracks, selectedAudioTrack, resetHideTimer]);
@@ -353,13 +363,20 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         setError(null);
         setIsLoading(false);
         setDuration(data.duration || 0);
-        setAudioTracks(data.audioTracks ?? []);
-        setTextTracks(data.textTracks ?? []);
 
-        if (data.audioTracks && data.audioTracks.length > 0 && selectedAudioTrack === undefined) {
-            setSelectedAudioTrack(data.audioTracks[0].id);
+        // Filter out VLC's synthetic "Disable" track (id < 0)
+        const realAudioTracks = (data.audioTracks ?? []).filter(t => t.id >= 0);
+        const realTextTracks = (data.textTracks ?? []).filter(t => t.id >= 0);
+
+        setAudioTracks(realAudioTracks);
+        setTextTracks(realTextTracks);
+
+        // Auto-select first real audio track
+        if (realAudioTracks.length > 0 && !audioAutoSelectedRef.current) {
+            setSelectedAudioTrack(realAudioTracks[0].id);
+            audioAutoSelectedRef.current = true;
         }
-    }, [selectedAudioTrack]);
+    }, []);
 
     const handleVlcProgress = useCallback((data: {
         currentTime: number;
@@ -381,9 +398,24 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     }, [isLoading]);
 
     const handleVlcError = useCallback((vlcError: unknown) => {
-        console.error('[PlayerScreenNew] VLC playback error', vlcError);
+        console.error('[PlayerScreen] VLC playback error', vlcError);
         setIsLoading(false);
-        setError(toErrorMessage(vlcError));
+
+        let message = 'Unknown playback error';
+        if (vlcError && typeof vlcError === 'object') {
+            const err = vlcError as Record<string, unknown>;
+            if (typeof err.message === 'string' && err.message) {
+                message = err.message;
+            } else if (typeof err.title === 'string' && err.title) {
+                message = [err.title, err.message].filter(Boolean).join(': ');
+            } else if (err.type === 'Error' && err.duration === 0 && err.currentTime === 0) {
+                message = 'Failed to open stream. Check that the URL is reachable and the format is supported.';
+            } else {
+                message = toErrorMessage(vlcError);
+            }
+        }
+
+        setError(message);
     }, []);
 
     useEffect(() => {
@@ -471,46 +503,50 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
     const canSeek = !isLive && duration > 0;
     const progress = canSeek ? (currentTime / duration) * 100 : 0;
-    const selectedAudioLabel = audioTracks.find((track) => track.id === selectedAudioTrack)?.name ?? 'Select';
+    const selectedAudioLabel = selectedAudioTrack === -1
+        ? 'Disabled'
+        : (audioTracks.find((track) => track.id === selectedAudioTrack)?.name ?? 'Select');
     const selectedSubtitleLabel = selectedTextTrack === -1
         ? 'Off'
         : (textTracks.find((track) => track.id === selectedTextTrack)?.name ?? 'Select');
 
     return (
         <View style={styles.container}>
-            {backend === 'native' ? (
-                <Video
-                    ref={nativeRef}
-                    source={{ ...nativeSourceRef.current }}
-                    style={styles.player}
-                    resizeMode={ResizeMode.CONTAIN}
-                    controls={false}
-                    paused={paused}
-                    onLoad={handleNativeLoad}
-                    onProgress={handleNativeProgress}
-                    onError={handleNativeError}
-                    progressUpdateInterval={500}
-                    onEnd={goBackSafe}
-                />
-            ) : (
-                <VLCPlayer
-                    style={styles.player}
-                    source={{ ...vlcSourceRef.current }}
-                    autoplay
-                    paused={paused}
-                    seek={vlcSeekValue}
-                    audioTrack={selectedAudioTrack}
-                    textTrack={selectedTextTrack}
-                    onBuffering={() => {
-                        setIsLoading(true);
-                        setError(null);
-                    }}
-                    onLoad={handleVlcLoad}
-                    onProgress={handleVlcProgress}
-                    onError={handleVlcError}
-                    onEnd={goBackSafe}
-                />
-            )}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                {backend === 'native' ? (
+                    <Video
+                        ref={nativeRef}
+                        source={{ ...nativeSourceRef.current }}
+                        style={styles.player}
+                        resizeMode={ResizeMode.CONTAIN}
+                        controls={false}
+                        paused={paused}
+                        onLoad={handleNativeLoad}
+                        onProgress={handleNativeProgress}
+                        onError={handleNativeError}
+                        progressUpdateInterval={500}
+                        onEnd={goBackSafe}
+                    />
+                ) : (
+                    <VLCPlayer
+                        style={styles.player}
+                        source={{ ...vlcSourceRef.current }}
+                        autoplay
+                        paused={paused}
+                        seek={vlcSeekValue}
+                        audioTrack={selectedAudioTrack}
+                        textTrack={selectedTextTrack}
+                        onBuffering={() => {
+                            setIsLoading(true);
+                            setError(null);
+                        }}
+                        onLoad={handleVlcLoad}
+                        onProgress={handleVlcProgress}
+                        onError={handleVlcError}
+                        onEnd={goBackSafe}
+                    />
+                )}
+            </View>
 
             {isLoading && !error && (
                 <View style={styles.centerOverlay} pointerEvents="none">
