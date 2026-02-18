@@ -104,6 +104,19 @@ function showNativeSelect(
     );
 }
 
+const isTV = Platform.isTV;
+const isTVOS = Platform.OS === 'ios' && isTV;
+
+// On tvOS, use TVFocusGuideView with autoFocus to guide focus into overlay regions.
+// On Android TV, spatial focus works natively — TVFocusGuideView interferes with FocusFinder.
+const FocusContainer = isTVOS
+    ? ({ style, children }: { style?: any; children: React.ReactNode }) => (
+        <TVFocusGuideView style={style} autoFocus>{children}</TVFocusGuideView>
+    )
+    : ({ style, children }: { style?: any; children: React.ReactNode }) => (
+        <View style={style}>{children}</View>
+    );
+
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
     const { title, type } = route.params;
     const isLive = type === 'live';
@@ -141,7 +154,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
 
     const nativeRef = useRef<VideoRef>(null);
+    const vlcRef = useRef<any>(null);
     const audioAutoSelectedRef = useRef(false);
+    const vlcTracksLoadedRef = useRef(false);
+    const userSelectedAudioRef = useRef(false);
+    const userSelectedTextRef = useRef(false);
     const seekingRef = useRef(false);
     const seekLockoutTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const exitGuardRef = useRef(false);
@@ -279,6 +296,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             : audioTracks.findIndex((track) => track.id === selectedAudioTrack) + 1;
 
         showNativeSelect('Audio Track', options, selectedIndex < 0 ? 0 : selectedIndex, (index) => {
+            userSelectedAudioRef.current = true;
             if (index === 0) {
                 setSelectedAudioTrack(-1);
             } else {
@@ -295,6 +313,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             : Math.max(0, textTracks.findIndex((track) => track.id === selectedTextTrack) + 1);
 
         showNativeSelect('Subtitle Track', options, selectedIndex, (index) => {
+            userSelectedTextRef.current = true;
             if (index === 0) {
                 setSelectedTextTrack(-1);
             } else {
@@ -374,17 +393,22 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         setIsLoading(false);
         setDuration((data.duration || 0) / 1000);
 
-        // Filter out VLC's synthetic "Disable" track (id < 0)
-        const realAudioTracks = (data.audioTracks ?? []).filter(t => t.id >= 0);
-        const realTextTracks = (data.textTracks ?? []).filter(t => t.id >= 0);
+        // VLC re-fires onLoad when track state changes (e.g. subtitle switch),
+        // and track IDs can shift between calls. Only populate tracks on first load.
+        if (!vlcTracksLoadedRef.current) {
+            const realAudioTracks = (data.audioTracks ?? []).filter(t => t.id >= 0);
+            const realTextTracks = (data.textTracks ?? []).filter(t => t.id >= 0);
 
-        setAudioTracks(realAudioTracks);
-        setTextTracks(realTextTracks);
+            if (realAudioTracks.length > 0 || realTextTracks.length > 0) {
+                vlcTracksLoadedRef.current = true;
+                setAudioTracks(realAudioTracks);
+                setTextTracks(realTextTracks);
 
-        // Auto-select first real audio track
-        if (realAudioTracks.length > 0 && !audioAutoSelectedRef.current) {
-            setSelectedAudioTrack(realAudioTracks[0].id);
-            audioAutoSelectedRef.current = true;
+                if (realAudioTracks.length > 0 && !audioAutoSelectedRef.current) {
+                    setSelectedAudioTrack(realAudioTracks[0].id);
+                    audioAutoSelectedRef.current = true;
+                }
+            }
         }
     }, []);
 
@@ -511,6 +535,10 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             if (seekLockoutTimer.current) {
                 clearTimeout(seekLockoutTimer.current);
             }
+            // Explicitly stop VLC on unmount to prevent "can't get VLCObject instance"
+            try {
+                vlcRef.current?.stopPlayer?.();
+            } catch (_) { /* ignore */ }
         };
     }, []);
 
@@ -535,12 +563,12 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         controls={false}
                         paused={paused}
                         selectedAudioTrack={
-                            selectedAudioTrack != null && selectedAudioTrack >= 0
+                            userSelectedAudioRef.current && selectedAudioTrack != null && selectedAudioTrack >= 0
                                 ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack }
                                 : undefined
                         }
                         selectedTextTrack={
-                            selectedTextTrack >= 0
+                            userSelectedTextRef.current && selectedTextTrack >= 0
                                 ? { type: SelectedTrackType.INDEX, value: selectedTextTrack }
                                 : undefined
                         }
@@ -553,6 +581,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                     />
                 ) : (
                     <VLCPlayer
+                        ref={vlcRef}
                         style={styles.player}
                         source={{ ...vlcSourceRef.current }}
                         autoplay
@@ -602,7 +631,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 style={[styles.overlay, { opacity: fadeAnim }]}
                 pointerEvents={overlayVisible ? 'auto' : 'none'}
             >
-                <TVFocusGuideView style={styles.overlayInner} autoFocus>
+                <FocusContainer style={styles.overlayInner}>
                     <View style={styles.header}>
                         <FocusablePressable
                             ref={backButtonRef}
@@ -621,7 +650,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         </Text>
                     </View>
 
-                    <TVFocusGuideView style={styles.controlsBar} autoFocus>
+                    <FocusContainer style={styles.controlsBar}>
                         {canSeek && (
                             <View style={styles.progressContainer}>
                                 <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
@@ -744,8 +773,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                 </Text>
                             </FocusablePressable>
                         </View>
-                    </TVFocusGuideView>
-                </TVFocusGuideView>
+                    </FocusContainer>
+                </FocusContainer>
             </Animated.View>
         </View>
     );
