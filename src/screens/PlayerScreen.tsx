@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -7,12 +7,13 @@ import {
     ActivityIndicator,
     Animated,
     TVEventHandler,
+    TVFocusGuideView,
     BackHandler,
     Platform,
     Alert,
     ActionSheetIOS,
 } from 'react-native';
-import Video, { OnLoadData, OnProgressData, OnVideoErrorData, ResizeMode, VideoRef } from 'react-native-video';
+import Video, { OnLoadData, OnProgressData, OnVideoErrorData, OnAudioTracksData, SelectedTrackType, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { RootStackScreenProps } from '../navigation/types';
 import { colors } from '../theme';
@@ -73,7 +74,7 @@ function showNativeSelect(
     selectedIndex: number,
     onPick: (index: number) => void,
 ) {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && !Platform.isTV) {
         ActionSheetIOS.showActionSheetWithOptions(
             {
                 title,
@@ -127,21 +128,12 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const audioButtonRef = useRef<FocusablePressableRef>(null);
     const subtitleButtonRef = useRef<FocusablePressableRef>(null);
 
-    const [backButtonTag, setBackButtonTag] = useState<number>();
-    const [rewindButtonTag, setRewindButtonTag] = useState<number>();
-    const [playButtonTag, setPlayButtonTag] = useState<number>();
-    const [forwardButtonTag, setForwardButtonTag] = useState<number>();
-    const [timelineBackButtonTag, setTimelineBackButtonTag] = useState<number>();
-    const [timelineForwardButtonTag, setTimelineForwardButtonTag] = useState<number>();
-    const [audioButtonTag, setAudioButtonTag] = useState<number>();
-    const [subtitleButtonTag, setSubtitleButtonTag] = useState<number>();
-
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [paused, setPaused] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [vlcSeekValue, setVlcSeekValue] = useState<number | undefined>(undefined);
+    const [vlcSeekValue, setVlcSeekValue] = useState(-1);
 
     const [audioTracks, setAudioTracks] = useState<PlayerTrack[]>([]);
     const [textTracks, setTextTracks] = useState<PlayerTrack[]>([]);
@@ -231,19 +223,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         return () => clearTimeout(hideTimer.current);
     }, [overlayVisible, resetHideTimer]);
 
-    useLayoutEffect(() => {
-        if (!overlayVisible) return;
-
-        setBackButtonTag(backButtonRef.current?.getNodeHandle() ?? undefined);
-        setRewindButtonTag(rewindButtonRef.current?.getNodeHandle() ?? undefined);
-        setPlayButtonTag(playButtonRef.current?.getNodeHandle() ?? undefined);
-        setForwardButtonTag(forwardButtonRef.current?.getNodeHandle() ?? undefined);
-        setTimelineBackButtonTag(timelineBackButtonRef.current?.getNodeHandle() ?? undefined);
-        setTimelineForwardButtonTag(timelineForwardButtonRef.current?.getNodeHandle() ?? undefined);
-        setAudioButtonTag(audioButtonRef.current?.getNodeHandle() ?? undefined);
-        setSubtitleButtonTag(subtitleButtonRef.current?.getNodeHandle() ?? undefined);
-    }, [overlayVisible, isLive, paused]);
-
     const goBackSafe = useCallback(() => {
         if (exitGuardRef.current) {
             return;
@@ -276,7 +255,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         } else {
             setVlcSeekValue(target / dur);
             setTimeout(() => {
-                setVlcSeekValue(undefined);
+                setVlcSeekValue(-1);
             }, 300);
         }
     }, [isLive]);
@@ -333,6 +312,37 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         setError(null);
         setIsLoading(false);
         setDuration(data.duration || 0);
+
+        // react-native-video includes audioTracks in OnLoadData
+        const nativeAudio = (data as any).audioTracks as Array<{ index: number; title: string; language: string; type: string }> | undefined;
+        if (nativeAudio && nativeAudio.length > 0) {
+            const mapped: PlayerTrack[] = nativeAudio.map(t => ({ id: t.index, name: t.title || t.language || `Track ${t.index}` }));
+            setAudioTracks(mapped);
+            if (!audioAutoSelectedRef.current && mapped.length > 0) {
+                setSelectedAudioTrack(mapped[0].id);
+                audioAutoSelectedRef.current = true;
+            }
+        }
+
+        const nativeText = (data as any).textTracks as Array<{ index: number; title: string; language: string; type: string }> | undefined;
+        if (nativeText && nativeText.length > 0) {
+            const mapped: PlayerTrack[] = nativeText.map(t => ({ id: t.index, name: t.title || t.language || `Track ${t.index}` }));
+            setTextTracks(mapped);
+        }
+    }, []);
+
+    const handleNativeAudioTracks = useCallback((data: OnAudioTracksData) => {
+        if (data.audioTracks && data.audioTracks.length > 0) {
+            const mapped: PlayerTrack[] = data.audioTracks.map(t => ({
+                id: t.index,
+                name: t.title || t.language || `Track ${t.index}`,
+            }));
+            setAudioTracks(mapped);
+            if (!audioAutoSelectedRef.current && mapped.length > 0) {
+                setSelectedAudioTrack(mapped[0].id);
+                audioAutoSelectedRef.current = true;
+            }
+        }
     }, []);
 
     const handleNativeProgress = useCallback((data: OnProgressData) => {
@@ -362,7 +372,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     }) => {
         setError(null);
         setIsLoading(false);
-        setDuration(data.duration || 0);
+        setDuration((data.duration || 0) / 1000);
 
         // Filter out VLC's synthetic "Disable" track (id < 0)
         const realAudioTracks = (data.audioTracks ?? []).filter(t => t.id >= 0);
@@ -387,12 +397,15 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         }
 
         if (!seekingRef.current) {
-            if (typeof data.duration === 'number' && data.duration > 0 && data.duration !== durationRef.current) {
-                setDuration(data.duration);
+            if (typeof data.duration === 'number' && data.duration > 0) {
+                const durSeconds = data.duration / 1000;
+                if (durSeconds !== durationRef.current) {
+                    setDuration(durSeconds);
+                }
             }
 
             if (typeof data.currentTime === 'number') {
-                setCurrentTime(data.currentTime);
+                setCurrentTime(data.currentTime / 1000);
             }
         }
     }, [isLoading]);
@@ -521,7 +534,18 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         resizeMode={ResizeMode.CONTAIN}
                         controls={false}
                         paused={paused}
+                        selectedAudioTrack={
+                            selectedAudioTrack != null && selectedAudioTrack >= 0
+                                ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack }
+                                : undefined
+                        }
+                        selectedTextTrack={
+                            selectedTextTrack >= 0
+                                ? { type: SelectedTrackType.INDEX, value: selectedTextTrack }
+                                : undefined
+                        }
                         onLoad={handleNativeLoad}
+                        onAudioTracks={handleNativeAudioTracks}
                         onProgress={handleNativeProgress}
                         onError={handleNativeError}
                         progressUpdateInterval={500}
@@ -578,11 +602,10 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 style={[styles.overlay, { opacity: fadeAnim }]}
                 pointerEvents={overlayVisible ? 'auto' : 'none'}
             >
-                <View style={styles.overlayInner}>
+                <TVFocusGuideView style={styles.overlayInner} autoFocus>
                     <View style={styles.header}>
                         <FocusablePressable
                             ref={backButtonRef}
-                            nextFocusDown={rewindButtonTag ?? playButtonTag}
                             onSelect={goBackSafe}
                             onFocus={resetHideTimer}
                             style={({ isFocused }) => [
@@ -598,7 +621,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         </Text>
                     </View>
 
-                    <View style={styles.controlsBar}>
+                    <TVFocusGuideView style={styles.controlsBar} autoFocus>
                         {canSeek && (
                             <View style={styles.progressContainer}>
                                 <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
@@ -613,9 +636,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             {!isLive && (
                                 <FocusablePressable
                                     ref={rewindButtonRef}
-                                    nextFocusUp={backButtonTag}
-                                    nextFocusRight={playButtonTag}
-                                    nextFocusDown={timelineBackButtonTag ?? audioButtonTag}
                                     onSelect={() => doSeek(-SEEK_STEP)}
                                     onFocus={resetHideTimer}
                                     style={({ isFocused }) => [
@@ -629,10 +649,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
                             <FocusablePressable
                                 ref={playButtonRef}
-                                nextFocusUp={backButtonTag}
-                                nextFocusLeft={isLive ? backButtonTag : rewindButtonTag}
-                                nextFocusRight={isLive ? backButtonTag : forwardButtonTag}
-                                nextFocusDown={timelineBackButtonTag ?? audioButtonTag}
                                 onSelect={doTogglePlayPause}
                                 onFocus={resetHideTimer}
                                 style={({ isFocused }) => [
@@ -651,9 +667,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             {!isLive && (
                                 <FocusablePressable
                                     ref={forwardButtonRef}
-                                    nextFocusUp={backButtonTag}
-                                    nextFocusLeft={playButtonTag}
-                                    nextFocusDown={timelineForwardButtonTag ?? audioButtonTag}
                                     onSelect={() => doSeek(SEEK_STEP)}
                                     onFocus={resetHideTimer}
                                     style={({ isFocused }) => [
@@ -670,9 +683,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             <View style={styles.timelineControlRow}>
                                 <FocusablePressable
                                     ref={timelineBackButtonRef}
-                                    nextFocusUp={playButtonTag}
-                                    nextFocusRight={timelineForwardButtonTag}
-                                    nextFocusDown={audioButtonTag}
                                     onSelect={() => doSeek(-TIMELINE_SEEK_STEP)}
                                     onFocus={resetHideTimer}
                                     style={({ isFocused }) => [
@@ -685,9 +695,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
                                 <FocusablePressable
                                     ref={timelineForwardButtonRef}
-                                    nextFocusUp={playButtonTag}
-                                    nextFocusLeft={timelineBackButtonTag}
-                                    nextFocusDown={subtitleButtonTag ?? audioButtonTag}
                                     onSelect={() => doSeek(TIMELINE_SEEK_STEP)}
                                     onFocus={resetHideTimer}
                                     style={({ isFocused }) => [
@@ -703,8 +710,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         <View style={styles.trackRow}>
                             <FocusablePressable
                                 ref={audioButtonRef}
-                                nextFocusUp={timelineBackButtonTag ?? playButtonTag}
-                                nextFocusRight={subtitleButtonTag}
                                 onSelect={openAudioSelector}
                                 onFocus={resetHideTimer}
                                 style={({ isFocused }) => [
@@ -723,8 +728,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
                             <FocusablePressable
                                 ref={subtitleButtonRef}
-                                nextFocusUp={timelineForwardButtonTag ?? playButtonTag}
-                                nextFocusLeft={audioButtonTag}
                                 onSelect={openSubtitleSelector}
                                 onFocus={resetHideTimer}
                                 style={({ isFocused }) => [
@@ -741,8 +744,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                 </Text>
                             </FocusablePressable>
                         </View>
-                    </View>
-                </View>
+                    </TVFocusGuideView>
+                </TVFocusGuideView>
             </Animated.View>
         </View>
     );

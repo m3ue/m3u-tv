@@ -1,11 +1,10 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Pressable, ViewStyle, StyleProp, findNodeHandle } from 'react-native';
+import { Pressable, ViewStyle, StyleProp } from 'react-native';
 
 type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => StyleProp<ViewStyle>);
 
 export type FocusablePressableRef = {
   focus: () => void;
-  getNodeHandle: () => number | null;
 };
 
 interface FocusablePressableProps {
@@ -37,7 +36,6 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
     },
     ref,
   ) => {
-    const pressableRef = useRef<any>(null);
     const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const [isFocused, setIsFocused] = useState(false);
     const [forcePreferredFocus, setForcePreferredFocus] = useState(false);
@@ -52,7 +50,6 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
           setForcePreferredFocus(false);
         }, 250);
       },
-      getNodeHandle: () => findNodeHandle(pressableRef.current),
     }));
 
     useEffect(() => {
@@ -65,7 +62,6 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
 
     return (
       <Pressable
-        ref={pressableRef}
         collapsable={false}
         focusable
         hasTVPreferredFocus={preferredFocus || forcePreferredFocus}
