@@ -136,8 +136,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const rewindButtonRef = useRef<FocusablePressableRef>(null);
     const playButtonRef = useRef<FocusablePressableRef>(null);
     const forwardButtonRef = useRef<FocusablePressableRef>(null);
-    const timelineBackButtonRef = useRef<FocusablePressableRef>(null);
-    const timelineForwardButtonRef = useRef<FocusablePressableRef>(null);
+    const timelineRef = useRef<FocusablePressableRef>(null);
+    const timelineFocusedRef = useRef(false);
     const audioButtonRef = useRef<FocusablePressableRef>(null);
     const subtitleButtonRef = useRef<FocusablePressableRef>(null);
 
@@ -514,6 +514,30 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 return;
             }
 
+            // When timeline is focused, intercept left/right for scrubbing
+            if (timelineFocusedRef.current) {
+                if (event.eventType === 'left') {
+                    doSeek(-SEEK_STEP);
+                    resetHideTimer();
+                    return;
+                }
+                if (event.eventType === 'right') {
+                    doSeek(SEEK_STEP);
+                    resetHideTimer();
+                    return;
+                }
+                if (event.eventType === 'longLeft') {
+                    doSeek(-TIMELINE_SEEK_STEP);
+                    resetHideTimer();
+                    return;
+                }
+                if (event.eventType === 'longRight') {
+                    doSeek(TIMELINE_SEEK_STEP);
+                    resetHideTimer();
+                    return;
+                }
+            }
+
             if (event.eventType === 'playPause') {
                 doTogglePlayPause();
                 resetHideTimer();
@@ -679,13 +703,39 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
                     <FocusContainer style={styles.controlsBar}>
                         {canSeek && (
-                            <View style={styles.progressContainer}>
-                                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-                                <View style={styles.progressTrack}>
-                                    <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                                </View>
-                                <Text style={styles.timeText}>{formatTime(duration)}</Text>
-                            </View>
+                            <FocusablePressable
+                                ref={timelineRef}
+                                onFocus={() => {
+                                    timelineFocusedRef.current = true;
+                                    resetHideTimer();
+                                }}
+                                onBlur={() => {
+                                    timelineFocusedRef.current = false;
+                                }}
+                                style={({ isFocused }) => [
+                                    styles.progressContainer,
+                                    isFocused && styles.progressContainerFocused,
+                                ]}
+                            >
+                                {({ isFocused }) => (
+                                    <>
+                                        <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                                        <View style={[
+                                            styles.progressTrack,
+                                            isFocused && styles.progressTrackFocused,
+                                        ]}>
+                                            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                                            {isFocused && (
+                                                <View style={[
+                                                    styles.progressThumb,
+                                                    { left: `${progress}%` },
+                                                ]} />
+                                            )}
+                                        </View>
+                                        <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                                    </>
+                                )}
+                            </FocusablePressable>
                         )}
 
                         <View style={styles.controlsRow}>
@@ -731,34 +781,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                 >
                                     <Icon name="SkipForward" size={scaledPixels(22)} color={colors.text} />
                                 </FocusablePressable>
-                            )}
-
-                            {canSeek && (
-                                <>
-                                    <FocusablePressable
-                                        ref={timelineBackButtonRef}
-                                        onSelect={() => doSeek(-TIMELINE_SEEK_STEP)}
-                                        onFocus={resetHideTimer}
-                                        style={({ isFocused }) => [
-                                            styles.controlButton,
-                                            isFocused && styles.controlButtonFocused,
-                                        ]}
-                                    >
-                                        <Text style={styles.controlButtonText}>-30s</Text>
-                                    </FocusablePressable>
-
-                                    <FocusablePressable
-                                        ref={timelineForwardButtonRef}
-                                        onSelect={() => doSeek(TIMELINE_SEEK_STEP)}
-                                        onFocus={resetHideTimer}
-                                        style={({ isFocused }) => [
-                                            styles.controlButton,
-                                            isFocused && styles.controlButtonFocused,
-                                        ]}
-                                    >
-                                        <Text style={styles.controlButtonText}>+30s</Text>
-                                    </FocusablePressable>
-                                </>
                             )}
 
                             <View style={styles.controlsDivider} />
@@ -874,6 +896,12 @@ const styles = StyleSheet.create({
     progressContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        borderRadius: scaledPixels(8),
+        paddingVertical: scaledPixels(8),
+        paddingHorizontal: scaledPixels(4),
+    },
+    progressContainerFocused: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
     },
     progressTrack: {
         flex: 1,
@@ -881,12 +909,28 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.3)',
         borderRadius: scaledPixels(3),
         marginHorizontal: scaledPixels(12),
-        overflow: 'hidden',
+    },
+    progressTrackFocused: {
+        height: scaledPixels(10),
+        borderRadius: scaledPixels(5),
+        backgroundColor: 'rgba(255,255,255,0.4)',
     },
     progressFill: {
         height: '100%',
         backgroundColor: colors.primary,
-        borderRadius: scaledPixels(3),
+        borderRadius: scaledPixels(5),
+    },
+    progressThumb: {
+        position: 'absolute',
+        top: '50%',
+        width: scaledPixels(18),
+        height: scaledPixels(18),
+        borderRadius: scaledPixels(9),
+        backgroundColor: colors.primary,
+        borderWidth: scaledPixels(2),
+        borderColor: '#fff',
+        marginLeft: -scaledPixels(9),
+        marginTop: -scaledPixels(9),
     },
     timeText: {
         color: colors.textSecondary,
@@ -908,11 +952,6 @@ const styles = StyleSheet.create({
         paddingVertical: scaledPixels(10),
         borderRadius: scaledPixels(8),
         backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    controlButtonText: {
-        color: colors.text,
-        fontSize: scaledPixels(13),
-        fontWeight: '600',
     },
     controlButtonFocused: {
         backgroundColor: colors.primary,
