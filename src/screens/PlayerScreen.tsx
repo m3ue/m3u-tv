@@ -661,7 +661,23 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                             </View>
                         )}
 
-                        <View style={styles.transportRow}>
+                        <View style={styles.controlsRow}>
+                            <FocusablePressable
+                                ref={playButtonRef}
+                                onSelect={doTogglePlayPause}
+                                onFocus={resetHideTimer}
+                                style={({ isFocused }) => [
+                                    styles.controlButton,
+                                    isFocused && styles.controlButtonFocused,
+                                ]}
+                            >
+                                <Icon
+                                    name={paused ? 'Play' : 'Pause'}
+                                    size={scaledPixels(22)}
+                                    color={colors.text}
+                                />
+                            </FocusablePressable>
+
                             {!isLive && (
                                 <FocusablePressable
                                     ref={rewindButtonRef}
@@ -672,26 +688,9 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                         isFocused && styles.controlButtonFocused,
                                     ]}
                                 >
-                                    <Icon name="SkipBack" size={scaledPixels(28)} color={colors.text} />
+                                    <Icon name="SkipBack" size={scaledPixels(22)} color={colors.text} />
                                 </FocusablePressable>
                             )}
-
-                            <FocusablePressable
-                                ref={playButtonRef}
-                                onSelect={doTogglePlayPause}
-                                onFocus={resetHideTimer}
-                                style={({ isFocused }) => [
-                                    styles.controlButton,
-                                    styles.playButton,
-                                    isFocused && styles.controlButtonFocused,
-                                ]}
-                            >
-                                <Icon
-                                    name={paused ? 'Play' : 'Pause'}
-                                    size={scaledPixels(36)}
-                                    color={colors.text}
-                                />
-                            </FocusablePressable>
 
                             {!isLive && (
                                 <FocusablePressable
@@ -703,40 +702,40 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                         isFocused && styles.controlButtonFocused,
                                     ]}
                                 >
-                                    <Icon name="SkipForward" size={scaledPixels(28)} color={colors.text} />
+                                    <Icon name="SkipForward" size={scaledPixels(22)} color={colors.text} />
                                 </FocusablePressable>
                             )}
-                        </View>
 
-                        {canSeek && (
-                            <View style={styles.timelineControlRow}>
-                                <FocusablePressable
-                                    ref={timelineBackButtonRef}
-                                    onSelect={() => doSeek(-TIMELINE_SEEK_STEP)}
-                                    onFocus={resetHideTimer}
-                                    style={({ isFocused }) => [
-                                        styles.timelineSeekButton,
-                                        isFocused && styles.controlButtonFocused,
-                                    ]}
-                                >
-                                    <Text style={styles.timelineSeekText}>-30s</Text>
-                                </FocusablePressable>
+                            {canSeek && (
+                                <>
+                                    <FocusablePressable
+                                        ref={timelineBackButtonRef}
+                                        onSelect={() => doSeek(-TIMELINE_SEEK_STEP)}
+                                        onFocus={resetHideTimer}
+                                        style={({ isFocused }) => [
+                                            styles.controlButton,
+                                            isFocused && styles.controlButtonFocused,
+                                        ]}
+                                    >
+                                        <Text style={styles.controlButtonText}>-30s</Text>
+                                    </FocusablePressable>
 
-                                <FocusablePressable
-                                    ref={timelineForwardButtonRef}
-                                    onSelect={() => doSeek(TIMELINE_SEEK_STEP)}
-                                    onFocus={resetHideTimer}
-                                    style={({ isFocused }) => [
-                                        styles.timelineSeekButton,
-                                        isFocused && styles.controlButtonFocused,
-                                    ]}
-                                >
-                                    <Text style={styles.timelineSeekText}>+30s</Text>
-                                </FocusablePressable>
-                            </View>
-                        )}
+                                    <FocusablePressable
+                                        ref={timelineForwardButtonRef}
+                                        onSelect={() => doSeek(TIMELINE_SEEK_STEP)}
+                                        onFocus={resetHideTimer}
+                                        style={({ isFocused }) => [
+                                            styles.controlButton,
+                                            isFocused && styles.controlButtonFocused,
+                                        ]}
+                                    >
+                                        <Text style={styles.controlButtonText}>+30s</Text>
+                                    </FocusablePressable>
+                                </>
+                            )}
 
-                        <View style={styles.trackRow}>
+                            <View style={styles.controlsDivider} />
+
                             <FocusablePressable
                                 ref={audioButtonRef}
                                 onSelect={openAudioSelector}
@@ -746,11 +745,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                     isFocused && styles.controlButtonFocused,
                                 ]}
                             >
-                                <Icon name="Languages" size={scaledPixels(18)} color={colors.text} />
+                                <Icon name="Languages" size={scaledPixels(16)} color={colors.text} />
                                 <Text style={styles.trackButtonText} numberOfLines={1}>
-                                    Audio
-                                </Text>
-                                <Text style={styles.trackValueText} numberOfLines={1}>
                                     {selectedAudioLabel}
                                 </Text>
                             </FocusablePressable>
@@ -764,11 +760,8 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                     isFocused && styles.controlButtonFocused,
                                 ]}
                             >
-                                <Icon name="Captions" size={scaledPixels(18)} color={colors.text} />
+                                <Icon name="Captions" size={scaledPixels(16)} color={colors.text} />
                                 <Text style={styles.trackButtonText} numberOfLines={1}>
-                                    Subtitles
-                                </Text>
-                                <Text style={styles.trackValueText} numberOfLines={1}>
                                     {selectedSubtitleLabel}
                                 </Text>
                             </FocusablePressable>
@@ -875,47 +868,33 @@ const styles = StyleSheet.create({
         minWidth: scaledPixels(60),
         textAlign: 'center',
     },
-    transportRow: {
+    controlsRow: {
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        gap: scaledPixels(20),
-    },
-    timelineControlRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: scaledPixels(12),
-    },
-    timelineSeekButton: {
-        minWidth: scaledPixels(100),
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: scaledPixels(16),
-        paddingVertical: scaledPixels(10),
-        borderRadius: scaledPixels(999),
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    timelineSeekText: {
-        color: colors.text,
-        fontSize: scaledPixels(14),
-        fontWeight: '600',
+        gap: scaledPixels(8),
     },
     controlButton: {
-        padding: scaledPixels(12),
-        borderRadius: scaledPixels(50),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: scaledPixels(14),
+        paddingVertical: scaledPixels(10),
+        borderRadius: scaledPixels(8),
         backgroundColor: 'rgba(255,255,255,0.1)',
     },
-    playButton: {
-        paddingHorizontal: scaledPixels(20),
+    controlButtonText: {
+        color: colors.text,
+        fontSize: scaledPixels(13),
+        fontWeight: '600',
     },
     controlButtonFocused: {
         backgroundColor: colors.primary,
     },
-    trackRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: scaledPixels(12),
+    controlsDivider: {
+        width: 1,
+        height: scaledPixels(20),
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        marginHorizontal: scaledPixels(4),
     },
     trackButton: {
         flexDirection: 'row',
@@ -923,20 +902,12 @@ const styles = StyleSheet.create({
         gap: scaledPixels(6),
         paddingHorizontal: scaledPixels(12),
         paddingVertical: scaledPixels(10),
-        borderRadius: scaledPixels(999),
+        borderRadius: scaledPixels(8),
         backgroundColor: 'rgba(255,255,255,0.1)',
-        maxWidth: '48%',
-        minWidth: scaledPixels(210),
     },
     trackButtonText: {
         color: colors.text,
         fontSize: scaledPixels(13),
         fontWeight: '600',
-    },
-    trackValueText: {
-        color: colors.textSecondary,
-        fontSize: scaledPixels(12),
-        flex: 1,
-        textAlign: 'right',
     },
 });
