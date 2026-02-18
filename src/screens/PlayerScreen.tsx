@@ -13,7 +13,7 @@ import {
     Alert,
     ActionSheetIOS,
 } from 'react-native';
-import Video, { OnLoadData, OnProgressData, OnVideoErrorData, OnAudioTracksData, SelectedTrackType, ResizeMode, VideoRef } from 'react-native-video';
+import Video, { OnLoadData, OnProgressData, OnVideoErrorData, OnAudioTracksData, OnTextTracksData, SelectedTrackType, ResizeMode, VideoRef } from 'react-native-video';
 import { VLCPlayer } from 'react-native-vlc-media-player';
 import { RootStackScreenProps } from '../navigation/types';
 import { colors } from '../theme';
@@ -29,7 +29,7 @@ const USER_AGENT =
 const VLC_ONLY_EXTENSIONS = ['.avi', '.mkv', '.wmv', '.flv', '.rmvb', '.rm', '.asf', '.divx', '.ogm'];
 
 type PlayerBackend = 'native' | 'vlc';
-type PlayerTrack = { id: number; name: string };
+type PlayerTrack = { id: number; name: string; language?: string };
 
 function getInitialBackend(url: string): PlayerBackend {
     if (Platform.OS !== 'android') {
@@ -335,7 +335,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         // react-native-video includes audioTracks in OnLoadData
         const nativeAudio = (data as any).audioTracks as Array<{ index: number; title: string; language: string; type: string }> | undefined;
         if (nativeAudio && nativeAudio.length > 0) {
-            const mapped: PlayerTrack[] = nativeAudio.map(t => ({ id: t.index, name: t.title || t.language || `Track ${t.index}` }));
+            const mapped: PlayerTrack[] = nativeAudio.map(t => ({
+                id: t.index,
+                name: t.title || t.language || `Track ${t.index}`,
+                language: t.language,
+            }));
             setAudioTracks(mapped);
             if (!audioAutoSelectedRef.current && mapped.length > 0) {
                 setSelectedAudioTrack(mapped[0].id);
@@ -345,7 +349,11 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
 
         const nativeText = (data as any).textTracks as Array<{ index: number; title: string; language: string; type: string }> | undefined;
         if (nativeText && nativeText.length > 0) {
-            const mapped: PlayerTrack[] = nativeText.map(t => ({ id: t.index, name: t.title || t.language || `Track ${t.index}` }));
+            const mapped: PlayerTrack[] = nativeText.map(t => ({
+                id: t.index,
+                name: t.title || t.language || `Track ${t.index}`,
+                language: t.language,
+            }));
             setTextTracks(mapped);
         }
     }, []);
@@ -355,12 +363,24 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             const mapped: PlayerTrack[] = data.audioTracks.map(t => ({
                 id: t.index,
                 name: t.title || t.language || `Track ${t.index}`,
+                language: t.language,
             }));
             setAudioTracks(mapped);
             if (!audioAutoSelectedRef.current && mapped.length > 0) {
                 setSelectedAudioTrack(mapped[0].id);
                 audioAutoSelectedRef.current = true;
             }
+        }
+    }, []);
+
+    const handleNativeTextTracks = useCallback((data: OnTextTracksData) => {
+        if (data.textTracks && data.textTracks.length > 0) {
+            const mapped: PlayerTrack[] = data.textTracks.map(t => ({
+                id: t.index,
+                name: t.title || t.language || `Track ${t.index}`,
+                language: t.language,
+            }));
+            setTextTracks(mapped);
         }
     }, []);
 
@@ -551,6 +571,16 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         ? 'Off'
         : (textTracks.find((track) => track.id === selectedTextTrack)?.name ?? 'Select');
 
+    // For native player text track selection, prefer language-based selection (more reliable for HLS/ExoPlayer)
+    const nativeSelectedTextTrack = useMemo(() => {
+        if (!userSelectedTextRef.current || selectedTextTrack < 0) return undefined;
+        const track = textTracks.find(t => t.id === selectedTextTrack);
+        if (track?.language) {
+            return { type: SelectedTrackType.LANGUAGE, value: track.language };
+        }
+        return { type: SelectedTrackType.INDEX, value: selectedTextTrack };
+    }, [selectedTextTrack, textTracks]);
+
     return (
         <View style={styles.container}>
             <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -567,13 +597,10 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                                 ? { type: SelectedTrackType.INDEX, value: selectedAudioTrack }
                                 : undefined
                         }
-                        selectedTextTrack={
-                            userSelectedTextRef.current && selectedTextTrack >= 0
-                                ? { type: SelectedTrackType.INDEX, value: selectedTextTrack }
-                                : undefined
-                        }
+                        selectedTextTrack={nativeSelectedTextTrack}
                         onLoad={handleNativeLoad}
                         onAudioTracks={handleNativeAudioTracks}
+                        onTextTracks={handleNativeTextTracks}
                         onProgress={handleNativeProgress}
                         onError={handleNativeError}
                         progressUpdateInterval={500}
