@@ -7304,11 +7304,11 @@ __metadata:
 
 "react-native-vlc-media-player@patch:react-native-vlc-media-player@npm%3A1.0.98#~/.yarn/patches/react-native-vlc-media-player-npm-1.0.98-aae291c363.patch":
   version: 1.0.98
-  resolution: "react-native-vlc-media-player@patch:react-native-vlc-media-player@npm%3A1.0.98#~/.yarn/patches/react-native-vlc-media-player-npm-1.0.98-aae291c363.patch::version=1.0.98&hash=44883a"
+  resolution: "react-native-vlc-media-player@patch:react-native-vlc-media-player@npm%3A1.0.98#~/.yarn/patches/react-native-vlc-media-player-npm-1.0.98-aae291c363.patch::version=1.0.98&hash=9f17de"
   dependencies:
     react-native-slider: "npm:^0.11.0"
     react-native-vector-icons: "npm:^9.2.0"
-  checksum: 10c0/d068bd0a902fb059106e63efd102e8766dd18147995203b5a8e1f916193749ee29cd1646fa9166c953f9ca89a6830a260cb1af86c5f6bff807c59a0f79b22886
+  checksum: 10c0/9d14b48483336c22ffb9a362b9c224f68c1f4445c3024ac13eeb98e1e18ef58e1ef0b81d37d27f7689ea4bf3c395274e8e74d222d111582a1f85259f38671db2
   languageName: node
   linkType: hard
 

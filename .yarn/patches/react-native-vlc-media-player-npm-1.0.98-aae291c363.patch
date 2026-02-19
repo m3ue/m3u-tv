@@ -8,6 +8,24 @@ index 9b914420143b8f9b76d5d76e8aab5cc99cfcd5e3..0fe9e817089847f76a10db49c84d9346
       } = this.props;*/
 -    const source = resolveAssetSource(this.props.source) || {};
 +    const source = Object.assign({}, resolveAssetSource(this.props.source) || {});
- 
+
      let uri = source.uri || "";
      if (uri && uri.match(/^\//)) {
+diff --git a/android/src/main/java/com/yuanzhou/vlc/vlcplayer/ReactVlcPlayerView.java b/android/src/main/java/com/yuanzhou/vlc/vlcplayer/ReactVlcPlayerView.java
+--- a/android/src/main/java/com/yuanzhou/vlc/vlcplayer/ReactVlcPlayerView.java
++++ b/android/src/main/java/com/yuanzhou/vlc/vlcplayer/ReactVlcPlayerView.java
+@@ -133,7 +133,7 @@ public class ReactVlcPlayerView extends SurfaceView implements
+
+     @Override
+     public void onHostPause() {
+-        if (!isPaused && mMediaPlayer != null) {
++        if (!isPaused && mMediaPlayer != null && libvlc != null) {
+             isPaused = true;
+             isHostPaused = true;
+             mMediaPlayer.pause();
+@@ -495,4 +495,5 @@ public class ReactVlcPlayerView extends SurfaceView implements
+         //surfaceView.removeOnLayoutChangeListener(onLayoutChangeListener);
+         mMediaPlayer.release();
++        mMediaPlayer = null;
+         libvlc.release();
+         libvlc = null;
