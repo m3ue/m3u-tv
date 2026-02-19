@@ -53,4 +53,4 @@ jobs:
         run: npm run typecheck
 
       - name: Run npm audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=critical

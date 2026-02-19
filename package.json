@@ -54,6 +54,10 @@
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   },
+  "resolutions": {
+    "tar": ">=7.5.8",
+    "ajv": ">=8.18.0"
+  },
   "expo": {
     "install": {
       "exclude": [
