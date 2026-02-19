@@ -5,6 +5,7 @@ type StyleType = StyleProp<ViewStyle> | ((props: { isFocused: boolean }) => Styl
 
 export type FocusablePressableRef = {
   focus: () => void;
+  getNodeHandle: () => number | null;
 };
 
 interface FocusablePressableProps {
@@ -37,6 +38,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
     ref,
   ) => {
     const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const nativeTagRef = useRef<number | null>(null);
     const [isFocused, setIsFocused] = useState(false);
     const [forcePreferredFocus, setForcePreferredFocus] = useState(false);
 
@@ -50,6 +52,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
           setForcePreferredFocus(false);
         }, 250);
       },
+      getNodeHandle: () => nativeTagRef.current,
     }));
 
     useEffect(() => {
@@ -70,7 +73,8 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
         nextFocusLeft={nextFocusLeft}
         nextFocusRight={nextFocusRight}
         onPress={onSelect}
-        onFocus={() => {
+        onFocus={(e) => {
+          nativeTagRef.current = (e.nativeEvent as any).target ?? null;
           setIsFocused(true);
           setForcePreferredFocus(false);
           onFocus?.();

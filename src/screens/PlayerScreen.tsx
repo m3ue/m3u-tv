@@ -132,7 +132,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const initialBackend = useMemo(() => getInitialBackend(streamUrl), [streamUrl]);
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
 
-    const backButtonRef = useRef<FocusablePressableRef>(null);
     const rewindButtonRef = useRef<FocusablePressableRef>(null);
     const playButtonRef = useRef<FocusablePressableRef>(null);
     const forwardButtonRef = useRef<FocusablePressableRef>(null);
@@ -225,7 +224,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         resetHideTimer();
 
         setTimeout(() => {
-            backButtonRef.current?.focus();
+            playButtonRef.current?.focus();
         }, 150);
     }, [fadeAnim, resetHideTimer]);
 
@@ -233,7 +232,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         resetHideTimer();
         if (overlayVisible) {
             setTimeout(() => {
-                backButtonRef.current?.focus();
+                playButtonRef.current?.focus();
             }, 150);
         }
 
@@ -684,18 +683,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             >
                 <FocusContainer style={styles.overlayInner}>
                     <View style={styles.header}>
-                        <FocusablePressable
-                            ref={backButtonRef}
-                            onSelect={goBackSafe}
-                            onFocus={resetHideTimer}
-                            style={({ isFocused }) => [
-                                styles.backButton,
-                                isFocused && styles.controlButtonFocused,
-                            ]}
-                        >
-                            <Icon name="ArrowLeft" size={scaledPixels(32)} color={colors.text} />
-                        </FocusablePressable>
-
                         <Text style={styles.title} numberOfLines={1}>
                             {title}
                         </Text>
@@ -865,7 +852,7 @@ const styles = StyleSheet.create({
     },
     overlayInner: {
         flex: 1,
-        justifyContent: 'space-between' as const,
+        justifyContent: 'flex-end' as const,
     },
     header: {
         flexDirection: 'row',
@@ -879,9 +866,10 @@ const styles = StyleSheet.create({
     title: {
         flex: 1,
         color: colors.text,
-        fontSize: scaledPixels(24),
+        fontSize: scaledPixels(32),
         fontWeight: 'bold',
-        marginLeft: scaledPixels(20),
+        marginLeft: scaledPixels(10),
+        marginBottom: scaledPixels(16),
         textShadowColor: 'black',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 5,
