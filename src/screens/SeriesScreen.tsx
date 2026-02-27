@@ -73,20 +73,6 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
 
   return (
     <View style={styles.container}>
-      {/* Category selector */}
-      <View style={styles.categoryListContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryList}
-          contentContainerStyle={styles.categoryListContent}
-        >
-          {[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories].map((item, index) =>
-            renderCategoryItem({ item, index })
-          )}
-        </ScrollView>
-      </View>
-
       {/* Series grid */}
       <View style={styles.gridContent}>
         {isLoading ? (
@@ -101,6 +87,18 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
             style={styles.seriesGrid}
             keyExtractor={(item) => String(item.series_id)}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={<View style={styles.categoryListContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryList}
+                contentContainerStyle={styles.categoryListContent}
+              >
+                {[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories].map((item, index) =>
+                  renderCategoryItem({ item, index })
+                )}
+              </ScrollView>
+            </View>}
           />
         )}
       </View>
@@ -133,12 +131,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    overflow: 'hidden',
     zIndex: 5,
   },
   categoryList: {
     flex: 1,
-    overflow: 'visible',
+    borderRadius: scaledPixels(50),
   },
   categoryListContent: {
     paddingHorizontal: scaledPixels(20),

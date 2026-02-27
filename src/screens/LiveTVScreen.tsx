@@ -75,20 +75,6 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
 
   return (
     <View style={styles.container}>
-      {/* Category selector */}
-      <View style={styles.categoryListContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryList}
-          contentContainerStyle={styles.categoryListContent}
-        >
-          {[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories].map((item, index) =>
-            renderCategoryItem({ item, index })
-          )}
-        </ScrollView>
-      </View>
-
       {/* Channels grid */}
       <View style={styles.gridContainer}>
         {isLoading ? (
@@ -103,6 +89,20 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
             style={styles.channelGrid}
             keyExtractor={(item) => String(item.stream_id)}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.categoryListContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.categoryList}
+                  contentContainerStyle={styles.categoryListContent}
+                >
+                  {[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories].map((item, index) =>
+                    renderCategoryItem({ item, index })
+                  )}
+                </ScrollView>
+              </View>
+            }
           />
         )}
       </View>
@@ -134,12 +134,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    overflow: 'hidden',
     zIndex: 5,
   },
   categoryList: {
     flex: 1,
-    overflow: 'visible',
+    borderRadius: scaledPixels(50),
   },
   categoryListContent: {
     paddingHorizontal: scaledPixels(20),

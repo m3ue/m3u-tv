@@ -76,20 +76,6 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
 
   return (
     <View style={styles.container}>
-      {/* Category selector */}
-      <View style={styles.categoryListContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryList}
-          contentContainerStyle={styles.categoryListContent}
-        >
-          {[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories].map((item, index) =>
-            renderCategoryItem({ item, index })
-          )}
-        </ScrollView>
-      </View>
-
       {/* Movies grid */}
       <View style={styles.gridContent}>
         {isLoading ? (
@@ -104,6 +90,18 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
             style={styles.movieGrid}
             keyExtractor={(item) => String(item.stream_id)}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={<View style={styles.categoryListContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryList}
+                contentContainerStyle={styles.categoryListContent}
+              >
+                {[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories].map((item, index) =>
+                  renderCategoryItem({ item, index })
+                )}
+              </ScrollView>
+            </View>}
           />
         )}
       </View>
@@ -136,12 +134,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrimDark,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    overflow: 'hidden',
     zIndex: 5,
   },
   categoryList: {
     flex: 1,
-    overflow: 'visible',
+    borderRadius: scaledPixels(50),
   },
   categoryListContent: {
     paddingHorizontal: scaledPixels(20),
