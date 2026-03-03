@@ -89,6 +89,10 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
             style={styles.channelGrid}
             keyExtractor={(item) => String(item.stream_id)}
             showsVerticalScrollIndicator={false}
+            removeClippedSubviews
+            initialNumToRender={24}
+            maxToRenderPerBatch={16}
+            windowSize={5}
             ListHeaderComponent={
               <View style={styles.categoryListContainer}>
                 <ScrollView

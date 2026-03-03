@@ -87,6 +87,10 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
             style={styles.seriesGrid}
             keyExtractor={(item) => String(item.series_id)}
             showsVerticalScrollIndicator={false}
+            removeClippedSubviews
+            initialNumToRender={24}
+            maxToRenderPerBatch={16}
+            windowSize={5}
             ListHeaderComponent={<View style={styles.categoryListContainer}>
               <ScrollView
                 horizontal
