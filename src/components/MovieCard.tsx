@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   moviePoster: {
     width: '100%',
-    borderRadius: scaledPixels(12),
+    borderRadius: scaledPixels(8),
     aspectRatio: 2 / 3,
   },
   movieInfo: {

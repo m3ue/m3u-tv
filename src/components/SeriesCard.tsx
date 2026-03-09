@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   seriesPoster: {
     width: '100%',
-    borderRadius: scaledPixels(12),
+    borderRadius: scaledPixels(8),
     aspectRatio: 2 / 3,
   },
   seriesInfo: {
