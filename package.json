@@ -7,6 +7,7 @@
     "start": "EXPO_TV=1 expo start",
     "android": "EXPO_TV=1 expo run:android",
     "bundle-android": "cd android && ./gradlew bundleRelease && cd ..",
+    "build-apk": "cd android && ./gradlew assembleRelease && cd ..",
     "ios": "EXPO_TV=1 expo run:ios",
     "web": "expo start --web",
     "prebuild": "EXPO_TV=1 expo prebuild --clean",
