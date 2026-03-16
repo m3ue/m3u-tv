@@ -103,9 +103,11 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
                 style={styles.categoryList}
                 contentContainerStyle={styles.categoryListContent}
               >
-                {[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories].map((item, index) =>
-                  renderCategoryItem({ item, index })
-                )}
+                {[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories].map((item, index) => (
+                  <React.Fragment key={item.category_id || 'all'}>
+                    {renderCategoryItem({ item, index })}
+                  </React.Fragment>
+                ))}
               </ScrollView>
             </View>
           }

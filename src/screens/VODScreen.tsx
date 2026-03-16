@@ -96,9 +96,11 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
               style={styles.categoryList}
               contentContainerStyle={styles.categoryListContent}
             >
-              {[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories].map((item, index) =>
-                renderCategoryItem({ item, index })
-              )}
+              {[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories].map((item, index) => (
+                <React.Fragment key={item.category_id || 'all'}>
+                  {renderCategoryItem({ item, index })}
+                </React.Fragment>
+              ))}
             </ScrollView>
           </View>}
         />

@@ -122,21 +122,16 @@ const FocusContainer = isTVOS
 const PROGRESS_INTERVAL_MS = 10_000; // Report progress every 10 seconds
 
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
-    const { title, type, streamId, seriesId, seasonNumber, startPosition } = route.params;
+    const { streamUrl, title, type, streamId, seriesId, seasonNumber, startPosition } = route.params;
     const isLive = type === 'live';
 
     const { isM3UEditor } = useXtream();
     const { activeViewer, updateProgress } = useViewer();
 
+    const [currentStreamUrl, setCurrentStreamUrl] = useState(streamUrl);
+    const formatRetried = useRef(false);
 
-    // DEBUGGING: Temporary hardcoded stream URL for testing purposes
-    let streamUrl = 'https://ftp.halifax.rwth-aachen.de/blender/demo/movies/Sintel.2010.1080p.mkv';
-    if (isLive) {
-        streamUrl = 'https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/5c12ba66eae03059cbdc77f2/master.m3u8?advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId=3c1b5410-0cf9-11f1-aa0b-e3d711d187f5&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid=ffaf6ba5-9e47-4c47-b494-a79be9873606&userId=&serverSideAds=true';
-    }
-
-
-    const initialBackend = useMemo(() => getInitialBackend(streamUrl), [streamUrl]);
+    const initialBackend = useMemo(() => getInitialBackend(currentStreamUrl), [currentStreamUrl]);
     const [backend, setBackend] = useState<PlayerBackend>(initialBackend);
 
     const rewindButtonRef = useRef<FocusablePressableRef>(null);
@@ -238,14 +233,14 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const nativeSourceRef = useRef<any>(null);
     const vlcSourceRef = useRef<any>(null);
 
-    if (!nativeSourceRef.current || nativeSourceRef.current.uri !== streamUrl) {
+    if (!nativeSourceRef.current || nativeSourceRef.current.uri !== currentStreamUrl) {
         nativeSourceRef.current = {
-            uri: streamUrl,
+            uri: currentStreamUrl,
             headers: { 'User-Agent': USER_AGENT },
             isNetwork: true,
         };
         vlcSourceRef.current = {
-            uri: streamUrl,
+            uri: currentStreamUrl,
             initOptions: ['--network-caching=3000', `--http-user-agent=${USER_AGENT}`],
             isNetwork: true,
         };
@@ -444,11 +439,36 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     }, []);
 
     const handleNativeError = useCallback((nativeError: OnVideoErrorData) => {
-        console.error('[PlayerScreenNew] Native playback error', nativeError);
+        // If HLS parse error and we haven't tried swapping format yet, try .ts ↔ .m3u8
+        if (backendRef.current === 'native' && !formatRetried.current) {
+            const errorStr = JSON.stringify(nativeError).toLowerCase();
+            const isFormatError = errorStr.includes('parserexception') ||
+                errorStr.includes('parsing_manifest') ||
+                errorStr.includes('contentismalformed');
+
+            if (isFormatError) {
+                formatRetried.current = true;
+                setCurrentStreamUrl((prev) => {
+                    const newUrl = prev.endsWith('.m3u8')
+                        ? prev.replace(/\.m3u8$/, '.ts')
+                        : prev.endsWith('.ts')
+                            ? prev.replace(/\.ts$/, '.m3u8')
+                            : prev;
+                    console.log(`[PlayerScreen] Format fallback: ${prev.split('/').pop()} → ${newUrl.split('/').pop()}`);
+                    return newUrl;
+                });
+                setError(null);
+                setIsLoading(true);
+                return;
+            }
+        }
+
+        console.error('[PlayerScreen] Playback error', nativeError);
 
         if (backendRef.current === 'native') {
+            console.log('[PlayerScreen] Native failed, switching to VLC backend');
             setBackend('vlc');
-            setError('Native playback failed, retrying with VLC...');
+            setError(null);
             setIsLoading(true);
             return;
         }
@@ -671,6 +691,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             <View style={StyleSheet.absoluteFill} pointerEvents="none">
                 {backend === 'native' ? (
                     <Video
+                        key={`native-${currentStreamUrl}`}
                         ref={nativeRef}
                         source={{ ...nativeSourceRef.current }}
                         style={styles.player}
@@ -693,6 +714,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                     />
                 ) : (
                     <VLCPlayer
+                        key={`vlc-${currentStreamUrl}`}
                         ref={vlcRef}
                         style={styles.player}
                         source={{ ...vlcSourceRef.current }}

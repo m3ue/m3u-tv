@@ -96,9 +96,11 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
               style={styles.categoryList}
               contentContainerStyle={styles.categoryListContent}
             >
-              {[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories].map((item, index) =>
-                renderCategoryItem({ item, index })
-              )}
+              {[{ category_id: '', category_name: 'All Series', parent_id: 0 }, ...seriesCategories].map((item, index) => (
+                <React.Fragment key={item.category_id || 'all'}>
+                  {renderCategoryItem({ item, index })}
+                </React.Fragment>
+              ))}
             </ScrollView>
           </View>}
         />
