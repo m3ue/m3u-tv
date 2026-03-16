@@ -134,12 +134,12 @@ yarn lint
 
 ## Future Enhancements
 
-- [x] Enhanced EPG with timeline view (planby integration)
-- [x] Search functionality
+- [x] Enhanced EPG with timeline view
+- [x] Continue watching
+- [x] Multiple profile support
 - [ ] Favorites/Watchlist
-- [ ] Continue watching
+- [x] Search functionality
 - [ ] Parental controls
-- [ ] Multiple profile support
 - [ ] Stream quality selection
 - [ ] Catchup/DVR support
 
