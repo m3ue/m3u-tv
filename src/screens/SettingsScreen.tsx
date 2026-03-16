@@ -41,6 +41,10 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
     vodCategories,
     seriesCategories,
     isM3UEditor,
+    fetchLiveStreams,
+    fetchVodStreams,
+    fetchSeries,
+    refreshCategories,
   } = useXtream();
   const { activeViewer } = useViewer();
 
@@ -52,6 +56,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [refreshInterval, setRefreshInterval] = useState(60);
+  const [refreshingKey, setRefreshingKey] = useState<string | null>(null);
 
   useEffect(() => {
     cacheService.loadSettings().then((s) => setRefreshInterval(s.refreshIntervalMinutes));
@@ -65,6 +70,19 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   const handleClearCache = async () => {
     await cacheService.clear();
     Alert.alert('Cache Cleared', 'All cached content has been removed.');
+  };
+
+  const handleManualRefresh = async (key: string, action: () => Promise<unknown>) => {
+    if (refreshingKey) return;
+    setRefreshingKey(key);
+    try {
+      await action();
+      Alert.alert('Refreshed', `${key} data has been refreshed.`);
+    } catch {
+      Alert.alert('Error', `Failed to refresh ${key}.`);
+    } finally {
+      setRefreshingKey(null);
+    }
   };
 
   const handleConnect = async () => {
@@ -230,6 +248,36 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
                     ]}
                   >
                     {option.label}
+                  </Text>
+                )}
+              </FocusablePressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Manual Refresh</Text>
+          <View style={styles.refreshActions}>
+            {[
+              { key: 'Categories', action: () => refreshCategories() },
+              { key: 'Channels', action: () => fetchLiveStreams(undefined, true) },
+              { key: 'Movies', action: () => fetchVodStreams(undefined, true) },
+              { key: 'Series', action: () => fetchSeries(undefined, true) },
+            ].map((item) => (
+              <FocusablePressable
+                key={item.key}
+                style={({ isFocused }) => [
+                  styles.refreshAction,
+                  isFocused && styles.refreshActionFocused,
+                ]}
+                onSelect={() => handleManualRefresh(item.key, item.action)}
+              >
+                {({ isFocused }) => (
+                  <Text
+                    style={[
+                      styles.refreshActionText,
+                      isFocused && styles.buttonTextFocused,
+                    ]}
+                  >
+                    {refreshingKey === item.key ? 'Refreshing...' : item.key}
                   </Text>
                 )}
               </FocusablePressable>
@@ -628,5 +676,30 @@ const styles = StyleSheet.create({
   refreshOptionTextActive: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  refreshActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: scaledPixels(12),
+    marginBottom: scaledPixels(spacing.lg),
+  },
+  refreshAction: {
+    backgroundColor: colors.card,
+    paddingHorizontal: scaledPixels(24),
+    paddingVertical: scaledPixels(14),
+    borderRadius: scaledPixels(12),
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  refreshActionFocused: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    transform: [{ scale: 1.08 }],
+  },
+  refreshActionText: {
+    color: colors.textSecondary,
+    fontSize: scaledPixels(18),
+    fontWeight: '500',
   },
 });
