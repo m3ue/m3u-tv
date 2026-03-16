@@ -30,7 +30,6 @@ export type DrawerParamList = {
   Home: undefined;
   Search: undefined;
   LiveTV: undefined;
-  EPG: undefined;
   VOD: undefined;
   Series: undefined;
   Settings: undefined;

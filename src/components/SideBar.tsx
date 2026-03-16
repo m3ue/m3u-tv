@@ -15,7 +15,7 @@ import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
 import { DrawerParamList } from '../navigation/types';
-import { FocusablePressable, FocusablePressableRef } from './FocusablePressable';
+import { FocusablePressable } from './FocusablePressable';
 import { navigationRef } from '../navigation/navigationRef';
 import { BlurView } from 'expo-blur';
 
@@ -39,7 +39,6 @@ const MENU_ITEMS: MenuItem[] = [
     { id: 'Home', label: 'Home', icon: 'Home' },
     { id: 'Search', label: 'Search', icon: 'Search' },
     { id: 'LiveTV', label: 'Live TV', icon: 'Tv' },
-    { id: 'EPG', label: 'TV Guide', icon: 'Calendar' },
     { id: 'VOD', label: 'Movies', icon: 'Film' },
     { id: 'Series', label: 'Series', icon: 'Tv2' },
     { id: 'Settings', label: 'Settings', icon: 'Settings' },
@@ -64,29 +63,16 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
     const isMenuRoute = MENU_ITEMS.some((item) => item.id === currentRouteName);
     const activeMenuId = isMenuRoute ? currentRouteName : preferredMenuId;
 
-    // Refs to each menu item so we can set focus programmatically
-    const menuItemRefs = useRef<Record<string, FocusablePressableRef | null>>({});
-
     // External request to focus sidebar (e.g., back button or explicit activation)
     useEffect(() => {
         if (isSidebarActive) {
             setExpanded(true);
             wasSidebarActiveRef.current = true;
-            // When the EPG screen opens the sidebar programmatically, native focus
-            // is held by the EPG's FocusCapture (which has just been deactivated).
-            // Explicitly move focus to the current menu item so the user can
-            // immediately navigate with Up/Down.
-            if (currentRouteName === 'EPG') {
-                const target =
-                    menuItemRefs.current[preferredMenuId] ??
-                    Object.values(menuItemRefs.current).find(Boolean);
-                target?.focus();
-            }
             return;
         }
         wasSidebarActiveRef.current = false;
         setExpanded(false);
-    }, [isSidebarActive, setExpanded, currentRouteName, preferredMenuId]);
+    }, [isSidebarActive, setExpanded]);
 
     // Keep preferred item in sync with active route.
     useEffect(() => {
@@ -168,11 +154,7 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                 <View style={styles.menuContainer}>
                     {MENU_ITEMS.map((item) => (
                         <FocusablePressable
-                            ref={(r) => {
-                                menuItemRefs.current[item.id] = r;
-                            }}
                             key={item.id}
-                            focusable={currentRouteName !== 'EPG' || isSidebarActive}
                             nextFocusRight={contentFocusTag}
                             onSelect={() => {
                                 console.log(`[SideBar] onSelect triggered for: ${item.id}`);
@@ -185,9 +167,6 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                                 }
                             }}
                             onFocus={() => {
-                                // The EPG screen manages its own focus; never activate the
-                                // sidebar from a native focus event while EPG is active.
-                                if (currentRouteName === 'EPG') return;
                                 setExpanded(true);
                                 if (!isSidebarActive) {
                                     setSidebarActive(true);

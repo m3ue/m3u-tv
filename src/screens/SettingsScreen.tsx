@@ -143,14 +143,6 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
             </FocusablePressable>
             <FocusablePressable
               style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
-              onSelect={() => navigation.navigate('EPG')}
-            >
-              {({ isFocused }) => (
-                <Text style={[styles.menuButtonText, isFocused && styles.buttonTextFocused]}>EPG Guide</Text>
-              )}
-            </FocusablePressable>
-            <FocusablePressable
-              style={({ isFocused }) => [styles.menuButton, isFocused && styles.menuButtonFocused]}
               onSelect={() => navigation.navigate('VOD')}
             >
               {({ isFocused }) => (
