@@ -10,6 +10,7 @@ export type FocusablePressableRef = {
 
 interface FocusablePressableProps {
   onSelect?: () => void;
+  onLongPress?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
   preferredFocus?: boolean;
@@ -26,6 +27,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
   (
     {
       onSelect,
+      onLongPress,
       onFocus,
       onBlur,
       preferredFocus,
@@ -75,6 +77,7 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
         nextFocusLeft={nextFocusLeft}
         nextFocusRight={nextFocusRight}
         onPress={onSelect}
+        onLongPress={onLongPress}
         onFocus={(e) => {
           nativeTagRef.current = (e.nativeEvent as any).target ?? null;
           setIsFocused(true);

@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useXtream } from '../context/XtreamContext';
 import { cacheService, EpgViewMode } from '../services/CacheService';
 import { epgService } from '../services/EpgService';
+import { favoritesService } from '../services/FavoritesService';
 import { EPGGrid } from '../components/EPGGrid';
 import { Icon } from '../components/Icon';
 import { useMenu } from '../context/MenuContext';
@@ -42,7 +43,10 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const { isConfigured, liveCategories, fetchLiveStreams, getLiveStreamUrl } = useXtream();
   const [liveStreams, setLiveStreams] = useState<XtreamLiveStream[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+  const [categoryInitialized, setCategoryInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const allStreamsRef = useRef<XtreamLiveStream[]>([]);
   const [epgMap, setEpgMap] = useState<Record<string, EpgInfo | null>>({});
   const [epgLoaded, setEpgLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<EpgViewMode>('list');
@@ -50,9 +54,16 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const liveStreamsRef = useRef(liveStreams);
   liveStreamsRef.current = liveStreams;
 
-  // Load persisted view mode
+  // Load persisted view mode, last category, and favorites
   useEffect(() => {
     cacheService.loadSettings().then((s) => setViewMode(s.epgViewMode));
+    favoritesService.load().then(() => {
+      setFavoriteIds(new Set(favoritesService.getAll()));
+      return favoritesService.getLastCategory();
+    }).then((lastCat) => {
+      if (lastCat !== undefined) setSelectedCategory(lastCat);
+      setCategoryInitialized(true);
+    });
   }, []);
 
   // Helper: load EPG for a set of stream IDs and merge into epgMap
@@ -172,13 +183,39 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     return () => clearInterval(interval);
   }, [epgLoaded, liveStreams]);
 
+  const FAVORITES_CATEGORY = '__FAVORITES__';
+
+  const toggleFavorite = useCallback(async (streamId: number) => {
+    await favoritesService.toggle(streamId);
+    setFavoriteIds(new Set(favoritesService.getAll()));
+    if (selectedCategory === FAVORITES_CATEGORY) {
+      setLiveStreams((prev) => prev.filter((s) => favoritesService.isFavorite(s.stream_id)));
+    }
+  }, [selectedCategory]);
+
   // Load streams for the selected category
   const loadStreams = useCallback(
     async (categoryId?: string) => {
       setIsLoading(true);
       try {
-        const streams = await fetchLiveStreams(categoryId);
-        setLiveStreams(streams);
+        if (categoryId === FAVORITES_CATEGORY) {
+          const allFavIds = favoritesService.getAll();
+          if (allFavIds.length === 0) {
+            setLiveStreams([]);
+            return;
+          }
+          let all = allStreamsRef.current;
+          if (all.length === 0) {
+            all = await fetchLiveStreams();
+            allStreamsRef.current = all;
+          }
+          const favSet = new Set(allFavIds);
+          setLiveStreams(all.filter((s) => favSet.has(s.stream_id)));
+        } else {
+          const streams = await fetchLiveStreams(categoryId);
+          if (!categoryId) allStreamsRef.current = streams;
+          setLiveStreams(streams);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -188,9 +225,15 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
 
   // Fetch live streams when screen becomes focused or category changes
   useEffect(() => {
-    if (!isConfigured || !isFocused) return;
+    if (!isConfigured || !isFocused || !categoryInitialized) return;
     loadStreams(selectedCategory);
-  }, [isConfigured, isFocused, selectedCategory, loadStreams]);
+  }, [isConfigured, isFocused, selectedCategory, categoryInitialized, loadStreams]);
+
+  // Persist selected category
+  useEffect(() => {
+    if (!categoryInitialized) return;
+    favoritesService.setLastCategory(selectedCategory);
+  }, [selectedCategory, categoryInitialized]);
 
   const toggleViewMode = useCallback(async () => {
     const next = viewMode === 'list' ? 'grid' : 'list';
@@ -218,7 +261,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
       onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
       style={({ isFocused }) => [
         styles.categoryButton,
-        selectedCategory === item.category_id && styles.categoryButtonActive,
+        (selectedCategory ?? undefined) === (item.category_id || undefined) && styles.categoryButtonActive,
         isFocused && styles.categoryButtonFocused,
       ]}
       onSelect={() => {
@@ -229,7 +272,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
         <Text
           style={[
             styles.categoryText,
-            selectedCategory === item.category_id && styles.categoryTextActive,
+            (selectedCategory ?? undefined) === (item.category_id || undefined) && styles.categoryTextActive,
             isFocused && styles.categoryTextFocused,
           ]}
           numberOfLines={1}
@@ -243,6 +286,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const renderStreamItem = useCallback(
     ({ item, index }: { item: XtreamLiveStream; index: number }) => {
       const epg = epgMap[String(item.stream_id)];
+      const isFav = favoriteIds.has(item.stream_id);
       return (
         <FocusablePressable
           onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
@@ -251,6 +295,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
             isFocused && styles.channelRowFocused,
           ]}
           onSelect={() => handleChannelSelect(item)}
+          onLongPress={() => toggleFavorite(item.stream_id)}
         >
           {({ isFocused: focused }) => (
             <View style={styles.channelRowInner}>
@@ -290,6 +335,11 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
                   <Text style={styles.noEpg}>No program info</Text>
                 )}
               </View>
+              {isFav && (
+                <View style={styles.favStar}>
+                  <Icon name="Star" size={scaledPixels(18)} color={colors.warning} />
+                </View>
+              )}
               {epg?.nextTitle ? (
                 <View style={styles.nextInfo}>
                   <Text style={styles.nextLabel}>Next</Text>
@@ -306,7 +356,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
         </FocusablePressable>
       );
     },
-    [epgMap, handleChannelSelect, isSidebarActive, setSidebarActive],
+    [epgMap, favoriteIds, handleChannelSelect, toggleFavorite, isSidebarActive, setSidebarActive],
   );
 
   if (!isConfigured) {
@@ -345,7 +395,11 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
             style={styles.categoryList}
             contentContainerStyle={styles.categoryListContent}
           >
-            {[{ category_id: '', category_name: 'All Channels', parent_id: 0 }, ...liveCategories].map(
+            {[
+              { category_id: '', category_name: 'All Channels', parent_id: 0 },
+              { category_id: FAVORITES_CATEGORY, category_name: '★ Favorites', parent_id: 0 },
+              ...liveCategories,
+            ].map(
               (item, index) => (
                 <React.Fragment key={item.category_id ? `cat-${item.category_id}` : `idx-${index}`}>
                   {renderCategoryItem({ item, index })}
@@ -360,7 +414,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
       {viewMode === 'list' ? (
         <FlatList
           data={liveStreams}
-          extraData={epgMap}
+          extraData={[epgMap, favoriteIds]}
           renderItem={renderStreamItem}
           keyExtractor={(item) => String(item.stream_id)}
           showsVerticalScrollIndicator={false}
@@ -538,6 +592,11 @@ const styles = StyleSheet.create({
   },
   channelNameFocused: {
     color: '#ffffff',
+  },
+
+  // Favorite star
+  favStar: {
+    marginRight: scaledPixels(4),
   },
 
   // EPG info
