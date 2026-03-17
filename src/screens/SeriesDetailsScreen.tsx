@@ -64,6 +64,17 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
     const loadInfo = async () => {
       try {
         const info = await fetchSeriesInfo(item.series_id);
+        if ((!info.seasons || info.seasons.length === 0) && info.episodes) {
+          const keys = Object.keys(info.episodes).sort((a, b) => Number(a) - Number(b));
+          info.seasons = keys.map((k) => ({
+            air_date: '',
+            episode_count: info.episodes[k].length,
+            id: Number(k),
+            name: `Season ${k}`,
+            overview: '',
+            season_number: Number(k),
+          }));
+        }
         setSeriesInfo(info);
         if (info.seasons && info.seasons.length > 0) {
           setSelectedSeason(String(info.seasons[0].season_number));
