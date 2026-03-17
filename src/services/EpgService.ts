@@ -19,7 +19,7 @@ export interface EpgCurrentNext {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const EPG_CACHE_KEY = 'm3ue_epg_v4';
+const EPG_CACHE_KEY = 'm3ue_epg_v7';
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const BATCH_SIZE = 50; // Max streams per batch request (server allows 100)
 
@@ -67,7 +67,6 @@ class EpgService {
   /** Pending batch promises to deduplicate concurrent requests */
   private pendingBatches: Map<string, Promise<void>> = new Map();
   private cacheRestored = false;
-  private _loggedTimestampDebug = false;
 
   // ── Public API ──────────────────────────────────────────────────────────
 
@@ -130,7 +129,6 @@ class EpgService {
   async loadBatch(streamIds: number[]): Promise<void> {
     // Filter to streams that need refreshing
     const toFetch = streamIds.filter((id) => !this._isFresh(String(id)));
-    console.log('[EpgService] loadBatch: requested', streamIds.length, 'toFetch', toFetch.length);
     if (toFetch.length === 0) return;
 
     // Process in chunks of BATCH_SIZE
@@ -165,7 +163,6 @@ class EpgService {
     const toFetch = streams.filter(
       (s) => !this.data.has(String(s.streamId)) || !this._isFresh(String(s.streamId)),
     );
-    console.log('[EpgService] loadFullProgrammes: requested', streams.length, 'toFetch', toFetch.length);
     if (toFetch.length === 0) return;
 
     const ids = toFetch.map((s) => s.streamId);
@@ -173,16 +170,9 @@ class EpgService {
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const chunk = ids.slice(i, i + BATCH_SIZE);
       try {
-        console.log('[EpgService] Fetching full EPG batch, chunk size:', chunk.length, 'first IDs:', chunk.slice(0, 5));
         const result = await xtreamService.getFullEpgBatch(chunk);
-        const resultKeys = Object.keys(result);
-        console.log('[EpgService] Full EPG batch result keys:', resultKeys.length, 'sample:', resultKeys.slice(0, 3));
         for (const id of chunk) {
           const epgData = result[String(id)];
-          const listingsCount = epgData?.epg_listings?.length ?? 0;
-          if (listingsCount > 0) {
-            console.log('[EpgService] Stream', id, 'has', listingsCount, 'listings');
-          }
           this._storeListings(String(id), epgData?.epg_listings, false);
         }
       } catch (err) {
@@ -226,19 +216,6 @@ class EpgService {
       }
     }
     if (currentIdx === -1) {
-      // Debug: log why no match found
-      if (!this._loggedTimestampDebug) {
-        this._loggedTimestampDebug = true;
-        const first = programmes[0];
-        const last = programmes[programmes.length - 1];
-        console.log('[EpgService] _lookupCurrentNext MISS key=', key,
-          'count=', programmes.length,
-          'now=', Math.floor(now),
-          'range=', first.startTimestamp, '-', last.stopTimestamp,
-          'diff_start=', Math.floor(now - first.startTimestamp), 's',
-          'diff_end=', Math.floor(last.stopTimestamp - now), 's',
-          'title0=', first.title.substring(0, 30));
-      }
       return null;
     }
 
@@ -287,35 +264,18 @@ class EpgService {
       }))
       .sort((a, b) => a.startTimestamp - b.startTimestamp);
 
-    if (programmes.length > 0) {
-      const first = programmes[0];
-      const last = programmes[programmes.length - 1];
-      const now = Math.floor(Date.now() / 1000);
-      console.log('[EpgService] _storeListings key=', key, 'count=', programmes.length,
-        'range:', first.startTimestamp, '-', last.stopTimestamp,
-        'now:', now, 'nowInRange:', first.startTimestamp <= now && now <= last.stopTimestamp,
-        'firstTitle:', first.title.substring(0, 30));
-    }
-
     this.data.set(key, programmes);
     this.fetchTimes.set(key, Date.now());
   }
 
   private async _fetchBatch(streamIds: number[]): Promise<void> {
     try {
-      console.log('[EpgService] _fetchBatch: fetching', streamIds.length, 'streams, first IDs:', streamIds.slice(0, 5));
       const result = await xtreamService.getEpgBatch(streamIds);
-      const resultKeys = Object.keys(result);
-      console.log('[EpgService] _fetchBatch result keys:', resultKeys.length, 'sample:', resultKeys.slice(0, 3));
 
-      let storedCount = 0;
       for (const id of streamIds) {
         const epgData = result[String(id)];
-        const listingsCount = epgData?.epg_listings?.length ?? 0;
         this._storeListings(String(id), epgData?.epg_listings, false);
-        if (listingsCount > 0) storedCount++;
       }
-      console.log('[EpgService] _fetchBatch stored', storedCount, '/', streamIds.length, 'with data');
 
       this._saveToCache();
     } catch (err) {
@@ -349,6 +309,9 @@ class EpgService {
       // Clean up old cache keys from previous versions
       AsyncStorage.removeItem('m3ue_epg_cache').catch(() => {});
       AsyncStorage.removeItem('m3ue_epg_v3').catch(() => {});
+      AsyncStorage.removeItem('m3ue_epg_v4').catch(() => {});
+      AsyncStorage.removeItem('m3ue_epg_v5').catch(() => {});
+      AsyncStorage.removeItem('m3ue_epg_v6').catch(() => {});
 
       const raw = await AsyncStorage.getItem(EPG_CACHE_KEY);
       if (!raw) return;
@@ -374,10 +337,6 @@ class EpgService {
         );
         this.fetchTimes.set(key, parsed.ts);
         count++;
-      }
-
-      if (count > 0) {
-        console.log('[EpgService] Restored', count, 'channels from cache');
       }
     } catch {
       // Corrupted cache, ignore

@@ -122,7 +122,6 @@ function MainNavigator() {
 }
 
 export function AppNavigator() {
-  console.log('AppNavigator: Rendering');
   return (
     <ViewerProvider>
     <NavigationContainer theme={AppTheme} ref={navigationRef}>

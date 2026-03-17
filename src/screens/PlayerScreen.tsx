@@ -535,7 +535,6 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         : prev.endsWith('.ts')
                             ? prev.replace(/\.ts$/, '.m3u8')
                             : prev;
-                    console.log(`[PlayerScreen] Format fallback: ${prev.split('/').pop()} → ${newUrl.split('/').pop()}`);
                     return newUrl;
                 });
                 setError(null);

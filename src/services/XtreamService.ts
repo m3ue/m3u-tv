@@ -8,6 +8,7 @@ import {
   XtreamSeries,
   XtreamSeriesInfo,
   XtreamShortEpg,
+  XtreamEpgListing,
   ContentItem,
   PlaylistViewer,
   WatchProgress,
@@ -202,24 +203,17 @@ class XtreamService {
 
   /**
    * Batch EPG fetch using the server's native get_epg_batch endpoint.
-   * Accepts up to 100 stream IDs and a date string (YYYY-MM-DD).
+   * Fetches yesterday + today to ensure current-time programmes are included.
    * Falls back to individual get_short_epg calls if batch endpoint fails.
    */
-  async getEpgBatch(streamIds: number[], date?: string): Promise<Record<string, XtreamShortEpg>> {
+  async getEpgBatch(streamIds: number[]): Promise<Record<string, XtreamShortEpg>> {
     if (streamIds.length === 0) return {};
 
     // Try native batch endpoint first (m3u-editor specific)
-    console.log('[XtreamService] getEpgBatch: isM3UEditor=', this.isM3UEditor, 'ids:', streamIds.length);
     if (this.isM3UEditor) {
       try {
-        const params: Record<string, string> = {
-          stream_ids: streamIds.join(','),
-        };
-        if (date) params.date = date;
-        const url = this.getApiUrl('get_epg_batch', params);
-        console.log('[XtreamService] getEpgBatch URL:', url.substring(0, 150) + '...');
-        const result = await this.fetchJson<Record<string, XtreamShortEpg>>(url);
-        console.log('[XtreamService] getEpgBatch success, keys:', Object.keys(result).length);
+        const idsParam = streamIds.join(',');
+        const result = await this._fetchTwoDays(idsParam);
         return result;
       } catch (err) {
         console.warn('[XtreamService] getEpgBatch batch failed:', err);
@@ -246,25 +240,18 @@ class XtreamService {
   }
 
   /**
-   * Batch full EPG fetch for EPG grid (uses get_simple_data_table per stream).
+   * Batch full EPG fetch for EPG grid.
+   * Fetches yesterday + today to ensure current-time programmes are included.
    * Uses native get_epg_batch when available.
    */
   async getFullEpgBatch(streamIds: number[]): Promise<Record<string, XtreamShortEpg>> {
     if (streamIds.length === 0) return {};
 
     // Try native batch endpoint (returns same format as get_simple_data_table)
-    console.log('[XtreamService] getFullEpgBatch: isM3UEditor=', this.isM3UEditor, 'ids:', streamIds.length);
     if (this.isM3UEditor) {
       try {
-        const today = new Date().toISOString().split('T')[0];
-        const params: Record<string, string> = {
-          stream_ids: streamIds.join(','),
-          date: today,
-        };
-        const url = this.getApiUrl('get_epg_batch', params);
-        console.log('[XtreamService] getFullEpgBatch URL:', url.substring(0, 150) + '...');
-        const result = await this.fetchJson<Record<string, XtreamShortEpg>>(url);
-        console.log('[XtreamService] getFullEpgBatch success, keys:', Object.keys(result).length);
+        const idsParam = streamIds.join(',');
+        const result = await this._fetchTwoDays(idsParam);
         return result;
       } catch (err) {
         console.warn('[XtreamService] getFullEpgBatch batch failed:', err);
@@ -288,6 +275,47 @@ class XtreamService {
       }
     }
     return result;
+  }
+
+  /**
+   * Fetch EPG batch for yesterday + today and merge results.
+   * Ensures the current time period is always covered regardless of
+   * how the server interprets date boundaries.
+   */
+  private async _fetchTwoDays(idsParam: string): Promise<Record<string, XtreamShortEpg>> {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayStr = now.toISOString().split('T')[0];
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const urlYesterday = this.getApiUrl('get_epg_batch', { stream_ids: idsParam, date: yesterdayStr });
+    const urlToday = this.getApiUrl('get_epg_batch', { stream_ids: idsParam, date: todayStr });
+
+    const [resYesterday, resToday] = await Promise.all([
+      this.fetchJson<Record<string, XtreamShortEpg>>(urlYesterday),
+      this.fetchJson<Record<string, XtreamShortEpg>>(urlToday),
+    ]);
+
+    // Merge: combine epg_listings, deduplicate by start_timestamp
+    const merged: Record<string, XtreamShortEpg> = {};
+    const allKeys = new Set([...Object.keys(resYesterday), ...Object.keys(resToday)]);
+    for (const key of allKeys) {
+      const a = resYesterday[key]?.epg_listings || [];
+      const b = resToday[key]?.epg_listings || [];
+      const seen = new Set<string>();
+      const combined: XtreamEpgListing[] = [];
+      for (const listing of [...a, ...b]) {
+        const ts = String(listing.start_timestamp);
+        if (!seen.has(ts)) {
+          seen.add(ts);
+          combined.push(listing);
+        }
+      }
+      merged[key] = { epg_listings: combined };
+    }
+
+    return merged;
   }
 
   // Viewers (m3u-editor specific)

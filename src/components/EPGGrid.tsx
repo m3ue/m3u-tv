@@ -122,9 +122,6 @@ export function EPGGrid({ streams, onChannelSelect, isSidebarActive, setSidebarA
         loadedIdsRef.current.add(stream.stream_id);
       }
     }
-    if (Object.keys(data).length > 0) {
-      console.log('[EPGGrid] Initialized from cache:', Object.keys(data).length, 'channels');
-    }
     return data;
   });
 
@@ -164,14 +161,10 @@ export function EPGGrid({ streams, onChannelSelect, isSidebarActive, setSidebarA
     // Merge loaded data into state
     setEpgData((prev) => {
       const next = { ...prev };
-      let totalProgs = 0;
       for (const id of newIds) {
         const key = String(id);
-        const progs = epgService.getProgrammes(key);
-        totalProgs += progs.length;
-        next[key] = progs;
+        next[key] = epgService.getProgrammes(key);
       }
-      console.log('[EPGGrid] setEpgData: merging', newIds.length, 'keys, total programmes:', totalProgs);
       return next;
     });
   }, []);
@@ -181,14 +174,10 @@ export function EPGGrid({ streams, onChannelSelect, isSidebarActive, setSidebarA
     if (!streams.length) return;
     let cancelled = false;
 
-    // Reset for new streams, but preserve any data already loaded from cache init
-    const alreadyLoaded = loadedIdsRef.current.size;
-
     const load = async () => {
       setIsLoadingEpg(true);
       const initialIds = streams.slice(0, INITIAL_LOAD_COUNT).map((s) => s.stream_id);
       const toLoad = initialIds.filter((id) => !loadedIdsRef.current.has(id));
-      console.log('[EPGGrid] Initial load:', initialIds.length, 'channels,', alreadyLoaded, 'from cache,', toLoad.length, 'to fetch');
 
       if (toLoad.length > 0) {
         await loadEpgForIds(toLoad);
@@ -270,12 +259,6 @@ export function EPGGrid({ streams, onChannelSelect, isSidebarActive, setSidebarA
       const programmes = epgData[key] || [];
       const blocks = getVisiblePrograms(programmes, windowStart, windowEnd, now);
       const hasData = programmes.length > 0;
-
-      // Debug: log first 3 rows to verify data reaches renderRow
-      if (index < 3) {
-        const first = programmes[0];
-        console.log(`[EPGGrid] renderRow #${index} key=${key} progs=${programmes.length} blocks=${blocks.length} window=${windowStart}-${windowEnd} now=${now}${first ? ` firstProg=${first.startTimestamp}-${first.stopTimestamp}` : ''}`);
-      }
 
       return (
         <View style={styles.row}>

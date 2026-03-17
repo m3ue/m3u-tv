@@ -169,7 +169,6 @@ export const SideBar = ({ contentFocusTag }: SideBarProps) => {
                             ref={(r) => { menuRefs.current[item.id] = r; }}
                             nextFocusRight={contentFocusTag}
                             onSelect={() => {
-                                console.log(`[SideBar] onSelect triggered for: ${item.id}`);
                                 if (navigationRef.isReady()) {
                                     // @ts-ignore
                                     navigationRef.navigate('Main', { screen: item.id });

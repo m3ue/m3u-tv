@@ -60,17 +60,14 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
     const newIds = ids.filter((id) => !loadedEpgIdsRef.current.has(id));
     if (newIds.length === 0) return;
 
-    console.log('[LiveTV] loadEpgForIds:', newIds.length, 'new IDs, first:', newIds.slice(0, 5));
     newIds.forEach((id) => loadedEpgIdsRef.current.add(id));
     await epgService.loadBatch(newIds);
 
-    let withData = 0;
     setEpgMap((prev) => {
       const next = { ...prev };
       for (const id of newIds) {
         const data = epgService.getCurrentAndNext(String(id));
         if (data) {
-          withData++;
           next[String(id)] = {
             currentTitle: data.currentTitle,
             currentProgress: data.currentProgress,
@@ -80,7 +77,6 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
       }
       return next;
     });
-    console.log('[LiveTV] loadEpgForIds done:', withData, '/', newIds.length, 'have EPG data');
   }, []);
 
   // Load initial batch of EPG data when streams change
@@ -104,7 +100,6 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
       }
     }
     if (cachedCount > 0) {
-      console.log('[LiveTV] Populated', cachedCount, 'from EpgService cache');
       setEpgMap(cached);
     }
 
