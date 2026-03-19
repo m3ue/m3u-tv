@@ -21,7 +21,8 @@
     "lint": "eslint . --debug",
     "lint:fix": "eslint . --fix",
     "pretty": "npx prettier *.{ts,tsx} --write",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "npx patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.6",
@@ -48,7 +49,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "~15.12.1",
     "react-native-video": "^6.19.0",
-    "react-native-vlc-media-player": "patch:react-native-vlc-media-player@npm%3A1.0.98#~/.yarn/patches/react-native-vlc-media-player-npm-1.0.98-aae291c363.patch",
+    "react-native-vlc-media-player": "1.0.98",
     "react-native-web": "^0.21.2",
     "react-native-worklets": "0.5.1"
   },
