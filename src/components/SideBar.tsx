@@ -21,6 +21,7 @@ import { BlurView } from 'expo-blur';
 
 const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
+const LOGO_SIZE = Math.min(scaledPixels(60), SIDEBAR_WIDTH_COLLAPSED - scaledPixels(20) * 2);
 
 // Export these for use in screens
 export { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED };
@@ -51,6 +52,8 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
     const wasSidebarActiveRef = useRef(false);
     const menuRefs = useRef<Record<string, FocusablePressableRef | null>>({});
     const focusGuardRef = useRef(false);
+    const hoverRef = useRef<View>(null);
+    const isWeb = Platform.OS === 'web';
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -66,8 +69,35 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
     // Sync it from navigation state when route changes externally (not via sidebar).
     const activeMenuId = preferredMenuId;
 
-    // External request to focus sidebar (e.g., back button or explicit activation)
+    // Web/Electron: expand sidebar on mouse hover, collapse on leave
     useEffect(() => {
+        if (!isWeb) return;
+        const el = hoverRef.current as unknown as HTMLElement;
+        if (!el) return;
+
+        let leaveTimer: ReturnType<typeof setTimeout>;
+
+        const enterHandler = () => {
+            clearTimeout(leaveTimer);
+            setExpanded(true);
+        };
+        const leaveHandler = () => {
+            leaveTimer = setTimeout(() => setExpanded(false), 200);
+        };
+
+        el.addEventListener('mouseenter', enterHandler);
+        el.addEventListener('mouseleave', leaveHandler);
+        return () => {
+            clearTimeout(leaveTimer);
+            el.removeEventListener('mouseenter', enterHandler);
+            el.removeEventListener('mouseleave', leaveHandler);
+        };
+    }, [isWeb, setExpanded]);
+
+    // External request to focus sidebar (e.g., back button or explicit activation)
+    // On web, hover handles expand/collapse — skip this effect.
+    useEffect(() => {
+        if (isWeb) return;
         if (isSidebarActive) {
             setExpanded(true);
             wasSidebarActiveRef.current = true;
@@ -150,11 +180,11 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
 
     return (
         <Animated.View style={[styles.container, animatedStyle]}>
-            <View style={styles.navContainer}>
+            <View ref={hoverRef} style={styles.navContainer}>
                 <View style={styles.logoContainer}>
                     <Animated.Image
                         source={require('../../assets/images/logo.png')}
-                        style={[{ width: scaledPixels(60), height: scaledPixels(60) }, logoAnimatedStyle]}
+                        style={[{ width: LOGO_SIZE, height: LOGO_SIZE }, logoAnimatedStyle]}
                     />
                     {isExpanded && (
                         <Text numberOfLines={1} style={[styles.logoText, { width: scaledPixels(200) }]}>
@@ -174,14 +204,16 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
                                     // @ts-ignore
                                     navigationRef.navigate('Main', { screen: item.id });
                                     setPreferredMenuId(item.id);
-                                    // Set guard immediately so onFocus on other items is blocked
-                                    focusGuardRef.current = true;
-                                    setSidebarActive(false);
-                                    setExpanded(false);
+                                    if (!isWeb) {
+                                        focusGuardRef.current = true;
+                                        setSidebarActive(false);
+                                        setExpanded(false);
+                                    }
                                     onNavigate?.();
                                 }
                             }}
                             onFocus={() => {
+                                if (isWeb) return;
                                 if (focusGuardRef.current) return;
                                 setExpanded(true);
                                 if (!isSidebarActive) {
@@ -231,6 +263,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
             <BlurView
                 intensity={30}
                 experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+                pointerEvents="none"
                 style={StyleSheet.absoluteFill}
             />
         </Animated.View>
