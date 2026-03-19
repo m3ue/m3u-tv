@@ -12,7 +12,6 @@ import {
   LiveTVScreen,
   VODScreen,
   SeriesScreen,
-  SearchScreen,
   PlayerScreen,
   MovieDetailsScreen,
   SeriesDetailsScreen,
