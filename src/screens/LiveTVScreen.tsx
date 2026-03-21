@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   FlatList,
-  ScrollView,
   Image,
   ViewToken,
 } from 'react-native';
@@ -25,7 +24,7 @@ import { RootStackParamList } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
-import { useHorizontalWheelScroll } from '../hooks/useHorizontalWheelScroll';
+import { CategoryScroller } from '../components/CategoryScroller';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,7 +37,6 @@ interface EpgInfo {
 // ── Main Screen ──────────────────────────────────────────────────────────────
 
 export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
-  const categoryWheelRef = useHorizontalWheelScroll();
   const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { isSidebarActive, setSidebarActive } = useMenu();
@@ -390,13 +388,8 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
             />
           )}
         </FocusablePressable>
-        <View ref={categoryWheelRef} style={styles.categoryListContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryList}
-            contentContainerStyle={styles.categoryListContent}
-          >
+        <View style={styles.categoryListContainer}>
+          <CategoryScroller>
             {[
               { category_id: '', category_name: 'All Channels', parent_id: 0 },
               { category_id: FAVORITES_CATEGORY, category_name: '★ Favorites', parent_id: 0 },
@@ -408,7 +401,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
                 </React.Fragment>
               ),
             )}
-          </ScrollView>
+          </CategoryScroller>
         </View>
       </View>
 
@@ -503,15 +496,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     zIndex: 5,
-  },
-  categoryList: {
-    flex: 1,
-    borderRadius: scaledPixels(50),
-  },
-  categoryListContent: {
-    paddingHorizontal: scaledPixels(20),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),

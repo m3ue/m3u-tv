@@ -20,30 +20,29 @@ export function useHorizontalWheelScroll() {
     let scrollableEl: HTMLElement | null = null;
 
     /**
-     * Scan all child divs to find the one with the largest horizontal overflow.
-     * Requires >100px overflow to avoid matching truncated text buttons.
+     * Find the ScrollView's scroll container by walking up from buttons.
+     * Structure: ref > wrapper > ScrollView-container > content-row > buttons
+     * The ScrollView-container (grandparent of buttons) is what we want.
      */
     const findScrollable = (): HTMLElement | null => {
-      const divs = el.querySelectorAll('div');
-      let bestDiv: HTMLElement | null = null;
-      let bestOverflow = 0;
-      for (const div of Array.from(divs)) {
-        const orig = div.style.overflowX;
-        div.style.overflowX = 'auto';
-        const overflow = div.scrollWidth - div.clientWidth;
-        div.style.overflowX = orig;
-        if (overflow > 100 && overflow > bestOverflow) {
-          bestOverflow = overflow;
-          bestDiv = div;
-        }
+      const firstButton = el.querySelector('button') || el.querySelector('[role="button"]');
+      if (!firstButton) {
+        return null;
       }
-      return bestDiv;
+      const contentRow = firstButton.parentElement;
+      if (!contentRow || contentRow === el) {
+        return null;
+      }
+      const scrollContainer = contentRow.parentElement;
+      if (!scrollContainer || scrollContainer === el) {
+        return contentRow as HTMLElement;
+      }
+      return scrollContainer as HTMLElement;
     };
 
     const applyScrollStyles = (): void => {
       const found = findScrollable();
       if (found && found !== scrollableEl) {
-        // Clean up old element
         if (scrollableEl) {
           scrollableEl.classList.remove('m3u-scroll');
           scrollableEl.style.overflowX = '';
@@ -55,18 +54,20 @@ export function useHorizontalWheelScroll() {
     };
 
     const handler = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      if (!scrollableEl) applyScrollStyles();
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) {
+        return;
+      }
+      if (!scrollableEl) {
+        applyScrollStyles();
+      }
       if (scrollableEl) {
         e.preventDefault();
         scrollableEl.scrollLeft += e.deltaY;
       }
     };
 
-    // Initial attempt
     applyScrollStyles();
 
-    // Watch for DOM changes (e.g. categories loading async) and re-detect
     const observer = new MutationObserver(() => {
       applyScrollStyles();
     });
@@ -78,6 +79,7 @@ export function useHorizontalWheelScroll() {
       el.removeEventListener('wheel', handler);
       if (scrollableEl) {
         scrollableEl.classList.remove('m3u-scroll');
+        scrollableEl.style.overflowX = '';
       }
       scrollableEl = null;
     };

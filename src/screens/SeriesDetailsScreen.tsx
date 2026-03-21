@@ -8,9 +8,9 @@ import {
   useWindowDimensions,
   ScrollView,
   FlatList,
-  TVFocusGuideView,
   Platform,
 } from 'react-native';
+import { FocusGuide } from '../components/FocusGuide';
 import { useIsFocused } from '@react-navigation/native';
 import { useXtream } from '../context/XtreamContext';
 import { useViewer } from '../context/ViewerContext';
@@ -178,7 +178,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
             </View>
 
             <View style={styles.navigationSection}>
-              <TVFocusGuideView style={styles.seasonsColumn} autoFocus>
+              <FocusGuide style={styles.seasonsColumn} autoFocus>
                 <Text style={styles.sectionTitle}>Seasons</Text>
                 <ScrollView>
                   {seriesInfo?.seasons.map((season, index) => (
@@ -208,9 +208,9 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                     </FocusablePressable>
                   ))}
                 </ScrollView>
-              </TVFocusGuideView>
+              </FocusGuide>
 
-              <TVFocusGuideView style={styles.episodesColumn} autoFocus>
+              <FocusGuide style={styles.episodesColumn} autoFocus>
                 <Text style={styles.sectionTitle}>Episodes</Text>
                 <FlatList
                   data={episodes}
@@ -267,7 +267,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                     </FocusablePressable>
                   )}
                 />
-              </TVFocusGuideView>
+              </FocusGuide>
             </View>
           </View>
         </LinearGradient>

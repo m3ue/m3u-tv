@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { useViewer } from '../context/ViewerContext';
 import { useXtream } from '../context/XtreamContext';
 import { useTVRemoteEvents } from '../hooks/useTVRemoteEvents';
+import { epgService } from '../services/EpgService';
 
 const OVERLAY_TIMEOUT = 5000;
 const SEEK_STEP = 10;
@@ -28,7 +29,7 @@ function formatTime(seconds: number): string {
 }
 
 export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player'>) => {
-    const { streamUrl, title, type, streamId, seriesId, seasonNumber, startPosition } = route.params;
+    const { streamUrl, title, type, streamId, seriesId, seasonNumber, startPosition, epgChannelId } = route.params;
     const isLive = type === 'live';
 
     const { isM3UEditor } = useXtream();
@@ -50,6 +51,9 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const currentTimeRef = useRef(0);
     const durationRef = useRef(0);
     const exitGuardRef = useRef(false);
+
+    const [epgCurrent, setEpgCurrent] = useState<{ title: string; progress: number } | null>(null);
+    const [epgNext, setEpgNext] = useState<string | null>(null);
 
     useEffect(() => {
         overlayVisibleRef.current = overlayVisible;
@@ -96,6 +100,39 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             video.pause();
         }
     }, []);
+
+    // Fetch EPG data for live channel
+    useEffect(() => {
+        if (!isLive || !streamId) return;
+
+        let interval: ReturnType<typeof setInterval>;
+        let cancelled = false;
+
+        const updateEpg = async () => {
+            const data = await epgService.getCurrentAndNextAsync(
+                epgChannelId || '',
+                streamId,
+            );
+            if (cancelled) return;
+
+            if (!data) {
+                setEpgCurrent(null);
+                setEpgNext(null);
+                return;
+            }
+
+            setEpgCurrent({ title: data.currentTitle, progress: data.currentProgress });
+            setEpgNext(data.nextTitle);
+        };
+
+        updateEpg();
+        interval = setInterval(updateEpg, 30000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [isLive, streamId, epgChannelId]);
 
     // Guard to prevent multiple external player launches
     const externalPlayerLaunched = useRef(false);
@@ -449,7 +486,29 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                         >
                             <Icon name="ArrowLeft" size={scaledPixels(22)} color={colors.text} />
                         </FocusablePressable>
-                        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                        <View style={styles.headerInfo}>
+                            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                            {isLive && epgCurrent && (
+                                <View style={styles.epgInfoRow}>
+                                    <View style={styles.epgCurrentRow}>
+                                        <View style={styles.epgLiveBadge}>
+                                            <Text style={styles.epgLiveBadgeText}>LIVE</Text>
+                                        </View>
+                                        <Text style={styles.epgCurrentTitle} numberOfLines={1}>
+                                            {epgCurrent.title}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.epgProgressBg}>
+                                        <View style={[styles.epgProgressFill, { width: `${Math.round(epgCurrent.progress * 100)}%` }]} />
+                                    </View>
+                                    {epgNext && (
+                                        <Text style={styles.epgNextText} numberOfLines={1}>
+                                            Next: {epgNext}
+                                        </Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
                     </View>
 
                     <View style={styles.controlsBar}>
@@ -580,20 +639,64 @@ const styles = StyleSheet.create({
     },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
     },
     backButton: {
         padding: scaledPixels(10),
         borderRadius: scaledPixels(50),
         backgroundColor: 'rgba(0,0,0,0.5)',
+        marginTop: scaledPixels(4),
+    },
+    headerInfo: {
+        flex: 1,
+        marginLeft: scaledPixels(10),
+        marginBottom: scaledPixels(16),
     },
     title: {
-        flex: 1,
         color: colors.text,
         fontSize: scaledPixels(32),
         fontWeight: 'bold',
-        marginLeft: scaledPixels(10),
-        marginBottom: scaledPixels(16),
+    },
+    epgInfoRow: {
+        marginTop: scaledPixels(8),
+        gap: scaledPixels(4),
+    },
+    epgCurrentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scaledPixels(8),
+    },
+    epgLiveBadge: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: scaledPixels(8),
+        paddingVertical: scaledPixels(2),
+        borderRadius: scaledPixels(4),
+    },
+    epgLiveBadgeText: {
+        color: '#ffffff',
+        fontSize: scaledPixels(11),
+        fontWeight: '700',
+    },
+    epgCurrentTitle: {
+        flex: 1,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: scaledPixels(18),
+    },
+    epgProgressBg: {
+        height: scaledPixels(3),
+        borderRadius: scaledPixels(2),
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        overflow: 'hidden',
+        maxWidth: scaledPixels(400),
+    },
+    epgProgressFill: {
+        height: '100%',
+        borderRadius: scaledPixels(2),
+        backgroundColor: colors.primary,
+    },
+    epgNextText: {
+        color: 'rgba(255,255,255,0.75)',
+        fontSize: scaledPixels(15),
     },
     controlsBar: {
         backgroundColor: 'rgba(0,0,0,0.7)',

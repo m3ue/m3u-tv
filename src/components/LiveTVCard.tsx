@@ -30,6 +30,8 @@ export function LiveTVCard({ item, nextFocusLeft, onFocus }: LiveTVCardProps) {
           streamUrl,
           title: item.name,
           type: 'live',
+          streamId: item.stream_id,
+          epgChannelId: item.epg_channel_id || undefined,
         });
       }}
     >

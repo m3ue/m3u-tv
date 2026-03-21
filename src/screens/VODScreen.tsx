@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, ScrollView, Platform, useWindowDimensions } from 'react-native';
-import { useHorizontalWheelScroll } from '../hooks/useHorizontalWheelScroll';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, Platform, useWindowDimensions } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
 import { useMenu } from '../context/MenuContext';
 import { colors } from '../theme';
@@ -8,6 +7,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamCategory, XtreamVodStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
+import { CategoryScroller } from '../components/CategoryScroller';
 import { MovieCard } from '../components/MovieCard';
 
 import { SIDEBAR_WIDTH_COLLAPSED } from '../components/SideBar';
@@ -15,7 +15,6 @@ import { SIDEBAR_WIDTH_COLLAPSED } from '../components/SideBar';
 const CARD_CELL_WIDTH = scaledPixels(200) + scaledPixels(12) * 2;
 
 export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
-  const categoryWheelRef = useHorizontalWheelScroll();
   const { isSidebarActive, setSidebarActive } = useMenu();
   const { isConfigured, vodCategories, fetchVodStreams } = useXtream();
   const [movies, setMovies] = useState<XtreamVodStream[]>([]);
@@ -119,19 +118,14 @@ export function VODScreen(_props: DrawerScreenPropsType<'VOD'>) {
               </View>
             ) : null
           }
-          ListHeaderComponent={<View ref={categoryWheelRef} style={styles.categoryListContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.categoryList}
-              contentContainerStyle={styles.categoryListContent}
-            >
+          ListHeaderComponent={<View style={styles.categoryListContainer}>
+            <CategoryScroller>
               {[{ category_id: '', category_name: 'All Movies', parent_id: 0 }, ...vodCategories].map((item, index) => (
                 <React.Fragment key={item.category_id ? `cat-${item.category_id}` : `idx-${index}`}>
                   {renderCategoryItem({ item, index })}
                 </React.Fragment>
               ))}
-            </ScrollView>
+            </CategoryScroller>
           </View>}
         />
       </View>
@@ -166,15 +160,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     zIndex: 5,
-  },
-  categoryList: {
-    flex: 1,
-    borderRadius: scaledPixels(50),
-  },
-  categoryListContent: {
-    paddingHorizontal: scaledPixels(20),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   categoryButton: {
     paddingHorizontal: scaledPixels(25),
