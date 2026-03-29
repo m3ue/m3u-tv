@@ -2,13 +2,6 @@
   "name": "react-native-mpv",
   "version": "0.1.0",
   "private": true,
-  "files": [
-    "src/",
-    "android/src/",
-    "android/build.gradle",
-    "ios/",
-    "react-native.config.json"
-  ],
   "main": "src/index.tsx",
   "types": "src/index.tsx",
   "react-native": "src/index.tsx",
