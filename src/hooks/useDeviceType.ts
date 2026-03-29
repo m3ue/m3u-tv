@@ -37,5 +37,5 @@ export function useDeviceType(): DeviceType {
 
 export function useShouldUseSidebar(): boolean {
   const deviceType = useDeviceType();
-  return deviceType === 'tv' || deviceType === 'desktop' || deviceType === 'tablet';
+  return deviceType === 'tv' || deviceType === 'desktop';
 }

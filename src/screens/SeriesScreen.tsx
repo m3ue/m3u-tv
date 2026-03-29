@@ -9,6 +9,7 @@ import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { CategoryScroller } from '../components/CategoryScroller';
 import { SeriesCard } from '../components/SeriesCard';
+import { useResponsiveColumns } from '../hooks/useResponsiveColumns';
 
 import { SIDEBAR_WIDTH_COLLAPSED } from '../components/SideBar';
 
@@ -21,11 +22,12 @@ export function SeriesScreen(_props: DrawerScreenPropsType<'Series'>) {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const { width: windowWidth } = useWindowDimensions();
+  const responsiveColumns = useResponsiveColumns();
   const numColumns = useMemo(() => {
-    if (Platform.OS !== 'web') return 8;
+    if (Platform.OS !== 'web') return responsiveColumns;
     const available = windowWidth - SIDEBAR_WIDTH_COLLAPSED - scaledPixels(40);
     return Math.max(2, Math.floor(available / CARD_CELL_WIDTH));
-  }, [windowWidth]);
+  }, [windowWidth, responsiveColumns]);
 
   useEffect(() => {
     if (isConfigured) {

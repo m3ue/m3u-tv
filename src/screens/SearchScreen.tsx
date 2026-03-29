@@ -18,6 +18,7 @@ import { LiveTVCard } from '../components/LiveTVCard';
 import { MovieCard } from '../components/MovieCard';
 import { SeriesCard } from '../components/SeriesCard';
 import { Icon } from '../components/Icon';
+import { useResponsiveColumns } from '../hooks/useResponsiveColumns';
 
 type ContentType = 'all' | 'live' | 'vod' | 'series';
 
@@ -40,6 +41,7 @@ type SearchResult =
 
 export function SearchScreen(_props: DrawerScreenPropsType<'Search'>) {
   const { isSidebarActive, setSidebarActive } = useMenu();
+  const numColumns = useResponsiveColumns();
   const {
     isConfigured,
     fetchLiveStreams,
@@ -155,7 +157,8 @@ export function SearchScreen(_props: DrawerScreenPropsType<'Search'>) {
         data={results}
         renderItem={renderResult}
         keyExtractor={getResultKey}
-        numColumns={8}
+        numColumns={numColumns}
+        key={`search-${numColumns}`}
         style={styles.resultGrid}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews

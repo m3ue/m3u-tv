@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   ViewToken,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -486,8 +487,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: scaledPixels(10),
     paddingHorizontal: scaledPixels(10),
-    marginRight: scaledPixels(40),
-    marginTop: scaledPixels(25),
+    marginRight: Platform.isTV ? scaledPixels(40) : scaledPixels(10),
+    marginTop: Platform.isTV ? scaledPixels(25) : scaledPixels(10),
     marginBottom: scaledPixels(12),
     height: scaledPixels(80),
     borderRadius: scaledPixels(50),
@@ -504,7 +505,7 @@ const styles = StyleSheet.create({
     borderRadius: scaledPixels(25),
     marginHorizontal: scaledPixels(8),
     marginVertical: scaledPixels(4),
-    width: scaledPixels(180),
+    ...(Platform.isTV ? { width: scaledPixels(180) } : {}),
     alignItems: 'center',
     overflow: 'visible',
     justifyContent: 'center',
@@ -624,7 +625,7 @@ const styles = StyleSheet.create({
 
   // Next program
   nextInfo: {
-    width: scaledPixels(200),
+    ...(Platform.isTV ? { width: scaledPixels(200) } : { maxWidth: '30%', flexShrink: 0 }),
     alignItems: 'flex-end',
     justifyContent: 'center',
     gap: scaledPixels(2),
