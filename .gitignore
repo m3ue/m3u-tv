@@ -41,3 +41,4 @@ src/config/devDefaults.ts
 # Build directories
 ios
 android
+release
