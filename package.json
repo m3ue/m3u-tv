@@ -1,6 +1,11 @@
 {
   "name": "m3u-tv",
   "version": "0.0.1",
+  "description": "Multi-platform IPTV player for TV, mobile, and desktop",
+  "author": {
+    "name": "sparkison",
+    "email": "sparkison@users.noreply.github.com"
+  },
   "main": "node_modules/expo/AppEntry.js",
   "private": true,
   "packageManager": "yarn@4.13.0",

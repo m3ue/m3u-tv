@@ -66,6 +66,9 @@ const config = {
           minSdkVersion: 26,
           usesCleartextTraffic: true,
         },
+        ios: {
+          deploymentTarget: '16.0',
+        },
       },
     ],
     'expo-secure-store',
