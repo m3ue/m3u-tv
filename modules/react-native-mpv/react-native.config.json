@@ -4,6 +4,6 @@
     "javaPackageName": "dev.sparkison.mpv"
   },
   "ios": {
-    "podspecPath": "./ios/react-native-mpv.podspec"
+    "podspecPath": "./react-native-mpv.podspec"
   }
 }
