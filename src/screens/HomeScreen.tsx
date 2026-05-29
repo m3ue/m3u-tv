@@ -216,9 +216,17 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               </View>
             ) : (
               <View style={styles.continuePlaceholder}>
-                <Text style={styles.continuePlaceholderIcon}>▶</Text>
-                <Text style={styles.continuePlaceholderText}>Nothing here yet</Text>
-                <Text style={styles.continuePlaceholderHint}>Start watching a movie or series and it will appear here</Text>
+                <Image
+                  source={require('../../assets/images/logo.png')}
+                  style={styles.continuePlaceholderLogoBg}
+                  resizeMode="contain"
+                />
+                <View style={styles.continuePlaceholderAccent} />
+                <View style={styles.continuePlaceholderContent}>
+                  <Text style={styles.continuePlaceholderPlayIcon}>▶</Text>
+                  <Text style={styles.continuePlaceholderTitle}>Nothing here yet</Text>
+                  <Text style={styles.continuePlaceholderHint}>Start watching content and it will appear here</Text>
+                </View>
               </View>
             )}
           </View>
@@ -414,7 +422,7 @@ const styles = StyleSheet.create({
     paddingVertical: scaledPixels(20),
   },
   continueWatchingList: {
-    height: Platform.OS === 'web' ? scaledPixels(430) : scaledPixels(390),
+    height: Platform.OS === 'web' ? scaledPixels(450) : scaledPixels(410),
     overflow: 'visible',
   },
   continueCard: {
@@ -461,29 +469,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(4),
   },
   continuePlaceholder: {
-    height: Platform.OS === 'web' ? scaledPixels(200) : scaledPixels(160),
+    height: Platform.OS === 'web' ? scaledPixels(240) : scaledPixels(180),
     marginHorizontal: scaledPixels(10),
-    borderRadius: scaledPixels(12),
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderStyle: 'dashed',
+    borderRadius: scaledPixels(16),
+    backgroundColor: colors.backgroundElevated,
+    overflow: 'hidden',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  continuePlaceholderIcon: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: scaledPixels(40),
+  continuePlaceholderLogoBg: {
+    position: 'absolute',
+    width: scaledPixels(380),
+    height: scaledPixels(380),
+    top: -scaledPixels(70),
+    right: -scaledPixels(70),
+    opacity: 0.07,
+  },
+  continuePlaceholderAccent: {
+    width: scaledPixels(4),
+    alignSelf: 'stretch',
+    backgroundColor: colors.primary,
+    opacity: 0.8,
+  },
+  continuePlaceholderContent: {
+    flex: 1,
+    paddingLeft: scaledPixels(32),
+    paddingRight: scaledPixels(160),
+  },
+  continuePlaceholderPlayIcon: {
+    color: colors.primary,
+    fontSize: scaledPixels(28),
     marginBottom: scaledPixels(12),
+    opacity: 0.9,
   },
-  continuePlaceholderText: {
-    color: colors.textSecondary,
-    fontSize: scaledPixels(22),
+  continuePlaceholderTitle: {
+    color: colors.text,
+    fontSize: scaledPixels(24),
     fontWeight: '600',
     marginBottom: scaledPixels(8),
   },
   continuePlaceholderHint: {
     color: 'rgba(255,255,255,0.35)',
-    fontSize: scaledPixels(18),
+    fontSize: scaledPixels(17),
+    lineHeight: scaledPixels(26),
   },
 });
