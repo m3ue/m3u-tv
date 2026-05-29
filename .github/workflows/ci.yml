@@ -394,6 +394,7 @@ jobs:
         run: corepack yarn install --immutable || corepack yarn install
 
       - name: Create stub binary dirs (CI smoke-test — no bundled mpv)
+        shell: bash
         run: mkdir -p binaries/mac/arm64 binaries/mac/x64 binaries/win/x64
 
       - name: Export web bundle
