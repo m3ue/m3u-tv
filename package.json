@@ -97,15 +97,6 @@
       "electron/**/*",
       "desktop/libmpv-addon/build/Release/*.node"
     ],
-    "extraResources": [
-      {
-        "from": "binaries/mac/${arch}/",
-        "to": "mpv",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "linux": {
       "target": [
         "AppImage",
@@ -117,12 +108,26 @@
       "target": [
         "nsis",
         "portable"
+      ],
+      "extraResources": [
+        {
+          "from": "binaries/win/x64/",
+          "to": "mpv",
+          "filter": ["**/*"]
+        }
       ]
     },
     "mac": {
       "identity": null,
       "target": [
         "dmg"
+      ],
+      "extraResources": [
+        {
+          "from": "binaries/mac/${arch}/",
+          "to": "mpv",
+          "filter": ["**/*"]
+        }
       ]
     }
   },
