@@ -56,7 +56,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const [epgNext, setEpgNext] = useState<string | null>(null);
 
     // Embedded mpv state (Electron only)
-    const [embeddedMpv, setEmbeddedMpv] = useState(false);
+    const [embeddedMpv] = useState(false);
     const [audioTracks, setAudioTracks] = useState<Array<{ id: number; name: string; language?: string }>>([]);
     const [textTracks, setTextTracks] = useState<Array<{ id: number; name: string; language?: string }>>([]);
     const [selectedAudioTrack, setSelectedAudioTrack] = useState(0);
@@ -200,43 +200,32 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
         const video = videoRef.current;
         if (!video) return;
 
-        // In Electron: use embedded mpv for native playback inside the window.
-        // Falls back to external player if embedded start fails.
-        if (isElectron && electronAPI?.mpv) {
+        // In Electron: open a floating, independent mpv window per stream.
+        // The main window stays open so the user can keep browsing.
+        if (isElectron) {
             let cancelled = false;
-            const startEmbeddedMpv = async () => {
-                try {
-                    const result = await electronAPI.mpv.start(streamUrl, {
-                        startPosition: startPosition || 0,
-                        title: title || 'm3u-tv',
-                    });
+
+            if (electronAPI?.openFloating) {
+                electronAPI.openFloating(streamUrl, {
+                    title: title || 'm3u-tv',
+                    startPosition: startPosition || 0,
+                }).then((result: any) => {
                     if (cancelled) return;
-                    if (result.success) {
-                        setEmbeddedMpv(true);
-                        embeddedMpvRef.current = true;
-                        setIsLoading(false);
+                    if (result?.success) {
+                        // Stream is playing in its own window — go back to the browser
+                        navigation.goBack();
                     } else {
+                        // mpv not found or failed — fall back to legacy external player
                         openInExternalPlayer();
                     }
-                } catch {
+                }).catch(() => {
                     if (!cancelled) openInExternalPlayer();
-                }
-            };
-            startEmbeddedMpv();
-            return () => {
-                cancelled = true;
-                if (embeddedMpvRef.current) {
-                    electronAPI.mpv.stop().catch(() => {});
-                    embeddedMpvRef.current = false;
-                    setEmbeddedMpv(false);
-                }
-            };
-        }
+                });
+            } else {
+                openInExternalPlayer();
+            }
 
-        // Electron without embedded mpv support — use external player
-        if (isElectron) {
-            openInExternalPlayer();
-            return;
+            return () => { cancelled = true; };
         }
 
         // Browser playback: try HLS.js for .m3u8, direct for MP4/WebM

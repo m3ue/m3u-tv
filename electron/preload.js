@@ -4,6 +4,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
 
+  // Open a stream in an independent floating mpv window (preferred path)
+  openFloating: (streamUrl, options) => ipcRenderer.invoke('mpv:open-floating', streamUrl, options),
+
   // Legacy external player API (fallback when embedded mpv unavailable)
   openExternal: (url, startPosition) => ipcRenderer.invoke('open-external', url, startPosition || 0),
   onExternalPlayerClosed: (callback) => {

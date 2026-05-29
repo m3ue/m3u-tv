@@ -151,6 +151,52 @@ app.whenReady().then(() => {
     }
   });
 
+  // ── Floating mpv windows — one per stream, independent of the main window ──
+  // Each call spawns a new mpv window. The main Electron window is never hidden.
+  // Multiple streams can be open simultaneously.
+  ipcMain.handle('mpv:open-floating', async (_event, streamUrl, options) => {
+    // Validate URL to prevent command injection
+    try {
+      const parsed = new URL(streamUrl);
+      if (!['http:', 'https:', 'rtmp:', 'rtsp:'].includes(parsed.protocol)) {
+        return { success: false, error: 'Invalid URL protocol' };
+      }
+    } catch {
+      return { success: false, error: 'Invalid URL' };
+    }
+
+    const mpvInfo = MpvController.findMpvCommand();
+    if (!mpvInfo) {
+      return { success: false, error: 'mpv not found. Install mpv to use the player.' };
+    }
+
+    const startPosition = options?.startPosition || 0;
+    const title = options?.title || 'm3u-tv';
+
+    const mpvArgs = [
+      ...mpvInfo.args,
+      '--force-window=yes',
+      '--hwdec=auto',
+      '--keep-open=no',
+      '--idle=no',
+      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      `--title=${title}`,
+      '--geometry=960x540',
+      ...(startPosition > 0 ? [`--start=${Math.floor(startPosition)}`] : []),
+      '--', streamUrl,
+    ];
+
+    const child = spawn(mpvInfo.cmd, mpvArgs, {
+      stdio: 'ignore',
+      detached: false,
+    });
+    child.on('error', (err) => {
+      console.error('[mpv:open-floating] Failed to start:', err.message);
+    });
+
+    return { success: true };
+  });
+
   // ── Embedded mpv player (renders inside the Electron window) ──────
   let mpvController = null;
 
