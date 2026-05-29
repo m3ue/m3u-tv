@@ -180,9 +180,9 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
               <FocusGuide style={styles.seasonsColumn} autoFocus>
                 <Text style={styles.sectionTitle}>Seasons</Text>
                 <ScrollView
-                  horizontal={!Platform.isTV}
+                  horizontal={!Platform.isTV && Platform.OS !== 'web'}
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={!Platform.isTV ? styles.seasonsRow : undefined}
+                  contentContainerStyle={!Platform.isTV && Platform.OS !== 'web' ? styles.seasonsRow : undefined}
                 >
                   {seriesInfo?.seasons.map((season, index) => (
                     <FocusablePressable
@@ -226,11 +226,11 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                       style={({ isFocused }) => [
                         styles.episodeItem,
                         isFocused && styles.itemFocused,
-                        Platform.isTV && { width: width - scaledPixels(450) },
+                        (Platform.isTV || Platform.OS === 'web') && { width: width - scaledPixels(Platform.OS === 'web' ? 520 : 450) },
                       ]}
                     >
                       <View style={styles.episodeMain}>
-                        {Platform.isTV && <Text style={styles.episodeNumber}>{ep.episode_num}</Text>}
+                        {(Platform.isTV || Platform.OS === 'web') && <Text style={styles.episodeNumber}>{ep.episode_num}</Text>}
                         <View style={styles.episodeImageWrapper}>
                           <Image
                             source={{ uri: ep.info?.movie_image || item.cover }}
@@ -250,7 +250,7 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                         </View>
                         <View style={styles.episodeInfo}>
                           <Text style={styles.episodeTitle} numberOfLines={1}>
-                            {!Platform.isTV ? `${ep.episode_num}. ` : ''}{ep.title}
+                            {ep.title}
                           </Text>
                           <View style={styles.metaRow}>
                             {ep.info?.rating ? (
@@ -261,11 +261,11 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                             ) : null}
                             {ep.info?.duration ? <Text style={styles.metaText}>{ep.info.duration}</Text> : null}
                           </View>
-                          <Text style={styles.episodePlot} numberOfLines={Platform.isTV ? 3 : 2}>
+                          <Text style={styles.episodePlot} numberOfLines={Platform.isTV || Platform.OS === 'web' ? 3 : 2}>
                             {ep.info?.plot || 'No description available for this episode.'}
                           </Text>
                         </View>
-                        {Platform.isTV && <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />}
+                        {(Platform.isTV || Platform.OS === 'web') && <Icon name="ChevronRight" size={scaledPixels(24)} color={colors.text} />}
                       </View>
                     </FocusablePressable>
                   )}
@@ -345,13 +345,15 @@ const styles = StyleSheet.create({
   },
   navigationSection: {
     flex: 1,
-    flexDirection: Platform.isTV ? 'row' : 'column',
+    flexDirection: Platform.isTV || Platform.OS === 'web' ? 'row' : 'column',
     marginTop: scaledPixels(20),
   },
   seasonsColumn: {
-    ...(Platform.isTV
-      ? { width: scaledPixels(250), marginRight: scaledPixels(40) }
-      : { marginBottom: scaledPixels(15) }),
+    ...(Platform.OS === 'web'
+      ? { width: scaledPixels(320), marginRight: scaledPixels(40) }
+      : Platform.isTV
+        ? { width: scaledPixels(250), marginRight: scaledPixels(40) }
+        : { marginBottom: scaledPixels(15) }),
   },
   seasonsRow: {
     flexDirection: 'row',
@@ -359,7 +361,7 @@ const styles = StyleSheet.create({
   },
   episodesColumn: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: Platform.OS === 'web' ? 'visible' : 'hidden',
   },
   sectionTitle: {
     fontSize: scaledPixels(24),
@@ -373,18 +375,20 @@ const styles = StyleSheet.create({
     paddingVertical: scaledPixels(15),
     paddingHorizontal: scaledPixels(20),
     borderRadius: scaledPixels(8),
-    marginBottom: Platform.isTV ? scaledPixels(10) : 0,
-    ...(!Platform.isTV && { marginRight: scaledPixels(10), flexShrink: 0 }),
+    marginBottom: Platform.isTV || Platform.OS === 'web' ? scaledPixels(10) : 0,
+    ...(!Platform.isTV && Platform.OS !== 'web' && { marginRight: scaledPixels(10), flexShrink: 0 }),
     backgroundColor: 'rgba(255,255,255,0.05)',
-    ...(Platform.isTV && { overflow: 'hidden' as const }),
+    ...((Platform.isTV || Platform.OS === 'web') && { overflow: 'hidden' as const }),
     borderWidth: 2,
     borderColor: 'transparent',
   },
   seasonItemActive: {
     backgroundColor: 'rgba(236, 0, 63, 0.2)',
-    ...(Platform.isTV
-      ? { borderLeftWidth: 4, borderLeftColor: colors.primary }
-      : { borderBottomWidth: 3, borderBottomColor: colors.primary }),
+    ...(Platform.OS === 'web'
+      ? { borderLeftWidth: 4, borderLeftColor: colors.primary, borderColor: 'transparent' }
+      : Platform.isTV
+        ? { borderLeftWidth: 4, borderLeftColor: colors.primary }
+        : { borderBottomWidth: 3, borderBottomColor: colors.primary }),
   },
   seasonText: {
     color: colors.textSecondary,
@@ -406,15 +410,16 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   episodeMain: {
-    flexDirection: Platform.isTV ? 'row' : 'column',
-    alignItems: Platform.isTV ? 'center' : 'flex-start',
-    gap: scaledPixels(Platform.isTV ? 20 : 10),
-    ...(Platform.isTV && { height: scaledPixels(150) }),
+    flexDirection: Platform.isTV || Platform.OS === 'web' ? 'row' : 'column',
+    alignItems: Platform.isTV || Platform.OS === 'web' ? 'center' : 'flex-start',
+    gap: scaledPixels(Platform.isTV || Platform.OS === 'web' ? 20 : 10),
+    ...(Platform.isTV && Platform.OS !== 'web' && { height: scaledPixels(150) }),
+    ...(Platform.OS === 'web' && { minHeight: scaledPixels(120) }),
   },
   episodeNumber: {
     fontSize: scaledPixels(24),
     color: colors.text,
-    ...(Platform.isTV && { width: scaledPixels(50) }),
+    ...((Platform.isTV || Platform.OS === 'web') && { width: scaledPixels(50) }),
     fontWeight: 'bold',
   },
   episodeInfo: {
@@ -428,7 +433,7 @@ const styles = StyleSheet.create({
   },
   episodeImageWrapper: {
     position: 'relative',
-    width: Platform.isTV ? scaledPixels(200) : '100%',
+    width: Platform.OS === 'web' ? scaledPixels(280) : Platform.isTV ? scaledPixels(200) : '100%',
     aspectRatio: 16 / 9,
     borderRadius: scaledPixels(8),
     overflow: 'hidden',
