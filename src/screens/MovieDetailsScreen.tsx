@@ -168,8 +168,8 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
-    paddingHorizontal: Platform.isTV ? scaledPixels(80) : scaledPixels(20),
-    paddingTop: Platform.isTV ? scaledPixels(60) : (StatusBar.currentHeight ?? 0) + scaledPixels(10),
+    paddingHorizontal: Platform.isTV || Platform.OS === 'web' ? scaledPixels(80) : scaledPixels(20),
+    paddingTop: Platform.isTV || Platform.OS === 'web' ? scaledPixels(60) : (StatusBar.currentHeight ?? 0) + scaledPixels(10),
   },
   backButton: {
     padding: scaledPixels(10),
@@ -186,23 +186,23 @@ const styles = StyleSheet.create({
     paddingBottom: scaledPixels(100),
   },
   header: {
-    flexDirection: Platform.isTV ? 'row' : 'column',
-    alignItems: Platform.isTV ? 'flex-start' : 'center',
+    flexDirection: Platform.isTV || Platform.OS === 'web' ? 'row' : 'column',
+    alignItems: Platform.isTV || Platform.OS === 'web' ? 'flex-start' : 'center',
     marginBottom: scaledPixels(40),
   },
   poster: {
-    width: Platform.isTV ? scaledPixels(300) : scaledPixels(200),
-    height: Platform.isTV ? scaledPixels(450) : scaledPixels(300),
+    width: Platform.isTV || Platform.OS === 'web' ? scaledPixels(300) : scaledPixels(200),
+    height: Platform.isTV || Platform.OS === 'web' ? scaledPixels(450) : scaledPixels(300),
     borderRadius: scaledPixels(12),
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   mainInfo: {
-    flex: Platform.isTV ? 1 : undefined,
-    marginLeft: Platform.isTV ? scaledPixels(40) : 0,
-    marginTop: Platform.isTV ? 0 : scaledPixels(20),
+    flex: Platform.isTV || Platform.OS === 'web' ? 1 : undefined,
+    marginLeft: Platform.isTV || Platform.OS === 'web' ? scaledPixels(40) : 0,
+    marginTop: Platform.isTV || Platform.OS === 'web' ? 0 : scaledPixels(20),
     justifyContent: 'center',
-    alignItems: Platform.isTV ? 'flex-start' : 'center',
+    alignItems: Platform.isTV || Platform.OS === 'web' ? 'flex-start' : 'center',
   },
   title: {
     fontSize: scaledPixels(48),
