@@ -88,6 +88,7 @@
   "build": {
     "appId": "com.m3utv.desktop",
     "productName": "M3U TV",
+    "icon": "electron/images/icon.png",
     "directories": {
       "output": "release"
     },

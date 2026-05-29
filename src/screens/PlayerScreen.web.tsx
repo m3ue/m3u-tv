@@ -40,6 +40,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
     const playButtonRef = useRef<FocusablePressableRef>(null);
 
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingHint, setLoadingHint] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [paused, setPaused] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -206,6 +207,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
             let cancelled = false;
 
             if (electronAPI?.openFloating) {
+                setLoadingHint('Opening player…');
                 electronAPI.openFloating(streamUrl, {
                     title: title || 'm3u-tv',
                     startPosition: startPosition || 0,
@@ -540,7 +542,7 @@ export const PlayerScreen = ({ route, navigation }: RootStackScreenProps<'Player
                 <View style={styles.centerOverlay} pointerEvents="none">
                     <ActivityIndicator color="#ffffff" size="large" />
                     <Text style={styles.loadingText}>
-                        {isBuffering ? 'Buffering...' : 'Loading stream...'}
+                        {isBuffering ? 'Buffering...' : loadingHint ?? 'Loading stream...'}
                     </Text>
                 </View>
             )}

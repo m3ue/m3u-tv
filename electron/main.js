@@ -2,6 +2,8 @@ const { app, BrowserWindow, globalShortcut, protocol, net, session, ipcMain, she
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
+const nodeNet = require('net');
+const os = require('os');
 const { spawn } = require('child_process');
 const { MpvController } = require('./mpvController');
 
@@ -28,7 +30,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     backgroundColor: '#0a0a0f',
-    icon: path.join(__dirname, '..', 'logo.png'),
+    icon: path.join(__dirname, 'images', 'icon.png'),
     titleBarStyle: 'default',
     autoHideMenuBar: true,
     webPreferences: {
@@ -153,7 +155,8 @@ app.whenReady().then(() => {
 
   // ── Floating mpv windows — one per stream, independent of the main window ──
   // Each call spawns a new mpv window. The main Electron window is never hidden.
-  // Multiple streams can be open simultaneously.
+  // The IPC promise resolves only once mpv's socket connects, so the renderer's
+  // loading spinner stays visible until mpv's window is actually on screen.
   ipcMain.handle('mpv:open-floating', async (_event, streamUrl, options) => {
     // Validate URL to prevent command injection
     try {
@@ -173,6 +176,11 @@ app.whenReady().then(() => {
     const startPosition = options?.startPosition || 0;
     const title = options?.title || 'm3u-tv';
 
+    // Unique socket path so we can detect when mpv is ready
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\m3u-tv-float-${Date.now()}`
+      : path.join(os.tmpdir(), `m3u-tv-float-${Date.now()}.sock`);
+
     const mpvArgs = [
       ...mpvInfo.args,
       '--force-window=yes',
@@ -182,17 +190,34 @@ app.whenReady().then(() => {
       '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       `--title=${title}`,
       '--geometry=960x540',
+      `--input-ipc-server=${socketPath}`,
       ...(startPosition > 0 ? [`--start=${Math.floor(startPosition)}`] : []),
       '--', streamUrl,
     ];
 
-    const child = spawn(mpvInfo.cmd, mpvArgs, {
-      stdio: 'ignore',
-      detached: false,
+    const child = spawn(mpvInfo.cmd, mpvArgs, { stdio: 'ignore', detached: false });
+    child.on('error', (err) => console.error('[mpv:open-floating] Failed to start:', err.message));
+
+    // Wait until mpv's IPC socket connects — this confirms the window is visible.
+    // Resolves early on error or after an 8-second safety timeout.
+    await new Promise((resolve) => {
+      const deadline = setTimeout(resolve, 8000);
+
+      const tryConnect = () => {
+        if (process.platform !== 'win32' && !fs.existsSync(socketPath)) {
+          setTimeout(tryConnect, 150);
+          return;
+        }
+        const sock = nodeNet.createConnection(socketPath);
+        sock.on('connect', () => { sock.destroy(); clearTimeout(deadline); setTimeout(resolve, 1000); });
+        sock.on('error', () => setTimeout(tryConnect, 150));
+      };
+      setTimeout(tryConnect, 200);
     });
-    child.on('error', (err) => {
-      console.error('[mpv:open-floating] Failed to start:', err.message);
-    });
+
+    if (process.platform !== 'win32') {
+      try { fs.unlinkSync(socketPath); } catch {}
+    }
 
     return { success: true };
   });
