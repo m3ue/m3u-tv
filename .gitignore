@@ -15,7 +15,6 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.github/
 .idea
 .DS_Store
 *.suo
@@ -42,3 +41,6 @@ src/config/devDefaults.ts
 ios
 android
 release
+
+# Platform-specific native binaries (fetched by scripts/download-binaries.sh)
+binaries/
