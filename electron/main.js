@@ -74,6 +74,8 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(() => {
+  app.setName('M3U TV');
+
   // Set dock icon explicitly on macOS (required in dev mode; packaged builds use the .icns in the bundle)
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(path.join(__dirname, 'images', 'icon.png'));
