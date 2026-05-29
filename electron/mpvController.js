@@ -42,16 +42,48 @@ class MpvController {
   }
 
   /**
-   * Locate the mpv binary.
+   * Locate the mpv binary. Search order:
+   *   1. Bundled binary (electron-builder extraResources — production)
+   *   2. Dev-mode binaries from scripts/download-binaries.sh
+   *   3. Homebrew paths on macOS (Electron does not inherit shell PATH)
+   *   4. PATH via `which`
+   *   5. Flatpak on Linux
    */
   static findMpvCommand() {
     const { execSync } = require('child_process');
+    const bin = process.platform === 'win32' ? 'mpv.exe' : 'mpv';
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
 
+    // 1. Packaged build — electron-builder puts extraResources here
+    if (process.resourcesPath) {
+      const p = path.join(process.resourcesPath, 'mpv', bin);
+      if (fs.existsSync(p)) return { cmd: p, args: [], isFlatpak: false };
+    }
+
+    // 2. Dev-mode bundle (scripts/download-binaries.sh output)
+    const devPaths = process.platform === 'darwin'
+      ? [path.join(__dirname, '..', 'binaries', 'mac', arch, bin)]
+      : process.platform === 'win32'
+        ? [path.join(__dirname, '..', 'binaries', 'win', 'x64', bin)]
+        : [];
+    for (const p of devPaths) {
+      if (fs.existsSync(p)) return { cmd: p, args: [], isFlatpak: false };
+    }
+
+    // 3. Homebrew on macOS (Electron inherits a minimal PATH, not the shell one)
+    if (process.platform === 'darwin') {
+      for (const p of ['/opt/homebrew/bin/mpv', '/usr/local/bin/mpv']) {
+        if (fs.existsSync(p)) return { cmd: p, args: [], isFlatpak: false };
+      }
+    }
+
+    // 4. Generic PATH
     try {
       execSync('which mpv', { stdio: 'ignore' });
       return { cmd: 'mpv', args: [], isFlatpak: false };
     } catch {}
 
+    // 5. Flatpak (Linux only)
     if (process.platform === 'linux') {
       try {
         execSync('flatpak info io.mpv.Mpv', { stdio: 'ignore' });

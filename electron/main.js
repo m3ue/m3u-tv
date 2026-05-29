@@ -1,8 +1,21 @@
 const { app, BrowserWindow, globalShortcut, protocol, net, session, ipcMain, shell } = require('electron');
 const path = require('path');
 const url = require('url');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const { MpvController } = require('./mpvController');
+
+// Tell the native libmpv addon where to find libmpv (packaged builds and dev-mode bundles).
+// The addon uses dlopen and respects this env var; without it it searches /opt/homebrew/lib.
+if (process.platform === 'darwin' && !process.env.M3U_TV_LIBMPV_DYLIB) {
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  for (const candidate of [
+    process.resourcesPath && path.join(process.resourcesPath, 'mpv', 'libmpv.2.dylib'),
+    path.join(__dirname, '..', 'binaries', 'mac', arch, 'libmpv.2.dylib'),
+  ].filter(Boolean)) {
+    if (fs.existsSync(candidate)) { process.env.M3U_TV_LIBMPV_DYLIB = candidate; break; }
+  }
+}
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 
