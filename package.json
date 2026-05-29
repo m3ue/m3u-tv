@@ -100,7 +100,9 @@
       {
         "from": "binaries/mac/${arch}/",
         "to": "mpv",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "linux": {
