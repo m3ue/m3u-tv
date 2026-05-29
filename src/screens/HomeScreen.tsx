@@ -157,56 +157,73 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         }}
       />
       {/* Continue Watching Row */}
-      {recentlyWatched.filter((w) => w.content_type !== 'live').length > 0 && (
-        <View style={styles.rowContainer}>
-          <Text style={styles.rowTitle}>Continue Watching</Text>
-          <View style={styles.continueWatchingList}>
-            <FlatList
-              data={recentlyWatched.filter((w) => w.content_type !== 'live')}
-              horizontal
-              removeClippedSubviews
-              initialNumToRender={6}
-              style={styles.rowList}
-              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => `${item.content_type}-${item.stream_id}`}
-              renderItem={({ item: prog, index }) => {
-                const vod = prog.content_type === 'vod'
-                  ? vodStreams.find((v) => v.stream_id === prog.stream_id)
-                  : undefined;
-                const series = prog.content_type === 'episode' && prog.series_id
-                  ? seriesList.find((s) => s.series_id === prog.series_id)
-                  : undefined;
-                const cover = vod?.stream_icon || series?.cover || '';
-                const title = vod?.name || series?.name || `Stream ${prog.stream_id}`;
-                const pct = prog.duration_seconds && prog.duration_seconds > 0
-                  ? Math.min(prog.position_seconds / prog.duration_seconds, 1)
-                  : 0;
-                if (!vod && !series) return null;
-                return (
-                  <FocusablePressable
-                    onSelect={() => handleContinueWatching(prog)}
-                    onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
-                    style={({ isFocused }) => [styles.continueCard, isFocused && styles.continueCardFocused]}
-                  >
-                    {() => (
-                      <View style={styles.continueCardInner}>
-                        <Image source={{ uri: cover }} style={styles.continueCover} resizeMode="cover" />
-                        {pct > 0 && (
-                          <View style={styles.continueProgressBg}>
-                            <View style={[styles.continueProgressFill, { width: `${Math.round(pct * 100)}%` as any }]} />
+      {isM3UEditor && activeViewer && (() => {
+        const watchable = recentlyWatched
+          .filter((w) => w.content_type !== 'live')
+          .map((prog) => {
+            const vod = prog.content_type === 'vod'
+              ? vodStreams.find((v) => v.stream_id === prog.stream_id)
+              : undefined;
+            const series = prog.content_type === 'episode' && prog.series_id
+              ? seriesList.find((s) => s.series_id === prog.series_id)
+              : undefined;
+            if (!vod && !series) return null;
+            return { prog, vod, series };
+          })
+          .filter(Boolean) as { prog: WatchProgress; vod?: XtreamVodStream; series?: XtreamSeries }[];
+
+        return (
+          <View style={styles.rowContainer}>
+            <Text style={styles.rowTitle}>Continue Watching</Text>
+            {watchable.length > 0 ? (
+              <View style={styles.continueWatchingList}>
+                <FlatList
+                  data={watchable}
+                  horizontal
+                  removeClippedSubviews
+                  initialNumToRender={6}
+                  style={styles.rowList}
+                  contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={({ prog }) => `${prog.content_type}-${prog.stream_id}`}
+                  renderItem={({ item: { prog, vod, series }, index }) => {
+                    const cover = vod?.stream_icon || series?.cover || '';
+                    const title = vod?.name || series?.name || `Stream ${prog.stream_id}`;
+                    const pct = prog.duration_seconds && prog.duration_seconds > 0
+                      ? Math.min(prog.position_seconds / prog.duration_seconds, 1)
+                      : 0;
+                    return (
+                      <FocusablePressable
+                        onSelect={() => handleContinueWatching(prog)}
+                        onFocus={index === 0 ? () => isSidebarActive && setSidebarActive(false) : undefined}
+                        style={({ isFocused }) => [styles.continueCard, isFocused && styles.continueCardFocused]}
+                      >
+                        {() => (
+                          <View style={styles.continueCardInner}>
+                            <Image source={{ uri: cover }} style={styles.continueCover} resizeMode="cover" />
+                            {pct > 0 && (
+                              <View style={styles.continueProgressBg}>
+                                <View style={[styles.continueProgressFill, { width: `${Math.round(pct * 100)}%` as any }]} />
+                              </View>
+                            )}
+                            <Text style={styles.continueTitle} numberOfLines={2}>{title}</Text>
                           </View>
                         )}
-                        <Text style={styles.continueTitle} numberOfLines={2}>{title}</Text>
-                      </View>
-                    )}
-                  </FocusablePressable>
-                );
-              }}
-            />
+                      </FocusablePressable>
+                    );
+                  }}
+                />
+              </View>
+            ) : (
+              <View style={styles.continuePlaceholder}>
+                <Text style={styles.continuePlaceholderIcon}>▶</Text>
+                <Text style={styles.continuePlaceholderText}>Nothing here yet</Text>
+                <Text style={styles.continuePlaceholderHint}>Start watching a movie or series and it will appear here</Text>
+              </View>
+            )}
           </View>
-        </View>
-      )}
+        );
+      })()}
 
       {/* Favorites Row */}
       {favoriteStreams.length > 0 && (
@@ -442,5 +459,31 @@ const styles = StyleSheet.create({
     fontSize: scaledPixels(16),
     marginTop: scaledPixels(6),
     paddingHorizontal: scaledPixels(4),
+  },
+  continuePlaceholder: {
+    height: Platform.OS === 'web' ? scaledPixels(200) : scaledPixels(160),
+    marginHorizontal: scaledPixels(10),
+    borderRadius: scaledPixels(12),
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  continuePlaceholderIcon: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: scaledPixels(40),
+    marginBottom: scaledPixels(12),
+  },
+  continuePlaceholderText: {
+    color: colors.textSecondary,
+    fontSize: scaledPixels(22),
+    fontWeight: '600',
+    marginBottom: scaledPixels(8),
+  },
+  continuePlaceholderHint: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: scaledPixels(18),
   },
 });
