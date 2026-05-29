@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList, Image, Platform } from 'react-native';
 import { useXtream } from '../context/XtreamContext';
 import { useViewer } from '../context/ViewerContext';
 import { useMenu } from '../context/MenuContext';
@@ -167,6 +167,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               removeClippedSubviews
               initialNumToRender={6}
               style={styles.rowList}
+              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => `${item.content_type}-${item.stream_id}`}
               renderItem={({ item: prog, index }) => {
@@ -223,6 +224,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               maxToRenderPerBatch={4}
               windowSize={3}
               style={styles.rowList}
+              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -246,6 +248,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               maxToRenderPerBatch={4}
               windowSize={3}
               style={styles.rowList}
+              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -269,6 +272,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               maxToRenderPerBatch={4}
               windowSize={3}
               style={styles.rowList}
+              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
               keyExtractor={(item) => String(item.stream_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -292,6 +296,7 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
               maxToRenderPerBatch={4}
               windowSize={3}
               style={styles.rowList}
+              contentContainerStyle={Platform.OS === 'web' ? styles.rowListContent : undefined}
               keyExtractor={(item) => String(item.series_id)}
               showsHorizontalScrollIndicator={false}
             />
@@ -378,18 +383,21 @@ const styles = StyleSheet.create({
     marginLeft: scaledPixels(10),
   },
   liveTvRowList: {
-    height: scaledPixels(224),
+    height: Platform.OS === 'web' ? scaledPixels(264) : scaledPixels(224),
     overflow: 'visible',
   },
   posterRowList: {
-    height: scaledPixels(390),
+    height: Platform.OS === 'web' ? scaledPixels(430) : scaledPixels(390),
     overflow: 'visible',
   },
   rowList: {
     overflow: 'visible',
   },
+  rowListContent: {
+    paddingVertical: scaledPixels(20),
+  },
   continueWatchingList: {
-    height: scaledPixels(390),
+    height: Platform.OS === 'web' ? scaledPixels(430) : scaledPixels(390),
     overflow: 'visible',
   },
   continueCard: {
