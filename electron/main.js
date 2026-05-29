@@ -76,7 +76,7 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(() => {
   // Set dock icon explicitly on macOS (required in dev mode; packaged builds use the .icns in the bundle)
   if (process.platform === 'darwin' && app.dock) {
-    app.dock.setIcon(path.join(__dirname, 'images', 'icon.icns'));
+    app.dock.setIcon(path.join(__dirname, 'images', 'icon.png'));
   }
 
   // Serve dist/ files via custom protocol so absolute paths (/_expo/...) resolve correctly
