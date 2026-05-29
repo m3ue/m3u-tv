@@ -7,6 +7,7 @@ import { favoritesService } from '../services/FavoritesService';
 import { colors } from '../theme';
 import { scaledPixels } from '../hooks/useScale';
 import { FocusablePressable } from '../components/FocusablePressable';
+import { Icon } from '../components/Icon';
 import { LiveTVCard } from '../components/LiveTVCard';
 import { MovieCard } from '../components/MovieCard';
 import { SeriesCard } from '../components/SeriesCard';
@@ -223,9 +224,13 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
                 />
                 <View style={styles.continuePlaceholderAccent} />
                 <View style={styles.continuePlaceholderContent}>
-                  <Text style={styles.continuePlaceholderPlayIcon}>▶</Text>
                   <Text style={styles.continuePlaceholderTitle}>Nothing here yet</Text>
-                  <Text style={styles.continuePlaceholderHint}>Start watching content and it will appear here</Text>
+                  <View style={styles.continuePlaceholderIcons}>
+                    <Icon name="Tv" size={scaledPixels(28)} color={colors.textTertiary} />
+                    <Icon name="Film" size={scaledPixels(28)} color={colors.textTertiary} />
+                    <Icon name="Tv2" size={scaledPixels(28)} color={colors.textTertiary} />
+                  </View>
+                  <Text style={styles.continuePlaceholderHint}>Start watching content and it will appear here to continue watching later...</Text>
                 </View>
               </View>
             )}
@@ -469,7 +474,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaledPixels(4),
   },
   continuePlaceholder: {
-    height: Platform.OS === 'web' ? scaledPixels(240) : scaledPixels(180),
+    height: scaledPixels(180),
     marginHorizontal: scaledPixels(10),
     borderRadius: scaledPixels(16),
     backgroundColor: colors.backgroundElevated,
@@ -493,12 +498,13 @@ const styles = StyleSheet.create({
   },
   continuePlaceholderContent: {
     flex: 1,
+    gap: scaledPixels(12),
     paddingLeft: scaledPixels(32),
     paddingRight: scaledPixels(160),
   },
-  continuePlaceholderPlayIcon: {
-    color: colors.primary,
-    fontSize: scaledPixels(28),
+  continuePlaceholderIcons: {
+    flexDirection: 'row',
+    gap: scaledPixels(16),
     marginBottom: scaledPixels(12),
     opacity: 0.9,
   },
