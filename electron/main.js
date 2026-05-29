@@ -24,13 +24,17 @@ const DIST_DIR = path.join(__dirname, '..', 'dist');
 let mainWindow;
 
 function createWindow() {
+  const iconFile = process.platform === 'darwin'
+    ? path.join(__dirname, 'images', 'icon.icns')
+    : path.join(__dirname, 'images', 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
     minWidth: 800,
     minHeight: 600,
     backgroundColor: '#0a0a0f',
-    icon: path.join(__dirname, 'images', 'icon.png'),
+    icon: iconFile,
     titleBarStyle: 'default',
     autoHideMenuBar: true,
     webPreferences: {
@@ -70,6 +74,11 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(() => {
+  // Set dock icon explicitly on macOS (required in dev mode; packaged builds use the .icns in the bundle)
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(path.join(__dirname, 'images', 'icon.icns'));
+  }
+
   // Serve dist/ files via custom protocol so absolute paths (/_expo/...) resolve correctly
   protocol.handle('app', (request) => {
     const reqUrl = new URL(request.url);

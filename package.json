@@ -113,12 +113,15 @@
         {
           "from": "binaries/win/x64/",
           "to": "mpv",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
     "mac": {
       "identity": null,
+      "icon": "electron/images/icon.icns",
       "target": [
         "dmg"
       ],
@@ -126,7 +129,9 @@
         {
           "from": "binaries/mac/${arch}/",
           "to": "mpv",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     }
