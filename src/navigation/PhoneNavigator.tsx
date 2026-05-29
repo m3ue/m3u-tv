@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { enableDragScroll } from '../utils/webInteractions';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
 import {
@@ -95,6 +97,10 @@ function TabNavigator() {
 }
 
 export function PhoneNavigator() {
+  useEffect(() => {
+    if (Platform.OS === 'web') return enableDragScroll();
+  }, []);
+
   return (
     <ViewerProvider>
       <NavigationContainer theme={AppTheme} ref={navigationRef}>

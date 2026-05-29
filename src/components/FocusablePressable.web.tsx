@@ -1,6 +1,7 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import type { FocusablePressableRef, FocusablePressableProps } from './FocusablePressable.types';
+import { spatialNavigate } from '../utils/webInteractions';
 
 export type { FocusablePressableRef, FocusablePressableProps } from './FocusablePressable.types';
 
@@ -33,6 +34,9 @@ export const FocusablePressable = forwardRef<FocusablePressableRef, FocusablePre
         if (key === 'Enter' || key === ' ') {
           e.preventDefault?.();
           onSelect?.();
+        } else if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') {
+          e.preventDefault?.();
+          spatialNavigate(key);
         }
       },
       [onSelect],
