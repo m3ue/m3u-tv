@@ -181,12 +181,16 @@ app.whenReady().then(() => {
       ? `\\\\.\\pipe\\m3u-tv-float-${Date.now()}`
       : path.join(os.tmpdir(), `m3u-tv-float-${Date.now()}.sock`);
 
+    const mpvConfigDir = path.join(__dirname, 'mpv');
+
     const mpvArgs = [
       ...mpvInfo.args,
+      `--config-dir=${mpvConfigDir}`,
       '--force-window=yes',
       '--hwdec=auto',
       '--keep-open=no',
       '--idle=no',
+      '--osc=no',
       '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       `--title=${title}`,
       '--geometry=960x540',
