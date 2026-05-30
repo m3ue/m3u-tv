@@ -184,32 +184,41 @@ export const SeriesDetailsScreen = ({ route, navigation }: RootStackScreenProps<
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={!Platform.isTV && Platform.OS !== 'web' ? styles.seasonsRow : undefined}
                 >
-                  {seriesInfo?.seasons.map((season, index) => (
-                    <FocusablePressable
-                      key={season.season_number}
-                      ref={index === 0 ? seasonListRef : undefined}
-                      preferredFocus={index === 0}
-                      nextFocusRight={firstEpisodeTag}
-                      onSelect={() => setSelectedSeason(String(season.season_number))}
-                      style={({ isFocused }) => [
-                        styles.seasonItem,
-                        selectedSeason === String(season.season_number) && styles.seasonItemActive,
-                        isFocused && styles.itemFocused,
-                      ]}
-                    >
-                      {({ isFocused }) => (
-                        <Text
-                          style={[
-                            styles.seasonText,
-                            selectedSeason === String(season.season_number) && styles.seasonTextActive,
-                            isFocused && styles.seasonTextActive,
-                          ]}
-                        >
-                          Season {season.season_number}
-                        </Text>
-                      )}
-                    </FocusablePressable>
-                  ))}
+                  {seriesInfo?.seasons.map((season, index) => {
+                    const isActive = selectedSeason === String(season.season_number);
+                    return (
+                      <FocusablePressable
+                        key={season.season_number}
+                        ref={index === 0 ? seasonListRef : undefined}
+                        preferredFocus={index === 0}
+                        nextFocusRight={firstEpisodeTag}
+                        onSelect={() => setSelectedSeason(String(season.season_number))}
+                        style={({ isFocused }) => [
+                          styles.seasonItem,
+                          isActive && styles.seasonItemActive,
+                          isFocused && styles.itemFocused,
+                          // Ensure the longhand left-border color matches state on TV/web
+                          // (longhand always wins over `borderColor` shorthand in RN).
+                          (Platform.isTV || Platform.OS === 'web') && {
+                            borderLeftColor:
+                              isFocused || isActive ? colors.primary : 'transparent',
+                          },
+                        ]}
+                      >
+                        {({ isFocused }) => (
+                          <Text
+                            style={[
+                              styles.seasonText,
+                              isActive && styles.seasonTextActive,
+                              isFocused && styles.seasonTextActive,
+                            ]}
+                          >
+                            Season {season.season_number}
+                          </Text>
+                        )}
+                      </FocusablePressable>
+                    );
+                  })}
                 </ScrollView>
               </FocusGuide>
 
@@ -378,17 +387,20 @@ const styles = StyleSheet.create({
     marginBottom: Platform.isTV || Platform.OS === 'web' ? scaledPixels(10) : 0,
     ...(!Platform.isTV && Platform.OS !== 'web' && { marginRight: scaledPixels(10), flexShrink: 0 }),
     backgroundColor: 'rgba(255,255,255,0.05)',
-    ...((Platform.isTV || Platform.OS === 'web') && { overflow: 'hidden' as const }),
     borderWidth: 2,
     borderColor: 'transparent',
+    // Reserve a stable 4px left-border slot on TV/web so activating a season
+    // doesn't trigger a layout shift that clips the child <Text> on native.
+    ...((Platform.isTV || Platform.OS === 'web') && {
+      borderLeftWidth: 4,
+      borderLeftColor: 'transparent',
+    }),
   },
   seasonItemActive: {
     backgroundColor: 'rgba(236, 0, 63, 0.2)',
-    ...(Platform.OS === 'web'
-      ? { borderLeftWidth: 4, borderLeftColor: colors.primary, borderColor: 'transparent' }
-      : Platform.isTV
-        ? { borderLeftWidth: 4, borderLeftColor: colors.primary }
-        : { borderBottomWidth: 3, borderBottomColor: colors.primary }),
+    ...(Platform.isTV || Platform.OS === 'web'
+      ? { borderLeftColor: colors.primary }
+      : { borderBottomWidth: 3, borderBottomColor: colors.primary }),
   },
   seasonText: {
     color: colors.textSecondary,
