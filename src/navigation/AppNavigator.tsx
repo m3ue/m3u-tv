@@ -16,6 +16,8 @@ import {
   MovieDetailsScreen,
   SeriesDetailsScreen,
   ViewerSelectionScreen,
+  RecordingsScreen,
+  RecordingDetailsScreen,
 } from '../screens';
 import { ViewerProvider } from '../context/ViewerContext';
 import { SideBar, SIDEBAR_WIDTH_COLLAPSED } from '../components/SideBar';
@@ -123,6 +125,7 @@ function MainNavigator() {
               <MainStack.Screen name="LiveTV" component={LiveTVScreen} />
               <MainStack.Screen name="VOD" component={VODScreen} />
               <MainStack.Screen name="Series" component={SeriesScreen} />
+              <MainStack.Screen name="Recordings" component={RecordingsScreen} />
               <MainStack.Screen name="Settings" component={SettingsScreen} />
             </MainStack.Navigator>
           </View>
@@ -182,6 +185,13 @@ export function AppNavigator() {
           options={{
             animation: 'fade',
             presentation: 'transparentModal',
+          }}
+        />
+        <RootStack.Screen
+          name="RecordingDetails"
+          component={RecordingDetailsScreen}
+          options={{
+            animation: 'slide_from_right',
           }}
         />
       </RootStack.Navigator>

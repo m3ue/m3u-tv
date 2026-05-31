@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DrawerScreenProps } from '@react-navigation/drawer';
 import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import { XtreamVodStream, XtreamSeries } from '../types/xtream';
+import { XtreamVodStream, XtreamSeries, DvrRecording } from '../types/xtream';
 
 // Root Stack Navigator
 export type RootStackParamList = {
@@ -9,7 +9,7 @@ export type RootStackParamList = {
   Player: {
     streamUrl: string;
     title: string;
-    type: 'live' | 'vod' | 'series';
+    type: 'live' | 'vod' | 'series' | 'dvr';
     // Optional progress-tracking params (m3u-editor specific)
     streamId?: number;
     seriesId?: number;
@@ -24,6 +24,9 @@ export type RootStackParamList = {
     item: XtreamSeries;
   };
   ViewerSelection: undefined;
+  RecordingDetails: {
+    recording: DvrRecording;
+  };
 };
 
 // Drawer Navigator
@@ -33,6 +36,7 @@ export type DrawerParamList = {
   LiveTV: undefined;
   VOD: undefined;
   Series: undefined;
+  Recordings: undefined;
   Settings: undefined;
 };
 

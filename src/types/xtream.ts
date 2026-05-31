@@ -271,6 +271,58 @@ export interface XtreamShortEpg {
   epg_listings: XtreamEpgListing[];
 }
 
+// DVR Types (m3u-editor specific)
+
+export type DvrRecordingStatus =
+  | 'scheduled'
+  | 'recording'
+  | 'post_processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface DvrRecording {
+  uuid: string;
+  title: string;
+  subtitle?: string;
+  status: DvrRecordingStatus;
+  channel_name?: string;
+  channel_id?: number;
+  scheduled_start: string;
+  scheduled_end: string;
+  actual_start?: string;
+  actual_end?: string;
+  duration_seconds?: number;
+  file_size_bytes?: number;
+  season?: number;
+  episode?: number;
+  stream_url?: string;
+  live_url?: string;
+  edl_url?: string;
+  has_edl?: boolean;
+  metadata?: Record<string, unknown>;
+  epg_programme_data?: Record<string, unknown>;
+  error_message?: string;
+}
+
+export interface ScheduleDvrParams {
+  channel_id: number;
+  title: string;
+  start_time: string;
+  end_time: string;
+  programme_id?: string;
+  start_early_seconds?: number;
+  end_late_seconds?: number;
+}
+
+export interface CreateDvrSeriesRuleParams {
+  channel_id: number;
+  title: string;
+  match_mode?: 'contains' | 'exact' | 'starts_with';
+  series_mode?: 'all' | 'new_flag' | 'unique_se';
+  keep_last?: number;
+}
+
 // UI Types
 export interface ContentItem {
   id: number;

@@ -14,6 +14,7 @@ import { Icon, IconName } from './Icon';
 import { colors } from '../theme/colors';
 import { scaledPixels } from '../hooks/useScale';
 import { useMenu } from '../context/MenuContext';
+import { useXtream } from '../context/XtreamContext';
 import { DrawerParamList } from '../navigation/types';
 import { FocusablePressable, FocusablePressableRef } from './FocusablePressable';
 import { navigationRef } from '../navigation/navigationRef';
@@ -38,7 +39,7 @@ interface MenuItem {
     icon: IconName;
 }
 
-const MENU_ITEMS: MenuItem[] = [
+const BASE_menuItems: MenuItem[] = [
     { id: 'Home', label: 'Home', icon: 'Home' },
     { id: 'Search', label: 'Search', icon: 'Search' },
     { id: 'LiveTV', label: 'Live TV', icon: 'Tv' },
@@ -47,8 +48,14 @@ const MENU_ITEMS: MenuItem[] = [
     { id: 'Settings', label: 'Settings', icon: 'Settings' },
 ];
 
+const DVR_MENU_ITEM: MenuItem = { id: 'Recordings', label: 'Recordings', icon: 'Video' };
+
 export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
     const { isExpanded, setExpanded, isSidebarActive, setSidebarActive } = useMenu();
+    const { isM3UEditor } = useXtream();
+    const menuItems = isM3UEditor
+        ? [...BASE_menuItems.slice(0, -1), DVR_MENU_ITEM, BASE_menuItems[BASE_menuItems.length - 1]]
+        : BASE_menuItems;
     const [preferredMenuId, setPreferredMenuId] = useState<string>('Home');
     const wasSidebarActiveRef = useRef(false);
     const menuRefs = useRef<Record<string, FocusablePressableRef | null>>({});
@@ -120,7 +127,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
 
     // Keep preferred item in sync with actual navigation route.
     useEffect(() => {
-        const isTopLevelMenuRoute = MENU_ITEMS.some((item) => item.id === (currentRouteName as keyof DrawerParamList));
+        const isTopLevelMenuRoute = menuItems.some((item) => item.id === (currentRouteName as keyof DrawerParamList));
         if (isTopLevelMenuRoute && preferredMenuId !== currentRouteName) {
             setPreferredMenuId(currentRouteName);
         }
@@ -196,7 +203,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
                 </View>
 
                 <View style={styles.menuContainer}>
-                    {MENU_ITEMS.map((item) => (
+                    {menuItems.map((item) => (
                         <FocusablePressable
                             key={item.id}
                             ref={(r) => { menuRefs.current[item.id] = r; }}

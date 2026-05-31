@@ -15,6 +15,10 @@ import {
   WatchProgress,
   UpdateProgressParams,
   WatchContentType,
+  DvrRecording,
+  DvrRecordingStatus,
+  ScheduleDvrParams,
+  CreateDvrSeriesRuleParams,
 } from '../types/xtream';
 
 const M3UE_CLIENT_HEADER = 'X-M3UE-Client';
@@ -397,6 +401,55 @@ class XtreamService {
     if (type) params.type = type;
     const url = this.getApiUrl('get_recently_watched', params);
     return this.fetchJson<WatchProgress[]>(url);
+  }
+
+  // DVR (m3u-editor specific)
+  async getRecordings(status?: DvrRecordingStatus, limit = 50, offset = 0): Promise<DvrRecording[]> {
+    const params: Record<string, string> = { limit: String(limit), offset: String(offset) };
+    if (status) params.status = status;
+    const url = this.getApiUrl('get_dvr_recordings', params);
+    return this.fetchJson<DvrRecording[]>(url);
+  }
+
+  async getRecording(uuid: string): Promise<DvrRecording> {
+    const url = this.getApiUrl('get_dvr_recording', { recording_id: uuid });
+    return this.fetchJson<DvrRecording>(url);
+  }
+
+  async scheduleDvr(params: ScheduleDvrParams): Promise<{ success: boolean; rule_id: number; message: string }> {
+    const url = this.getApiUrl('schedule_dvr');
+    const body: Record<string, string> = {
+      channel_id: String(params.channel_id),
+      title: params.title,
+      start_time: params.start_time,
+      end_time: params.end_time,
+    };
+    if (params.programme_id !== undefined) body.programme_id = params.programme_id;
+    if (params.start_early_seconds !== undefined) body.start_early_seconds = String(params.start_early_seconds);
+    if (params.end_late_seconds !== undefined) body.end_late_seconds = String(params.end_late_seconds);
+    return this.fetchPost(url, body);
+  }
+
+  async createDvrSeriesRule(params: CreateDvrSeriesRuleParams): Promise<{ success: boolean; rule_id: number }> {
+    const url = this.getApiUrl('create_dvr_series_rule');
+    const body: Record<string, string> = {
+      channel_id: String(params.channel_id),
+      title: params.title,
+    };
+    if (params.match_mode) body.match_mode = params.match_mode;
+    if (params.series_mode) body.series_mode = params.series_mode;
+    if (params.keep_last !== undefined) body.keep_last = String(params.keep_last);
+    return this.fetchPost(url, body);
+  }
+
+  async cancelRecording(uuid: string): Promise<{ success: boolean }> {
+    const url = this.getApiUrl('cancel_dvr_recording');
+    return this.fetchPost(url, { recording_id: uuid });
+  }
+
+  async deleteRecording(uuid: string): Promise<{ success: boolean }> {
+    const url = this.getApiUrl('delete_dvr_recording');
+    return this.fetchPost(url, { recording_id: uuid });
   }
 
   // Helper methods to transform data for UI
