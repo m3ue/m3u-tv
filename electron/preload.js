@@ -4,6 +4,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
 
+  // Title-bar metrics for the custom drag region (height, side insets for native
+  // window controls, etc). Resolves once from the main process.
+  getTitleBarInfo: () => ipcRenderer.invoke('titleBar:getInfo'),
+
   // Open a stream in an independent floating mpv window (preferred path)
   openFloating: (streamUrl, options) => ipcRenderer.invoke('mpv:open-floating', streamUrl, options),
 
@@ -49,6 +53,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event, data) => callback(data);
       ipcRenderer.on('mpv:end', handler);
       return () => ipcRenderer.removeListener('mpv:end', handler);
+    },
+    onEmbeddedMode: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('mpv:embedded-mode', handler);
+      return () => ipcRenderer.removeListener('mpv:embedded-mode', handler);
     },
   },
 });

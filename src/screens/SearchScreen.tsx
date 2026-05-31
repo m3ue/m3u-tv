@@ -13,6 +13,7 @@ import { colors } from '../theme';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamVodStream, XtreamSeries } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
+import { useElectronTitleBar } from '../hooks/useElectronTitleBar';
 import { FocusablePressable, FocusablePressableRef } from '../components/FocusablePressable';
 import { LiveTVCard } from '../components/LiveTVCard';
 import { MovieCard } from '../components/MovieCard';
@@ -49,6 +50,7 @@ export function SearchScreen(_props: DrawerScreenPropsType<'Search'>) {
     fetchSeries,
   } = useXtream();
 
+  const titleBarInfo = useElectronTitleBar();
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ContentType>('all');
   const [isLoading, setIsLoading] = useState(false);
@@ -152,7 +154,7 @@ export function SearchScreen(_props: DrawerScreenPropsType<'Search'>) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(10) }]}>
       <FlatList
         data={results}
         renderItem={renderResult}

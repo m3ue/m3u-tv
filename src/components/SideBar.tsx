@@ -18,6 +18,7 @@ import { DrawerParamList } from '../navigation/types';
 import { FocusablePressable, FocusablePressableRef } from './FocusablePressable';
 import { navigationRef } from '../navigation/navigationRef';
 import { BlurView } from 'expo-blur';
+import { useElectronTitleBar } from '../hooks/useElectronTitleBar';
 
 const SIDEBAR_WIDTH_COLLAPSED = scaledPixels(100);
 const SIDEBAR_WIDTH_EXPANDED = scaledPixels(300);
@@ -54,6 +55,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
     const focusGuardRef = useRef(false);
     const hoverRef = useRef<View>(null);
     const isWeb = Platform.OS === 'web';
+    const titleBarInfo = useElectronTitleBar();
 
     const currentRouteName = useNavigationState((state) => {
         if (!state) return 'Home';
@@ -180,7 +182,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
 
     return (
         <Animated.View style={[styles.container, animatedStyle]}>
-            <View ref={hoverRef} style={styles.navContainer}>
+            <View ref={hoverRef} style={[styles.navContainer, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(10) }]}>
                 <View style={styles.logoContainer}>
                     <Animated.Image
                         source={require('../../assets/images/logo.png')}

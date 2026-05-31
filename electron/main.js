@@ -28,14 +28,24 @@ function createWindow() {
     ? path.join(__dirname, 'images', 'icon.icns')
     : path.join(__dirname, 'images', 'icon.png');
 
-  mainWindow = new BrowserWindow({
+  // Cross-platform frameless title bar configuration.
+  //  - macOS: `hiddenInset` keeps the traffic-light buttons as a translucent overlay.
+  //  - Windows/Linux: `hidden` + `titleBarOverlay` keeps the native min/max/close buttons
+  //    as an overlay so the renderer can paint behind them and provide its own drag area.
+  // The renderer reads `electronAPI.titleBar` to know how much top inset to reserve
+  // and where to render the drag region.
+  const TITLE_BAR_HEIGHT = process.platform === 'darwin' ? 28 : 32;
+  const TRAFFIC_LIGHTS_INSET = 80; // approximate width occupied by macOS traffic lights
+
+  /** @type {Electron.BrowserWindowConstructorOptions} */
+  const windowOptions = {
     width: 1280,
     height: 720,
     minWidth: 800,
     minHeight: 600,
     backgroundColor: '#0a0a0f',
+    transparent: true,
     icon: iconFile,
-    titleBarStyle: 'default',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -43,7 +53,35 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: false,
     },
-  });
+  };
+
+  if (process.platform === 'darwin') {
+    windowOptions.titleBarStyle = 'hiddenInset';
+    // Nudge the traffic lights down slightly so they sit nicely on our drag bar.
+    windowOptions.trafficLightPosition = { x: 14, y: 14 };
+  } else {
+    // Windows & Linux: keep native window controls as an overlay.
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = {
+      color: '#0a0a0f00', // transparent so our app paints through
+      symbolColor: '#ffffff',
+      height: TITLE_BAR_HEIGHT,
+    };
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
+
+  // Expose title-bar metrics to the renderer so the UI can reserve space for the
+  // drag region and offset content (e.g. sidebar logo) below the window controls.
+  ipcMain.handle('titleBar:getInfo', () => ({
+    platform: process.platform,
+    height: TITLE_BAR_HEIGHT,
+    // Left inset where the system places its window-controls overlay.
+    // macOS: traffic lights on the left. Win/Linux: controls are on the right
+    // (overlay), so no left inset is needed.
+    leftInset: process.platform === 'darwin' ? TRAFFIC_LIGHTS_INSET : 0,
+    rightInset: process.platform === 'darwin' ? 0 : 140,
+  }));
 
   const isDev = process.env.ELECTRON_DEV === '1';
   if (isDev) {
@@ -231,7 +269,7 @@ app.whenReady().then(() => {
     });
 
     if (process.platform !== 'win32') {
-      try { fs.unlinkSync(socketPath); } catch {}
+      try { fs.unlinkSync(socketPath); } catch { }
     }
 
     return { success: true };

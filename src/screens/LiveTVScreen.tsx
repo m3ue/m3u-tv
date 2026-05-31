@@ -24,6 +24,7 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { RootStackParamList } from '../navigation/types';
 import { XtreamCategory, XtreamLiveStream } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
+import { useElectronTitleBar } from '../hooks/useElectronTitleBar';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { CategoryScroller } from '../components/CategoryScroller';
 
@@ -52,6 +53,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   const [epgLoaded, setEpgLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<EpgViewMode>('list');
   const loadedEpgIdsRef = useRef<Set<number>>(new Set());
+  const titleBarInfo = useElectronTitleBar();
   const liveStreamsRef = useRef(liveStreams);
   liveStreamsRef.current = liveStreams;
 
@@ -371,7 +373,7 @@ export function LiveTVScreen(_props: DrawerScreenPropsType<'LiveTV'>) {
   if (!isFocused) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(10) }]}>
       {/* Category bar + view mode toggle */}
       <View style={styles.categoryBar}>
         <FocusablePressable

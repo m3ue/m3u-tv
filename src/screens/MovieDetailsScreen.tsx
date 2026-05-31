@@ -7,6 +7,7 @@ import { colors } from '../theme';
 import { RootStackScreenProps } from '../navigation/types';
 import { XtreamVodInfo, WatchProgress } from '../types/xtream';
 import { scaledPixels } from '../hooks/useScale';
+import { useElectronTitleBar } from '../hooks/useElectronTitleBar';
 import { FocusablePressable, FocusablePressableRef } from '../components/FocusablePressable';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +16,7 @@ import ResumeDialog from '../components/ResumeDialog';
 export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'Details'>) => {
   const isFocused = useIsFocused();
   const { item } = route.params;
+  const titleBarInfo = useElectronTitleBar();
   const playButtonRef = useRef<FocusablePressableRef>(null);
   const { fetchVodInfo, getVodStreamUrl, isM3UEditor } = useXtream();
   const { activeViewer, getProgress } = useViewer();
@@ -96,7 +98,10 @@ export const MovieDetailsScreen = ({ route, navigation }: RootStackScreenProps<'
         onDismiss={() => setShowResumeDialog(false)}
       />
       <ImageBackground source={{ uri: backdrop }} style={styles.backdrop}>
-        <LinearGradient colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]} style={styles.gradient}>
+        <LinearGradient
+          colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.8)', colors.background]}
+          style={[styles.gradient, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(10) }]}
+        >
           <FocusablePressable
             onSelect={() => navigation.goBack()}
             style={({ isFocused: f }) => [styles.backButton, f && styles.backButtonFocused]}
