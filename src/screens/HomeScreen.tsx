@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, FlatList, Image, Platform } from 'react-native';
+import { showChoiceDialog } from '../utils/platformAlert';
 import { useXtream } from '../context/XtreamContext';
 import { useViewer } from '../context/ViewerContext';
 import { useMenu } from '../context/MenuContext';
@@ -11,7 +12,6 @@ import { Icon } from '../components/Icon';
 import { LiveTVCard } from '../components/LiveTVCard';
 import { MovieCard } from '../components/MovieCard';
 import { SeriesCard } from '../components/SeriesCard';
-import ResumeDialog from '../components/ResumeDialog';
 import { DrawerScreenPropsType } from '../navigation/types';
 import { XtreamLiveStream, XtreamVodStream, XtreamSeries, WatchProgress } from '../types/xtream';
 
@@ -25,8 +25,6 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
   const [contentLoading, setContentLoading] = useState(false);
   const [recentlyWatched, setRecentlyWatched] = useState<WatchProgress[]>([]);
   const [favoriteStreams, setFavoriteStreams] = useState<XtreamLiveStream[]>([]);
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const [pendingWatch, setPendingWatch] = useState<{ progress: WatchProgress; vod?: XtreamVodStream; series?: XtreamSeries } | null>(null);
 
   useEffect(() => {
     loadSavedCredentials();
@@ -66,22 +64,8 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
     setContentLoading(false);
   };
 
-  const handleContinueWatching = useCallback((item: WatchProgress) => {
-    const vod = item.content_type === 'vod'
-      ? vodStreams.find((v) => v.stream_id === item.stream_id)
-      : undefined;
-    const series = item.content_type === 'episode' && item.series_id
-      ? seriesList.find((s) => s.series_id === item.series_id)
-      : undefined;
-    if (!vod && !series) return;
-
-    setPendingWatch({ progress: item, vod, series });
-    setShowResumeDialog(true);
-  }, [vodStreams, seriesList]);
-
-  const playContinueWatching = useCallback((startPosition?: number) => {
-    if (!pendingWatch) return;
-    const { progress, vod } = pendingWatch;
+  const playContinueWatching = useCallback((item: { progress: WatchProgress; vod?: XtreamVodStream; series?: XtreamSeries }, startPosition?: number) => {
+    const { progress, vod } = item;
     if (progress.content_type === 'vod' && vod) {
       const streamUrl = getVodStreamUrl(vod.stream_id, vod.container_extension);
       navigation.navigate('Player', {
@@ -93,8 +77,8 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
       });
     } else if (progress.content_type === 'episode') {
       const streamUrl = getSeriesStreamUrl(String(progress.stream_id));
-      const title = pendingWatch.series?.name
-        ? `${pendingWatch.series.name} - S${progress.season_number ?? '?'}`
+      const title = item.series?.name
+        ? `${item.series.name} - S${progress.season_number ?? '?'}`
         : `Episode ${progress.stream_id}`;
       navigation.navigate('Player', {
         streamUrl,
@@ -106,9 +90,29 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
         startPosition,
       });
     }
-    setShowResumeDialog(false);
-    setPendingWatch(null);
-  }, [pendingWatch, navigation, getVodStreamUrl, getSeriesStreamUrl]);
+  }, [navigation, getVodStreamUrl, getSeriesStreamUrl]);
+
+  const handleContinueWatching = useCallback((item: WatchProgress) => {
+    const vod = item.content_type === 'vod'
+      ? vodStreams.find((v) => v.stream_id === item.stream_id)
+      : undefined;
+    const series = item.content_type === 'episode' && item.series_id
+      ? seriesList.find((s) => s.series_id === item.series_id)
+      : undefined;
+    if (!vod && !series) return;
+
+    const watchItem = { progress: item, vod, series };
+    const position = item.position_seconds;
+    const mins = Math.floor(position / 60);
+    const secs = position % 60;
+    const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+    showChoiceDialog('Resume Playback?', `Resume from ${timeStr}?`, [
+      { text: 'Resume', onPress: () => playContinueWatching(watchItem, position) },
+      { text: 'Start Over', onPress: () => playContinueWatching(watchItem, 0) },
+      { text: 'Cancel' },
+    ]);
+  }, [vodStreams, seriesList, playContinueWatching]);
 
   if (isLoading) {
     return (
@@ -146,17 +150,6 @@ export function HomeScreen({ navigation }: DrawerScreenPropsType<'Home'>) {
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-      <ResumeDialog
-        visible={showResumeDialog}
-        position={pendingWatch?.progress.position_seconds ?? 0}
-        duration={pendingWatch?.progress.duration_seconds}
-        onResume={() => playContinueWatching(pendingWatch?.progress.position_seconds)}
-        onStartOver={() => playContinueWatching(0)}
-        onDismiss={() => {
-          setShowResumeDialog(false);
-          setPendingWatch(null);
-        }}
-      />
       {/* Continue Watching Row */}
       {isM3UEditor && activeViewer && (() => {
         const watchable = recentlyWatched

@@ -10,3 +10,17 @@ export function showConfirm(title: string, message: string, onConfirm: () => voi
     { text: 'Confirm', style: 'destructive', onPress: onConfirm },
   ]);
 }
+
+export type ChoiceButton = { text: string; onPress?: () => void };
+
+export function showChoiceDialog(
+  title: string,
+  message: string,
+  buttons: ChoiceButton[],
+): void {
+  Alert.alert(
+    title,
+    message,
+    buttons.map((b) => ({ text: b.text, onPress: b.onPress })),
+  );
+}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, protocol, net, session, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, protocol, net, session, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
@@ -82,6 +82,20 @@ function createWindow() {
     leftInset: process.platform === 'darwin' ? TRAFFIC_LIGHTS_INSET : 0,
     rightInset: process.platform === 'darwin' ? 0 : 140,
   }));
+
+  // Native OS message box — supports any number of buttons, returns the clicked button index.
+  ipcMain.handle('dialog:showMessageBox', async (_event, options) => {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: options.type ?? 'question',
+      title: options.title ?? '',
+      message: options.message ?? '',
+      detail: options.detail,
+      buttons: options.buttons ?? ['OK'],
+      defaultId: options.defaultId ?? 0,
+      cancelId: options.cancelId,
+    });
+    return result.response;
+  });
 
   const isDev = process.env.ELECTRON_DEV === '1';
   if (isDev) {

@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeAllListeners('external-player-closed');
   },
 
+  // Native OS dialog — returns a Promise<number> (index of the clicked button).
+  showMessageBox: (options) => ipcRenderer.invoke('dialog:showMessageBox', options),
+
   // Embedded mpv player API
   mpv: {
     start: (streamUrl, options) => ipcRenderer.invoke('mpv:start', streamUrl, options),
