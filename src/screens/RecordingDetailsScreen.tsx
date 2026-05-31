@@ -146,7 +146,7 @@ export function RecordingDetailsScreen({ route, navigation }: RootStackScreenPro
     <View style={styles.container}>
       {/* Back button */}
       <FocusablePressable
-        onPress={() => navigation.goBack()}
+        onSelect={() => navigation.goBack()}
         style={({ isFocused }) => [styles.backButton, isFocused && styles.backButtonFocused]}
       >
         <Icon name="ArrowLeft" size={scaledPixels(18)} color={colors.text} />
@@ -173,7 +173,7 @@ export function RecordingDetailsScreen({ route, navigation }: RootStackScreenPro
           {canPlay && (
             <FocusablePressable
               ref={playButtonRef}
-              onPress={handlePlay}
+              onSelect={handlePlay}
               style={({ isFocused }) => [styles.actionBtn, styles.actionBtnPrimary, isFocused && styles.actionBtnFocused]}
             >
               <Icon name={recording.status === 'recording' ? 'Radio' : 'Play'} size={scaledPixels(16)} color={colors.textOnPrimary} />
@@ -184,7 +184,7 @@ export function RecordingDetailsScreen({ route, navigation }: RootStackScreenPro
           )}
           {canCancel && (
             <FocusablePressable
-              onPress={handleCancel}
+              onSelect={handleCancel}
               style={({ isFocused }) => [styles.actionBtn, isFocused && styles.actionBtnFocused]}
             >
               <Icon name="XCircle" size={scaledPixels(16)} color={colors.warning} />
@@ -193,7 +193,7 @@ export function RecordingDetailsScreen({ route, navigation }: RootStackScreenPro
           )}
           {canDelete && (
             <FocusablePressable
-              onPress={handleDelete}
+              onSelect={handleDelete}
               style={({ isFocused }) => [styles.actionBtn, isFocused && styles.actionBtnFocused]}
             >
               <Icon name="Trash2" size={scaledPixels(16)} color={colors.error} />
