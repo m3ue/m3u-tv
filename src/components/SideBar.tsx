@@ -182,7 +182,7 @@ export const SideBar = ({ contentFocusTag, onNavigate }: SideBarProps) => {
 
     return (
         <Animated.View style={[styles.container, animatedStyle]}>
-            <View ref={hoverRef} style={[styles.navContainer, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(10) }]}>
+            <View ref={hoverRef} style={[styles.navContainer, titleBarInfo && { paddingTop: titleBarInfo.height + scaledPixels(40) }]}>
                 <View style={styles.logoContainer}>
                     <Animated.Image
                         source={require('../../assets/images/logo.png')}

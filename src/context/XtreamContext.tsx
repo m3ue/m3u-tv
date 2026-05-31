@@ -29,6 +29,7 @@ interface XtreamState {
   liveStreams: XtreamLiveStream[];
   vodStreams: XtreamVodStream[];
   series: XtreamSeries[];
+  isServerUnreachable: boolean;
 }
 
 interface XtreamContextValue extends XtreamState {
@@ -63,6 +64,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
     liveStreams: [],
     vodStreams: [],
     series: [],
+    isServerUnreachable: false,
   });
 
   useEffect(() => {
@@ -172,6 +174,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
       liveStreams: [],
       vodStreams: [],
       series: [],
+      isServerUnreachable: false,
     });
   }, []);
 
@@ -213,7 +216,7 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
             }
             const isM3UEditor = !!authResponse.m3u_editor;
             const m3uEditorVersion = authResponse.m3u_editor?.version ?? null;
-            setState((prev) => ({ ...prev, authResponse, isM3UEditor, m3uEditorVersion }));
+            setState((prev) => ({ ...prev, authResponse, isM3UEditor, m3uEditorVersion, isServerUnreachable: false }));
 
             if (cached.isStale) {
               Promise.all([
@@ -226,7 +229,10 @@ export function XtreamProvider({ children }: { children: ReactNode }) {
               }).catch((e) => console.warn('[XtreamContext] Background category refresh failed:', e));
             }
           })
-          .catch((e) => console.warn('[XtreamContext] Background auth failed:', e));
+          .catch((e) => {
+            console.warn('[XtreamContext] Background auth failed:', e);
+            setState((prev) => ({ ...prev, isServerUnreachable: true }));
+          });
 
         return true;
       }

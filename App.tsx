@@ -10,6 +10,7 @@ import { PhoneNavigator } from './src/navigation/PhoneNavigator';
 import { useShouldUseSidebar } from './src/hooks/useDeviceType';
 import { useGlobalWebStyles } from './src/hooks/useGlobalWebStyles';
 import { ElectronTitleBar } from './src/components/ElectronTitleBar';
+import { OfflineBanner } from './src/components/OfflineBanner';
 
 LogBox.ignoreLogs(['Persistent storage is not supported on tvOS']);
 
@@ -24,6 +25,7 @@ export default function App() {
           <MenuProvider>
             <StatusBar style="light" />
             {useSidebar ? <AppNavigator /> : <PhoneNavigator />}
+            <OfflineBanner />
             {/* Custom drag region for the frameless Electron window. Renders
                 nothing on native or non-Electron web. Mounted last so it sits
                 above all app UI. */}
