@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -13,6 +14,38 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
   group('XtreamService contract', () {
+    test('default transport authenticates against player_api.php over HTTP', () async {
+      final server = await io.HttpServer.bind(io.InternetAddress.loopbackIPv4, 0);
+      final requests = <Uri>[];
+      unawaited(server.listen((io.HttpRequest request) {
+        requests.add(request.uri);
+        request.response.headers.contentType = io.ContentType.json;
+        final action = request.uri.queryParameters['action'];
+        final body = switch (action) {
+          null => xtreamAuth(auth: 1),
+          'get_live_categories' => [category('10', 'Live News')],
+          _ => <String, Object?>{'error': 'unexpected action $action'},
+        };
+        request.response.write(jsonEncode(body));
+        unawaited(request.response.close());
+      }).asFuture<void>());
+      addTearDown(() => server.close(force: true));
+
+      final service = XtreamService();
+      final response = await service.authenticate(UserCredentials(
+        server: 'http://${server.address.host}:${server.port}',
+        username: 'demo',
+        password: 'secret',
+      ));
+
+      expect(response.isAuthenticated, isTrue);
+      expect(await service.getLiveCategories(), [const Category(id: '10', name: 'Live News')]);
+      expect(requests.map((Uri uri) => uri.path).toSet(), {'/player_api.php'});
+      expect(requests.first.queryParameters['username'], 'demo');
+      expect(requests.first.queryParameters['password'], 'secret');
+      expect(requests.last.queryParameters['action'], 'get_live_categories');
+    });
+
     test('auth success loads categories and typed content', () async {
       final transport = FakeXtreamTransport({
         'auth': xtreamAuth(auth: 1),
@@ -89,7 +122,7 @@ void main() {
 
   group('M3UParser contract', () {
     test('parses valid direct M3U with metadata, headers, and groups', () async {
-      final text = await File('test/fixtures/direct_playlist.m3u').readAsString();
+      final text = await io.File('test/fixtures/direct_playlist.m3u').readAsString();
 
       final result = M3UParser().parse(text);
 
@@ -106,13 +139,13 @@ void main() {
     });
 
     test('malformed playlist reports a typed parse error', () async {
-      final text = await File('test/fixtures/malformed_playlist.m3u').readAsString();
+      final text = await io.File('test/fixtures/malformed_playlist.m3u').readAsString();
 
       expect(() => M3UParser().parse(text), throwsA(isA<M3UParseException>()));
     });
 
     test('maps tvg-id to EPG current/next programmes', () async {
-      final playlist = M3UParser().parse(await File('test/fixtures/direct_playlist.m3u').readAsString());
+      final playlist = M3UParser().parse(await io.File('test/fixtures/direct_playlist.m3u').readAsString());
       final now = DateTime.utc(2026, 1, 1, 12);
       final epg = EpgService(clock: () => now)..loadPrograms([
         EpgProgram(

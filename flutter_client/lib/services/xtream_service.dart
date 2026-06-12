@@ -2,6 +2,8 @@
 
 import 'cache_service.dart';
 import 'domain_models.dart';
+import 'xtream_http_transport_stub.dart'
+    if (dart.library.io) 'xtream_http_transport_io.dart';
 
 typedef XtreamTransport = Future<Object?> Function(XtreamRequest request);
 
@@ -46,7 +48,7 @@ class XtreamAuthResponse {
 
 class XtreamService {
   XtreamService({XtreamTransport? transport, CacheService? cache})
-      : _transport = transport ?? _missingTransport,
+      : _transport = transport ?? createDefaultXtreamTransport(),
         _cache = cache;
 
   static const _clientHeader = 'X-M3UE-Client';
@@ -229,10 +231,6 @@ class XtreamService {
     final credentials = _credentials;
     if (credentials == null) throw StateError('Xtream credentials not configured');
     return credentials;
-  }
-
-  static Future<Object?> _missingTransport(XtreamRequest request) {
-    throw UnsupportedError('XtreamService requires an injected transport in this Flutter service layer.');
   }
 }
 
