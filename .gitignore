@@ -15,7 +15,10 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.github/
+.github/*
+!.github/workflows/
+.github/workflows/*
+!.github/workflows/flutter-client.yml
 .idea
 .DS_Store
 *.suo
@@ -42,3 +45,15 @@ src/config/devDefaults.ts
 ios
 android
 release
+!docs/
+!docs/release/
+!docs/release/platform-release-matrix.md
+!flutter_client/test/
+!flutter_client/test/release/
+!flutter_client/test/release/release_matrix_documentation_test.dart
+# Local Android release signing material; never commit real credentials.
+*.jks
+*.keystore
+flutter_client/android/signing.properties
+flutter_client/android/*.jks
+flutter_client/android/*.keystore
