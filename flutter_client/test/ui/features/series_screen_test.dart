@@ -10,8 +10,20 @@ void main() {
 
     setUp(() {
       testSeriesList = [
-        const Series(id: 1, name: 'Breaking Bad', coverUrl: 'http://example.com/bb.jpg', categoryId: '30', rating: 4.8),
-        const Series(id: 2, name: 'Stranger Things', coverUrl: 'http://example.com/st.jpg', categoryId: '31', rating: 4.2),
+        const Series(
+          id: 1,
+          name: 'Breaking Bad',
+          coverUrl: 'http://example.com/bb.jpg',
+          categoryId: '30',
+          rating: 4.8,
+        ),
+        const Series(
+          id: 2,
+          name: 'Stranger Things',
+          coverUrl: 'http://example.com/st.jpg',
+          categoryId: '31',
+          rating: 4.2,
+        ),
       ];
       testCategories = [
         const Category(id: '30', name: 'Thriller'),
@@ -20,10 +32,9 @@ void main() {
     });
 
     testWidgets('renders series grid with names', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Breaking Bad'), findsOneWidget);
@@ -31,10 +42,9 @@ void main() {
     });
 
     testWidgets('renders All Series and category tabs', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('All Series'), findsOneWidget);
@@ -43,10 +53,9 @@ void main() {
     });
 
     testWidgets('tapping category tab filters series', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Thriller'));
@@ -56,34 +65,65 @@ void main() {
     });
 
     testWidgets('shows loading indicator while fetching', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-        isLoading: true,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          seriesList: testSeriesList,
+          categories: testCategories,
+          isLoading: true,
+        ),
+      );
       await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows not configured message when not connected', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-        isConfigured: false,
-      ));
+    testWidgets('shows not configured message when not connected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          seriesList: testSeriesList,
+          categories: testCategories,
+          isConfigured: false,
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Please connect to your service in Settings'), findsOneWidget);
+      expect(
+        find.text('Please connect to your service in Settings'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('tapping series triggers onSeriesSelect callback', (tester) async {
+    testWidgets('category bar and series grid expose scrollbars', (
+      tester,
+    ) async {
+      final manyCategories = List<Category>.generate(
+        16,
+        (index) => Category(id: '$index', name: 'Category $index'),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: manyCategories),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Scrollbar), findsWidgets);
+      expect(find.byTooltip('Scroll categories left'), findsOneWidget);
+      expect(find.byTooltip('Scroll categories right'), findsOneWidget);
+    });
+
+    testWidgets('tapping series triggers onSeriesSelect callback', (
+      tester,
+    ) async {
       Series? selectedSeries;
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-        onSeriesSelect: (series) => selectedSeries = series,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          seriesList: testSeriesList,
+          categories: testCategories,
+          onSeriesSelect: (series) => selectedSeries = series,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Breaking Bad'));
@@ -94,10 +134,9 @@ void main() {
     });
 
     testWidgets('shows rating when available', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        seriesList: testSeriesList,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('★ 4.8'), findsOneWidget);

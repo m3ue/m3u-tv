@@ -10,9 +10,31 @@ void main() {
 
     setUp(() {
       testVodItems = [
-        const VodItem(id: 1, name: 'Big Buck Bunny', streamUrl: 'http://example.com/1.mp4', containerExtension: 'mp4', logoUrl: 'http://example.com/bunny.jpg', categoryId: '20', rating: 4.5),
-        const VodItem(id: 2, name: 'Sintel', streamUrl: 'http://example.com/2.mp4', containerExtension: 'mp4', logoUrl: 'http://example.com/sintel.jpg', categoryId: '21', rating: 4.0),
-        const VodItem(id: 3, name: 'Tears of Steel', streamUrl: 'http://example.com/3.mkv', containerExtension: 'mkv', categoryId: '20'),
+        const VodItem(
+          id: 1,
+          name: 'Big Buck Bunny',
+          streamUrl: 'http://example.com/1.mp4',
+          containerExtension: 'mp4',
+          logoUrl: 'http://example.com/bunny.jpg',
+          categoryId: '20',
+          rating: 4.5,
+        ),
+        const VodItem(
+          id: 2,
+          name: 'Sintel',
+          streamUrl: 'http://example.com/2.mp4',
+          containerExtension: 'mp4',
+          logoUrl: 'http://example.com/sintel.jpg',
+          categoryId: '21',
+          rating: 4.0,
+        ),
+        const VodItem(
+          id: 3,
+          name: 'Tears of Steel',
+          streamUrl: 'http://example.com/3.mkv',
+          containerExtension: 'mkv',
+          categoryId: '20',
+        ),
       ];
       testCategories = [
         const Category(id: '20', name: 'Action'),
@@ -21,10 +43,9 @@ void main() {
     });
 
     testWidgets('renders movie grid with names', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Big Buck Bunny'), findsOneWidget);
@@ -33,10 +54,9 @@ void main() {
     });
 
     testWidgets('renders All Movies and category tabs', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('All Movies'), findsOneWidget);
@@ -45,10 +65,9 @@ void main() {
     });
 
     testWidgets('tapping category tab filters movies', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Action'));
@@ -60,34 +79,63 @@ void main() {
     });
 
     testWidgets('shows loading indicator while fetching', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-        isLoading: true,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          vodItems: testVodItems,
+          categories: testCategories,
+          isLoading: true,
+        ),
+      );
       await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows not configured message when not connected', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-        isConfigured: false,
-      ));
+    testWidgets('shows not configured message when not connected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          vodItems: testVodItems,
+          categories: testCategories,
+          isConfigured: false,
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Please connect to your service in Settings'), findsOneWidget);
+      expect(
+        find.text('Please connect to your service in Settings'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('category bar and movie grid expose scrollbars', (
+      tester,
+    ) async {
+      final manyCategories = List<Category>.generate(
+        16,
+        (index) => Category(id: '$index', name: 'Category $index'),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: manyCategories),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Scrollbar), findsWidgets);
+      expect(find.byTooltip('Scroll categories left'), findsOneWidget);
+      expect(find.byTooltip('Scroll categories right'), findsOneWidget);
     });
 
     testWidgets('tapping movie triggers onVodSelect callback', (tester) async {
       VodItem? selectedItem;
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-        onVodSelect: (item) => selectedItem = item,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          vodItems: testVodItems,
+          categories: testCategories,
+          onVodSelect: (item) => selectedItem = item,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Big Buck Bunny'));
@@ -98,10 +146,9 @@ void main() {
     });
 
     testWidgets('shows rating when available', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        vodItems: testVodItems,
-        categories: testCategories,
-      ));
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('★ 4.5'), findsOneWidget);

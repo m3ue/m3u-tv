@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// VOD (Movies) screen with category filtering and poster grid.
 ///
@@ -34,7 +35,9 @@ class _VodScreenState extends State<VodScreen> {
     if (_selectedCategory == null || _selectedCategory == '') {
       return widget.vodItems;
     }
-    return widget.vodItems.where((v) => v.categoryId == _selectedCategory).toList();
+    return widget.vodItems
+        .where((v) => v.categoryId == _selectedCategory)
+        .toList();
   }
 
   @override
@@ -62,13 +65,13 @@ class _VodScreenState extends State<VodScreen> {
             child: widget.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No movies available',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      )
-                    : _buildGrid(filtered),
+                ? Center(
+                    child: Text(
+                      'No movies available',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  )
+                : _buildGrid(filtered),
           ),
         ],
       ),
@@ -77,39 +80,19 @@ class _VodScreenState extends State<VodScreen> {
 
   Widget _buildCategoryBar() {
     final tabs = [
-      const _VodCategoryTab(id: '', name: 'All Movies'),
-      ...widget.categories.map((c) => _VodCategoryTab(id: c.id, name: c.name)),
+      const CategoryTabData(id: '', name: 'All Movies'),
+      ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
 
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: tabs.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final tab = tabs[index];
-                final isSelected = (_selectedCategory ?? '') == tab.id;
-                return _CategoryChip(
-                  label: tab.name,
-                  isSelected: isSelected,
-                  onTap: () => setState(() => _selectedCategory = tab.id),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+    return ScrollableCategoryBar(
+      tabs: tabs,
+      selectedId: _selectedCategory ?? '',
+      onSelected: (id) => setState(() => _selectedCategory = id),
     );
   }
 
   Widget _buildGrid(List<VodItem> items) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
+    return ScrollbarGridView(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 5,
         childAspectRatio: 0.6,
@@ -119,69 +102,14 @@ class _VodScreenState extends State<VodScreen> {
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return _VodCard(
-          item: item,
-          onTap: () => widget.onVodSelect(item),
-        );
+        return _VodCard(item: item, onTap: () => widget.onVodSelect(item));
       },
     );
   }
 }
 
-class _VodCategoryTab {
-  const _VodCategoryTab({required this.id, required this.name});
-  final String id;
-  final String name;
-}
-
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: isSelected
-          ? colorScheme.primaryContainer
-          : colorScheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: isSelected
-                ? Border.all(color: colorScheme.primary, width: 2)
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _VodCard extends StatelessWidget {
-  const _VodCard({
-    required this.item,
-    required this.onTap,
-  });
+  const _VodCard({required this.item, required this.onTap});
 
   final VodItem item;
   final VoidCallback onTap;
@@ -202,15 +130,12 @@ class _VodCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Poster
               Expanded(
-                child: item.logoUrl != null && item.logoUrl!.isNotEmpty
-                    ? Image.network(
-                        item.logoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.movie, size: 48),
-                      )
-                    : const Icon(Icons.movie, size: 48),
+                child: ResilientMediaImage(
+                  imageUrl: item.logoUrl,
+                  fallbackIcon: Icons.movie,
+                  borderRadius: 0,
+                ),
               ),
               // Title + rating
               Padding(
@@ -228,9 +153,9 @@ class _VodCard extends StatelessWidget {
                       Text(
                         '★ ${item.rating}',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: const Color(0xFFFFCC00),
-                              fontWeight: FontWeight.bold,
-                            ),
+                          color: const Color(0xFFFFCC00),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                   ],
                 ),
