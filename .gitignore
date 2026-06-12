@@ -44,6 +44,8 @@ src/config/devDefaults.ts
 # Build directories
 ios
 android
+!flutter_client/android/
+!flutter_client/android/**
 release
 !docs/
 !docs/release/
