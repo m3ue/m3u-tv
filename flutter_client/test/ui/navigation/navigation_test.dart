@@ -84,6 +84,29 @@ void main() {
       expect(find.text('Server URL'), findsOneWidget);
     });
 
+    testWidgets('sidebar labels remain visible after selecting a route', (tester) async {
+      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(NavigationSidebar),
+          matching: find.text('Home'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(NavigationSidebar),
+          matching: find.text('Settings'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('Player route pushes as modal via inner navigator', (
       tester,
     ) async {

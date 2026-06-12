@@ -285,7 +285,6 @@ class NavigationSidebar extends StatelessWidget {
               icon: _routeIcon(routes[index]),
               selected: index == currentIndex,
               focusNode: focusNodes[index],
-              expanded: sidebarActive,
               onTap: () => onNavigate(index),
             );
           }),
@@ -313,7 +312,6 @@ class SidebarDestinationItem extends StatefulWidget {
     required this.icon,
     required this.selected,
     required this.focusNode,
-    required this.expanded,
     required this.onTap,
   });
 
@@ -321,7 +319,6 @@ class SidebarDestinationItem extends StatefulWidget {
   final IconData icon;
   final bool selected;
   final FocusNode focusNode;
-  final bool expanded;
   final VoidCallback onTap;
 
   @override
@@ -394,18 +391,16 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
           child: Row(
             children: [
               Icon(widget.icon, color: foregroundColor, size: 24),
-              if (widget.expanded) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: foregroundColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: foregroundColor,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
             ],
           ),
         ),
