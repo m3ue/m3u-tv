@@ -28,7 +28,25 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
   final response = await httpRequest.close();
   final text = await utf8.decodeStream(response);
   if (text.isEmpty) return null;
-  return jsonDecode(text);
+  final body = jsonDecode(text);
+  if (response.statusCode >= HttpStatus.badRequest) {
+    throw XtreamHttpException(
+      statusCode: response.statusCode,
+      reasonPhrase: response.reasonPhrase,
+      method: request.method,
+      uri: uri,
+      serverMessage: _serverMessage(body),
+    );
+  }
+  return body;
+}
+
+String? _serverMessage(Object? body) {
+  if (body is! Map) return null;
+  final json = body.cast<Object?, Object?>();
+  final value = json['error'] ?? json['message'] ?? json['detail'] ?? json['error_code'];
+  if (value == null) return null;
+  return '$value';
 }
 
 Uri _buildUri(XtreamRequest request) {

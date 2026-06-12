@@ -19,6 +19,39 @@ class XtreamAuthException implements Exception {
   String toString() => message;
 }
 
+class XtreamHttpException implements Exception {
+  const XtreamHttpException({
+    required this.statusCode,
+    required this.method,
+    required this.uri,
+    this.reasonPhrase,
+    this.serverMessage,
+  });
+
+  final int statusCode;
+  final String method;
+  final Uri uri;
+  final String? reasonPhrase;
+  final String? serverMessage;
+
+  @override
+  String toString() {
+    final action = uri.queryParameters['action'];
+    final safeUri = uri.replace(
+      queryParameters: <String, String>{
+        if (action != null) 'action': action,
+      },
+    );
+    final serverDetail = serverMessage == null || serverMessage!.isEmpty
+        ? ''
+        : ': $serverMessage';
+    final reason = reasonPhrase == null || reasonPhrase!.isEmpty
+        ? ''
+        : ' $reasonPhrase';
+    return 'Xtream HTTP $statusCode$reason for $method $safeUri$serverDetail';
+  }
+}
+
 class XtreamRequest {
   const XtreamRequest({required this.credentials, required this.headers, this.action, this.params = const {}, this.body = const {}, this.method = 'GET'});
 

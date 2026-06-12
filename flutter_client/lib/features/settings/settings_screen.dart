@@ -43,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
         onConnect:
             onConnect ?? (credentials) => authNotifier.connect(credentials),
         isLoading: authNotifier.isLoading,
-        error: authNotifier.error,
+        error: sourceError ?? authNotifier.error,
       );
     }
 

@@ -326,6 +326,22 @@ void main() {
       expect(find.byType(ConnectionForm), findsOneWidget);
     });
 
+    testWidgets('shows source error on connection form when content load fails', (tester) async {
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+
+      await tester.pumpWidget(_settingsApp(
+        notifier,
+        sourceError: 'Xtream HTTP 401 Unauthorized for GET http://server.test/player_api.php: Unauthorized',
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConnectionForm), findsOneWidget);
+      expect(find.textContaining('Xtream HTTP 401'), findsOneWidget);
+    });
+
     testWidgets('shows connection status when configured', (tester) async {
       final storage = InMemorySecureStorage();
       final transport = _FakeTransport({
@@ -624,13 +640,14 @@ Widget _testApp(Widget child) {
   );
 }
 
-Widget _settingsApp(AuthNotifier notifier, {Viewer? activeViewer}) {
+Widget _settingsApp(AuthNotifier notifier, {Viewer? activeViewer, String? sourceError}) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
     home: Scaffold(
       body: SettingsScreen(
         authNotifier: notifier,
         activeViewer: activeViewer,
+        sourceError: sourceError,
         onDisconnect: () => notifier.disconnect(),
       ),
     ),

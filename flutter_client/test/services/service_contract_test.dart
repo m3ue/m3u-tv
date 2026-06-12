@@ -46,6 +46,35 @@ void main() {
       expect(requests.last.queryParameters['action'], 'get_live_categories');
     });
 
+    test('default transport reports unauthorized HTTP failures without credentials', () async {
+      final server = await io.HttpServer.bind(io.InternetAddress.loopbackIPv4, 0);
+      unawaited(server.listen((io.HttpRequest request) {
+        request.response.statusCode = io.HttpStatus.unauthorized;
+        request.response.reasonPhrase = 'Unauthorized';
+        request.response.headers.contentType = io.ContentType.json;
+        request.response.write(jsonEncode(<String, Object?>{'error': 'Unauthorized'}));
+        unawaited(request.response.close());
+      }).asFuture<void>());
+      addTearDown(() => server.close(force: true));
+
+      final service = XtreamService();
+
+      await expectLater(
+        service.authenticate(UserCredentials(
+          server: 'http://${server.address.host}:${server.port}',
+          username: 'demo-user',
+          password: 'playlist-secret',
+        )),
+        throwsA(
+          isA<XtreamHttpException>()
+              .having((XtreamHttpException error) => error.statusCode, 'statusCode', 401)
+              .having((XtreamHttpException error) => '$error', 'message', contains('player_api.php'))
+              .having((XtreamHttpException error) => '$error', 'message', isNot(contains('demo-user')))
+              .having((XtreamHttpException error) => '$error', 'message', isNot(contains('playlist-secret'))),
+        ),
+      );
+    });
+
     test('auth success loads categories and typed content', () async {
       final transport = FakeXtreamTransport({
         'auth': xtreamAuth(auth: 1),
