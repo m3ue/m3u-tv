@@ -1,0 +1,260 @@
+import 'package:flutter/material.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
+
+/// EPG screen showing current/next program info for live channels.
+///
+/// Mirrors the RN LiveTVScreen EPG behavior:
+/// - List view with current program title, progress bar, and next program
+/// - Grid view toggle
+/// - "No program info" for channels without EPG data
+/// - Lazy EPG loading for visible channels
+class EpgScreen extends StatefulWidget {
+  const EpgScreen({
+    super.key,
+    required this.channels,
+    required this.epgService,
+    required this.onChannelSelect,
+  });
+
+  final List<Channel> channels;
+  final EpgService epgService;
+  final void Function(Channel) onChannelSelect;
+
+  @override
+  State<EpgScreen> createState() => _EpgScreenState();
+}
+
+class _EpgScreenState extends State<EpgScreen> {
+  bool _isGridView = false;
+  Map<int, EpgCurrentNext?> _epgMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEpg();
+  }
+
+  void _loadEpg() {
+    final map = <int, EpgCurrentNext?>{};
+    for (final channel in widget.channels) {
+      final result = widget.epgService.lookupForChannel(channel);
+      if (result != null) {
+        map[channel.id] = result;
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _epgMap = map;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          // View mode toggle
+          Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
+                  onPressed: () => setState(() => _isGridView = !_isGridView),
+                  tooltip: _isGridView ? 'List view' : 'Grid view',
+                ),
+                Text(
+                  'EPG',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: widget.channels.isEmpty
+                ? Center(
+                    child: Text(
+                      'No channels available',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  )
+                : _isGridView
+                    ? _buildGridView()
+                    : _buildListView(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListView() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListView.builder(
+      itemCount: widget.channels.length,
+      itemBuilder: (context, index) {
+        final channel = widget.channels[index];
+        final epg = _epgMap[channel.id];
+        return InkWell(
+          onTap: () => widget.onChannelSelect(channel),
+          child: Container(
+            height: 80,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                // Channel logo
+                if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      channel.logoUrl!,
+                      width: 48,
+                      height: 48,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.tv, size: 48),
+                    ),
+                  )
+                else
+                  const Icon(Icons.tv, size: 48),
+                const SizedBox(width: 14),
+                // Channel name + EPG info
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        channel.name,
+                        style: Theme.of(context).textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (epg != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          epg.current.title,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: epg.progress,
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+                        ),
+                      ] else
+                        Text(
+                          'No program info',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Next program
+                if (epg?.next != null)
+                  SizedBox(
+                    width: 160,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'NEXT',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Text(
+                          epg!.next!.title,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        childAspectRatio: 1.5,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+      ),
+      itemCount: widget.channels.length,
+      itemBuilder: (context, index) {
+        final channel = widget.channels[index];
+        final epg = _epgMap[channel.id];
+        return InkWell(
+          onTap: () => widget.onChannelSelect(channel),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  channel.name,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                if (epg != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    epg.current.title,
+                    style: Theme.of(context).textTheme.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  LinearProgressIndicator(
+                    value: epg.progress,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                ] else
+                  Text(
+                    'No program info',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
