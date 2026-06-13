@@ -16,6 +16,9 @@ import { DrawerScreenPropsType } from '../navigation/types';
 import { FocusablePressable } from '../components/FocusablePressable';
 import { scaledPixels } from '../hooks/useScale';
 import { cacheService, EpgViewMode } from '../services/CacheService';
+import { getSecureItem } from '../services/secureStorage';
+
+const STORAGE_KEY = 'm3ue_tv_credentials';
 
 const REFRESH_OPTIONS = [
   { label: '15 minutes', value: 15 },
@@ -55,6 +58,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
   const [server, setServer] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isEditingConnection, setIsEditingConnection] = useState(false);
 
   // Load dev defaults in development mode
   useEffect(() => {
@@ -80,6 +84,29 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
       setRefreshInterval(s.refreshIntervalMinutes);
       setEpgViewMode(s.epgViewMode);
     });
+  }, []);
+
+  useEffect(() => {
+    const loadSavedConnectionSettings = async () => {
+      const saved = await getSecureItem(STORAGE_KEY);
+      if (!saved) return;
+
+      try {
+        const credentials = JSON.parse(saved) as {
+          server?: string;
+          username?: string;
+          password?: string;
+        };
+
+        setServer(credentials.server ?? '');
+        setUsername(credentials.username ?? '');
+        setPassword(credentials.password ?? '');
+      } catch {
+        // Ignore malformed saved credentials and keep manual input available.
+      }
+    };
+
+    loadSavedConnectionSettings();
   }, []);
 
   const handleRefreshChange = async (value: number) => {
@@ -120,6 +147,7 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
     clearError();
     const success = await connect({ server, username, password });
     if (success) {
+      setIsEditingConnection(false);
       navigation.navigate('Home');
     }
   };
@@ -206,6 +234,105 @@ export function SettingsScreen({ navigation }: DrawerScreenPropsType<'Settings'>
             <Text style={styles.statusValue}>{authResponse.user_info.active_cons}</Text>
           </View>
         </View>
+
+        <FocusablePressable
+          style={({ isFocused }) => [styles.settingsButton, isFocused && styles.settingsButtonFocused]}
+          onSelect={() => setIsEditingConnection((value) => !value)}
+        >
+          {({ isFocused }) => (
+            <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>
+              {isEditingConnection ? 'Hide Connection Settings' : 'Edit Connection Settings'}
+            </Text>
+          )}
+        </FocusablePressable>
+
+        {isEditingConnection && (
+          <View style={styles.editSection}>
+            <Text style={styles.title}>Connection Settings</Text>
+            <Text style={styles.subtitle}>Update your Xtream codes details</Text>
+
+            <View style={styles.form}>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Server URL</Text>
+                <FocusablePressable
+                  preferredFocus
+                  style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}
+                  onSelect={() => serverRef.current?.focus()}
+                >
+                  <TextInput
+                    ref={serverRef}
+                    style={styles.input}
+                    value={server}
+                    onChangeText={setServer}
+                    placeholder="http://example.com:8080"
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </FocusablePressable>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Username</Text>
+                <FocusablePressable
+                  style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}
+                  onSelect={() => usernameRef.current?.focus()}
+                >
+                  <TextInput
+                    ref={usernameRef}
+                    style={styles.input}
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder="Username"
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </FocusablePressable>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Password</Text>
+                <FocusablePressable
+                  style={({ isFocused }) => [styles.inputContainer, isFocused && styles.inputFocused]}
+                  onSelect={() => passwordRef.current?.focus()}
+                >
+                  <TextInput
+                    ref={passwordRef}
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Password"
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </FocusablePressable>
+              </View>
+
+              <View style={styles.editActions}>
+                <FocusablePressable
+                  style={({ isFocused }) => [styles.connectButton, isFocused && styles.buttonFocused]}
+                  onSelect={handleConnect}
+                >
+                  {isLoading ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Save</Text>}
+                </FocusablePressable>
+
+                <FocusablePressable
+                  style={({ isFocused }) => [styles.secondaryButton, isFocused && styles.settingsButtonFocused]}
+                  onSelect={() => setIsEditingConnection(false)}
+                >
+                  {({ isFocused }) => (
+                    <Text style={[styles.settingsButtonText, isFocused && styles.buttonTextFocused]}>Cancel</Text>
+                  )}
+                </FocusablePressable>
+              </View>
+            </View>
+          </View>
+        )}
 
         {isM3UEditor && activeViewer && (
           <View style={styles.viewerSection}>
@@ -445,6 +572,10 @@ const styles = StyleSheet.create({
   infoContainer: {
     marginBottom: scaledPixels(40),
   },
+  editSection: {
+    marginTop: scaledPixels(spacing.lg),
+    marginBottom: scaledPixels(spacing.xl),
+  },
   title: {
     fontSize: scaledPixels(typography.fontSize.xl),
     fontWeight: typography.fontWeight.bold,
@@ -508,6 +639,21 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary || '#FFFFFF',
     fontSize: scaledPixels(typography.fontSize.md),
     fontWeight: typography.fontWeight.bold,
+  },
+  secondaryButton: {
+    backgroundColor: colors.card,
+    borderRadius: scaledPixels(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: scaledPixels(spacing.md),
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: scaledPixels(180),
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: scaledPixels(spacing.md),
+    marginTop: scaledPixels(spacing.lg),
   },
   input: {
     backgroundColor: colors.card,
