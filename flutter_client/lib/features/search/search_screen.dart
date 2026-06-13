@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Search screen with client-side filtering across Live TV, Movies, and Series.
 ///
@@ -31,7 +32,8 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
+class _SearchScreenState extends State<SearchScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _query = '';
 
@@ -54,14 +56,32 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  List<Channel> get _filteredChannels =>
-      _query.isEmpty ? widget.channels : widget.channels.where((c) => c.name.toLowerCase().contains(_query.toLowerCase())).toList();
+  String get _normalizedQuery => _query.trim().toLowerCase();
 
-  List<VodItem> get _filteredVodItems =>
-      _query.isEmpty ? widget.vodItems : widget.vodItems.where((v) => v.name.toLowerCase().contains(_query.toLowerCase())).toList();
+  bool get _hasQuery => _normalizedQuery.isNotEmpty;
 
-  List<Series> get _filteredSeriesList =>
-      _query.isEmpty ? widget.seriesList : widget.seriesList.where((s) => s.name.toLowerCase().contains(_query.toLowerCase())).toList();
+  List<Channel> get _filteredChannels => _hasQuery
+      ? widget.channels
+            .where(
+              (channel) =>
+                  channel.name.toLowerCase().contains(_normalizedQuery),
+            )
+            .toList(growable: false)
+      : const [];
+
+  List<VodItem> get _filteredVodItems => _hasQuery
+      ? widget.vodItems
+            .where((item) => item.name.toLowerCase().contains(_normalizedQuery))
+            .toList(growable: false)
+      : const [];
+
+  List<Series> get _filteredSeriesList => _hasQuery
+      ? widget.seriesList
+            .where(
+              (series) => series.name.toLowerCase().contains(_normalizedQuery),
+            )
+            .toList(growable: false)
+      : const [];
 
   @override
   Widget build(BuildContext context) {
@@ -79,23 +99,16 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     return Scaffold(
       body: Column(
         children: [
-          // Search field
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
+            padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
+            child: InlineMediaSearchField(
+              query: _query,
+              hintText: 'Search live TV, movies, and series...',
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
           // Tabs
-          TabBar(
-            controller: _tabController,
-            tabs: _tabs,
-          ),
+          TabBar(controller: _tabController, tabs: _tabs),
           // Content
           Expanded(
             child: TabBarView(
@@ -114,55 +127,50 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   }
 
   Widget _buildAllTab() {
+    if (!_hasQuery) return _buildPromptState();
+
     final channels = _filteredChannels;
     final vodItems = _filteredVodItems;
     final seriesList = _filteredSeriesList;
 
     if (channels.isEmpty && vodItems.isEmpty && seriesList.isEmpty) {
-      return Center(
-        child: Text(
-          _query.isEmpty ? 'Type to search' : 'No results found',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
+      return _buildEmptyState('No results found');
     }
 
     return ListView(
       children: [
         if (channels.isNotEmpty) ...[
           const _SectionHeader(title: 'Live TV'),
-          ...channels.map((c) => _ChannelListTile(
-                channel: c,
-                onTap: () => widget.onChannelSelect(c),
-              )),
+          ...channels.map(
+            (c) => _ChannelListTile(
+              channel: c,
+              onTap: () => widget.onChannelSelect(c),
+            ),
+          ),
         ],
         if (vodItems.isNotEmpty) ...[
           const _SectionHeader(title: 'Movies'),
-          ...vodItems.map((v) => _VodListTile(
-                item: v,
-                onTap: () => widget.onVodSelect(v),
-              )),
+          ...vodItems.map(
+            (v) => _VodListTile(item: v, onTap: () => widget.onVodSelect(v)),
+          ),
         ],
         if (seriesList.isNotEmpty) ...[
           const _SectionHeader(title: 'Series'),
-          ...seriesList.map((s) => _SeriesListTile(
-                item: s,
-                onTap: () => widget.onSeriesSelect(s),
-              )),
+          ...seriesList.map(
+            (s) =>
+                _SeriesListTile(item: s, onTap: () => widget.onSeriesSelect(s)),
+          ),
         ],
       ],
     );
   }
 
   Widget _buildLiveTvTab() {
+    if (!_hasQuery) return _buildPromptState();
+
     final channels = _filteredChannels;
     if (channels.isEmpty) {
-      return Center(
-        child: Text(
-          _query.isEmpty ? 'No channels available' : 'No results found',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
+      return _buildEmptyState('No results found');
     }
     return ListView.builder(
       itemCount: channels.length,
@@ -174,14 +182,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   }
 
   Widget _buildMoviesTab() {
+    if (!_hasQuery) return _buildPromptState();
+
     final vodItems = _filteredVodItems;
     if (vodItems.isEmpty) {
-      return Center(
-        child: Text(
-          _query.isEmpty ? 'No movies available' : 'No results found',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
+      return _buildEmptyState('No results found');
     }
     return ListView.builder(
       itemCount: vodItems.length,
@@ -193,14 +198,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   }
 
   Widget _buildSeriesTab() {
+    if (!_hasQuery) return _buildPromptState();
+
     final seriesList = _filteredSeriesList;
     if (seriesList.isEmpty) {
-      return Center(
-        child: Text(
-          _query.isEmpty ? 'No series available' : 'No results found',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      );
+      return _buildEmptyState('No results found');
     }
     return ListView.builder(
       itemCount: seriesList.length,
@@ -208,6 +210,14 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
         item: seriesList[index],
         onTap: () => widget.onSeriesSelect(seriesList[index]),
       ),
+    );
+  }
+
+  Widget _buildPromptState() => _buildEmptyState('Type to search');
+
+  Widget _buildEmptyState(String label) {
+    return Center(
+      child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
     );
   }
 }
@@ -222,7 +232,9 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -236,13 +248,13 @@ class _ChannelListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: channel.logoUrl != null && channel.logoUrl!.isNotEmpty
-          ? CircleAvatar(
-              backgroundImage: NetworkImage(channel.logoUrl!),
-              onBackgroundImageError: (_, __) {},
-              child: const Icon(Icons.tv),
-            )
-          : const CircleAvatar(child: Icon(Icons.tv)),
+      leading: ResilientMediaImage(
+        imageUrl: channel.logoUrl,
+        fallbackIcon: Icons.tv,
+        width: MediaBrowsingMetrics.logoSize,
+        height: MediaBrowsingMetrics.logoSize,
+        fit: BoxFit.contain,
+      ),
       title: Text(channel.name),
       onTap: onTap,
     );
@@ -257,13 +269,13 @@ class _VodListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: item.logoUrl != null && item.logoUrl!.isNotEmpty
-          ? CircleAvatar(
-              backgroundImage: NetworkImage(item.logoUrl!),
-              onBackgroundImageError: (_, __) {},
-              child: const Icon(Icons.movie),
-            )
-          : const CircleAvatar(child: Icon(Icons.movie)),
+      leading: ResilientMediaImage(
+        imageUrl: item.logoUrl,
+        fallbackIcon: Icons.movie,
+        width: MediaBrowsingMetrics.logoSize,
+        height: MediaBrowsingMetrics.logoSize,
+        fit: BoxFit.contain,
+      ),
       title: Text(item.name),
       subtitle: item.rating != null ? Text('★ ${item.rating}') : null,
       onTap: onTap,
@@ -279,13 +291,13 @@ class _SeriesListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: item.coverUrl != null && item.coverUrl!.isNotEmpty
-          ? CircleAvatar(
-              backgroundImage: NetworkImage(item.coverUrl!),
-              onBackgroundImageError: (_, __) {},
-              child: const Icon(Icons.tv),
-            )
-          : const CircleAvatar(child: Icon(Icons.tv)),
+      leading: ResilientMediaImage(
+        imageUrl: item.coverUrl,
+        fallbackIcon: Icons.tv,
+        width: MediaBrowsingMetrics.logoSize,
+        height: MediaBrowsingMetrics.logoSize,
+        fit: BoxFit.contain,
+      ),
       title: Text(item.name),
       subtitle: item.rating != null ? Text('★ ${item.rating}') : null,
       onTap: onTap,

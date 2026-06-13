@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 void main() {
   group('SearchScreen', () {
@@ -15,6 +16,7 @@ void main() {
           id: 1,
           name: 'BBC News',
           streamUrl: 'http://example.com/1.m3u8',
+          logoUrl: 'http://example.com/bbc.png',
           categoryId: '10',
         ),
         const Channel(
@@ -30,6 +32,7 @@ void main() {
           name: 'The Matrix',
           streamUrl: 'http://example.com/10.mp4',
           containerExtension: 'mp4',
+          logoUrl: 'http://example.com/matrix.jpg',
           categoryId: '20',
         ),
         const VodItem(
@@ -41,7 +44,12 @@ void main() {
         ),
       ];
       testSeriesList = [
-        const Series(id: 20, name: 'Breaking Bad', categoryId: '30'),
+        const Series(
+          id: 20,
+          name: 'Breaking Bad',
+          coverUrl: 'http://example.com/breaking-bad.jpg',
+          categoryId: '30',
+        ),
         const Series(id: 21, name: 'Bad Sisters', categoryId: '31'),
       ];
     });
@@ -72,6 +80,24 @@ void main() {
       // Tab bar should have all four tabs
       expect(find.byType(TabBar), findsOneWidget);
       expect(find.byType(Tab), findsNWidgets(4));
+    });
+
+    testWidgets('shows prompt instead of immediate results before query', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Type to search'), findsOneWidget);
+      expect(find.text('BBC News'), findsNothing);
+      expect(find.text('The Matrix'), findsNothing);
+      expect(find.text('Breaking Bad'), findsNothing);
     });
 
     testWidgets('searching filters results case-insensitively', (tester) async {
@@ -159,6 +185,25 @@ void main() {
       expect(find.text('BBC News'), findsNothing);
     });
 
+    testWidgets('search result images use resilient media widgets', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'matrix');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircleAvatar), findsNothing);
+      expect(find.byType(ResilientMediaImage), findsWidgets);
+    });
+
     testWidgets('result taps dispatch shared media selection handlers', (
       tester,
     ) async {
@@ -178,9 +223,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.enterText(find.byType(TextField), 'bbc');
+      await tester.pumpAndSettle();
       await tester.tap(find.text('BBC News'));
       await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'matrix');
+      await tester.pumpAndSettle();
       await tester.tap(find.text('The Matrix'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'bad');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Breaking Bad'));
       await tester.pumpAndSettle();
