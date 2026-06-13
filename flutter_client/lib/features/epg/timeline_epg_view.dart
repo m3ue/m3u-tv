@@ -448,8 +448,10 @@ class _ProgramsRow extends StatelessWidget {
         .where((p) => p.end.isAfter(windowStart) && p.start.isBefore(windowEnd))
         .toList();
 
+    final now = DateTime.now();
     final blocks = <Widget>[];
     for (final p in visible) {
+      final isCurrent = !now.isBefore(p.start) && now.isBefore(p.end);
       final clampedStart =
           p.start.isBefore(windowStart) ? windowStart : p.start;
       final clampedEnd = p.end.isAfter(windowEnd) ? windowEnd : p.end;
@@ -460,11 +462,21 @@ class _ProgramsRow extends StatelessWidget {
 
       if (width < 4) continue;
 
+      final bgColor = isCurrent
+          ? colorScheme.primaryContainer
+          : colorScheme.secondaryContainer;
+      final fgColor = isCurrent
+          ? colorScheme.onPrimaryContainer
+          : colorScheme.onSecondaryContainer;
+      final borderColor = isCurrent
+          ? colorScheme.primary.withValues(alpha: 0.6)
+          : colorScheme.outline.withValues(alpha: 0.25);
+
       blocks.add(
         Positioned(
           left: left + 1,
-          top: 4,
-          height: rowHeight - 8,
+          top: isCurrent ? 2 : 4,
+          height: rowHeight - (isCurrent ? 4 : 8),
           width: width - 2,
           child: Material(
             color: Colors.transparent,
@@ -473,18 +485,18 @@ class _ProgramsRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
+                  color: bgColor,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: colorScheme.outline.withValues(alpha: 0.25),
-                  ),
+                  border: Border.all(color: borderColor),
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Text(
                   p.title,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSecondaryContainer,
+                    color: fgColor,
+                    fontWeight:
+                        isCurrent ? FontWeight.w600 : FontWeight.normal,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
