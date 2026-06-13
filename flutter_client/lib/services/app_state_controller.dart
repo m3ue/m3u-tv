@@ -122,6 +122,16 @@ class AppStateController extends ChangeNotifier {
         savedSource == AppSourceType.none) {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
+        if (await _hydrateCachedXtreamContent()) {
+          _isBootstrapping = false;
+          notifyListeners();
+          unawaited(
+            _replaceWithXtreamContent(
+              clearCache: false,
+            ).then((_) => notifyListeners()),
+          );
+          return;
+        }
         await _replaceWithXtreamContent(clearCache: false);
       }
     } else if (savedSource == AppSourceType.m3u) {
@@ -247,6 +257,22 @@ class AppStateController extends ChangeNotifier {
 
       final viewers = results[6] as List<Viewer>;
       final channels = results[3] as List<Channel>;
+      final liveCategories = results[0] as List<Category>;
+      final vodCategories = results[1] as List<Category>;
+      final seriesCategories = results[2] as List<Category>;
+      final vodItems = results[4] as List<VodItem>;
+      final seriesList = results[5] as List<Series>;
+
+      _sourceType = AppSourceType.xtream;
+      _liveCategories = liveCategories;
+      _vodCategories = vodCategories;
+      _seriesCategories = seriesCategories;
+      _channels = channels;
+      _vodItems = vodItems;
+      _seriesList = seriesList;
+      _error = null;
+      notifyListeners();
+
       await _loadXtreamEpg(channels);
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
       final progress = activeViewer == null
@@ -255,32 +281,68 @@ class AppStateController extends ChangeNotifier {
 
       if (clearCache) await cacheService.clear();
       await cacheService.set('sourceType', 'xtream');
-      await cacheService.set('liveCategories', results[0] as List<Category>);
-      await cacheService.set('vodCategories', results[1] as List<Category>);
-      await cacheService.set('seriesCategories', results[2] as List<Category>);
+      await cacheService.set('liveCategories', liveCategories);
+      await cacheService.set('vodCategories', vodCategories);
+      await cacheService.set('seriesCategories', seriesCategories);
       await cacheService.set('liveStreams', channels);
-      await cacheService.set('vodStreams', results[4] as List<VodItem>);
-      await cacheService.set('seriesStreams', results[5] as List<Series>);
+      await cacheService.set('vodStreams', vodItems);
+      await cacheService.set('seriesStreams', seriesList);
       await secureStorage.write(
         _sourceKey,
         jsonEncode(<String, Object?>{'type': 'xtream'}),
       );
 
-      _sourceType = AppSourceType.xtream;
-      _liveCategories = results[0] as List<Category>;
-      _vodCategories = results[1] as List<Category>;
-      _seriesCategories = results[2] as List<Category>;
-      _channels = channels;
-      _vodItems = results[4] as List<VodItem>;
-      _seriesList = results[5] as List<Series>;
       _activeViewer = activeViewer;
       _progressList = progress;
       _error = null;
+      notifyListeners();
       return true;
     } catch (error) {
       _error = _redact('$error', xtreamService.credentials);
       return false;
     }
+  }
+
+  Future<bool> _hydrateCachedXtreamContent() async {
+    final source = await cacheService.get<String>('sourceType');
+    if (source?.data != 'xtream') return false;
+
+    final liveCategories =
+        (await cacheService.get<List<Category>>('liveCategories'))?.data ??
+        const <Category>[];
+    final vodCategories =
+        (await cacheService.get<List<Category>>('vodCategories'))?.data ??
+        const <Category>[];
+    final seriesCategories =
+        (await cacheService.get<List<Category>>('seriesCategories'))?.data ??
+        const <Category>[];
+    final channels =
+        (await cacheService.get<List<Channel>>('liveStreams'))?.data ??
+        const <Channel>[];
+    final vodItems =
+        (await cacheService.get<List<VodItem>>('vodStreams'))?.data ??
+        const <VodItem>[];
+    final seriesList =
+        (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
+        const <Series>[];
+
+    final hasContent = liveCategories.isNotEmpty ||
+        vodCategories.isNotEmpty ||
+        seriesCategories.isNotEmpty ||
+        channels.isNotEmpty ||
+        vodItems.isNotEmpty ||
+        seriesList.isNotEmpty;
+    if (!hasContent) return false;
+
+    _sourceType = AppSourceType.xtream;
+    _liveCategories = liveCategories;
+    _vodCategories = vodCategories;
+    _seriesCategories = seriesCategories;
+    _channels = channels;
+    _vodItems = vodItems;
+    _seriesList = seriesList;
+    _error = null;
+    return true;
   }
 
   Future<List<Progress>> _loadRecentlyWatched(String viewerId) async {

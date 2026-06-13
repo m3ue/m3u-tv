@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
@@ -17,6 +18,80 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
   group('app state boot', () {
+    test('cached Xtream state is visible before remote refresh finishes', () async {
+      final storage = InMemorySecureStorage();
+      final cacheMemory = <String, Object?>{};
+      final catalogGate = Completer<Object?>();
+      await storage.write(
+        'm3ue_tv_credentials',
+        jsonEncode(<String, String>{
+          'server': 'https://fixture.example',
+          'username': 'fixture-user',
+          'password': 'fixture-password',
+        }),
+      );
+      await storage.write(
+        'm3ue_tv_source',
+        jsonEncode(<String, String>{'type': 'xtream'}),
+      );
+
+      final cache = CacheService(memory: cacheMemory);
+      await cache.set('sourceType', 'xtream');
+      await cache.set('liveCategories', const <Category>[
+        Category(id: 'cached-live', name: 'Cached Live'),
+      ]);
+      await cache.set('vodCategories', const <Category>[
+        Category(id: 'cached-vod', name: 'Cached Movies'),
+      ]);
+      await cache.set('seriesCategories', const <Category>[
+        Category(id: 'cached-series', name: 'Cached Series'),
+      ]);
+      await cache.set('liveStreams', const <Channel>[
+        Channel(id: 901, name: 'Cached BBC', streamUrl: 'cached-live-url'),
+      ]);
+      await cache.set('vodStreams', const <VodItem>[
+        VodItem(
+          id: 902,
+          name: 'Cached Movie',
+          streamUrl: 'cached-vod-url',
+          containerExtension: 'mp4',
+        ),
+      ]);
+      await cache.set('seriesStreams', const <Series>[
+        Series(id: 903, name: 'Cached Show'),
+      ]);
+
+      final controller = _controller(
+        storage: storage,
+        cacheMemory: cacheMemory,
+        transport: _FakeXtreamTransport.success()
+            .withResponse('get_live_categories', catalogGate.future)
+            .call,
+      );
+
+      final boot = controller.boot();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.sourceType, AppSourceType.xtream);
+      expect(controller.isBootstrapping, isFalse);
+      expect(controller.liveCategories.single.name, 'Cached Live');
+      expect(controller.channels.single.name, 'Cached BBC');
+      expect(controller.vodItems.single.name, 'Cached Movie');
+      expect(controller.seriesList.single.name, 'Cached Show');
+      await boot;
+
+      catalogGate.complete(
+        _FakeXtreamTransport.success().responses['get_live_categories'],
+      );
+      for (var pumpCount = 0; pumpCount < 5; pumpCount += 1) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(controller.liveCategories.single.name, 'News');
+      expect(controller.channels.single.name, 'BBC One');
+    });
+
     testWidgets(
       'saved_source boots connected app state without constructor fixtures',
       (WidgetTester tester) async {
@@ -55,11 +130,13 @@ void main() {
         await tester.pumpWidget(_TestApp(controller: controller));
         await _pumpAppState(tester);
 
-        expect(find.text('Connected source: Xtream'), findsOneWidget);
-        expect(find.text('BBC One'), findsOneWidget);
-        expect(find.text('Big Buck Bunny'), findsOneWidget);
-        expect(find.text('Fixture Show'), findsOneWidget);
-        expect(find.text('Stream 201'), findsOneWidget);
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.isBootstrapping, isFalse);
+        expect(_visibleText(tester), contains('Connected source: Xtream'));
+        expect(controller.liveCategories.single.name, 'News');
+        expect(controller.channels.single.name, 'BBC One');
+        expect(controller.vodItems.single.name, 'Big Buck Bunny');
+        expect(controller.seriesList.single.name, 'Fixture Show');
         expect(await controller.favoritesService.isFavorite(101), isTrue);
 
         await _tapSidebarDestination(tester, 'Live TV');
@@ -91,8 +168,10 @@ void main() {
           transport: _FakeXtreamTransport.success().call,
         );
         await restarted.boot();
+        await _waitForXtreamRefresh(restarted);
 
         expect(restarted.channels.single.name, 'BBC One');
+        expect(restarted.channels.single.epgChannelId, 'bbc.one');
         expect(
           restarted.epgService
               .lookupForChannel(restarted.channels.single)
@@ -229,6 +308,7 @@ void main() {
           ),
         );
         await restarted.boot();
+        await _waitForXtreamRefresh(restarted);
 
         expect(restarted.sourceType, AppSourceType.xtream);
         expect(restarted.channels.single.name, 'BBC One');
@@ -284,6 +364,20 @@ Future<void> _pumpAppState(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+}
+
+Future<void> _waitForXtreamRefresh(AppStateController controller) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    final hasEpg = controller.channels.isNotEmpty &&
+        controller.epgService.lookupForChannel(controller.channels.single) !=
+            null;
+    if (hasEpg &&
+        controller.activeViewer != null &&
+        controller.progressList.isNotEmpty) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
 
 Finder _sidebarDestination(String label) {
@@ -401,12 +495,20 @@ class _FakeXtreamTransport {
 
   final Map<String, Object?> responses;
 
+  _FakeXtreamTransport withResponse(String action, Object? response) {
+    return _FakeXtreamTransport(<String, Object?>{
+      ...responses,
+      action: response,
+    });
+  }
+
   Future<Object?> call(XtreamRequest request) async {
     final action = request.action ?? 'auth';
     final response = responses[action];
     if (response == null) {
       throw StateError('No fixture for ${jsonEncode(request.toDebugMap())}');
     }
+    if (response is Future<Object?>) return response;
     return response;
   }
 }
