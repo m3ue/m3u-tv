@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/app/device_type_resolver.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final nativeTelevisionHint = await resolveNativeTelevisionHint();
+  runApp(MyApp(nativeTelevisionHint: nativeTelevisionHint));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.nativeTelevisionHint = false});
+
+  final bool nativeTelevisionHint;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +23,14 @@ class MyApp extends StatelessWidget {
       ),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: ThemeMode.dark,
-      home: const AppShell(deviceType: DeviceType.tv),
+      home: Builder(
+        builder: (context) => AppShell(
+          deviceType: resolveDeviceType(
+            context,
+            nativeTelevisionHint: nativeTelevisionHint,
+          ),
+        ),
+      ),
     );
   }
 }

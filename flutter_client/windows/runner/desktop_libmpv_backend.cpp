@@ -153,7 +153,7 @@ struct PlayerInstance {
     }
     int size[] = {static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight)};
     int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
-    char format[] = "bgra";
+    char format[] = "rgba";
     void* buffer = pixels.data();
     mpv_render_param params[] = {
         {MPV_RENDER_PARAM_SW_SIZE, size},

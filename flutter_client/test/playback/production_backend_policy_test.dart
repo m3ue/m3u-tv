@@ -91,7 +91,10 @@ void main() {
         expect(find.text('Backend'), findsOneWidget);
         expect(find.text('Server transcode fallback'), findsWidgets);
         expect(find.text('Fallback'), findsOneWidget);
-        expect(find.textContaining('Unsupported codec hevc/aac'), findsOneWidget);
+        expect(
+          find.textContaining('Unsupported codec hevc/aac'),
+          findsOneWidget,
+        );
         expect(find.text('Transcode'), findsOneWidget);
         expect(find.textContaining('unsupported-session'), findsOneWidget);
         expect(find.text('Android mpv/libmpv'), findsOneWidget);
@@ -145,14 +148,48 @@ void main() {
         );
         expect(
           orchestrator.diagnostics,
-          contains('load-failed:desktopLibmpv:backend_unavailable:libmpv shared library not found; tried libmpv.so.2'),
+          contains(
+            'load-failed:desktopLibmpv:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
+          ),
         );
         expect(
           orchestrator.diagnostics,
-          contains('error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2'),
+          contains(
+            'error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
+          ),
         );
       },
     );
+
+    test(
+      'desktop software texture render paths use Flutter RGBA pixel buffers',
+      () {
+        final linuxBackend = File(
+          'linux/desktop_libmpv_backend.cc',
+        ).readAsStringSync();
+        final windowsBackend = File(
+          'windows/runner/desktop_libmpv_backend.cpp',
+        ).readAsStringSync();
+
+        expect(linuxBackend, contains('char format[] = "rgba";'));
+        expect(windowsBackend, contains('char format[] = "rgba";'));
+        expect(linuxBackend, isNot(contains('char format[] = "bgra";')));
+        expect(windowsBackend, isNot(contains('char format[] = "bgra";')));
+      },
+    );
+
+    test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
+      final media3Plugin = File(
+        'android/app/src/main/kotlin/com/m3ue/m3utv/Media3PlaybackPlugin.kt',
+      ).readAsStringSync();
+
+      expect(media3Plugin, contains('retryHlsAsProgressive'));
+      expect(media3Plugin, contains('MimeTypes.VIDEO_MP2T'));
+      expect(
+        media3Plugin,
+        contains('Input does not start with the #EXTM3U header'),
+      );
+    });
 
     test(
       'failure diagnostics cover decoder failure, dead stream, and stalled transcode',
@@ -170,7 +207,9 @@ void main() {
         expect(decoderFailure.errors, isEmpty);
         expect(
           decoderFailure.orchestrator.diagnostics,
-          contains('fallback-reason:decoder_failure:Media3 decoder failed during init'),
+          contains(
+            'fallback-reason:decoder_failure:Media3 decoder failed during init',
+          ),
         );
         await decoderFailure.dispose();
 
@@ -187,7 +226,9 @@ void main() {
         expect(deadStream.gateway.startedServerRequests, isEmpty);
         expect(
           deadStream.orchestrator.diagnostics,
-          contains('load-failed:androidExoPlayer:stream_not_found:Fixture stream not found'),
+          contains(
+            'load-failed:androidExoPlayer:stream_not_found:Fixture stream not found',
+          ),
         );
         await deadStream.dispose();
 
@@ -218,7 +259,9 @@ void main() {
         ]);
         expect(
           stalled.orchestrator.diagnostics,
-          contains('cleanup:server-transcode:stopped:stalled-stream:stalled-session'),
+          contains(
+            'cleanup:server-transcode:stopped:stalled-stream:stalled-session',
+          ),
         );
         await stalled.dispose();
       },
@@ -279,178 +322,193 @@ void main() {
       },
     );
 
-    test('network_loss: buffering timeout retries once then cleans up', () async {
-      final media3 = _PolicyPlayerAdapter(
-        capabilities: PlaybackCapabilities.androidExoPlayer,
-        loadStatus: PlaybackStatus.buffering,
-      );
-      final gateway = _PolicyTranscodeGateway();
-      final orchestrator = PlaybackOrchestrator(
-        platform: PlaybackPlatform.android,
-        adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.androidExoPlayer: media3,
-        },
-        transcodeGateway: gateway,
-        bufferingTimeout: const Duration(milliseconds: 20),
-        retryDelay: Duration.zero,
-      );
-      final errors = <PlaybackError>[];
-      final subscription = orchestrator.onError.listen(errors.add);
+    test(
+      'network_loss: buffering timeout retries once then cleans up',
+      () async {
+        final media3 = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+          loadStatus: PlaybackStatus.buffering,
+        );
+        final gateway = _PolicyTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.android,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: media3,
+          },
+          transcodeGateway: gateway,
+          bufferingTimeout: const Duration(milliseconds: 20),
+          retryDelay: Duration.zero,
+        );
+        final errors = <PlaybackError>[];
+        final subscription = orchestrator.onError.listen(errors.add);
 
-      await orchestrator.open(
-        const PlaybackSource(uri: 'https://provider.example/live/offline.ts'),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 80));
-
-      expect(
-        media3.commands.where(
-          (String command) =>
-              command == 'load:https://provider.example/live/offline.ts',
-        ),
-        hasLength(2),
-      );
-      expect(errors, hasLength(1));
-      expect(errors.single.code, 'network_unavailable');
-      expect(errors.single.recoverable, isTrue);
-      expect(orchestrator.activeBackend, isNull);
-      expect(media3.commands, contains('stop'));
-
-      await subscription.cancel();
-      await orchestrator.dispose();
-    });
-
-    test('token_expiry: mid-playback expiry reloads once then errors', () async {
-      final media3 = _PolicyPlayerAdapter(
-        capabilities: PlaybackCapabilities.androidExoPlayer,
-      );
-      final gateway = _PolicyTranscodeGateway();
-      final orchestrator = PlaybackOrchestrator(
-        platform: PlaybackPlatform.android,
-        adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.androidExoPlayer: media3,
-        },
-        transcodeGateway: gateway,
-        retryDelay: Duration.zero,
-      );
-      final errors = <PlaybackError>[];
-      final subscription = orchestrator.onError.listen(errors.add);
-
-      await orchestrator.open(
-        const PlaybackSource(uri: 'https://provider.example/live/expiring.ts'),
-      );
-      media3.emitError(
-        const PlaybackError(
-          backend: PlaybackBackend.androidExoPlayer,
-          message: 'Provider token expired during playback',
-          code: 'expired_token',
-          recoverable: true,
-        ),
-      );
-      await pumpEventQueue();
-      media3.emitError(
-        const PlaybackError(
-          backend: PlaybackBackend.androidExoPlayer,
-          message: 'Provider token expired during playback',
-          code: 'expired_token',
-          recoverable: true,
-        ),
-      );
-      await pumpEventQueue();
-
-      expect(
-        media3.commands.where(
-          (String command) =>
-              command == 'load:https://provider.example/live/expiring.ts',
-        ),
-        hasLength(2),
-      );
-      expect(errors, hasLength(1));
-      expect(errors.single.code, 'expired_token');
-      expect(errors.single.recoverable, isTrue);
-      expect(
-        orchestrator.diagnostics,
-        contains('active-retry:expired_token:androidExoPlayer:1'),
-      );
-
-      await subscription.cancel();
-      await orchestrator.dispose();
-    });
-
-    test('rapid_channel_switch: twenty server sessions leave no active backend', () async {
-      final direct = _PolicyPlayerAdapter(
-        capabilities: PlaybackCapabilities.desktopLibmpv,
-        loadFailure: BackendUnavailableException('libmpv unavailable'),
-      );
-      final serverPlayer = _PolicyPlayerAdapter(
-        capabilities: PlaybackCapabilities.serverTranscode,
-      );
-      final gateway = _PolicyTranscodeGateway();
-      final orchestrator = PlaybackOrchestrator(
-        platform: PlaybackPlatform.desktop,
-        adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.desktopLibmpv: direct,
-          PlaybackBackend.serverTranscode: serverPlayer,
-        },
-        transcodeGateway: gateway,
-      );
-
-      for (var index = 0; index < 20; index += 1) {
         await orchestrator.open(
-          PlaybackSource(
-            uri: 'https://provider.example/live/channel-$index.ts',
-            metadata: <String, Object?>{
-              'broadcast_network_id': 'network-$index',
-            },
+          const PlaybackSource(uri: 'https://provider.example/live/offline.ts'),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+
+        expect(
+          media3.commands.where(
+            (String command) =>
+                command == 'load:https://provider.example/live/offline.ts',
+          ),
+          hasLength(2),
+        );
+        expect(errors, hasLength(1));
+        expect(errors.single.code, 'network_unavailable');
+        expect(errors.single.recoverable, isTrue);
+        expect(orchestrator.activeBackend, isNull);
+        expect(media3.commands, contains('stop'));
+
+        await subscription.cancel();
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
+      'token_expiry: mid-playback expiry reloads once then errors',
+      () async {
+        final media3 = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final gateway = _PolicyTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.android,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: media3,
+          },
+          transcodeGateway: gateway,
+          retryDelay: Duration.zero,
+        );
+        final errors = <PlaybackError>[];
+        final subscription = orchestrator.onError.listen(errors.add);
+
+        await orchestrator.open(
+          const PlaybackSource(
+            uri: 'https://provider.example/live/expiring.ts',
           ),
         );
-      }
-      await orchestrator.dispose();
-
-      expect(orchestrator.activeBackend, isNull);
-      expect(gateway.startedServerRequests, hasLength(20));
-      expect(gateway.stoppedBroadcasts, hasLength(20));
-      expect(gateway.stoppedServerTranscodes, hasLength(20));
-      expect(
-        serverPlayer.commands.where((String command) => command == 'stop'),
-        hasLength(20),
-      );
-    });
-
-    test('large_m3u_epg_perf: fixture stays under documented thresholds', () {
-      final buffer = StringBuffer('#EXTM3U\n');
-      final now = DateTime.utc(2026, 1, 1, 12);
-      final programs = <EpgProgram>[];
-      for (var index = 0; index < 10000; index += 1) {
-        buffer.writeln(
-          '#EXTINF:-1 tvg-id="bulk.$index" group-title="Bulk",Bulk $index',
-        );
-        buffer.writeln('https://streams.example/live/$index.m3u8');
-        programs.add(
-          EpgProgram(
-            channelId: 'bulk.$index',
-            title: 'Current $index',
-            description: 'Task 9 bulk EPG fixture',
-            start: now.subtract(const Duration(minutes: 5)),
-            end: now.add(const Duration(minutes: 55)),
+        media3.emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.androidExoPlayer,
+            message: 'Provider token expired during playback',
+            code: 'expired_token',
+            recoverable: true,
           ),
         );
-      }
+        await pumpEventQueue();
+        media3.emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.androidExoPlayer,
+            message: 'Provider token expired during playback',
+            code: 'expired_token',
+            recoverable: true,
+          ),
+        );
+        await pumpEventQueue();
 
-      final rssBefore = ProcessInfo.currentRss;
-      final stopwatch = Stopwatch()..start();
-      final playlist = M3UParser().parse(buffer.toString());
-      final epg = EpgService(clock: () => now)..loadPrograms(programs);
-      final elapsed = stopwatch.elapsed;
-      final rssDelta = ProcessInfo.currentRss - rssBefore;
+        expect(
+          media3.commands.where(
+            (String command) =>
+                command == 'load:https://provider.example/live/expiring.ts',
+          ),
+          hasLength(2),
+        );
+        expect(errors, hasLength(1));
+        expect(errors.single.code, 'expired_token');
+        expect(errors.single.recoverable, isTrue);
+        expect(
+          orchestrator.diagnostics,
+          contains('active-retry:expired_token:androidExoPlayer:1'),
+        );
 
-      expect(playlist.channels, hasLength(10000));
-      expect(
-        epg.lookupForChannel(playlist.channels.last)?.current.title,
-        'Current 9999',
-      );
-      expect(elapsed, lessThan(const Duration(seconds: 2)));
-      expect(rssDelta, lessThan(64 * 1024 * 1024));
-    }, timeout: const Timeout(Duration(seconds: 3)));
+        await subscription.cancel();
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
+      'rapid_channel_switch: twenty server sessions leave no active backend',
+      () async {
+        final direct = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          loadFailure: BackendUnavailableException('libmpv unavailable'),
+        );
+        final serverPlayer = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.serverTranscode,
+        );
+        final gateway = _PolicyTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: direct,
+            PlaybackBackend.serverTranscode: serverPlayer,
+          },
+          transcodeGateway: gateway,
+        );
+
+        for (var index = 0; index < 20; index += 1) {
+          await orchestrator.open(
+            PlaybackSource(
+              uri: 'https://provider.example/live/channel-$index.ts',
+              metadata: <String, Object?>{
+                'broadcast_network_id': 'network-$index',
+              },
+            ),
+          );
+        }
+        await orchestrator.dispose();
+
+        expect(orchestrator.activeBackend, isNull);
+        expect(gateway.startedServerRequests, hasLength(20));
+        expect(gateway.stoppedBroadcasts, hasLength(20));
+        expect(gateway.stoppedServerTranscodes, hasLength(20));
+        expect(
+          serverPlayer.commands.where((String command) => command == 'stop'),
+          hasLength(20),
+        );
+      },
+    );
+
+    test(
+      'large_m3u_epg_perf: fixture stays under documented thresholds',
+      () {
+        final buffer = StringBuffer('#EXTM3U\n');
+        final now = DateTime.utc(2026, 1, 1, 12);
+        final programs = <EpgProgram>[];
+        for (var index = 0; index < 10000; index += 1) {
+          buffer.writeln(
+            '#EXTINF:-1 tvg-id="bulk.$index" group-title="Bulk",Bulk $index',
+          );
+          buffer.writeln('https://streams.example/live/$index.m3u8');
+          programs.add(
+            EpgProgram(
+              channelId: 'bulk.$index',
+              title: 'Current $index',
+              description: 'Task 9 bulk EPG fixture',
+              start: now.subtract(const Duration(minutes: 5)),
+              end: now.add(const Duration(minutes: 55)),
+            ),
+          );
+        }
+
+        final rssBefore = ProcessInfo.currentRss;
+        final stopwatch = Stopwatch()..start();
+        final playlist = M3UParser().parse(buffer.toString());
+        final epg = EpgService(clock: () => now)..loadPrograms(programs);
+        final elapsed = stopwatch.elapsed;
+        final rssDelta = ProcessInfo.currentRss - rssBefore;
+
+        expect(playlist.channels, hasLength(10000));
+        expect(
+          epg.lookupForChannel(playlist.channels.last)?.current.title,
+          'Current 9999',
+        );
+        expect(elapsed, lessThan(const Duration(seconds: 2)));
+        expect(rssDelta, lessThan(64 * 1024 * 1024));
+      },
+      timeout: const Timeout(Duration(seconds: 3)),
+    );
   });
 }
 

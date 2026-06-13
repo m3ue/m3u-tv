@@ -53,6 +53,24 @@ void main() {
       expect(find.text('Tears of Steel'), findsOneWidget);
     });
 
+    testWidgets('narrow phone layout does not overflow movie cards', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Big Buck Bunny'), findsOneWidget);
+      expect(find.text('★ 4.5'), findsOneWidget);
+    });
+
     testWidgets('renders All Movies and category tabs', (tester) async {
       await tester.pumpWidget(
         _TestApp(vodItems: testVodItems, categories: testCategories),

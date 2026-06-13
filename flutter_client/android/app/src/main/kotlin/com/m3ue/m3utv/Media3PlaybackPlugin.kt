@@ -8,6 +8,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -126,7 +127,13 @@ class Media3PlaybackPlugin(
         val player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory))
             .build()
-        val state = PlayerState(player, textureEntry, surface, textureEntry.id())
+        val state = PlayerState(
+            player = player,
+            textureEntry = textureEntry,
+            surface = surface,
+            textureId = textureEntry.id(),
+            uri = uri,
+        )
         playerState = state
         mediaSession = MediaSession.Builder(context, player).build()
 
@@ -186,9 +193,16 @@ class Media3PlaybackPlugin(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            val state = playerState
+            if (state != null && state.retryHlsAsProgressive(error)) {
+                emit("buffering", uri = state.uri, positionMs = state.player.currentPosition, textureId = state.textureId)
+                state.player.prepare()
+                return
+            }
+
             emit(
                 "error",
-                positionMs = playerState?.player?.currentPosition,
+                positionMs = state?.player?.currentPosition,
                 code = error.errorCodeName,
                 message = error.message ?: "Media3 playback failed",
                 recoverable = true,
@@ -201,7 +215,23 @@ class Media3PlaybackPlugin(
         val textureEntry: TextureRegistry.SurfaceTextureEntry,
         val surface: Surface,
         val textureId: Long,
-    )
+        val uri: String,
+        var retriedHlsAsProgressive: Boolean = false,
+    ) {
+        fun retryHlsAsProgressive(error: PlaybackException): Boolean {
+            if (retriedHlsAsProgressive || !error.looksLikeHlsManifestMismatch()) {
+                return false
+            }
+
+            retriedHlsAsProgressive = true
+            val mediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(uri))
+                .setMimeType(MimeTypes.VIDEO_MP2T)
+                .build()
+            player.setMediaItem(mediaItem, player.currentPosition)
+            return true
+        }
+    }
 
     private fun MethodCall.argumentsMap(): Map<String, Any?> = arguments as? Map<String, Any?> ?: emptyMap()
 
@@ -211,4 +241,9 @@ class Media3PlaybackPlugin(
         const val METHOD_CHANNEL = "m3u_tv/android_media3"
         const val EVENT_CHANNEL = "m3u_tv/android_media3/events"
     }
+}
+
+private fun PlaybackException.looksLikeHlsManifestMismatch(): Boolean {
+    val text = listOfNotNull(message, cause?.message).joinToString("\n")
+    return text.contains("Input does not start with the #EXTM3U header")
 }

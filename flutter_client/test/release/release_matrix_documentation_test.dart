@@ -144,6 +144,17 @@ void main() {
     },
   );
 
+  test('android gradle flags keep Flutter plugin on compatible DSL path', () {
+    final gradleProperties = readFile('android/gradle.properties');
+    final settingsGradle = readFile('android/settings.gradle.kts');
+    final appBuildGradle = readFile('android/app/build.gradle.kts');
+
+    expect(gradleProperties, contains('android.builtInKotlin=true'));
+    expect(gradleProperties, contains('android.newDsl=false'));
+    expect(settingsGradle, isNot(contains('org.jetbrains.kotlin.android')));
+    expect(appBuildGradle, isNot(contains('org.jetbrains.kotlin.android')));
+  });
+
   test('android manifest exposes Android TV launcher metadata', () {
     final manifest = readFile('android/app/src/main/AndroidManifest.xml');
 
