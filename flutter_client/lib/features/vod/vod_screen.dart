@@ -30,14 +30,21 @@ class VodScreen extends StatefulWidget {
 
 class _VodScreenState extends State<VodScreen> {
   String? _selectedCategory;
+  String _query = '';
 
   List<VodItem> get _filteredItems {
-    if (_selectedCategory == null || _selectedCategory == '') {
-      return widget.vodItems;
+    final selectedCategory = _selectedCategory;
+    final categoryFiltered =
+        selectedCategory == null || selectedCategory.isEmpty
+        ? widget.vodItems
+        : widget.vodItems.where((item) => item.categoryId == selectedCategory);
+    final normalizedQuery = _query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return categoryFiltered.toList(growable: false);
     }
-    return widget.vodItems
-        .where((v) => v.categoryId == _selectedCategory)
-        .toList();
+    return categoryFiltered
+        .where((item) => item.name.toLowerCase().contains(normalizedQuery))
+        .toList(growable: false);
   }
 
   @override
@@ -58,6 +65,7 @@ class _VodScreenState extends State<VodScreen> {
     return Scaffold(
       body: Column(
         children: [
+          _buildSearchField(),
           // Category bar
           _buildCategoryBar(),
           // Content area
@@ -74,6 +82,22 @@ class _VodScreenState extends State<VodScreen> {
                 : _buildGrid(filtered),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        0,
+      ),
+      child: InlineMediaSearchField(
+        query: _query,
+        hintText: 'Search movies...',
+        onChanged: (value) => setState(() => _query = value),
       ),
     );
   }
@@ -134,6 +158,7 @@ class _VodCard extends StatelessWidget {
                 child: ResilientMediaImage(
                   imageUrl: item.logoUrl,
                   fallbackIcon: Icons.movie,
+                  fit: BoxFit.contain,
                   borderRadius: 0,
                 ),
               ),

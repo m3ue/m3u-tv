@@ -113,6 +113,36 @@ void main() {
       expect(find.byTooltip('Scroll categories right'), findsOneWidget);
     });
 
+    testWidgets('inline search filters series case-insensitively', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'stranger');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Stranger Things'), findsOneWidget);
+      expect(find.text('Breaking Bad'), findsNothing);
+    });
+
+    testWidgets('inline search composes with category filter', (tester) async {
+      await tester.pumpWidget(
+        _TestApp(seriesList: testSeriesList, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Thriller'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'bad');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Breaking Bad'), findsOneWidget);
+      expect(find.text('Stranger Things'), findsNothing);
+    });
+
     testWidgets('tapping series triggers onSeriesSelect callback', (
       tester,
     ) async {

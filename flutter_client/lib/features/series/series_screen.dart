@@ -31,14 +31,23 @@ class SeriesScreen extends StatefulWidget {
 
 class _SeriesScreenState extends State<SeriesScreen> {
   String? _selectedCategory;
+  String _query = '';
 
   List<Series> get _filteredItems {
-    if (_selectedCategory == null || _selectedCategory == '') {
-      return widget.seriesList;
+    final selectedCategory = _selectedCategory;
+    final categoryFiltered =
+        selectedCategory == null || selectedCategory.isEmpty
+        ? widget.seriesList
+        : widget.seriesList.where(
+            (item) => item.categoryId == selectedCategory,
+          );
+    final normalizedQuery = _query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return categoryFiltered.toList(growable: false);
     }
-    return widget.seriesList
-        .where((s) => s.categoryId == _selectedCategory)
-        .toList();
+    return categoryFiltered
+        .where((item) => item.name.toLowerCase().contains(normalizedQuery))
+        .toList(growable: false);
   }
 
   @override
@@ -59,6 +68,7 @@ class _SeriesScreenState extends State<SeriesScreen> {
     return Scaffold(
       body: Column(
         children: [
+          _buildSearchField(),
           // Category bar
           _buildCategoryBar(),
           // Content area
@@ -75,6 +85,22 @@ class _SeriesScreenState extends State<SeriesScreen> {
                 : _buildGrid(filtered),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        0,
+      ),
+      child: InlineMediaSearchField(
+        query: _query,
+        hintText: 'Search series...',
+        onChanged: (value) => setState(() => _query = value),
       ),
     );
   }
@@ -138,6 +164,7 @@ class _SeriesCard extends StatelessWidget {
                 child: ResilientMediaImage(
                   imageUrl: item.coverUrl,
                   fallbackIcon: Icons.tv,
+                  fit: BoxFit.contain,
                   borderRadius: 0,
                 ),
               ),

@@ -127,6 +127,38 @@ void main() {
       expect(find.byTooltip('Scroll categories right'), findsOneWidget);
     });
 
+    testWidgets('inline search filters movies case-insensitively', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'sintel');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sintel'), findsOneWidget);
+      expect(find.text('Big Buck Bunny'), findsNothing);
+      expect(find.text('Tears of Steel'), findsNothing);
+    });
+
+    testWidgets('inline search composes with category filter', (tester) async {
+      await tester.pumpWidget(
+        _TestApp(vodItems: testVodItems, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Action'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'steel');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tears of Steel'), findsOneWidget);
+      expect(find.text('Big Buck Bunny'), findsNothing);
+      expect(find.text('Sintel'), findsNothing);
+    });
+
     testWidgets('tapping movie triggers onVodSelect callback', (tester) async {
       VodItem? selectedItem;
       await tester.pumpWidget(
