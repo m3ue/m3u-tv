@@ -9,6 +9,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 import 'epg_overlay.dart';
 import 'playback_controls.dart';
@@ -21,6 +22,7 @@ class PlayerScreen extends StatefulWidget {
     required this.args,
     required this.orchestrator,
     required this.epgService,
+    this.xtreamService,
     this.progressReporter,
     super.key,
   });
@@ -28,6 +30,7 @@ class PlayerScreen extends StatefulWidget {
   final PlayerArgs args;
   final PlaybackOrchestrator orchestrator;
   final EpgService epgService;
+  final XtreamService? xtreamService;
   final void Function(Progress progress)? progressReporter;
 
   @override
@@ -66,6 +69,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _overlayHideTimer;
   Timer? _progressTimer;
   Timer? _epgTimer;
+  Future<void>? _epgFetch;
 
   StreamSubscription<PlaybackState>? _stateSubscription;
   StreamSubscription<PlaybackError>? _errorSubscription;
@@ -185,7 +189,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _startProgressReporting();
     }
 
-    if (_isLive && state.status == PlaybackStatus.playing) {
+    if (_isLive &&
+        (state.status == PlaybackStatus.ready ||
+            state.status == PlaybackStatus.playing)) {
       _startEpgRefresh();
     }
   }
@@ -243,12 +249,45 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _updateEpg() {
+  Future<void> _updateEpg() async {
     if (!_isLive || widget.args.epgChannelId == null) return;
     final channelId = widget.args.epgChannelId!;
     final result = widget.epgService.lookup(channelId);
+    if (result != null) {
+      if (mounted) {
+        setState(() => _epgData = result);
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() => _epgData = result);
+    }
+
+    final streamId = widget.args.streamId;
+    final xtreamService = widget.xtreamService;
+    if (streamId == null || xtreamService == null || _epgFetch != null) return;
+
+    final fetch = xtreamService.getShortEpg(
+      streamId,
+      channelId: channelId,
+      limit: 4,
+    );
+    _epgFetch = fetch;
+    try {
+      final programs = await fetch;
+      if (_disposed || !mounted) return;
+      widget.epgService.mergePrograms(programs);
+      final refreshed = widget.epgService.lookup(channelId);
+      if (mounted) {
+        setState(() => _epgData = refreshed);
+      }
+    } catch (_) {
+      if (_disposed || !mounted) return;
+    } finally {
+      if (identical(_epgFetch, fetch)) {
+        _epgFetch = null;
+      }
     }
   }
 

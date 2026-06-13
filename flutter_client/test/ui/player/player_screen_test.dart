@@ -11,7 +11,9 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 import 'fake_player_adapter.dart';
 import 'fake_transcode_gateway.dart';
@@ -370,6 +372,188 @@ void main() {
   });
 
   group('PlayerScreen', () {
+    testWidgets('renders desktop libmpv texture when backend is ready', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'Texture Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(adapter.loadCalls, hasLength(1));
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final texture = tester.widget<Texture>(find.byType(Texture));
+      expect(texture.textureId, 42);
+    });
+
+    testWidgets('shows live EPG as soon as playback is ready', (tester) async {
+      final now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final epgService = EpgService(clock: () => now)
+        ..loadPrograms(
+          <EpgProgram>[
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Current News',
+              description: 'Fixture bulletin',
+              start: now.subtract(const Duration(minutes: 10)),
+              end: now.add(const Duration(minutes: 20)),
+            ),
+          ],
+        );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'EPG Fixture',
+              type: 'live',
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: epgService,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(adapter.loadCalls, hasLength(1));
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Current News'), findsOneWidget);
+    });
+
+    testWidgets('fetches short EPG when player cache misses', (tester) async {
+      final now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final requests = <XtreamRequest>[];
+      final xtreamService = XtreamService(
+        transport: (request) async {
+          requests.add(request);
+          if (request.action == null) {
+            return {
+              'user_info': {'auth': 1, 'status': 'Active'},
+              'm3u_editor': {'version': 'fixture'},
+            };
+          }
+          if (request.action == 'get_short_epg') {
+            return {
+              'epg_listings': [
+                {
+                  'channel_id': 'bbc.one',
+                  'title': 'Fetched News',
+                  'description': 'Fetched bulletin',
+                  'start': now.subtract(const Duration(minutes: 10)).toIso8601String(),
+                  'end': now.add(const Duration(minutes: 20)).toIso8601String(),
+                },
+              ],
+            };
+          }
+          return <String, Object?>{};
+        },
+      );
+      await xtreamService.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'EPG Fetch Fixture',
+              type: 'live',
+              streamId: 101,
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => now),
+            xtreamService: xtreamService,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(adapter.loadCalls, hasLength(1));
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Fetched News'), findsOneWidget);
+      expect(requests.last.action, 'get_short_epg');
+      expect(requests.last.params, {'stream_id': '101', 'limit': '4'});
+    });
+
     testWidgets('backs out of the route when playback error is visible',
         (tester) async {
       final adapter = FakePlayerAdapter(

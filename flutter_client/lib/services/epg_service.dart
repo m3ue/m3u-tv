@@ -12,13 +12,29 @@ class EpgService {
 
   void loadPrograms(List<EpgProgram> programs) {
     _programsByChannel.clear();
+    _storePrograms(programs);
+    _loadedAt = _clock();
+  }
+
+  void mergePrograms(List<EpgProgram> programs) {
+    final channelIds = programs
+        .map((program) => program.channelId)
+        .where((channelId) => channelId.isNotEmpty)
+        .toSet();
+    for (final channelId in channelIds) {
+      _programsByChannel.remove(channelId);
+    }
+    _storePrograms(programs);
+    _loadedAt = _clock();
+  }
+
+  void _storePrograms(List<EpgProgram> programs) {
     for (final program in programs) {
       _programsByChannel.putIfAbsent(program.channelId, () => <EpgProgram>[]).add(program);
     }
     for (final entry in _programsByChannel.entries) {
       entry.value.sort((a, b) => a.start.compareTo(b.start));
     }
-    _loadedAt = _clock();
   }
 
   void loadBatch(Map<String, List<EpgProgram>> batch) {

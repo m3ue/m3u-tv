@@ -172,6 +172,7 @@ RouteFactory buildAppRouter({
                     playbackOrchestratorBuilder?.call() ??
                     _buildPlaybackOrchestrator(),
                 epgService: epgService ?? EpgService(),
+                xtreamService: xtreamService,
               ),
         );
       }
