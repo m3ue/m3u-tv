@@ -39,6 +39,7 @@ class LiveTvScreen extends StatefulWidget {
 class _LiveTvScreenState extends State<LiveTvScreen> {
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
+  String _query = '';
   Set<int> _favoriteIds = {};
   final Map<int, EpgCurrentNext?> _epgMap = {};
   bool _isGridView = false;
@@ -69,15 +70,24 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   }
 
   List<Channel> get _filteredChannels {
-    if (_selectedCategory == null || _selectedCategory == '') {
-      return widget.channels;
+    final selectedCategory = _selectedCategory;
+    final categoryFiltered =
+        selectedCategory == null || selectedCategory.isEmpty
+        ? widget.channels
+        : selectedCategory == _favoritesCategoryId
+        ? widget.channels.where((channel) => _favoriteIds.contains(channel.id))
+        : widget.channels.where(
+            (channel) => channel.categoryId == selectedCategory,
+          );
+    final normalizedQuery = _query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return categoryFiltered.toList(growable: false);
     }
-    if (_selectedCategory == _favoritesCategoryId) {
-      return widget.channels.where((c) => _favoriteIds.contains(c.id)).toList();
-    }
-    return widget.channels
-        .where((c) => c.categoryId == _selectedCategory)
-        .toList();
+    return categoryFiltered
+        .where(
+          (channel) => channel.name.toLowerCase().contains(normalizedQuery),
+        )
+        .toList(growable: false);
   }
 
   List<CategoryTabData> get _categoryTabs {
@@ -116,6 +126,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
     return Scaffold(
       body: Column(
         children: [
+          _buildSearchField(),
           // Category bar + view mode toggle
           _buildCategoryBar(),
           // Content area
@@ -134,6 +145,22 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                 : _buildListView(filtered),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        MediaBrowsingMetrics.contentPadding,
+        0,
+      ),
+      child: InlineMediaSearchField(
+        query: _query,
+        hintText: 'Search live TV...',
+        onChanged: (value) => setState(() => _query = value),
       ),
     );
   }

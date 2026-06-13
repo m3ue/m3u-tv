@@ -188,6 +188,46 @@ void main() {
       expect(find.byTooltip('Scroll categories right'), findsOneWidget);
     });
 
+    testWidgets('inline search filters channels case-insensitively', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(channels: testChannels, categories: testCategories),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'cnn');
+      await tester.pumpAndSettle();
+
+      expect(find.text('CNN'), findsOneWidget);
+      expect(find.text('BBC One'), findsNothing);
+      expect(find.text('ESPN'), findsNothing);
+    });
+
+    testWidgets('inline search composes with favorites filter', (tester) async {
+      final favoritesService = FavoritesService();
+      await favoritesService.add(1);
+      await favoritesService.add(2);
+
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          categories: testCategories,
+          favoritesService: favoritesService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('★ Favorites'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'bbc');
+      await tester.pumpAndSettle();
+
+      expect(find.text('BBC One'), findsOneWidget);
+      expect(find.text('CNN'), findsNothing);
+      expect(find.text('ESPN'), findsNothing);
+    });
+
     testWidgets('tapping channel triggers onChannelSelect callback', (
       tester,
     ) async {
