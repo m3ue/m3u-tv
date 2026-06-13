@@ -308,6 +308,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _handleBack() {
+    if (_errorMessage != null) {
+      _goBack();
+      return;
+    }
     if (_overlayVisible) {
       _hideOverlay();
     } else {

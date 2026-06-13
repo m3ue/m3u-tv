@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/resume_prompt.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/epg_service.dart';
+
+import 'fake_player_adapter.dart';
+import 'fake_transcode_gateway.dart';
 
 void main() {
   group('formatTime', () {
@@ -357,6 +366,80 @@ void main() {
       ));
       await tester.tap(find.text('Start Over'));
       expect(startedOver, isTrue);
+    });
+  });
+
+  group('PlayerScreen', () {
+    testWidgets('backs out of the route when playback error is visible',
+        (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.android,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.androidExoPlayer: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Launcher'),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PlayerScreen(
+                              args: const PlayerArgs(
+                                streamUrl: 'https://example.com/live.m3u8',
+                                title: 'Error Fixture',
+                                type: 'live',
+                              ),
+                              orchestrator: orchestrator,
+                              epgService: EpgService(
+                                clock: () => DateTime.utc(2026),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Open player'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open player'));
+      await tester.pumpAndSettle();
+
+      adapter.emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.androidExoPlayer,
+          message: 'Playback failed',
+          code: 'playback_failed',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Playback error'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Launcher'), findsOneWidget);
+      expect(find.text('Playback error'), findsNothing);
     });
   });
 }
