@@ -79,9 +79,7 @@ void main() {
         expect(orchestrator.activeBackend, PlaybackBackend.appleAvKit);
         expect(
           orchestrator.diagnostics,
-          contains(
-            'fallback:appleAvKit:preferred appleMpvKit unsupported',
-          ),
+          contains('fallback:appleAvKit:preferred appleMpvKit unsupported'),
         );
 
         await orchestrator.dispose();
@@ -188,6 +186,52 @@ void main() {
         expect(
           orchestrator.diagnostics,
           contains('error:server_transcode_unavailable:m3u-editor offline'),
+        );
+
+        await sub.cancel();
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
+      'desktop without server adapter emits the native libmpv failure',
+      () async {
+        final desktop = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          loadFailure: const PlaybackException(
+            message: 'libmpv render context failed to initialize',
+            backend: PlaybackBackend.desktopLibmpv,
+            code: 'desktop-libmpv-render-context-failed',
+            recoverable: true,
+          ),
+        );
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: desktop,
+          },
+          transcodeGateway: transcode,
+        );
+        final errors = <PlaybackError>[];
+        final sub = orchestrator.onError.listen(errors.add);
+
+        await orchestrator.open(_source(videoCodec: 'hevc'));
+        await pumpEventQueue();
+
+        expect(errors, hasLength(1));
+        expect(errors.single.backend, PlaybackBackend.desktopLibmpv);
+        expect(errors.single.code, 'desktop-libmpv-render-context-failed');
+        expect(
+          errors.single.message,
+          'libmpv render context failed to initialize',
+        );
+        expect(transcode.startedServerRequests, isEmpty);
+        expect(
+          orchestrator.diagnostics,
+          contains(
+            'error:desktop-libmpv-render-context-failed:libmpv render context failed to initialize',
+          ),
         );
 
         await sub.cancel();
@@ -359,6 +403,59 @@ void main() {
 
       await orchestrator.dispose();
     });
+
+    test(
+      'desktop without server transcode reports the libmpv load failure',
+      () async {
+        final desktop = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          loadFailure: const PlaybackException(
+            message: 'libmpv shared library not found; tried libmpv.so.2',
+            backend: PlaybackBackend.desktopLibmpv,
+            code: 'backend_unavailable',
+            recoverable: true,
+          ),
+        );
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: desktop,
+          },
+          transcodeGateway: transcode,
+        );
+        final errors = <PlaybackError>[];
+        final sub = orchestrator.onError.listen(errors.add);
+
+        await orchestrator.open(_source(isLive: false));
+        await pumpEventQueue();
+
+        expect(desktop.commands, <String>[
+          'load:https://provider.example/live/news.ts',
+        ]);
+        expect(transcode.startedServerRequests, isEmpty);
+        expect(errors, hasLength(1));
+        expect(errors.single.backend, PlaybackBackend.desktopLibmpv);
+        expect(errors.single.code, 'backend_unavailable');
+        expect(
+          errors.single.message,
+          'libmpv shared library not found; tried libmpv.so.2',
+        );
+        expect(
+          errors.single.message,
+          isNot(contains('No server transcode playback backend is registered')),
+        );
+        expect(
+          orchestrator.diagnostics,
+          contains(
+            'error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
+          ),
+        );
+
+        await sub.cancel();
+        await orchestrator.dispose();
+      },
+    );
   });
 }
 
@@ -445,11 +542,13 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
 class _FakePlayerAdapter implements PlayerAdapter {
   _FakePlayerAdapter({
     required this.capabilities,
+    this.loadFailure,
     this.unsupportedVideoCodecs = const <String>{},
   });
 
   @override
   final PlaybackCapabilities capabilities;
+  final PlaybackException? loadFailure;
   final Set<String> unsupportedVideoCodecs;
   final List<String> commands = <String>[];
   final List<PlaybackSource> loadedSources = <PlaybackSource>[];
@@ -472,6 +571,10 @@ class _FakePlayerAdapter implements PlayerAdapter {
   Future<void> load(PlaybackSource source) async {
     commands.add('load:${source.uri}');
     loadedSources.add(source);
+    final failure = loadFailure;
+    if (failure != null) {
+      throw failure;
+    }
     if (source.videoCodec != null &&
         unsupportedVideoCodecs.contains(source.videoCodec)) {
       throw PlaybackException.unsupported(

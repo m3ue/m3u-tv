@@ -102,7 +102,7 @@ void main() {
     );
 
     test(
-      'desktop policy uses in-process libmpv then server transcode on missing native library',
+      'desktop policy reports libmpv failure when no server transcode player is registered',
       () async {
         final desktopLibmpv = _PolicyPlayerAdapter(
           capabilities: PlaybackCapabilities.desktopLibmpv,
@@ -110,19 +110,18 @@ void main() {
             'libmpv shared library not found; tried libmpv.so.2',
           ),
         );
-        final serverPlayer = _PolicyPlayerAdapter(
-          capabilities: PlaybackCapabilities.serverTranscode,
-        );
         final gateway = _PolicyTranscodeGateway();
         final orchestrator = PlaybackOrchestrator(
           platform: PlaybackPlatform.desktop,
           adapters: <PlaybackBackend, PlayerAdapter>{
             PlaybackBackend.desktopLibmpv: desktopLibmpv,
-            PlaybackBackend.serverTranscode: serverPlayer,
           },
           transcodeGateway: gateway,
         );
         addTearDown(orchestrator.dispose);
+        final errors = <PlaybackError>[];
+        final subscription = orchestrator.onError.listen(errors.add);
+        addTearDown(subscription.cancel);
 
         await orchestrator.open(
           const PlaybackSource(
@@ -135,15 +134,22 @@ void main() {
         expect(desktopLibmpv.commands, <String>[
           'load:https://provider.example/vod/movie.mkv',
         ]);
-        expect(gateway.startedServerRequests, hasLength(1));
-        expect(orchestrator.activeBackend, PlaybackBackend.serverTranscode);
+        expect(gateway.startedServerRequests, isEmpty);
+        expect(orchestrator.activeBackend, isNull);
+        expect(errors, hasLength(1));
+        expect(errors.single.backend, PlaybackBackend.desktopLibmpv);
+        expect(errors.single.code, BackendUnavailableException.unavailableCode);
+        expect(
+          errors.single.message,
+          'libmpv shared library not found; tried libmpv.so.2',
+        );
         expect(
           orchestrator.diagnostics,
           contains('load-failed:desktopLibmpv:backend_unavailable:libmpv shared library not found; tried libmpv.so.2'),
         );
         expect(
           orchestrator.diagnostics,
-          contains('active-backend:serverTranscode:ready'),
+          contains('error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2'),
         );
       },
     );

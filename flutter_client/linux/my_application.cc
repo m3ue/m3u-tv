@@ -1,5 +1,7 @@
 #include "my_application.h"
 
+#include <locale.h>
+
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
@@ -86,6 +88,8 @@ static gboolean my_application_local_command_line(GApplication* application, gch
 // Implements GApplication::startup.
 static void my_application_startup(GApplication* application) {
   //MyApplication* self = MY_APPLICATION(object);
+
+  setlocale(LC_NUMERIC, "C");
 
   // Perform any actions required at application startup.
 

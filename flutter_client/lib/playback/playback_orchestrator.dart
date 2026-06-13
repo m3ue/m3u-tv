@@ -102,10 +102,7 @@ class PlaybackOrchestrator {
       lastRecoverableFailure = failure;
     }
 
-    await _openServerTranscode(
-      source,
-      lastFailure: lastRecoverableFailure,
-    );
+    await _openServerTranscode(source, lastFailure: lastRecoverableFailure);
   }
 
   Future<void> play() => _requireActiveAdapter().play();
@@ -197,6 +194,10 @@ class PlaybackOrchestrator {
   }) async {
     final adapter = _adapters[PlaybackBackend.serverTranscode];
     if (adapter == null) {
+      if (_platform == PlaybackPlatform.desktop && lastFailure != null) {
+        _emitError(PlaybackError.fromException(lastFailure));
+        return;
+      }
       _emitError(
         PlaybackError(
           backend: lastFailure?.backend ?? PlaybackBackend.serverTranscode,
@@ -403,7 +404,8 @@ class PlaybackOrchestrator {
         _handleRecoverableActiveFailure(
           PlaybackError(
             backend: backend,
-            message: 'Playback stayed buffering for ${_bufferingTimeout.inSeconds}s',
+            message:
+                'Playback stayed buffering for ${_bufferingTimeout.inSeconds}s',
             code: 'network_unavailable',
             recoverable: true,
           ),
@@ -444,7 +446,9 @@ class PlaybackOrchestrator {
     _recovering = true;
     _activeRecoveryAttempts += 1;
     final generation = _playbackGeneration;
-    _diagnostics.add('active-retry:${error.code}:${backend.name}:$_activeRecoveryAttempts');
+    _diagnostics.add(
+      'active-retry:${error.code}:${backend.name}:$_activeRecoveryAttempts',
+    );
     try {
       if (_retryDelay > Duration.zero) {
         await Future<void>.delayed(_retryDelay);
