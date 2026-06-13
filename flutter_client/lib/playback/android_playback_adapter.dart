@@ -216,16 +216,22 @@ class AndroidPlaybackAdapter implements PlayerAdapter {
     if (decoderFailure == 'black-screen') return 'black-screen';
     if (decoderFailure == 'decoder-failure') return 'decoder-failure';
 
-    final videoCodec = _videoCodecFromSource(source.videoCodec);
-    if (videoCodec == VideoCodec.unknown ||
-        !androidCapabilities.supportsVideo(videoCodec)) {
-      return 'unsupported-codec';
+    final videoCodecName = source.videoCodec;
+    if (videoCodecName != null) {
+      final videoCodec = _videoCodecFromSource(videoCodecName);
+      if (videoCodec == VideoCodec.unknown ||
+          !androidCapabilities.supportsVideo(videoCodec)) {
+        return 'unsupported-codec';
+      }
     }
 
-    final audioCodec = _audioCodecFromSource(source.audioCodec);
-    if (audioCodec == AudioCodec.unknown ||
-        !androidCapabilities.supportsAudio(audioCodec)) {
-      return 'unsupported-codec';
+    final audioCodecName = source.audioCodec;
+    if (audioCodecName != null) {
+      final audioCodec = _audioCodecFromSource(audioCodecName);
+      if (audioCodec == AudioCodec.unknown ||
+          !androidCapabilities.supportsAudio(audioCodec)) {
+        return 'unsupported-codec';
+      }
     }
 
     return null;

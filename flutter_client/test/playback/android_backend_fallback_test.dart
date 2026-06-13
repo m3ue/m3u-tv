@@ -47,6 +47,35 @@ void main() {
       ]);
     });
 
+    test('loads streams without codec metadata through Media3 first', () async {
+      final host = _FakeAndroidMedia3Host();
+      final adapter = AndroidPlaybackAdapter(
+        probe: const AndroidPlaybackProbe(
+          hardwareCodecs: <VideoCodec>{VideoCodec.h264},
+          passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac, AudioCodec.mp3},
+          mpvAvailable: false,
+          serverTranscodeAvailable: false,
+        ),
+        media3Host: host,
+      );
+
+      await adapter.load(
+        const PlaybackSource(
+          uri: 'https://provider.example/live/channel.ts',
+          title: 'Provider Channel',
+          isLive: true,
+        ),
+      );
+
+      expect(adapter.activeBackend, PlaybackBackend.androidExoPlayer);
+      expect(host.commands, <String>[
+        'load:https://provider.example/live/channel.ts',
+      ]);
+      expect(adapter.decisionLog, contains('direct:exo-player'));
+
+      await adapter.dispose();
+    });
+
     test(
       'uses server transcode for unsupported codec fixtures while Android MPV is future-gated',
       () async {
