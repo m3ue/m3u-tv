@@ -120,13 +120,11 @@ class _SeriesDetailsBody extends StatelessWidget {
               children: [
                 Text(info.series.name, style: theme.textTheme.headlineMedium),
                 if (info.series.rating != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    '★ ${info.series.rating}',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  const SizedBox(height: 8),
+                  Chip(
+                    label: Text('★ ${info.series.rating}'),
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
                 ],
                 if (info.series.plot != null) ...[

@@ -126,6 +126,7 @@ class VodInfo {
     this.duration,
     this.rating,
     this.coverUrl,
+    this.backdropUrl,
     this.containerExtension,
   });
 
@@ -140,6 +141,7 @@ class VodInfo {
   final String? duration;
   final double? rating;
   final String? coverUrl;
+  final String? backdropUrl;
   final String? containerExtension;
 
   factory VodInfo.fromXtream(Map<String, Object?> json) {
@@ -182,6 +184,7 @@ class VodInfo {
       coverUrl: _asNullableString(
         pick(['cover_big', 'movie_image', 'stream_icon', 'cover']),
       ),
+      backdropUrl: _asNullableString(_firstListItem(info['backdrop_path'])),
       containerExtension: _asNullableString(
         pick(['container_extension', 'containerExtension']),
       ),
@@ -482,6 +485,11 @@ String _durationFromSeconds(int seconds) {
   if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
   if (hours > 0) return '${hours}h';
   return '${minutes}m';
+}
+
+Object? _firstListItem(Object? value) {
+  if (value is List && value.isNotEmpty) return value.first;
+  return value;
 }
 
 String? _yearFromDate(String? value) {

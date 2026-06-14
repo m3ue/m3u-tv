@@ -57,8 +57,9 @@ class _VodDetailsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final details = _ResolvedVodDetails(item, info);
+    final backdrop = details.backdropUrl;
 
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,6 +134,30 @@ class _VodDetailsBody extends StatelessWidget {
         ],
       ),
     );
+
+    if (backdrop == null) return content;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(backdrop, fit: BoxFit.cover),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.2),
+                Colors.black.withValues(alpha: 0.85),
+                theme.colorScheme.surface,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
+        content,
+      ],
+    );
   }
 
   void _play(BuildContext context, _ResolvedVodDetails details) {
@@ -169,6 +194,7 @@ class _ResolvedVodDetails {
   String? get duration => _notEmpty(info?.duration);
   double? get rating => info?.rating ?? item.rating;
   String? get coverUrl => _notEmpty(info?.coverUrl) ?? _notEmpty(item.logoUrl);
+  String? get backdropUrl => _notEmpty(info?.backdropUrl);
   String? get containerExtension =>
       _notEmpty(info?.containerExtension) ?? item.containerExtension;
 }
