@@ -173,7 +173,6 @@ class _VodCard extends StatelessWidget {
                 child: ResilientMediaImage(
                   imageUrl: item.logoUrl,
                   fallbackIcon: Icons.movie,
-                  fit: BoxFit.contain,
                   borderRadius: 0,
                 ),
               ),

@@ -164,7 +164,6 @@ class _SeriesCard extends StatelessWidget {
                 child: ResilientMediaImage(
                   imageUrl: item.coverUrl,
                   fallbackIcon: Icons.tv,
-                  fit: BoxFit.contain,
                   borderRadius: 0,
                 ),
               ),
