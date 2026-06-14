@@ -45,7 +45,7 @@ class AppShell extends StatefulWidget {
 
 class AppShellState extends State<AppShell> {
   int _currentIndex = 0;
-  bool _sidebarActive = true;
+  bool _sidebarActive = false;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final AppStateController _appState;
   late final bool _ownsAppState;
@@ -193,28 +193,36 @@ class AppShellState extends State<AppShell> {
         }
 
         return Scaffold(
-          body: Row(
+          body: Stack(
             children: [
-              NavigationSidebar(
-                currentIndex: _currentIndex,
-                sidebarActive: _sidebarActive,
-                focusNodes: _sidebarFocusNodes,
-                scopeNode: _sidebarScopeNode,
-                onNavigate: _navigateTo,
-                onActivateSidebar: _activateSidebar,
-                onDeactivateSidebar: _deactivateSidebar,
-              ),
-              Expanded(
-                child: FocusScope(
-                  node: _contentFocusNode,
-                  child: _ContentNavigator(
-                    navigatorKey: _navigatorKey,
-                    currentIndex: _currentIndex,
-                    appState: _appState,
-                    playbackOrchestratorBuilder:
-                        widget.playbackOrchestratorBuilder,
-                    playerRouteBuilder: widget.playerRouteBuilder,
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 64),
+                  child: FocusScope(
+                    node: _contentFocusNode,
+                    child: _ContentNavigator(
+                      navigatorKey: _navigatorKey,
+                      currentIndex: _currentIndex,
+                      appState: _appState,
+                      playbackOrchestratorBuilder:
+                          widget.playbackOrchestratorBuilder,
+                      playerRouteBuilder: widget.playerRouteBuilder,
+                    ),
                   ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                bottom: 0,
+                child: NavigationSidebar(
+                  currentIndex: _currentIndex,
+                  sidebarActive: _sidebarActive,
+                  focusNodes: _sidebarFocusNodes,
+                  scopeNode: _sidebarScopeNode,
+                  onNavigate: _navigateTo,
+                  onActivateSidebar: _activateSidebar,
+                  onDeactivateSidebar: _deactivateSidebar,
                 ),
               ),
             ],
@@ -298,7 +306,16 @@ class NavigationSidebar extends StatelessWidget {
       curve: Curves.easeInOut,
       width: width,
       clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(2, 0),
+          ),
+        ],
+      ),
       child: FocusScope(
         node: scopeNode,
         onKeyEvent: (node, event) {
@@ -317,24 +334,29 @@ class NavigationSidebar extends StatelessWidget {
               height: 72,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
-                child: Row(
-                  children: [
-                    SvgPicture.asset(
-                      'assets/icons/logo.svg',
-                      width: 36,
-                      height: 36,
-                    ),
-                    if (expanded) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        'M3U TV',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: OverflowBox(
+                  maxWidth: 200,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/logo.svg',
+                        width: 36,
+                        height: 36,
                       ),
+                      if (expanded) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          'M3U TV',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -462,22 +484,25 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                 ? Border.all(color: colorScheme.primary, width: 2)
                 : null,
           ),
-          child: Row(
-            children: [
-              Icon(widget.icon, color: foregroundColor, size: 24),
-              if (widget.expanded) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
+          child: OverflowBox(
+            maxWidth: 200,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, color: foregroundColor, size: 24),
+                if (widget.expanded) ...[
+                  const SizedBox(width: 12),
+                  Text(
                     widget.label,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: foregroundColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
