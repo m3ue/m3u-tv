@@ -72,12 +72,6 @@ class AppShellState extends State<AppShell> {
   void _onAppStateChanged() {
     if (!mounted) return;
     setState(() {});
-    final route = _mainRoutes[_currentIndex];
-    Future.microtask(() {
-      if (mounted) {
-        _navigatorKey.currentState?.pushReplacementNamed(route);
-      }
-    });
   }
 
   void _initSidebarFocusNodes() {
@@ -601,67 +595,75 @@ class _ContentNavigator extends StatelessWidget {
   }
 
   Widget _buildMainRoute(String routeName) {
-    if (appState.isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return switch (routeName) {
-      RouteNames.home => _HomeScreen(
-        appState: appState,
-        onChannelSelect: _openChannel,
-        onVodSelect: _openVod,
-        onSeriesSelect: _openSeries,
-        onProgressSelect: _openProgress,
-      ),
-      RouteNames.search => SearchScreen(
-        channels: appState.channels,
-        vodItems: appState.vodItems,
-        seriesList: appState.seriesList,
-        isConfigured: appState.isConfigured,
-        onChannelSelect: _openChannel,
-        onVodSelect: _openVod,
-        onSeriesSelect: _openSeries,
-      ),
-      RouteNames.liveTv => LiveTvScreen(
-        channels: appState.channels,
-        categories: appState.liveCategories,
-        isLoading: appState.isLoadingContent,
-        isConfigured: appState.isConfigured,
-        favoritesService: appState.favoritesService,
-        epgService: appState.epgService,
-        onChannelSelect: _openChannel,
-      ),
-      RouteNames.vod => VodScreen(
-        vodItems: appState.vodItems,
-        categories: appState.vodCategories,
-        isLoading: appState.isLoadingContent,
-        isConfigured: appState.isConfigured,
-        onVodSelect: _openVod,
-      ),
-      RouteNames.series => SeriesScreen(
-        seriesList: appState.seriesList,
-        categories: appState.seriesCategories,
-        isLoading: appState.isLoadingContent,
-        isConfigured: appState.isConfigured,
-        onSeriesSelect: _openSeries,
-      ),
-      RouteNames.settings => SettingsScreen(
-        authNotifier: appState.authNotifier,
-        activeViewer: appState.activeViewer,
-        viewers: appState.viewers,
-        sourceLabel: appState.sourceLabel,
-        sourceError: appState.error,
-        isConfiguredOverride: appState.isConfigured,
-        epgRefreshInterval: appState.epgRefreshInterval,
-        epgRefreshOptions: AppStateController.epgRefreshOptions,
-        onConnect: appState.connectXtream,
-        onDisconnect: () => unawaited(appState.disconnect()),
-        onSwitchViewer: (viewer) => unawaited(appState.switchViewer(viewer)),
-        onCreateViewer: appState.createViewer,
-        onClearCache: () => unawaited(appState.clearAndRefresh()),
-        onEpgIntervalChanged: (d) => unawaited(appState.setEpgRefreshInterval(d)),
-      ),
-      _ => const PlaceholderScreen(title: 'Home'),
-    };
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) {
+        if (appState.isBootstrapping) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return switch (routeName) {
+          RouteNames.home => _HomeScreen(
+            appState: appState,
+            onChannelSelect: _openChannel,
+            onVodSelect: _openVod,
+            onSeriesSelect: _openSeries,
+            onProgressSelect: _openProgress,
+          ),
+          RouteNames.search => SearchScreen(
+            channels: appState.channels,
+            vodItems: appState.vodItems,
+            seriesList: appState.seriesList,
+            isConfigured: appState.isConfigured,
+            onChannelSelect: _openChannel,
+            onVodSelect: _openVod,
+            onSeriesSelect: _openSeries,
+          ),
+          RouteNames.liveTv => LiveTvScreen(
+            channels: appState.channels,
+            categories: appState.liveCategories,
+            isLoading: appState.isLoadingContent,
+            isConfigured: appState.isConfigured,
+            favoritesService: appState.favoritesService,
+            epgService: appState.epgService,
+            onChannelSelect: _openChannel,
+          ),
+          RouteNames.vod => VodScreen(
+            vodItems: appState.vodItems,
+            categories: appState.vodCategories,
+            isLoading: appState.isLoadingContent,
+            isConfigured: appState.isConfigured,
+            onVodSelect: _openVod,
+          ),
+          RouteNames.series => SeriesScreen(
+            seriesList: appState.seriesList,
+            categories: appState.seriesCategories,
+            isLoading: appState.isLoadingContent,
+            isConfigured: appState.isConfigured,
+            onSeriesSelect: _openSeries,
+          ),
+          RouteNames.settings => SettingsScreen(
+            authNotifier: appState.authNotifier,
+            activeViewer: appState.activeViewer,
+            viewers: appState.viewers,
+            sourceLabel: appState.sourceLabel,
+            sourceError: appState.error,
+            isConfiguredOverride: appState.isConfigured,
+            epgRefreshInterval: appState.epgRefreshInterval,
+            epgRefreshOptions: AppStateController.epgRefreshOptions,
+            onConnect: appState.connectXtream,
+            onDisconnect: () => unawaited(appState.disconnect()),
+            onSwitchViewer: (viewer) => unawaited(appState.switchViewer(viewer)),
+            onCreateViewer: appState.createViewer,
+            onClearCache: () => unawaited(appState.clearAndRefresh()),
+            onEpgIntervalChanged: (d) =>
+                unawaited(appState.setEpgRefreshInterval(d)),
+          ),
+          _ => const PlaceholderScreen(title: 'Home'),
+        };
+      },
+    );
   }
 }
 
