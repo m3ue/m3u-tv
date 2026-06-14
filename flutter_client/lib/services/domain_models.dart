@@ -197,6 +197,7 @@ class Series {
     required this.id,
     required this.name,
     this.coverUrl,
+    this.backdropUrl,
     this.categoryId,
     this.plot,
     this.rating,
@@ -205,6 +206,7 @@ class Series {
   final int id;
   final String name;
   final String? coverUrl;
+  final String? backdropUrl;
   final String? categoryId;
   final String? plot;
   final double? rating;
@@ -213,6 +215,7 @@ class Series {
     id: _asInt(json['series_id']),
     name: '${json['name'] ?? ''}',
     coverUrl: _asNullableString(json['cover']),
+    backdropUrl: _asNullableString(_firstListItem(json['backdrop_path'])),
     categoryId: _asNullableString(json['category_id']),
     plot: _asNullableString(json['plot']),
     rating: _asDoubleOrNull(json['rating']),

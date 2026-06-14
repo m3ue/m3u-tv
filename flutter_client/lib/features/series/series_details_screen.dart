@@ -39,14 +39,18 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text('Could not load episodes: ${snapshot.error}'));
+              return Center(
+                child: Text('Could not load episodes: ${snapshot.error}'),
+              );
             }
             final info = snapshot.data;
-            if (info == null) return const Center(child: Text('No episodes available'));
+            if (info == null)
+              return const Center(child: Text('No episodes available'));
             return _SeriesDetailsBody(
               info: info,
               selectedSeason: _selectedSeason,
-              onSeasonSelected: (season) => setState(() => _selectedSeason = season),
+              onSeasonSelected: (season) =>
+                  setState(() => _selectedSeason = season),
               onEpisodeSelected: _playEpisode,
             );
           },
@@ -91,13 +95,17 @@ class _SeriesDetailsBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final seasonNumber = selectedSeason ??
-        (info.seasons.isNotEmpty ? info.seasons.first.number : info.episodesBySeason.keys.firstOrNull);
+    final seasonNumber =
+        selectedSeason ??
+        (info.seasons.isNotEmpty
+            ? info.seasons.first.number
+            : info.episodesBySeason.keys.firstOrNull);
     final episodes = seasonNumber == null
         ? const <Episode>[]
         : info.episodesBySeason[seasonNumber] ?? const <Episode>[];
+    final backdrop = info.series.backdropUrl;
 
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.all(24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,17 +150,20 @@ class _SeriesDetailsBody extends StatelessWidget {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: info.seasons.map((season) {
-                      final selected = season.number == seasonNumber;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(season.name),
-                          selected: selected,
-                          onSelected: (_) => onSeasonSelected(season.number),
-                        ),
-                      );
-                    }).toList(growable: false),
+                    children: info.seasons
+                        .map((season) {
+                          final selected = season.number == seasonNumber;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(season.name),
+                              selected: selected,
+                              onSelected: (_) =>
+                                  onSeasonSelected(season.number),
+                            ),
+                          );
+                        })
+                        .toList(growable: false),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -161,17 +172,21 @@ class _SeriesDetailsBody extends StatelessWidget {
                       ? const Center(child: Text('No episodes available'))
                       : ListView.separated(
                           itemCount: episodes.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final episode = episodes[index];
                             return Card(
+                              clipBehavior: Clip.antiAlias,
                               child: ListTile(
                                 autofocus: index == 0,
                                 leading: CircleAvatar(
                                   child: Text('${episode.episodeNumber}'),
                                 ),
                                 title: Text(episode.title),
-                                subtitle: episode.plot == null ? null : Text(episode.plot!),
+                                subtitle: episode.plot == null
+                                    ? null
+                                    : Text(episode.plot!),
                                 trailing: const Icon(Icons.play_arrow),
                                 onTap: () => onEpisodeSelected(episode),
                               ),
@@ -184,6 +199,54 @@ class _SeriesDetailsBody extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (backdrop == null) return content;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Align(
+          alignment: Alignment.topRight,
+          child: FractionallySizedBox(
+            widthFactor: 0.7,
+            heightFactor: 0.4,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(backdrop, fit: BoxFit.cover),
+                // Fade left edge into background
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerRight,
+                        end: Alignment.centerLeft,
+                        colors: [Colors.transparent, theme.colorScheme.surface],
+                        stops: const [0.1, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Fade bottom edge into background
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, theme.colorScheme.surface],
+                        stops: const [0.1, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        content,
+      ],
     );
   }
 }
