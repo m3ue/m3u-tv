@@ -9,6 +9,7 @@ class FavoritesService {
 
   static const _favoritesKey = 'm3ue_favorites';
   static const _lastCategoryKey = 'm3ue_last_category';
+  static const _lastViewModeKey = 'm3ue_last_view_mode';
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? _store;
@@ -45,6 +46,13 @@ class FavoritesService {
 
   Future<String?> getLastCategory() async =>
       await _read(_lastCategoryKey) as String?;
+
+  Future<void> setLastViewMode(String viewMode) async {
+    await _write(_lastViewModeKey, viewMode);
+  }
+
+  Future<String?> getLastViewMode() async =>
+      await _read(_lastViewModeKey) as String?;
 
   Future<Object?> _read(String key) async =>
       _store == null ? _memory[key] : _store.read(key);

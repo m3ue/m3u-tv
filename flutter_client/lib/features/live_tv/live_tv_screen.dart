@@ -55,9 +55,16 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
 
   Future<void> _initCategory() async {
     final lastCat = await widget.favoritesService.getLastCategory();
+    final lastMode = await widget.favoritesService.getLastViewMode();
     if (mounted) {
       setState(() {
         _selectedCategory = lastCat;
+        if (lastMode != null) {
+          _viewMode = _ViewMode.values.firstWhere(
+            (m) => m.name == lastMode,
+            orElse: () => _ViewMode.list,
+          );
+        }
       });
     }
     await _loadFavorites();
@@ -185,11 +192,15 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
           _ViewMode.logoGrid => Icons.view_list,
           _ViewMode.epgGrid => Icons.list,
         }),
-        onPressed: () => setState(() => _viewMode = switch (_viewMode) {
-          _ViewMode.list => _ViewMode.logoGrid,
-          _ViewMode.logoGrid => _ViewMode.epgGrid,
-          _ViewMode.epgGrid => _ViewMode.list,
-        }),
+        onPressed: () {
+          final next = switch (_viewMode) {
+            _ViewMode.list => _ViewMode.logoGrid,
+            _ViewMode.logoGrid => _ViewMode.epgGrid,
+            _ViewMode.epgGrid => _ViewMode.list,
+          };
+          setState(() => _viewMode = next);
+          widget.favoritesService.setLastViewMode(next.name);
+        },
         tooltip: switch (_viewMode) {
           _ViewMode.list => 'Logo grid',
           _ViewMode.logoGrid => 'EPG grid',
