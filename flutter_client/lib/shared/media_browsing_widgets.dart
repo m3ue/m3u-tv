@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 class CategoryTabData {
@@ -23,6 +24,7 @@ class MediaBrowsingMetrics {
   static const double posterCardWidth = 180;
   static const double posterCardHeight = 300;
 }
+
 
 class InlineMediaSearchField extends StatefulWidget {
   const InlineMediaSearchField({
@@ -284,21 +286,24 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
             Expanded(
               child: SizedBox(
                 height: 40,
-                child: ListView.separated(
-                  controller: _controller,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: widget.tabs.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
-                  itemBuilder: (context, index) {
-                    final tab = widget.tabs[index];
-                    return CategoryFilterChip(
-                      label: tab.name,
-                      isSelected: widget.selectedId == tab.id,
-                      onTap: () => widget.onSelected(tab.id),
-                    );
-                  },
+                child: DpadRegion(
+                  horizontalEdge: DpadEdgeBehavior.stop,
+                  child: ListView.separated(
+                    controller: _controller,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    itemCount: widget.tabs.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: MediaBrowsingMetrics.chipGap),
+                    itemBuilder: (context, index) {
+                      final tab = widget.tabs[index];
+                      return CategoryFilterChip(
+                        label: tab.name,
+                        isSelected: widget.selectedId == tab.id,
+                        onTap: () => widget.onSelected(tab.id),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -351,7 +356,8 @@ class CategoryFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Focus(
+    return DpadFocusable(
+      onSelect: onTap,
       child: Material(
         color: isSelected
             ? colorScheme.primaryContainer
@@ -543,20 +549,25 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       ? MediaBrowsingMetrics.posterCardHeight
                       : MediaBrowsingMetrics.previewCardHeight) +
                   16,
-              child: Scrollbar(
-                controller: _controller,
-                thumbVisibility: true,
-                trackVisibility: true,
-                child: ListView.separated(
+              child: DpadRegion(
+                memoryKey: 'preview-row/${widget.title}',
+                horizontalEdge: DpadEdgeBehavior.stop,
+                child: Scrollbar(
                   controller: _controller,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(bottom: 12),
-                  itemCount: visibleItems.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: MediaBrowsingMetrics.itemGap),
-                  itemBuilder: (context, index) => MediaPreviewCard(
-                    item: visibleItems[index],
-                    posterStyle: widget.posterStyle,
+                  thumbVisibility: true,
+                  trackVisibility: true,
+                  child: ListView.separated(
+                    controller: _controller,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    itemCount: visibleItems.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: MediaBrowsingMetrics.itemGap),
+                    itemBuilder: (context, index) => MediaPreviewCard(
+                      item: visibleItems[index],
+                      posterStyle: widget.posterStyle,
+                      autofocus: index == 0,
+                    ),
                   ),
                 ),
               ),
@@ -568,20 +579,23 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
 }
 
 class MediaPreviewCard extends StatelessWidget {
-  const MediaPreviewCard({required this.item, this.posterStyle = false, super.key});
+  const MediaPreviewCard({required this.item, this.posterStyle = false, this.autofocus = false, super.key});
 
   final MediaPreviewItem item;
   final bool posterStyle;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isRating = item.subtitle?.startsWith('★') ?? false;
-    return SizedBox(
-      width: posterStyle
-          ? MediaBrowsingMetrics.posterCardWidth
-          : MediaBrowsingMetrics.previewCardWidth,
-      child: Focus(
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: item.onTap,
+      child: SizedBox(
+        width: posterStyle
+            ? MediaBrowsingMetrics.posterCardWidth
+            : MediaBrowsingMetrics.previewCardWidth,
         child: Material(
           color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
@@ -645,3 +659,5 @@ class MediaPreviewCard extends StatelessWidget {
     );
   }
 }
+
+

@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -129,18 +130,21 @@ class _VodScreenState extends State<VodScreen> {
                 .floor()
                 .clamp(1, _desktopPosterColumns);
 
-        return ScrollbarGridView(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columnCount,
-            childAspectRatio: 0.6,
-            mainAxisSpacing: MediaBrowsingMetrics.itemGap,
-            crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+        return DpadRegion(
+          memoryKey: 'vod/grid',
+          child: ScrollbarGridView(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columnCount,
+              childAspectRatio: 0.6,
+              mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+              crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return _VodCard(item: item, autofocus: index == 0, onTap: () => widget.onVodSelect(item));
+            },
           ),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return _VodCard(item: item, onTap: () => widget.onVodSelect(item));
-          },
         );
       },
     );
@@ -148,24 +152,24 @@ class _VodScreenState extends State<VodScreen> {
 }
 
 class _VodCard extends StatelessWidget {
-  const _VodCard({required this.item, required this.onTap});
+  const _VodCard({required this.item, required this.onTap, this.autofocus = false});
 
   final VodItem item;
   final VoidCallback onTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Focus(
-      child: InkWell(
-        onTap: onTap,
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: onTap,
+      child: Material(
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

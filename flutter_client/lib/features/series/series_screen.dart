@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -119,44 +120,48 @@ class _SeriesScreenState extends State<SeriesScreen> {
   }
 
   Widget _buildGrid(List<Series> items) {
-    return ScrollbarGridView(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        childAspectRatio: 0.6,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+    return DpadRegion(
+      memoryKey: 'series/grid',
+      child: ScrollbarGridView(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 5,
+          childAspectRatio: 0.6,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return _SeriesCard(
+            item: item,
+            autofocus: index == 0,
+            onTap: () => widget.onSeriesSelect(item),
+          );
+        },
       ),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _SeriesCard(
-          item: item,
-          onTap: () => widget.onSeriesSelect(item),
-        );
-      },
     );
   }
 }
 
 class _SeriesCard extends StatelessWidget {
-  const _SeriesCard({required this.item, required this.onTap});
+  const _SeriesCard({required this.item, required this.onTap, this.autofocus = false});
 
   final Series item;
   final VoidCallback onTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Focus(
-      child: InkWell(
-        onTap: onTap,
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: onTap,
+      child: Material(
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

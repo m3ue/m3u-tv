@@ -193,6 +193,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.9"
+  dpad:
+    dependency: "direct main"
+    description:
+      name: dpad
+      sha256: "3f08643269c24c34bfd0672ba5141264c89b33f5e3c713bbf560e9e049769a07"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.0"
   fake_async:
     dependency: transitive
     description:

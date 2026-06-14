@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -168,6 +169,15 @@ class AppShellState extends State<AppShell> {
         },
         child: Focus(
           autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+                useSidebar) {
+              _activateSidebar();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
           child: useSidebar ? _buildTvLayout() : _buildMobileLayout(),
         ),
       ),
@@ -198,15 +208,32 @@ class AppShellState extends State<AppShell> {
               Positioned.fill(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 64),
-                  child: FocusScope(
-                    node: _contentFocusNode,
-                    child: _ContentNavigator(
-                      navigatorKey: _navigatorKey,
-                      currentIndex: _currentIndex,
-                      appState: _appState,
-                      playbackOrchestratorBuilder:
-                          widget.playbackOrchestratorBuilder,
-                      playerRouteBuilder: widget.playerRouteBuilder,
+                  child: DpadRegion(
+                    memoryKey: 'content',
+                    horizontalEdge: DpadEdgeBehavior.stop,
+                    onEdge: (direction) {
+                      if (direction == TraversalDirection.left) {
+                        _activateSidebar();
+                      }
+                    },
+                    child: FocusScope(
+                      node: _contentFocusNode,
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent &&
+                            event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                          _activateSidebar();
+                          return KeyEventResult.handled;
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: _ContentNavigator(
+                        navigatorKey: _navigatorKey,
+                        currentIndex: _currentIndex,
+                        appState: _appState,
+                        playbackOrchestratorBuilder:
+                            widget.playbackOrchestratorBuilder,
+                        playerRouteBuilder: widget.playerRouteBuilder,
+                      ),
                     ),
                   ),
                 ),

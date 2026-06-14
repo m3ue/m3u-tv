@@ -1,3 +1,5 @@
+import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
@@ -21,6 +23,13 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'M3U TV',
+      builder: Dpad.wrap(
+        debugOverlay: kDebugMode,
+        theme: const DpadThemeData(
+          effects: [DpadBorderEffect(), DpadScaleEffect(scale: 1.04)],
+          scrollPadding: 48,
+        ),
+      ),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: primary),
         useMaterial3: true,

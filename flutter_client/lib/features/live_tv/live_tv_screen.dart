@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -211,48 +212,56 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   }
 
   Widget _buildListView(List<Channel> channels) {
-    return ScrollbarListView(
-      itemCount: channels.length,
-      itemBuilder: (context, index) {
-        final channel = channels[index];
-        final epg = _epgMap[channel.id];
-        final isFav = _favoriteIds.contains(channel.id);
-        return _ChannelRow(
-          channel: channel,
-          epg: epg,
-          isFavorite: isFav,
-          onTap: () => widget.onChannelSelect(channel),
-          onLongPress: () async {
-            await widget.favoritesService.toggle(channel.id);
-            await _loadFavorites();
-          },
-        );
-      },
+    return DpadRegion(
+      memoryKey: 'live-tv/list',
+      child: ScrollbarListView(
+        itemCount: channels.length,
+        itemBuilder: (context, index) {
+          final channel = channels[index];
+          final epg = _epgMap[channel.id];
+          final isFav = _favoriteIds.contains(channel.id);
+          return _ChannelRow(
+            channel: channel,
+            epg: epg,
+            isFavorite: isFav,
+            autofocus: index == 0,
+            onTap: () => widget.onChannelSelect(channel),
+            onLongPress: () async {
+              await widget.favoritesService.toggle(channel.id);
+              await _loadFavorites();
+            },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildGridView(List<Channel> channels) {
-    return ScrollbarGridView(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 1.5,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+    return DpadRegion(
+      memoryKey: 'live-tv/grid',
+      child: ScrollbarGridView(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          childAspectRatio: 1.5,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+        ),
+        itemCount: channels.length,
+        itemBuilder: (context, index) {
+          final channel = channels[index];
+          final isFav = _favoriteIds.contains(channel.id);
+          return _ChannelGridItem(
+            channel: channel,
+            isFavorite: isFav,
+            autofocus: index == 0,
+            onTap: () => widget.onChannelSelect(channel),
+            onLongPress: () async {
+              await widget.favoritesService.toggle(channel.id);
+              await _loadFavorites();
+            },
+          );
+        },
       ),
-      itemCount: channels.length,
-      itemBuilder: (context, index) {
-        final channel = channels[index];
-        final isFav = _favoriteIds.contains(channel.id);
-        return _ChannelGridItem(
-          channel: channel,
-          isFavorite: isFav,
-          onTap: () => widget.onChannelSelect(channel),
-          onLongPress: () async {
-            await widget.favoritesService.toggle(channel.id);
-            await _loadFavorites();
-          },
-        );
-      },
     );
   }
 }
@@ -262,6 +271,7 @@ class _ChannelRow extends StatelessWidget {
     required this.channel,
     this.epg,
     required this.isFavorite,
+    required this.autofocus,
     required this.onTap,
     required this.onLongPress,
   });
@@ -269,27 +279,29 @@ class _ChannelRow extends StatelessWidget {
   final Channel channel;
   final EpgCurrentNext? epg;
   final bool isFavorite;
+  final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Focus(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DpadFocusable(
+        autofocus: autofocus,
+        onSelect: onTap,
+        child: Material(
+          color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 72,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.transparent),
-            ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: SizedBox(
+              height: 72,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 // Channel logo
@@ -377,11 +389,13 @@ class _ChannelRow extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
+            ),  // Row
+          ),    // inner Padding
+        ),      // SizedBox
+      ),        // InkWell
+    ),          // Material
+  ),            // DpadFocusable
+);              // outer Padding
   }
 }
 
@@ -389,28 +403,30 @@ class _ChannelGridItem extends StatelessWidget {
   const _ChannelGridItem({
     required this.channel,
     required this.isFavorite,
+    required this.autofocus,
     required this.onTap,
     required this.onLongPress,
   });
 
   final Channel channel;
   final bool isFavorite;
+  final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Focus(
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: onTap,
+      child: Material(
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

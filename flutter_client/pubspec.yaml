@@ -9,6 +9,7 @@ environment:
 
 dependencies:
   cupertino_icons: ^1.0.8
+  dpad: ^3.0.0
   flutter:
     sdk: flutter
   flutter_svg: ^2.3.0
