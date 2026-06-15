@@ -59,6 +59,7 @@ Quality gates for the primary client:
 ```bash
 flutter analyze
 flutter test
+dart format ./
 ```
 
 ## Configuration
