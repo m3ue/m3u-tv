@@ -3,8 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const workflowPath = '../.github/workflows/flutter-client.yml';
-  const retiredWorkflowPath = '../.github/workflows/ci.yml';
+  const workflowPath = '../.github/workflows/ci.yml';
   const releaseMatrixPath = '../docs/release/platform-release-matrix.md';
   const readmePath = 'README.md';
 
@@ -12,22 +11,18 @@ void main() {
 
   test('flutter workflow is the active CI contract', () {
     final workflow = readFile(workflowPath);
-    final retiredWorkflow = readFile(retiredWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
     expect(workflow, contains('git clone --depth 1 --branch stable'));
     expect(workflow, contains('/tmp/flutter/bin/flutter --version'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter analyze'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter test'));
-    expect(retiredWorkflow, contains('workflow_dispatch'));
 
-    for (final activeWorkflow in <String>[workflow, retiredWorkflow]) {
-      expect(activeWorkflow, isNot(contains('electron-builder')));
-      expect(activeWorkflow, isNot(contains('electron:build')));
-      expect(activeWorkflow, isNot(contains('corepack yarn lint:fix')));
-      expect(activeWorkflow, isNot(contains('corepack yarn typecheck')));
-      expect(activeWorkflow, isNot(contains('expo prebuild')));
-    }
+    expect(workflow, isNot(contains('electron-builder')));
+    expect(workflow, isNot(contains('electron:build')));
+    expect(workflow, isNot(contains('corepack yarn lint:fix')));
+    expect(workflow, isNot(contains('corepack yarn typecheck')));
+    expect(workflow, isNot(contains('expo prebuild')));
   });
 
   test('release matrix documents required toolchains and blockers', () {

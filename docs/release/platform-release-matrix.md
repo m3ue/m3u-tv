@@ -4,7 +4,7 @@ This document is the production release source of truth for the Flutter client. 
 
 ## Active CI Baseline
 
-The only active workflow created for this release baseline is `.github/workflows/flutter-client.yml`. It runs these Flutter gates from `flutter_client/` with the pinned Flutter binary:
+The only active workflow created for this release baseline is `.github/workflows/ci.yml`. It runs these Flutter gates from `flutter_client/` with the pinned Flutter binary:
 
 ```bash
 /tmp/flutter/bin/flutter analyze
