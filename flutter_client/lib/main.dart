@@ -1,18 +1,41 @@
+import 'dart:io';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final appState = await _buildAppState();
   final nativeTelevisionHint = await resolveNativeTelevisionHint();
-  runApp(MyApp(nativeTelevisionHint: nativeTelevisionHint));
+  runApp(MyApp(nativeTelevisionHint: nativeTelevisionHint, appState: appState));
+}
+
+Future<AppStateController> _buildAppState() async {
+  if (Platform.isAndroid || Platform.isIOS) {
+    final dir = await getApplicationDocumentsDirectory();
+    final store = PersistentJsonStore(
+      file: File('${dir.path}/app_state.json'),
+    );
+    return AppStateController(
+      persistentStore: store,
+      secureStorage: FlutterSecureStorageAdapter(),
+    );
+  }
+  // Desktop (macOS, Linux, Windows): existing _defaultPath() logic is correct.
+  return AppStateController();
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.nativeTelevisionHint = false});
+  const MyApp({super.key, this.nativeTelevisionHint = false, this.appState});
 
   final bool nativeTelevisionHint;
+  final AppStateController? appState;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +81,7 @@ class MyApp extends StatelessWidget {
             context,
             nativeTelevisionHint: nativeTelevisionHint,
           ),
+          appState: appState,
         ),
       ),
     );

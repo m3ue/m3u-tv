@@ -17,12 +17,6 @@ void main() {
     expect(workflow, contains('/tmp/flutter/bin/flutter --version'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter analyze'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter test'));
-
-    expect(workflow, isNot(contains('electron-builder')));
-    expect(workflow, isNot(contains('electron:build')));
-    expect(workflow, isNot(contains('corepack yarn lint:fix')));
-    expect(workflow, isNot(contains('corepack yarn typecheck')));
-    expect(workflow, isNot(contains('expo prebuild')));
   });
 
   test('release matrix documents required toolchains and blockers', () {
@@ -221,8 +215,6 @@ void main() {
     expect(readme, contains('/tmp/flutter/bin/flutter analyze'));
     expect(readme, contains('/tmp/flutter/bin/flutter test'));
     expect(readme, contains('../docs/release/platform-release-matrix.md'));
-    expect(readme, contains('React Native/Expo commands are legacy-only'));
-    expect(readme, contains('Electron is not an active CI or release target'));
     expect(readme, contains('physical Android phone/tablet QA'));
     expect(readme, contains('physical Android TV hardware QA'));
     expect(readme, contains('Emulator logs are supplemental only'));

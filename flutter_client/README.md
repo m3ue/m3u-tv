@@ -1,6 +1,6 @@
 # M3U TV Flutter Client
 
-This directory is the Flutter rewrite workspace for the M3U TV client. It is isolated from the existing React Native/Expo application at the repository root.
+This directory is the Flutter client for M3U TV.
 
 ## Local commands and active gates
 
@@ -17,12 +17,12 @@ The active CI baseline is intentionally limited to the Flutter client gates:
 
 ```bash
 cd flutter_client
+/tmp/flutter/bin/flutter pub get
+/tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
 /tmp/flutter/bin/flutter analyze
 /tmp/flutter/bin/flutter test
 ```
 
-React Native/Expo commands are legacy-only references from the retired root app.
-They must not be used for active release CI. Electron is not an active CI or release target.
 
 ## Production toolchain baseline
 
@@ -55,14 +55,14 @@ review, and platform QA blockers in the release matrix are closed.
 
 ```bash
 cd flutter_client
-/tmp/flutter/bin/flutter config --enable-linux-desktop
-/tmp/flutter/bin/flutter build linux
+flutter config --enable-linux-desktop
+flutter build linux
 
-/tmp/flutter/bin/flutter config --enable-windows-desktop
-/tmp/flutter/bin/flutter build windows
+flutter config --enable-windows-desktop
+flutter build windows
 
-/tmp/flutter/bin/flutter config --enable-macos-desktop
-/tmp/flutter/bin/flutter build macos
+flutter config --enable-macos-desktop
+flutter build macos
 ```
 
 Desktop release candidates must bundle or declare libmpv/FFmpeg/libass
@@ -75,7 +75,7 @@ downloads, or Apple Distribution signing and sandbox review for Mac App Store.
 
 ```bash
 cd flutter_client
-/tmp/flutter/bin/flutter build apk --debug
+flutter build apk --debug
 ```
 
 The debug APK is for smoke testing and sideload QA only. Play Store and Android
@@ -90,7 +90,7 @@ and physical Android TV hardware. Emulator logs are supplemental only.
 
 ```bash
 cd flutter_client
-/tmp/flutter/bin/flutter build ios --no-codesign
+flutter build ios --no-codesign
 ```
 
 The no-codesign build is a CI/local smoke gate only. TestFlight/App Store or MDM
@@ -101,7 +101,7 @@ and crash-review gates pass.
 
 ### tvOS
 
-There is no supported `/tmp/flutter/bin/flutter build tvos` command in the pinned
+There is no supported `flutter build tvos` command in the pinned
 toolchain. tvOS remains feasibility-only until a custom Flutter tvOS embedder,
 Siri Remote/gamepad forwarding, signing, and playback QA pass.
 
@@ -112,11 +112,10 @@ The initial test harness includes:
 
 ## CI
 
-The Flutter client workflow lives at `.github/workflows/flutter-client.yml`. It
-does not run Electron builder commands, React Native/Expo release jobs, or root
-Yarn release gates. Its active gates run from `flutter_client/` only:
+The Flutter client workflow lives at `.github/workflows/ci.yml`. Its active gates run from `flutter_client/` only:
 
 ```bash
 /tmp/flutter/bin/flutter analyze
 /tmp/flutter/bin/flutter test
+/tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
 ```
