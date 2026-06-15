@@ -14,14 +14,16 @@ release track.
 - TDD baseline: `.omo/evidence/task-9-initial-failing-tests.txt` captures the
   first failing `flutter test test/playback/apple_backend_test.dart` run before
   `apple_backend_feasibility.dart` existed.
-- Existing crash-risk reference:
-  `modules/react-native-mpv/ios/MpvPlayerView.swift` already shows the hard
-  parts of mpv on Apple: mpv calls are isolated on `mpvQueue`, UIKit/Metal work
-  returns to the main thread, track reads are deferred to avoid mpv event-lock
-  deadlocks, and render cleanup must drain before `mpv_render_context_free`.
-- Existing MPVKit pod reference: `plugins/withMpvPlayer.js` injects a local
-  `MPVKit.podspec`, downloads `MPVKit-GPL-Frameworks.zip`, marks MPVKit as
-  `GPL-3.0`, and sets both iOS and tvOS deployment targets to 13.0.
+- Prior RN crash-risk evidence (files removed): The former
+  `modules/react-native-mpv/ios/MpvPlayerView.swift` demonstrated the key mpv
+  Apple hazards: mpv calls isolated on `mpvQueue`, UIKit/Metal work returning to
+  the main thread, deferred track reads to avoid mpv event-lock deadlocks, and
+  render cleanup draining before `mpv_render_context_free`. These patterns inform
+  the Flutter plugin design even though the RN source no longer exists.
+- Prior MPVKit pod reference (file removed): The former `plugins/withMpvPlayer.js`
+  injected a local `MPVKit.podspec`, downloaded `MPVKit-GPL-Frameworks.zip`,
+  marked MPVKit as `GPL-3.0`, and set iOS and tvOS deployment targets to 13.0.
+  Both files were deleted with the React Native app removal.
 - Flutter CLI validation on this Linux host:
   `/tmp/flutter/bin/flutter create --help` lists `ios`, `macos`, and shared
   `darwin` plugin generation, but no `tvos`; `/tmp/flutter/bin/flutter build
@@ -122,7 +124,7 @@ Signing/bundle requirements:
 | --- | --- | --- | --- |
 | mpv | GPL-2.0-or-later by default, with possible LGPL-only build modes depending on configuration. | Publish corresponding source/notices for GPL builds, or prove and document an LGPL-only configuration with relink rights before distribution. | Feasibility only until legal approves a compatible binary strategy. |
 | FFmpeg | LGPL/GPL configuration-dependent; nonfree combinations are not redistributable. | Record exact configure flags, enabled codecs, external libraries, source offers, and relink path. GPL/nonfree codec choices can make App Store distribution impossible for this app. | Prefer AVKit on Apple; bundle FFmpeg only after legal approves the exact build. |
-| MPVKit | Current local podspec in `plugins/withMpvPlayer.js` declares GPL-3.0 and downloads `MPVKit-GPL-Frameworks.zip`. | GPL-3.0 requires compatible licensing for the combined distributed app plus corresponding source. | Do not ship MPVKit in production without an explicit GPL-compatible app licensing decision. |
+| MPVKit | The former RN podspec (now removed) declared GPL-3.0 and downloaded `MPVKit-GPL-Frameworks.zip`. Any Flutter equivalent must make the same declaration. | GPL-3.0 requires compatible licensing for the combined distributed app plus corresponding source. | Do not ship MPVKit in production without an explicit GPL-compatible app licensing decision. |
 | libass | ISC permissive license. | Preserve copyright/license notices when bundled directly or through mpv/FFmpeg. | Acceptable as a dependency, but combined binaries inherit mpv/FFmpeg obligations. |
 | Plezy reference code | GPL reference material. | Do not copy source unless this project accepts GPL-compatible licensing for derived work. | Conceptual reference only; use architecture lessons, not code. |
 

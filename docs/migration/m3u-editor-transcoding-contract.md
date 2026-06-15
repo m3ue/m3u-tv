@@ -1,6 +1,6 @@
 # m3u-editor Transcoding Contract
 
-Source of truth: sibling repo `/home/mebert/github_repos/m3u-editor` on `dev` at `6e62ae27`, specifically `TranscodeMode.php`, `M3uProxyService.php`, `NetworkBroadcastService.php`, `PlexService.php`, `NetworkBroadcastPayloadTest.php`, and `NetworkBroadcastSeekTest.php`.
+This document describes the m3u-editor proxy API surface as implemented by the Flutter fake server at `flutter_client/test/fakes/fake_m3u_editor_server.dart`. The contract covers the three proxy modes (`direct`, `server`, `local`) and the broadcast lifecycle endpoints. It is not yet implemented in the production Flutter playback path — the fake server exists to allow client contract tests to be written ahead of real integration.
 
 ## Modes
 

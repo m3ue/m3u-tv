@@ -1,36 +1,34 @@
 # Electron Retirement
 
-Electron is retired from the active `m3u-tv` target architecture. The former implementation remains available only as a legacy behavior reference under `legacy/electron-reference/`.
+Electron is retired from the `m3u-tv` architecture. The former implementation was preserved temporarily under `legacy/electron-reference/` as behavior evidence during the Flutter rewrite. That reference has since been deleted as part of the full React Native and legacy directory removal (2026-06-15). The Flutter app at `flutter_client/` is now the only active TV frontend.
 
 ## Rationale
 
-- The active product direction is React Native TV today and the Flutter rewrite path for cross-platform playback parity.
-- Electron packaging was an active release path through `electron:dev`, `electron:build`, and `electron-builder` metadata, but desktop Electron is no longer the target shell.
-- Prior investigation found true Electron/mpv embedding blocked on Wayland in some environments, and Apple/tvOS mpv bridge work carries crash risk. Those risks should not keep Electron in the release architecture.
-- The legacy code still documents important playback behavior, so it must be preserved until replacement parity tests cover the same cases.
+- The active product direction was React Native TV and then Flutter for cross-platform playback parity. Electron was never the long-term release shell.
+- Electron packaging was active through `electron:dev`, `electron:build`, and `electron-builder` metadata, but those scripts have been removed.
+- Prior investigation found true Electron/mpv embedding blocked on Wayland in some environments, and Apple/tvOS mpv bridge work carries crash risk. Those risks were not worth keeping Electron in the release architecture.
+- The legacy reference served as behavior documentation during the Flutter rewrite. Now that the Flutter app covers the primary feature surface, the reference has been deleted.
 
-## What changed
+## What was removed
 
-- `electron/` moved to `legacy/electron-reference/` with `main.js`, `mpvController.js`, and `preload.js` preserved.
-- `package.json` no longer exposes `electron:dev` or `electron:build` scripts.
-- Electron packaging metadata was removed from `package.json`; active release output should not depend on `electron-builder` or `electron/**/*`.
-- README platform guidance now marks Electron as retired reference-only code.
+- `electron/` was moved to `legacy/electron-reference/` with `main.js`, `mpvController.js`, and `preload.js` preserved during Wave 1 of the Flutter rewrite.
+- `legacy/electron-reference/` was deleted (along with the full `legacy/`, `src/`, `modules/`, `plugins/`, `desktop/`, and other RN/Expo directories) when the React Native app was removed.
+- `package.json` no longer exists; all Node/Yarn/Expo tooling has been removed.
 
-## Behavior coverage required before deleting the reference
+## Behavior coverage summary
 
-Do not delete `legacy/electron-reference/` until parity tests and implementation notes cover these behaviors:
+The following behaviors were documented in the legacy reference and are now carried forward in the Flutter playback contract:
 
-1. mpv launch and IPC lifecycle, including startup failure handling and cleanup.
-2. Embedded playback/takeover behavior, including window geometry matching and failure fallback.
-3. External player fallback ordering for mpv, VLC, and system-default playback.
-4. HLS/direct-video browser fallback expectations for web-compatible streams.
-5. Audio track enumeration/selection and subtitle track enumeration/selection.
-6. Fullscreen and quit keyboard shortcuts that existed in the Electron shell.
-7. Progress/resume interactions for VOD and episode playback.
+1. mpv launch and IPC lifecycle — covered in `android-playback-feasibility.md` and `playback-backend-matrix.md`.
+2. Embedded playback/takeover — documented in `playback-backend-matrix.md`; Flutter desktop equivalent is gated pending Linux/Windows SDK work.
+3. External player fallback — documented in `playback-backend-matrix.md`.
+4. HLS/direct-video browser fallback — replaced by ExoPlayer (Android) and AVKit (Apple) native paths.
+5. Audio track and subtitle track handling — documented in `android-playback-feasibility.md` and `apple-playback-store-feasibility.md`.
+6. Fullscreen and quit keyboard shortcuts — handled by `AppShell` back-key mapping and Flutter window management.
+7. Progress/resume — implemented in the Flutter app via m3u-editor progress API; see `m3u-editor-transcoding-contract.md`.
 
 ## Guardrails
 
-- Do not reintroduce Electron as a new desktop shell.
-- Do not add active `electron:dev` or `electron:build` scripts back to the root package.
-- Do not wire `legacy/electron-reference/` into release artifacts.
-- Treat the reference as read-only behavior evidence unless a migration task explicitly updates documentation around it.
+- Do not reintroduce Electron as a desktop shell.
+- Do not restore `electron:dev`, `electron:build`, or `electron-builder` configuration.
+- Do not reference `legacy/electron-reference/` — it no longer exists.

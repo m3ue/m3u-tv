@@ -11,7 +11,7 @@ The only active workflow created for this release baseline is `.github/workflows
 /tmp/flutter/bin/flutter test
 ```
 
-The workflow does not run Electron builder commands, Electron scripts, React Native/Expo release jobs, or root Yarn typecheck/lint release gates. Root RN/Expo scripts remain legacy migration references only.
+The workflow does not run Electron builder commands, Electron scripts, or React Native/Expo release jobs. The React Native/Expo app has been fully removed; only the Flutter client remains in this repository.
 
 ## Toolchain Matrix
 

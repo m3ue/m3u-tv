@@ -7,7 +7,7 @@ The Flutter rewrite should use an Android playback adapter that tries ExoPlayer 
 ## Backend order
 
 1. **Android ExoPlayer** is the first backend for normal HLS, MPEG-TS, and MP4 streams. Capability detection must be per device rather than assumed globally: H.264, H.265/HEVC, and AV1 depend on MediaCodec hardware support, and AC3/DTS depend on passthrough or decoder availability.
-2. **Android MPV/libmpv** is the direct-play fallback for unsupported codecs, advanced subtitle formats, black-screen reports, and MediaCodec decoder failures. The existing React Native Android reference initializes libmpv with an Android GPU surface, `mediacodec-copy`, AudioTrack output, cache/network settings, and track observers; the Flutter adapter should preserve that shape when native binding work begins.
+2. **Android MPV/libmpv** is the direct-play fallback for unsupported codecs, advanced subtitle formats, black-screen reports, and MediaCodec decoder failures. The Flutter adapter should initialize libmpv with an Android GPU surface, `mediacodec-copy`, AudioTrack output, cache/network settings, and track observers — following the same shape used by the now-removed React Native reference.
 3. **Server transcode** is the final fallback when ExoPlayer cannot handle the stream and MPV is not available or cannot recover. This keeps unsupported provider fixtures playable without assuming every Android TV box can decode every advertised format.
 
 ## Codec and feature matrix

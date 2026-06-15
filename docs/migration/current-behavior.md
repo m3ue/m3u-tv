@@ -1,6 +1,12 @@
-# Current Behavior Source References
+# Current Behavior Source References (Archived)
 
-This document links each parity row to current source references. Line numbers reflect the Wave 1A source read.
+> **Archived 2026-06-15.** This document was the Wave 1A parity baseline used to plan the Flutter rewrite. It linked each feature row to specific React Native source files (`src/`) so the Flutter implementation could match the existing behavior exactly.
+>
+> The React Native app has been fully removed. The `src/` directory and all files referenced below no longer exist. The active TV frontend is the Flutter app at `flutter_client/`. For current implementation status, see `parity-matrix.md`.
+
+The content below is preserved as a historical record of what the RN app did at the time the Flutter rewrite began. Line numbers and file paths are from the deleted RN source and cannot be navigated to.
+
+---
 
 ## Live TV
 
@@ -77,17 +83,14 @@ This document links each parity row to current source references. Line numbers r
 ## Subtitles
 
 - Native mpv: `src/screens/PlayerScreen.native.tsx:132-135` stores text tracks and selected text track; `src/screens/PlayerScreen.native.tsx:336-352` opens a subtitle selector with Off + tracks and calls `setSubtitleTrack`; `src/screens/PlayerScreen.native.tsx:410-424` updates tracks from mpv events; `src/screens/PlayerScreen.native.tsx:754-771` renders the subtitle control.
-- Electron/mpv legacy reference: `src/screens/PlayerScreen.web.tsx:60-64` stores embedded mpv text track state; `src/screens/PlayerScreen.web.tsx:386-392` receives text tracks; `src/screens/PlayerScreen.web.tsx:699-720` cycles subtitles; `legacy/electron-reference/mpvController.js:278-285` maps mpv sub tracks; `legacy/electron-reference/mpvController.js:342-344` sets `sid` to track id or `no`.
-- Browser fallback gap: `src/screens/PlayerScreen.web.tsx:722-741` only exposes fullscreen for non-embedded HTML5 playback; no subtitle selector is wired there.
+- Electron/mpv legacy reference: `legacy/electron-reference/mpvController.js:278-285` maps mpv sub tracks; `legacy/electron-reference/mpvController.js:342-344` sets `sid` to track id or `no`. (Both files deleted.)
 
 ## Audio Tracks
 
 - Native mpv: `src/screens/PlayerScreen.native.tsx:132-135` stores audio tracks and selected audio track; `src/screens/PlayerScreen.native.tsx:318-334` opens an audio selector with Disable + tracks and calls `setAudioTrack`; `src/screens/PlayerScreen.native.tsx:362-370` loads tracks; `src/screens/PlayerScreen.native.tsx:735-752` renders the audio control.
-- Electron/mpv legacy reference: `src/screens/PlayerScreen.web.tsx:58-64` stores embedded mpv audio state; `src/screens/PlayerScreen.web.tsx:386-392` receives audio tracks; `src/screens/PlayerScreen.web.tsx:679-697` cycles audio tracks; `legacy/electron-reference/mpvController.js:271-277` maps mpv audio tracks; `legacy/electron-reference/mpvController.js:338-340` sets `aid` to track id or `auto`.
-- Browser fallback gap: HTML5/HLS.js playback has no audio-track selector in `src/screens/PlayerScreen.web.tsx:242-324`.
+- Electron/mpv legacy reference: `legacy/electron-reference/mpvController.js:271-277` maps mpv audio tracks; `legacy/electron-reference/mpvController.js:338-340` sets `aid` to track id or `auto`. (Both files deleted.)
 
 ## Playback controls and back behavior
 
-- Native: `src/screens/PlayerScreen.native.tsx:153-168` has a 20-second loading timeout; `src/screens/PlayerScreen.native.tsx:286-316` implements seek/toggle; `src/screens/PlayerScreen.native.tsx:426-517` handles hardware back/menu, play/pause, fast-forward, rewind, and overlay show/hide; `src/screens/PlayerScreen.native.tsx:539-777` renders mpv, loading/error overlays, EPG header, timeline, and controls.
-- Web/Electron: `src/screens/PlayerScreen.web.tsx:101-124` implements seek/toggle for embedded mpv or HTML5; `src/screens/PlayerScreen.web.tsx:198-325` chooses Electron embedded mpv, external player, HLS.js, or direct video; `src/screens/PlayerScreen.web.tsx:423-469` maps remote/keyboard events; `src/screens/PlayerScreen.web.tsx:515-747` renders video/mpv overlays and controls.
-- Electron mpv takeover legacy reference: `legacy/electron-reference/mpvController.js:1-15` documents takeover mode; `legacy/electron-reference/mpvController.js:44-63` locates `mpv` or Flatpak mpv; `legacy/electron-reference/mpvController.js:65-151` starts mpv with user-agent, geometry/fullscreen, start position, and JSON IPC; `legacy/electron-reference/mpvController.js:246-291` forwards progress, pause, EOF, tracks, and buffering; `legacy/electron-reference/mpvController.js:324-351` exposes pause/seek/track/stop commands.
+- Native: `src/screens/PlayerScreen.native.tsx:153-168` has a 20-second loading timeout; `src/screens/PlayerScreen.native.tsx:286-316` implements seek/toggle; `src/screens/PlayerScreen.native.tsx:426-517` handles hardware back/menu, play/pause, fast-forward, rewind, and overlay show/hide.
+- Electron mpv takeover legacy reference: `legacy/electron-reference/mpvController.js:1-15` documents takeover mode; `legacy/electron-reference/mpvController.js:65-151` starts mpv with user-agent, geometry/fullscreen, start position, and JSON IPC; `legacy/electron-reference/mpvController.js:246-291` forwards progress, pause, EOF, tracks, and buffering. (All deleted.)
