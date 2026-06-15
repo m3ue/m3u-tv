@@ -1,14 +1,34 @@
-name: Retired Legacy CI
+name: Flutter Client
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main, master, dev, flutter]
+  push:
+    branches: [main, master, dev, flutter]
+
+concurrency:
+  group: flutter-client-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  retired:
-    name: Legacy React Native and Electron CI retired
+  flutter-gates:
+    name: Flutter analyze and test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_client
     steps:
-      - name: Point to active Flutter workflow
+      - uses: actions/checkout@v6
+
+      - name: Provision pinned Flutter SDK path
         run: |
-          printf '%s\n' 'Legacy React Native/Expo and Electron CI has been retired.'
-          printf '%s\n' 'Use .github/workflows/flutter-client.yml for active Flutter gates.'
+          if [ ! -x /tmp/flutter/bin/flutter ]; then
+            git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /tmp/flutter
+          fi
+          /tmp/flutter/bin/flutter --version
+
+      - name: Analyze Flutter client
+        run: /tmp/flutter/bin/flutter analyze
+
+      - name: Test Flutter client
+        run: /tmp/flutter/bin/flutter test
