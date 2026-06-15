@@ -142,12 +142,13 @@ void main() {
   test('android gradle flags keep Flutter plugin on compatible DSL path', () {
     final gradleProperties = readFile('android/gradle.properties');
     final settingsGradle = readFile('android/settings.gradle.kts');
-    final appBuildGradle = readFile('android/app/build.gradle.kts');
 
-    expect(gradleProperties, contains('android.builtInKotlin=true'));
+    // builtInKotlin=false keeps Flutter's own bundled packages (e.g. integration_test)
+    // working — they still declare org.jetbrains.kotlin.android explicitly and break
+    // when AGP 9 enforces builtInKotlin=true.
+    expect(gradleProperties, contains('android.builtInKotlin=false'));
     expect(gradleProperties, contains('android.newDsl=false'));
-    expect(settingsGradle, isNot(contains('org.jetbrains.kotlin.android')));
-    expect(appBuildGradle, isNot(contains('org.jetbrains.kotlin.android')));
+    expect(settingsGradle, contains('org.jetbrains.kotlin.android'));
   });
 
   test('android manifest exposes Android TV launcher metadata', () {
