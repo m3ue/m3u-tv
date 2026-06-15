@@ -199,6 +199,7 @@ class AppShellState extends State<AppShell> {
                 navigatorKey: _navigatorKey,
                 currentIndex: _currentIndex,
                 appState: _appState,
+                onConnected: () => _navigateTo(0),
                 playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
                 playerRouteBuilder: widget.playerRouteBuilder,
               ),
@@ -227,6 +228,7 @@ class AppShellState extends State<AppShell> {
                         currentIndex: _currentIndex,
                         appState: _appState,
                         onSidebarActivate: _activateSidebar,
+                        onConnected: () => _navigateTo(0),
                         playbackOrchestratorBuilder:
                             widget.playbackOrchestratorBuilder,
                         playerRouteBuilder: widget.playerRouteBuilder,
@@ -262,6 +264,7 @@ class AppShellState extends State<AppShell> {
         navigatorKey: _navigatorKey,
         currentIndex: _currentIndex,
         appState: _appState,
+        onConnected: () => _navigateTo(0),
         playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
         playerRouteBuilder: widget.playerRouteBuilder,
       ),
@@ -541,6 +544,7 @@ class _ContentNavigator extends StatelessWidget {
     required this.currentIndex,
     required this.appState,
     this.onSidebarActivate,
+    this.onConnected,
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
   });
@@ -549,6 +553,7 @@ class _ContentNavigator extends StatelessWidget {
   final int currentIndex;
   final AppStateController appState;
   final VoidCallback? onSidebarActivate;
+  final VoidCallback? onConnected;
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
 
@@ -715,6 +720,7 @@ class _ContentNavigator extends StatelessWidget {
             onClearCache: () => unawaited(appState.clearAndRefresh()),
             onEpgIntervalChanged: (d) =>
                 unawaited(appState.setEpgRefreshInterval(d)),
+            onConnected: onConnected,
           ),
           _ => const PlaceholderScreen(title: 'Home'),
         };
