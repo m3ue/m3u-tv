@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
+// M3 buttons and chips use StadiumBorder. A large radius makes the dpad
+// focus border match the pill shape regardless of widget height.
+const _kStadiumEffect = [
+  DpadBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
+];
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
@@ -252,6 +258,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
           DpadFocusable(
             autofocus: true,
             onSelect: _handleConnect,
+            effects: _kStadiumEffect,
             child: SizedBox(
               height: 48,
               child: ElevatedButton(
@@ -394,6 +401,7 @@ class _ConnectedView extends StatelessWidget {
                   ),
                   DpadFocusable(
                     onSelect: () => _openViewerManagement(context),
+                    effects: _kStadiumEffect,
                     child: FilledButton.tonal(
                       onPressed: () => _openViewerManagement(context),
                       child: const Text('Manage Viewers'),
@@ -426,13 +434,7 @@ class _ConnectedView extends StatelessWidget {
                       final selected = d == epgRefreshInterval;
                       return DpadFocusable(
                         onSelect: () => onEpgIntervalChanged?.call(d),
-                        effects: const [
-                          DpadBorderEffect(
-                            borderRadius: BorderRadius.all(
-                              Radius.circular(20),
-                            ),
-                          ),
-                        ],
+                        effects: _kStadiumEffect,
                         child: ChoiceChip(
                           label: Text(_intervalLabel(d)),
                           selected: selected,
@@ -450,6 +452,7 @@ class _ConnectedView extends StatelessWidget {
                   child: DpadFocusable(
                     autofocus: epgRefreshOptions.isEmpty,
                     onSelect: onClearCache,
+                    effects: _kStadiumEffect,
                     child: FilledButton.icon(
                       onPressed: onClearCache,
                       icon: const Icon(Icons.refresh),
@@ -469,6 +472,7 @@ class _ConnectedView extends StatelessWidget {
               width: double.infinity,
               child: DpadFocusable(
                 onSelect: onDisconnect,
+                effects: _kStadiumEffect,
                 child: FilledButton(
                   onPressed: onDisconnect,
                   style: FilledButton.styleFrom(
@@ -568,6 +572,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     const Spacer(),
                     DpadFocusable(
                       onSelect: () => Navigator.of(context).pop(),
+                      effects: _kStadiumEffect,
                       child: IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(context).pop(),
@@ -601,6 +606,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                           _nameController.clear();
                           _createError = null;
                         }),
+                        effects: _kStadiumEffect,
                         child: TextButton(
                           onPressed: () => setState(() {
                             _showAddForm = false;
@@ -613,6 +619,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                       const SizedBox(width: 8),
                       DpadFocusable(
                         onSelect: _isCreating ? null : _handleCreate,
+                        effects: _kStadiumEffect,
                         child: FilledButton(
                           onPressed: _isCreating ? null : _handleCreate,
                           child: _isCreating
@@ -685,6 +692,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     DpadFocusable(
                       autofocus: others.isEmpty,
                       onSelect: () => setState(() => _showAddForm = true),
+                      effects: _kStadiumEffect,
                       child: FilledButton.icon(
                         onPressed: () =>
                             setState(() => _showAddForm = true),
