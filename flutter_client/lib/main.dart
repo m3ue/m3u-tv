@@ -29,7 +29,6 @@ class MyApp extends StatelessWidget {
               borderRadius: BorderRadius.all(Radius.circular(8)),
             ),
           ],
-          scrollPadding: 48,
         ),
       ),
       theme: ThemeData(

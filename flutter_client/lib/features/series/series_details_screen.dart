@@ -44,8 +44,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               );
             }
             final info = snapshot.data;
-            if (info == null)
+            if (info == null) {
               return const Center(child: Text('No episodes available'));
+            }
             return _SeriesDetailsBody(
               info: info,
               selectedSeason: _selectedSeason,
