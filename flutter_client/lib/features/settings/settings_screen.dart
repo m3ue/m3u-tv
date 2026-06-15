@@ -99,7 +99,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return Scaffold(
         body: _ConnectionFormBody(
           onConnect: _handleConnect,
-          error: _connectionError ??
+          error:
+              _connectionError ??
               widget.sourceError ??
               widget.authNotifier.error,
         ),
@@ -431,15 +432,10 @@ class _ConnectedView extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     children: epgRefreshOptions.map((d) {
-                      final selected = d == epgRefreshInterval;
-                      return DpadFocusable(
-                        onSelect: () => onEpgIntervalChanged?.call(d),
-                        effects: _kStadiumEffect,
-                        child: ChoiceChip(
-                          label: Text(_intervalLabel(d)),
-                          selected: selected,
-                          onSelected: (_) => onEpgIntervalChanged?.call(d),
-                        ),
+                      return _IntervalChip(
+                        label: _intervalLabel(d),
+                        isSelected: d == epgRefreshInterval,
+                        onTap: () => onEpgIntervalChanged?.call(d),
                       );
                     }).toList(),
                   ),
@@ -453,7 +449,7 @@ class _ConnectedView extends StatelessWidget {
                     autofocus: epgRefreshOptions.isEmpty,
                     onSelect: onClearCache,
                     effects: _kStadiumEffect,
-                    child: FilledButton.icon(
+                    child: FilledButton.tonalIcon(
                       onPressed: onClearCache,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Clear Cache & Refresh'),
@@ -694,8 +690,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                       onSelect: () => setState(() => _showAddForm = true),
                       effects: _kStadiumEffect,
                       child: FilledButton.icon(
-                        onPressed: () =>
-                            setState(() => _showAddForm = true),
+                        onPressed: () => setState(() => _showAddForm = true),
                         icon: const Icon(Icons.person_add),
                         label: const Text('Add New Viewer'),
                       ),
@@ -712,11 +707,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
 }
 
 class _ViewerRow extends StatelessWidget {
-  const _ViewerRow({
-    required this.viewer,
-    this.isActive = false,
-    this.onTap,
-  });
+  const _ViewerRow({required this.viewer, this.isActive = false, this.onTap});
 
   final Viewer viewer;
   final bool isActive;
@@ -795,22 +786,75 @@ class _SettingsSection extends StatelessWidget {
         ],
         const SizedBox(height: 8),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          child: Padding(padding: const EdgeInsets.all(16), child: child),
         ),
       ],
     );
   }
 }
 
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({
+class _IntervalChip extends StatelessWidget {
+  const _IntervalChip({
     required this.label,
-    required this.value,
-    this.valueColor,
+    required this.isSelected,
+    required this.onTap,
   });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  static const double _radius = 20;
+  static const _effects = [
+    DpadBorderEffect(borderRadius: BorderRadius.all(Radius.circular(_radius))),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DpadFocusable(
+      onSelect: onTap,
+      effects: _effects,
+      child: Material(
+        color: isSelected
+            ? colorScheme.primaryContainer
+            : colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(_radius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(_radius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  Icon(
+                    Icons.check,
+                    size: 16,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: isSelected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;

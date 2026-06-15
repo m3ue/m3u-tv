@@ -24,7 +24,11 @@ class MyApp extends StatelessWidget {
       title: 'M3U TV',
       builder: Dpad.wrap(
         theme: const DpadThemeData(
-          effects: [DpadBorderEffect(borderRadius: BorderRadius.all(Radius.circular(8)))],
+          effects: [
+            DpadBorderEffect(
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+          ],
           scrollPadding: 48,
         ),
       ),
@@ -40,6 +44,8 @@ class MyApp extends StatelessWidget {
               brightness: Brightness.dark,
             ).copyWith(
               primary: primary,
+              error: const Color(0xFFff0033),
+              onError: Colors.white,
               onPrimary: Colors.white,
               secondary: secondary,
               surface: background,
