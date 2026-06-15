@@ -31,16 +31,25 @@ class ContinueWatchingScreen extends StatefulWidget {
 class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
   /// Filter progress items: only show non-live content with position > 30 seconds
   List<Progress> get _eligibleItems => widget.progressList
-      .where((p) => p.contentType != ContentType.live && p.positionSeconds >= 30 && !p.completed)
+      .where(
+        (p) =>
+            p.contentType != ContentType.live &&
+            p.positionSeconds >= 30 &&
+            !p.completed,
+      )
       .toList();
 
   String _getTitle(Progress progress) {
     if (progress.contentType == ContentType.vod) {
-      final vod = widget.vodItems.where((v) => v.id == progress.streamId).firstOrNull;
+      final vod = widget.vodItems
+          .where((v) => v.id == progress.streamId)
+          .firstOrNull;
       return vod?.name ?? 'Movie ${progress.streamId}';
     } else if (progress.contentType == ContentType.episode) {
       final series = progress.seriesId != null
-          ? widget.seriesList.where((s) => s.id == progress.seriesId).firstOrNull
+          ? widget.seriesList
+                .where((s) => s.id == progress.seriesId)
+                .firstOrNull
           : null;
       return series?.name ?? 'Episode ${progress.streamId}';
     }
@@ -49,11 +58,15 @@ class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
 
   String? _getCoverUrl(Progress progress) {
     if (progress.contentType == ContentType.vod) {
-      final vod = widget.vodItems.where((v) => v.id == progress.streamId).firstOrNull;
+      final vod = widget.vodItems
+          .where((v) => v.id == progress.streamId)
+          .firstOrNull;
       return vod?.logoUrl;
     } else if (progress.contentType == ContentType.episode) {
       final series = progress.seriesId != null
-          ? widget.seriesList.where((s) => s.id == progress.seriesId).firstOrNull
+          ? widget.seriesList
+                .where((s) => s.id == progress.seriesId)
+                .firstOrNull
           : null;
       return series?.coverUrl;
     }
@@ -62,7 +75,10 @@ class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
 
   double _getProgress(Progress progress) {
     if (progress.durationSeconds != null && progress.durationSeconds! > 0) {
-      return (progress.positionSeconds / progress.durationSeconds!).clamp(0.0, 1.0);
+      return (progress.positionSeconds / progress.durationSeconds!).clamp(
+        0.0,
+        1.0,
+      );
     }
     return 0;
   }
@@ -156,7 +172,8 @@ class _ContinueWatchingCard extends StatelessWidget {
                     ? Image.network(
                         coverUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_outline, size: 48),
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.play_circle_outline, size: 48),
                       )
                     : const Icon(Icons.play_circle_outline, size: 48),
               ),

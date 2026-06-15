@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -161,19 +163,21 @@ class _VodDetailsBody extends StatelessWidget {
   }
 
   void _play(BuildContext context, _ResolvedVodDetails details) {
-    Navigator.of(context).pushNamed(
-      RouteNames.player,
-      arguments: PlayerArgs(
-        streamUrl: item.streamUrl,
-        title: details.name,
-        type: 'vod',
-        streamId: item.id,
-        metadata: <String, Object?>{
-          if (details.containerExtension != null)
-            'container_extension': details.containerExtension,
-          if (details.duration != null) 'duration': details.duration,
-          if (details.rating != null) 'rating': details.rating,
-        },
+    unawaited(
+      Navigator.of(context).pushNamed(
+        RouteNames.player,
+        arguments: PlayerArgs(
+          streamUrl: item.streamUrl,
+          title: details.name,
+          type: 'vod',
+          streamId: item.id,
+          metadata: <String, Object?>{
+            if (details.containerExtension != null)
+              'container_extension': details.containerExtension,
+            if (details.duration != null) 'duration': details.duration,
+            if (details.rating != null) 'rating': details.rating,
+          },
+        ),
       ),
     );
   }

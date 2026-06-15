@@ -31,7 +31,7 @@ void main() {
       () async {
         final sourceFixture = _ProductionSourceFixture(server.uri);
         final liveItem = sourceFixture.liveChannels.singleWhere(
-          (Channel channel) => channel.name == hlsLiveFixture.title,
+          (channel) => channel.name == hlsLiveFixture.title,
         );
         final playerArgs = hlsLiveFixture.playerArgs(server.uri);
 
@@ -93,7 +93,7 @@ void main() {
       () async {
         final sourceFixture = _ProductionSourceFixture(server.uri);
         final vodItem = sourceFixture.vodItems.singleWhere(
-          (VodItem item) => item.name == subtitlesAndAudioFixture.title,
+          (item) => item.name == subtitlesAndAudioFixture.title,
         );
         final playerArgs = subtitlesAndAudioFixture.playerArgs(
           server.uri,
@@ -164,7 +164,7 @@ void main() {
         expect(stalledError.recoverable, isTrue);
         expect(
           stalledGateway.stoppedServerTranscodes.any(
-            (String item) => item.contains('server-'),
+            (item) => item.contains('server-'),
           ),
           isTrue,
         );
@@ -189,13 +189,13 @@ class _ProductionSourceFixture {
   List<Category> get categories => productionFixtureCategories;
 
   List<Channel> get liveChannels => productionStreamCatalog
-      .where((ProductionStreamFixture fixture) => fixture.type == 'live')
-      .map((ProductionStreamFixture fixture) => fixture.channel(serverUri))
+      .where((fixture) => fixture.type == 'live')
+      .map((fixture) => fixture.channel(serverUri))
       .toList(growable: false);
 
   List<VodItem> get vodItems => productionStreamCatalog
-      .where((ProductionStreamFixture fixture) => fixture.type == 'vod')
-      .map((ProductionStreamFixture fixture) => fixture.vodItem(serverUri))
+      .where((fixture) => fixture.type == 'vod')
+      .map((fixture) => fixture.vodItem(serverUri))
       .toList(growable: false);
 }
 
@@ -231,6 +231,7 @@ Future<_PlaybackResult> _openAndCollectResult(
     transcodeGateway: gateway,
   );
   final errors = <PlaybackError>[];
+  // ignore: cancel_subscriptions
   final subscription = orchestrator.onError.listen(errors.add);
 
   await orchestrator.open(args.toPlaybackSource());
@@ -247,7 +248,7 @@ Future<_PlaybackResult> _openAndCollectResult(
 }
 
 class _PlaybackResult {
-  _PlaybackResult({
+  const _PlaybackResult({
     required this.orchestrator,
     required this.directPlayer,
     required this.serverPlayer,

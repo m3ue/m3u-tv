@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import 'playback_capabilities.dart';
-import 'player_adapter.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 
 class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   DesktopLibmpvBackend({MethodChannel? channel})
@@ -136,7 +136,7 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   ]) async {
     final handle = _handle;
     await _channel.invokeMethod<void>(method, <String, Object?>{
-      if (handle != null) 'handle': handle,
+      'handle': ?handle,
       ...arguments,
     });
   }

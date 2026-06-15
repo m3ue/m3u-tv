@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import 'playback_capabilities.dart';
-import 'player_adapter.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 
 enum VideoCodec { h264, h265, av1, mpeg2, unknown }
 
@@ -332,7 +332,7 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   @override
   Stream<AndroidMedia3Event> get events =>
       _eventChannel.receiveBroadcastStream().map(
-        (Object? event) => AndroidMedia3Event.fromMap(
+        (event) => AndroidMedia3Event.fromMap(
           Map<String, Object?>.from(event! as Map<Object?, Object?>),
         ),
       );
@@ -404,7 +404,7 @@ class AndroidMedia3Event {
       type: _typeFromString(map['type'] as String?),
       uri: map['uri'] as String?,
       position: map['positionMs'] is num
-          ? Duration(milliseconds: (map['positionMs'] as num).round())
+          ? Duration(milliseconds: (map['positionMs']! as num).round())
           : null,
       code: map['code'] as String?,
       message: map['message'] as String?,

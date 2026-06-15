@@ -1,13 +1,15 @@
-import 'domain_models.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 
 typedef Clock = DateTime Function();
 
 class EpgService {
-  EpgService({Clock? clock, this.cacheTtl = const Duration(minutes: 30)}) : _clock = clock ?? DateTime.now;
+  EpgService({Clock? clock, this.cacheTtl = const Duration(minutes: 30)})
+    : _clock = clock ?? DateTime.now;
 
   final Clock _clock;
   final Duration cacheTtl;
-  final Map<String, List<EpgProgram>> _programsByChannel = <String, List<EpgProgram>>{};
+  final Map<String, List<EpgProgram>> _programsByChannel =
+      <String, List<EpgProgram>>{};
   DateTime? _loadedAt;
 
   void loadPrograms(List<EpgProgram> programs) {
@@ -30,7 +32,9 @@ class EpgService {
 
   void _storePrograms(List<EpgProgram> programs) {
     for (final program in programs) {
-      _programsByChannel.putIfAbsent(program.channelId, () => <EpgProgram>[]).add(program);
+      _programsByChannel
+          .putIfAbsent(program.channelId, () => <EpgProgram>[])
+          .add(program);
     }
     for (final entry in _programsByChannel.entries) {
       entry.value.sort((a, b) => a.start.compareTo(b.start));
@@ -38,10 +42,13 @@ class EpgService {
   }
 
   void loadBatch(Map<String, List<EpgProgram>> batch) {
-    loadPrograms(batch.values.expand((programs) => programs).toList(growable: false));
+    loadPrograms(
+      batch.values.expand((programs) => programs).toList(growable: false),
+    );
   }
 
-  bool get isFresh => _loadedAt != null && _clock().difference(_loadedAt!) < cacheTtl;
+  bool get isFresh =>
+      _loadedAt != null && _clock().difference(_loadedAt!) < cacheTtl;
 
   EpgCurrentNext? lookupForChannel(Channel channel) {
     final ids = <String?>[channel.epgChannelId, channel.tvgName, channel.name];

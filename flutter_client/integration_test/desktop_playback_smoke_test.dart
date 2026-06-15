@@ -9,7 +9,7 @@ void main() {
 
   group('desktop libmpv backend smoke', () {
     testWidgets('reports feasibility and plays fixture without external mpv', (
-      WidgetTester tester,
+      tester,
     ) async {
       final backend = DesktopLibmpvBackend();
       addTearDown(backend.dispose);
@@ -40,7 +40,7 @@ void main() {
       await backend.stop();
 
       expect(
-        states.map((PlaybackState state) => state.status),
+        states.map((state) => state.status),
         containsAll(<PlaybackStatus>[
           PlaybackStatus.ready,
           PlaybackStatus.playing,
@@ -54,7 +54,7 @@ void main() {
       const channel = MethodChannel('m3u_tv/desktop_libmpv');
       final calls = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
+          .setMockMethodCallHandler(channel, (call) async {
             calls.add(call.method);
             switch (call.method) {
               case 'probe':

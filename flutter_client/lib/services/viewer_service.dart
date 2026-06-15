@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'domain_models.dart';
-import 'persistent_store.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 
 class ViewerService {
   ViewerService({Map<String, Object?>? memory, PersistentJsonStore? store})

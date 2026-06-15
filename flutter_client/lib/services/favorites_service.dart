@@ -1,6 +1,6 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'persistent_store.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 
 class FavoritesService {
   FavoritesService({Map<String, Object?>? memory, PersistentJsonStore? store})

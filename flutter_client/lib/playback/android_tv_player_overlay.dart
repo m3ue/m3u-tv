@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'player_adapter.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 
 enum PlaybackOverlayAction { play, pause, dismiss, audioTracks, subtitles }
 
@@ -35,8 +35,8 @@ class AndroidTvPlaybackOverlayController extends ChangeNotifier {
       return;
     }
     focusedControl = switch (focusedControl) {
-      PlaybackOverlayControl.play || PlaybackOverlayControl.pause =>
-        PlaybackOverlayControl.audioTracks,
+      PlaybackOverlayControl.play ||
+      PlaybackOverlayControl.pause => PlaybackOverlayControl.audioTracks,
       PlaybackOverlayControl.audioTracks => PlaybackOverlayControl.subtitles,
       PlaybackOverlayControl.subtitles => PlaybackOverlayControl.subtitles,
     };
@@ -49,8 +49,8 @@ class AndroidTvPlaybackOverlayController extends ChangeNotifier {
       return;
     }
     focusedControl = switch (focusedControl) {
-      PlaybackOverlayControl.play || PlaybackOverlayControl.pause =>
-        focusedControl,
+      PlaybackOverlayControl.play ||
+      PlaybackOverlayControl.pause => focusedControl,
       PlaybackOverlayControl.audioTracks => _primaryPlaybackControl,
       PlaybackOverlayControl.subtitles => PlaybackOverlayControl.audioTracks,
     };
@@ -146,7 +146,9 @@ class _AndroidTvPlayerOverlayState extends State<AndroidTvPlayerOverlay> {
       autofocus: true,
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
-      child: widget.controller.isVisible ? _buildVisibleOverlay() : _buildHiddenOverlay(),
+      child: widget.controller.isVisible
+          ? _buildVisibleOverlay()
+          : _buildHiddenOverlay(),
     );
   }
 

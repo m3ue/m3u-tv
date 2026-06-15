@@ -1,4 +1,4 @@
-import 'domain_models.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 
 class M3UParseException implements Exception {
   const M3UParseException(this.message, {this.line});
@@ -11,7 +11,11 @@ class M3UParseException implements Exception {
 }
 
 class M3UPlaylist {
-  const M3UPlaylist({required this.channels, required this.categories, this.metadata = const {}});
+  const M3UPlaylist({
+    required this.channels,
+    required this.categories,
+    this.metadata = const {},
+  });
 
   final List<Channel> channels;
   final List<Category> categories;
@@ -22,11 +26,14 @@ class M3UParser {
   M3UPlaylist parse(String text) {
     final lines = text.split(RegExp(r'\r?\n'));
     final firstContent = lines.indexWhere((line) => line.trim().isNotEmpty);
-    if (firstContent == -1 || !lines[firstContent].trimLeft().startsWith('#EXTM3U')) {
+    if (firstContent == -1 ||
+        !lines[firstContent].trimLeft().startsWith('#EXTM3U')) {
       throw const M3UParseException('Playlist must start with #EXTM3U');
     }
 
-    final metadata = _parseAttributes(lines[firstContent].trim().replaceFirst('#EXTM3U', '').trim());
+    final metadata = _parseAttributes(
+      lines[firstContent].trim().replaceFirst('#EXTM3U', '').trim(),
+    );
     final channels = <Channel>[];
     _PendingEntry? pending;
     var nextId = 1;
@@ -37,33 +44,46 @@ class M3UParser {
 
       if (line.startsWith('#EXTINF:')) {
         if (pending != null) {
-          throw M3UParseException('EXTINF entry is missing a stream URL', line: index + 1);
+          throw M3UParseException(
+            'EXTINF entry is missing a stream URL',
+            line: index + 1,
+          );
         }
         pending = _PendingEntry.fromExtinf(line, index + 1);
         continue;
       }
 
       if (line.startsWith('#EXTVLCOPT:')) {
-        pending?.headers.addAll(_parseVlcOption(line.substring('#EXTVLCOPT:'.length)));
+        pending?.headers.addAll(
+          _parseVlcOption(line.substring('#EXTVLCOPT:'.length)),
+        );
         continue;
       }
 
       if (line.startsWith('#EXTHTTP:')) {
-        pending?.headers.addAll(_parseHeaderOption(line.substring('#EXTHTTP:'.length)));
+        pending?.headers.addAll(
+          _parseHeaderOption(line.substring('#EXTHTTP:'.length)),
+        );
         continue;
       }
 
       if (line.startsWith('#')) continue;
 
       if (pending == null) {
-        throw M3UParseException('Stream URL has no preceding EXTINF metadata', line: index + 1);
+        throw M3UParseException(
+          'Stream URL has no preceding EXTINF metadata',
+          line: index + 1,
+        );
       }
       channels.add(pending.toChannel(nextId++, line));
       pending = null;
     }
 
     if (pending != null) {
-      throw M3UParseException('EXTINF entry is missing a stream URL', line: pending.line);
+      throw M3UParseException(
+        'EXTINF entry is missing a stream URL',
+        line: pending.line,
+      );
     }
 
     final categoryNames = <String, String>{};
@@ -75,7 +95,11 @@ class M3UParser {
         .map((name) => Category(id: _categoryId(name), name: name))
         .toList(growable: false);
 
-    return M3UPlaylist(channels: channels, categories: categories, metadata: metadata);
+    return M3UPlaylist(
+      channels: channels,
+      categories: categories,
+      metadata: metadata,
+    );
   }
 
   Map<String, String> _parseVlcOption(String option) {
@@ -95,17 +119,27 @@ class M3UParser {
     final separator = option.contains('=') ? '=' : ':';
     final index = option.indexOf(separator);
     if (index <= 0) return const {};
-    return {option.substring(0, index).trim(): option.substring(index + 1).trim()};
+    return {
+      option.substring(0, index).trim(): option.substring(index + 1).trim(),
+    };
   }
 }
 
 class _PendingEntry {
-  _PendingEntry({required this.line, required this.name, required this.attributes, required this.headers});
+  _PendingEntry({
+    required this.line,
+    required this.name,
+    required this.attributes,
+    required this.headers,
+  });
 
   factory _PendingEntry.fromExtinf(String line, int lineNumber) {
     final commaIndex = line.indexOf(',');
     if (commaIndex == -1) {
-      throw M3UParseException('EXTINF entry is missing display name', line: lineNumber);
+      throw M3UParseException(
+        'EXTINF entry is missing display name',
+        line: lineNumber,
+      );
     }
     final info = line.substring(0, commaIndex);
     final displayName = line.substring(commaIndex + 1).trim();
@@ -153,4 +187,7 @@ String _normalizeGroup(String? value) {
   return trimmed == null || trimmed.isEmpty ? 'Ungrouped' : trimmed;
 }
 
-String _categoryId(String name) => name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
+String _categoryId(String name) => name
+    .toLowerCase()
+    .replaceAll(RegExp('[^a-z0-9]+'), '-')
+    .replaceAll(RegExp(r'^-|-$'), '');

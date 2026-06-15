@@ -150,7 +150,11 @@ class _VodScreenState extends State<VodScreen> {
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              return _VodCard(item: item, autofocus: index == 0, onTap: () => widget.onVodSelect(item));
+              return _VodCard(
+                item: item,
+                autofocus: index == 0,
+                onTap: () => widget.onVodSelect(item),
+              );
             },
           ),
         );
@@ -160,7 +164,11 @@ class _VodScreenState extends State<VodScreen> {
 }
 
 class _VodCard extends StatelessWidget {
-  const _VodCard({required this.item, required this.onTap, this.autofocus = false});
+  const _VodCard({
+    required this.item,
+    required this.onTap,
+    this.autofocus = false,
+  });
 
   final VodItem item;
   final VoidCallback onTap;

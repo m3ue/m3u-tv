@@ -102,7 +102,7 @@ void main() {
 
         expect(adapter.activeBackend, PlaybackBackend.serverTranscode);
         expect(
-          states.map((PlaybackState state) => state.backend),
+          states.map((state) => state.backend),
           contains(PlaybackBackend.serverTranscode),
         );
         expect(
@@ -206,12 +206,12 @@ void main() {
           throwsA(
             isA<PlaybackException>()
                 .having(
-                  (PlaybackException error) => error.code,
+                  (error) => error.code,
                   'code',
                   'unsupported',
                 )
                 .having(
-                  (PlaybackException error) => error.recoverable,
+                  (error) => error.recoverable,
                   'recoverable',
                   isTrue,
                 ),
@@ -308,7 +308,7 @@ void main() {
           containsPair('Referer', 'https://fixture.invalid/app'),
         );
         expect(
-          states.map((PlaybackState state) => state.status),
+          states.map((state) => state.status),
           containsAll(<PlaybackStatus>[
             PlaybackStatus.loading,
             PlaybackStatus.ready,
@@ -330,7 +330,7 @@ void main() {
 
   group('AndroidTvPlayerOverlay', () {
     testWidgets('handles D-pad select/play/pause/back focus flow', (
-      WidgetTester tester,
+      tester,
     ) async {
       final controller = AndroidTvPlaybackOverlayController(
         initialStatus: PlaybackStatus.playing,

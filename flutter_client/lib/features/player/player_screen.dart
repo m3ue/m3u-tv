@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import 'package:m3u_tv/features/player/epg_overlay.dart';
+import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/resume_prompt.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
@@ -10,10 +12,6 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
-
-import 'epg_overlay.dart';
-import 'playback_controls.dart';
-import 'resume_prompt.dart';
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -95,9 +93,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _overlayHideTimer?.cancel();
     _progressTimer?.cancel();
     _epgTimer?.cancel();
-    _stateSubscription?.cancel();
-    _errorSubscription?.cancel();
-    widget.orchestrator.stop();
+    unawaited(_stateSubscription?.cancel());
+    unawaited(_errorSubscription?.cancel());
+    unawaited(widget.orchestrator.stop());
     super.dispose();
   }
 
@@ -116,14 +114,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       includeStartPosition: _showResumePrompt,
     );
 
-    widget.orchestrator.open(source).catchError((Object error) {
-      if (!_disposed && mounted) {
-        setState(() {
-          _errorMessage = error.toString();
-          _status = PlaybackStatus.idle;
-        });
-      }
-    });
+    unawaited(
+      widget.orchestrator.open(source).catchError((Object error) {
+        if (!_disposed && mounted) {
+          setState(() {
+            _errorMessage = error.toString();
+            _status = PlaybackStatus.idle;
+          });
+        }
+      }),
+    );
   }
 
   void _startLoadingTimeout() {
@@ -242,10 +242,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _startEpgRefresh() {
     if (!_isLive) return;
     _epgTimer?.cancel();
-    _updateEpg();
+    unawaited(_updateEpg());
     _epgTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_disposed || !mounted) return;
-      _updateEpg();
+      unawaited(_updateEpg());
     });
   }
 
@@ -282,7 +282,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) {
         setState(() => _epgData = refreshed);
       }
-    } catch (_) {
+    } on Object catch (_) {
       if (_disposed || !mounted) return;
     } finally {
       if (identical(_epgFetch, fetch)) {
@@ -298,15 +298,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _togglePlayPause() {
     if (_isPlaying) {
-      widget.orchestrator.pause();
+      unawaited(widget.orchestrator.pause());
     } else {
-      widget.orchestrator.play();
+      unawaited(widget.orchestrator.play());
     }
   }
 
   void _seekTo(Duration position) {
     if (!_canSeek) return;
-    widget.orchestrator.seek(position);
+    unawaited(widget.orchestrator.seek(position));
   }
 
   void _handleResume() {
@@ -315,7 +315,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
     final startPos = widget.args.startPosition;
     if (startPos != null && startPos > 0) {
-      widget.orchestrator.seek(Duration(seconds: startPos.round()));
+      unawaited(widget.orchestrator.seek(Duration(seconds: startPos.round())));
     }
   }
 
@@ -328,12 +328,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // Track selection handlers (for future track selector integration)
   // ignore: unused_element
   void _handleAudioTrackSelected(String? trackId) {
-    widget.orchestrator.setAudioTrack(trackId);
+    unawaited(widget.orchestrator.setAudioTrack(trackId));
   }
 
   // ignore: unused_element
   void _handleSubtitleTrackSelected(String? trackId) {
-    widget.orchestrator.setSubtitleTrack(trackId);
+    unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
 
   void _showOverlay() {
@@ -659,7 +659,7 @@ class _PlaybackDiagnosticsSnapshot {
     required PlaybackBackend? activeBackend,
     required List<String> diagnostics,
   }) {
-    String backendLabel = _backendLabel(activeBackend);
+    var backendLabel = _backendLabel(activeBackend);
     String? fallbackReason;
     String? codecDecision;
     String? transcodeSession;

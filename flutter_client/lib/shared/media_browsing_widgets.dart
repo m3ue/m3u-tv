@@ -25,7 +25,6 @@ class MediaBrowsingMetrics {
   static const double posterCardHeight = 300;
 }
 
-
 class InlineMediaSearchField extends StatefulWidget {
   const InlineMediaSearchField({
     required this.query,
@@ -135,7 +134,10 @@ class ResilientMediaImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fallback = _MediaImageFallback(icon: fallbackIcon, title: fallbackTitle);
+    final fallback = _MediaImageFallback(
+      icon: fallbackIcon,
+      title: fallbackTitle,
+    );
     final url = imageUrl;
 
     final image = ClipRRect(
@@ -144,7 +146,9 @@ class ResilientMediaImage extends StatelessWidget {
         width: width,
         height: height,
         child: DecoratedBox(
-          decoration: BoxDecoration(color: backgroundColor ?? colorScheme.surfaceContainerHighest),
+          decoration: BoxDecoration(
+            color: backgroundColor ?? colorScheme.surfaceContainerHighest,
+          ),
           child: url == null || url.isEmpty
               ? fallback
               : Image.network(
@@ -164,7 +168,7 @@ class ResilientMediaImage extends StatelessWidget {
                     if (loadingProgress == null) return child;
                     return fallback;
                   },
-                  errorBuilder: (_, __, ___) => fallback,
+                  errorBuilder: (_, _, _) => fallback,
                 ),
         ),
       ),
@@ -187,7 +191,9 @@ class _MediaImageFallback extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Center(child: Icon(icon, size: 48, color: colorScheme.onSurfaceVariant)),
+        Center(
+          child: Icon(icon, size: 48, color: colorScheme.onSurfaceVariant),
+        ),
         if (fallbackTitle != null && fallbackTitle.isNotEmpty)
           Align(
             alignment: Alignment.bottomCenter,
@@ -271,7 +277,7 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.zero,
                   itemCount: widget.tabs.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(width: MediaBrowsingMetrics.chipGap),
                   itemBuilder: (context, index) {
                     final tab = widget.tabs[index];
@@ -310,7 +316,9 @@ class CategoryFilterChip extends StatelessWidget {
       onSelect: onTap,
       effects: const [
         DpadBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(MediaBrowsingMetrics.chipRadius)),
+          borderRadius: BorderRadius.all(
+            Radius.circular(MediaBrowsingMetrics.chipRadius),
+          ),
         ),
       ],
       child: Material(
@@ -493,7 +501,8 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
             Text(widget.emptyLabel)
           else
             SizedBox(
-              height: (widget.posterStyle
+              height:
+                  (widget.posterStyle
                       ? MediaBrowsingMetrics.posterCardHeight
                       : MediaBrowsingMetrics.previewCardHeight) +
                   16,
@@ -514,7 +523,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.only(bottom: 12),
                     itemCount: visibleItems.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(width: MediaBrowsingMetrics.itemGap),
                     itemBuilder: (context, index) => MediaPreviewCard(
                       item: visibleItems[index],
@@ -532,7 +541,12 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
 }
 
 class MediaPreviewCard extends StatelessWidget {
-  const MediaPreviewCard({required this.item, this.posterStyle = false, this.autofocus = false, super.key});
+  const MediaPreviewCard({
+    required this.item,
+    this.posterStyle = false,
+    this.autofocus = false,
+    super.key,
+  });
 
   final MediaPreviewItem item;
   final bool posterStyle;
@@ -580,7 +594,9 @@ class MediaPreviewCard extends StatelessWidget {
                       Text(
                         item.title,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: posterStyle ? FontWeight.normal : FontWeight.w700,
+                          fontWeight: posterStyle
+                              ? FontWeight.normal
+                              : FontWeight.w700,
                         ),
                         maxLines: posterStyle ? 2 : 1,
                         overflow: TextOverflow.ellipsis,
@@ -589,14 +605,15 @@ class MediaPreviewCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           item.subtitle!,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: posterStyle && isRating
-                                ? const Color(0xFFFFCC00)
-                                : colorScheme.onSurfaceVariant,
-                            fontWeight: posterStyle && isRating
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: posterStyle && isRating
+                                    ? const Color(0xFFFFCC00)
+                                    : colorScheme.onSurfaceVariant,
+                                fontWeight: posterStyle && isRating
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -612,5 +629,3 @@ class MediaPreviewCard extends StatelessWidget {
     );
   }
 }
-
-

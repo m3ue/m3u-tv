@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
@@ -60,77 +62,89 @@ class TrackSelector extends StatelessWidget {
 
   String get _audioLabel {
     if (selectedAudioTrackId == null) return 'Disabled';
-    final track = audioTracks.where((t) => t.id == selectedAudioTrackId).firstOrNull;
+    final track = audioTracks
+        .where((t) => t.id == selectedAudioTrackId)
+        .firstOrNull;
     return track?.label ?? 'Select';
   }
 
   String get _subtitleLabel {
     if (selectedSubtitleTrackId == null) return 'Off';
-    final track = subtitleTracks.where((t) => t.id == selectedSubtitleTrackId).firstOrNull;
+    final track = subtitleTracks
+        .where((t) => t.id == selectedSubtitleTrackId)
+        .firstOrNull;
     return track?.label ?? 'Select';
   }
 
   void _showAudioDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Audio Track'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Disable'),
-                selected: selectedAudioTrackId == null,
-                onTap: () {
-                  onAudioTrackSelected(null);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ...audioTracks.map((track) => ListTile(
-                title: Text(track.label),
-                selected: track.id == selectedAudioTrackId,
-                onTap: () {
-                  onAudioTrackSelected(track.id);
-                  Navigator.of(context).pop();
-                },
-              )),
-            ],
-          ),
-        );
-      },
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Audio Track'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Disable'),
+                  selected: selectedAudioTrackId == null,
+                  onTap: () {
+                    onAudioTrackSelected(null);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ...audioTracks.map(
+                  (track) => ListTile(
+                    title: Text(track.label),
+                    selected: track.id == selectedAudioTrackId,
+                    onTap: () {
+                      onAudioTrackSelected(track.id);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   void _showSubtitleDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Subtitle Track'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Off'),
-                selected: selectedSubtitleTrackId == null,
-                onTap: () {
-                  onSubtitleTrackSelected(null);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ...subtitleTracks.map((track) => ListTile(
-                title: Text(track.label),
-                selected: track.id == selectedSubtitleTrackId,
-                onTap: () {
-                  onSubtitleTrackSelected(track.id);
-                  Navigator.of(context).pop();
-                },
-              )),
-            ],
-          ),
-        );
-      },
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Subtitle Track'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Off'),
+                  selected: selectedSubtitleTrackId == null,
+                  onTap: () {
+                    onSubtitleTrackSelected(null);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ...subtitleTracks.map(
+                  (track) => ListTile(
+                    title: Text(track.label),
+                    selected: track.id == selectedSubtitleTrackId,
+                    onTap: () {
+                      onSubtitleTrackSelected(track.id);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

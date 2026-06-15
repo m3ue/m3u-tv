@@ -193,7 +193,7 @@ void main() {
     ];
     final suspiciousSecretPatterns = <RegExp>[
       RegExp(
-        r'-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----',
+        '-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----',
         caseSensitive: false,
       ),
       RegExp(r'storePassword\s*=\s*"[^"]+"', caseSensitive: false),

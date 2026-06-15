@@ -50,7 +50,9 @@ class _ViewerSelectorState extends State<ViewerSelector> {
     if (viewer != null) {
       _nameController.clear();
     } else {
-      setState(() => _createError = 'Failed to create viewer. Please try again.');
+      setState(
+        () => _createError = 'Failed to create viewer. Please try again.',
+      );
     }
     setState(() => _isCreating = false);
   }
@@ -58,7 +60,9 @@ class _ViewerSelectorState extends State<ViewerSelector> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final others = widget.viewers.where((v) => v.ulid != widget.activeViewer.ulid).toList();
+    final others = widget.viewers
+        .where((v) => v.ulid != widget.activeViewer.ulid)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,7 +152,10 @@ class _ViewerCard extends StatelessWidget {
                   if (viewer.isAdmin)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: colorScheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
@@ -182,7 +189,9 @@ class _ViewerTile extends StatelessWidget {
 
     return ListTile(
       leading: CircleAvatar(
-        child: Text(viewer.name.isNotEmpty ? viewer.name[0].toUpperCase() : '?'),
+        child: Text(
+          viewer.name.isNotEmpty ? viewer.name[0].toUpperCase() : '?',
+        ),
       ),
       title: Text(viewer.name),
       trailing: viewer.isAdmin

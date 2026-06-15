@@ -18,7 +18,7 @@ void main() {
       'maps missing libmpv load response to typed BackendUnavailable',
       () async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall call) async {
+            .setMockMethodCallHandler(channel, (call) async {
               expect(call.method, 'load');
               return <String, Object?>{
                 'ok': false,
@@ -53,7 +53,7 @@ void main() {
 
     test('probe reports missing libmpv with fallback decision', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
+          .setMockMethodCallHandler(channel, (call) async {
             expect(call.method, 'probe');
             return <String, Object?>{
               'platform': 'linux',
@@ -86,7 +86,7 @@ void main() {
     test('normal texture path never invokes the process-launch seam', () async {
       final calls = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
+          .setMockMethodCallHandler(channel, (call) async {
             calls.add(call.method);
             switch (call.method) {
               case 'probe':
@@ -151,7 +151,7 @@ void main() {
 
     test('windows probe reports bundled DLL diagnostics', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
+          .setMockMethodCallHandler(channel, (call) async {
             expect(call.method, 'probe');
             return <String, Object?>{
               'platform': 'windows',
@@ -187,7 +187,7 @@ void main() {
       () async {
         MethodCall? loadCall;
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall call) async {
+            .setMockMethodCallHandler(channel, (call) async {
               loadCall = call;
               return <String, Object?>{
                 'ok': false,
@@ -231,7 +231,7 @@ void main() {
     test('windows texture controls stay on method channel commands', () async {
       final calls = <MethodCall>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall call) async {
+          .setMockMethodCallHandler(channel, (call) async {
             calls.add(call);
             if (call.method == 'load') {
               return <String, Object?>{
@@ -259,7 +259,7 @@ void main() {
       await backend.dispose();
 
       expect(backend.textureId, isNull);
-      expect(calls.map((MethodCall call) => call.method), <String>[
+      expect(calls.map((call) => call.method), <String>[
         'load',
         'play',
         'pause',

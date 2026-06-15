@@ -3,17 +3,17 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' hide Category;
 
-import 'auth_notifier.dart';
-import 'cache_service.dart';
-import 'domain_models.dart';
-import 'epg_service.dart';
-import 'favorites_service.dart';
-import 'm3u_parser.dart';
-import 'persistent_store.dart';
-import 'resume_service.dart';
-import 'secure_storage.dart';
-import 'viewer_service.dart';
-import 'xtream_service.dart';
+import 'package:m3u_tv/services/auth_notifier.dart';
+import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/m3u_parser.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/resume_service.dart';
+import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/viewer_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 enum AppSourceType { none, xtream, m3u }
 
@@ -278,7 +278,7 @@ class AppStateController extends ChangeNotifier {
       _viewers = [..._viewers, viewer];
       await switchViewer(viewer);
       return viewer;
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }
@@ -354,7 +354,7 @@ class AppStateController extends ChangeNotifier {
       _error = null;
       notifyListeners();
       return true;
-    } catch (error) {
+    } on Object catch (error) {
       _error = _redact('$error', xtreamService.credentials);
       return false;
     }
@@ -383,7 +383,8 @@ class AppStateController extends ChangeNotifier {
         (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
         const <Series>[];
 
-    final hasContent = liveCategories.isNotEmpty ||
+    final hasContent =
+        liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
         seriesCategories.isNotEmpty ||
         channels.isNotEmpty ||
@@ -415,13 +416,15 @@ class AppStateController extends ChangeNotifier {
     try {
       final programs = await xtreamService.getEpgBatch(channels);
       if (kDebugMode) {
-        debugPrint('[EPG] getEpgBatch → ${programs.length} programs for ${channels.length} channels');
+        debugPrint(
+          '[EPG] getEpgBatch → ${programs.length} programs for ${channels.length} channels',
+        );
       }
       if (programs.isNotEmpty) {
         epgService.loadPrograms(programs);
         notifyListeners();
       }
-    } catch (e) {
+    } on Object catch (e) {
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
       // Don't clear existing EPG data on a batch failure — a transient network
       // error shouldn't wipe a previously loaded guide.
@@ -447,7 +450,7 @@ class AppStateController extends ChangeNotifier {
     try {
       final json = jsonDecode(raw) as Map<String, Object?>;
       return json['type'] == 'm3u' ? AppSourceType.m3u : AppSourceType.xtream;
-    } catch (_) {
+    } on Object catch (_) {
       return AppSourceType.none;
     }
   }

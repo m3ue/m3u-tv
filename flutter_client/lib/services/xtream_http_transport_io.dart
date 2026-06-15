@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'xtream_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 XtreamTransport createDefaultXtreamTransport() {
   final client = HttpClient();
@@ -21,8 +21,9 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
   if (request.method == 'POST' && request.body.isNotEmpty) {
     final bytes = utf8.encode(jsonEncode(request.body));
     httpRequest.headers.contentType = ContentType.json;
-    httpRequest.contentLength = bytes.length;
-    httpRequest.add(bytes);
+    httpRequest
+      ..contentLength = bytes.length
+      ..add(bytes);
   }
 
   final response = await httpRequest.close();
@@ -44,7 +45,8 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
 String? _serverMessage(Object? body) {
   if (body is! Map) return null;
   final json = body.cast<Object?, Object?>();
-  final value = json['error'] ?? json['message'] ?? json['detail'] ?? json['error_code'];
+  final value =
+      json['error'] ?? json['message'] ?? json['detail'] ?? json['error_code'];
   if (value == null) return null;
   return '$value';
 }

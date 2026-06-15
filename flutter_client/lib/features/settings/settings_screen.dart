@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
@@ -197,8 +199,10 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
       return;
     }
     setState(() => _validationError = null);
-    widget.onConnect(
-      UserCredentials(server: server, username: username, password: password),
+    unawaited(
+      widget.onConnect(
+        UserCredentials(server: server, username: username, password: password),
+      ),
     );
   }
 
@@ -308,13 +312,15 @@ class _ConnectedView extends StatelessWidget {
   final void Function(Duration interval)? onEpgIntervalChanged;
 
   void _openViewerManagement(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => _ViewerManagementDialog(
-        viewers: viewers.isNotEmpty ? viewers : [activeViewer!],
-        activeViewer: activeViewer!,
-        onSwitch: onSwitchViewer ?? (_) {},
-        onCreateViewer: onCreateViewer,
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (_) => _ViewerManagementDialog(
+          viewers: viewers.isNotEmpty ? viewers : [activeViewer!],
+          activeViewer: activeViewer!,
+          onSwitch: onSwitchViewer ?? (_) {},
+          onCreateViewer: onCreateViewer,
+        ),
       ),
     );
   }

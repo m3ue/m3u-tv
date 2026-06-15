@@ -26,7 +26,7 @@ void main() {
           containerExtension: 'mp4',
           logoUrl: 'http://example.com/sintel.jpg',
           categoryId: '21',
-          rating: 4.0,
+          rating: 4,
         ),
         const VodItem(
           id: 3,

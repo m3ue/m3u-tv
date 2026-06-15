@@ -11,23 +11,53 @@ void main() {
 
     setUp(() {
       testChannels = [
-        const Channel(id: 1, name: 'BBC One', streamUrl: 'http://example.com/1.m3u8', epgChannelId: 'bbc.one'),
-        const Channel(id: 2, name: 'CNN', streamUrl: 'http://example.com/2.m3u8', epgChannelId: 'cnn'),
+        const Channel(
+          id: 1,
+          name: 'BBC One',
+          streamUrl: 'http://example.com/1.m3u8',
+          epgChannelId: 'bbc.one',
+        ),
+        const Channel(
+          id: 2,
+          name: 'CNN',
+          streamUrl: 'http://example.com/2.m3u8',
+          epgChannelId: 'cnn',
+        ),
       ];
 
-      epgService = EpgService(clock: () => DateTime(2025, 1, 1, 20));
-      epgService.loadPrograms([
-        EpgProgram(channelId: 'bbc.one', title: 'Evening News', description: 'Latest news', start: DateTime(2025, 1, 1, 19), end: DateTime(2025, 1, 1, 20, 30)),
-        EpgProgram(channelId: 'bbc.one', title: 'Late Show', description: 'Talk show', start: DateTime(2025, 1, 1, 20, 30), end: DateTime(2025, 1, 1, 21)),
-        EpgProgram(channelId: 'cnn', title: 'CNN Tonight', description: 'News', start: DateTime(2025, 1, 1, 20), end: DateTime(2025, 1, 1, 21)),
-      ]);
+      epgService = EpgService(clock: () => DateTime(2025, 1, 1, 20))
+        ..loadPrograms([
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Evening News',
+            description: 'Latest news',
+            start: DateTime(2025, 1, 1, 19),
+            end: DateTime(2025, 1, 1, 20, 30),
+          ),
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Late Show',
+            description: 'Talk show',
+            start: DateTime(2025, 1, 1, 20, 30),
+            end: DateTime(2025, 1, 1, 21),
+          ),
+          EpgProgram(
+            channelId: 'cnn',
+            title: 'CNN Tonight',
+            description: 'News',
+            start: DateTime(2025, 1, 1, 20),
+            end: DateTime(2025, 1, 1, 21),
+          ),
+        ]);
     });
 
     testWidgets('renders EPG screen with channels', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(EpgScreen), findsOneWidget);
@@ -35,11 +65,15 @@ void main() {
       expect(find.text('CNN'), findsOneWidget);
     });
 
-    testWidgets('shows current program title for channels with EPG', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-      ));
+    testWidgets('shows current program title for channels with EPG', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       // BBC One should show "Evening News" as current program
@@ -47,10 +81,12 @@ void main() {
     });
 
     testWidgets('shows next program title when available', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       // BBC One should show "Late Show" as next program
@@ -58,34 +94,48 @@ void main() {
     });
 
     testWidgets('shows progress bar for current program', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Should find progress indicators
       expect(find.byType(LinearProgressIndicator), findsAtLeast(1));
     });
 
-    testWidgets('shows no program info for channels without EPG', (tester) async {
+    testWidgets('shows no program info for channels without EPG', (
+      tester,
+    ) async {
       final channelsWithoutEpg = [
-        const Channel(id: 99, name: 'Unknown Channel', streamUrl: 'http://example.com/99.m3u8'),
+        const Channel(
+          id: 99,
+          name: 'Unknown Channel',
+          streamUrl: 'http://example.com/99.m3u8',
+        ),
       ];
-      await tester.pumpWidget(_TestApp(
-        channels: channelsWithoutEpg,
-        epgService: epgService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: channelsWithoutEpg,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('No program info'), findsOneWidget);
     });
 
-    testWidgets('toggling view mode switches between list and grid', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-      ));
+    testWidgets('toggling view mode switches between list and grid', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Find and tap the view mode toggle button
@@ -100,11 +150,13 @@ void main() {
 
     testWidgets('tapping channel triggers onChannelSelect', (tester) async {
       Channel? selectedChannel;
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        epgService: epgService,
-        onChannelSelect: (channel) => selectedChannel = channel,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          epgService: epgService,
+          onChannelSelect: (channel) => selectedChannel = channel,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('BBC One'));

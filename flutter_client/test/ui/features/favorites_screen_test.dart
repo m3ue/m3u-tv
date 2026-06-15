@@ -12,11 +12,24 @@ void main() {
 
     setUp(() {
       testChannels = [
-        const Channel(id: 1, name: 'BBC One', streamUrl: 'http://example.com/1.m3u8'),
-        const Channel(id: 2, name: 'CNN', streamUrl: 'http://example.com/2.m3u8'),
+        const Channel(
+          id: 1,
+          name: 'BBC One',
+          streamUrl: 'http://example.com/1.m3u8',
+        ),
+        const Channel(
+          id: 2,
+          name: 'CNN',
+          streamUrl: 'http://example.com/2.m3u8',
+        ),
       ];
       testVodItems = [
-        const VodItem(id: 10, name: 'The Matrix', streamUrl: 'http://example.com/10.mp4', containerExtension: 'mp4'),
+        const VodItem(
+          id: 10,
+          name: 'The Matrix',
+          streamUrl: 'http://example.com/10.mp4',
+          containerExtension: 'mp4',
+        ),
       ];
       testSeriesList = [
         const Series(id: 20, name: 'Breaking Bad'),
@@ -29,13 +42,15 @@ void main() {
 
       final favIds = await favoritesService.all();
 
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-        favoriteChannelIds: favIds,
-        favoritesService: favoritesService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+          favoriteChannelIds: favIds,
+          favoritesService: favoritesService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Live TV'), findsOneWidget);
@@ -49,13 +64,15 @@ void main() {
 
       final favIds = await favoritesService.all();
 
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-        favoriteChannelIds: favIds,
-        favoritesService: favoritesService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+          favoriteChannelIds: favIds,
+          favoritesService: favoritesService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('BBC One'), findsOneWidget);
@@ -64,13 +81,15 @@ void main() {
     testWidgets('shows favorited VOD items in Movies tab', (tester) async {
       final favoritesService = FavoritesService();
 
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-        favoriteVodIds: const {10},
-        favoritesService: favoritesService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+          favoriteVodIds: const {10},
+          favoritesService: favoritesService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Movies'));
@@ -82,13 +101,15 @@ void main() {
     testWidgets('shows favorited series in Series tab', (tester) async {
       final favoritesService = FavoritesService();
 
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-        favoriteSeriesIds: const {20},
-        favoritesService: favoritesService,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+          favoriteSeriesIds: const {20},
+          favoritesService: favoritesService,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Series'));
@@ -98,26 +119,35 @@ void main() {
     });
 
     testWidgets('shows empty state when no favorites', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('No favorites yet'), findsOneWidget);
     });
 
-    testWidgets('shows not configured message when not connected', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        channels: testChannels,
-        vodItems: testVodItems,
-        seriesList: testSeriesList,
-        isConfigured: false,
-      ));
+    testWidgets('shows not configured message when not connected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: testChannels,
+          vodItems: testVodItems,
+          seriesList: testSeriesList,
+          isConfigured: false,
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Please connect to your service in Settings'), findsOneWidget);
+      expect(
+        find.text('Please connect to your service in Settings'),
+        findsOneWidget,
+      );
     });
   });
 }

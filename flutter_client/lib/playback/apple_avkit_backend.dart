@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import 'playback_capabilities.dart';
-import 'player_adapter.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 
 /// Dart adapter for the iOS AVKit/AVPlayer playback plugin.
 ///
@@ -40,12 +40,14 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> load(PlaybackSource source) async {
-    _emit(_state.copyWith(
-      backend: PlaybackBackend.appleAvKit,
-      status: PlaybackStatus.loading,
-      source: source,
-      position: source.startPosition,
-    ));
+    _emit(
+      _state.copyWith(
+        backend: PlaybackBackend.appleAvKit,
+        status: PlaybackStatus.loading,
+        source: source,
+        position: source.startPosition,
+      ),
+    );
     try {
       final result = await _host.load(source);
       _textureId = result['textureId'] as int?;
@@ -108,12 +110,14 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
 
   void _handleEvent(_AvKitEvent event) {
     if (event.type == _AvKitEventType.error) {
-      _errorController.add(PlaybackError(
-        backend: PlaybackBackend.appleAvKit,
-        message: event.message ?? 'AVKit playback failed',
-        code: event.code ?? 'avkit-error',
-        recoverable: event.recoverable,
-      ));
+      _errorController.add(
+        PlaybackError(
+          backend: PlaybackBackend.appleAvKit,
+          message: event.message ?? 'AVKit playback failed',
+          code: event.code ?? 'avkit-error',
+          recoverable: event.recoverable,
+        ),
+      );
       return;
     }
     final status = switch (event.type) {
@@ -121,14 +125,17 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
       _AvKitEventType.ready => PlaybackStatus.ready,
       _AvKitEventType.playing => PlaybackStatus.playing,
       _AvKitEventType.end => PlaybackStatus.completed,
-      _AvKitEventType.stopped || _AvKitEventType.disposed => PlaybackStatus.stopped,
+      _AvKitEventType.stopped ||
+      _AvKitEventType.disposed => PlaybackStatus.stopped,
       _AvKitEventType.error => _state.status,
     };
-    _emit(_state.copyWith(
-      backend: PlaybackBackend.appleAvKit,
-      status: status,
-      position: event.position ?? _state.position,
-    ));
+    _emit(
+      _state.copyWith(
+        backend: PlaybackBackend.appleAvKit,
+        status: status,
+        position: event.position ?? _state.position,
+      ),
+    );
   }
 
   void _emit(PlaybackState state) {
@@ -152,10 +159,8 @@ abstract class _AvKitHost {
 
 class _MethodChannelAvKitHost implements _AvKitHost {
   const _MethodChannelAvKitHost({
-    MethodChannel methodChannel =
-        const MethodChannel('m3u_tv/apple_avkit'),
-    EventChannel eventChannel =
-        const EventChannel('m3u_tv/apple_avkit/events'),
+    MethodChannel methodChannel = const MethodChannel('m3u_tv/apple_avkit'),
+    EventChannel eventChannel = const EventChannel('m3u_tv/apple_avkit/events'),
   }) : _method = methodChannel,
        _event = eventChannel;
 
@@ -163,27 +168,29 @@ class _MethodChannelAvKitHost implements _AvKitHost {
   final EventChannel _event;
 
   @override
-  Stream<_AvKitEvent> get events =>
-      _event.receiveBroadcastStream().map((Object? raw) {
-        final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
-        return _AvKitEvent.fromMap(map);
-      });
+  Stream<_AvKitEvent> get events => _event.receiveBroadcastStream().map((raw) {
+    final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
+    return _AvKitEvent.fromMap(map);
+  });
 
   @override
   Future<Map<String, dynamic>> load(PlaybackSource source) async {
-    final result = await _method.invokeMethod<Object?>('load', <String, Object?>{
-      'source': <String, Object?>{
-        'uri': source.uri,
-        'title': source.title,
-        'startPositionMs': source.startPosition.inMilliseconds,
-        'isLive': source.isLive,
-        'videoCodec': source.videoCodec,
-        'audioCodec': source.audioCodec,
-        'userAgent': source.userAgent,
-        'headers': source.headers,
-        'metadata': source.metadata,
+    final result = await _method.invokeMethod<Object?>(
+      'load',
+      <String, Object?>{
+        'source': <String, Object?>{
+          'uri': source.uri,
+          'title': source.title,
+          'startPositionMs': source.startPosition.inMilliseconds,
+          'isLive': source.isLive,
+          'videoCodec': source.videoCodec,
+          'audioCodec': source.audioCodec,
+          'userAgent': source.userAgent,
+          'headers': source.headers,
+          'metadata': source.metadata,
+        },
       },
-    });
+    );
     if (result is Map) return Map<String, dynamic>.from(result);
     return const <String, dynamic>{};
   }
@@ -196,9 +203,9 @@ class _MethodChannelAvKitHost implements _AvKitHost {
 
   @override
   Future<void> seek(Duration position) => _method.invokeMethod<void>(
-        'seek',
-        <String, Object?>{'positionMs': position.inMilliseconds},
-      );
+    'seek',
+    <String, Object?>{'positionMs': position.inMilliseconds},
+  );
 
   @override
   Future<void> stop() => _method.invokeMethod<void>('stop');
@@ -215,7 +222,15 @@ class _MethodChannelAvKitHost implements _AvKitHost {
 
 // --- Event model ---
 
-enum _AvKitEventType { buffering, ready, playing, error, end, stopped, disposed }
+enum _AvKitEventType {
+  buffering,
+  ready,
+  playing,
+  error,
+  end,
+  stopped,
+  disposed,
+}
 
 class _AvKitEvent {
   const _AvKitEvent({
@@ -227,14 +242,14 @@ class _AvKitEvent {
   });
 
   factory _AvKitEvent.fromMap(Map<String, Object?> map) => _AvKitEvent(
-        type: _typeFrom(map['type'] as String?),
-        position: map['positionMs'] is num
-            ? Duration(milliseconds: (map['positionMs'] as num).round())
-            : null,
-        code: map['code'] as String?,
-        message: map['message'] as String?,
-        recoverable: map['recoverable'] == true,
-      );
+    type: _typeFrom(map['type'] as String?),
+    position: map['positionMs'] is num
+        ? Duration(milliseconds: (map['positionMs']! as num).round())
+        : null,
+    code: map['code'] as String?,
+    message: map['message'] as String?,
+    recoverable: map['recoverable'] == true,
+  );
 
   final _AvKitEventType type;
   final Duration? position;
@@ -243,13 +258,13 @@ class _AvKitEvent {
   final bool recoverable;
 
   static _AvKitEventType _typeFrom(String? value) => switch (value) {
-        'buffering' => _AvKitEventType.buffering,
-        'ready' => _AvKitEventType.ready,
-        'playing' => _AvKitEventType.playing,
-        'error' => _AvKitEventType.error,
-        'end' => _AvKitEventType.end,
-        'stopped' => _AvKitEventType.stopped,
-        'disposed' => _AvKitEventType.disposed,
-        _ => _AvKitEventType.error,
-      };
+    'buffering' => _AvKitEventType.buffering,
+    'ready' => _AvKitEventType.ready,
+    'playing' => _AvKitEventType.playing,
+    'error' => _AvKitEventType.error,
+    'end' => _AvKitEventType.end,
+    'stopped' => _AvKitEventType.stopped,
+    'disposed' => _AvKitEventType.disposed,
+    _ => _AvKitEventType.error,
+  };
 }

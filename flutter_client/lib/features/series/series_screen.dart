@@ -152,7 +152,11 @@ class _SeriesScreenState extends State<SeriesScreen> {
 }
 
 class _SeriesCard extends StatelessWidget {
-  const _SeriesCard({required this.item, required this.onTap, this.autofocus = false});
+  const _SeriesCard({
+    required this.item,
+    required this.onTap,
+    this.autofocus = false,
+  });
 
   final Series item;
   final VoidCallback onTap;

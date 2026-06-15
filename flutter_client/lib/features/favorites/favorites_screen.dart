@@ -40,7 +40,8 @@ class FavoritesScreen extends StatefulWidget {
   State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProviderStateMixin {
+class _FavoritesScreenState extends State<FavoritesScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   static const _tabs = [
@@ -61,17 +62,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProv
     super.dispose();
   }
 
-  List<Channel> get _favoriteChannels =>
-      widget.channels.where((c) => widget.favoriteChannelIds.contains(c.id)).toList();
+  List<Channel> get _favoriteChannels => widget.channels
+      .where((c) => widget.favoriteChannelIds.contains(c.id))
+      .toList();
 
-  List<VodItem> get _favoriteVodItems =>
-      widget.vodItems.where((v) => widget.favoriteVodIds.contains(v.id)).toList();
+  List<VodItem> get _favoriteVodItems => widget.vodItems
+      .where((v) => widget.favoriteVodIds.contains(v.id))
+      .toList();
 
-  List<Series> get _favoriteSeriesList =>
-      widget.seriesList.where((s) => widget.favoriteSeriesIds.contains(s.id)).toList();
+  List<Series> get _favoriteSeriesList => widget.seriesList
+      .where((s) => widget.favoriteSeriesIds.contains(s.id))
+      .toList();
 
   bool get _hasAnyFavorites =>
-      _favoriteChannels.isNotEmpty || _favoriteVodItems.isNotEmpty || _favoriteSeriesList.isNotEmpty;
+      _favoriteChannels.isNotEmpty ||
+      _favoriteVodItems.isNotEmpty ||
+      _favoriteSeriesList.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +138,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProv
           leading: channel.logoUrl != null && channel.logoUrl!.isNotEmpty
               ? CircleAvatar(
                   backgroundImage: NetworkImage(channel.logoUrl!),
-                  onBackgroundImageError: (_, __) {},
+                  onBackgroundImageError: (_, _) {},
                   child: const Icon(Icons.tv),
                 )
               : const CircleAvatar(child: Icon(Icons.tv)),
@@ -181,7 +187,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProv
                       ? Image.network(
                           item.logoUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.movie, size: 48),
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.movie, size: 48),
                         )
                       : const Icon(Icons.movie, size: 48),
                 ),
@@ -235,7 +242,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> with SingleTickerProv
                       ? Image.network(
                           item.coverUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.tv, size: 48),
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.tv, size: 48),
                         )
                       : const Icon(Icons.tv, size: 48),
                 ),

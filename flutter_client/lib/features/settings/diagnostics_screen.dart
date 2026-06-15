@@ -30,20 +30,29 @@ class DiagnosticsScreen extends StatelessWidget {
         children: [
           Text('Backend Capabilities', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 16),
-          _CapabilityRow(label: 'm3u-editor Version', value: cap.m3uEditorVersion),
+          _CapabilityRow(
+            label: 'm3u-editor Version',
+            value: cap.m3uEditorVersion,
+          ),
           const SizedBox(height: 8),
           Text('Features', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
-          ...cap.features.map((f) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(f, style: theme.textTheme.bodyMedium),
-              ],
+          ...cap.features.map(
+            (f) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(f, style: theme.textTheme.bodyMedium),
+                ],
+              ),
             ),
-          )),
+          ),
           const SizedBox(height: 24),
           Text('Transcode Server', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
@@ -80,9 +89,12 @@ class _CapabilityRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        )),
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         Text(value, style: theme.textTheme.bodyMedium),
       ],
     );

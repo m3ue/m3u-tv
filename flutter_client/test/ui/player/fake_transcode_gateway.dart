@@ -14,8 +14,8 @@ class FakeTranscodeGateway implements PlaybackTranscodeGateway {
 
   TranscodeResponse? _nextServerTranscodeResponse;
   BroadcastSession? _nextBroadcastResponse;
-  Object? _nextServerTranscodeError;
-  Object? _nextBroadcastError;
+  Exception? _nextServerTranscodeError;
+  Exception? _nextBroadcastError;
 
   void setNextServerTranscodeResponse(TranscodeResponse response) {
     _nextServerTranscodeResponse = response;
@@ -25,17 +25,16 @@ class FakeTranscodeGateway implements PlaybackTranscodeGateway {
     _nextBroadcastResponse = session;
   }
 
-  void setNextServerTranscodeError(Object error) {
+  void setNextServerTranscodeError(Exception error) {
     _nextServerTranscodeError = error;
   }
 
-  void setNextBroadcastError(Object error) {
+  void setNextBroadcastError(Exception error) {
     _nextBroadcastError = error;
   }
 
   @override
-  Future<TranscodeResponse> startServerTranscode(
-      StreamRequest request) async {
+  Future<TranscodeResponse> startServerTranscode(StreamRequest request) async {
     startServerTranscodeCalls.add(request);
     if (_nextServerTranscodeError != null) {
       final error = _nextServerTranscodeError!;

@@ -58,11 +58,13 @@ class _ConnectionFormState extends State<ConnectionForm> {
       _validationError = null;
     });
 
-    widget.onConnect(UserCredentials(
-      server: server,
-      username: username,
-      password: password,
-    ));
+    widget.onConnect(
+      UserCredentials(
+        server: server,
+        username: username,
+        password: password,
+      ),
+    );
   }
 
   @override
@@ -77,9 +79,12 @@ class _ConnectionFormState extends State<ConnectionForm> {
         children: [
           Text('Connection Settings', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),
-          Text('Enter your Xtream codes details', style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          )),
+          Text(
+            'Enter your Xtream codes details',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 24),
           if (displayError != null)
             Padding(

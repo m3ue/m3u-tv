@@ -9,8 +9,9 @@ enum TranscodeMode {
 
   static TranscodeMode fromValue(String value) {
     return TranscodeMode.values.firstWhere(
-      (TranscodeMode mode) => mode.value == value,
-      orElse: () => throw ArgumentError.value(value, 'value', 'Unknown transcode mode'),
+      (mode) => mode.value == value,
+      orElse: () =>
+          throw ArgumentError.value(value, 'value', 'Unknown transcode mode'),
     );
   }
 }
@@ -29,8 +30,9 @@ enum BroadcastStatus {
 
   static BroadcastStatus fromValue(String value) {
     return BroadcastStatus.values.firstWhere(
-      (BroadcastStatus status) => status.value == value,
-      orElse: () => throw ArgumentError.value(value, 'value', 'Unknown broadcast status'),
+      (status) => status.value == value,
+      orElse: () =>
+          throw ArgumentError.value(value, 'value', 'Unknown broadcast status'),
     );
   }
 }
@@ -179,7 +181,9 @@ class BroadcastSession {
 
 Map<String, Object?> _withoutNulls(Map<String, Object?> value) {
   return Map<String, Object?>.fromEntries(
-    value.entries.where((MapEntry<String, Object?> entry) => entry.value != null),
+    value.entries.where(
+      (entry) => entry.value != null,
+    ),
   );
 }
 

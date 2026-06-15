@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -63,18 +65,20 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   void _playEpisode(Episode episode) {
     final streamUrl = episode.streamUrl;
     if (streamUrl == null || streamUrl.isEmpty) return;
-    Navigator.of(context).pushNamed(
-      RouteNames.player,
-      arguments: PlayerArgs(
-        streamUrl: streamUrl,
-        title: episode.title,
-        type: 'series',
-        streamId: int.tryParse(episode.id),
-        seriesId: widget.seriesId,
-        seasonNumber: episode.seasonNumber,
-        metadata: <String, Object?>{
-          'container_extension': episode.containerExtension,
-        },
+    unawaited(
+      Navigator.of(context).pushNamed(
+        RouteNames.player,
+        arguments: PlayerArgs(
+          streamUrl: streamUrl,
+          title: episode.title,
+          type: 'series',
+          streamId: int.tryParse(episode.id),
+          seriesId: widget.seriesId,
+          seasonNumber: episode.seasonNumber,
+          metadata: <String, Object?>{
+            'container_extension': episode.containerExtension,
+          },
+        ),
       ),
     );
   }
@@ -173,8 +177,7 @@ class _SeriesDetailsBody extends StatelessWidget {
                       ? const Center(child: Text('No episodes available'))
                       : ListView.separated(
                           itemCount: episodes.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final episode = episodes[index];
                             return Card(

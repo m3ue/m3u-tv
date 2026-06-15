@@ -1,4 +1,4 @@
-include: package:flutter_lints/flutter.yaml
+include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
   language:
@@ -9,17 +9,27 @@ analyzer:
     missing_required_param: error
     missing_return: error
     todo: warning
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
 
 linter:
   rules:
-    always_declare_return_types: true
-    avoid_dynamic_calls: true
-    avoid_redundant_argument_values: true
-    avoid_unused_constructor_parameters: true
-    directives_ordering: true
-    prefer_const_constructors: true
-    prefer_final_locals: true
-    prefer_single_quotes: true
-    require_trailing_commas: true
-    sort_constructors_first: true
-    unawaited_futures: true
+    # Library-only rule — not applicable to app code.
+    public_member_api_docs: false
+    # Conflicts with the Flutter convention of putting super.key first.
+    always_put_required_named_parameters_first: false
+    # 96 violations are in string literals and comments the formatter cannot break.
+    lines_longer_than_80_chars: false
+    # Overly strict for app code; ignore directives are used without formal reasons.
+    document_ignores: false
+    # async IO is used intentionally in service layer — sync IO is inappropriate here.
+    avoid_slow_async_io: false
+    # Domain models use == for value equality in tests; changing breaks test ergonomics.
+    avoid_equals_and_hash_code_on_mutable_classes: false
+    # Methods that communicate intent via name; setters would obscure meaning here.
+    use_setters_to_change_properties: false
+    # Static factories are clearer than named constructors in several places.
+    prefer_constructors_over_static_methods: false
+    # Minor style preference — for loops are more readable in multi-statement contexts.
+    prefer_foreach: false

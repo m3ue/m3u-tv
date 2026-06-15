@@ -1,4 +1,4 @@
-import 'persistent_store.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 
 /// Secure storage abstraction for persisting sensitive data like credentials.
 ///

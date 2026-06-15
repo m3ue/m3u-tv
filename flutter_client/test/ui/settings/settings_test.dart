@@ -17,7 +17,10 @@ void main() {
   group('SecureStorage', () {
     test('InMemorySecureStorage stores and retrieves credentials', () async {
       final storage = InMemorySecureStorage();
-      await storage.write('m3ue_tv_credentials', '{"server":"http://x.com","username":"u","password":"p"}');
+      await storage.write(
+        'm3ue_tv_credentials',
+        '{"server":"http://x.com","username":"u","password":"p"}',
+      );
       expect(await storage.read('m3ue_tv_credentials'), isNotNull);
     });
 
@@ -37,7 +40,10 @@ void main() {
       final storage = InMemorySecureStorage();
       await storage.write('m3ue_tv_credentials', '{"password":"secret123"}');
       // Verify the stored value is present but not in any log
-      expect(await storage.read('m3ue_tv_credentials'), '{"password":"secret123"}');
+      expect(
+        await storage.read('m3ue_tv_credentials'),
+        '{"password":"secret123"}',
+      );
       // InMemorySecureStorage should not expose values through toString
       expect(storage.toString(), isNot(contains('secret123')));
     });
@@ -69,7 +75,11 @@ void main() {
       );
 
       final result = await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'p'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'u',
+          password: 'p',
+        ),
       );
 
       expect(result, isTrue);
@@ -88,7 +98,11 @@ void main() {
       );
 
       final result = await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'wrong'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'u',
+          password: 'wrong',
+        ),
       );
 
       expect(result, isFalse);
@@ -106,44 +120,66 @@ void main() {
       );
 
       final result = await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'expired'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'u',
+          password: 'expired',
+        ),
       );
 
       expect(result, isFalse);
       expect(notifier.error, isNotNull);
     });
 
-    test('connect with non-m3u-editor backend sets notM3UEditor error', () async {
-      final transport = _FakeTransport({
-        'auth': {
-          'user_info': {'username': 'u', 'password': 'p', 'auth': 1, 'status': 'Active'},
-          'server_info': {'url': 'x.com', 'port': '443'},
-          // No m3u_editor key
-        },
-      });
-      final notifier = AuthNotifier(
-        xtreamService: XtreamService(transport: transport.call),
-        secureStorage: InMemorySecureStorage(),
-      );
+    test(
+      'connect with non-m3u-editor backend sets notM3UEditor error',
+      () async {
+        final transport = _FakeTransport({
+          'auth': {
+            'user_info': {
+              'username': 'u',
+              'password': 'p',
+              'auth': 1,
+              'status': 'Active',
+            },
+            'server_info': {'url': 'x.com', 'port': '443'},
+            // No m3u_editor key
+          },
+        });
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: transport.call),
+          secureStorage: InMemorySecureStorage(),
+        );
 
-      final result = await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'p'),
-      );
+        final result = await notifier.connect(
+          const UserCredentials(
+            server: 'http://x.com',
+            username: 'u',
+            password: 'p',
+          ),
+        );
 
-      expect(result, isFalse);
-      expect(notifier.error, contains('m3u-editor'));
-    });
+        expect(result, isFalse);
+        expect(notifier.error, contains('m3u-editor'));
+      },
+    );
 
     test('connect with offline server sets error', () async {
       final notifier = AuthNotifier(
-        xtreamService: XtreamService(transport: (_) async {
-          throw Exception('Connection refused');
-        }),
+        xtreamService: XtreamService(
+          transport: (_) async {
+            throw Exception('Connection refused');
+          },
+        ),
         secureStorage: InMemorySecureStorage(),
       );
 
       final result = await notifier.connect(
-        const UserCredentials(server: 'http://offline.com', username: 'u', password: 'p'),
+        const UserCredentials(
+          server: 'http://offline.com',
+          username: 'u',
+          password: 'p',
+        ),
       );
 
       expect(result, isFalse);
@@ -164,7 +200,11 @@ void main() {
       );
 
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'p'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'u',
+          password: 'p',
+        ),
       );
 
       final saved = await storage.read('m3ue_tv_credentials');
@@ -186,7 +226,11 @@ void main() {
       );
 
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'u', password: 'p'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'u',
+          password: 'p',
+        ),
       );
       expect(notifier.isConfigured, isTrue);
 
@@ -218,24 +262,29 @@ void main() {
       expect(notifier.isConfigured, isTrue);
     });
 
-    test('loadSavedCredentials returns false when no saved credentials', () async {
-      final notifier = AuthNotifier(
-        xtreamService: XtreamService(transport: _FakeTransport({}).call),
-        secureStorage: InMemorySecureStorage(),
-      );
+    test(
+      'loadSavedCredentials returns false when no saved credentials',
+      () async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
 
-      final result = await notifier.loadSavedCredentials();
-      expect(result, isFalse);
-    });
+        final result = await notifier.loadSavedCredentials();
+        expect(result, isFalse);
+      },
+    );
   });
 
   // --- ConnectionForm widget ---
 
   group('ConnectionForm', () {
     testWidgets('shows server, username, password fields', (tester) async {
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (_) {}),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (_) {}),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Server URL'), findsOneWidget);
@@ -244,9 +293,11 @@ void main() {
     });
 
     testWidgets('shows error when fields are empty on connect', (tester) async {
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (_) {}),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (_) {}),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Connect'));
@@ -257,9 +308,11 @@ void main() {
 
     testWidgets('calls onConnect with entered credentials', (tester) async {
       UserCredentials? captured;
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (creds) => captured = creds),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (creds) => captured = creds),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).at(0), 'http://x.com');
@@ -274,10 +327,14 @@ void main() {
       expect(captured!.password, 'pass1');
     });
 
-    testWidgets('shows loading indicator when isLoading is true', (tester) async {
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (_) {}, isLoading: true),
-      ));
+    testWidgets('shows loading indicator when isLoading is true', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (_) {}, isLoading: true),
+        ),
+      );
       // Use pump instead of pumpAndSettle because CircularProgressIndicator has infinite animation
       await tester.pump();
 
@@ -288,24 +345,31 @@ void main() {
     });
 
     testWidgets('shows error text when error is provided', (tester) async {
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (_) {}, error: 'Authentication failed'),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (_) {}, error: 'Authentication failed'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Authentication failed'), findsOneWidget);
     });
 
     testWidgets('password field obscures text', (tester) async {
-      await tester.pumpWidget(_testApp(
-        ConnectionForm(onConnect: (_) {}),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          ConnectionForm(onConnect: (_) {}),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Find the password field (3rd TextFormField) and verify its TextField has obscureText
       final passwordField = find.byType(TextFormField).at(2);
       // Find the TextField descendant within this TextFormField
-      final textField = find.descendant(of: passwordField, matching: find.byType(TextField));
+      final textField = find.descendant(
+        of: passwordField,
+        matching: find.byType(TextField),
+      );
       final textFieldWidget = tester.widget<TextField>(textField);
       expect(textFieldWidget.obscureText, isTrue);
     });
@@ -326,16 +390,21 @@ void main() {
       expect(find.text('Server URL'), findsOneWidget);
     });
 
-    testWidgets('shows source error on connection form when content load fails', (tester) async {
+    testWidgets('shows source error on connection form when content load fails', (
+      tester,
+    ) async {
       final notifier = AuthNotifier(
         xtreamService: XtreamService(transport: _FakeTransport({}).call),
         secureStorage: InMemorySecureStorage(),
       );
 
-      await tester.pumpWidget(_settingsApp(
-        notifier,
-        sourceError: 'Xtream HTTP 401 Unauthorized for GET http://server.test/player_api.php: Unauthorized',
-      ));
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          sourceError:
+              'Xtream HTTP 401 Unauthorized for GET http://server.test/player_api.php: Unauthorized',
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Server URL'), findsOneWidget);
@@ -355,7 +424,11 @@ void main() {
         secureStorage: storage,
       );
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'demo', password: 'secret'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'demo',
+          password: 'secret',
+        ),
       );
 
       await tester.pumpWidget(_settingsApp(notifier));
@@ -379,7 +452,11 @@ void main() {
         secureStorage: storage,
       );
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'demo', password: 'secret'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'demo',
+          password: 'secret',
+        ),
       );
 
       await tester.pumpWidget(_settingsApp(notifier));
@@ -401,7 +478,11 @@ void main() {
         secureStorage: storage,
       );
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'demo', password: 'secret'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'demo',
+          password: 'secret',
+        ),
       );
 
       await tester.pumpWidget(_settingsApp(notifier));
@@ -410,7 +491,9 @@ void main() {
       expect(find.text('Content Cache'), findsOneWidget);
     });
 
-    testWidgets('shows viewer section when m3u-editor and viewer available', (tester) async {
+    testWidgets('shows viewer section when m3u-editor and viewer available', (
+      tester,
+    ) async {
       final storage = InMemorySecureStorage();
       final transport = _FakeTransport({
         'auth': _xtreamAuth(auth: 1),
@@ -423,7 +506,11 @@ void main() {
         secureStorage: storage,
       );
       await notifier.connect(
-        const UserCredentials(server: 'http://x.com', username: 'demo', password: 'secret'),
+        const UserCredentials(
+          server: 'http://x.com',
+          username: 'demo',
+          password: 'secret',
+        ),
       );
 
       const viewer = Viewer(id: 1, ulid: 'v1', name: 'Admin', isAdmin: true);
@@ -445,13 +532,15 @@ void main() {
         const Viewer(id: 2, ulid: 'v2', name: 'User', isAdmin: false),
       ];
 
-      await tester.pumpWidget(_testApp(
-        ViewerSelector(
-          viewers: viewers,
-          activeViewer: viewers[0],
-          onSwitch: (_) {},
+      await tester.pumpWidget(
+        _testApp(
+          ViewerSelector(
+            viewers: viewers,
+            activeViewer: viewers[0],
+            onSwitch: (_) {},
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       // Admin name appears in the viewer card
@@ -466,13 +555,15 @@ void main() {
       ];
       Viewer? switchedTo;
 
-      await tester.pumpWidget(_testApp(
-        ViewerSelector(
-          viewers: viewers,
-          activeViewer: viewers[0],
-          onSwitch: (v) => switchedTo = v,
+      await tester.pumpWidget(
+        _testApp(
+          ViewerSelector(
+            viewers: viewers,
+            activeViewer: viewers[0],
+            onSwitch: (v) => switchedTo = v,
+          ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('User'));
@@ -492,9 +583,11 @@ void main() {
         transcodeAvailable: true,
       );
 
-      await tester.pumpWidget(_testApp(
-        const DiagnosticsScreen(capabilities: capabilities),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          const DiagnosticsScreen(capabilities: capabilities),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Backend Capabilities'), findsOneWidget);
@@ -509,9 +602,11 @@ void main() {
         transcodeAvailable: true,
       );
 
-      await tester.pumpWidget(_testApp(
-        const DiagnosticsScreen(capabilities: capabilities),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          const DiagnosticsScreen(capabilities: capabilities),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Transcode Server'), findsOneWidget);
@@ -525,9 +620,11 @@ void main() {
         transcodeAvailable: false,
       );
 
-      await tester.pumpWidget(_testApp(
-        const DiagnosticsScreen(capabilities: capabilities),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          const DiagnosticsScreen(capabilities: capabilities),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Unavailable'), findsOneWidget);
@@ -540,9 +637,11 @@ void main() {
         transcodeAvailable: true,
       );
 
-      await tester.pumpWidget(_testApp(
-        const DiagnosticsScreen(capabilities: capabilities),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          const DiagnosticsScreen(capabilities: capabilities),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Ensure no password or credential text appears
@@ -556,9 +655,11 @@ void main() {
     });
 
     testWidgets('shows no capabilities message when null', (tester) async {
-      await tester.pumpWidget(_testApp(
-        const DiagnosticsScreen(capabilities: null),
-      ));
+      await tester.pumpWidget(
+        _testApp(
+          const DiagnosticsScreen(capabilities: null),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Not connected'), findsOneWidget);
@@ -570,14 +671,18 @@ void main() {
   group('M3U source diagnostics', () {
     test('valid M3U URL source parses successfully', () async {
       final parser = M3UParser();
-      const m3uContent = '#EXTM3U\n'
+      const m3uContent =
+          '#EXTM3U\n'
           '#EXTINF:-1 tvg-id="ch1" group-title="News",Channel 1\n'
           'http://streams.example/live/1.m3u8\n';
       final result = parser.parse(m3uContent);
 
       expect(result.channels, hasLength(1));
       expect(result.channels.first.name, 'Channel 1');
-      expect(result.channels.first.streamUrl, 'http://streams.example/live/1.m3u8');
+      expect(
+        result.channels.first.streamUrl,
+        'http://streams.example/live/1.m3u8',
+      );
     });
 
     test('malformed M3U source throws parse exception', () {
@@ -590,7 +695,8 @@ void main() {
 
     test('invalid URL in M3U source is captured in channel', () async {
       final parser = M3UParser();
-      const m3uContent = '#EXTM3U\n'
+      const m3uContent =
+          '#EXTM3U\n'
           '#EXTINF:-1 tvg-id="ch1",Channel 1\n'
           'not-a-valid-url\n';
       final result = parser.parse(m3uContent);
@@ -604,17 +710,23 @@ void main() {
 
 // --- Test helpers ---
 
-Map<String, Object?> _xtreamAuth({required int auth, String status = 'Active'}) => {
-      'user_info': {
-        'username': 'demo',
-        'password': 'secret',
-        'auth': auth,
-        'status': status,
-        'message': status,
-      },
-      'server_info': {'url': 'x.com', 'port': '443', 'server_protocol': 'https'},
-      'm3u_editor': {'version': '0.10.0', 'features': <String>['progress']},
-    };
+Map<String, Object?> _xtreamAuth({
+  required int auth,
+  String status = 'Active',
+}) => {
+  'user_info': {
+    'username': 'demo',
+    'password': 'secret',
+    'auth': auth,
+    'status': status,
+    'message': status,
+  },
+  'server_info': {'url': 'x.com', 'port': '443', 'server_protocol': 'https'},
+  'm3u_editor': {
+    'version': '0.10.0',
+    'features': <String>['progress'],
+  },
+};
 
 class _FakeTransport {
   _FakeTransport(this.responses);
@@ -640,7 +752,11 @@ Widget _testApp(Widget child) {
   );
 }
 
-Widget _settingsApp(AuthNotifier notifier, {Viewer? activeViewer, String? sourceError}) {
+Widget _settingsApp(
+  AuthNotifier notifier, {
+  Viewer? activeViewer,
+  String? sourceError,
+}) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
     home: Scaffold(

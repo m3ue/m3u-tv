@@ -43,7 +43,7 @@ void main() {
     });
 
     testWidgets('loads HLS live and MP4 VOD fixtures through Media3', (
-      WidgetTester tester,
+      tester,
     ) async {
       _skipWithoutAndroidSmokeFlag();
 
@@ -63,7 +63,7 @@ void main() {
         await _pumpUntil(
           tester,
           () => states.any(
-            (PlaybackState state) =>
+            (state) =>
                 state.status == PlaybackStatus.ready ||
                 state.status == PlaybackStatus.playing,
           ),
@@ -73,14 +73,14 @@ void main() {
         expect(adapter.activeBackend, PlaybackBackend.androidExoPlayer);
         expect(errors, isEmpty);
         expect(
-          states.map((PlaybackState state) => state.status),
+          states.map((state) => state.status),
           contains(anyOf(PlaybackStatus.ready, PlaybackStatus.playing)),
         );
       }
     });
 
     testWidgets('emits typed recoverable error for dead stream fixture', (
-      WidgetTester tester,
+      tester,
     ) async {
       _skipWithoutAndroidSmokeFlag();
 

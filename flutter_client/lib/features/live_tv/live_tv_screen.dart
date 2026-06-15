@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
@@ -53,7 +55,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   @override
   void initState() {
     super.initState();
-    _initCategory();
+    unawaited(_initCategory());
   }
 
   Future<void> _initCategory() async {
@@ -155,10 +157,10 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                   )
                 : switch (_viewMode) {
                     _ViewMode.epgGrid => TimelineEpgView(
-                        channels: filtered,
-                        epgService: widget.epgService,
-                        onChannelSelect: widget.onChannelSelect,
-                      ),
+                      channels: filtered,
+                      epgService: widget.epgService,
+                      onChannelSelect: widget.onChannelSelect,
+                    ),
                     _ViewMode.logoGrid => _buildGridView(filtered),
                     _ViewMode.list => _buildListView(filtered),
                   },
@@ -202,7 +204,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             _ViewMode.epgGrid => _ViewMode.list,
           };
           setState(() => _viewMode = next);
-          widget.favoritesService.setLastViewMode(next.name);
+          unawaited(widget.favoritesService.setLastViewMode(next.name));
         },
         tooltip: switch (_viewMode) {
           _ViewMode.list => 'Logo grid',
@@ -316,100 +318,107 @@ class _ChannelRow extends StatelessWidget {
               height: 72,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                // Channel logo
-                ResilientMediaImage(
-                  imageUrl: channel.logoUrl,
-                  fallbackIcon: Icons.tv,
-                  width: MediaBrowsingMetrics.logoSize,
-                  height: MediaBrowsingMetrics.logoSize,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(width: 14),
-                // Channel info
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        channel.name,
-                        style: Theme.of(context).textTheme.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (epg != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          epg!.current.title,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        LinearProgressIndicator(
-                          value: epg!.progress,
-                          backgroundColor: colorScheme.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation(
-                            colorScheme.primary,
+                child: Row(
+                  children: [
+                    // Channel logo
+                    ResilientMediaImage(
+                      imageUrl: channel.logoUrl,
+                      fallbackIcon: Icons.tv,
+                      width: MediaBrowsingMetrics.logoSize,
+                      height: MediaBrowsingMetrics.logoSize,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 14),
+                    // Channel info
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            channel.name,
+                            style: Theme.of(context).textTheme.titleSmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ] else
-                        Text(
-                          'No program info',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontStyle: FontStyle.italic,
+                          if (epg != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              epg!.current.title,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            LinearProgressIndicator(
+                              value: epg!.progress,
+                              backgroundColor:
+                                  colorScheme.surfaceContainerHighest,
+                              valueColor: AlwaysStoppedAnimation(
+                                colorScheme.primary,
                               ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Favorite star
-                if (isFavorite)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Icon(
-                      Icons.star,
-                      color: colorScheme.tertiary,
-                      size: 20,
+                            ),
+                          ] else
+                            Text(
+                              'No program info',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                // Next program
-                if (epg?.next != null)
-                  SizedBox(
-                    width: 160,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'NEXT',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                    // Favorite star
+                    if (isFavorite)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.star,
+                          color: colorScheme.tertiary,
+                          size: 20,
                         ),
-                        Text(
-                          epg!.next!.title,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
+                      ),
+                    // Next program
+                    if (epg?.next != null)
+                      SizedBox(
+                        width: 160,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'NEXT',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            Text(
+                              epg!.next!.title,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),  // Row
-          ),    // inner Padding
-        ),      // SizedBox
-      ),        // InkWell
-    ),          // Material
-  ),            // DpadFocusable
-);              // outer Padding
+                      ),
+                  ],
+                ), // Row
+              ), // inner Padding
+            ), // SizedBox
+          ), // InkWell
+        ), // Material
+      ), // DpadFocusable
+    ); // outer Padding
   }
 }
 

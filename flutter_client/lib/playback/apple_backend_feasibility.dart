@@ -1,4 +1,4 @@
-import 'playback_capabilities.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
 
 enum AppleTargetPlatform { ios, ipados, macos, tvos }
 
@@ -361,7 +361,7 @@ class AppleBackendFeasibility {
 
   static ApplePlaybackTarget forPlatform(AppleTargetPlatform platform) {
     return targets.firstWhere(
-      (ApplePlaybackTarget target) => target.platform == platform,
+      (target) => target.platform == platform,
     );
   }
 }

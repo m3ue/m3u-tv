@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import 'domain_models.dart';
-import 'secure_storage.dart';
-import 'xtream_service.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 /// Manages authentication state, mirroring the RN XtreamContext behavior.
 ///
@@ -59,7 +59,7 @@ class AuthNotifier extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
+    } on Object catch (e) {
       _error = _redact(e.toString(), credentials);
       _isLoading = false;
       notifyListeners();
@@ -93,7 +93,7 @@ class AuthNotifier extends ChangeNotifier {
         password: '${json['password'] ?? ''}',
       );
       return await connect(credentials);
-    } catch (e) {
+    } on Object catch (_) {
       return false;
     }
   }

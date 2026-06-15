@@ -10,7 +10,7 @@ void main() {
   group('m3u-editor transcoding contract models', () {
     test('encodes the source-of-truth transcode modes', () {
       expect(
-        TranscodeMode.values.map((TranscodeMode mode) => mode.value),
+        TranscodeMode.values.map((mode) => mode.value),
         <String>['direct', 'server', 'local'],
       );
     });
@@ -151,39 +151,46 @@ void main() {
       expect(authFailure.body['error_code'], 'auth_failed');
     });
 
-    test('simulates stalled transcode, callback failure, and cancellation', () async {
-      final stalled = await _jsonPost(
-        server.uri.resolve('/transcode'),
-        const StreamRequest(
-          url: 'https://provider.example/live/stalled.ts',
-          mode: TranscodeMode.local,
-          metadata: {'scenario': 'stalled'},
-        ).toJson(),
-      );
-      final callbackFailure = await _jsonPost(
-        server.uri.resolve('/broadcast/network-callback-fail/start'),
-        _broadcastStartPayload(callbackUrl: 'http://client.invalid/fail-callback'),
-      );
+    test(
+      'simulates stalled transcode, callback failure, and cancellation',
+      () async {
+        final stalled = await _jsonPost(
+          server.uri.resolve('/transcode'),
+          const StreamRequest(
+            url: 'https://provider.example/live/stalled.ts',
+            mode: TranscodeMode.local,
+            metadata: {'scenario': 'stalled'},
+          ).toJson(),
+        );
+        final callbackFailure = await _jsonPost(
+          server.uri.resolve('/broadcast/network-callback-fail/start'),
+          _broadcastStartPayload(
+            callbackUrl: 'http://client.invalid/fail-callback',
+          ),
+        );
 
-      expect(stalled.statusCode, HttpStatus.accepted);
-      expect(stalled.body['status'], 'stalled');
-      expect(callbackFailure.statusCode, HttpStatus.badGateway);
-      expect(callbackFailure.body['error_code'], 'callback_failed');
+        expect(stalled.statusCode, HttpStatus.accepted);
+        expect(stalled.body['status'], 'stalled');
+        expect(callbackFailure.statusCode, HttpStatus.badGateway);
+        expect(callbackFailure.body['error_code'], 'callback_failed');
 
-      final cancel = await _jsonPost(
-        server.uri.resolve('/transcode/${stalled.body['stream_id']}/cancel'),
-        const <String, Object?>{},
-      );
-      expect(cancel.statusCode, HttpStatus.ok);
-      expect(cancel.body['status'], 'cancelled');
-    });
+        final cancel = await _jsonPost(
+          server.uri.resolve('/transcode/${stalled.body['stream_id']}/cancel'),
+          const <String, Object?>{},
+        );
+        expect(cancel.statusCode, HttpStatus.ok);
+        expect(cancel.body['status'], 'cancelled');
+      },
+    );
 
     test('simulates broadcast start, status, and stop', () async {
       final start = await _jsonPost(
         server.uri.resolve('/broadcast/network-1/start'),
         _broadcastStartPayload(),
       );
-      final status = await _jsonGet(server.uri.resolve('/broadcast/network-1/status'));
+      final status = await _jsonGet(
+        server.uri.resolve('/broadcast/network-1/status'),
+      );
       final stop = await _jsonPost(
         server.uri.resolve('/broadcast/network-1/stop'),
         const <String, Object?>{},
@@ -220,12 +227,16 @@ Map<String, Object?> _broadcastStartPayload({String? callbackUrl}) {
     'audio_codec': 'aac',
     'preset': 'veryfast',
     'hwaccel': null,
-    'callback_url': callbackUrl ?? 'http://client.example/api/m3u-proxy/broadcast/callback',
+    'callback_url':
+        callbackUrl ?? 'http://client.example/api/m3u-proxy/broadcast/callback',
     'output_dir': '/dev/shm',
   };
 }
 
-Future<_JsonResponse> _jsonGet(Uri uri, {String apiToken = 'secret-token'}) async {
+Future<_JsonResponse> _jsonGet(
+  Uri uri, {
+  String apiToken = 'secret-token',
+}) async {
   final client = HttpClient();
   try {
     final request = await client.getUrl(uri);

@@ -23,7 +23,7 @@ void main() {
         );
         final requests = <Uri>[];
         unawaited(
-          server.listen((io.HttpRequest request) {
+          server.listen((request) {
             requests.add(request.uri);
             request.response.headers.contentType = io.ContentType.json;
             final action = request.uri.queryParameters['action'];
@@ -51,7 +51,7 @@ void main() {
         expect(await service.getLiveCategories(), [
           const Category(id: '10', name: 'Live News'),
         ]);
-        expect(requests.map((Uri uri) => uri.path).toSet(), {
+        expect(requests.map((uri) => uri.path).toSet(), {
           '/player_api.php',
         });
         expect(requests.first.queryParameters['username'], 'demo');
@@ -68,7 +68,7 @@ void main() {
           0,
         );
         unawaited(
-          server.listen((io.HttpRequest request) {
+          server.listen((request) {
             request.response.statusCode = io.HttpStatus.unauthorized;
             request.response.reasonPhrase = 'Unauthorized';
             request.response.headers.contentType = io.ContentType.json;
@@ -93,22 +93,22 @@ void main() {
           throwsA(
             isA<XtreamHttpException>()
                 .having(
-                  (XtreamHttpException error) => error.statusCode,
+                  (error) => error.statusCode,
                   'statusCode',
                   401,
                 )
                 .having(
-                  (XtreamHttpException error) => '$error',
+                  (error) => '$error',
                   'message',
                   contains('player_api.php'),
                 )
                 .having(
-                  (XtreamHttpException error) => '$error',
+                  (error) => '$error',
                   'message',
                   isNot(contains('demo-user')),
                 )
                 .having(
-                  (XtreamHttpException error) => '$error',
+                  (error) => '$error',
                   'message',
                   isNot(contains('playlist-secret')),
                 ),
@@ -351,10 +351,10 @@ void main() {
         ),
       ]);
       final midday = programs.singleWhere(
-        (EpgProgram program) => program.title == 'Midday News',
+        (program) => program.title == 'Midday News',
       );
       final afternoon = programs.singleWhere(
-        (EpgProgram program) => program.title == 'Afternoon News',
+        (program) => program.title == 'Afternoon News',
       );
 
       expect(programs, hasLength(2));
@@ -366,7 +366,7 @@ void main() {
     test('EPG batch chunks requests to at most 100 stream ids', () async {
       final now = DateTime.utc(2026, 1, 1, 12);
       final transport = FakeXtreamTransport({'auth': xtreamAuth(auth: 1)});
-      transport.onRequest = (XtreamRequest request) {
+      transport.onRequest = (request) {
         if (request.action != 'get_epg_batch') {
           return transport.responses[request.action ?? 'auth'];
         }
@@ -546,10 +546,11 @@ void main() {
         final now = DateTime.utc(2026, 1, 1, 12);
         final programs = <EpgProgram>[];
         for (var i = 0; i < 5000; i++) {
-          buffer.writeln(
-            '#EXTINF:-1 tvg-id="ch.$i" group-title="Bulk",Channel $i',
-          );
-          buffer.writeln('https://streams.example/live/$i.m3u8');
+          buffer
+            ..writeln(
+              '#EXTINF:-1 tvg-id="ch.$i" group-title="Bulk",Channel $i',
+            )
+            ..writeln('https://streams.example/live/$i.m3u8');
           programs.add(
             EpgProgram(
               channelId: 'ch.$i',

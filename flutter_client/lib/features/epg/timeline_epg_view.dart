@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 
-const double _kChannelColW = 128.0;
-const double _kTimeHeaderH = 28.0;
-const double _kRowH = 60.0;
-const double _kPxPerMin = 5.0; // 300 px per hour
+const double _kChannelColW = 128;
+const double _kTimeHeaderH = 28;
+const double _kRowH = 60;
+const double _kPxPerMin = 5; // 300 px per hour
 
 /// Horizontal TV-guide style EPG — channels on the Y-axis, time on the X-axis.
 ///
@@ -61,8 +61,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _initWindow() {
     final now = DateTime.now();
-    _windowStart = DateTime(now.year, now.month, now.day, now.hour)
-        .subtract(const Duration(hours: 1));
+    _windowStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+    ).subtract(const Duration(hours: 1));
     _windowEnd = _windowStart.add(Duration(hours: widget.windowHours + 2));
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
   }
@@ -72,11 +76,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _scrollToNow(_) {
     if (!mounted) return;
-    final nowOffset = DateTime.now().difference(_windowStart).inMinutes * _kPxPerMin;
-    final target = math.max(0.0, nowOffset - 80.0);
+    final nowOffset =
+        DateTime.now().difference(_windowStart).inMinutes * _kPxPerMin;
+    final target = math.max(0, nowOffset - 80.0);
     for (final c in [_headerHCtrl, ..._rowHCtrls]) {
       if (c.hasClients) {
-        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent));
+        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent).toDouble());
       }
     }
   }
@@ -190,10 +195,9 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                     final hOffset = _headerHCtrl.hasClients
                         ? _headerHCtrl.offset
                         : 0.0;
-                    final nowX = DateTime.now()
-                            .difference(_windowStart)
-                            .inMinutes *
-                        _kPxPerMin -
+                    final nowX =
+                        DateTime.now().difference(_windowStart).inMinutes *
+                            _kPxPerMin -
                         hOffset;
 
                     return Stack(
@@ -235,8 +239,9 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                       itemExtent: _kRowH,
                       itemBuilder: (_, i) {
                         final channel = widget.channels[i];
-                        final programs =
-                            widget.epgService.programsForChannel(channel);
+                        final programs = widget.epgService.programsForChannel(
+                          channel,
+                        );
                         return NotificationListener<ScrollUpdateNotification>(
                           onNotification: (n) {
                             _syncH(n.metrics.pixels);
@@ -269,10 +274,8 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                           return const SizedBox.shrink();
                         }
                         final nowX =
-                            DateTime.now()
-                                .difference(_windowStart)
-                                .inMinutes *
-                            _kPxPerMin -
+                            DateTime.now().difference(_windowStart).inMinutes *
+                                _kPxPerMin -
                             _headerHCtrl.offset;
                         if (nowX < 0) return const SizedBox.shrink();
                         return Positioned(
@@ -282,7 +285,9 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                           width: 2,
                           child: IgnorePointer(
                             child: Container(
-                              color: colorScheme.primary.withValues(alpha: 0.35),
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.35,
+                              ),
                             ),
                           ),
                         );
@@ -327,8 +332,7 @@ class _ChannelCell extends StatelessWidget {
               width: 32,
               height: 32,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.tv, size: 28),
+              errorBuilder: (_, _, _) => const Icon(Icons.tv, size: 28),
             )
           else
             const Icon(Icons.tv, size: 28),
@@ -363,7 +367,8 @@ class _TimeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final totalW = windowEnd.difference(windowStart).inMinutes * pixelsPerMinute;
+    final totalW =
+        windowEnd.difference(windowStart).inMinutes * pixelsPerMinute;
 
     // Snap to the last 30-min boundary at or before windowStart
     var slot = DateTime(
@@ -417,7 +422,9 @@ class _TimeHeader extends StatelessWidget {
   String _label(DateTime t) {
     final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final suffix = t.hour < 12 ? 'AM' : 'PM';
-    return t.minute == 0 ? '$h $suffix' : '$h:${t.minute.toString().padLeft(2, '0')}';
+    return t.minute == 0
+        ? '$h $suffix'
+        : '$h:${t.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -452,8 +459,9 @@ class _ProgramsRow extends StatelessWidget {
     final blocks = <Widget>[];
     for (final p in visible) {
       final isCurrent = !now.isBefore(p.start) && now.isBefore(p.end);
-      final clampedStart =
-          p.start.isBefore(windowStart) ? windowStart : p.start;
+      final clampedStart = p.start.isBefore(windowStart)
+          ? windowStart
+          : p.start;
       final clampedEnd = p.end.isAfter(windowEnd) ? windowEnd : p.end;
       final left =
           clampedStart.difference(windowStart).inMinutes * pixelsPerMinute;
@@ -489,14 +497,12 @@ class _ProgramsRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: borderColor),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Text(
                   p.title,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: fgColor,
-                    fontWeight:
-                        isCurrent ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

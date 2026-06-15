@@ -98,14 +98,18 @@ class AppShellState extends State<AppShell> {
     setState(() {
       _currentIndex = index;
     });
-    _navigatorKey.currentState?.pushReplacementNamed(_mainRoutes[index]);
+    unawaited(
+      _navigatorKey.currentState?.pushReplacementNamed(_mainRoutes[index]),
+    );
     // On TV, navigating from sidebar collapses it
     if (shouldUseSidebar(widget.deviceType)) {
       _sidebarActive = false;
       // Move focus to content after navigation
-      Future.microtask(() {
-        if (mounted) _contentFocusNode.requestFocus();
-      });
+      unawaited(
+        Future.microtask(() {
+          if (mounted) _contentFocusNode.requestFocus();
+        }),
+      );
     }
   }
 
@@ -120,9 +124,11 @@ class AppShellState extends State<AppShell> {
             0,
             _sidebarFocusNodes.length - 1,
           )];
-      Future.microtask(() {
-        if (mounted) node.requestFocus();
-      });
+      unawaited(
+        Future.microtask(() {
+          if (mounted) node.requestFocus();
+        }),
+      );
     }
   }
 
@@ -130,9 +136,11 @@ class AppShellState extends State<AppShell> {
     setState(() {
       _sidebarActive = false;
     });
-    Future.microtask(() {
-      if (mounted) _contentFocusNode.requestFocus();
-    });
+    unawaited(
+      Future.microtask(() {
+        if (mounted) _contentFocusNode.requestFocus();
+      }),
+    );
   }
 
   bool _handleBackPress() {
@@ -329,89 +337,93 @@ class NavigationSidebar extends StatelessWidget {
       onEnter: (_) => onActivateSidebar(),
       onExit: (_) => onDeactivateSidebar(),
       child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      width: width,
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(2, 0),
-          ),
-        ],
-      ),
-      child: FocusScope(
-        node: scopeNode,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-              event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            onDeactivateSidebar();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Logo header
-            SizedBox(
-              height: 72,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
-                child: OverflowBox(
-                  maxWidth: 200,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/logo.svg',
-                        width: 36,
-                        height: 36,
-                      ),
-                      if (expanded) ...[
-                        const SizedBox(width: 12),
-                        Text(
-                          'M3U TV',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.w700,
-                          ),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        width: width,
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(2, 0),
+            ),
+          ],
+        ),
+        child: FocusScope(
+          node: scopeNode,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.arrowRight) {
+              onDeactivateSidebar();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Logo header
+              SizedBox(
+                height: 72,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
+                  child: OverflowBox(
+                    maxWidth: 200,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/logo.svg',
+                          width: 36,
+                          height: 36,
                         ),
+                        if (expanded) ...[
+                          const SizedBox(width: 12),
+                          Text(
+                            'M3U TV',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 8),
-            // Nav items
-            ...List.generate(routes.length, (index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                child: SidebarDestinationItem(
-                  label: RouteNames.routeLabels[routes[index]] ?? routes[index],
-                  icon: _routeIcon(routes[index]),
-                  selected: index == currentIndex,
-                  expanded: expanded,
-                  focusNode: focusNodes[index],
-                  onTap: () => onNavigate(index),
-                ),
-              );
-            }),
-          ],
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 8),
+              // Nav items
+              ...List.generate(routes.length, (index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  child: SidebarDestinationItem(
+                    label:
+                        RouteNames.routeLabels[routes[index]] ?? routes[index],
+                    icon: _routeIcon(routes[index]),
+                    selected: index == currentIndex,
+                    expanded: expanded,
+                    focusNode: focusNodes[index],
+                    onTap: () => onNavigate(index),
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   IconData _routeIcon(String route) => switch (route) {
@@ -577,24 +589,32 @@ class _ContentNavigator extends StatelessWidget {
   }
 
   void _openChannel(Channel channel) {
-    navigatorKey.currentState?.pushNamed(
-      RouteNames.player,
-      arguments: PlayerArgs(
-        streamUrl: channel.streamUrl,
-        title: channel.name,
-        type: 'live',
-        streamId: channel.id,
-        epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
-        headers: channel.headers,
+    unawaited(
+      navigatorKey.currentState?.pushNamed(
+        RouteNames.player,
+        arguments: PlayerArgs(
+          streamUrl: channel.streamUrl,
+          title: channel.name,
+          type: 'live',
+          streamId: channel.id,
+          epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+          headers: channel.headers,
+        ),
       ),
     );
   }
 
   void _openVod(VodItem item, {double? startPosition}) {
     if (startPosition == null) {
-      navigatorKey.currentState?.pushNamed(
-        RouteNames.details,
-        arguments: DetailsArgs(vodId: item.id, vodName: item.name, item: item),
+      unawaited(
+        navigatorKey.currentState?.pushNamed(
+          RouteNames.details,
+          arguments: DetailsArgs(
+            vodId: item.id,
+            vodName: item.name,
+            item: item,
+          ),
+        ),
       );
       return;
     }
@@ -603,17 +623,19 @@ class _ContentNavigator extends StatelessWidget {
   }
 
   void _playVod(VodItem item, {double? startPosition}) {
-    navigatorKey.currentState?.pushNamed(
-      RouteNames.player,
-      arguments: PlayerArgs(
-        streamUrl: item.streamUrl,
-        title: item.name,
-        type: 'vod',
-        streamId: item.id,
-        startPosition: startPosition,
-        metadata: <String, Object?>{
-          'container_extension': item.containerExtension,
-        },
+    unawaited(
+      navigatorKey.currentState?.pushNamed(
+        RouteNames.player,
+        arguments: PlayerArgs(
+          streamUrl: item.streamUrl,
+          title: item.name,
+          type: 'vod',
+          streamId: item.id,
+          startPosition: startPosition,
+          metadata: <String, Object?>{
+            'container_extension': item.containerExtension,
+          },
+        ),
       ),
     );
   }
@@ -641,11 +663,13 @@ class _ContentNavigator extends StatelessWidget {
   }
 
   void _openSeries(Series series) {
-    navigatorKey.currentState?.pushNamed(
-      RouteNames.seriesDetails,
-      arguments: SeriesDetailsArgs(
-        seriesId: series.id,
-        seriesName: series.name,
+    unawaited(
+      navigatorKey.currentState?.pushNamed(
+        RouteNames.seriesDetails,
+        arguments: SeriesDetailsArgs(
+          seriesId: series.id,
+          seriesName: series.name,
+        ),
       ),
     );
   }
@@ -715,7 +739,8 @@ class _ContentNavigator extends StatelessWidget {
             epgRefreshOptions: AppStateController.epgRefreshOptions,
             onConnect: appState.connectXtream,
             onDisconnect: () => unawaited(appState.disconnect()),
-            onSwitchViewer: (viewer) => unawaited(appState.switchViewer(viewer)),
+            onSwitchViewer: (viewer) =>
+                unawaited(appState.switchViewer(viewer)),
             onCreateViewer: appState.createViewer,
             onClearCache: () => unawaited(appState.clearAndRefresh()),
             onEpgIntervalChanged: (d) =>
@@ -770,12 +795,16 @@ class _HomeScreen extends StatelessWidget {
       emptyLabel: 'No Live TV available',
       items: appState.channels
           .map(
-            (Channel channel) => MediaPreviewItem(
+            (channel) => MediaPreviewItem(
               title: channel.name,
               imageUrl: channel.logoUrl,
-              subtitle: appState.epgService.lookupForChannel(channel)?.current.title
-                  ?? channel.groupTitle
-                  ?? 'Live channel',
+              subtitle:
+                  appState.epgService
+                      .lookupForChannel(channel)
+                      ?.current
+                      .title ??
+                  channel.groupTitle ??
+                  'Live channel',
               fallbackIcon: Icons.live_tv,
               imageFit: BoxFit.contain,
               imagePadding: const EdgeInsets.all(10),
@@ -792,7 +821,7 @@ class _HomeScreen extends StatelessWidget {
       posterStyle: true,
       items: appState.vodItems
           .map(
-            (VodItem item) => MediaPreviewItem(
+            (item) => MediaPreviewItem(
               title: item.name,
               imageUrl: item.logoUrl,
               subtitle: item.rating == null ? 'Movie' : '★ ${item.rating}',
@@ -810,7 +839,7 @@ class _HomeScreen extends StatelessWidget {
       posterStyle: true,
       items: appState.seriesList
           .map(
-            (Series series) => MediaPreviewItem(
+            (series) => MediaPreviewItem(
               title: series.name,
               imageUrl: series.coverUrl,
               subtitle: series.rating == null ? 'Series' : '★ ${series.rating}',

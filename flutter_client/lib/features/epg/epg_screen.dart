@@ -82,8 +82,8 @@ class _EpgScreenState extends State<EpgScreen> {
                   ),
                 )
               : _isGridView
-                  ? _buildGridView(epgMap)
-                  : _buildListView(epgMap),
+              ? _buildGridView(epgMap)
+              : _buildListView(epgMap),
         ),
       ],
     );
@@ -115,8 +115,7 @@ class _EpgScreenState extends State<EpgScreen> {
                       channel.logoUrl!,
                       width: 48,
                       height: 48,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.tv, size: 48),
+                      errorBuilder: (_, _, _) => const Icon(Icons.tv, size: 48),
                     ),
                   )
                 else
@@ -145,10 +144,10 @@ class _EpgScreenState extends State<EpgScreen> {
                         const SizedBox(height: 4),
                         LinearProgressIndicator(
                           value: epg.progress,
-                          backgroundColor:
-                              colorScheme.surfaceContainerHighest,
-                          valueColor:
-                              AlwaysStoppedAnimation(colorScheme.primary),
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(
+                            colorScheme.primary,
+                          ),
                         ),
                       ] else
                         Text(
@@ -236,15 +235,16 @@ class _EpgScreenState extends State<EpgScreen> {
                   const SizedBox(height: 4),
                   LinearProgressIndicator(
                     value: epg.progress,
-                    backgroundColor:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                   ),
                 ] else
                   Text(
                     'No program info',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontStyle: FontStyle.italic,
-                        ),
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
               ],
             ),

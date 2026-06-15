@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'format_time.dart';
+import 'package:m3u_tv/features/player/format_time.dart';
 
 /// Playback controls overlay for the player screen.
 ///
@@ -35,8 +35,10 @@ class PlaybackControls extends StatelessWidget {
 
   double _progress() {
     if (duration.inMilliseconds == 0) return 0;
-    return (currentPosition.inMilliseconds / duration.inMilliseconds)
-        .clamp(0.0, 1.0);
+    return (currentPosition.inMilliseconds / duration.inMilliseconds).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   @override
@@ -68,7 +70,11 @@ class PlaybackControls extends StatelessWidget {
               color: Colors.black54,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.arrow_back, color: colorScheme.onSurface, size: 24),
+            child: Icon(
+              Icons.arrow_back,
+              color: colorScheme.onSurface,
+              size: 24,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -170,7 +176,10 @@ class PlaybackControls extends StatelessWidget {
             onTap: () {
               final target = currentPosition - seekStep;
               final clamped = Duration(
-                milliseconds: target.inMilliseconds.clamp(0, duration.inMilliseconds),
+                milliseconds: target.inMilliseconds.clamp(
+                  0,
+                  duration.inMilliseconds,
+                ),
               );
               onSeek(clamped);
             },
@@ -182,7 +191,10 @@ class PlaybackControls extends StatelessWidget {
             onTap: () {
               final target = currentPosition + seekStep;
               final clamped = Duration(
-                milliseconds: target.inMilliseconds.clamp(0, duration.inMilliseconds),
+                milliseconds: target.inMilliseconds.clamp(
+                  0,
+                  duration.inMilliseconds,
+                ),
               );
               onSeek(clamped);
             },

@@ -2,9 +2,9 @@
 
 import 'dart:convert';
 
-import 'cache_service.dart';
-import 'domain_models.dart';
-import 'xtream_http_transport_stub.dart'
+import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
     if (dart.library.io) 'xtream_http_transport_io.dart';
 
 typedef XtreamTransport = Future<Object?> Function(XtreamRequest request);
@@ -40,7 +40,7 @@ class XtreamHttpException implements Exception {
   String toString() {
     final action = uri.queryParameters['action'];
     final safeUri = uri.replace(
-      queryParameters: <String, String>{if (action != null) 'action': action},
+      queryParameters: <String, String>{'action': ?action},
     );
     final serverDetail = serverMessage == null || serverMessage!.isEmpty
         ? ''
@@ -166,7 +166,7 @@ class XtreamService {
   Future<List<Channel>> getLiveStreams({String? categoryId}) async {
     final response = await _request(
       'get_live_streams',
-      params: {if (categoryId != null) 'category_id': categoryId},
+      params: {'category_id': ?categoryId},
     );
     return _asList(response)
         .map((item) {
@@ -180,7 +180,7 @@ class XtreamService {
   Future<List<VodItem>> getVodStreams({String? categoryId}) async {
     final response = await _request(
       'get_vod_streams',
-      params: {if (categoryId != null) 'category_id': categoryId},
+      params: {'category_id': ?categoryId},
     );
     return _asList(response)
         .map((item) {
@@ -203,7 +203,7 @@ class XtreamService {
   Future<List<Series>> getSeries({String? categoryId}) async {
     final response = await _request(
       'get_series',
-      params: {if (categoryId != null) 'category_id': categoryId},
+      params: {'category_id': ?categoryId},
     );
     return _asList(
       response,
@@ -357,9 +357,7 @@ class XtreamService {
       final response = await _request(
         'get_epg_batch',
         params: {
-          'stream_ids': chunk
-              .map((Channel channel) => '${channel.id}')
-              .join(','),
+          'stream_ids': chunk.map((channel) => '${channel.id}').join(','),
           'limit': '$limit',
         },
       );

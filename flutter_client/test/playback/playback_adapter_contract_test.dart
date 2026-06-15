@@ -47,7 +47,7 @@ void main() {
           'stop',
         ]);
         expect(
-          states.map((PlaybackState state) => state.status),
+          states.map((state) => state.status),
           containsAll(<PlaybackStatus>[
             PlaybackStatus.ready,
             PlaybackStatus.playing,
@@ -117,7 +117,7 @@ void main() {
     test('declares explicit backend rows for every planned platform path', () {
       expect(
         PlaybackCapabilities.matrix.map(
-          (PlaybackCapabilities capabilities) => capabilities.backend,
+          (capabilities) => capabilities.backend,
         ),
         containsAll(<PlaybackBackend>[
           PlaybackBackend.androidExoPlayer,
@@ -189,11 +189,11 @@ void main() {
 
 class _PlaybackUiHarness {
   _PlaybackUiHarness(this.adapter) {
-    _stateSubscription = adapter.onState.listen((PlaybackState state) {
+    _stateSubscription = adapter.onState.listen((state) {
       backend = state.backend;
       status = state.status;
     });
-    _errorSubscription = adapter.onError.listen((PlaybackError error) {
+    _errorSubscription = adapter.onError.listen((error) {
       lastError = error;
     });
   }

@@ -16,8 +16,7 @@ class FakeM3uEditorServer {
       Map<String, Map<String, Object?>>.unmodifiable(
         Map<String, Map<String, Object?>>.fromEntries(
           _broadcasts.entries.where(
-            (MapEntry<String, Map<String, Object?>> entry) =>
-                entry.value['status'] != 'stopped',
+            (entry) => entry.value['status'] != 'stopped',
           ),
         ),
       );
@@ -333,10 +332,10 @@ class FakeM3uEditorServer {
     int statusCode,
     Map<String, Object?> body,
   ) {
-    final response = request.response;
-    response.statusCode = statusCode;
-    response.headers.contentType = ContentType.json;
-    response.write(jsonEncode(body));
+    final response = request.response
+      ..statusCode = statusCode
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(body));
     unawaited(response.close());
   }
 

@@ -1,4 +1,4 @@
-import 'xtream_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 
 XtreamTransport createDefaultXtreamTransport() {
   return (XtreamRequest request) {

@@ -59,7 +59,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 80));
 
         expect(
-          direct.commands.where((String c) => c == 'load:$sourceUri'),
+          direct.commands.where((c) => c == 'load:$sourceUri'),
           hasLength(2),
         );
         expect(errors, hasLength(1));
@@ -122,7 +122,7 @@ void main() {
         await pumpEventQueue();
 
         expect(
-          direct.commands.where((String c) => c == 'load:$sourceUri'),
+          direct.commands.where((c) => c == 'load:$sourceUri'),
           hasLength(2),
         );
         expect(errors, hasLength(1));
@@ -187,17 +187,18 @@ void main() {
           reason: 'all server transcode stop requests must be issued',
         );
         expect(
-          serverPlayer.commands.where((String c) => c == 'stop'),
+          serverPlayer.commands.where((c) => c == 'stop'),
           hasLength(20),
         );
         expect(
-          serverPlayer.commands.where((String c) => c == 'dispose'),
+          serverPlayer.commands.where((c) => c == 'dispose'),
           hasLength(1),
         );
         expect(
           server.activeBroadcasts,
           isEmpty,
-          reason: 'fake server must report zero active broadcasts after cleanup',
+          reason:
+              'fake server must report zero active broadcasts after cleanup',
         );
       },
     );

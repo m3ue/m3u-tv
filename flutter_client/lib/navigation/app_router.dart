@@ -233,8 +233,8 @@ PageRoute<void> _buildModalRoute(RouteSettings settings, Widget screen) {
   return PageRouteBuilder<void>(
     settings: settings,
     opaque: false,
-    pageBuilder: (_, __, ___) => screen,
-    transitionsBuilder: (_, animation, __, child) {
+    pageBuilder: (_, _, _) => screen,
+    transitionsBuilder: (_, animation, _, child) {
       return FadeTransition(opacity: animation, child: child);
     },
   );
@@ -243,8 +243,8 @@ PageRoute<void> _buildModalRoute(RouteSettings settings, Widget screen) {
 PageRoute<void> _buildSlideRoute(RouteSettings settings, Widget screen) {
   return PageRouteBuilder<void>(
     settings: settings,
-    pageBuilder: (_, __, ___) => screen,
-    transitionsBuilder: (_, animation, __, child) {
+    pageBuilder: (_, _, _) => screen,
+    transitionsBuilder: (_, animation, _, child) {
       return SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(1, 0),

@@ -497,7 +497,7 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
   });
 
   final TranscodeResponse? serverResponse;
-  final Object? serverError;
+  final Exception? serverError;
   final BroadcastSession? broadcastSession;
   final List<StreamRequest> startedServerRequests = <StreamRequest>[];
   final List<StreamRequest> startedBroadcastRequests = <StreamRequest>[];

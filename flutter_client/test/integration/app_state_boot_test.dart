@@ -17,83 +17,86 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
   group('app state boot', () {
-    test('cached Xtream state is visible before remote refresh finishes', () async {
-      final storage = InMemorySecureStorage();
-      final cacheMemory = <String, Object?>{};
-      final catalogGate = Completer<Object?>();
-      await storage.write(
-        'm3ue_tv_credentials',
-        jsonEncode(<String, String>{
-          'server': 'https://fixture.example',
-          'username': 'fixture-user',
-          'password': 'fixture-password',
-        }),
-      );
-      await storage.write(
-        'm3ue_tv_source',
-        jsonEncode(<String, String>{'type': 'xtream'}),
-      );
+    test(
+      'cached Xtream state is visible before remote refresh finishes',
+      () async {
+        final storage = InMemorySecureStorage();
+        final cacheMemory = <String, Object?>{};
+        final catalogGate = Completer<Object?>();
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': 'https://fixture.example',
+            'username': 'fixture-user',
+            'password': 'fixture-password',
+          }),
+        );
+        await storage.write(
+          'm3ue_tv_source',
+          jsonEncode(<String, String>{'type': 'xtream'}),
+        );
 
-      final cache = CacheService(memory: cacheMemory);
-      await cache.set('sourceType', 'xtream');
-      await cache.set('liveCategories', const <Category>[
-        Category(id: 'cached-live', name: 'Cached Live'),
-      ]);
-      await cache.set('vodCategories', const <Category>[
-        Category(id: 'cached-vod', name: 'Cached Movies'),
-      ]);
-      await cache.set('seriesCategories', const <Category>[
-        Category(id: 'cached-series', name: 'Cached Series'),
-      ]);
-      await cache.set('liveStreams', const <Channel>[
-        Channel(id: 901, name: 'Cached BBC', streamUrl: 'cached-live-url'),
-      ]);
-      await cache.set('vodStreams', const <VodItem>[
-        VodItem(
-          id: 902,
-          name: 'Cached Movie',
-          streamUrl: 'cached-vod-url',
-          containerExtension: 'mp4',
-        ),
-      ]);
-      await cache.set('seriesStreams', const <Series>[
-        Series(id: 903, name: 'Cached Show'),
-      ]);
+        final cache = CacheService(memory: cacheMemory);
+        await cache.set('sourceType', 'xtream');
+        await cache.set('liveCategories', const <Category>[
+          Category(id: 'cached-live', name: 'Cached Live'),
+        ]);
+        await cache.set('vodCategories', const <Category>[
+          Category(id: 'cached-vod', name: 'Cached Movies'),
+        ]);
+        await cache.set('seriesCategories', const <Category>[
+          Category(id: 'cached-series', name: 'Cached Series'),
+        ]);
+        await cache.set('liveStreams', const <Channel>[
+          Channel(id: 901, name: 'Cached BBC', streamUrl: 'cached-live-url'),
+        ]);
+        await cache.set('vodStreams', const <VodItem>[
+          VodItem(
+            id: 902,
+            name: 'Cached Movie',
+            streamUrl: 'cached-vod-url',
+            containerExtension: 'mp4',
+          ),
+        ]);
+        await cache.set('seriesStreams', const <Series>[
+          Series(id: 903, name: 'Cached Show'),
+        ]);
 
-      final controller = _controller(
-        storage: storage,
-        cacheMemory: cacheMemory,
-        transport: _FakeXtreamTransport.success()
-            .withResponse('get_live_categories', catalogGate.future)
-            .call,
-      );
+        final controller = _controller(
+          storage: storage,
+          cacheMemory: cacheMemory,
+          transport: _FakeXtreamTransport.success()
+              .withResponse('get_live_categories', catalogGate.future)
+              .call,
+        );
 
-      final boot = controller.boot();
-      await Future<void>.delayed(Duration.zero);
-      await Future<void>.delayed(Duration.zero);
-
-      expect(controller.sourceType, AppSourceType.xtream);
-      expect(controller.isBootstrapping, isFalse);
-      expect(controller.liveCategories.single.name, 'Cached Live');
-      expect(controller.channels.single.name, 'Cached BBC');
-      expect(controller.vodItems.single.name, 'Cached Movie');
-      expect(controller.seriesList.single.name, 'Cached Show');
-      await boot;
-
-      catalogGate.complete(
-        _FakeXtreamTransport.success().responses['get_live_categories'],
-      );
-      for (var pumpCount = 0; pumpCount < 5; pumpCount += 1) {
+        final boot = controller.boot();
         await Future<void>.delayed(Duration.zero);
-      }
+        await Future<void>.delayed(Duration.zero);
 
-      expect(controller.liveCategories.single.name, 'News');
-      expect(controller.channels.single.name, 'BBC One');
-    });
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.isBootstrapping, isFalse);
+        expect(controller.liveCategories.single.name, 'Cached Live');
+        expect(controller.channels.single.name, 'Cached BBC');
+        expect(controller.vodItems.single.name, 'Cached Movie');
+        expect(controller.seriesList.single.name, 'Cached Show');
+        await boot;
+
+        catalogGate.complete(
+          _FakeXtreamTransport.success().responses['get_live_categories'],
+        );
+        for (var pumpCount = 0; pumpCount < 5; pumpCount += 1) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(controller.liveCategories.single.name, 'News');
+        expect(controller.channels.single.name, 'BBC One');
+      },
+    );
 
     testWidgets(
       'saved_source boots connected app state without constructor fixtures',
-      (WidgetTester tester) async {
+      (tester) async {
         final storage = InMemorySecureStorage();
         final localMemory = <String, Object?>{};
         await storage.write(
@@ -194,7 +197,7 @@ void main() {
 
     testWidgets(
       'source switch failure path preserves prior cache and redacts credentials',
-      (WidgetTester tester) async {
+      (tester) async {
         final storage = InMemorySecureStorage();
         final cacheMemory = <String, Object?>{};
         final localMemory = <String, Object?>{};
@@ -355,7 +358,7 @@ AppStateController _controller({
 String _visibleText(WidgetTester tester) {
   return tester
       .widgetList<Text>(find.byType(Text))
-      .map((Text text) => text.data ?? '')
+      .map((text) => text.data ?? '')
       .join('\n');
 }
 
@@ -367,7 +370,8 @@ Future<void> _pumpAppState(WidgetTester tester) async {
 
 Future<void> _waitForXtreamRefresh(AppStateController controller) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {
-    final hasEpg = controller.channels.isNotEmpty &&
+    final hasEpg =
+        controller.channels.isNotEmpty &&
         controller.epgService.lookupForChannel(controller.channels.single) !=
             null;
     if (hasEpg &&

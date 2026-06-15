@@ -280,7 +280,7 @@ void main() {
       _TestApp(
         deviceType: DeviceType.tv,
         appState: appState,
-        playerRouteBuilder: (PlayerArgs args) {
+        playerRouteBuilder: (args) {
           capturedArgs = args;
           return _testPlayerRoute(args);
         },

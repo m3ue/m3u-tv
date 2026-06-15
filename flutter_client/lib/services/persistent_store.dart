@@ -30,7 +30,7 @@ class PersistentJsonStore {
 
   Future<void> removeWhere(bool Function(String key) test) async {
     final data = await _readAll();
-    data.removeWhere((String key, Object? value) => test(key));
+    data.removeWhere((key, value) => test(key));
     await _writeAll(data);
   }
 

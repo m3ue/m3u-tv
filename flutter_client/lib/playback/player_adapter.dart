@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'playback_capabilities.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
 
 abstract class PlayerAdapter {
   PlaybackCapabilities get capabilities;

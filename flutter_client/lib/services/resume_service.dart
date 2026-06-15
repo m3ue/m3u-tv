@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'domain_models.dart';
-import 'persistent_store.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 
 class ResumeService {
   ResumeService({
@@ -44,7 +44,7 @@ class ResumeService {
     return values
         .map(_progressFromStored)
         .whereType<Progress>()
-        .where((Progress progress) => progress.viewerId == viewerId)
+        .where((progress) => progress.viewerId == viewerId)
         .toList(growable: false);
   }
 

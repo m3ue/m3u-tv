@@ -6,7 +6,7 @@ import 'package:m3u_tv/main.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('launches the Flutter client shell', (WidgetTester tester) async {
+  testWidgets('launches the Flutter client shell', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 

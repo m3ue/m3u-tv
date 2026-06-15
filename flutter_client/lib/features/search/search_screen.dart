@@ -168,8 +168,10 @@ class _SearchScreenState extends State<SearchScreen>
           if (seriesList.isNotEmpty) ...[
             const _SectionHeader(title: 'Series'),
             ...seriesList.map(
-              (s) =>
-                  _SeriesListTile(item: s, onTap: () => widget.onSeriesSelect(s)),
+              (s) => _SeriesListTile(
+                item: s,
+                onTap: () => widget.onSeriesSelect(s),
+              ),
             ),
           ],
         ],
@@ -283,7 +285,11 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _ChannelListTile extends StatelessWidget {
-  const _ChannelListTile({required this.channel, required this.onTap, this.autofocus = false});
+  const _ChannelListTile({
+    required this.channel,
+    required this.onTap,
+    this.autofocus = false,
+  });
   final Channel channel;
   final VoidCallback onTap;
   final bool autofocus;
@@ -309,7 +315,11 @@ class _ChannelListTile extends StatelessWidget {
 }
 
 class _VodListTile extends StatelessWidget {
-  const _VodListTile({required this.item, required this.onTap, this.autofocus = false});
+  const _VodListTile({
+    required this.item,
+    required this.onTap,
+    this.autofocus = false,
+  });
   final VodItem item;
   final VoidCallback onTap;
   final bool autofocus;
@@ -336,7 +346,11 @@ class _VodListTile extends StatelessWidget {
 }
 
 class _SeriesListTile extends StatelessWidget {
-  const _SeriesListTile({required this.item, required this.onTap, this.autofocus = false});
+  const _SeriesListTile({
+    required this.item,
+    required this.onTap,
+    this.autofocus = false,
+  });
   final Series item;
   final VoidCallback onTap;
   final bool autofocus;

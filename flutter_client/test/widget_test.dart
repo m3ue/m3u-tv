@@ -4,7 +4,7 @@ import 'package:m3u_tv/main.dart';
 
 void main() {
   testWidgets('renders the app shell', (
-    WidgetTester tester,
+    tester,
   ) async {
     await tester.pumpWidget(const MyApp());
     await tester.pump();

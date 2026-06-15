@@ -5,28 +5,35 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   String readFile(String path) => File(path).readAsStringSync();
 
-  test('license notices checklist exists and documents required dependencies', () {
-    const checklistPath = '../docs/release/license-notices-checklist.md';
-    final checklist = readFile(checklistPath);
+  test(
+    'license notices checklist exists and documents required dependencies',
+    () {
+      const checklistPath = '../docs/release/license-notices-checklist.md';
+      final checklist = readFile(checklistPath);
 
-    for (final expected in <String>[
-      'CC BY-NC-SA 4.0',
-      'Media3 / ExoPlayer',
-      'Apache License 2.0',
-      'Flutter SDK and Flutter Plugins',
-      'BSD-3-Clause',
-      'mpv / libmpv',
-      'LGPL-2.1+',
-      'FFmpeg',
-      'libass',
-      'GPL Policy Gate',
-      'Do not ship GPL-only binaries',
-      'Release Artifact Checklist',
-      'Honest Blockers',
-    ]) {
-      expect(checklist, contains(expected), reason: 'License checklist must mention $expected');
-    }
-  });
+      for (final expected in <String>[
+        'CC BY-NC-SA 4.0',
+        'Media3 / ExoPlayer',
+        'Apache License 2.0',
+        'Flutter SDK and Flutter Plugins',
+        'BSD-3-Clause',
+        'mpv / libmpv',
+        'LGPL-2.1+',
+        'FFmpeg',
+        'libass',
+        'GPL Policy Gate',
+        'Do not ship GPL-only binaries',
+        'Release Artifact Checklist',
+        'Honest Blockers',
+      ]) {
+        expect(
+          checklist,
+          contains(expected),
+          reason: 'License checklist must mention $expected',
+        );
+      }
+    },
+  );
 
   test('no keystore or signing files are committed in the repository', () {
     final repoDir = Directory('..');
@@ -97,7 +104,8 @@ void main() {
     expect(
       committedFiles,
       isEmpty,
-      reason: 'Repository must not contain committed keystore, signing, or store credential files. Found: ${committedFiles.join(', ')}',
+      reason:
+          'Repository must not contain committed keystore, signing, or store credential files. Found: ${committedFiles.join(', ')}',
     );
   });
 
@@ -119,7 +127,12 @@ void main() {
     for (final path in checkedPaths) {
       final content = readFile(path);
       for (final pattern in suspiciousPatterns) {
-        expect(content, isNot(matches(pattern)), reason: '$path must not contain hardcoded signing secrets matching $pattern');
+        expect(
+          content,
+          isNot(matches(pattern)),
+          reason:
+              '$path must not contain hardcoded signing secrets matching $pattern',
+        );
       }
     }
   });
@@ -134,33 +147,52 @@ void main() {
       'flutter_client/android/*.jks',
       'flutter_client/android/*.keystore',
     ]) {
-      expect(gitignore, contains(expected), reason: 'Root .gitignore must block $expected');
+      expect(
+        gitignore,
+        contains(expected),
+        reason: 'Root .gitignore must block $expected',
+      );
     }
   });
 
-  test('platform config files use production app ID or document template status', () {
-    // Android is the active release platform and must use the production ID
-    final androidBuildGradle = readFile('android/app/build.gradle.kts');
-    expect(androidBuildGradle, contains('namespace = "com.m3ue.m3utv"'));
-    expect(androidBuildGradle, contains('applicationId = "com.m3ue.m3utv"'));
-    expect(androidBuildGradle, isNot(contains('com.example')));
+  test(
+    'platform config files use production app ID or document template status',
+    () {
+      // Android is the active release platform and must use the production ID
+      final androidBuildGradle = readFile('android/app/build.gradle.kts');
+      expect(androidBuildGradle, contains('namespace = "com.m3ue.m3utv"'));
+      expect(androidBuildGradle, contains('applicationId = "com.m3ue.m3utv"'));
+      expect(androidBuildGradle, isNot(contains('com.example')));
 
-    // Non-Android platforms are future-gated; they may still have template IDs,
-    // but we record them so they are not forgotten when those platforms activate.
-    final linuxCmake = readFile('linux/CMakeLists.txt');
-    final windowsRc = readFile('windows/runner/Runner.rc');
-    final macosConfig = readFile('macos/Runner/Configs/AppInfo.xcconfig');
+      // Non-Android platforms are future-gated; they may still have template IDs,
+      // but we record them so they are not forgotten when those platforms activate.
+      final linuxCmake = readFile('linux/CMakeLists.txt');
+      final windowsRc = readFile('windows/runner/Runner.rc');
+      final macosConfig = readFile('macos/Runner/Configs/AppInfo.xcconfig');
 
-    // These are known template IDs in non-Android platforms; they are not
-    // release blockers today but must be updated before those platforms ship.
-    if (linuxCmake.contains('com.example')) {
-      expect(linuxCmake, contains('com.example.m3u_tv'), reason: 'Linux template ID must be the known template value');
-    }
-    if (windowsRc.contains('com.example')) {
-      expect(windowsRc, contains('com.example'), reason: 'Windows template ID must be the known template value');
-    }
-    if (macosConfig.contains('com.example')) {
-      expect(macosConfig, contains('com.example.m3uTv'), reason: 'macOS template ID must be the known template value');
-    }
-  });
+      // These are known template IDs in non-Android platforms; they are not
+      // release blockers today but must be updated before those platforms ship.
+      if (linuxCmake.contains('com.example')) {
+        expect(
+          linuxCmake,
+          contains('com.example.m3u_tv'),
+          reason: 'Linux template ID must be the known template value',
+        );
+      }
+      if (windowsRc.contains('com.example')) {
+        expect(
+          windowsRc,
+          contains('com.example'),
+          reason: 'Windows template ID must be the known template value',
+        );
+      }
+      if (macosConfig.contains('com.example')) {
+        expect(
+          macosConfig,
+          contains('com.example.m3uTv'),
+          reason: 'macOS template ID must be the known template value',
+        );
+      }
+    },
+  );
 }

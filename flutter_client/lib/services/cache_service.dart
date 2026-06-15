@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'domain_models.dart';
-import 'persistent_store.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 
 class CacheEntry<T> {
   const CacheEntry({required this.data, required this.isStale});
@@ -49,7 +49,7 @@ class CacheService {
 
   Future<void> clear() async {
     _memory.removeWhere((key, _) => key.startsWith('m3ue_cache_'));
-    await _store?.removeWhere((String key) => key.startsWith('m3ue_cache_'));
+    await _store?.removeWhere((key) => key.startsWith('m3ue_cache_'));
   }
 }
 
@@ -97,11 +97,11 @@ Object? _decodeCacheData(String key, Object? raw) {
   return switch (key) {
     'liveCategories' || 'vodCategories' || 'seriesCategories' =>
       list
-          ?.map((Object? item) => Category.fromXtream(_asMap(item)))
+          ?.map((item) => Category.fromXtream(_asMap(item)))
           .toList(growable: false),
     'liveStreams' =>
       list
-          ?.map((Object? item) {
+          ?.map((item) {
             final json = _asMap(item);
             return Channel(
               id: _asInt(json['stream_id']),
@@ -117,7 +117,7 @@ Object? _decodeCacheData(String key, Object? raw) {
           .toList(growable: false),
     'vodStreams' =>
       list
-          ?.map((Object? item) {
+          ?.map((item) {
             final json = _asMap(item);
             return VodItem(
               id: _asInt(json['stream_id']),
@@ -132,7 +132,7 @@ Object? _decodeCacheData(String key, Object? raw) {
           .toList(growable: false),
     'seriesStreams' =>
       list
-          ?.map((Object? item) => Series.fromXtream(_asMap(item)))
+          ?.map((item) => Series.fromXtream(_asMap(item)))
           .toList(growable: false),
     _ => raw,
   };

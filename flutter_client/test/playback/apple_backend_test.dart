@@ -11,7 +11,7 @@ void main() {
       () {
         expect(
           AppleBackendFeasibility.targets.map(
-            (ApplePlaybackTarget target) => target.platform,
+            (target) => target.platform,
           ),
           <AppleTargetPlatform>[
             AppleTargetPlatform.ios,
@@ -54,7 +54,7 @@ void main() {
       for (final target in AppleBackendFeasibility.targets) {
         expect(
           target.backendOrder.map(
-            (PlaybackCapabilities capabilities) => capabilities.backend,
+            (capabilities) => capabilities.backend,
           ),
           contains(PlaybackBackend.appleAvKit),
           reason: '${target.platform.label} must not block playback on mpv',
@@ -78,7 +78,7 @@ void main() {
     test('records App Store gates and license obligations', () {
       expect(
         AppleBackendFeasibility.appStoreGates.map(
-          (AppleStoreGate gate) => gate.id,
+          (gate) => gate.id,
         ),
         containsAll(<String>[
           'public-apis',

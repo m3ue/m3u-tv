@@ -2,9 +2,9 @@
 
 import 'dart:async';
 
-import '../transcoding/transcoding.dart';
-import 'playback_capabilities.dart';
-import 'player_adapter.dart';
+import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/transcoding/transcoding.dart';
 
 abstract class PlaybackTranscodeGateway {
   Future<TranscodeResponse> startServerTranscode(StreamRequest request);
@@ -69,7 +69,7 @@ class PlaybackOrchestrator {
   int? get activeTextureId {
     final adapter = _activeAdapter;
     if (adapter is! VideoTextureProvider) return null;
-    return (adapter as VideoTextureProvider).textureId;
+    return (adapter! as VideoTextureProvider).textureId;
   }
 
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
@@ -172,8 +172,9 @@ class PlaybackOrchestrator {
     try {
       await adapter.load(source);
       _activeSource = source;
-      _diagnostics.add(successDiagnostic);
-      _diagnostics.add('active-backend:${backend.name}:ready');
+      _diagnostics
+        ..add(successDiagnostic)
+        ..add('active-backend:${backend.name}:ready');
       return null;
     } on PlaybackException catch (error) {
       if (identical(_activeAdapter, adapter) && _activeBackend == backend) {
@@ -230,7 +231,7 @@ class PlaybackOrchestrator {
         ),
       );
       return;
-    } catch (error) {
+    } on Object catch (error) {
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -264,7 +265,7 @@ class PlaybackOrchestrator {
     BroadcastSession? broadcast;
     try {
       broadcast = await _startBroadcastIfNeeded(source);
-    } catch (error) {
+    } on Object catch (error) {
       await _cleanupSessions();
       _emitError(
         PlaybackError(
@@ -380,12 +381,13 @@ class PlaybackOrchestrator {
     if (!_boundAdapters.add(adapter)) {
       return;
     }
-    _subscriptions.add(adapter.onState.listen(_handleAdapterState));
-    _subscriptions.add(
-      adapter.onError.listen((PlaybackError error) {
-        unawaited(_handleAdapterError(adapter, error));
-      }),
-    );
+    _subscriptions
+      ..add(adapter.onState.listen(_handleAdapterState))
+      ..add(
+        adapter.onError.listen((error) {
+          unawaited(_handleAdapterError(adapter, error));
+        }),
+      );
   }
 
   void _handleAdapterState(PlaybackState state) {
@@ -468,7 +470,7 @@ class PlaybackOrchestrator {
       await _stopActiveAdapter();
       await _cleanupSessions();
       _emitError(PlaybackError.fromException(retryError));
-    } catch (retryError) {
+    } on Object catch (retryError) {
       if (_disposed || generation != _playbackGeneration) return;
       await _stopActiveAdapter();
       await _cleanupSessions();

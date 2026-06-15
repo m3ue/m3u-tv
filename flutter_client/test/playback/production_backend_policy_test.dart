@@ -18,7 +18,7 @@ void main() {
   group('production backend policy', () {
     testWidgets(
       'unsupported_codec: Android uses Media3 then server transcode and renders diagnostics',
-      (WidgetTester tester) async {
+      (tester) async {
         final media3 = _PolicyPlayerAdapter(
           capabilities: PlaybackCapabilities.androidExoPlayer,
           loadFailure: const PlaybackException.unsupported(
@@ -305,7 +305,7 @@ void main() {
         await orchestrator.dispose();
 
         expect(
-          serverPlayer.commands.where((String command) => command == 'stop'),
+          serverPlayer.commands.where((command) => command == 'stop'),
           hasLength(1),
         );
         expect(gateway.stoppedServerTranscodes, <String>[
@@ -313,7 +313,7 @@ void main() {
         ]);
         expect(
           orchestrator.diagnostics.where(
-            (String item) =>
+            (item) =>
                 item ==
                 'cleanup:server-transcode:stopped:cleanup-stream:cleanup-session',
           ),
@@ -349,7 +349,7 @@ void main() {
 
         expect(
           media3.commands.where(
-            (String command) =>
+            (command) =>
                 command == 'load:https://provider.example/live/offline.ts',
           ),
           hasLength(2),
@@ -409,7 +409,7 @@ void main() {
 
         expect(
           media3.commands.where(
-            (String command) =>
+            (command) =>
                 command == 'load:https://provider.example/live/expiring.ts',
           ),
           hasLength(2),
@@ -464,7 +464,7 @@ void main() {
         expect(gateway.stoppedBroadcasts, hasLength(20));
         expect(gateway.stoppedServerTranscodes, hasLength(20));
         expect(
-          serverPlayer.commands.where((String command) => command == 'stop'),
+          serverPlayer.commands.where((command) => command == 'stop'),
           hasLength(20),
         );
       },
@@ -477,10 +477,11 @@ void main() {
         final now = DateTime.utc(2026, 1, 1, 12);
         final programs = <EpgProgram>[];
         for (var index = 0; index < 10000; index += 1) {
-          buffer.writeln(
-            '#EXTINF:-1 tvg-id="bulk.$index" group-title="Bulk",Bulk $index',
-          );
-          buffer.writeln('https://streams.example/live/$index.m3u8');
+          buffer
+            ..writeln(
+              '#EXTINF:-1 tvg-id="bulk.$index" group-title="Bulk",Bulk $index',
+            )
+            ..writeln('https://streams.example/live/$index.m3u8');
           programs.add(
             EpgProgram(
               channelId: 'bulk.$index',
@@ -535,6 +536,7 @@ Future<_PolicyOpenResult> _openWithFailure(
     transcodeGateway: transcodeGateway,
   );
   final errors = <PlaybackError>[];
+  // ignore: cancel_subscriptions
   final subscription = orchestrator.onError.listen(errors.add);
 
   await orchestrator.open(

@@ -29,15 +29,22 @@ void main() {
     });
 
     testWidgets('renders continue watching items', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        progressList: testProgress,
-        vodItems: const [
-          VodItem(id: 10, name: 'The Matrix', streamUrl: 'http://example.com/10.mp4', containerExtension: 'mp4'),
-        ],
-        seriesList: const [
-          Series(id: 5, name: 'Breaking Bad'),
-        ],
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          progressList: testProgress,
+          vodItems: const [
+            VodItem(
+              id: 10,
+              name: 'The Matrix',
+              streamUrl: 'http://example.com/10.mp4',
+              containerExtension: 'mp4',
+            ),
+          ],
+          seriesList: const [
+            Series(id: 5, name: 'Breaking Bad'),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('The Matrix'), findsOneWidget);
@@ -45,15 +52,22 @@ void main() {
     });
 
     testWidgets('shows progress bar for items', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        progressList: testProgress,
-        vodItems: const [
-          VodItem(id: 10, name: 'The Matrix', streamUrl: 'http://example.com/10.mp4', containerExtension: 'mp4'),
-        ],
-        seriesList: const [
-          Series(id: 5, name: 'Breaking Bad'),
-        ],
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          progressList: testProgress,
+          vodItems: const [
+            VodItem(
+              id: 10,
+              name: 'The Matrix',
+              streamUrl: 'http://example.com/10.mp4',
+              containerExtension: 'mp4',
+            ),
+          ],
+          seriesList: const [
+            Series(id: 5, name: 'Breaking Bad'),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Should find LinearProgressIndicator for progress bars
@@ -61,38 +75,54 @@ void main() {
     });
 
     testWidgets('shows empty state when no progress items', (tester) async {
-      await tester.pumpWidget(const _TestApp(
-        progressList: [],
-        vodItems: [],
-        seriesList: [],
-      ));
+      await tester.pumpWidget(
+        const _TestApp(
+          progressList: [],
+          vodItems: [],
+          seriesList: [],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('No continue watching items'), findsOneWidget);
     });
 
-    testWidgets('shows not configured message when not connected', (tester) async {
-      await tester.pumpWidget(_TestApp(
-        progressList: testProgress,
-        vodItems: const [],
-        seriesList: const [],
-        isConfigured: false,
-      ));
+    testWidgets('shows not configured message when not connected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          progressList: testProgress,
+          vodItems: const [],
+          seriesList: const [],
+          isConfigured: false,
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Please connect to your service in Settings'), findsOneWidget);
+      expect(
+        find.text('Please connect to your service in Settings'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tapping item triggers onResume callback', (tester) async {
       Progress? selectedProgress;
-      await tester.pumpWidget(_TestApp(
-        progressList: testProgress,
-        vodItems: const [
-          VodItem(id: 10, name: 'The Matrix', streamUrl: 'http://example.com/10.mp4', containerExtension: 'mp4'),
-        ],
-        seriesList: const [],
-        onResume: (progress) => selectedProgress = progress,
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          progressList: testProgress,
+          vodItems: const [
+            VodItem(
+              id: 10,
+              name: 'The Matrix',
+              streamUrl: 'http://example.com/10.mp4',
+              containerExtension: 'mp4',
+            ),
+          ],
+          seriesList: const [],
+          onResume: (progress) => selectedProgress = progress,
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('The Matrix'));
@@ -112,13 +142,20 @@ void main() {
           durationSeconds: 3600,
         ),
       ];
-      await tester.pumpWidget(_TestApp(
-        progressList: shortProgress,
-        vodItems: const [
-          VodItem(id: 10, name: 'The Matrix', streamUrl: 'http://example.com/10.mp4', containerExtension: 'mp4'),
-        ],
-        seriesList: const [],
-      ));
+      await tester.pumpWidget(
+        _TestApp(
+          progressList: shortProgress,
+          vodItems: const [
+            VodItem(
+              id: 10,
+              name: 'The Matrix',
+              streamUrl: 'http://example.com/10.mp4',
+              containerExtension: 'mp4',
+            ),
+          ],
+          seriesList: const [],
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Should show empty state since position < 30 seconds

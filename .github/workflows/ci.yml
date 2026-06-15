@@ -27,6 +27,9 @@ jobs:
           fi
           /tmp/flutter/bin/flutter --version
 
+      - name: Check formatting
+        run: /tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
+
       - name: Analyze Flutter client
         run: /tmp/flutter/bin/flutter analyze
 
