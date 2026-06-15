@@ -26,6 +26,7 @@ class LiveTvScreen extends StatefulWidget {
     required this.favoritesService,
     required this.epgService,
     required this.onChannelSelect,
+    this.onSidebarActivate,
   });
 
   final List<Channel> channels;
@@ -35,6 +36,7 @@ class LiveTvScreen extends StatefulWidget {
   final FavoritesService favoritesService;
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<LiveTvScreen> createState() => _LiveTvScreenState();
@@ -214,6 +216,12 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   Widget _buildListView(List<Channel> channels) {
     return DpadRegion(
       memoryKey: 'live-tv/list',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
       child: ScrollbarListView(
         itemCount: channels.length,
         itemBuilder: (context, index) {
@@ -239,6 +247,12 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   Widget _buildGridView(List<Channel> channels) {
     return DpadRegion(
       memoryKey: 'live-tv/grid',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
       child: ScrollbarGridView(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,

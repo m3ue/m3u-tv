@@ -18,6 +18,7 @@ class SeriesScreen extends StatefulWidget {
     required this.isLoading,
     required this.isConfigured,
     required this.onSeriesSelect,
+    this.onSidebarActivate,
   });
 
   final List<Series> seriesList;
@@ -25,6 +26,7 @@ class SeriesScreen extends StatefulWidget {
   final bool isLoading;
   final bool isConfigured;
   final void Function(Series) onSeriesSelect;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<SeriesScreen> createState() => _SeriesScreenState();
@@ -122,6 +124,12 @@ class _SeriesScreenState extends State<SeriesScreen> {
   Widget _buildGrid(List<Series> items) {
     return DpadRegion(
       memoryKey: 'series/grid',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
       child: ScrollbarGridView(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 5,

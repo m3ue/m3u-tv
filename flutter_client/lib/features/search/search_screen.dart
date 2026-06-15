@@ -19,6 +19,7 @@ class SearchScreen extends StatefulWidget {
     required this.onChannelSelect,
     required this.onVodSelect,
     required this.onSeriesSelect,
+    this.onSidebarActivate,
   });
 
   final List<Channel> channels;
@@ -28,6 +29,7 @@ class SearchScreen extends StatefulWidget {
   final void Function(Channel) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -138,31 +140,40 @@ class _SearchScreenState extends State<SearchScreen>
       return _buildEmptyState('No results found');
     }
 
-    return ListView(
-      children: [
-        if (channels.isNotEmpty) ...[
-          const _SectionHeader(title: 'Live TV'),
-          ...channels.map(
-            (c) => _ChannelListTile(
-              channel: c,
-              onTap: () => widget.onChannelSelect(c),
+    return DpadRegion(
+      memoryKey: 'search/all',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: ListView(
+        children: [
+          if (channels.isNotEmpty) ...[
+            const _SectionHeader(title: 'Live TV'),
+            ...channels.map(
+              (c) => _ChannelListTile(
+                channel: c,
+                onTap: () => widget.onChannelSelect(c),
+              ),
             ),
-          ),
+          ],
+          if (vodItems.isNotEmpty) ...[
+            const _SectionHeader(title: 'Movies'),
+            ...vodItems.map(
+              (v) => _VodListTile(item: v, onTap: () => widget.onVodSelect(v)),
+            ),
+          ],
+          if (seriesList.isNotEmpty) ...[
+            const _SectionHeader(title: 'Series'),
+            ...seriesList.map(
+              (s) =>
+                  _SeriesListTile(item: s, onTap: () => widget.onSeriesSelect(s)),
+            ),
+          ],
         ],
-        if (vodItems.isNotEmpty) ...[
-          const _SectionHeader(title: 'Movies'),
-          ...vodItems.map(
-            (v) => _VodListTile(item: v, onTap: () => widget.onVodSelect(v)),
-          ),
-        ],
-        if (seriesList.isNotEmpty) ...[
-          const _SectionHeader(title: 'Series'),
-          ...seriesList.map(
-            (s) =>
-                _SeriesListTile(item: s, onTap: () => widget.onSeriesSelect(s)),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -173,12 +184,21 @@ class _SearchScreenState extends State<SearchScreen>
     if (channels.isEmpty) {
       return _buildEmptyState('No results found');
     }
-    return ListView.builder(
-      itemCount: channels.length,
-      itemBuilder: (context, index) => _ChannelListTile(
-        channel: channels[index],
-        autofocus: index == 0,
-        onTap: () => widget.onChannelSelect(channels[index]),
+    return DpadRegion(
+      memoryKey: 'search/live-tv',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: ListView.builder(
+        itemCount: channels.length,
+        itemBuilder: (context, index) => _ChannelListTile(
+          channel: channels[index],
+          autofocus: index == 0,
+          onTap: () => widget.onChannelSelect(channels[index]),
+        ),
       ),
     );
   }
@@ -190,12 +210,21 @@ class _SearchScreenState extends State<SearchScreen>
     if (vodItems.isEmpty) {
       return _buildEmptyState('No results found');
     }
-    return ListView.builder(
-      itemCount: vodItems.length,
-      itemBuilder: (context, index) => _VodListTile(
-        item: vodItems[index],
-        autofocus: index == 0,
-        onTap: () => widget.onVodSelect(vodItems[index]),
+    return DpadRegion(
+      memoryKey: 'search/movies',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: ListView.builder(
+        itemCount: vodItems.length,
+        itemBuilder: (context, index) => _VodListTile(
+          item: vodItems[index],
+          autofocus: index == 0,
+          onTap: () => widget.onVodSelect(vodItems[index]),
+        ),
       ),
     );
   }
@@ -207,12 +236,21 @@ class _SearchScreenState extends State<SearchScreen>
     if (seriesList.isEmpty) {
       return _buildEmptyState('No results found');
     }
-    return ListView.builder(
-      itemCount: seriesList.length,
-      itemBuilder: (context, index) => _SeriesListTile(
-        item: seriesList[index],
-        autofocus: index == 0,
-        onTap: () => widget.onSeriesSelect(seriesList[index]),
+    return DpadRegion(
+      memoryKey: 'search/series',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: ListView.builder(
+        itemCount: seriesList.length,
+        itemBuilder: (context, index) => _SeriesListTile(
+          item: seriesList[index],
+          autofocus: index == 0,
+          onTap: () => widget.onSeriesSelect(seriesList[index]),
+        ),
       ),
     );
   }

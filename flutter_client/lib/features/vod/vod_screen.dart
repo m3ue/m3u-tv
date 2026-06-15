@@ -17,6 +17,7 @@ class VodScreen extends StatefulWidget {
     required this.isLoading,
     required this.isConfigured,
     required this.onVodSelect,
+    this.onSidebarActivate,
   });
 
   final List<VodItem> vodItems;
@@ -24,6 +25,7 @@ class VodScreen extends StatefulWidget {
   final bool isLoading;
   final bool isConfigured;
   final void Function(VodItem) onVodSelect;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<VodScreen> createState() => _VodScreenState();
@@ -132,6 +134,12 @@ class _VodScreenState extends State<VodScreen> {
 
         return DpadRegion(
           memoryKey: 'vod/grid',
+          horizontalEdge: DpadEdgeBehavior.stop,
+          onEdge: (direction) {
+            if (direction == TraversalDirection.left) {
+              widget.onSidebarActivate?.call();
+            }
+          },
           child: ScrollbarGridView(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columnCount,

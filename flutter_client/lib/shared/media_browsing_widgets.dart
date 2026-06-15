@@ -249,20 +249,6 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
     super.dispose();
   }
 
-  void _page(double direction) {
-    if (!_controller.hasClients) return;
-    final viewport = _controller.position.viewportDimension;
-    final next = (_controller.offset + direction * viewport * 0.72).clamp(
-      _controller.position.minScrollExtent,
-      _controller.position.maxScrollExtent,
-    );
-    _controller.animateTo(
-      next,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -277,66 +263,30 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
               widget.leading!,
               const SizedBox(width: MediaBrowsingMetrics.chipGap),
             ],
-            _CategoryScrollButton(
-              icon: Icons.chevron_left,
-              tooltip: 'Scroll categories left',
-              onPressed: () => _page(-1),
-            ),
-            const SizedBox(width: MediaBrowsingMetrics.chipGap),
             Expanded(
               child: SizedBox(
                 height: 40,
-                child: DpadRegion(
-                  horizontalEdge: DpadEdgeBehavior.stop,
-                  child: ListView.separated(
-                    controller: _controller,
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.zero,
-                    itemCount: widget.tabs.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(width: MediaBrowsingMetrics.chipGap),
-                    itemBuilder: (context, index) {
-                      final tab = widget.tabs[index];
-                      return CategoryFilterChip(
-                        label: tab.name,
-                        isSelected: widget.selectedId == tab.id,
-                        onTap: () => widget.onSelected(tab.id),
-                      );
-                    },
-                  ),
+                child: ListView.separated(
+                  controller: _controller,
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.zero,
+                  itemCount: widget.tabs.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
+                  itemBuilder: (context, index) {
+                    final tab = widget.tabs[index];
+                    return CategoryFilterChip(
+                      label: tab.name,
+                      isSelected: widget.selectedId == tab.id,
+                      onTap: () => widget.onSelected(tab.id),
+                    );
+                  },
                 ),
               ),
-            ),
-            const SizedBox(width: MediaBrowsingMetrics.chipGap),
-            _CategoryScrollButton(
-              icon: Icons.chevron_right,
-              tooltip: 'Scroll categories right',
-              onPressed: () => _page(1),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _CategoryScrollButton extends StatelessWidget {
-  const _CategoryScrollButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton.filledTonal(
-      icon: Icon(icon),
-      tooltip: tooltip,
-      onPressed: onPressed,
     );
   }
 }
@@ -358,6 +308,11 @@ class CategoryFilterChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return DpadFocusable(
       onSelect: onTap,
+      effects: const [
+        DpadBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(MediaBrowsingMetrics.chipRadius)),
+        ),
+      ],
       child: Material(
         color: isSelected
             ? colorScheme.primaryContainer
@@ -366,17 +321,8 @@ class CategoryFilterChip extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(MediaBrowsingMetrics.chipRadius),
-          child: Container(
+          child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(
-                MediaBrowsingMetrics.chipRadius,
-              ),
-              border: Border.all(
-                color: isSelected ? colorScheme.primary : Colors.transparent,
-                width: 2,
-              ),
-            ),
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -510,6 +456,7 @@ class MediaPreviewSection extends StatefulWidget {
     required this.emptyLabel,
     required this.items,
     this.posterStyle = false,
+    this.onSidebarActivate,
     super.key,
   });
 
@@ -517,6 +464,7 @@ class MediaPreviewSection extends StatefulWidget {
   final String emptyLabel;
   final List<MediaPreviewItem> items;
   final bool posterStyle;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<MediaPreviewSection> createState() => _MediaPreviewSectionState();
@@ -552,6 +500,11 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               child: DpadRegion(
                 memoryKey: 'preview-row/${widget.title}',
                 horizontalEdge: DpadEdgeBehavior.stop,
+                onEdge: (direction) {
+                  if (direction == TraversalDirection.left) {
+                    widget.onSidebarActivate?.call();
+                  }
+                },
                 child: Scrollbar(
                   controller: _controller,
                   thumbVisibility: true,

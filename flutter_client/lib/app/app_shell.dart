@@ -170,9 +170,13 @@ class AppShellState extends State<AppShell> {
         child: Focus(
           autofocus: true,
           onKeyEvent: (node, event) {
+            // Only intercept left arrow when content scope has no focused
+            // descendant (empty/unconfigured state). When content has focus,
+            // let dpad handle traversal via its Shortcuts before we intercept.
             if (event is KeyDownEvent &&
                 event.logicalKey == LogicalKeyboardKey.arrowLeft &&
-                useSidebar) {
+                useSidebar &&
+                !_contentFocusNode.hasFocus) {
               _activateSidebar();
               return KeyEventResult.handled;
             }
@@ -218,18 +222,11 @@ class AppShellState extends State<AppShell> {
                     },
                     child: FocusScope(
                       node: _contentFocusNode,
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                          _activateSidebar();
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
                       child: _ContentNavigator(
                         navigatorKey: _navigatorKey,
                         currentIndex: _currentIndex,
                         appState: _appState,
+                        onSidebarActivate: _activateSidebar,
                         playbackOrchestratorBuilder:
                             widget.playbackOrchestratorBuilder,
                         playerRouteBuilder: widget.playerRouteBuilder,
@@ -543,6 +540,7 @@ class _ContentNavigator extends StatelessWidget {
     required this.navigatorKey,
     required this.currentIndex,
     required this.appState,
+    this.onSidebarActivate,
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
   });
@@ -550,6 +548,7 @@ class _ContentNavigator extends StatelessWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   final int currentIndex;
   final AppStateController appState;
+  final VoidCallback? onSidebarActivate;
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
 
@@ -662,6 +661,7 @@ class _ContentNavigator extends StatelessWidget {
             onVodSelect: _openVod,
             onSeriesSelect: _openSeries,
             onProgressSelect: _openProgress,
+            onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.search => SearchScreen(
             channels: appState.channels,
@@ -671,6 +671,7 @@ class _ContentNavigator extends StatelessWidget {
             onChannelSelect: _openChannel,
             onVodSelect: _openVod,
             onSeriesSelect: _openSeries,
+            onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.liveTv => LiveTvScreen(
             channels: appState.channels,
@@ -680,6 +681,7 @@ class _ContentNavigator extends StatelessWidget {
             favoritesService: appState.favoritesService,
             epgService: appState.epgService,
             onChannelSelect: _openChannel,
+            onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.vod => VodScreen(
             vodItems: appState.vodItems,
@@ -687,6 +689,7 @@ class _ContentNavigator extends StatelessWidget {
             isLoading: appState.isLoadingContent,
             isConfigured: appState.isConfigured,
             onVodSelect: _openVod,
+            onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.series => SeriesScreen(
             seriesList: appState.seriesList,
@@ -694,6 +697,7 @@ class _ContentNavigator extends StatelessWidget {
             isLoading: appState.isLoadingContent,
             isConfigured: appState.isConfigured,
             onSeriesSelect: _openSeries,
+            onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.settings => SettingsScreen(
             authNotifier: appState.authNotifier,
@@ -726,6 +730,7 @@ class _HomeScreen extends StatelessWidget {
     required this.onVodSelect,
     required this.onSeriesSelect,
     required this.onProgressSelect,
+    this.onSidebarActivate,
   });
 
   final AppStateController appState;
@@ -733,6 +738,7 @@ class _HomeScreen extends StatelessWidget {
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
+  final VoidCallback? onSidebarActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -751,6 +757,7 @@ class _HomeScreen extends StatelessWidget {
       title: 'Continue Watching',
       emptyLabel: 'No Continue Watching available',
       items: continueWatchingItems,
+      onSidebarActivate: onSidebarActivate,
     );
     final liveSection = MediaPreviewSection(
       title: 'Live TV',
@@ -771,6 +778,7 @@ class _HomeScreen extends StatelessWidget {
             ),
           )
           .toList(growable: false),
+      onSidebarActivate: onSidebarActivate,
     );
     final moviesSection = MediaPreviewSection(
       title: 'Movies',
@@ -788,6 +796,7 @@ class _HomeScreen extends StatelessWidget {
             ),
           )
           .toList(growable: false),
+      onSidebarActivate: onSidebarActivate,
     );
     final seriesSection = MediaPreviewSection(
       title: 'Series',
@@ -805,6 +814,7 @@ class _HomeScreen extends StatelessWidget {
             ),
           )
           .toList(growable: false),
+      onSidebarActivate: onSidebarActivate,
     );
     final previewSections = continueWatchingItems.isEmpty
         ? [liveSection, moviesSection, seriesSection, continueWatchingSection]

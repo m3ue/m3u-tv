@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
       title: 'M3U TV',
       builder: Dpad.wrap(
         theme: const DpadThemeData(
-          effects: [DpadBorderEffect(), DpadScaleEffect(scale: 1.04)],
+          effects: [DpadBorderEffect(borderRadius: BorderRadius.all(Radius.circular(8)))],
           scrollPadding: 48,
         ),
       ),
