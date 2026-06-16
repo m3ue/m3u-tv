@@ -317,67 +317,72 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       builder: (context, constraints) {
         if (constraints.maxWidth < 240 || constraints.maxHeight < 120) {
           return Scaffold(
-            body: FocusScope(
-              node: _contentFocusNode,
-              child: _ContentNavigator(
-                navigatorKey: _navigatorKey,
-                currentIndex: _currentIndex,
-                appState: _appState,
-                onConnected: () => _navigateTo(0),
-                onOpenPlayer: _openPlayer,
-                playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
-                playerRouteBuilder: widget.playerRouteBuilder,
+            body: SafeArea(
+              child: FocusScope(
+                node: _contentFocusNode,
+                child: _ContentNavigator(
+                  navigatorKey: _navigatorKey,
+                  currentIndex: _currentIndex,
+                  appState: _appState,
+                  onConnected: () => _navigateTo(0),
+                  onOpenPlayer: _openPlayer,
+                  playbackOrchestratorBuilder:
+                      widget.playbackOrchestratorBuilder,
+                  playerRouteBuilder: widget.playerRouteBuilder,
+                ),
               ),
             ),
           );
         }
 
         return Scaffold(
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 64),
-                  child: DpadRegion(
-                    memoryKey: 'content',
-                    horizontalEdge: DpadEdgeBehavior.stop,
-                    onEdge: (direction) {
-                      if (direction == TraversalDirection.left) {
-                        _activateSidebar();
-                      }
-                    },
-                    child: FocusScope(
-                      node: _contentFocusNode,
-                      child: _ContentNavigator(
-                        navigatorKey: _navigatorKey,
-                        currentIndex: _currentIndex,
-                        appState: _appState,
-                        onSidebarActivate: _activateSidebar,
-                        onConnected: () => _navigateTo(0),
-                        onOpenPlayer: _openPlayer,
-                        playbackOrchestratorBuilder:
-                            widget.playbackOrchestratorBuilder,
-                        playerRouteBuilder: widget.playerRouteBuilder,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 64),
+                    child: DpadRegion(
+                      memoryKey: 'content',
+                      horizontalEdge: DpadEdgeBehavior.stop,
+                      onEdge: (direction) {
+                        if (direction == TraversalDirection.left) {
+                          _activateSidebar();
+                        }
+                      },
+                      child: FocusScope(
+                        node: _contentFocusNode,
+                        child: _ContentNavigator(
+                          navigatorKey: _navigatorKey,
+                          currentIndex: _currentIndex,
+                          appState: _appState,
+                          onSidebarActivate: _activateSidebar,
+                          onConnected: () => _navigateTo(0),
+                          onOpenPlayer: _openPlayer,
+                          playbackOrchestratorBuilder:
+                              widget.playbackOrchestratorBuilder,
+                          playerRouteBuilder: widget.playerRouteBuilder,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                bottom: 0,
-                child: NavigationSidebar(
-                  currentIndex: _currentIndex,
-                  sidebarActive: _sidebarActive,
-                  focusNodes: _sidebarFocusNodes,
-                  scopeNode: _sidebarScopeNode,
-                  onNavigate: _navigateTo,
-                  onActivateSidebar: _activateSidebar,
-                  onDeactivateSidebar: _deactivateSidebar,
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  child: NavigationSidebar(
+                    currentIndex: _currentIndex,
+                    sidebarActive: _sidebarActive,
+                    focusNodes: _sidebarFocusNodes,
+                    scopeNode: _sidebarScopeNode,
+                    onNavigate: _navigateTo,
+                    onActivateSidebar: _activateSidebar,
+                    onDeactivateSidebar: _deactivateSidebar,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -386,14 +391,17 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Widget _buildMobileLayout() {
     return Scaffold(
-      body: _ContentNavigator(
-        navigatorKey: _navigatorKey,
-        currentIndex: _currentIndex,
-        appState: _appState,
-        onConnected: () => _navigateTo(0),
-        onOpenPlayer: _openPlayer,
-        playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
-        playerRouteBuilder: widget.playerRouteBuilder,
+      body: SafeArea(
+        bottom: false,
+        child: _ContentNavigator(
+          navigatorKey: _navigatorKey,
+          currentIndex: _currentIndex,
+          appState: _appState,
+          onConnected: () => _navigateTo(0),
+          onOpenPlayer: _openPlayer,
+          playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
+          playerRouteBuilder: widget.playerRouteBuilder,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
