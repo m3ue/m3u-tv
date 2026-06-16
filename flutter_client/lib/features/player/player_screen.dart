@@ -65,9 +65,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _showResumePrompt = false;
   bool _overlayVisible = true;
 
-  // Focus node handed to the play/pause button in PlaybackControls so that
-  // _showOverlay() can move focus there explicitly (autofocus alone won't
-  // steal focus from the outer Focus that already holds it).
+  // Owns the outer Focus so we can steal focus from the content area when
+  // the player opens, and reclaim it whenever the overlay hides.
+  final FocusNode _screenFocusNode = FocusNode();
+
+  // Handed to the play/pause button so _showOverlay() can jump focus there.
   final FocusNode _controlsFocusNode = FocusNode();
 
   Timer? _loadingTimer;
@@ -87,6 +89,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Steal focus from the content area (autofocus won't do this if another
+    // widget already holds focus when the player opens via the AppShell Stack).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _screenFocusNode.requestFocus();
+    });
     _checkResumePrompt();
     _startPlayback();
     _startLoadingTimeout();
@@ -100,6 +107,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _overlayHideTimer?.cancel();
     _progressTimer?.cancel();
     _epgTimer?.cancel();
+    _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     unawaited(_stateSubscription?.cancel());
     unawaited(_errorSubscription?.cancel());
@@ -155,6 +163,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _overlayHideTimer = Timer(_overlayTimeout, () {
       if (!_disposed && mounted) {
         setState(() => _overlayVisible = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_overlayVisible) _screenFocusNode.requestFocus();
+        });
       }
     });
   }
@@ -359,6 +370,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _hideOverlay() {
     _overlayHideTimer?.cancel();
     setState(() => _overlayVisible = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_overlayVisible) _screenFocusNode.requestFocus();
+    });
   }
 
   void _handleBack() {
@@ -399,6 +413,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
           },
           child: Focus(
+            focusNode: _screenFocusNode,
             autofocus: true,
             onKeyEvent: (node, event) {
               // Any key press while the overlay is hidden brings it back.
