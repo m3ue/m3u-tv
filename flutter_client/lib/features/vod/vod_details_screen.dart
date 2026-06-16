@@ -88,7 +88,7 @@ class _VodDetailsBody extends StatelessWidget {
     final content = Padding(
       padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           SizedBox(
             width: 220,
@@ -129,7 +129,15 @@ class _VodDetailsBody extends StatelessWidget {
             ),
           ),
         ),
-        content,
+        Align(
+          alignment: Alignment.bottomLeft,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.sizeOf(context).height * 0.1,
+            ),
+            child: content,
+          ),
+        ),
       ],
     );
   }
