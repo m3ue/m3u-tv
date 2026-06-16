@@ -193,62 +193,73 @@ class _EpgScreenState extends State<EpgScreen> {
   }
 
   Widget _buildGridView(Map<int, EpgCurrentNext?> epgMap) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 1.5,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-      ),
-      itemCount: widget.channels.length,
-      itemBuilder: (context, index) {
-        final channel = widget.channels[index];
-        final epg = epgMap[channel.id];
-        return InkWell(
-          onTap: () => widget.onChannelSelect(channel),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  channel.name,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-                if (epg != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    epg.current.title,
-                    style: Theme.of(context).textTheme.labelSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: epg.progress,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                  ),
-                ] else
-                  Text(
-                    'No program info',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const minCardWidth = 160.0;
+        const maxColumns = 4;
+        final columnCount =
+            ((constraints.maxWidth - 32 + 8) / (minCardWidth + 8))
+                .floor()
+                .clamp(1, maxColumns);
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columnCount,
+            childAspectRatio: 1.5,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
           ),
+          itemCount: widget.channels.length,
+          itemBuilder: (context, index) {
+            final channel = widget.channels[index];
+            final epg = epgMap[channel.id];
+            return InkWell(
+              onTap: () => widget.onChannelSelect(channel),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      channel.name,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (epg != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        epg.current.title,
+                        style: Theme.of(context).textTheme.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: epg.progress,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                      ),
+                    ] else
+                      Text(
+                        'No program info',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

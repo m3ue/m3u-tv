@@ -256,9 +256,9 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
         }
       },
       child: ScrollbarGridView(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          childAspectRatio: 1.5,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 160,
+          mainAxisExtent: 120,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
         ),

@@ -33,6 +33,9 @@ class SeriesScreen extends StatefulWidget {
 }
 
 class _SeriesScreenState extends State<SeriesScreen> {
+  static const double _minPosterCardWidth = 120;
+  static const int _desktopPosterColumns = 5;
+
   String? _selectedCategory;
   String _query = '';
 
@@ -122,31 +125,43 @@ class _SeriesScreenState extends State<SeriesScreen> {
   }
 
   Widget _buildGrid(List<Series> items) {
-    return DpadRegion(
-      memoryKey: 'series/grid',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth =
+            constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
+        final columnCount =
+            ((availableWidth + MediaBrowsingMetrics.itemGap) /
+                    (_minPosterCardWidth + MediaBrowsingMetrics.itemGap))
+                .floor()
+                .clamp(1, _desktopPosterColumns);
+
+        return DpadRegion(
+          memoryKey: 'series/grid',
+          horizontalEdge: DpadEdgeBehavior.stop,
+          onEdge: (direction) {
+            if (direction == TraversalDirection.left) {
+              widget.onSidebarActivate?.call();
+            }
+          },
+          child: ScrollbarGridView(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columnCount,
+              childAspectRatio: 0.6,
+              mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+              crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return _SeriesCard(
+                item: item,
+                autofocus: index == 0,
+                onTap: () => widget.onSeriesSelect(item),
+              );
+            },
+          ),
+        );
       },
-      child: ScrollbarGridView(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5,
-          childAspectRatio: 0.6,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _SeriesCard(
-            item: item,
-            autofocus: index == 0,
-            onTap: () => widget.onSeriesSelect(item),
-          );
-        },
-      ),
     );
   }
 }
