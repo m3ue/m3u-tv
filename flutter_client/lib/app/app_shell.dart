@@ -45,12 +45,14 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> {
+class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _sidebarActive = false;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final AppStateController _appState;
   late final bool _ownsAppState;
+
+  DateTime? _lastBackPress;
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
@@ -65,6 +67,7 @@ class AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _appState.addListener(_onAppStateChanged);
@@ -72,6 +75,28 @@ class AppShellState extends State<AppShell> {
       unawaited(_appState.boot());
     }
     _initSidebarFocusNodes();
+  }
+
+  @override
+  Future<bool> didPopRoute() async {
+    if (_handleBackPress()) return true;
+
+    // Double-back to exit: require two back presses within 2 seconds.
+    final now = DateTime.now();
+    final last = _lastBackPress;
+    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+      return false; // Let Android exit the app.
+    }
+    _lastBackPress = now;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Press back again to exit'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    return true;
   }
 
   void _onAppStateChanged() {
@@ -87,6 +112,7 @@ class AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
       node.dispose();
