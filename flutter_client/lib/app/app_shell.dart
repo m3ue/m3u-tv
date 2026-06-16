@@ -197,9 +197,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _playerArgs = null;
       _playerOrchestrator = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => orch?.dispose().ignore(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      orch?.dispose().ignore();
+      if (mounted) _contentFocusNode.requestFocus();
+    });
   }
 
   bool _handleBackPress() {
