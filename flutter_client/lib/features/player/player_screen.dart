@@ -421,9 +421,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const _PlayPauseIntent(),
-          LogicalKeySet(LogicalKeyboardKey.arrowLeft): const _SeekBackIntent(),
-          LogicalKeySet(LogicalKeyboardKey.arrowRight):
-              const _SeekForwardIntent(),
+          // Only claim arrow keys when the overlay is hidden — when visible,
+          // let dpad's root Shortcuts handle them for spatial navigation.
+          if (!_overlayVisible) ...{
+            LogicalKeySet(LogicalKeyboardKey.arrowLeft):
+                const _SeekBackIntent(),
+            LogicalKeySet(LogicalKeyboardKey.arrowRight):
+                const _SeekForwardIntent(),
+          },
         },
         child: Actions(
           actions: <Type, Action<Intent>>{

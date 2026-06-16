@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/features/player/format_time.dart';
 
@@ -42,6 +43,8 @@ class PlaybackControls extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return DpadRegion(
+      horizontalEdge: DpadEdgeBehavior.stop,
+      verticalEdge: DpadEdgeBehavior.stop,
       child: Container(
         padding: const EdgeInsets.all(40),
         color: Colors.black26,
@@ -232,6 +235,7 @@ class _SeekBar extends StatefulWidget {
 
 class _SeekBarState extends State<_SeekBar> {
   final FocusNode _focusNode = FocusNode();
+  Timer? _commitTimer;
   Duration? _scrubPosition;
   bool _hasFocus = false;
 
@@ -245,6 +249,7 @@ class _SeekBarState extends State<_SeekBar> {
 
   @override
   void dispose() {
+    _commitTimer?.cancel();
     _focusNode
       ..removeListener(_onFocusChange)
       ..dispose();
@@ -269,9 +274,13 @@ class _SeekBarState extends State<_SeekBar> {
         ),
       );
     });
+    _commitTimer?.cancel();
+    _commitTimer = Timer(const Duration(milliseconds: 700), _commit);
   }
 
   void _commit() {
+    _commitTimer?.cancel();
+    _commitTimer = null;
     final pos = _scrubPosition;
     if (pos == null) return;
     setState(() => _scrubPosition = null);
@@ -288,129 +297,118 @@ class _SeekBarState extends State<_SeekBar> {
         ? 0.0
         : (displayPos.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
 
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onKeyEvent: (node, event) {
-        if (!_focusNode.hasFocus) return KeyEventResult.ignored;
-        if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-          return KeyEventResult.ignored;
-        }
-        final key = event.logicalKey;
-        if (key == LogicalKeyboardKey.arrowLeft) {
+    return DpadFocusable(
+      focusNode: _focusNode,
+      onSelect: _commit,
+      onDirection: (direction) {
+        if (direction == TraversalDirection.left) {
           _adjustScrub(-1);
-          return KeyEventResult.handled;
+          return true;
         }
-        if (key == LogicalKeyboardKey.arrowRight) {
+        if (direction == TraversalDirection.right) {
           _adjustScrub(1);
-          return KeyEventResult.handled;
+          return true;
         }
-        return KeyEventResult.ignored;
+        return false;
       },
-      child: DpadFocusable(
-        focusNode: _focusNode,
-        onSelect: _commit,
-        effects: const [
-          DpadBorderEffect(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-          ),
-        ],
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 60,
-                child: Text(
-                  formatTime(displayPos),
-                  style: TextStyle(
-                    color: isScrubbing
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                    fontWeight: isScrubbing
-                        ? FontWeight.w700
-                        : FontWeight.normal,
-                  ),
-                  textAlign: TextAlign.center,
+      effects: const [
+        DpadBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 60,
+              child: Text(
+                formatTime(displayPos),
+                style: TextStyle(
+                  color: isScrubbing
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                  fontWeight: isScrubbing ? FontWeight.w700 : FontWeight.normal,
                 ),
+                textAlign: TextAlign.center,
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final trackW = constraints.maxWidth;
-                      final fillW = (trackW * progress).clamp(0.0, trackW);
-                      final barH = _hasFocus ? 8.0 : 6.0;
-                      return SizedBox(
-                        height: 16,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              top: (16 - barH) / 2,
-                              height: barH,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white30,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final trackW = constraints.maxWidth;
+                    final fillW = (trackW * progress).clamp(0.0, trackW);
+                    final barH = _hasFocus ? 8.0 : 6.0;
+                    return SizedBox(
+                      height: 16,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            top: (16 - barH) / 2,
+                            height: barH,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white30,
+                                borderRadius: BorderRadius.circular(4),
                               ),
                             ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            top: (16 - barH) / 2,
+                            width: fillW,
+                            height: barH,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                          if (_hasFocus)
                             Positioned(
-                              left: 0,
-                              top: (16 - barH) / 2,
-                              width: fillW,
-                              height: barH,
+                              left: (fillW - 8).clamp(0, trackW - 16),
+                              top: 0,
                               child: Container(
+                                width: 16,
+                                height: 16,
                                 decoration: BoxDecoration(
                                   color: colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(4),
+                                  shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black38,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            if (_hasFocus)
-                              Positioned(
-                                left: (fillW - 8).clamp(0, trackW - 16),
-                                top: 0,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Colors.black38,
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-              SizedBox(
-                width: 60,
-                child: Text(
-                  formatTime(total),
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
+            ),
+            SizedBox(
+              width: 60,
+              child: Text(
+                formatTime(total),
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 14,
                 ),
+                textAlign: TextAlign.center,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
