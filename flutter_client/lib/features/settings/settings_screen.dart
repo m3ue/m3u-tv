@@ -57,8 +57,10 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isConnecting = false;
   String? _connectionError;
+  UserCredentials? _lastCredentials;
 
   Future<void> _handleConnect(UserCredentials credentials) async {
+    _lastCredentials = credentials;
     setState(() {
       _isConnecting = true;
       _connectionError = null;
@@ -101,6 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return Scaffold(
         body: _ConnectionFormBody(
           onConnect: _handleConnect,
+          initialValues: _lastCredentials,
           error:
               _connectionError ??
               widget.sourceError ??
@@ -166,9 +169,14 @@ class _ConnectingScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ConnectionFormBody extends StatefulWidget {
-  const _ConnectionFormBody({required this.onConnect, this.error});
+  const _ConnectionFormBody({
+    required this.onConnect,
+    this.initialValues,
+    this.error,
+  });
 
   final Future<void> Function(UserCredentials credentials) onConnect;
+  final UserCredentials? initialValues;
   final String? error;
 
   @override
@@ -176,9 +184,15 @@ class _ConnectionFormBody extends StatefulWidget {
 }
 
 class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
-  final _serverController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  late final _serverController = TextEditingController(
+    text: widget.initialValues?.server,
+  );
+  late final _usernameController = TextEditingController(
+    text: widget.initialValues?.username,
+  );
+  late final _passwordController = TextEditingController(
+    text: widget.initialValues?.password,
+  );
   String? _validationError;
 
   @override
