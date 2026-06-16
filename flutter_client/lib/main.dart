@@ -64,9 +64,11 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: primary),
         useMaterial3: true,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         colorScheme:
             ColorScheme.fromSeed(
               seedColor: primary,
