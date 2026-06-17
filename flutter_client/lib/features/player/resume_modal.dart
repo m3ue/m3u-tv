@@ -13,7 +13,8 @@ Future<double?> showResumeModal(
 }) {
   return showDialog<double>(
     context: context,
-    builder: (_) => _ResumeModal(title: title, positionSeconds: positionSeconds),
+    builder: (_) =>
+        _ResumeModal(title: title, positionSeconds: positionSeconds),
   );
 }
 
@@ -85,7 +86,8 @@ class _ResumeModal extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 DpadFocusable(
-                  onSelect: () => Navigator.of(context).pop(0),
+                  // ignore: prefer_int_literals
+                  onSelect: () => Navigator.of(context).pop(0.0),
                   effects: const [
                     DpadBorderEffect(
                       borderRadius: BorderRadius.all(Radius.circular(8)),
@@ -100,6 +102,7 @@ class _ResumeModal extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    // ignore: prefer_int_literals
                     onTap: () => Navigator.of(context).pop(0.0),
                   ),
                 ),
@@ -130,8 +133,9 @@ class _ResumeModal extends StatelessWidget {
                         ),
                       ],
                       child: FilledButton(
-                        onPressed: () =>
-                            Navigator.of(context).pop(positionSeconds.toDouble()),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).pop(positionSeconds.toDouble()),
                         child: const Text('Resume'),
                       ),
                     ),

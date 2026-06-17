@@ -484,7 +484,8 @@ class _EpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final p = progress;
-    final progressValue = (p != null &&
+    final progressValue =
+        (p != null &&
             p.durationSeconds != null &&
             p.durationSeconds! > 0 &&
             !p.completed)

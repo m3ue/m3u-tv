@@ -335,6 +335,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
+    // Resume modal is shown for in-progress VOD; tap Resume to proceed.
+    expect(find.text('Resume Watching'), findsOneWidget);
+    await tester.tap(find.text('Resume'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
     expect(find.text('Player route: Route Movie'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });

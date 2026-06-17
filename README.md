@@ -58,9 +58,9 @@ flutter run
 Quality gates for the primary client:
 
 ```bash
+dart format ./
 flutter analyze
 flutter test
-dart format ./
 ```
 
 ## Configuration
@@ -133,6 +133,7 @@ To use with M3U Editor, use your M3U Editor server URL and credentials from a Pl
 
 ```bash
 cd flutter_client
+dart format ./
 flutter analyze
 flutter test
 ```
