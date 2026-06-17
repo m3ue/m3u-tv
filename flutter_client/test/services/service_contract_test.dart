@@ -117,6 +117,54 @@ void main() {
       },
     );
 
+    test(
+      'default transport reports plaintext server failures cleanly',
+      () async {
+        final server = await io.HttpServer.bind(
+          io.InternetAddress.loopbackIPv4,
+          0,
+        );
+        unawaited(
+          server.listen((request) {
+            request.response.headers.contentType = io.ContentType.text;
+            request.response.write('no available server');
+            unawaited(request.response.close());
+          }).asFuture<void>(),
+        );
+        addTearDown(() => server.close(force: true));
+
+        final service = XtreamService();
+
+        await expectLater(
+          service.authenticate(
+            UserCredentials(
+              server: 'http://${server.address.host}:${server.port}',
+              username: 'demo-user',
+              password: 'playlist-secret',
+            ),
+          ),
+          throwsA(
+            isA<XtreamResponseException>()
+                .having(
+                  (error) => '$error',
+                  'message',
+                  contains('no available server'),
+                )
+                .having(
+                  (error) => '$error',
+                  'message',
+                  isNot(contains('FormatException')),
+                )
+                .having(
+                  (error) => '$error',
+                  'message',
+                  isNot(contains('playlist-secret')),
+                ),
+          ),
+        );
+      },
+    );
+
     test('auth success loads categories and typed content', () async {
       final transport = FakeXtreamTransport({
         'auth': xtreamAuth(auth: 1),

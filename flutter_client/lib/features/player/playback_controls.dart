@@ -137,13 +137,6 @@ class PlaybackControls extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _ControlButton(
-          icon: isPlaying ? Icons.pause : Icons.play_arrow,
-          onTap: onPlayPause,
-          colorScheme: colorScheme,
-          autofocus: playPauseFocusNode == null,
-          focusNode: playPauseFocusNode,
-        ),
         if (!isLive)
           _ControlButton(
             icon: Icons.replay_10,
@@ -159,6 +152,13 @@ class PlaybackControls extends StatelessWidget {
             },
             colorScheme: colorScheme,
           ),
+        _ControlButton(
+          icon: isPlaying ? Icons.pause : Icons.play_arrow,
+          onTap: onPlayPause,
+          colorScheme: colorScheme,
+          autofocus: playPauseFocusNode == null,
+          focusNode: playPauseFocusNode,
+        ),
         if (!isLive)
           _ControlButton(
             icon: Icons.forward_10,
@@ -200,6 +200,11 @@ class _ControlButton extends StatelessWidget {
       autofocus: autofocus,
       focusNode: focusNode,
       onSelect: onTap,
+      effects: const [
+        DpadBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+        ),
+      ],
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -278,6 +283,29 @@ class _SeekBarState extends State<_SeekBar> {
     _commitTimer = Timer(const Duration(milliseconds: 700), _commit);
   }
 
+  void _seekFromPointer(double localDx, double width) {
+    if (widget.duration <= Duration.zero || width <= 0) return;
+    final clampedX = localDx.clamp(0.0, width);
+    final ratio = clampedX / width;
+    setState(() {
+      _scrubPosition = Duration(
+        milliseconds: (widget.duration.inMilliseconds * ratio).round(),
+      );
+    });
+  }
+
+  void _commitPointerSeek() {
+    _commitTimer?.cancel();
+    _commitTimer = null;
+    final pos = _scrubPosition;
+    if (pos == null) return;
+    widget.onSeek(pos);
+    // Keep thumb visible while the player seeks to the new position.
+    _commitTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _scrubPosition = null);
+    });
+  }
+
   void _commit() {
     _commitTimer?.cancel();
     _commitTimer = null;
@@ -342,55 +370,71 @@ class _SeekBarState extends State<_SeekBar> {
                     final trackW = constraints.maxWidth;
                     final fillW = (trackW * progress).clamp(0.0, trackW);
                     final barH = _hasFocus ? 8.0 : 6.0;
-                    return SizedBox(
-                      height: 16,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            top: (16 - barH) / 2,
-                            height: barH,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white30,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 0,
-                            top: (16 - barH) / 2,
-                            width: fillW,
-                            height: barH,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                          if (_hasFocus)
+                    return GestureDetector(
+                      key: const Key('playback-seekbar-track'),
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (details) {
+                        _seekFromPointer(details.localPosition.dx, trackW);
+                      },
+                      onTap: _commitPointerSeek,
+                      onHorizontalDragStart: (details) {
+                        _seekFromPointer(details.localPosition.dx, trackW);
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        _seekFromPointer(details.localPosition.dx, trackW);
+                      },
+                      onHorizontalDragEnd: (_) => _commitPointerSeek(),
+                      child: SizedBox(
+                        height: 16,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
                             Positioned(
-                              left: (fillW - 8).clamp(0, trackW - 16),
-                              top: 0,
+                              left: 0,
+                              right: 0,
+                              top: (16 - barH) / 2,
+                              height: barH,
                               child: Container(
-                                width: 16,
-                                height: 16,
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black38,
-                                      blurRadius: 4,
-                                    ),
-                                  ],
+                                  color: Colors.white30,
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
                               ),
                             ),
-                        ],
+                            Positioned(
+                              left: 0,
+                              top: (16 - barH) / 2,
+                              width: fillW,
+                              height: barH,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                            if (_hasFocus || isScrubbing)
+                              Positioned(
+                                left: (fillW - 8).clamp(0, trackW - 16),
+                                top: 0,
+                                child: Container(
+                                  key: const Key('playback-seekbar-thumb'),
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black38,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },

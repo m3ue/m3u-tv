@@ -186,6 +186,36 @@ void main() {
       expect(notifier.error, isNotNull);
     });
 
+    test(
+      'connect with plaintext server failure hides parser details',
+      () async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(
+            transport: (_) async {
+              throw XtreamResponseException(
+                method: 'GET',
+                uri: Uri.parse('http://x.com/player_api.php'),
+                serverMessage: 'no available server',
+              );
+            },
+          ),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        final result = await notifier.connect(
+          const UserCredentials(
+            server: 'http://x.com',
+            username: 'u',
+            password: 'p',
+          ),
+        );
+
+        expect(result, isFalse);
+        expect(notifier.error, contains('no available server'));
+        expect(notifier.error, isNot(contains('FormatException')));
+      },
+    );
+
     test('connect persists credentials to secure storage', () async {
       final storage = InMemorySecureStorage();
       final transport = _FakeTransport({
