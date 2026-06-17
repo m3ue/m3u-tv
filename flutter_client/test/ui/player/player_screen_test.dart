@@ -138,6 +138,160 @@ void main() {
       expect(find.byIcon(Icons.forward_10), findsOneWidget);
     });
 
+    testWidgets('orders VOD seek controls around play pause', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+
+      final replayCenter = tester.getCenter(find.byIcon(Icons.replay_10));
+      final playPauseCenter = tester.getCenter(find.byIcon(Icons.pause));
+      final forwardCenter = tester.getCenter(find.byIcon(Icons.forward_10));
+
+      expect(replayCenter.dx, lessThan(playPauseCenter.dx));
+      expect(playPauseCenter.dx, lessThan(forwardCenter.dx));
+    });
+
+    testWidgets('calls onSeek with 10 second replay target', (tester) async {
+      Duration? seekTarget;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(seconds: 30),
+            duration: const Duration(minutes: 1),
+            onPlayPause: () {},
+            onSeek: (target) => seekTarget = target,
+            onBack: () {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.replay_10));
+
+      expect(seekTarget, const Duration(seconds: 20));
+    });
+
+    testWidgets('calls onSeek with 10 second forward target', (tester) async {
+      Duration? seekTarget;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(seconds: 30),
+            duration: const Duration(minutes: 1),
+            onPlayPause: () {},
+            onSeek: (target) => seekTarget = target,
+            onBack: () {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+
+      expect(seekTarget, const Duration(seconds: 40));
+    });
+
+    testWidgets('clamps seek controls to media bounds', (tester) async {
+      final seekTargets = <Duration>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(seconds: 5),
+            duration: const Duration(seconds: 8),
+            onPlayPause: () {},
+            onSeek: seekTargets.add,
+            onBack: () {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.replay_10));
+      await tester.tap(find.byIcon(Icons.forward_10));
+
+      expect(seekTargets, [Duration.zero, const Duration(seconds: 8)]);
+    });
+
+    testWidgets('clicking seekbar track seeks to clicked position', (
+      tester,
+    ) async {
+      Duration? seekTarget;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: Duration.zero,
+            duration: const Duration(seconds: 100),
+            onPlayPause: () {},
+            onSeek: (target) => seekTarget = target,
+            onBack: () {},
+          ),
+        ),
+      );
+
+      final track = find.byKey(const Key('playback-seekbar-track'));
+      final rect = tester.getRect(track);
+
+      await tester.tapAt(Offset(rect.left + rect.width * 0.5, rect.center.dy));
+      await tester.pump();
+
+      expect(seekTarget, const Duration(seconds: 50));
+      expect(find.byKey(const Key('playback-seekbar-thumb')), findsOneWidget);
+    });
+
+    testWidgets('dragging seekbar track seeks to dragged position', (
+      tester,
+    ) async {
+      final seekTargets = <Duration>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: Duration.zero,
+            duration: const Duration(seconds: 100),
+            onPlayPause: () {},
+            onSeek: seekTargets.add,
+            onBack: () {},
+          ),
+        ),
+      );
+
+      final rect = tester.getRect(
+        find.byKey(const Key('playback-seekbar-track')),
+      );
+      final gesture = await tester.startGesture(
+        Offset(rect.left + rect.width * 0.25, rect.center.dy),
+      );
+      await gesture.moveTo(
+        Offset(rect.left + rect.width * 0.75, rect.center.dy),
+      );
+      await gesture.up();
+
+      expect(seekTargets, isNotEmpty);
+      expect(seekTargets.last, const Duration(seconds: 75));
+    });
+
     testWidgets('displays formatted time', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
