@@ -7,6 +7,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
+import 'package:m3u_tv/playback/media_kit_ios_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -276,6 +277,7 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       ),
     );
   } else if (platform == PlaybackPlatform.apple) {
+    adapters[PlaybackBackend.appleMpvKit] = MediaKitIosAdapter();
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
     adapters[PlaybackBackend.desktopLibmpv] = MediaKitDesktopAdapter();
