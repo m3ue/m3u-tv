@@ -13,9 +13,8 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // MediaKit (libmpv) is only used on desktop. Android uses ExoPlayer and
-  // iOS uses AVKit — neither bundle libmpv, so skip initialization there.
-  if (!kIsWeb && (Platform.isMacOS || Platform.isLinux || Platform.isWindows)) {
+  // MediaKit (libmpv) is used on desktop and iOS. Android uses ExoPlayer only.
+  if (!kIsWeb && !Platform.isAndroid) {
     MediaKit.ensureInitialized();
   }
   final appState = await _buildAppState();
