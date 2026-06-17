@@ -52,6 +52,30 @@ class XtreamHttpException implements Exception {
   }
 }
 
+class XtreamResponseException implements Exception {
+  const XtreamResponseException({
+    required this.method,
+    required this.uri,
+    this.serverMessage,
+  });
+
+  final String method;
+  final Uri uri;
+  final String? serverMessage;
+
+  @override
+  String toString() {
+    final detail = serverMessage == null || serverMessage!.isEmpty
+        ? 'Server returned an invalid Xtream response.'
+        : 'Server returned an invalid Xtream response: $serverMessage';
+    final action = uri.queryParameters['action'];
+    final safeUri = uri.replace(
+      queryParameters: <String, String>{'action': ?action},
+    );
+    return '$detail ($method $safeUri)';
+  }
+}
+
 class XtreamRequest {
   const XtreamRequest({
     required this.credentials,

@@ -28,8 +28,39 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
 
   final response = await httpRequest.close();
   final text = await utf8.decodeStream(response);
-  if (text.isEmpty) return null;
-  final body = jsonDecode(text);
+  if (text.isEmpty) {
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw XtreamHttpException(
+        statusCode: response.statusCode,
+        reasonPhrase: response.reasonPhrase,
+        method: request.method,
+        uri: uri,
+      );
+    }
+    return null;
+  }
+
+  final Object? body;
+  try {
+    body = jsonDecode(text);
+  } on FormatException {
+    final serverMessage = _plainServerMessage(text);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw XtreamHttpException(
+        statusCode: response.statusCode,
+        reasonPhrase: response.reasonPhrase,
+        method: request.method,
+        uri: uri,
+        serverMessage: serverMessage,
+      );
+    }
+    throw XtreamResponseException(
+      method: request.method,
+      uri: uri,
+      serverMessage: serverMessage,
+    );
+  }
+
   if (response.statusCode >= HttpStatus.badRequest) {
     throw XtreamHttpException(
       statusCode: response.statusCode,
@@ -40,6 +71,12 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
     );
   }
   return body;
+}
+
+String? _plainServerMessage(String text) {
+  final message = text.trim();
+  if (message.isEmpty) return null;
+  return message.length <= 240 ? message : '${message.substring(0, 240)}...';
 }
 
 String? _serverMessage(Object? body) {
