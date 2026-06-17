@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
+import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
@@ -175,7 +176,37 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  void _openPlayer(PlayerArgs args) {
+  Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
+    var resolvedArgs = args;
+    if (resolvedArgs.type != 'live' &&
+        resolvedArgs.startPosition == null &&
+        resolvedArgs.streamId != null) {
+      final target = resolvedArgs.type == 'series'
+          ? ContentType.episode
+          : ContentType.vod;
+      final progress = _appState.progressList.firstWhereOrNull(
+        (p) =>
+            p.streamId == resolvedArgs.streamId &&
+            p.contentType == target &&
+            p.positionSeconds >= 30 &&
+            !p.completed,
+      );
+      if (progress != null && context.mounted) {
+        final startPos = await showResumeModal(
+          context,
+          title: resolvedArgs.title,
+          positionSeconds: progress.positionSeconds,
+        );
+        if (startPos == null) return;
+        if (startPos > 0) {
+          resolvedArgs = resolvedArgs.copyWith(startPosition: startPos);
+        }
+      }
+    }
+    _openPlayerDirect(resolvedArgs);
+  }
+
+  void _openPlayerDirect(PlayerArgs args) {
     final oldOrch = _playerOrchestrator;
     final newOrch =
         widget.playbackOrchestratorBuilder?.call() ??
@@ -257,6 +288,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
+    void openPlayer(PlayerArgs args) => unawaited(_openPlayer(context, args));
+
     final shell = Shortcuts(
       shortcuts: <LogicalKeySet, Intent>{
         LogicalKeySet(LogicalKeyboardKey.escape): const _BackIntent(),
@@ -284,7 +317,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             }
             return KeyEventResult.ignored;
           },
-          child: useSidebar ? _buildTvLayout() : _buildMobileLayout(),
+          child: useSidebar
+              ? _buildTvLayout(openPlayer)
+              : _buildMobileLayout(openPlayer),
         ),
       ),
     );
@@ -292,6 +327,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final args = _playerArgs;
     final orch = _playerOrchestrator;
     if (args == null || orch == null) return shell;
+
+    final viewerId = _appState.activeViewer?.ulid ?? '';
 
     return Stack(
       children: [
@@ -305,6 +342,21 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 orchestrator: orch,
                 epgService: _appState.epgService,
                 xtreamService: _appState.xtreamService,
+                viewerId: viewerId,
+                progressReporter: (progress) {
+                  if (_appState.sourceType == AppSourceType.xtream) {
+                    unawaited(
+                      _appState.xtreamService
+                          .updateProgress(progress)
+                          .catchError((_) {}),
+                    );
+                  }
+                  unawaited(
+                    _appState.resumeService.save(progress).then((_) {
+                      if (mounted) unawaited(_appState.refreshLocalState());
+                    }),
+                  );
+                },
                 onClose: _closePlayer,
               ),
         ),
@@ -312,7 +364,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTvLayout() {
+  Widget _buildTvLayout(void Function(PlayerArgs) openPlayer) {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 240 || constraints.maxHeight < 120) {
@@ -325,7 +377,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   currentIndex: _currentIndex,
                   appState: _appState,
                   onConnected: () => _navigateTo(0),
-                  onOpenPlayer: _openPlayer,
+                  onOpenPlayer: openPlayer,
                   playbackOrchestratorBuilder:
                       widget.playbackOrchestratorBuilder,
                   playerRouteBuilder: widget.playerRouteBuilder,
@@ -358,7 +410,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           appState: _appState,
                           onSidebarActivate: _activateSidebar,
                           onConnected: () => _navigateTo(0),
-                          onOpenPlayer: _openPlayer,
+                          onOpenPlayer: openPlayer,
                           playbackOrchestratorBuilder:
                               widget.playbackOrchestratorBuilder,
                           playerRouteBuilder: widget.playerRouteBuilder,
@@ -389,7 +441,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMobileLayout() {
+  Widget _buildMobileLayout(void Function(PlayerArgs) openPlayer) {
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -398,7 +450,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           currentIndex: _currentIndex,
           appState: _appState,
           onConnected: () => _navigateTo(0),
-          onOpenPlayer: _openPlayer,
+          onOpenPlayer: openPlayer,
           playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
           playerRouteBuilder: widget.playerRouteBuilder,
         ),
@@ -975,10 +1027,6 @@ class _HomeScreen extends StatelessWidget {
           .toList(growable: false),
       onSidebarActivate: onSidebarActivate,
     );
-    final previewSections = continueWatchingItems.isEmpty
-        ? [liveSection, moviesSection, seriesSection, continueWatchingSection]
-        : [continueWatchingSection, liveSection, moviesSection, seriesSection];
-
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
@@ -987,24 +1035,10 @@ class _HomeScreen extends StatelessWidget {
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
           Text('Connected source: ${appState.sourceLabel}'),
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-          if (continueWatchingItems.isEmpty)
-            ...previewSections
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final sectionWidth =
-                    (constraints.maxWidth - MediaBrowsingMetrics.itemGap) / 2;
-                return Wrap(
-                  spacing: MediaBrowsingMetrics.itemGap,
-                  children: previewSections
-                      .map(
-                        (section) =>
-                            SizedBox(width: sectionWidth, child: section),
-                      )
-                      .toList(growable: false),
-                );
-              },
-            ),
+          if (continueWatchingItems.isNotEmpty) continueWatchingSection,
+          liveSection,
+          moviesSection,
+          seriesSection,
         ],
       ),
     );

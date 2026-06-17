@@ -23,6 +23,7 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.progressReporter,
+    this.viewerId = '',
     this.onClose,
     super.key,
   });
@@ -32,6 +33,7 @@ class PlayerScreen extends StatefulWidget {
   final EpgService epgService;
   final XtreamService? xtreamService;
   final void Function(Progress progress)? progressReporter;
+  final String viewerId;
   final VoidCallback? onClose;
 
   @override
@@ -283,7 +285,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (_disposed || !mounted) return;
       widget.progressReporter?.call(
         Progress(
-          viewerId: '',
+          viewerId: widget.viewerId,
           contentType: _isLive
               ? ContentType.live
               : (widget.args.type == 'series'

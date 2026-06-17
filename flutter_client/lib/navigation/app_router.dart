@@ -65,6 +65,24 @@ class PlayerArgs {
   final Map<String, String> headers;
   final Map<String, Object?> metadata;
 
+  PlayerArgs copyWith({double? startPosition}) {
+    return PlayerArgs(
+      streamUrl: streamUrl,
+      title: title,
+      type: type,
+      streamId: streamId,
+      seriesId: seriesId,
+      seasonNumber: seasonNumber,
+      startPosition: startPosition ?? this.startPosition,
+      epgChannelId: epgChannelId,
+      videoCodec: videoCodec,
+      audioCodec: audioCodec,
+      userAgent: userAgent,
+      headers: headers,
+      metadata: metadata,
+    );
+  }
+
   PlaybackSource toPlaybackSource({bool includeStartPosition = true}) {
     return PlaybackSource(
       uri: streamUrl,
