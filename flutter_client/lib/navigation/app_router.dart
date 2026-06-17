@@ -132,6 +132,7 @@ RouteFactory buildAppRouter({
   PlaybackOrchestrator Function()? playbackOrchestratorBuilder,
   Widget Function(PlayerArgs args)? playerRouteBuilder,
   void Function(PlayerArgs)? onOpenPlayer,
+  List<Progress> progressList = const [],
 }) {
   return (RouteSettings settings) {
     final routeName = settings.name;
@@ -227,6 +228,7 @@ RouteFactory buildAppRouter({
             seriesName: args.seriesName,
             xtreamService: xtreamService,
             onPlay: onOpenPlayer,
+            progressList: progressList,
           ),
         );
       }

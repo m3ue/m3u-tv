@@ -761,6 +761,7 @@ class _ContentNavigator extends StatelessWidget {
       playbackOrchestratorBuilder: playbackOrchestratorBuilder,
       playerRouteBuilder: playerRouteBuilder,
       onOpenPlayer: onOpenPlayer,
+      progressList: appState.progressList,
     );
 
     return Navigator(
@@ -822,7 +823,8 @@ class _ContentNavigator extends StatelessWidget {
         (item) => item.id == progress.streamId,
       );
       if (item != null) {
-        _playVod(item, startPosition: progress.positionSeconds.toDouble());
+        // Pass no startPosition — the pre-player resume modal will handle it.
+        _playVod(item);
       }
       return;
     }
@@ -830,10 +832,22 @@ class _ContentNavigator extends StatelessWidget {
     if (progress.contentType == ContentType.episode &&
         progress.seriesId != null) {
       final series = appState.seriesList.firstWhereOrNull(
-        (series) => series.id == progress.seriesId,
+        (s) => s.id == progress.seriesId,
       );
       if (series != null) {
-        _openSeries(series);
+        final streamUrl = appState.xtreamService.getSeriesStreamUrl(
+          progress.streamId.toString(),
+        );
+        onOpenPlayer?.call(
+          PlayerArgs(
+            streamUrl: streamUrl,
+            title: series.name,
+            type: 'series',
+            streamId: progress.streamId,
+            seriesId: progress.seriesId,
+            seasonNumber: progress.seasonNumber,
+          ),
+        );
       }
     }
   }

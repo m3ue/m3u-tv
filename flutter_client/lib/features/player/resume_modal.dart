@@ -13,8 +13,7 @@ Future<double?> showResumeModal(
 }) {
   return showDialog<double>(
     context: context,
-    builder: (_) =>
-        _ResumeModal(title: title, positionSeconds: positionSeconds),
+    builder: (_) => _ResumeModal(title: title, positionSeconds: positionSeconds),
   );
 }
 
@@ -30,88 +29,116 @@ class _ResumeModal extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Dialog(
-      child: DpadRegion(
-        verticalEdge: DpadEdgeBehavior.stop,
-        horizontalEdge: DpadEdgeBehavior.stop,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Resume Watching', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: DpadRegion(
+          verticalEdge: DpadEdgeBehavior.stop,
+          horizontalEdge: DpadEdgeBehavior.stop,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Resume Watching', style: theme.textTheme.titleLarge),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 20),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: colorScheme.primary,
-                        child: Icon(
-                          Icons.play_arrow,
-                          color: colorScheme.onPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Continue', style: theme.textTheme.titleMedium),
-                          Text(
-                            'From ${formatTime(Duration(seconds: positionSeconds))}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                const SizedBox(height: 20),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: colorScheme.primary,
+                          child: Icon(
+                            Icons.play_arrow,
+                            color: colorScheme.onPrimary,
                           ),
-                        ],
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Continue',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            Text(
+                              'From ${formatTime(Duration(seconds: positionSeconds))}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DpadFocusable(
+                  onSelect: () => Navigator.of(context).pop(0),
+                  effects: const [
+                    DpadBorderEffect(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                  ],
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      child: Icon(Icons.replay, color: colorScheme.onSurface),
+                    ),
+                    title: const Text('Start from Beginning'),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onTap: () => Navigator.of(context).pop(0.0),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    DpadFocusable(
+                      onSelect: () => Navigator.of(context).pop(),
+                      effects: const [
+                        DpadBorderEffect(
+                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                        ),
+                      ],
+                      child: FilledButton.tonal(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    DpadFocusable(
+                      autofocus: true,
+                      onSelect: () =>
+                          Navigator.of(context).pop(positionSeconds.toDouble()),
+                      effects: const [
+                        DpadBorderEffect(
+                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                        ),
+                      ],
+                      child: FilledButton(
+                        onPressed: () =>
+                            Navigator.of(context).pop(positionSeconds.toDouble()),
+                        child: const Text('Resume'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                  child: Icon(
-                    Icons.replay,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                title: const Text('Start from Beginning'),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                onTap: () => Navigator.of(context).pop(0),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FilledButton.tonal(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    autofocus: true,
-                    onPressed: () =>
-                        Navigator.of(context).pop(positionSeconds.toDouble()),
-                    child: const Text('Resume'),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

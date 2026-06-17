@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
-import 'package:m3u_tv/features/player/resume_prompt.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
@@ -43,7 +42,6 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   static const Duration _loadingTimeout = Duration(seconds: 20);
   static const Duration _progressInterval = Duration(seconds: 10);
-  static const Duration _resumeThreshold = Duration(seconds: 30);
   static const Duration _overlayTimeout = Duration(seconds: 8);
 
   PlaybackStatus _status = PlaybackStatus.idle;
@@ -65,7 +63,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   EpgCurrentNext? _epgData;
 
-  bool _showResumePrompt = false;
   bool _overlayVisible = true;
 
   // Owns the outer Focus so we can steal focus from the content area when
@@ -110,7 +107,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       }
     });
-    _checkResumePrompt();
     _startPlayback();
     _startLoadingTimeout();
     _scheduleOverlayHide();
@@ -151,13 +147,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.dispose();
   }
 
-  void _checkResumePrompt() {
-    final startPos = widget.args.startPosition;
-    if (!_isLive && startPos != null && startPos > _resumeThreshold.inSeconds) {
-      _showResumePrompt = true;
-    }
-  }
-
   // Sets the error state and reclaims _screenFocusNode after the next frame.
   // PlaybackControls is hidden when _errorMessage is set, so without this the
   // escape-to-close Shortcuts would have no focused node to route through.
@@ -175,9 +164,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _stateSubscription = widget.orchestrator.onState.listen(_handleState);
     _errorSubscription = widget.orchestrator.onError.listen(_handleError);
 
-    final source = widget.args.toPlaybackSource(
-      includeStartPosition: _showResumePrompt,
-    );
+    final source = widget.args.toPlaybackSource();
 
     unawaited(
       widget.orchestrator.open(source).catchError((Object error) {
@@ -385,22 +372,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(position));
   }
 
-  void _handleResume() {
-    setState(() {
-      _showResumePrompt = false;
-    });
-    final startPos = widget.args.startPosition;
-    if (startPos != null && startPos > 0) {
-      unawaited(widget.orchestrator.seek(Duration(seconds: startPos.round())));
-    }
-  }
-
-  void _handleStartOver() {
-    setState(() {
-      _showResumePrompt = false;
-    });
-  }
-
   // Track selection handlers (for future track selector integration)
   // ignore: unused_element
   void _handleAudioTrackSelected(String? trackId) {
@@ -476,7 +447,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             onKeyEvent: (node, event) {
               if (event is KeyDownEvent &&
                   !_overlayVisible &&
-                  !_showResumePrompt &&
                   _errorMessage == null) {
                 // Don't intercept back/escape — let the Shortcuts above handle
                 // it as a direct back action. Intercepting it here would set
@@ -563,20 +533,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
                   ),
 
-                // Resume prompt
-                if (_showResumePrompt)
-                  ResumePrompt(
-                    position: Duration(
-                      seconds: (widget.args.startPosition ?? 0).round(),
-                    ),
-                    onResume: _handleResume,
-                    onStartOver: _handleStartOver,
-                  ),
-
                 // Playback controls overlay
-                if (_overlayVisible &&
-                    !_showResumePrompt &&
-                    _errorMessage == null)
+                if (_overlayVisible && _errorMessage == null)
                   PlaybackControls(
                     isPlaying: _isPlaying,
                     isLive: _isLive,
@@ -590,9 +548,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     playPauseFocusNode: _controlsFocusNode,
                   ),
 
-                if (_overlayVisible &&
-                    !_showResumePrompt &&
-                    _errorMessage == null)
+                if (_overlayVisible && _errorMessage == null)
                   Positioned(
                     top: 40,
                     right: 40,
@@ -603,9 +559,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ),
 
                 // Hidden overlay tap area
-                if (!_overlayVisible &&
-                    !_showResumePrompt &&
-                    _errorMessage == null)
+                if (!_overlayVisible && _errorMessage == null)
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
@@ -615,10 +569,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ),
 
                 // EPG overlay (live only)
-                if (_isLive &&
-                    _epgData != null &&
-                    _overlayVisible &&
-                    !_showResumePrompt)
+                if (_isLive && _epgData != null && _overlayVisible)
                   Positioned(
                     top: 40,
                     left: 104,

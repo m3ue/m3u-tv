@@ -13,12 +13,14 @@ class SeriesDetailsScreen extends StatefulWidget {
     required this.seriesName,
     required this.xtreamService,
     this.onPlay,
+    this.progressList = const [],
   });
 
   final int seriesId;
   final String seriesName;
   final XtreamService xtreamService;
   final void Function(PlayerArgs)? onPlay;
+  final List<Progress> progressList;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -53,6 +55,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             return _SeriesDetailsBody(
               info: info,
               selectedSeason: _selectedSeason,
+              progressList: widget.progressList,
               onSeasonSelected: (season) =>
                   setState(() => _selectedSeason = season),
               onEpisodeSelected: _playEpisode,
@@ -86,12 +89,14 @@ class _SeriesDetailsBody extends StatelessWidget {
   const _SeriesDetailsBody({
     required this.info,
     required this.selectedSeason,
+    required this.progressList,
     required this.onSeasonSelected,
     required this.onEpisodeSelected,
   });
 
   final SeriesInfo info;
   final int? selectedSeason;
+  final List<Progress> progressList;
   final ValueChanged<int> onSeasonSelected;
   final ValueChanged<Episode> onEpisodeSelected;
 
@@ -176,6 +181,7 @@ class _SeriesDetailsBody extends StatelessWidget {
                 Expanded(
                   child: _EpisodeList(
                     episodes: episodes,
+                    progressList: progressList,
                     onEpisodeSelected: onEpisodeSelected,
                   ),
                 ),
@@ -360,8 +366,19 @@ class _SeriesDetailsBody extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final episode = episodes[index];
+                final streamId = int.tryParse(episode.id);
+                final progress = streamId == null
+                    ? null
+                    : progressList
+                          .where(
+                            (p) =>
+                                p.streamId == streamId &&
+                                p.contentType == ContentType.episode,
+                          )
+                          .firstOrNull;
                 return _EpisodeTile(
                   episode: episode,
+                  progress: progress,
                   autofocus: index == 0,
                   onTap: () => onEpisodeSelected(episode),
                 );
@@ -409,9 +426,14 @@ class _SeasonChips extends StatelessWidget {
 }
 
 class _EpisodeList extends StatelessWidget {
-  const _EpisodeList({required this.episodes, required this.onEpisodeSelected});
+  const _EpisodeList({
+    required this.episodes,
+    required this.progressList,
+    required this.onEpisodeSelected,
+  });
 
   final List<Episode> episodes;
+  final List<Progress> progressList;
   final ValueChanged<Episode> onEpisodeSelected;
 
   @override
@@ -424,8 +446,19 @@ class _EpisodeList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final episode = episodes[index];
+        final streamId = int.tryParse(episode.id);
+        final progress = streamId == null
+            ? null
+            : progressList
+                  .where(
+                    (p) =>
+                        p.streamId == streamId &&
+                        p.contentType == ContentType.episode,
+                  )
+                  .firstOrNull;
         return _EpisodeTile(
           episode: episode,
+          progress: progress,
           autofocus: index == 0,
           onTap: () => onEpisodeSelected(episode),
         );
@@ -439,23 +472,46 @@ class _EpisodeTile extends StatelessWidget {
     required this.episode,
     required this.autofocus,
     required this.onTap,
+    this.progress,
   });
 
   final Episode episode;
+  final Progress? progress;
   final bool autofocus;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final p = progress;
+    final progressValue = (p != null &&
+            p.durationSeconds != null &&
+            p.durationSeconds! > 0 &&
+            !p.completed)
+        ? (p.positionSeconds / p.durationSeconds!).clamp(0.0, 1.0)
+        : null;
+
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        autofocus: autofocus,
-        leading: CircleAvatar(child: Text('${episode.episodeNumber}')),
-        title: Text(episode.title),
-        subtitle: episode.plot == null ? null : Text(episode.plot!),
-        trailing: const Icon(Icons.play_arrow),
-        onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            autofocus: autofocus,
+            leading: CircleAvatar(child: Text('${episode.episodeNumber}')),
+            title: Text(episode.title),
+            subtitle: episode.plot == null ? null : Text(episode.plot!),
+            trailing: const Icon(Icons.play_arrow),
+            onTap: onTap,
+          ),
+          if (progressValue != null)
+            LinearProgressIndicator(
+              value: progressValue,
+              minHeight: 3,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+            ),
+        ],
       ),
     );
   }
