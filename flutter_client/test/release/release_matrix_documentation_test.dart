@@ -212,8 +212,8 @@ void main() {
   test('flutter readme points contributors at active gates only', () {
     final readme = readFile(readmePath);
 
-    expect(readme, contains('/tmp/flutter/bin/flutter analyze'));
-    expect(readme, contains('/tmp/flutter/bin/flutter test'));
+    expect(readme, contains('flutter analyze'));
+    expect(readme, contains('flutter test'));
     expect(readme, contains('../docs/release/platform-release-matrix.md'));
     expect(readme, contains('physical Android phone/tablet QA'));
     expect(readme, contains('physical Android TV hardware QA'));

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -35,33 +36,50 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.seriesName)),
-      body: SafeArea(
-        child: FutureBuilder<SeriesInfo>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Could not load episodes: ${snapshot.error}'),
-              );
-            }
-            final info = snapshot.data;
-            if (info == null) {
-              return const Center(child: Text('No episodes available'));
-            }
-            return _SeriesDetailsBody(
-              info: info,
-              selectedSeason: _selectedSeason,
-              progressList: widget.progressList,
-              onSeasonSelected: (season) =>
-                  setState(() => _selectedSeason = season),
-              onEpisodeSelected: _playEpisode,
-            );
-          },
+      appBar: AppBar(
+        title: Text(widget.seriesName),
+        automaticallyImplyLeading: false,
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: DpadFocusable(
+            onSelect: () => Navigator.of(context).maybePop(),
+            effects: const [
+              DpadBorderEffect(
+                borderRadius: BorderRadius.all(Radius.circular(50)),
+              ),
+            ],
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
         ),
+      ),
+      body: FutureBuilder<SeriesInfo>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Could not load episodes: ${snapshot.error}'),
+            );
+          }
+          final info = snapshot.data;
+          if (info == null) {
+            return const Center(child: Text('No episodes available'));
+          }
+          return _SeriesDetailsBody(
+            info: info,
+            selectedSeason: _selectedSeason,
+            progressList: widget.progressList,
+            onSeasonSelected: (season) =>
+                setState(() => _selectedSeason = season),
+            onEpisodeSelected: _playEpisode,
+          );
+        },
       ),
     );
   }
@@ -409,13 +427,12 @@ class _SeasonChips extends StatelessWidget {
       child: Row(
         children: seasons
             .map((season) {
-              final selected = season.number == selectedSeason;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(season.name),
-                  selected: selected,
-                  onSelected: (_) => onSeasonSelected(season.number),
+                child: CategoryFilterChip(
+                  label: season.name,
+                  isSelected: season.number == selectedSeason,
+                  onTap: () => onSeasonSelected(season.number),
                 ),
               );
             })
@@ -492,27 +509,33 @@ class _EpisodeTile extends StatelessWidget {
         ? (p.positionSeconds / p.durationSeconds!).clamp(0.0, 1.0)
         : null;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            autofocus: autofocus,
-            leading: CircleAvatar(child: Text('${episode.episodeNumber}')),
-            title: Text(episode.title),
-            subtitle: episode.plot == null ? null : Text(episode.plot!),
-            trailing: const Icon(Icons.play_arrow),
-            onTap: onTap,
-          ),
-          if (progressValue != null)
-            LinearProgressIndicator(
-              value: progressValue,
-              minHeight: 3,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: onTap,
+      effects: const [
+        DpadBorderEffect(),
+      ],
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: CircleAvatar(child: Text('${episode.episodeNumber}')),
+              title: Text(episode.title),
+              subtitle: episode.plot == null ? null : Text(episode.plot!),
+              trailing: const Icon(Icons.play_arrow),
+              onTap: onTap,
             ),
-        ],
+            if (progressValue != null)
+              LinearProgressIndicator(
+                value: progressValue,
+                minHeight: 3,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+              ),
+          ],
+        ),
       ),
     );
   }

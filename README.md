@@ -17,12 +17,12 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 ## Platforms Supported
 
-| Platform | Method |
+| Platform | Status |
 |---|---|
-| Android TV | Flutter client (`flutter_client/`) |
-| Desktop (Linux/macOS/Windows) | Flutter client (`flutter_client/`) with in-process libmpv feasibility gates |
-| Android/iOS/iPadOS | Flutter client (`flutter_client/`) |
-| Apple TV (tvOS) | Migration feasibility tracked; Flutter tvOS remains gated on embedder support |
+| Android TV | Supported — ExoPlayer via Media3 |
+| Android / iOS / iPadOS | Supported |
+| Apple TV (tvOS) | Supported — AVKit backend via [flutter-tvos](https://github.com/fluttertv/flutter-tvos) |
+| Desktop (macOS / Linux / Windows) | Supported — libmpv via media_kit |
 
 ## Tech Stack
 
@@ -34,31 +34,34 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 ### Prerequisites
 
-- Flutter SDK available via the CLI (ability to run `flutter` and `dart` commands)
-- **Android/Android TV**: Android Studio with emulator or device when running platform builds
-   - **NOTE**: If running the editor via `docker` on your local machine, you can access it in the emulator via: `http://10.0.2.2:36400`. Run `adb reverse tcp:36400 tcp:36400` to route `localhost` so images and streams work too. 
-- **Apple platforms**: Xcode when running iOS/macOS feasibility builds
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) on your PATH
+- **Android / Android TV**: Android Studio with an emulator or device
+  - Running M3U Editor via Docker locally? Access it from the emulator at `http://10.0.2.2:36400`. Run `adb reverse tcp:36400 tcp:36400` so images and streams work too.
+- **Apple platforms (iOS, macOS, tvOS)**: Xcode 15+
+- **Apple TV (tvOS)**: [flutter-tvos CLI](#apple-tv-tvos) installed (separate from the Flutter SDK)
 
 ### Installation
 
 ```bash
-cd m3u-tv
 cd flutter_client
 flutter pub get
 ```
 
 ### Running the App
 
-#### Flutter client
-
 ```bash
+# Android / iOS / desktop
 flutter run
+
+# Apple TV simulator — see the tvOS section below for first-time setup
+flutter-tvos run -d <device-id>
 ```
 
-Quality gates for the primary client:
+Quality gates:
 
 ```bash
-dart format ./
+cd flutter_client
+dart format .
 flutter analyze
 flutter test
 ```
@@ -138,12 +141,51 @@ flutter analyze
 flutter test
 ```
 
+### Apple TV (tvOS)
+
+tvOS builds use [flutter-tvos](https://github.com/fluttertv/flutter-tvos) — a drop-in companion CLI that targets tvOS instead of iOS. Install it once, alongside your normal Flutter SDK.
+
+**Install flutter-tvos** (one-time, version 1.3.0 / Flutter 3.44.1):
+
+```bash
+git clone https://github.com/fluttertv/flutter-tvos.git ~/flutter-tvos
+```
+
+Add to your shell profile (`~/.zshrc` or `~/.bash_profile`):
+
+```bash
+export PATH="$HOME/flutter-tvos/bin:$PATH"
+```
+
+Then reload and download the tvOS engine artifacts:
+
+```bash
+source ~/.zshrc          # or restart your terminal
+flutter-tvos precache
+flutter-tvos doctor      # should show ✓ Flutter and ✓ tvOS toolchain
+```
+
+**Run on the Apple TV simulator:**
+
+```bash
+cd flutter_client
+flutter-tvos devices     # find your simulator ID
+flutter-tvos run -d <simulator-id>
+```
+
+**Update flutter-tvos** when a new version ships:
+
+```bash
+flutter-tvos upgrade
+```
+
+> `flutter-tvos` and `flutter` are independent CLIs. `flutter-tvos` commands only target tvOS; everything else (`flutter run`, `flutter build apk`, etc.) continues to use the standard `flutter` CLI as normal.
+
 ### Adding New Screens
 
-1. Add the screen component in `src/screens/`
-2. Add the route to `src/navigation/types.ts`
-3. Register it in `src/navigation/AppNavigator.tsx`
-4. Export from `src/screens/index.ts`
+1. Add the screen widget in `lib/features/<feature>/`
+2. Add the route name to `lib/navigation/route_names.dart`
+3. Register it in `lib/navigation/app_router.dart`
 
 ## Future Enhancements
 
@@ -151,7 +193,7 @@ flutter test
 - [x] Continue watching
 - [x] Favorites/Watchlist
 - [x] Search functionality
-- [ ] Desktop builds
+- [x] Apple TV (tvOS)
 - [ ] Parental controls
 - [ ] Stream quality selection
 - [ ] Catchup/DVR support

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -30,22 +31,39 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.item.name)),
-      body: SafeArea(
-        child: _future == null
-            ? _VodDetailsBody(item: widget.item, onPlay: widget.onPlay)
-            : FutureBuilder<VodInfo?>(
-                future: _future,
-                builder: (context, snapshot) {
-                  return _VodDetailsBody(
-                    item: widget.item,
-                    info: snapshot.hasError ? null : snapshot.data,
-                    isLoading: snapshot.connectionState != ConnectionState.done,
-                    onPlay: widget.onPlay,
-                  );
-                },
+      appBar: AppBar(
+        title: Text(widget.item.name),
+        automaticallyImplyLeading: false,
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: DpadFocusable(
+            onSelect: () => Navigator.of(context).maybePop(),
+            effects: const [
+              DpadBorderEffect(
+                borderRadius: BorderRadius.all(Radius.circular(50)),
               ),
+            ],
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+        ),
       ),
+      body: _future == null
+          ? _VodDetailsBody(item: widget.item, onPlay: widget.onPlay)
+          : FutureBuilder<VodInfo?>(
+              future: _future,
+              builder: (context, snapshot) {
+                return _VodDetailsBody(
+                  item: widget.item,
+                  info: snapshot.hasError ? null : snapshot.data,
+                  isLoading: snapshot.connectionState != ConnectionState.done,
+                  onPlay: widget.onPlay,
+                );
+              },
+            ),
     );
   }
 }

@@ -365,12 +365,20 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Widget _buildTvLayout(void Function(PlayerArgs) openPlayer) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 240 || constraints.maxHeight < 120) {
-          return Scaffold(
-            body: SafeArea(
-              child: FocusScope(
+    return MediaQuery.removePadding(
+      // Strip all system safe-area insets for the TV layout. On tvOS, the
+      // system reports status-bar / overscan padding that would otherwise make
+      // Scaffold AppBars taller and push body content down unnecessarily.
+      context: context,
+      removeTop: true,
+      removeBottom: true,
+      removeLeft: true,
+      removeRight: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 240 || constraints.maxHeight < 120) {
+            return Scaffold(
+              body: FocusScope(
                 node: _contentFocusNode,
                 child: _ContentNavigator(
                   navigatorKey: _navigatorKey,
@@ -383,13 +391,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   playerRouteBuilder: widget.playerRouteBuilder,
                 ),
               ),
-            ),
-          );
-        }
+            );
+          }
 
-        return Scaffold(
-          body: SafeArea(
-            child: Stack(
+          return Scaffold(
+            body: Stack(
               children: [
                 Positioned.fill(
                   child: Padding(
@@ -435,9 +441,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
               ],
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

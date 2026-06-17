@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -37,6 +39,11 @@ DeviceType deviceTypeForView({
   bool nativeTelevisionHint = false,
 }) {
   if (nativeTelevisionHint) {
+    return DeviceType.tv;
+  }
+
+  // tvOS reports TargetPlatform.iOS at the Dart level; detect it by OS name.
+  if (!kIsWeb && Platform.operatingSystem == 'tvos') {
     return DeviceType.tv;
   }
 

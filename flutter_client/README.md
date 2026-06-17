@@ -1,121 +1,90 @@
-# M3U TV Flutter Client
+# M3U TV — Flutter Client
 
-This directory is the Flutter client for M3U TV.
+Flutter app for M3U TV targeting Android TV, iOS, macOS, Linux, Windows, and Apple TV (tvOS).
 
-## Local commands and active gates
-
-Use the pinned Flutter binary for this rewrite work:
+## Quick start
 
 ```bash
 cd flutter_client
-/tmp/flutter/bin/flutter pub get
-/tmp/flutter/bin/flutter analyze
-/tmp/flutter/bin/flutter test
+flutter pub get
+flutter run
 ```
 
-The active CI baseline is intentionally limited to the Flutter client gates:
+## Quality gates
+
+Run these from `flutter_client/` before every PR:
 
 ```bash
-cd flutter_client
-/tmp/flutter/bin/flutter pub get
-/tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
-/tmp/flutter/bin/flutter analyze
-/tmp/flutter/bin/flutter test
+dart format .
+flutter analyze
+flutter test
 ```
 
+## Platform commands
 
-## Production toolchain baseline
-
-The platform release source of truth is
-`../docs/release/platform-release-matrix.md`. It records required SDKs,
-toolchains, signing placeholders, and blockers without claiming host builds pass
-before those dependencies exist.
-
-- Android and Android TV release work needs the Android SDK, Android build tools,
-  a compatible JDK, signing material supplied outside git, Play Console metadata,
-  physical Android phone/tablet QA, and physical Android TV hardware QA.
-  Emulator logs are supplemental only and do not satisfy the release blocker.
-- Linux desktop release work needs Flutter Linux desktop support, GTK development
-  files, `clang++` or an explicit `CXX`, packaged libmpv/runtime dependencies,
-  and license notices.
-- Windows desktop release work needs a Windows runner, Visual Studio Build Tools,
-  Windows SDK, bundled mpv/FFmpeg DLLs, and Authenticode or MSIX signing.
-- Apple release work needs a macOS/Xcode host, provisioning/codesigning, App
-  Store or notarization preparation, and AVKit-safe playback fallback evidence.
-- tvOS remains feasibility-only because the pinned Flutter toolchain has no
-  first-class `flutter build tvos` command.
-
-## Build and release smoke commands
-
-These commands are local smoke commands only. They must not be read as production
-release readiness until the matching toolchain, signing, codec review, license
-review, and platform QA blockers in the release matrix are closed.
-
-### Desktop
+### Android / Android TV
 
 ```bash
-cd flutter_client
-flutter config --enable-linux-desktop
-flutter build linux
-
-flutter config --enable-windows-desktop
-flutter build windows
-
-flutter config --enable-macos-desktop
-flutter build macos
+flutter run                       # debug on connected device/emulator
+flutter build apk --debug         # debug APK for sideload QA
 ```
 
-Desktop release candidates must bundle or declare libmpv/FFmpeg/libass
-dependencies, preserve license notices, and use platform signing before public
-distribution. Windows needs Authenticode/MSIX signing for Microsoft Store or
-installer release. macOS needs Developer ID signing and notarization for direct
-downloads, or Apple Distribution signing and sandbox review for Mac App Store.
-
-### Android and Android TV
+### iOS / iPadOS
 
 ```bash
-cd flutter_client
-flutter build apk --debug
+flutter run                       # debug on simulator or device
+flutter build ios --no-codesign   # CI smoke build
 ```
 
-The debug APK is for smoke testing and sideload QA only. Play Store and Android
-TV releases require signed release AAB/APK artifacts, Play Console metadata,
-data-safety disclosures, TV launcher/focus checks, and native codec/license
-review. Android playback defaults to Media3/ExoPlayer. The blocking fallback is m3u-editor server transcode. Android mpv/libmpv remains future-gated and non-blocking for release readiness.
-
-Android release QA is blocked until it passes on a physical Android phone/tablet
-and physical Android TV hardware. Emulator logs are supplemental only.
-
-### iOS and iPadOS
+### macOS / Linux / Windows
 
 ```bash
-cd flutter_client
-flutter build ios --no-codesign
+flutter run -d macos
+flutter run -d linux
+flutter run -d windows
 ```
 
-The no-codesign build is a CI/local smoke gate only. TestFlight/App Store or MDM
-distribution requires Xcode archive signing, provisioning profiles, entitlements,
-embedded-framework signing, and App Review. AVKit/AVPlayer plus server transcode
-is the safe release path; MPVKit remains blocked until GPL/LGPL/FFmpeg, signing,
-and crash-review gates pass.
+### Apple TV (tvOS)
 
-### tvOS
+tvOS builds require the [flutter-tvos CLI](https://github.com/fluttertv/flutter-tvos). See the [tvOS setup section in the root README](../README.md#apple-tv-tvos) for one-time install instructions.
 
-There is no supported `flutter build tvos` command in the pinned
-toolchain. tvOS remains feasibility-only until a custom Flutter tvOS embedder,
-Siri Remote/gamepad forwarding, signing, and playback QA pass.
-
-The initial test harness includes:
-
-- `test/widget_test.dart` for fast widget tests.
-- `integration_test/app_test.dart` for future device/emulator integration coverage.
-
-## CI
-
-The Flutter client workflow lives at `.github/workflows/ci.yml`. Its active gates run from `flutter_client/` only:
+Once installed:
 
 ```bash
-/tmp/flutter/bin/flutter analyze
-/tmp/flutter/bin/flutter test
-/tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
+flutter-tvos devices              # list available Apple TV simulators
+flutter-tvos run -d <device-id>   # run on simulator (hot reload works)
+flutter-tvos build tvos --simulator --debug   # build only
 ```
+
+## Project structure
+
+```
+lib/
+  app/            App shell, device type detection
+  features/       Screen-level widgets (live_tv, vod, series, player, …)
+  navigation/     Router, route names, PlayerArgs
+  playback/       Platform playback adapters and orchestrator
+  services/       Domain models, Xtream API, EPG, state controller
+  shared/         Reusable UI widgets
+tvos/             Apple TV (tvOS) Xcode runner
+ios/              iOS Xcode runner
+android/          Android Gradle project
+packages/         Local Flutter packages (flutter_secure_storage_tvos, …)
+test/             Unit and widget tests
+```
+
+## Android release notes
+
+See [../docs/release/platform-release-matrix.md](../docs/release/platform-release-matrix.md) for full release gates.
+
+- Android playback defaults to Media3/ExoPlayer. The blocking fallback is m3u-editor server transcode when direct playback fails.
+- Android mpv/libmpv remains future-gated and non-blocking.
+- Emulator logs are supplemental only. Release sign-off requires physical Android phone/tablet QA and physical Android TV hardware QA on the target API level.
+
+## Toolchain versions
+
+| Tool | Version |
+|---|---|
+| Flutter SDK | `^3.12.0` (see `pubspec.yaml`) |
+| flutter-tvos | 1.3.0 (Flutter 3.44.1) |
+| Dart | `^3.12.0` |

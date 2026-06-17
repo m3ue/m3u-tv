@@ -13,8 +13,8 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // MediaKit (libmpv) is used on desktop and iOS. Android uses ExoPlayer only.
-  if (!kIsWeb && !Platform.isAndroid) {
+  // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
+  if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
   }
   final appState = await _buildAppState();

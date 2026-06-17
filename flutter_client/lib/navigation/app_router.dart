@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
@@ -297,7 +299,10 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       ),
     );
   } else if (platform == PlaybackPlatform.apple) {
-    adapters[PlaybackBackend.appleMpvKit] = MediaKitIosAdapter();
+    // media_kit doesn't support tvOS; only register it on standard iOS/macOS.
+    if (!kIsWeb && Platform.operatingSystem != 'tvos') {
+      adapters[PlaybackBackend.appleMpvKit] = MediaKitIosAdapter();
+    }
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
     adapters[PlaybackBackend.desktopLibmpv] = MediaKitDesktopAdapter();
