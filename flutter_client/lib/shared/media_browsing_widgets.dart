@@ -496,11 +496,13 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
         // logical 1920px → scale 1.5). Clamped to 1.0 minimum so mobile and
         // standard-density Android TV are unaffected.
         final scale = (constraints.maxWidth / 1280.0).clamp(1.0, 2.0);
-        final cardWidth = (widget.posterStyle
+        final cardWidth =
+            (widget.posterStyle
                 ? MediaBrowsingMetrics.posterCardWidth
                 : MediaBrowsingMetrics.previewCardWidth) *
             scale;
-        final cardHeight = (widget.posterStyle
+        final cardHeight =
+            (widget.posterStyle
                 ? MediaBrowsingMetrics.posterCardHeight
                 : MediaBrowsingMetrics.previewCardHeight) *
             scale;
@@ -520,30 +522,37 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               else
                 SizedBox(
                   height: cardHeight + 16,
-                  child: DpadRegion(
-                    memoryKey: 'preview-row/${widget.title}',
-                    horizontalEdge: DpadEdgeBehavior.stop,
-                    onEdge: (direction) {
-                      if (direction == TraversalDirection.left) {
-                        widget.onSidebarActivate?.call();
-                      }
-                    },
-                    child: Scrollbar(
-                      controller: _controller,
-                      thumbVisibility: true,
-                      trackVisibility: true,
-                      child: ListView.separated(
+                  // ExcludeSemantics prevents the tvOS framework bug where
+                  // ScrollableState.setIgnorePointer calls markNeedsSemanticsUpdate
+                  // during the semantics flush phase, causing an assertion crash
+                  // when scrolling quickly.
+                  child: ExcludeSemantics(
+                    child: DpadRegion(
+                      memoryKey: 'preview-row/${widget.title}',
+                      horizontalEdge: DpadEdgeBehavior.stop,
+                      onEdge: (direction) {
+                        if (direction == TraversalDirection.left) {
+                          widget.onSidebarActivate?.call();
+                        }
+                      },
+                      child: Scrollbar(
                         controller: _controller,
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.only(bottom: 12),
-                        itemCount: visibleItems.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(width: MediaBrowsingMetrics.itemGap),
-                        itemBuilder: (context, index) => MediaPreviewCard(
-                          item: visibleItems[index],
-                          posterStyle: widget.posterStyle,
-                          autofocus: index == 0,
-                          cardWidth: cardWidth,
+                        thumbVisibility: true,
+                        trackVisibility: true,
+                        child: ListView.separated(
+                          controller: _controller,
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.only(bottom: 12),
+                          itemCount: visibleItems.length,
+                          separatorBuilder: (_, _) => const SizedBox(
+                            width: MediaBrowsingMetrics.itemGap,
+                          ),
+                          itemBuilder: (context, index) => MediaPreviewCard(
+                            item: visibleItems[index],
+                            posterStyle: widget.posterStyle,
+                            autofocus: index == 0,
+                            cardWidth: cardWidth,
+                          ),
                         ),
                       ),
                     ),
@@ -575,7 +584,8 @@ class MediaPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isRating = item.subtitle?.startsWith('★') ?? false;
-    final width = cardWidth ??
+    final width =
+        cardWidth ??
         (posterStyle
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
