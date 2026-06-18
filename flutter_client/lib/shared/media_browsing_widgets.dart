@@ -490,52 +490,69 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   @override
   Widget build(BuildContext context) {
     final visibleItems = widget.items.take(12).toList(growable: false);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          if (visibleItems.isEmpty)
-            Text(widget.emptyLabel)
-          else
-            SizedBox(
-              height:
-                  (widget.posterStyle
-                      ? MediaBrowsingMetrics.posterCardHeight
-                      : MediaBrowsingMetrics.previewCardHeight) +
-                  16,
-              child: DpadRegion(
-                memoryKey: 'preview-row/${widget.title}',
-                horizontalEdge: DpadEdgeBehavior.stop,
-                onEdge: (direction) {
-                  if (direction == TraversalDirection.left) {
-                    widget.onSidebarActivate?.call();
-                  }
-                },
-                child: Scrollbar(
-                  controller: _controller,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  child: ListView.separated(
-                    controller: _controller,
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.only(bottom: 12),
-                    itemCount: visibleItems.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: MediaBrowsingMetrics.itemGap),
-                    itemBuilder: (context, index) => MediaPreviewCard(
-                      item: visibleItems[index],
-                      posterStyle: widget.posterStyle,
-                      autofocus: index == 0,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Scale card dimensions proportionally on wide TV screens (e.g. tvOS
+        // logical 1920px → scale 1.5). Clamped to 1.0 minimum so mobile and
+        // standard-density Android TV are unaffected.
+        final scale = (constraints.maxWidth / 1280.0).clamp(1.0, 2.0);
+        final cardWidth = (widget.posterStyle
+                ? MediaBrowsingMetrics.posterCardWidth
+                : MediaBrowsingMetrics.previewCardWidth) *
+            scale;
+        final cardHeight = (widget.posterStyle
+                ? MediaBrowsingMetrics.posterCardHeight
+                : MediaBrowsingMetrics.previewCardHeight) *
+            scale;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.title,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: MediaBrowsingMetrics.chipGap),
+              if (visibleItems.isEmpty)
+                Text(widget.emptyLabel)
+              else
+                SizedBox(
+                  height: cardHeight + 16,
+                  child: DpadRegion(
+                    memoryKey: 'preview-row/${widget.title}',
+                    horizontalEdge: DpadEdgeBehavior.stop,
+                    onEdge: (direction) {
+                      if (direction == TraversalDirection.left) {
+                        widget.onSidebarActivate?.call();
+                      }
+                    },
+                    child: Scrollbar(
+                      controller: _controller,
+                      thumbVisibility: true,
+                      trackVisibility: true,
+                      child: ListView.separated(
+                        controller: _controller,
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(bottom: 12),
+                        itemCount: visibleItems.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(width: MediaBrowsingMetrics.itemGap),
+                        itemBuilder: (context, index) => MediaPreviewCard(
+                          item: visibleItems[index],
+                          posterStyle: widget.posterStyle,
+                          autofocus: index == 0,
+                          cardWidth: cardWidth,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -545,24 +562,28 @@ class MediaPreviewCard extends StatelessWidget {
     required this.item,
     this.posterStyle = false,
     this.autofocus = false,
+    this.cardWidth,
     super.key,
   });
 
   final MediaPreviewItem item;
   final bool posterStyle;
   final bool autofocus;
+  final double? cardWidth;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isRating = item.subtitle?.startsWith('★') ?? false;
+    final width = cardWidth ??
+        (posterStyle
+            ? MediaBrowsingMetrics.posterCardWidth
+            : MediaBrowsingMetrics.previewCardWidth);
     return DpadFocusable(
       autofocus: autofocus,
       onSelect: item.onTap,
       child: SizedBox(
-        width: posterStyle
-            ? MediaBrowsingMetrics.posterCardWidth
-            : MediaBrowsingMetrics.previewCardWidth,
+        width: width,
         child: Material(
           color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
