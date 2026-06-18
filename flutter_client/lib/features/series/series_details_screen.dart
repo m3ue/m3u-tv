@@ -513,7 +513,9 @@ class _EpisodeTile extends StatelessWidget {
       autofocus: autofocus,
       onSelect: onTap,
       effects: const [
-        DpadBorderEffect(),
+        DpadBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
       ],
       child: Card(
         clipBehavior: Clip.antiAlias,
