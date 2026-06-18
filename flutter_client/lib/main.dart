@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:m3u_tv/app/app_shell.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
@@ -59,6 +61,11 @@ class MyApp extends StatelessWidget {
             ),
           ],
         ),
+        onFocusChange: (node) {
+          if (node != null) {
+            unawaited(SystemSound.play(SystemSoundType.click));
+          }
+        },
       ),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: primary),
