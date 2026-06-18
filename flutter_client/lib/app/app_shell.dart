@@ -394,52 +394,72 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             );
           }
 
-          return Scaffold(
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 64),
-                    child: DpadRegion(
-                      memoryKey: 'content',
-                      horizontalEdge: DpadEdgeBehavior.stop,
-                      onEdge: (direction) {
-                        if (direction == TraversalDirection.left) {
-                          _activateSidebar();
-                        }
-                      },
-                      child: FocusScope(
-                        node: _contentFocusNode,
-                        child: _ContentNavigator(
-                          navigatorKey: _navigatorKey,
-                          currentIndex: _currentIndex,
-                          appState: _appState,
-                          onSidebarActivate: _activateSidebar,
-                          onConnected: () => _navigateTo(0),
-                          onOpenPlayer: openPlayer,
-                          playbackOrchestratorBuilder:
-                              widget.playbackOrchestratorBuilder,
-                          playerRouteBuilder: widget.playerRouteBuilder,
+          // Normalize all TV targets to a 1280×720 logical reference so the
+          // UI scales proportionally on both Android TV (logical ~1280×720)
+          // and tvOS (logical 1920×1080, DPR=1). FittedBox scales the fixed
+          // reference to fill whatever physical screen size is reported.
+          const refWidth = 1280.0;
+          const refHeight = 720.0;
+          return SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.fill,
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  size: const Size(refWidth, refHeight),
+                ),
+                child: SizedBox(
+                  width: refWidth,
+                  height: refHeight,
+                  child: Scaffold(
+                    body: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 64),
+                            child: DpadRegion(
+                              memoryKey: 'content',
+                              horizontalEdge: DpadEdgeBehavior.stop,
+                              onEdge: (direction) {
+                                if (direction == TraversalDirection.left) {
+                                  _activateSidebar();
+                                }
+                              },
+                              child: FocusScope(
+                                node: _contentFocusNode,
+                                child: _ContentNavigator(
+                                  navigatorKey: _navigatorKey,
+                                  currentIndex: _currentIndex,
+                                  appState: _appState,
+                                  onSidebarActivate: _activateSidebar,
+                                  onConnected: () => _navigateTo(0),
+                                  onOpenPlayer: openPlayer,
+                                  playbackOrchestratorBuilder:
+                                      widget.playbackOrchestratorBuilder,
+                                  playerRouteBuilder: widget.playerRouteBuilder,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          bottom: 0,
+                          child: NavigationSidebar(
+                            currentIndex: _currentIndex,
+                            sidebarActive: _sidebarActive,
+                            focusNodes: _sidebarFocusNodes,
+                            scopeNode: _sidebarScopeNode,
+                            onNavigate: _navigateTo,
+                            onActivateSidebar: _activateSidebar,
+                            onDeactivateSidebar: _deactivateSidebar,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  child: NavigationSidebar(
-                    currentIndex: _currentIndex,
-                    sidebarActive: _sidebarActive,
-                    focusNodes: _sidebarFocusNodes,
-                    scopeNode: _sidebarScopeNode,
-                    onNavigate: _navigateTo,
-                    onActivateSidebar: _activateSidebar,
-                    onDeactivateSidebar: _deactivateSidebar,
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },
