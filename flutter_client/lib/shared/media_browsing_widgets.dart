@@ -272,21 +272,23 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
             Expanded(
               child: SizedBox(
                 height: 40,
-                child: ListView.separated(
-                  controller: _controller,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: widget.tabs.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
-                  itemBuilder: (context, index) {
-                    final tab = widget.tabs[index];
-                    return CategoryFilterChip(
-                      label: tab.name,
-                      isSelected: widget.selectedId == tab.id,
-                      onTap: () => widget.onSelected(tab.id),
-                    );
-                  },
+                child: ExcludeSemantics(
+                  child: ListView.separated(
+                    controller: _controller,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    itemCount: widget.tabs.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: MediaBrowsingMetrics.chipGap),
+                    itemBuilder: (context, index) {
+                      final tab = widget.tabs[index];
+                      return CategoryFilterChip(
+                        label: tab.name,
+                        isSelected: widget.selectedId == tab.id,
+                        onTap: () => widget.onSelected(tab.id),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -376,16 +378,18 @@ class _ScrollbarGridViewState extends State<ScrollbarGridView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scrollbar(
-      controller: _controller,
-      thumbVisibility: true,
-      trackVisibility: true,
-      child: GridView.builder(
+    return ExcludeSemantics(
+      child: Scrollbar(
         controller: _controller,
-        padding: widget.padding,
-        gridDelegate: widget.gridDelegate,
-        itemCount: widget.itemCount,
-        itemBuilder: widget.itemBuilder,
+        thumbVisibility: true,
+        trackVisibility: true,
+        child: GridView.builder(
+          controller: _controller,
+          padding: widget.padding,
+          gridDelegate: widget.gridDelegate,
+          itemCount: widget.itemCount,
+          itemBuilder: widget.itemBuilder,
+        ),
       ),
     );
   }
@@ -418,15 +422,17 @@ class _ScrollbarListViewState extends State<ScrollbarListView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scrollbar(
-      controller: _controller,
-      thumbVisibility: true,
-      trackVisibility: true,
-      child: ListView.builder(
+    return ExcludeSemantics(
+      child: Scrollbar(
         controller: _controller,
-        padding: widget.padding,
-        itemCount: widget.itemCount,
-        itemBuilder: widget.itemBuilder,
+        thumbVisibility: true,
+        trackVisibility: true,
+        child: ListView.builder(
+          controller: _controller,
+          padding: widget.padding,
+          itemCount: widget.itemCount,
+          itemBuilder: widget.itemBuilder,
+        ),
       ),
     );
   }
