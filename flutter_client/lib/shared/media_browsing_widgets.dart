@@ -23,6 +23,9 @@ class MediaBrowsingMetrics {
   static const double previewCardHeight = 148;
   static const double posterCardWidth = 180;
   static const double posterCardHeight = 300;
+  // Landscape "Continue Watching" cards: 16:9 thumbnail + text area.
+  static const double landscapeCardWidth = 280;
+  static const double landscapeCardHeight = 205; // 157.5 (9/16×280) + 47 text
 }
 
 class InlineMediaSearchField extends StatefulWidget {
@@ -470,6 +473,7 @@ class MediaPreviewSection extends StatefulWidget {
     required this.emptyLabel,
     required this.items,
     this.posterStyle = false,
+    this.landscapeStyle = false,
     this.onSidebarActivate,
     super.key,
   });
@@ -478,6 +482,7 @@ class MediaPreviewSection extends StatefulWidget {
   final String emptyLabel;
   final List<MediaPreviewItem> items;
   final bool posterStyle;
+  final bool landscapeStyle;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -502,16 +507,20 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
         // logical 1920px → scale 1.5). Clamped to 1.0 minimum so mobile and
         // standard-density Android TV are unaffected.
         final scale = (constraints.maxWidth / 1280.0).clamp(1.0, 2.0);
-        final cardWidth =
-            (widget.posterStyle
-                ? MediaBrowsingMetrics.posterCardWidth
-                : MediaBrowsingMetrics.previewCardWidth) *
-            scale;
-        final cardHeight =
-            (widget.posterStyle
-                ? MediaBrowsingMetrics.posterCardHeight
-                : MediaBrowsingMetrics.previewCardHeight) *
-            scale;
+        final double baseWidth;
+        final double baseHeight;
+        if (widget.landscapeStyle) {
+          baseWidth = MediaBrowsingMetrics.landscapeCardWidth;
+          baseHeight = MediaBrowsingMetrics.landscapeCardHeight;
+        } else if (widget.posterStyle) {
+          baseWidth = MediaBrowsingMetrics.posterCardWidth;
+          baseHeight = MediaBrowsingMetrics.posterCardHeight;
+        } else {
+          baseWidth = MediaBrowsingMetrics.previewCardWidth;
+          baseHeight = MediaBrowsingMetrics.previewCardHeight;
+        }
+        final cardWidth = baseWidth * scale;
+        final cardHeight = baseHeight * scale;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 28),
@@ -556,6 +565,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                           itemBuilder: (context, index) => MediaPreviewCard(
                             item: visibleItems[index],
                             posterStyle: widget.posterStyle,
+                            landscapeStyle: widget.landscapeStyle,
                             autofocus: index == 0,
                             cardWidth: cardWidth,
                           ),
@@ -576,6 +586,7 @@ class MediaPreviewCard extends StatelessWidget {
   const MediaPreviewCard({
     required this.item,
     this.posterStyle = false,
+    this.landscapeStyle = false,
     this.autofocus = false,
     this.cardWidth,
     super.key,
@@ -583,6 +594,7 @@ class MediaPreviewCard extends StatelessWidget {
 
   final MediaPreviewItem item;
   final bool posterStyle;
+  final bool landscapeStyle;
   final bool autofocus;
   final double? cardWidth;
 
@@ -592,77 +604,142 @@ class MediaPreviewCard extends StatelessWidget {
     final isRating = item.subtitle?.startsWith('★') ?? false;
     final width =
         cardWidth ??
-        (posterStyle
+        (landscapeStyle
+            ? MediaBrowsingMetrics.landscapeCardWidth
+            : posterStyle
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
+
+    final card = Material(
+      color: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: item.onTap,
+        child: landscapeStyle
+            ? _buildLandscapeContent(context, colorScheme, width)
+            : _buildDefaultContent(context, colorScheme, isRating),
+      ),
+    );
+
     return DpadFocusable(
       autofocus: autofocus,
       onSelect: item.onTap,
-      child: SizedBox(
-        width: width,
-        child: Material(
-          color: colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: item.onTap,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: item.imagePadding,
-                    child: ResilientMediaImage(
-                      imageUrl: item.imageUrl,
-                      fallbackIcon: item.fallbackIcon,
-                      fit: item.imageFit,
-                      aspectRatio: item.imageAspectRatio,
-                      fallbackTitle: item.fallbackTitle,
-                      backgroundColor: item.imageBackgroundColor,
-                      borderRadius: 0,
-                    ),
-                  ),
+      child: SizedBox(width: width, child: card),
+    );
+  }
+
+  Widget _buildLandscapeContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    double width,
+  ) {
+    final imageHeight = width * 9 / 16;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: item.imagePadding,
+          child: ResilientMediaImage(
+            imageUrl: item.imageUrl,
+            fallbackIcon: item.fallbackIcon,
+            width: width,
+            height: imageHeight,
+            fit: item.imageFit,
+            fallbackTitle: item.fallbackTitle,
+            backgroundColor: item.imageBackgroundColor,
+            borderRadius: 0,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: posterStyle
-                              ? FontWeight.normal
-                              : FontWeight.w700,
-                        ),
-                        maxLines: posterStyle ? 2 : 1,
-                        overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (item.subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle!,
+                  style:
+                      Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
-                      if (item.subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          item.subtitle!,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: posterStyle && isRating
-                                    ? const Color(0xFFFFCC00)
-                                    : colorScheme.onSurfaceVariant,
-                                fontWeight: posterStyle && isRating
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDefaultContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isRating,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: item.imagePadding,
+            child: ResilientMediaImage(
+              imageUrl: item.imageUrl,
+              fallbackIcon: item.fallbackIcon,
+              fit: item.imageFit,
+              aspectRatio: item.imageAspectRatio,
+              fallbackTitle: item.fallbackTitle,
+              backgroundColor: item.imageBackgroundColor,
+              borderRadius: 0,
             ),
           ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: posterStyle ? FontWeight.normal : FontWeight.w700,
+                ),
+                maxLines: posterStyle ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (item.subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle!,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: posterStyle && isRating
+                        ? const Color(0xFFFFCC00)
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: posterStyle && isRating
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

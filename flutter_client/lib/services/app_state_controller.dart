@@ -405,11 +405,65 @@ class AppStateController extends ChangeNotifier {
 
   Future<List<Progress>> _loadRecentlyWatched(String viewerId) async {
     final remote = await xtreamService.getRecentlyWatched(viewerId);
-    for (final progress in remote) {
-      await resumeService.save(progress);
-    }
     final local = await resumeService.all(viewerId);
-    return <Progress>{...remote, ...local}.toList(growable: false);
+
+    // Build a lookup of locally-stored entries keyed by (contentType, streamId).
+    // Local entries carry enriched metadata (title, thumbnail, etc.) that was
+    // saved during playback via progressReporter. Remote entries carry the
+    // authoritative server position but no enrichment.
+    final localMap = {
+      for (final p in local) (p.contentType, p.streamId): p,
+    };
+
+    // For each remote entry, prefer the local copy when it has enriched
+    // metadata; otherwise use remote (which has the latest position).
+    // Any remote position advance is merged in by saving below.
+    final result = <Progress>[
+      for (final r in remote)
+        () {
+          final l = localMap[(r.contentType, r.streamId)];
+          // Local wins if it has enrichment; remote wins otherwise so the
+          // latest server position is reflected.
+          if (l != null && l.title != null && l.title!.isNotEmpty) {
+            // Merge: keep enriched metadata but adopt the server's position.
+            if (r.positionSeconds != l.positionSeconds ||
+                r.completed != l.completed) {
+              return Progress(
+                viewerId: l.viewerId,
+                contentType: l.contentType,
+                streamId: l.streamId,
+                positionSeconds: r.positionSeconds,
+                durationSeconds: r.durationSeconds ?? l.durationSeconds,
+                completed: r.completed,
+                seriesId: l.seriesId ?? r.seriesId,
+                seasonNumber: l.seasonNumber ?? r.seasonNumber,
+                title: l.title,
+                episodeTitle: l.episodeTitle,
+                seriesName: l.seriesName,
+                thumbnailUrl: l.thumbnailUrl,
+                backdropUrl: l.backdropUrl,
+                rating: l.rating,
+                runtime: l.runtime,
+              );
+            }
+            return l;
+          }
+          return r;
+        }(),
+      // Include local-only entries (e.g. M3U source, or server not yet synced).
+      for (final l in local)
+        if (!remote.any(
+          (r) => r.contentType == l.contentType && r.streamId == l.streamId,
+        ))
+          l,
+    ];
+
+    // Persist the merged list so future local reads are up to date.
+    for (final p in result) {
+      await resumeService.save(p);
+    }
+
+    return result;
   }
 
   Future<void> _loadXtreamEpg(List<Channel> channels) async {

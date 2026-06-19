@@ -368,6 +368,13 @@ class Progress {
     this.completed = false,
     this.seriesId,
     this.seasonNumber,
+    this.title,
+    this.episodeTitle,
+    this.seriesName,
+    this.thumbnailUrl,
+    this.backdropUrl,
+    this.rating,
+    this.runtime,
   });
 
   final String viewerId;
@@ -378,6 +385,13 @@ class Progress {
   final bool completed;
   final int? seriesId;
   final int? seasonNumber;
+  final String? title;
+  final String? episodeTitle;
+  final String? seriesName;
+  final String? thumbnailUrl;
+  final String? backdropUrl;
+  final String? rating;
+  final String? runtime;
 
   factory Progress.fromJson(Map<String, Object?> json, {String? viewerId}) =>
       Progress(
@@ -395,6 +409,13 @@ class Progress {
         seasonNumber: json.containsKey('season_number')
             ? _asInt(json['season_number'])
             : null,
+        title: json['title'] as String?,
+        episodeTitle: json['episode_title'] as String?,
+        seriesName: json['series_name'] as String?,
+        thumbnailUrl: json['thumbnail_url'] as String?,
+        backdropUrl: json['backdrop_url'] as String?,
+        rating: json['rating'] != null ? '${json['rating']}' : null,
+        runtime: json['runtime'] as String?,
       );
 
   Map<String, Object?> toJson() => {
@@ -406,6 +427,13 @@ class Progress {
     'completed': completed,
     if (seriesId != null) 'series_id': seriesId,
     if (seasonNumber != null) 'season_number': seasonNumber,
+    if (title != null) 'title': title,
+    if (episodeTitle != null) 'episode_title': episodeTitle,
+    if (seriesName != null) 'series_name': seriesName,
+    if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
+    if (backdropUrl != null) 'backdrop_url': backdropUrl,
+    if (rating != null) 'rating': rating,
+    if (runtime != null) 'runtime': runtime,
   };
 
   @override

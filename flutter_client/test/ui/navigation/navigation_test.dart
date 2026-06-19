@@ -328,14 +328,14 @@ void main() {
     );
     await _pumpAppFrame(tester);
 
+    // CW card uses the legacy VOD-list lookup when progress has no title yet.
     expect(find.text('Resume Route Movie'), findsOneWidget);
-    expect(find.text('Stream 201'), findsOneWidget);
 
-    await tester.tap(find.text('Stream 201'));
+    await tester.tap(find.text('Resume Route Movie'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // Resume modal is shown for in-progress VOD; tap Resume to proceed.
+    // Resume modal lets the user choose to resume from saved position or restart.
     expect(find.text('Resume Watching'), findsOneWidget);
     await tester.tap(find.text('Resume'));
     await tester.pump();

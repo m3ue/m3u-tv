@@ -283,7 +283,9 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.containerExtension != null)
             'container_extension': details.containerExtension,
           if (details.duration != null) 'duration': details.duration,
-          if (details.rating != null) 'rating': details.rating,
+          if (details.rating != null) 'rating': '${details.rating}',
+          if (details.backdropUrl != null) 'backdrop_url': details.backdropUrl,
+          if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
         },
       ),
     );

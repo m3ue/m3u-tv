@@ -344,15 +344,63 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 xtreamService: _appState.xtreamService,
                 viewerId: viewerId,
                 progressReporter: (progress) {
+                  // Carry forward enriched metadata (title, backdrop, etc.) that
+                  // the player doesn't know about. Prefer args.metadata (set by
+                  // the launching context), then the existing progress list entry.
+                  final existing = _appState.progressList.firstWhereOrNull(
+                    (p) =>
+                        p.contentType == progress.contentType &&
+                        p.streamId == progress.streamId,
+                  );
+                  final toSave = Progress(
+                    viewerId: progress.viewerId,
+                    contentType: progress.contentType,
+                    streamId: progress.streamId,
+                    positionSeconds: progress.positionSeconds,
+                    durationSeconds:
+                        progress.durationSeconds ?? existing?.durationSeconds,
+                    completed: progress.completed,
+                    seriesId: progress.seriesId ?? existing?.seriesId,
+                    seasonNumber:
+                        progress.seasonNumber ?? existing?.seasonNumber,
+                    title:
+                        progress.title ??
+                        args.metadata['title'] as String? ??
+                        existing?.title,
+                    episodeTitle:
+                        progress.episodeTitle ??
+                        args.metadata['episode_title'] as String? ??
+                        existing?.episodeTitle,
+                    seriesName:
+                        progress.seriesName ??
+                        args.metadata['series_name'] as String? ??
+                        existing?.seriesName,
+                    thumbnailUrl:
+                        progress.thumbnailUrl ??
+                        args.metadata['thumbnail_url'] as String? ??
+                        existing?.thumbnailUrl,
+                    backdropUrl:
+                        progress.backdropUrl ??
+                        args.metadata['backdrop_url'] as String? ??
+                        existing?.backdropUrl,
+                    rating:
+                        progress.rating ??
+                        args.metadata['rating'] as String? ??
+                        existing?.rating,
+                    runtime:
+                        progress.runtime ??
+                        args.metadata['duration'] as String? ??
+                        existing?.runtime,
+                  );
                   if (_appState.sourceType == AppSourceType.xtream) {
                     unawaited(
                       _appState.xtreamService
-                          .updateProgress(progress)
+                          .updateProgress(toSave)
                           .catchError((_) {}),
                     );
                   }
                   unawaited(
-                    _appState.resumeService.save(progress).then((_) {
+                    _appState.resumeService.save(toSave).then((_) {
                       if (mounted) unawaited(_appState.refreshLocalState());
                     }),
                   );
@@ -829,8 +877,24 @@ class _ContentNavigator extends StatelessWidget {
         (item) => item.id == progress.streamId,
       );
       if (item != null) {
-        // Pass no startPosition — the pre-player resume modal will handle it.
-        _playVod(item);
+        // Pass enriched metadata from progress so it survives playback saves.
+        onOpenPlayer?.call(
+          PlayerArgs(
+            streamUrl: item.streamUrl,
+            title: progress.title ?? item.name,
+            type: 'vod',
+            streamId: item.id,
+            metadata: <String, Object?>{
+              'container_extension': item.containerExtension,
+              if (progress.backdropUrl != null)
+                'backdrop_url': progress.backdropUrl,
+              if (progress.thumbnailUrl != null)
+                'thumbnail_url': progress.thumbnailUrl,
+              if (progress.rating != null) 'rating': progress.rating,
+              if (progress.runtime != null) 'duration': progress.runtime,
+            },
+          ),
+        );
       }
       return;
     }
@@ -984,6 +1048,7 @@ class _HomeScreen extends StatelessWidget {
       title: 'Continue Watching',
       emptyLabel: 'No Continue Watching available',
       items: continueWatchingItems,
+      landscapeStyle: true,
       onSidebarActivate: onSidebarActivate,
     );
     final liveSection = MediaPreviewSection(
@@ -1072,6 +1137,25 @@ class _HomeScreen extends StatelessWidget {
 
   MediaPreviewItem? _resumePreviewItem(Progress progress) {
     if (progress.contentType == ContentType.vod) {
+      // Use enriched API data when available.
+      if (progress.title != null) {
+        final hasBackdrop = progress.backdropUrl != null;
+        final subtitle = [
+          if (progress.rating != null) '★ ${progress.rating}',
+          if (progress.runtime != null) progress.runtime!,
+        ].join('  ');
+        return MediaPreviewItem(
+          title: progress.title!,
+          imageUrl: progress.backdropUrl ?? progress.thumbnailUrl,
+          subtitle: subtitle.isNotEmpty ? subtitle : 'Movie',
+          fallbackIcon: Icons.movie,
+          imageFit: hasBackdrop ? BoxFit.cover : BoxFit.contain,
+          imageBackgroundColor: hasBackdrop ? null : Colors.black,
+          fallbackTitle: progress.title,
+          onTap: () => onProgressSelect(progress),
+        );
+      }
+      // Legacy fallback: look up from local VOD list.
       final item = appState.vodItems.firstWhereOrNull(
         (item) => item.id == progress.streamId,
       );
@@ -1082,28 +1166,54 @@ class _HomeScreen extends StatelessWidget {
         subtitle: 'Stream ${progress.streamId}',
         fallbackIcon: Icons.play_circle_outline,
         imageFit: BoxFit.contain,
-        imageAspectRatio: 2 / 3,
+        imageBackgroundColor: Colors.black,
         fallbackTitle: item.name,
         onTap: () => onProgressSelect(progress),
       );
     }
 
-    if (progress.contentType == ContentType.episode &&
-        progress.seriesId != null) {
-      final series = appState.seriesList.firstWhereOrNull(
-        (series) => series.id == progress.seriesId,
-      );
-      if (series == null) return null;
-      return MediaPreviewItem(
-        title: 'Resume ${series.name}',
-        imageUrl: series.coverUrl,
-        subtitle: 'Episode ${progress.streamId}',
-        fallbackIcon: Icons.play_circle_outline,
-        imageFit: BoxFit.contain,
-        imageAspectRatio: 2 / 3,
-        fallbackTitle: series.name,
-        onTap: () => onProgressSelect(progress),
-      );
+    if (progress.contentType == ContentType.episode) {
+      // Use enriched API data when available — but only if we can actually play
+      // it (seriesId is required by _openProgress to look up the stream URL).
+      if (progress.seriesId != null &&
+          (progress.seriesName != null || progress.title != null)) {
+        final displayTitle = progress.seriesName ?? progress.title!;
+        final subtitle = [
+          if (progress.episodeTitle != null) progress.episodeTitle!,
+          if (progress.rating != null) '★ ${progress.rating}',
+          if (progress.runtime != null) progress.runtime!,
+        ].join('  ');
+        return MediaPreviewItem(
+          title: displayTitle,
+          // Episode-specific thumbnail first; series backdrop as fallback.
+          imageUrl: progress.thumbnailUrl ?? progress.backdropUrl,
+          subtitle: subtitle.isNotEmpty
+              ? subtitle
+              : (progress.seasonNumber != null
+                    ? 'Season ${progress.seasonNumber}'
+                    : 'Series'),
+          fallbackIcon: Icons.tv,
+          fallbackTitle: displayTitle,
+          onTap: () => onProgressSelect(progress),
+        );
+      }
+      // Legacy fallback: look up from local series list.
+      if (progress.seriesId != null) {
+        final series = appState.seriesList.firstWhereOrNull(
+          (series) => series.id == progress.seriesId,
+        );
+        if (series == null) return null;
+        return MediaPreviewItem(
+          title: series.name,
+          imageUrl: series.backdropUrl ?? series.coverUrl,
+          subtitle: progress.seasonNumber != null
+              ? 'Season ${progress.seasonNumber}'
+              : 'Series',
+          fallbackIcon: Icons.tv,
+          fallbackTitle: series.name,
+          onTap: () => onProgressSelect(progress),
+        );
+      }
     }
 
     return null;
