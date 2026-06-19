@@ -163,7 +163,7 @@ class _VodScreenState extends State<VodScreen> {
   }
 }
 
-class _VodCard extends StatelessWidget {
+class _VodCard extends StatefulWidget {
   const _VodCard({
     required this.item,
     required this.onTap,
@@ -175,17 +175,35 @@ class _VodCard extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<_VodCard> createState() => _VodCardState();
+}
+
+class _VodCardState extends State<_VodCard> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final item = widget.item;
     return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
+      autofocus: widget.autofocus,
+      focusNode: _focusNode,
+      onSelect: widget.onTap,
       child: Material(
         color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onTap,
+          onTap: () {
+            _focusNode.requestFocus();
+            widget.onTap();
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

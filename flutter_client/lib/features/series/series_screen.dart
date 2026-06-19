@@ -166,7 +166,7 @@ class _SeriesScreenState extends State<SeriesScreen> {
   }
 }
 
-class _SeriesCard extends StatelessWidget {
+class _SeriesCard extends StatefulWidget {
   const _SeriesCard({
     required this.item,
     required this.onTap,
@@ -178,17 +178,35 @@ class _SeriesCard extends StatelessWidget {
   final bool autofocus;
 
   @override
+  State<_SeriesCard> createState() => _SeriesCardState();
+}
+
+class _SeriesCardState extends State<_SeriesCard> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final item = widget.item;
     return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
+      autofocus: widget.autofocus,
+      focusNode: _focusNode,
+      onSelect: widget.onTap,
       child: Material(
         color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onTap,
+          onTap: () {
+            _focusNode.requestFocus();
+            widget.onTap();
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

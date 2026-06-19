@@ -838,10 +838,20 @@ class _ContentNavigator extends StatelessWidget {
     );
   }
 
+  Future<void> _pushNamed(String routeName, {Object? arguments}) async {
+    // Yield one microtask so that any requestFocus() call made synchronously
+    // in InkWell.onTap (which itself schedules a microtask) has resolved before
+    // we snapshot primaryFocus for restoration on pop.
+    await Future<void>.microtask(() {});
+    final savedFocus = FocusManager.instance.primaryFocus;
+    await navigatorKey.currentState?.pushNamed(routeName, arguments: arguments);
+    savedFocus?.requestFocus();
+  }
+
   void _openVod(VodItem item, {double? startPosition}) {
     if (startPosition == null) {
       unawaited(
-        navigatorKey.currentState?.pushNamed(
+        _pushNamed(
           RouteNames.details,
           arguments: DetailsArgs(
             vodId: item.id,
@@ -924,7 +934,7 @@ class _ContentNavigator extends StatelessWidget {
 
   void _openSeries(Series series) {
     unawaited(
-      navigatorKey.currentState?.pushNamed(
+      _pushNamed(
         RouteNames.seriesDetails,
         arguments: SeriesDetailsArgs(
           seriesId: series.id,

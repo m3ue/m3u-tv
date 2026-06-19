@@ -590,7 +590,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   }
 }
 
-class MediaPreviewCard extends StatelessWidget {
+class MediaPreviewCard extends StatefulWidget {
   const MediaPreviewCard({
     required this.item,
     this.posterStyle = false,
@@ -607,14 +607,28 @@ class MediaPreviewCard extends StatelessWidget {
   final double? cardWidth;
 
   @override
+  State<MediaPreviewCard> createState() => _MediaPreviewCardState();
+}
+
+class _MediaPreviewCardState extends State<MediaPreviewCard> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final item = widget.item;
     final isRating = item.subtitle?.startsWith('★') ?? false;
     final width =
-        cardWidth ??
-        (landscapeStyle
+        widget.cardWidth ??
+        (widget.landscapeStyle
             ? MediaBrowsingMetrics.landscapeCardWidth
-            : posterStyle
+            : widget.posterStyle
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
 
@@ -623,15 +637,23 @@ class MediaPreviewCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: item.onTap,
-        child: landscapeStyle
+        onTap: () {
+          // Explicitly request focus so that navigation (pushNamed / player
+          // open) can snapshot primaryFocus and restore it on pop/close.
+          // DpadFocusable.onTapDown also calls requestFocus, but that fires
+          // asynchronously and may lose the race on fast taps.
+          _focusNode.requestFocus();
+          item.onTap();
+        },
+        child: widget.landscapeStyle
             ? _buildLandscapeContent(context, colorScheme, width)
             : _buildDefaultContent(context, colorScheme, isRating),
       ),
     );
 
     return DpadFocusable(
-      autofocus: autofocus,
+      autofocus: widget.autofocus,
+      focusNode: _focusNode,
       onSelect: item.onTap,
       child: SizedBox(width: width, child: card),
     );
@@ -642,14 +664,15 @@ class MediaPreviewCard extends StatelessWidget {
     ColorScheme colorScheme,
     double width,
   ) {
+    final item = widget.item;
     final imageHeight = width * 9 / 16;
-    final hasBadges = item.overlayBadges.isNotEmpty;
-    final hasProgress = item.progressFraction != null;
+    final hasBadges = widget.item.overlayBadges.isNotEmpty;
+    final hasProgress = widget.item.progressFraction != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: item.imagePadding,
+          padding: widget.item.imagePadding,
           child: SizedBox(
             width: width,
             height: imageHeight,
@@ -691,7 +714,7 @@ class MediaPreviewCard extends StatelessWidget {
                     bottom: hasProgress ? 9 : 6,
                     child: Row(
                       children: [
-                        for (final badge in item.overlayBadges)
+                        for (final badge in widget.item.overlayBadges)
                           Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: DecoratedBox(
@@ -726,7 +749,7 @@ class MediaPreviewCard extends StatelessWidget {
                     right: 0,
                     bottom: 0,
                     child: LinearProgressIndicator(
-                      value: item.progressFraction,
+                      value: widget.item.progressFraction,
                       minHeight: 3,
                       backgroundColor: Colors.white24,
                       color: colorScheme.primary,
@@ -772,12 +795,14 @@ class MediaPreviewCard extends StatelessWidget {
     ColorScheme colorScheme,
     bool isRating,
   ) {
+    final item = widget.item;
+    final posterStyle = widget.posterStyle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: Padding(
-            padding: item.imagePadding,
+            padding: widget.item.imagePadding,
             child: ResilientMediaImage(
               imageUrl: item.imageUrl,
               fallbackIcon: item.fallbackIcon,
