@@ -49,7 +49,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const primary = Color(0xFF4f39f6);
     const secondary = Color(0xFFec003f);
-    const background = Color(0xFF18181b);
+    const background = Color(0xFF09090b); // scaffold / page bg
+    const card = Color(0xFF18181b); // cards, list rows, sidebar
+    const elevated = Color(
+      0xFF18181b,
+    ); // modals, chips, high-elevation surfaces
 
     return MaterialApp(
       title: 'M3U TV',
@@ -75,6 +79,7 @@ class MyApp extends StatelessWidget {
       darkTheme: ThemeData(
         useMaterial3: true,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        scaffoldBackgroundColor: Colors.transparent,
         colorScheme:
             ColorScheme.fromSeed(
               seedColor: primary,
@@ -87,6 +92,10 @@ class MyApp extends StatelessWidget {
               secondary: secondary,
               surface: background,
               surfaceContainerLowest: background,
+              surfaceContainerLow: card,
+              surfaceContainer: card,
+              surfaceContainerHigh: card,
+              surfaceContainerHighest: elevated,
             ),
       ),
       themeMode: ThemeMode.dark,

@@ -443,6 +443,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           }
 
           return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
             body: Stack(
               children: [
                 Positioned.fill(
@@ -575,7 +576,7 @@ class NavigationSidebar extends StatelessWidget {
         width: width,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: theme.colorScheme.surfaceContainerHigh,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),

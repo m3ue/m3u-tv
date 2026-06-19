@@ -255,7 +255,10 @@ RouteFactory buildAppRouter({
 }
 
 MaterialPageRoute<void> _buildRoute(RouteSettings settings, Widget screen) {
-  return MaterialPageRoute<void>(settings: settings, builder: (_) => screen);
+  return MaterialPageRoute<void>(
+    settings: settings,
+    builder: (_) => _withGradient(screen),
+  );
 }
 
 PageRoute<void> _buildModalRoute(RouteSettings settings, Widget screen) {
@@ -272,7 +275,10 @@ PageRoute<void> _buildModalRoute(RouteSettings settings, Widget screen) {
 PageRoute<void> _buildSlideRoute(RouteSettings settings, Widget screen) {
   return PageRouteBuilder<void>(
     settings: settings,
-    pageBuilder: (_, _, _) => screen,
+    pageBuilder: (context, _, _) => ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: screen,
+    ),
     transitionsBuilder: (_, animation, _, child) {
       return SlideTransition(
         position: Tween<Offset>(
