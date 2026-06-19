@@ -34,9 +34,9 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
       appBar: AppBar(
         title: Text(widget.item.name),
         automaticallyImplyLeading: false,
-        leadingWidth: 64,
+        leadingWidth: 56,
         leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
+          padding: const EdgeInsets.all(8),
           child: DpadFocusable(
             onSelect: () => Navigator.of(context).maybePop(),
             effects: const [
