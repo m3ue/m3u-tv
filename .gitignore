@@ -25,9 +25,11 @@ flutter_client/pubspec.lock
 # Android release signing — never commit real credentials
 *.jks
 *.keystore
+*.pem
 flutter_client/android/signing.properties
 flutter_client/android/*.jks
 flutter_client/android/*.keystore
+flutter_client/android/*.pem
 
 # Dart/Flutter generated
 flutter_client/**/*.g.dart
