@@ -565,11 +565,23 @@ class _EpisodeTile extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  episode.title,
-                                  style: theme.textTheme.titleSmall,
+                                child: RichText(
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                  text: TextSpan(
+                                    style: theme.textTheme.titleSmall,
+                                    children: [
+                                      TextSpan(
+                                        text: 'E${episode.episodeNumber} · ',
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      TextSpan(text: episode.title),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
