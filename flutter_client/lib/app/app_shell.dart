@@ -363,6 +363,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     seriesId: progress.seriesId ?? existing?.seriesId,
                     seasonNumber:
                         progress.seasonNumber ?? existing?.seasonNumber,
+                    episodeNumber:
+                        progress.episodeNumber ??
+                        (args.metadata['episode_number'] as int?) ??
+                        existing?.episodeNumber,
                     title:
                         progress.title ??
                         args.metadata['title'] as String? ??
@@ -1216,6 +1220,9 @@ class _HomeScreen extends StatelessWidget {
           fallbackIcon: Icons.tv,
           fallbackTitle: displayTitle,
           progressFraction: fraction,
+          overlayLabel: progress.seasonNumber != null
+              ? 'S${progress.seasonNumber}${progress.episodeNumber != null ? ' E${progress.episodeNumber}' : ''}'
+              : null,
           overlayBadges: <String>[
             if (progress.rating != null) '★ ${progress.rating}',
             if (progress.runtime != null) progress.runtime!,

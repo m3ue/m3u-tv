@@ -455,6 +455,7 @@ class MediaPreviewItem {
     this.imageBackgroundColor,
     this.progressFraction,
     this.overlayBadges = const <String>[],
+    this.overlayLabel,
   });
 
   final String title;
@@ -471,8 +472,11 @@ class MediaPreviewItem {
   /// 0.0–1.0 progress shown as a bar along the bottom of the image.
   final double? progressFraction;
 
-  /// Short text labels rendered as chips overlaid on the image.
+  /// Short text labels rendered as chips overlaid on the image (right-aligned).
   final List<String> overlayBadges;
+
+  /// Optional label shown left-aligned opposite the overlay badges.
+  final String? overlayLabel;
 }
 
 class MediaPreviewSection extends StatefulWidget {
@@ -704,6 +708,31 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
                             Colors.transparent,
                             Colors.black.withValues(alpha: 0.7),
                           ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.item.overlayLabel != null)
+                  Positioned(
+                    left: 6,
+                    bottom: hasProgress ? 9 : 6,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          widget.item.overlayLabel!,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ),

@@ -251,6 +251,10 @@ class Episode {
     required this.containerExtension,
     required this.seasonNumber,
     this.plot,
+    this.thumbnailUrl,
+    this.rating,
+    this.duration,
+    this.releaseDate,
     this.streamUrl,
   });
 
@@ -260,19 +264,41 @@ class Episode {
   final String containerExtension;
   final int seasonNumber;
   final String? plot;
+  final String? thumbnailUrl;
+  final double? rating;
+  final String? duration;
+  final String? releaseDate;
   final String? streamUrl;
 
   factory Episode.fromXtream(Map<String, Object?> json, {String? streamUrl}) {
     final info =
         (json['info'] as Map?)?.cast<String, Object?>() ??
         const <String, Object?>{};
+    Object? pick(List<String> keys) {
+      for (final k in keys) {
+        final v = info[k] ?? json[k];
+        if (v != null && v != '') return v;
+      }
+      return null;
+    }
+
     return Episode(
       id: '${json['id'] ?? ''}',
       episodeNumber: _asInt(json['episode_num']),
       title: '${json['title'] ?? ''}',
       containerExtension: '${json['container_extension'] ?? 'mp4'}',
       seasonNumber: _asInt(json['season'] ?? info['season']),
-      plot: _asNullableString(info['plot']),
+      plot: _asNullableString(pick(['plot', 'description', 'desc'])),
+      thumbnailUrl: _asNullableString(
+        pick(['movie_image', 'cover_big', 'cover', 'thumbnail']),
+      ),
+      rating: _asDoubleOrNull(pick(['rating'])),
+      duration: _durationText(
+        pick(['duration', 'duration_secs', 'duration_seconds']),
+      ),
+      releaseDate: _asNullableString(
+        pick(['release_date', 'releasedate', 'air_date']),
+      ),
       streamUrl: streamUrl,
     );
   }
@@ -368,6 +394,7 @@ class Progress {
     this.completed = false,
     this.seriesId,
     this.seasonNumber,
+    this.episodeNumber,
     this.title,
     this.episodeTitle,
     this.seriesName,
@@ -385,6 +412,7 @@ class Progress {
   final bool completed;
   final int? seriesId;
   final int? seasonNumber;
+  final int? episodeNumber;
   final String? title;
   final String? episodeTitle;
   final String? seriesName;
@@ -409,6 +437,9 @@ class Progress {
         seasonNumber: json.containsKey('season_number')
             ? _asInt(json['season_number'])
             : null,
+        episodeNumber: json.containsKey('episode_number')
+            ? _asInt(json['episode_number'])
+            : null,
         title: json['title'] as String?,
         episodeTitle: json['episode_title'] as String?,
         seriesName: json['series_name'] as String?,
@@ -427,6 +458,7 @@ class Progress {
     'completed': completed,
     if (seriesId != null) 'series_id': seriesId,
     if (seasonNumber != null) 'season_number': seasonNumber,
+    if (episodeNumber != null) 'episode_number': episodeNumber,
     if (title != null) 'title': title,
     if (episodeTitle != null) 'episode_title': episodeTitle,
     if (seriesName != null) 'series_name': seriesName,

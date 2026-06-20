@@ -250,20 +250,27 @@ class XtreamService {
       final seasonNumber = int.tryParse(entry.key) ?? 0;
       episodeMap[seasonNumber] = _asList(entry.value)
           .map((item) {
-            final episode = Episode.fromXtream(_asMap(item));
+            final map = _asMap(item);
+            final episode = Episode.fromXtream(
+              map,
+              streamUrl: getSeriesStreamUrl(
+                '${map['id'] ?? ''}',
+                '${map['container_extension'] ?? 'mp4'}',
+              ),
+            );
+            if (episode.seasonNumber != 0) return episode;
             return Episode(
               id: episode.id,
               episodeNumber: episode.episodeNumber,
               title: episode.title,
               containerExtension: episode.containerExtension,
-              seasonNumber: episode.seasonNumber == 0
-                  ? seasonNumber
-                  : episode.seasonNumber,
+              seasonNumber: seasonNumber,
               plot: episode.plot,
-              streamUrl: getSeriesStreamUrl(
-                episode.id,
-                episode.containerExtension,
-              ),
+              thumbnailUrl: episode.thumbnailUrl,
+              rating: episode.rating,
+              duration: episode.duration,
+              releaseDate: episode.releaseDate,
+              streamUrl: episode.streamUrl,
             );
           })
           .toList(growable: false);

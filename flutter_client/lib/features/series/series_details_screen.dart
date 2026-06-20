@@ -97,6 +97,10 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
         seasonNumber: episode.seasonNumber,
         metadata: <String, Object?>{
           'container_extension': episode.containerExtension,
+          'season_number': episode.seasonNumber,
+          'episode_number': episode.episodeNumber,
+          'episode_title': episode.title,
+          'series_name': widget.seriesName,
         },
       ),
     );
@@ -499,7 +503,8 @@ class _EpisodeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final p = progress;
     final progressValue =
         (p != null &&
@@ -509,25 +514,102 @@ class _EpisodeTile extends StatelessWidget {
         ? (p.positionSeconds / p.durationSeconds!).clamp(0.0, 1.0)
         : null;
 
+    final hasThumbnail = episode.thumbnailUrl != null;
+
+    final metaChips = <String>[
+      if (episode.rating != null) '★ ${episode.rating!.toStringAsFixed(1)}',
+      if (episode.duration != null) episode.duration!,
+      if (episode.releaseDate != null) episode.releaseDate!,
+    ];
+
     return DpadFocusable(
       autofocus: autofocus,
       onSelect: onTap,
       effects: const [
-        DpadBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-        ),
+        DpadBorderEffect(),
       ],
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: CircleAvatar(child: Text('${episode.episodeNumber}')),
-              title: Text(episode.title),
-              subtitle: episode.plot == null ? null : Text(episode.plot!),
-              trailing: const Icon(Icons.play_arrow),
+            InkWell(
               onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thumbnail or episode-number badge
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        width: 120,
+                        height: 68,
+                        child: hasThumbnail
+                            ? Image.network(
+                                episode.thumbnailUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) =>
+                                    _episodeNumberBadge(colorScheme),
+                              )
+                            : _episodeNumberBadge(colorScheme),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Title, meta chips, description
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  episode.title,
+                                  style: theme.textTheme.titleSmall,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.play_arrow, size: 20),
+                            ],
+                          ),
+                          if (metaChips.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              children: metaChips
+                                  .map(
+                                    (chip) => Text(
+                                      chip,
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          if (episode.plot != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              episode.plot!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             if (progressValue != null)
               LinearProgressIndicator(
@@ -537,6 +619,22 @@ class _EpisodeTile extends StatelessWidget {
                 valueColor: AlwaysStoppedAnimation(colorScheme.primary),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _episodeNumberBadge(ColorScheme colorScheme) {
+    return ColoredBox(
+      color: colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Text(
+          'E${episode.episodeNumber}',
+          style: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
       ),
     );
