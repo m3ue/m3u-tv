@@ -32,6 +32,11 @@
   -->
   <key>FLTAssetsPath</key>
   <string>flutter_assets</string>
+  <key>TVTopShelfImage</key>
+  <dict>
+    <key>TVTopShelfPrimaryImageWide</key>
+    <string>Top Shelf Image</string>
+  </dict>
   <key>UIMainStoryboardFile</key>
   <string>Main</string>
   <key>UIRequiredDeviceCapabilities</key>
