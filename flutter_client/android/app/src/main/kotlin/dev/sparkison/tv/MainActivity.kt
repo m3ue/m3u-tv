@@ -1,4 +1,4 @@
-package com.m3ue.m3utv
+package dev.sparkison.tv
 
 import android.app.UiModeManager
 import android.content.Context

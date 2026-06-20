@@ -9,12 +9,22 @@ plugins {
 val media3Version = "1.10.1"
 val lifecycleVersion = "2.9.4"
 
+// Reads from (in priority order):
+//   1. Gradle properties  (-PANDROID_KEYSTORE_PATH=...)
+//   2. Environment variables  (ANDROID_KEYSTORE_PATH=...)
+//   3. android/signing.properties  (gitignored, for local dev)
 val androidSigningPropertiesFile = rootProject.file("signing.properties")
 val androidSigningProperties = Properties().apply {
     if (androidSigningPropertiesFile.isFile) {
         androidSigningPropertiesFile.inputStream().use(::load)
     }
 }
+
+fun signingValue(name: String): String? =
+    providers.gradleProperty(name).orNull
+        ?: providers.environmentVariable(name).orNull
+        ?: androidSigningProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+
 val releaseSigningKeys = listOf(
     "ANDROID_KEYSTORE_PATH",
     "ANDROID_KEY_ALIAS",
@@ -22,16 +32,14 @@ val releaseSigningKeys = listOf(
     "ANDROID_KEY_PASSWORD",
 )
 
-fun releaseSigningValue(name: String): String? =
-    providers.gradleProperty(name).orNull
-        ?: providers.environmentVariable(name).orNull
-        ?: androidSigningProperties.getProperty(name)?.takeIf { it.isNotBlank() }
-
-fun missingReleaseSigningKeys(): List<String> =
-    releaseSigningKeys.filter { releaseSigningValue(it).isNullOrBlank() }
+fun hasReleaseSigningKeys(): Boolean {
+    val keystorePath = signingValue("ANDROID_KEYSTORE_PATH") ?: return false
+    if (!file(keystorePath).isFile) return false
+    return releaseSigningKeys.all { !signingValue(it).isNullOrBlank() }
+}
 
 android {
-    namespace = "com.m3ue.m3utv"
+    namespace = "dev.sparkison.tv"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -45,10 +53,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.m3ue.m3utv"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion // flutter_secure_storage requires API 23+
+        applicationId = "dev.sparkison.tv"
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -56,19 +62,23 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = releaseSigningValue("ANDROID_KEYSTORE_PATH")
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-            }
-            keyAlias = releaseSigningValue("ANDROID_KEY_ALIAS")
-            storePassword = releaseSigningValue("ANDROID_KEYSTORE_PASSWORD")
-            keyPassword = releaseSigningValue("ANDROID_KEY_PASSWORD")
+            val keystorePath = signingValue("ANDROID_KEYSTORE_PATH")
+            if (keystorePath != null) storeFile = file(keystorePath)
+            keyAlias = signingValue("ANDROID_KEY_ALIAS")
+            storePassword = signingValue("ANDROID_KEYSTORE_PASSWORD")
+            keyPassword = signingValue("ANDROID_KEY_PASSWORD")
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use release signing when keys are available, otherwise fall back to
+            // debug signing so contributors can build without credentials.
+            signingConfig = if (hasReleaseSigningKeys()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
@@ -84,23 +94,4 @@ dependencies {
 
 flutter {
     source = "../.."
-}
-
-
-gradle.taskGraph.whenReady {
-    val releaseTaskRequested = allTasks.any { task ->
-        task.project == project && task.name.contains("Release")
-    }
-    if (releaseTaskRequested) {
-        val missing = missingReleaseSigningKeys()
-        check(missing.isEmpty()) {
-            "Release signing requires ${missing.joinToString()} from Gradle properties, " +
-                "environment variables, or android/signing.properties (ignored by git)."
-        }
-        val keystorePath = releaseSigningValue("ANDROID_KEYSTORE_PATH")!!
-        check(file(keystorePath).isFile) {
-            "Release signing keystore was not found at ANDROID_KEYSTORE_PATH; " +
-                "provide the keystore outside git before building release artifacts."
-        }
-    }
 }

@@ -1,4 +1,4 @@
-package com.m3ue.m3utv
+package dev.sparkison.tv
 
 import android.content.Context
 import android.net.Uri

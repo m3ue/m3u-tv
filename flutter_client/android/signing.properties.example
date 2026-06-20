@@ -1,0 +1,12 @@
+# Copy this file to signing.properties (gitignored) and fill in your values.
+# Alternatively, set these as environment variables for CI.
+#
+# ANDROID_KEYSTORE_PATH — path to the .jks file (absolute, or relative to android/)
+# ANDROID_KEY_ALIAS     — alias used when the keystore was created (e.g. "upload")
+# ANDROID_KEYSTORE_PASSWORD — keystore password
+# ANDROID_KEY_PASSWORD      — key password (often the same as keystore password)
+
+ANDROID_KEYSTORE_PATH=../upload-keystore.jks
+ANDROID_KEY_ALIAS=upload
+ANDROID_KEYSTORE_PASSWORD=
+ANDROID_KEY_PASSWORD=
