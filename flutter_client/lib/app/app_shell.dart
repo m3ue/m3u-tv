@@ -1012,6 +1012,7 @@ class _ContentNavigator extends StatelessWidget {
             isConfiguredOverride: appState.isConfigured,
             epgRefreshInterval: appState.epgRefreshInterval,
             epgRefreshOptions: AppStateController.epgRefreshOptions,
+            traktService: appState.traktService,
             onConnect: appState.connectXtream,
             onDisconnect: () => unawaited(appState.disconnect()),
             onSwitchViewer: (viewer) =>

@@ -128,6 +128,7 @@ class VodInfo {
     this.coverUrl,
     this.backdropUrl,
     this.containerExtension,
+    this.tmdbId,
   });
 
   final int id;
@@ -143,6 +144,7 @@ class VodInfo {
   final String? coverUrl;
   final String? backdropUrl;
   final String? containerExtension;
+  final int? tmdbId;
 
   factory VodInfo.fromXtream(Map<String, Object?> json) {
     final info = _asMap(json['info']);
@@ -188,6 +190,7 @@ class VodInfo {
       containerExtension: _asNullableString(
         pick(['container_extension', 'containerExtension']),
       ),
+      tmdbId: _asIntOrNull(pick(['tmdb_id', 'tmdb'])),
     );
   }
 }
@@ -201,6 +204,7 @@ class Series {
     this.categoryId,
     this.plot,
     this.rating,
+    this.tmdbId,
   });
 
   final int id;
@@ -210,6 +214,7 @@ class Series {
   final String? categoryId;
   final String? plot;
   final double? rating;
+  final int? tmdbId;
 
   factory Series.fromXtream(Map<String, Object?> json) => Series(
     id: _asInt(json['series_id']),
@@ -219,6 +224,7 @@ class Series {
     categoryId: _asNullableString(json['category_id']),
     plot: _asNullableString(json['plot']),
     rating: _asDoubleOrNull(json['rating']),
+    tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
   );
 }
 
@@ -402,6 +408,7 @@ class Progress {
     this.backdropUrl,
     this.rating,
     this.runtime,
+    this.tmdbId,
   });
 
   final String viewerId;
@@ -420,34 +427,36 @@ class Progress {
   final String? backdropUrl;
   final String? rating;
   final String? runtime;
+  final int? tmdbId;
 
-  factory Progress.fromJson(Map<String, Object?> json, {String? viewerId}) =>
-      Progress(
-        viewerId: viewerId ?? '${json['viewer_id'] ?? ''}',
-        contentType: contentTypeFromWire('${json['content_type'] ?? 'vod'}'),
-        streamId: _asInt(json['stream_id']),
-        positionSeconds: _asInt(json['position_seconds']),
-        durationSeconds: json.containsKey('duration_seconds')
-            ? _asInt(json['duration_seconds'])
-            : null,
-        completed: json['completed'] == true || json['completed'] == 1,
-        seriesId: json.containsKey('series_id')
-            ? _asInt(json['series_id'])
-            : null,
-        seasonNumber: json.containsKey('season_number')
-            ? _asInt(json['season_number'])
-            : null,
-        episodeNumber: json.containsKey('episode_number')
-            ? _asInt(json['episode_number'])
-            : null,
-        title: json['title'] as String?,
-        episodeTitle: json['episode_title'] as String?,
-        seriesName: json['series_name'] as String?,
-        thumbnailUrl: json['thumbnail_url'] as String?,
-        backdropUrl: json['backdrop_url'] as String?,
-        rating: json['rating'] != null ? '${json['rating']}' : null,
-        runtime: json['runtime'] as String?,
-      );
+  factory Progress.fromJson(
+    Map<String, Object?> json, {
+    String? viewerId,
+  }) => Progress(
+    viewerId: viewerId ?? '${json['viewer_id'] ?? ''}',
+    contentType: contentTypeFromWire('${json['content_type'] ?? 'vod'}'),
+    streamId: _asInt(json['stream_id']),
+    positionSeconds: _asInt(json['position_seconds']),
+    durationSeconds: json.containsKey('duration_seconds')
+        ? _asInt(json['duration_seconds'])
+        : null,
+    completed: json['completed'] == true || json['completed'] == 1,
+    seriesId: json.containsKey('series_id') ? _asInt(json['series_id']) : null,
+    seasonNumber: json.containsKey('season_number')
+        ? _asInt(json['season_number'])
+        : null,
+    episodeNumber: json.containsKey('episode_number')
+        ? _asInt(json['episode_number'])
+        : null,
+    title: json['title'] as String?,
+    episodeTitle: json['episode_title'] as String?,
+    seriesName: json['series_name'] as String?,
+    thumbnailUrl: json['thumbnail_url'] as String?,
+    backdropUrl: json['backdrop_url'] as String?,
+    rating: json['rating'] != null ? '${json['rating']}' : null,
+    runtime: json['runtime'] as String?,
+    tmdbId: json.containsKey('tmdb_id') ? _asIntOrNull(json['tmdb_id']) : null,
+  );
 
   Map<String, Object?> toJson() => {
     'viewer_id': viewerId,
@@ -466,6 +475,7 @@ class Progress {
     if (backdropUrl != null) 'backdrop_url': backdropUrl,
     if (rating != null) 'rating': rating,
     if (runtime != null) 'runtime': runtime,
+    if (tmdbId != null) 'tmdb_id': tmdbId,
   };
 
   @override
@@ -512,6 +522,13 @@ int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse('$value') ?? 0;
+}
+
+int? _asIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
 }
 
 double? _asDoubleOrNull(Object? value) {

@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -53,6 +54,7 @@ class AppStateController extends ChangeNotifier {
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
       m3uParser: m3uParser ?? M3UParser(),
+      traktService: TraktService(storage: resolvedSecureStorage),
     );
   }
 
@@ -66,6 +68,7 @@ class AppStateController extends ChangeNotifier {
     required this.viewerService,
     required this.epgService,
     required this.m3uParser,
+    required this.traktService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -86,6 +89,7 @@ class AppStateController extends ChangeNotifier {
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
+  final TraktService traktService;
 
   AppSourceType _sourceType = AppSourceType.none;
   bool _isBootstrapping = false;
@@ -125,6 +129,7 @@ class AppStateController extends ChangeNotifier {
     _isBootstrapping = true;
     _error = null;
     notifyListeners();
+    unawaited(traktService.init());
 
     final savedIntervalRaw = await secureStorage.read(_epgIntervalKey);
     if (savedIntervalRaw != null) {
