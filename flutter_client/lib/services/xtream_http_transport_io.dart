@@ -76,6 +76,13 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
 String? _plainServerMessage(String text) {
   final message = text.trim();
   if (message.isEmpty) return null;
+  // HTML error pages (nginx, Apache, etc.) are not useful as-is; the HTTP
+  // status line already conveys the error so we drop the body.
+  if (message.startsWith('<!') ||
+      message.startsWith('<html') ||
+      message.startsWith('<HTML')) {
+    return null;
+  }
   return message.length <= 240 ? message : '${message.substring(0, 240)}...';
 }
 
