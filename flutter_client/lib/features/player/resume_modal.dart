@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Shows a resume/start-over dialog before opening a VOD or Series episode.
 ///
@@ -89,7 +90,7 @@ class _ResumeModal extends StatelessWidget {
                   // ignore: prefer_int_literals
                   onSelect: () => Navigator.of(context).pop(0.0),
                   effects: const [
-                    DpadBorderEffect(
+                    GradientBorderEffect(
                       borderRadius: BorderRadius.all(Radius.circular(8)),
                     ),
                   ],
@@ -113,7 +114,7 @@ class _ResumeModal extends StatelessWidget {
                     DpadFocusable(
                       onSelect: () => Navigator.of(context).pop(),
                       effects: const [
-                        DpadBorderEffect(
+                        GradientBorderEffect(
                           borderRadius: BorderRadius.all(Radius.circular(50)),
                         ),
                       ],
@@ -128,7 +129,7 @@ class _ResumeModal extends StatelessWidget {
                       onSelect: () =>
                           Navigator.of(context).pop(positionSeconds.toDouble()),
                       effects: const [
-                        DpadBorderEffect(
+                        GradientBorderEffect(
                           borderRadius: BorderRadius.all(Radius.circular(50)),
                         ),
                       ],

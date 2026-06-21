@@ -10,6 +10,7 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -60,7 +61,7 @@ class MyApp extends StatelessWidget {
       builder: Dpad.wrap(
         theme: const DpadThemeData(
           effects: [
-            DpadBorderEffect(
+            GradientBorderEffect(
               borderRadius: BorderRadius.all(Radius.circular(8)),
             ),
           ],

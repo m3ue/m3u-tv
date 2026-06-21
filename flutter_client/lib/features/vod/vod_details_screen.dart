@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class VodDetailsScreen extends StatefulWidget {
@@ -40,7 +42,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
           child: DpadFocusable(
             onSelect: () => Navigator.of(context).maybePop(),
             effects: const [
-              DpadBorderEffect(
+              GradientBorderEffect(
                 borderRadius: BorderRadius.all(Radius.circular(50)),
               ),
             ],

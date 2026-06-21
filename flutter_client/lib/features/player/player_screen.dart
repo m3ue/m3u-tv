@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -12,6 +13,7 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -516,7 +518,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             focusNode: _errorButtonFocusNode,
                             onSelect: _goBack,
                             effects: const [
-                              DpadBorderEffect(
+                              GradientBorderEffect(
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(50),
                                 ),

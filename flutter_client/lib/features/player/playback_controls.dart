@@ -4,6 +4,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Playback controls overlay for the player screen.
 ///
@@ -66,7 +67,7 @@ class PlaybackControls extends StatelessWidget {
         DpadFocusable(
           onSelect: onBack,
           effects: const [
-            DpadBorderEffect(
+            GradientBorderEffect(
               borderRadius: BorderRadius.all(Radius.circular(50)),
             ),
           ],
@@ -201,7 +202,7 @@ class _ControlButton extends StatelessWidget {
       focusNode: focusNode,
       onSelect: onTap,
       effects: const [
-        DpadBorderEffect(
+        GradientBorderEffect(
           borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
       ],
@@ -340,7 +341,7 @@ class _SeekBarState extends State<_SeekBar> {
         return false;
       },
       effects: const [
-        DpadBorderEffect(
+        GradientBorderEffect(
           borderRadius: BorderRadius.all(Radius.circular(4)),
         ),
       ],

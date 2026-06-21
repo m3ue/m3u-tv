@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -318,7 +319,7 @@ class CategoryFilterChip extends StatelessWidget {
     return DpadFocusable(
       onSelect: onTap,
       effects: const [
-        DpadBorderEffect(
+        GradientBorderEffect(
           borderRadius: BorderRadius.all(
             Radius.circular(MediaBrowsingMetrics.chipRadius),
           ),

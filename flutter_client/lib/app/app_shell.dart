@@ -16,6 +16,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Device type enum matching the RN useDeviceType hook.
@@ -751,36 +752,60 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
         customBorder: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(8),
-            border: _focused && !widget.selected
-                ? Border.all(color: colorScheme.primary, width: 2)
-                : null,
-          ),
-          child: OverflowBox(
-            maxWidth: 200,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(widget.icon, color: foregroundColor, size: 24),
-                if (widget.expanded) ...[
-                  const SizedBox(width: 12),
-                  Text(
-                    widget.label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: foregroundColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: OverflowBox(
+                maxWidth: 200,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(widget.icon, color: foregroundColor, size: 24),
+                    if (widget.expanded) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: foregroundColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _focused && !widget.selected ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: CustomPaint(
+                    painter: GradientBorderPainter(
+                      borderRadius: const BorderRadius.all(Radius.circular(8)),
+                      width: 2.5,
+                      gradient: LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          colorScheme.primary,
+                          colorScheme.secondary,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
