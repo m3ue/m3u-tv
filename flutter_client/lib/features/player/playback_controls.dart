@@ -124,6 +124,7 @@ class PlaybackControls extends StatelessWidget {
 
   Widget _buildControlsBar(ColorScheme colorScheme) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.black87,
@@ -135,8 +136,6 @@ class PlaybackControls extends StatelessWidget {
           if (canSeek) _buildProgressBar(colorScheme),
           if (canSeek) const SizedBox(height: 12),
           _buildControlRow(colorScheme),
-          if (_hasTrackControls) const SizedBox(height: 12),
-          if (_hasTrackControls) _buildTrackControls(),
         ],
       ),
     );
@@ -165,8 +164,8 @@ class PlaybackControls extends StatelessWidget {
   }
 
   Widget _buildControlRow(ColorScheme colorScheme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final transportControls = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (!isLive)
           _ControlButton(
@@ -205,6 +204,13 @@ class PlaybackControls extends StatelessWidget {
             },
             colorScheme: colorScheme,
           ),
+      ],
+    );
+
+    return Row(
+      children: [
+        Expanded(child: Center(child: transportControls)),
+        if (_hasTrackControls) _buildTrackControls(),
       ],
     );
   }

@@ -162,6 +162,104 @@ void main() {
       expect(playPauseCenter.dx, lessThan(forwardCenter.dx));
     });
 
+    testWidgets('places track controls inline to the right of transport buttons', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            audioTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'audio-eng', label: 'English'),
+            ],
+            subtitleTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+            ],
+            selectedAudioTrackId: 'audio-eng',
+            selectedSubtitleTrackId: 'sub-eng',
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      final forwardCenter = tester.getCenter(find.byIcon(Icons.forward_10));
+      final audioCenter = tester.getCenter(find.byIcon(Icons.audiotrack));
+      final subtitleCenter = tester.getCenter(find.byIcon(Icons.subtitles));
+
+      expect(audioCenter.dx, greaterThan(forwardCenter.dx));
+      expect(subtitleCenter.dx, greaterThan(audioCenter.dx));
+      expect((audioCenter.dy - forwardCenter.dy).abs(), lessThan(1));
+      expect((subtitleCenter.dy - forwardCenter.dy).abs(), lessThan(1));
+    });
+
+    testWidgets('labels track controls by type and current selection', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            audioTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'audio-eng', label: 'English'),
+            ],
+            subtitleTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+            ],
+            selectedAudioTrackId: 'audio-eng',
+            selectedSubtitleTrackId: 'sub-eng',
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      expect(find.text('Audio: English'), findsOneWidget);
+      expect(find.text('Subs: English CC'), findsOneWidget);
+    });
+
+    testWidgets('shows first audio track while backend has not emitted selected track', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            audioTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'audio-de', label: 'de'),
+              PlaybackTrack(id: 'audio-en', label: 'en'),
+            ],
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      expect(find.text('Audio: de'), findsOneWidget);
+      expect(find.text('Select'), findsNothing);
+    });
+
     testWidgets('calls onSeek with 10 second replay target', (tester) async {
       Duration? seekTarget;
       await tester.pumpWidget(
@@ -453,6 +551,43 @@ void main() {
       await tester.tap(find.text('Spanish').last);
       await tester.pumpAndSettle();
       expect(selectedTrack, '2');
+    });
+
+    testWidgets('audio track dialog scrolls instead of overflowing', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 360));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TrackSelector(
+            audioTracks: List<PlaybackTrack>.generate(
+              12,
+              (index) => PlaybackTrack(
+                id: '$index',
+                label: 'Language $index',
+              ),
+            ),
+            subtitleTracks: const [],
+            selectedAudioTrackId: '0',
+            selectedSubtitleTrackId: null,
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.audiotrack));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(Scrollable), findsWidgets);
+      expect(find.text('Language 11'), findsNothing);
+
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -1000));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Language 11'), findsOneWidget);
     });
   });
 

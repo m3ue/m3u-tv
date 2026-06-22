@@ -63,19 +63,18 @@ class TrackSelector extends StatelessWidget {
   }
 
   String get _audioLabel {
-    if (selectedAudioTrackId == null) return 'Disabled';
-    final track = audioTracks
-        .where((t) => t.id == selectedAudioTrackId)
-        .firstOrNull;
-    return track?.label ?? 'Select';
+    final track = selectedAudioTrackId == null
+        ? audioTracks.firstOrNull
+        : audioTracks.where((t) => t.id == selectedAudioTrackId).firstOrNull;
+    return 'Audio: ${track?.label ?? 'Select'}';
   }
 
   String get _subtitleLabel {
-    if (selectedSubtitleTrackId == null) return 'Off';
+    if (selectedSubtitleTrackId == null) return 'Subs: Off';
     final track = subtitleTracks
         .where((t) => t.id == selectedSubtitleTrackId)
         .firstOrNull;
-    return track?.label ?? 'Select';
+    return 'Subs: ${track?.label ?? 'Select'}';
   }
 
   void _showAudioDialog(BuildContext context) {
@@ -85,8 +84,7 @@ class TrackSelector extends StatelessWidget {
         builder: (context) {
           return AlertDialog(
             title: const Text('Audio Track'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            content: _TrackDialogList(
               children: [
                 ListTile(
                   title: const Text('Disable'),
@@ -121,8 +119,7 @@ class TrackSelector extends StatelessWidget {
         builder: (context) {
           return AlertDialog(
             title: const Text('Subtitle Track'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            content: _TrackDialogList(
               children: [
                 ListTile(
                   title: const Text('Off'),
@@ -146,6 +143,30 @@ class TrackSelector extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _TrackDialogList extends StatelessWidget {
+  const _TrackDialogList({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.55;
+    return SizedBox(
+      width: double.maxFinite,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Scrollbar(
+          thumbVisibility: true,
+          child: ListView(
+            shrinkWrap: true,
+            children: children,
+          ),
+        ),
       ),
     );
   }
@@ -176,6 +197,7 @@ class _TrackButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
+          width: 160,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white10,
@@ -186,14 +208,17 @@ class _TrackButton extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: colorScheme.onSurface),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
