@@ -21,7 +21,7 @@ class TrackSelector extends StatelessWidget {
     super.key,
   });
 
-  static const double buttonWidth = 112;
+  static const double buttonWidth = 136;
   static const double controlsWidth = buttonWidth * 2 + 8;
 
   /// Available audio tracks.
@@ -194,24 +194,26 @@ class _TrackButton extends StatelessWidget {
             color: Colors.white10,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: colorScheme.onSurface),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: colorScheme.onSurface),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

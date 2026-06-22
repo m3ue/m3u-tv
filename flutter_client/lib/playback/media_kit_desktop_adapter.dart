@@ -79,6 +79,10 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
               subtitleTracks: mediaKitSubtitleTracksToPlaybackTracks(
                 tracks.subtitle,
               ),
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                _player.state.track.audio,
+                tracks.audio,
+              ),
             ),
           );
         }),
@@ -87,7 +91,10 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
         _player.stream.track.listen((track) {
           _emit(
             _state.copyWith(
-              selectedAudioTrackId: _selectedTrackId(track.audio.id),
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                track.audio,
+                _player.state.tracks.audio,
+              ),
               selectedSubtitleTrackId: _selectedTrackId(track.subtitle.id),
             ),
           );
@@ -235,6 +242,19 @@ String _mediaKitTrackLabel({
   return 'Track $id';
 }
 
-String? _selectedTrackId(String id) => id == 'no' ? null : id;
+String? selectedMediaKitAudioTrackId(
+  mk.AudioTrack selectedTrack,
+  List<mk.AudioTrack> availableTracks,
+) {
+  if (selectedTrack.id == 'no') return null;
+  if (selectedTrack.id != 'auto') return selectedTrack.id;
+
+  return availableTracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .firstOrNull
+      ?.id;
+}
+
+String? _selectedTrackId(String id) => id == 'no' || id == 'auto' ? null : id;
 
 bool _isMediaKitSentinelTrack(String id) => id == 'auto' || id == 'no';

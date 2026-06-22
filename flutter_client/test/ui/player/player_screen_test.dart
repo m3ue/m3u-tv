@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -250,6 +251,21 @@ void main() {
       expect(find.text('Subtitles'), findsOneWidget);
       expect(find.text('Audio: English'), findsNothing);
       expect(find.text('Subs: English CC'), findsNothing);
+
+      final audioButtonRect = tester.getRect(
+        find.ancestor(
+          of: find.text('Audio'),
+          matching: find.byType(DpadFocusable),
+        ),
+      );
+      final audioIconRect = tester.getRect(find.byIcon(Icons.audiotrack));
+      final audioTextRect = tester.getRect(find.text('Audio'));
+      final audioContentCenter =
+          (audioIconRect.left + audioTextRect.right) / 2;
+      expect(
+        (audioContentCenter - audioButtonRect.center.dx).abs(),
+        lessThan(1),
+      );
     });
 
     testWidgets('marks first audio track active while selected track is unknown', (

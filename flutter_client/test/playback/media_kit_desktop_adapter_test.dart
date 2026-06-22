@@ -41,5 +41,32 @@ void main() {
       expect(tracks.last.id, '4');
       expect(tracks.last.label, 'Track 4');
     });
+
+    test('resolves automatic audio selection to the first real track', () {
+      final selectedTrackId = selectedMediaKitAudioTrackId(
+        mk.AudioTrack.auto(),
+        const <mk.AudioTrack>[
+          mk.AudioTrack('auto', null, null),
+          mk.AudioTrack('no', null, null),
+          mk.AudioTrack('1', null, 'de'),
+          mk.AudioTrack('2', null, 'en'),
+        ],
+      );
+
+      expect(selectedTrackId, '1');
+    });
+
+    test('keeps disabled audio selection disabled', () {
+      final selectedTrackId = selectedMediaKitAudioTrackId(
+        mk.AudioTrack.no(),
+        const <mk.AudioTrack>[
+          mk.AudioTrack('auto', null, null),
+          mk.AudioTrack('no', null, null),
+          mk.AudioTrack('1', null, 'de'),
+        ],
+      );
+
+      expect(selectedTrackId, isNull);
+    });
   });
 }
