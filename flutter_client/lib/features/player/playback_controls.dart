@@ -207,10 +207,17 @@ class PlaybackControls extends StatelessWidget {
       ],
     );
 
-    return Row(
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        Expanded(child: Center(child: transportControls)),
-        if (_hasTrackControls) _buildTrackControls(),
+        Center(child: transportControls),
+        Align(
+          alignment: Alignment.centerRight,
+          child: SizedBox(
+            width: TrackSelector.controlsWidth,
+            child: _hasTrackControls ? _buildTrackControls() : null,
+          ),
+        ),
       ],
     );
   }

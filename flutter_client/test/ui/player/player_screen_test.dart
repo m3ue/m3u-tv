@@ -162,9 +162,26 @@ void main() {
       expect(playPauseCenter.dx, lessThan(forwardCenter.dx));
     });
 
-    testWidgets('places track controls inline to the right of transport buttons', (
+    testWidgets('keeps transport controls stable when tracks appear later', (
       tester,
     ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+
+      final playPauseBefore = tester.getCenter(find.byIcon(Icons.pause));
+
       await tester.pumpWidget(
         MaterialApp(
           home: PlaybackControls(
@@ -198,9 +215,10 @@ void main() {
       expect(subtitleCenter.dx, greaterThan(audioCenter.dx));
       expect((audioCenter.dy - forwardCenter.dy).abs(), lessThan(1));
       expect((subtitleCenter.dy - forwardCenter.dy).abs(), lessThan(1));
+      expect(tester.getCenter(find.byIcon(Icons.pause)), playPauseBefore);
     });
 
-    testWidgets('labels track controls by type and current selection', (
+    testWidgets('labels track controls by type only', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -228,11 +246,13 @@ void main() {
         ),
       );
 
-      expect(find.text('Audio: English'), findsOneWidget);
-      expect(find.text('Subs: English CC'), findsOneWidget);
+      expect(find.text('Audio'), findsOneWidget);
+      expect(find.text('Subtitles'), findsOneWidget);
+      expect(find.text('Audio: English'), findsNothing);
+      expect(find.text('Subs: English CC'), findsNothing);
     });
 
-    testWidgets('shows first audio track while backend has not emitted selected track', (
+    testWidgets('marks first audio track active while selected track is unknown', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -256,8 +276,17 @@ void main() {
         ),
       );
 
-      expect(find.text('Audio: de'), findsOneWidget);
-      expect(find.text('Select'), findsNothing);
+      expect(find.text('Audio'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.audiotrack));
+      await tester.pumpAndSettle();
+
+      final disableTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Disable'),
+      );
+      final deTile = tester.widget<ListTile>(find.widgetWithText(ListTile, 'de'));
+      expect(disableTile.selected, isFalse);
+      expect(deTile.selected, isTrue);
     });
 
     testWidgets('calls onSeek with 10 second replay target', (tester) async {

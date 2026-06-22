@@ -21,6 +21,9 @@ class TrackSelector extends StatelessWidget {
     super.key,
   });
 
+  static const double buttonWidth = 112;
+  static const double controlsWidth = buttonWidth * 2 + 8;
+
   /// Available audio tracks.
   final List<PlaybackTrack> audioTracks;
 
@@ -47,7 +50,7 @@ class TrackSelector extends StatelessWidget {
         if (audioTracks.isNotEmpty)
           _TrackButton(
             icon: Icons.audiotrack,
-            label: _audioLabel,
+            label: 'Audio',
             onTap: () => _showAudioDialog(context),
           ),
         if (audioTracks.isNotEmpty && subtitleTracks.isNotEmpty)
@@ -55,27 +58,15 @@ class TrackSelector extends StatelessWidget {
         if (subtitleTracks.isNotEmpty)
           _TrackButton(
             icon: Icons.subtitles,
-            label: _subtitleLabel,
+            label: 'Subtitles',
             onTap: () => _showSubtitleDialog(context),
           ),
       ],
     );
   }
 
-  String get _audioLabel {
-    final track = selectedAudioTrackId == null
-        ? audioTracks.firstOrNull
-        : audioTracks.where((t) => t.id == selectedAudioTrackId).firstOrNull;
-    return 'Audio: ${track?.label ?? 'Select'}';
-  }
-
-  String get _subtitleLabel {
-    if (selectedSubtitleTrackId == null) return 'Subs: Off';
-    final track = subtitleTracks
-        .where((t) => t.id == selectedSubtitleTrackId)
-        .firstOrNull;
-    return 'Subs: ${track?.label ?? 'Select'}';
-  }
+  String? get _effectiveAudioTrackId =>
+      selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
 
   void _showAudioDialog(BuildContext context) {
     unawaited(
@@ -88,7 +79,7 @@ class TrackSelector extends StatelessWidget {
               children: [
                 ListTile(
                   title: const Text('Disable'),
-                  selected: selectedAudioTrackId == null,
+                  selected: _effectiveAudioTrackId == null,
                   onTap: () {
                     onAudioTrackSelected(null);
                     Navigator.of(context).pop();
@@ -97,7 +88,7 @@ class TrackSelector extends StatelessWidget {
                 ...audioTracks.map(
                   (track) => ListTile(
                     title: Text(track.label),
-                    selected: track.id == selectedAudioTrackId,
+                    selected: track.id == _effectiveAudioTrackId,
                     onTap: () {
                       onAudioTrackSelected(track.id);
                       Navigator.of(context).pop();
@@ -197,7 +188,7 @@ class _TrackButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 160,
+          width: TrackSelector.buttonWidth,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white10,
