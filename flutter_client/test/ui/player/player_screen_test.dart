@@ -260,50 +260,54 @@ void main() {
       );
       final audioIconRect = tester.getRect(find.byIcon(Icons.audiotrack));
       final audioTextRect = tester.getRect(find.text('Audio'));
-      final audioContentCenter =
-          (audioIconRect.left + audioTextRect.right) / 2;
+      final audioContentCenter = (audioIconRect.left + audioTextRect.right) / 2;
       expect(
         (audioContentCenter - audioButtonRect.center.dx).abs(),
         lessThan(1),
       );
     });
 
-    testWidgets('marks first audio track active while selected track is unknown', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PlaybackControls(
-            isPlaying: true,
-            isLive: false,
-            canSeek: true,
-            currentPosition: const Duration(minutes: 5),
-            duration: const Duration(hours: 1),
-            audioTracks: const <PlaybackTrack>[
-              PlaybackTrack(id: 'audio-de', label: 'de'),
-              PlaybackTrack(id: 'audio-en', label: 'en'),
-            ],
-            onPlayPause: () {},
-            onSeek: (_) {},
-            onBack: () {},
-            onAudioTrackSelected: (_) {},
-            onSubtitleTrackSelected: (_) {},
+    testWidgets(
+      'marks first audio track active while selected track is unknown',
+      (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PlaybackControls(
+              isPlaying: true,
+              isLive: false,
+              canSeek: true,
+              currentPosition: const Duration(minutes: 5),
+              duration: const Duration(hours: 1),
+              audioTracks: const <PlaybackTrack>[
+                PlaybackTrack(id: 'audio-de', label: 'de'),
+                PlaybackTrack(id: 'audio-en', label: 'en'),
+              ],
+              onPlayPause: () {},
+              onSeek: (_) {},
+              onBack: () {},
+              onAudioTrackSelected: (_) {},
+              onSubtitleTrackSelected: (_) {},
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Audio'), findsOneWidget);
+        expect(find.text('Audio'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.audiotrack));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.audiotrack));
+        await tester.pumpAndSettle();
 
-      final disableTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'Disable'),
-      );
-      final deTile = tester.widget<ListTile>(find.widgetWithText(ListTile, 'de'));
-      expect(disableTile.selected, isFalse);
-      expect(deTile.selected, isTrue);
-    });
+        final disableTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'Disable'),
+        );
+        final deTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'de'),
+        );
+        expect(disableTile.selected, isFalse);
+        expect(deTile.selected, isTrue);
+      },
+    );
 
     testWidgets('calls onSeek with 10 second replay target', (tester) async {
       Duration? seekTarget;
