@@ -4,6 +4,8 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/features/player/track_selector.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Playback controls overlay for the player screen.
@@ -21,6 +23,12 @@ class PlaybackControls extends StatelessWidget {
     required this.onPlayPause,
     required this.onSeek,
     required this.onBack,
+    this.audioTracks = const <PlaybackTrack>[],
+    this.subtitleTracks = const <PlaybackTrack>[],
+    this.selectedAudioTrackId,
+    this.selectedSubtitleTrackId,
+    this.onAudioTrackSelected,
+    this.onSubtitleTrackSelected,
     this.fallbackReason,
     this.playPauseFocusNode,
     super.key,
@@ -34,6 +42,12 @@ class PlaybackControls extends StatelessWidget {
   final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onBack;
+  final List<PlaybackTrack> audioTracks;
+  final List<PlaybackTrack> subtitleTracks;
+  final String? selectedAudioTrackId;
+  final String? selectedSubtitleTrackId;
+  final ValueChanged<String?>? onAudioTrackSelected;
+  final ValueChanged<String?>? onSubtitleTrackSelected;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
 
@@ -121,8 +135,24 @@ class PlaybackControls extends StatelessWidget {
           if (canSeek) _buildProgressBar(colorScheme),
           if (canSeek) const SizedBox(height: 12),
           _buildControlRow(colorScheme),
+          if (_hasTrackControls) const SizedBox(height: 12),
+          if (_hasTrackControls) _buildTrackControls(),
         ],
       ),
+    );
+  }
+
+  bool get _hasTrackControls =>
+      audioTracks.isNotEmpty || subtitleTracks.isNotEmpty;
+
+  Widget _buildTrackControls() {
+    return TrackSelector(
+      audioTracks: audioTracks,
+      subtitleTracks: subtitleTracks,
+      selectedAudioTrackId: selectedAudioTrackId,
+      selectedSubtitleTrackId: selectedSubtitleTrackId,
+      onAudioTrackSelected: onAudioTrackSelected ?? (_) {},
+      onSubtitleTrackSelected: onSubtitleTrackSelected ?? (_) {},
     );
   }
 

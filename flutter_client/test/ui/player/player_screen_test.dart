@@ -757,6 +757,60 @@ void main() {
       expect(requests.last.params, {'stream_id': '101', 'limit': '4'});
     });
 
+    testWidgets('shows audio track selector and applies selection', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/movie.m3u8',
+              title: 'Multi Audio Fixture',
+              type: 'movie',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+          duration: Duration(hours: 1),
+          audioTracks: <PlaybackTrack>[
+            PlaybackTrack(id: 'audio-eng', label: 'English', language: 'eng'),
+            PlaybackTrack(id: 'audio-spa', label: 'Spanish', language: 'spa'),
+          ],
+          selectedAudioTrackId: 'audio-eng',
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.audiotrack), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.audiotrack));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Spanish').last);
+      await tester.pumpAndSettle();
+
+      expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
+    });
+
     testWidgets('backs out of the route when playback error is visible', (
       tester,
     ) async {

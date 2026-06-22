@@ -72,6 +72,28 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
         }),
       )
       ..add(
+        _player.stream.tracks.listen((tracks) {
+          _emit(
+            _state.copyWith(
+              audioTracks: mediaKitAudioTracksToPlaybackTracks(tracks.audio),
+              subtitleTracks: mediaKitSubtitleTracksToPlaybackTracks(
+                tracks.subtitle,
+              ),
+            ),
+          );
+        }),
+      )
+      ..add(
+        _player.stream.track.listen((track) {
+          _emit(
+            _state.copyWith(
+              selectedAudioTrackId: _selectedTrackId(track.audio.id),
+              selectedSubtitleTrackId: _selectedTrackId(track.subtitle.id),
+            ),
+          );
+        }),
+      )
+      ..add(
         _player.stream.completed.listen((completed) {
           if (completed) {
             _emit(_state.copyWith(status: PlaybackStatus.completed));
@@ -121,12 +143,26 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> setAudioTrack(String? trackId) async {
-    // Track selection via media_kit typed objects is deferred.
+    final track = trackId == null
+        ? mk.AudioTrack.no()
+        : _player.state.tracks.audio.firstWhere(
+            (track) => track.id == trackId,
+            orElse: () => mk.AudioTrack(trackId, null, null),
+          );
+    await _player.setAudioTrack(track);
+    _emit(_state.copyWith(selectedAudioTrackId: trackId));
   }
 
   @override
   Future<void> setSubtitleTrack(String? trackId) async {
-    // Track selection via media_kit typed objects is deferred.
+    final track = trackId == null
+        ? mk.SubtitleTrack.no()
+        : _player.state.tracks.subtitle.firstWhere(
+            (track) => track.id == trackId,
+            orElse: () => mk.SubtitleTrack(trackId, null, null),
+          );
+    await _player.setSubtitleTrack(track);
+    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
   }
 
   @override
@@ -148,3 +184,57 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
     if (!_stateController.isClosed) _stateController.add(state);
   }
 }
+
+List<PlaybackTrack> mediaKitAudioTracksToPlaybackTracks(
+  List<mk.AudioTrack> tracks,
+) {
+  return tracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .map(
+        (track) => PlaybackTrack(
+          id: track.id,
+          label: _mediaKitTrackLabel(
+            id: track.id,
+            title: track.title,
+            language: track.language,
+          ),
+          language: track.language,
+        ),
+      )
+      .toList(growable: false);
+}
+
+List<PlaybackTrack> mediaKitSubtitleTracksToPlaybackTracks(
+  List<mk.SubtitleTrack> tracks,
+) {
+  return tracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .map(
+        (track) => PlaybackTrack(
+          id: track.id,
+          label: _mediaKitTrackLabel(
+            id: track.id,
+            title: track.title,
+            language: track.language,
+          ),
+          language: track.language,
+        ),
+      )
+      .toList(growable: false);
+}
+
+String _mediaKitTrackLabel({
+  required String id,
+  required String? title,
+  required String? language,
+}) {
+  final cleanTitle = title?.trim();
+  if (cleanTitle != null && cleanTitle.isNotEmpty) return cleanTitle;
+  final cleanLanguage = language?.trim();
+  if (cleanLanguage != null && cleanLanguage.isNotEmpty) return cleanLanguage;
+  return 'Track $id';
+}
+
+String? _selectedTrackId(String id) => id == 'no' ? null : id;
+
+bool _isMediaKitSentinelTrack(String id) => id == 'auto' || id == 'no';

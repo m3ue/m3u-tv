@@ -53,14 +53,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _fallbackReason;
   bool _isPlaying = false;
 
-  // Track state (used for future track selector integration)
-  // ignore: unused_field
   List<PlaybackTrack> _audioTracks = [];
-  // ignore: unused_field
   List<PlaybackTrack> _subtitleTracks = [];
-  // ignore: unused_field
   String? _selectedAudioTrackId;
-  // ignore: unused_field
   String? _selectedSubtitleTrackId;
 
   EpgCurrentNext? _epgData;
@@ -374,13 +369,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(position));
   }
 
-  // Track selection handlers (for future track selector integration)
-  // ignore: unused_element
   void _handleAudioTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setAudioTrack(trackId));
   }
 
-  // ignore: unused_element
   void _handleSubtitleTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
@@ -546,6 +538,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     onPlayPause: _togglePlayPause,
                     onSeek: _seekTo,
                     onBack: _goBack,
+                    audioTracks: _audioTracks,
+                    subtitleTracks: _subtitleTracks,
+                    selectedAudioTrackId: _selectedAudioTrackId,
+                    selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                    onAudioTrackSelected: _handleAudioTrackSelected,
+                    onSubtitleTrackSelected: _handleSubtitleTrackSelected,
                     fallbackReason: _fallbackReason,
                     playPauseFocusNode: _controlsFocusNode,
                   ),

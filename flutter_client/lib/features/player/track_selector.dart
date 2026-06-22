@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Track selector widget for audio and subtitle track selection.
 ///
@@ -164,29 +166,37 @@ class _TrackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(8),
+    return DpadFocusable(
+      onSelect: onTap,
+      effects: const [
+        GradientBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: colorScheme.onSurface),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+      ],
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: colorScheme.onSurface),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
