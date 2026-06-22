@@ -56,6 +56,97 @@ flutter-tvos run -d <device-id>   # run on simulator (hot reload works)
 flutter-tvos build tvos --simulator --debug   # build only
 ```
 
+## Release builds
+
+All release builds require the Trakt credentials passed via `--dart-define`.
+Set the environment variables first (see [Trakt setup](#trakt-setup)), then use the commands below.
+
+### Android TV / Android (release APK / App Bundle)
+
+```bash
+# App Bundle (Play Store / sideload)
+flutter build appbundle --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+
+# APK (direct sideload)
+flutter build apk --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+### iOS (release archive for App Store)
+
+```bash
+flutter build ipa --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+Open `build/ios/archive/Runner.xcarchive` in Xcode to distribute via App Store Connect.
+
+### Apple TV / tvOS (release archive for App Store)
+
+```bash
+flutter-tvos build tvos --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+Open the resulting `.xcarchive` in Xcode to distribute via App Store Connect.
+
+### macOS (release archive for Mac App Store)
+
+```bash
+flutter build macos --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+### Linux
+
+```bash
+flutter build linux --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+### Windows
+
+```bash
+flutter build windows --release \
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+```
+
+## Trakt setup
+
+Trakt credentials are injected at compile time via `--dart-define` and are never stored in source control.
+
+1. Register an app at <https://trakt.tv/oauth/applications>
+   - Redirect URI: `urn:ietf:wg:oauth:2.0:oob`
+   - Scopes: `/scrobble` only
+2. Add to your shell profile (`~/.zshrc` or `~/.zprofile`):
+   ```bash
+   export TRAKT_CLIENT_ID="your_client_id"
+   export TRAKT_CLIENT_SECRET="your_client_secret"
+   ```
+3. Re-source your profile: `source ~/.zshrc`
+4. Pass the defines on every `flutter run` / `flutter build`:
+   ```bash
+   flutter run \
+     --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+     --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET \
+     -d <device-id>
+   ```
+
+For CI (GitHub Actions), store `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` as repository secrets and reference them in your workflow:
+
+```yaml
+--dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
+--dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+```
+
 ## Project structure
 
 ```
