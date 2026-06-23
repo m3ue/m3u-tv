@@ -355,7 +355,7 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
       return true;
     } on Object catch (error) {
-      _error = _redact('$error', xtreamService.credentials);
+      _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
       return false;
     }
   }

@@ -344,6 +344,7 @@ class _ConnectedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = authNotifier.authResponse;
+    final hasSourceError = sourceError != null && sourceError!.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -374,12 +375,37 @@ class _ConnectedView extends StatelessWidget {
                     value: auth.m3uEditorVersion ?? 'Unknown',
                   ),
                 ],
-                if (sourceError != null && sourceError!.isNotEmpty) ...[
+                if (hasSourceError) ...[
                   const Divider(),
                   _StatusRow(
                     label: 'Last error',
                     value: sourceError!,
                     valueColor: theme.colorScheme.error,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      DpadFocusable(
+                        onSelect: onClearCache,
+                        effects: _kStadiumEffect,
+                        child: FilledButton.tonalIcon(
+                          onPressed: onClearCache,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry connection'),
+                        ),
+                      ),
+                      DpadFocusable(
+                        onSelect: onDisconnect,
+                        effects: _kStadiumEffect,
+                        child: FilledButton.tonalIcon(
+                          onPressed: onDisconnect,
+                          icon: const Icon(Icons.settings),
+                          label: const Text('Edit server settings'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],

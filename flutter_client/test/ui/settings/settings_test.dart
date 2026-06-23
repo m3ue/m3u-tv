@@ -187,6 +187,39 @@ void main() {
     });
 
     test(
+      'connect with unavailable server shows user-facing outage error',
+      () async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(
+            transport: (_) async {
+              throw XtreamHttpException(
+                statusCode: 503,
+                method: 'GET',
+                uri: Uri.parse('http://x.com/player_api.php'),
+                reasonPhrase: 'Service Unavailable',
+                serverMessage: 'no available server',
+              );
+            },
+          ),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        final result = await notifier.connect(
+          const UserCredentials(
+            server: 'http://x.com',
+            username: 'u',
+            password: 'p',
+          ),
+        );
+
+        expect(result, isFalse);
+        expect(notifier.error, 'Server is currently unavailable.');
+        expect(notifier.error, isNot(contains('Xtream HTTP 503')));
+        expect(notifier.error, isNot(contains('player_api.php')));
+      },
+    );
+
+    test(
       'connect with plaintext server failure hides parser details',
       () async {
         final notifier = AuthNotifier(
@@ -467,6 +500,41 @@ void main() {
       // Should show the connected view with status
       expect(find.text('Connection'), findsOneWidget);
       expect(find.text('Connected'), findsWidgets);
+    });
+
+    testWidgets('shows outage actions instead of setup copy when configured', (
+      tester,
+    ) async {
+      var retried = false;
+      var edited = false;
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          sourceError: 'Server is currently unavailable.',
+          isConfiguredOverride: true,
+          onClearCache: () => retried = true,
+          onDisconnect: () => edited = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Server is currently unavailable.'), findsOneWidget);
+      expect(find.text('Retry connection'), findsOneWidget);
+      expect(find.text('Edit server settings'), findsOneWidget);
+      expect(find.text('Enter your Xtream codes details'), findsNothing);
+
+      await tester.tap(find.text('Retry connection'));
+      await tester.pumpAndSettle();
+      expect(retried, isTrue);
+
+      await tester.tap(find.text('Edit server settings'));
+      await tester.pumpAndSettle();
+      expect(edited, isTrue);
     });
 
     testWidgets('shows disconnect button when configured', (tester) async {
@@ -786,6 +854,9 @@ Widget _settingsApp(
   AuthNotifier notifier, {
   Viewer? activeViewer,
   String? sourceError,
+  bool? isConfiguredOverride,
+  VoidCallback? onClearCache,
+  VoidCallback? onDisconnect,
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
@@ -794,7 +865,9 @@ Widget _settingsApp(
         authNotifier: notifier,
         activeViewer: activeViewer,
         sourceError: sourceError,
-        onDisconnect: () => notifier.disconnect(),
+        isConfiguredOverride: isConfiguredOverride,
+        onClearCache: onClearCache,
+        onDisconnect: onDisconnect ?? () => notifier.disconnect(),
       ),
     ),
   );

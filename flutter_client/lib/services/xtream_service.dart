@@ -11,6 +11,8 @@ typedef XtreamTransport = Future<Object?> Function(XtreamRequest request);
 
 enum AuthErrorCode { invalidCredentials, expired, serverError, notM3UEditor }
 
+const serverUnavailableMessage = 'Server is currently unavailable.';
+
 class XtreamAuthException implements Exception {
   const XtreamAuthException(this.code, this.message);
 
@@ -50,6 +52,26 @@ class XtreamHttpException implements Exception {
         : ' $reasonPhrase';
     return 'Xtream HTTP $statusCode$reason for $method $safeUri$serverDetail';
   }
+}
+
+String userFacingXtreamError(Object error) {
+  if (error is XtreamHttpException && error.isServerUnavailable) {
+    return serverUnavailableMessage;
+  }
+  final message = error.toString();
+  final lower = message.toLowerCase();
+  if (lower.contains('connection refused') ||
+      lower.contains('connection timed out') ||
+      lower.contains('failed host lookup') ||
+      lower.contains('network is unreachable')) {
+    return serverUnavailableMessage;
+  }
+  return message;
+}
+
+extension XtreamHttpExceptionClassification on XtreamHttpException {
+  bool get isServerUnavailable =>
+      statusCode == 502 || statusCode == 503 || statusCode == 504;
 }
 
 class XtreamResponseException implements Exception {
