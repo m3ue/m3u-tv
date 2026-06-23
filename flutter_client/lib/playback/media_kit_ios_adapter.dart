@@ -77,6 +77,15 @@ class MediaKitIosAdapter
         }),
       )
       ..add(
+        _player.stream.videoParams.listen((params) {
+          _emit(
+            _state.copyWith(
+              videoAspectRatio: mediaKitVideoAspectRatio(params),
+            ),
+          );
+        }),
+      )
+      ..add(
         _player.stream.tracks.listen((tracks) {
           _emit(
             _state.copyWith(
