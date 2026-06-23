@@ -90,6 +90,7 @@ class TraktService extends ChangeNotifier {
   }
 
   Future<void> _poll() async {
+    if (_status == TraktAuthStatus.connected) return;
     final code = _pending?.deviceCode;
     if (code == null) return;
     try {
@@ -102,7 +103,12 @@ class TraktService extends ChangeNotifier {
     } on _TraktPendingException {
       // authorization_pending — keep polling
     } on Object catch (_) {
-      cancelAuth();
+      // Guard against a stale poll that fires after _saveTokens already
+      // completed (timer cancel and token write are async — a queued callback
+      // can still execute and receive a 409 "already used" from Trakt).
+      if (_status != TraktAuthStatus.connected) {
+        cancelAuth();
+      }
     }
   }
 
