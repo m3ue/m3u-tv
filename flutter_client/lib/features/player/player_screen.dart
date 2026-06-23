@@ -14,6 +14,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -461,6 +462,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     textureId: widget.orchestrator.activeTextureId,
                   ),
                 ),
+
+                if (widget.orchestrator.activeSubtitleController != null)
+                  Positioned.fill(
+                    child: mkv.SubtitleView(
+                      controller: widget.orchestrator.activeSubtitleController!,
+                      configuration: const mkv.SubtitleViewConfiguration(),
+                    ),
+                  ),
 
                 // Loading indicator
                 if (_status == PlaybackStatus.loading && _errorMessage == null)

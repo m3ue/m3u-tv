@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
 import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
-class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
+class MediaKitDesktopAdapter
+    implements PlayerAdapter, VideoTextureProvider, SubtitleControllerProvider {
   MediaKitDesktopAdapter() {
     _player = mk.Player();
     _controller = mkv.VideoController(_player);
@@ -28,6 +30,9 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   int? get textureId => _controller.id.value;
+
+  @override
+  mkv.VideoController get subtitleController => _controller;
 
   @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
