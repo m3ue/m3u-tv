@@ -748,7 +748,10 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
         return KeyEventResult.ignored;
       },
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: () {
+          widget.focusNode.requestFocus();
+          widget.onTap();
+        },
         customBorder: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),

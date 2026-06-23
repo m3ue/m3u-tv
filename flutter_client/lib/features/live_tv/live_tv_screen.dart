@@ -6,6 +6,7 @@ import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
@@ -304,120 +305,114 @@ class _ChannelRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: DpadFocusable(
+      child: DpadInkWell(
         autofocus: autofocus,
-        onSelect: onTap,
-        child: Material(
-          color: colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            onLongPress: onLongPress,
-            child: SizedBox(
-              height: 72,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    // Channel logo
-                    ResilientMediaImage(
-                      imageUrl: channel.logoUrl,
-                      fallbackIcon: Icons.tv,
-                      width: MediaBrowsingMetrics.logoSize,
-                      height: MediaBrowsingMetrics.logoSize,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(width: 14),
-                    // Channel info
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            channel.name,
-                            style: Theme.of(context).textTheme.titleSmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (epg != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              epg!.current.title,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            LinearProgressIndicator(
-                              value: epg!.progress,
-                              backgroundColor:
-                                  colorScheme.surfaceContainerHighest,
-                              valueColor: AlwaysStoppedAnimation(
-                                colorScheme.primary,
+        onTap: onTap,
+        onLongTap: onLongPress,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          height: 72,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                // Channel logo
+                ResilientMediaImage(
+                  imageUrl: channel.logoUrl,
+                  fallbackIcon: Icons.tv,
+                  width: MediaBrowsingMetrics.logoSize,
+                  height: MediaBrowsingMetrics.logoSize,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 14),
+                // Channel info
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        channel.name,
+                        style: Theme.of(context).textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (epg != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          epg!.current.title,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
-                            ),
-                          ] else
-                            Text(
-                              'No program info',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                            ),
-                        ],
-                      ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        LinearProgressIndicator(
+                          value: epg!.progress,
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(
+                            colorScheme.primary,
+                          ),
+                        ),
+                      ] else
+                        Text(
+                          'No program info',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Favorite star
+                if (isFavorite)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Icon(
+                      Icons.star,
+                      color: colorScheme.tertiary,
+                      size: 20,
                     ),
-                    // Favorite star
-                    if (isFavorite)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          Icons.star,
-                          color: colorScheme.tertiary,
-                          size: 20,
+                  ),
+                // Next program
+                if (epg?.next != null)
+                  SizedBox(
+                    width: 160,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'NEXT',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                         ),
-                      ),
-                    // Next program
-                    if (epg?.next != null)
-                      SizedBox(
-                        width: 160,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'NEXT',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                            Text(
-                              epg!.next!.title,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.right,
-                            ),
-                          ],
+                        Text(
+                          epg!.next!.title,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
                         ),
-                      ),
-                  ],
-                ), // Row
-              ), // inner Padding
-            ), // SizedBox
-          ), // InkWell
-        ), // Material
-      ), // DpadFocusable
+                      ],
+                    ),
+                  ),
+              ],
+            ), // Row
+          ), // inner Padding
+        ), // SizedBox
+      ), // DpadInkWell
     ); // outer Padding
   }
 }
@@ -440,39 +435,34 @@ class _ChannelGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return DpadFocusable(
+    return DpadInkWell(
       autofocus: autofocus,
-      onSelect: onTap,
-      child: Material(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ResilientMediaImage(
-                imageUrl: channel.logoUrl,
-                fallbackIcon: Icons.tv,
-                width: MediaBrowsingMetrics.logoSize,
-                height: MediaBrowsingMetrics.logoSize,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                channel.name,
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              if (isFavorite)
-                Icon(Icons.star, color: colorScheme.tertiary, size: 16),
-            ],
+      onTap: onTap,
+      onLongTap: onLongPress,
+      color: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ResilientMediaImage(
+            imageUrl: channel.logoUrl,
+            fallbackIcon: Icons.tv,
+            width: MediaBrowsingMetrics.logoSize,
+            height: MediaBrowsingMetrics.logoSize,
+            fit: BoxFit.contain,
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            channel.name,
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          if (isFavorite)
+            Icon(Icons.star, color: colorScheme.tertiary, size: 16),
+        ],
       ),
     );
   }

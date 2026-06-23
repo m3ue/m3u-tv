@@ -490,7 +490,7 @@ class _EpisodeList extends StatelessWidget {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
+class _EpisodeTile extends StatefulWidget {
   const _EpisodeTile({
     required this.episode,
     required this.autofocus,
@@ -504,7 +504,24 @@ class _EpisodeTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_EpisodeTile> createState() => _EpisodeTileState();
+}
+
+class _EpisodeTileState extends State<_EpisodeTile> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final episode = widget.episode;
+    final progress = widget.progress;
+    final autofocus = widget.autofocus;
+    final onTap = widget.onTap;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final p = progress;
@@ -526,6 +543,7 @@ class _EpisodeTile extends StatelessWidget {
 
     return DpadFocusable(
       autofocus: autofocus,
+      focusNode: _focusNode,
       onSelect: onTap,
       effects: const [
         GradientBorderEffect(
@@ -538,7 +556,10 @@ class _EpisodeTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             InkWell(
-              onTap: onTap,
+              onTap: () {
+                _focusNode.requestFocus();
+                onTap();
+              },
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -656,7 +677,7 @@ class _EpisodeTile extends StatelessWidget {
       color: colorScheme.surfaceContainerHighest,
       child: Center(
         child: Text(
-          'E${episode.episodeNumber}',
+          'E${widget.episode.episodeNumber}',
           style: TextStyle(
             color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,

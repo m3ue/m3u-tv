@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 class CategoryTabData {
@@ -316,34 +317,25 @@ class CategoryFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(
-            Radius.circular(MediaBrowsingMetrics.chipRadius),
-          ),
-        ),
-      ],
-      child: Material(
-        color: isSelected
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.chipRadius),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(MediaBrowsingMetrics.chipRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: isSelected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
+    const radius = BorderRadius.all(
+      Radius.circular(MediaBrowsingMetrics.chipRadius),
+    );
+    return DpadInkWell(
+      onTap: onTap,
+      effects: const [GradientBorderEffect(borderRadius: radius)],
+      color: isSelected
+          ? colorScheme.primaryContainer
+          : colorScheme.surfaceContainerHigh,
+      borderRadius: radius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: isSelected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),

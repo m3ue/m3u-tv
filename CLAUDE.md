@@ -21,10 +21,11 @@ This is the TV frontend for the `m3u-editor` system. It focuses on video playbac
 ## Rules
 
 ### TV Interaction
-1. **D-Pad Focus**: Every interactive element must be wrapped in `DpadFocusable`.
-2. **Border effects**: Use `DpadBorderEffect(borderRadius: …)` matching the widget's own corner radius. Pill/stadium widgets use `circular(50)`. Cards use `circular(8)`.
-3. **Edge navigation**: Leaf `DpadRegion`s use `horizontalEdge: DpadEdgeBehavior.stop` + `onEdge` to activate the sidebar on left-edge press.
-4. **Back handling**: Handled globally in `AppShell` via `Shortcuts` mapping Escape / GoBack → `_BackIntent`.
+1. **Tappable custom widgets**: Use `DpadInkWell` (`lib/shared/dpad_ink_well.dart`) instead of the manual `DpadFocusable + Material + InkWell` triple. It bakes in the fast-tap focus fix (explicit `FocusNode.requestFocus()` before the action) and auto-matches the border radius to the `GradientBorderEffect`. Supports `onLongTap` for D-pad hold and touch long-press simultaneously.
+2. **Material buttons** (`FilledButton`, `IconButton`, etc.): Wrap in plain `DpadFocusable` — the button provides its own ink/ripple.
+3. **Border effects**: `GradientBorderEffect(borderRadius: …)` matching the widget's corner radius. Pill/stadium → `circular(50)`. Cards → `circular(8)`. `DpadInkWell` derives this automatically from its `borderRadius` parameter when `effects` is not set.
+4. **Edge navigation**: Leaf `DpadRegion`s use `horizontalEdge: DpadEdgeBehavior.stop` + `onEdge` to activate the sidebar on left-edge press.
+5. **Back handling**: Handled globally in `AppShell` via `Shortcuts` mapping Escape / GoBack → `_BackIntent`.
 
 ### Style
 - Material 3 throughout. No `OutlinedButton` — use `FilledButton`, `FilledButton.tonal`, `FilledButton.icon`, or `FilledButton.tonalIcon`.
