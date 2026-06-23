@@ -137,6 +137,16 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
             emit(type: "stopped")
             result(nil)
 
+        case "setAudioTrack":
+            let args = call.arguments as? [String: Any]
+            selectTrack(characteristic: .audible, trackId: args?["trackId"] as? String)
+            result(nil)
+
+        case "setSubtitleTrack":
+            let args = call.arguments as? [String: Any]
+            selectTrack(characteristic: .legible, trackId: args?["trackId"] as? String)
+            result(nil)
+
         case "dispose":
             releasePlayer()
             result(nil)
@@ -163,7 +173,16 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         switch item.status {
         case .readyToPlay:
             let posMs = currentPositionMs()
-            emit(type: s.player.rate > 0 ? "playing" : "ready", positionMs: posMs)
+            emit(
+                type: s.player.rate > 0 ? "playing" : "ready",
+                positionMs: posMs,
+                audioTracks: playbackTracks(characteristic: .audible),
+                subtitleTracks: playbackTracks(characteristic: .legible),
+                selectedAudioTrackId: selectedTrackId(characteristic: .audible),
+                selectedSubtitleTrackId: selectedTrackId(characteristic: .legible),
+                includeSelectedAudioTrackId: true,
+                includeSelectedSubtitleTrackId: true
+            )
         case .failed:
             let msg = item.error?.localizedDescription ?? "AVPlayer item failed"
             emit(type: "error", code: "avkit-item-failed", message: msg, recoverable: true)
@@ -182,6 +201,62 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         emit(type: "end", positionMs: currentPositionMs())
     }
 
+    private func selectTrack(characteristic: AVMediaCharacteristic, trackId: String?) {
+        guard let item = state?.item,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) else {
+            return
+        }
+
+        if let trackId = trackId, let index = parseTrackIndex(trackId), index < group.options.count {
+            item.select(group.options[index], in: group)
+        } else {
+            item.select(nil, in: group)
+        }
+
+        emit(
+            type: state?.player.rate ?? 0 > 0 ? "playing" : "ready",
+            positionMs: currentPositionMs(),
+            audioTracks: playbackTracks(characteristic: .audible),
+            subtitleTracks: playbackTracks(characteristic: .legible),
+            selectedAudioTrackId: selectedTrackId(characteristic: .audible),
+            selectedSubtitleTrackId: selectedTrackId(characteristic: .legible),
+            includeSelectedAudioTrackId: true,
+            includeSelectedSubtitleTrackId: true
+        )
+    }
+
+    private func playbackTracks(characteristic: AVMediaCharacteristic) -> [[String: Any?]] {
+        guard let item = state?.item,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) else {
+            return []
+        }
+        let prefix = characteristic == .audible ? "audio" : "subtitle"
+        return group.options.enumerated().map { index, option in
+            [
+                "id": "\(prefix):\(index)",
+                "label": option.displayName,
+                "language": option.locale?.identifier,
+            ]
+        }
+    }
+
+    private func selectedTrackId(characteristic: AVMediaCharacteristic) -> String? {
+        guard let item = state?.item,
+              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: characteristic),
+              let selected = item.selectedMediaOption(in: group),
+              let index = group.options.firstIndex(of: selected) else {
+            return nil
+        }
+        let prefix = characteristic == .audible ? "audio" : "subtitle"
+        return "\(prefix):\(index)"
+    }
+
+    private func parseTrackIndex(_ trackId: String) -> Int? {
+        let parts = trackId.split(separator: ":")
+        guard parts.count == 2 else { return nil }
+        return Int(parts[1])
+    }
+
     private func currentPositionMs() -> Int64 {
         guard let player = state?.player else { return 0 }
         let seconds = CMTimeGetSeconds(player.currentTime())
@@ -193,6 +268,12 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         textureId: Int64? = nil,
         uri: String? = nil,
         positionMs: Int64? = nil,
+        audioTracks: [[String: Any?]]? = nil,
+        subtitleTracks: [[String: Any?]]? = nil,
+        selectedAudioTrackId: String? = nil,
+        selectedSubtitleTrackId: String? = nil,
+        includeSelectedAudioTrackId: Bool = false,
+        includeSelectedSubtitleTrackId: Bool = false,
         code: String? = nil,
         message: String? = nil,
         recoverable: Bool = false
@@ -201,6 +282,10 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         if let id = textureId  { event["textureId"]   = id       }
         if let u  = uri         { event["uri"]         = u        }
         if let p  = positionMs  { event["positionMs"]  = p        }
+        if let a  = audioTracks { event["audioTracks"] = a        }
+        if let st = subtitleTracks { event["subtitleTracks"] = st }
+        if includeSelectedAudioTrackId { event["selectedAudioTrackId"] = selectedAudioTrackId }
+        if includeSelectedSubtitleTrackId { event["selectedSubtitleTrackId"] = selectedSubtitleTrackId }
         if let c  = code        { event["code"]        = c        }
         if let m  = message     { event["message"]     = m        }
         if recoverable          { event["recoverable"] = true      }

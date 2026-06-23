@@ -166,6 +166,9 @@ void main() {
     testWidgets('keeps transport controls stable when tracks appear later', (
       tester,
     ) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       await tester.pumpWidget(
         MaterialApp(
           home: PlaybackControls(
@@ -208,16 +211,115 @@ void main() {
         ),
       );
 
-      final forwardCenter = tester.getCenter(find.byIcon(Icons.forward_10));
-      final audioCenter = tester.getCenter(find.byIcon(Icons.audiotrack));
-      final subtitleCenter = tester.getCenter(find.byIcon(Icons.subtitles));
+      final replayRect = tester.getRect(find.byIcon(Icons.replay_10));
+      final pauseRect = tester.getRect(find.byIcon(Icons.pause));
+      final forwardRect = tester.getRect(find.byIcon(Icons.forward_10));
+      final audioRect = tester.getRect(find.byIcon(Icons.audiotrack));
+      final subtitleRect = tester.getRect(find.byIcon(Icons.subtitles));
 
-      expect(audioCenter.dx, greaterThan(forwardCenter.dx));
-      expect(subtitleCenter.dx, greaterThan(audioCenter.dx));
-      expect((audioCenter.dy - forwardCenter.dy).abs(), lessThan(1));
-      expect((subtitleCenter.dy - forwardCenter.dy).abs(), lessThan(1));
+      expect(replayRect.overlaps(audioRect), isFalse);
+      expect(pauseRect.overlaps(audioRect), isFalse);
+      expect(forwardRect.overlaps(audioRect), isFalse);
+      expect(forwardRect.overlaps(subtitleRect), isFalse);
       expect(tester.getCenter(find.byIcon(Icons.pause)), playPauseBefore);
     });
+
+
+    testWidgets('stacks track selectors below transport controls on narrow portrait screens', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 932));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(seconds: 35),
+            duration: const Duration(hours: 1, minutes: 48),
+            audioTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'audio-eng', label: 'English'),
+            ],
+            subtitleTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+            ],
+            selectedAudioTrackId: 'audio-eng',
+            selectedSubtitleTrackId: 'sub-eng',
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Audio'), findsOneWidget);
+      expect(find.text('Subtitles'), findsOneWidget);
+
+      final audioRect = tester.getRect(find.byIcon(Icons.audiotrack));
+      final subtitleRect = tester.getRect(find.byIcon(Icons.subtitles));
+      final replayRect = tester.getRect(find.byIcon(Icons.replay_10));
+      final pauseRect = tester.getRect(find.byIcon(Icons.pause));
+      final forwardRect = tester.getRect(find.byIcon(Icons.forward_10));
+
+      expect(audioRect.top, greaterThan(forwardRect.bottom));
+      expect(subtitleRect.top, greaterThan(forwardRect.bottom));
+      expect(replayRect.overlaps(audioRect), isFalse);
+      expect(pauseRect.overlaps(audioRect), isFalse);
+      expect(forwardRect.overlaps(subtitleRect), isFalse);
+    });
+
+    testWidgets('keeps audio and subtitle selectors visible without transport overlap in landscape', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(932, 430));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(seconds: 35),
+            duration: const Duration(hours: 1, minutes: 48),
+            audioTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'audio-eng', label: 'English'),
+            ],
+            subtitleTracks: const <PlaybackTrack>[
+              PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+            ],
+            selectedAudioTrackId: 'audio-eng',
+            selectedSubtitleTrackId: 'sub-eng',
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Audio'), findsOneWidget);
+      expect(find.text('Subtitles'), findsOneWidget);
+
+      final audioRect = tester.getRect(find.byIcon(Icons.audiotrack));
+      final subtitleRect = tester.getRect(find.byIcon(Icons.subtitles));
+      final replayRect = tester.getRect(find.byIcon(Icons.replay_10));
+      final pauseRect = tester.getRect(find.byIcon(Icons.pause));
+      final forwardRect = tester.getRect(find.byIcon(Icons.forward_10));
+
+      expect(replayRect.overlaps(audioRect), isFalse);
+      expect(pauseRect.overlaps(audioRect), isFalse);
+      expect(forwardRect.overlaps(audioRect), isFalse);
+      expect(forwardRect.overlaps(subtitleRect), isFalse);
+    });
+
 
     testWidgets('labels track controls by type only', (
       tester,

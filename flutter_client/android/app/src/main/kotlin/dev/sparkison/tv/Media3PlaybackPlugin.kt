@@ -10,6 +10,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import androidx.media3.common.PlaybackException
@@ -61,6 +63,14 @@ class Media3PlaybackPlugin(
                 }
                 "seek" -> {
                     requirePlayer().seekTo(call.longArgument("positionMs"))
+                    result.success(null)
+                }
+                "setAudioTrack" -> {
+                    selectTrack(C.TRACK_TYPE_AUDIO, call.optionalStringArgument("trackId"))
+                    result.success(null)
+                }
+                "setSubtitleTrack" -> {
+                    selectTrack(C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
                     result.success(null)
                 }
                 "stop" -> {
@@ -178,6 +188,12 @@ class Media3PlaybackPlugin(
         positionMs: Long? = null,
         durationMs: Long? = null,
         textureId: Long? = null,
+        audioTracks: List<Map<String, Any?>>? = null,
+        subtitleTracks: List<Map<String, Any?>>? = null,
+        selectedAudioTrackId: String? = null,
+        selectedSubtitleTrackId: String? = null,
+        includeSelectedAudioTrackId: Boolean = false,
+        includeSelectedSubtitleTrackId: Boolean = false,
         code: String? = null,
         message: String? = null,
         recoverable: Boolean? = null,
@@ -187,10 +203,98 @@ class Media3PlaybackPlugin(
         if (positionMs != null) event["positionMs"] = positionMs
         if (durationMs != null) event["durationMs"] = durationMs
         if (textureId != null) event["textureId"] = textureId
+        if (audioTracks != null) event["audioTracks"] = audioTracks
+        if (subtitleTracks != null) event["subtitleTracks"] = subtitleTracks
+        if (includeSelectedAudioTrackId) event["selectedAudioTrackId"] = selectedAudioTrackId
+        if (includeSelectedSubtitleTrackId) event["selectedSubtitleTrackId"] = selectedSubtitleTrackId
         if (code != null) event["code"] = code
         if (message != null) event["message"] = message
         if (recoverable != null) event["recoverable"] = recoverable
         events?.success(event)
+    }
+
+    private fun selectTrack(trackType: Int, trackId: String?) {
+        val player = requirePlayer()
+        val builder = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(trackType)
+            .setTrackTypeDisabled(trackType, trackId == null)
+
+        if (trackId != null) {
+            val parsed = parseTrackId(trackId)
+            val group = parsed?.let { player.currentTracks.groups.getOrNull(it.first) }
+            if (group != null && group.type == trackType && parsed.second in 0 until group.length) {
+                builder.setOverrideForType(
+                    TrackSelectionOverride(group.mediaTrackGroup, listOf(parsed.second))
+                )
+            }
+        }
+
+        player.trackSelectionParameters = builder.build()
+        emitTrackSnapshot(player)
+    }
+
+    private fun emitTrackSnapshot(player: Player) {
+        emit(
+            type = if (player.isPlaying) "playing" else "ready",
+            positionMs = player.currentPosition,
+            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+            audioTracks = playbackTracks(player.currentTracks, C.TRACK_TYPE_AUDIO),
+            subtitleTracks = playbackTracks(player.currentTracks, C.TRACK_TYPE_TEXT),
+            selectedAudioTrackId = selectedTrackId(player.currentTracks, C.TRACK_TYPE_AUDIO),
+            selectedSubtitleTrackId = selectedTrackId(player.currentTracks, C.TRACK_TYPE_TEXT),
+            includeSelectedAudioTrackId = true,
+            includeSelectedSubtitleTrackId = true,
+        )
+    }
+
+    private fun playbackTracks(tracks: Tracks, trackType: Int): List<Map<String, Any?>> {
+        val result = mutableListOf<Map<String, Any?>>()
+        tracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type != trackType) return@forEachIndexed
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val id = trackId(trackType, groupIndex, trackIndex)
+                result.add(
+                    mapOf(
+                        "id" to id,
+                        "label" to trackLabel(trackType, trackIndex, format.label, format.language),
+                        "language" to format.language,
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    private fun selectedTrackId(tracks: Tracks, trackType: Int): String? {
+        tracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type != trackType) return@forEachIndexed
+            for (trackIndex in 0 until group.length) {
+                if (group.isTrackSelected(trackIndex)) {
+                    return trackId(trackType, groupIndex, trackIndex)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun trackId(trackType: Int, groupIndex: Int, trackIndex: Int): String {
+        val prefix = if (trackType == C.TRACK_TYPE_AUDIO) "audio" else "subtitle"
+        return "$prefix:$groupIndex:$trackIndex"
+    }
+
+    private fun parseTrackId(trackId: String): Pair<Int, Int>? {
+        val parts = trackId.split(':')
+        if (parts.size != 3) return null
+        val groupIndex = parts[1].toIntOrNull() ?: return null
+        val trackIndex = parts[2].toIntOrNull() ?: return null
+        return groupIndex to trackIndex
+    }
+
+    private fun trackLabel(trackType: Int, index: Int, label: String?, language: String?): String {
+        if (!label.isNullOrBlank()) return label
+        if (!language.isNullOrBlank()) return language.uppercase()
+        return if (trackType == C.TRACK_TYPE_AUDIO) "Audio ${index + 1}" else "Subtitle ${index + 1}"
     }
 
     private inner class Media3Listener : Player.Listener {
@@ -199,6 +303,11 @@ class Media3PlaybackPlugin(
             if (videoSize.width > 0 && videoSize.height > 0) {
                 state.surfaceProducer.setSize(videoSize.width, videoSize.height)
             }
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            val player = playerState?.player ?: return
+            emitTrackSnapshot(player)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -305,4 +414,10 @@ private fun PlaybackException.looksLikeFormatMismatch(): Boolean {
     val text = listOfNotNull(message, cause?.message).joinToString("\n")
     return text.contains("Input does not start with the #EXTM3U header") ||
         text.contains("UnrecognizedInputFormatException")
+}
+
+
+private fun MethodCall.optionalStringArgument(name: String): String? {
+    val args = arguments as? Map<*, *> ?: return null
+    return args[name] as? String
 }

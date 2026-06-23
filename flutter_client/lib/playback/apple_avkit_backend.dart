@@ -87,11 +87,13 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> setAudioTrack(String? trackId) async {
+    await _host.setAudioTrack(trackId);
     _emit(_state.copyWith(selectedAudioTrackId: trackId));
   }
 
   @override
   Future<void> setSubtitleTrack(String? trackId) async {
+    await _host.setSubtitleTrack(trackId);
     _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
   }
 
@@ -129,13 +131,24 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
       _AvKitEventType.disposed => PlaybackStatus.stopped,
       _AvKitEventType.error => _state.status,
     };
-    _emit(
-      _state.copyWith(
-        backend: PlaybackBackend.appleAvKit,
-        status: status,
-        position: event.position ?? _state.position,
-      ),
+    var nextState = _state.copyWith(
+      backend: PlaybackBackend.appleAvKit,
+      status: status,
+      position: event.position ?? _state.position,
+      audioTracks: event.audioTracks,
+      subtitleTracks: event.subtitleTracks,
     );
+    if (event.hasSelectedAudioTrackId) {
+      nextState = nextState.copyWith(
+        selectedAudioTrackId: event.selectedAudioTrackId,
+      );
+    }
+    if (event.hasSelectedSubtitleTrackId) {
+      nextState = nextState.copyWith(
+        selectedSubtitleTrackId: event.selectedSubtitleTrackId,
+      );
+    }
+    _emit(nextState);
   }
 
   void _emit(PlaybackState state) {
@@ -154,6 +167,8 @@ abstract class _AvKitHost {
   Future<void> pause();
   Future<void> seek(Duration position);
   Future<void> stop();
+  Future<void> setAudioTrack(String? trackId);
+  Future<void> setSubtitleTrack(String? trackId);
   Future<void> dispose();
 }
 
@@ -211,6 +226,18 @@ class _MethodChannelAvKitHost implements _AvKitHost {
   Future<void> stop() => _method.invokeMethod<void>('stop');
 
   @override
+  Future<void> setAudioTrack(String? trackId) => _method.invokeMethod<void>(
+    'setAudioTrack',
+    <String, Object?>{'trackId': trackId},
+  );
+
+  @override
+  Future<void> setSubtitleTrack(String? trackId) => _method.invokeMethod<void>(
+    'setSubtitleTrack',
+    <String, Object?>{'trackId': trackId},
+  );
+
+  @override
   Future<void> dispose() async {
     try {
       await _method.invokeMethod<void>('dispose');
@@ -236,16 +263,31 @@ class _AvKitEvent {
   const _AvKitEvent({
     required this.type,
     this.position,
+    this.audioTracks,
+    this.subtitleTracks,
+    this.selectedAudioTrackId,
+    this.selectedSubtitleTrackId,
+    bool? hasSelectedAudioTrackId,
+    bool? hasSelectedSubtitleTrackId,
     this.code,
     this.message,
     this.recoverable = false,
-  });
+  }) : hasSelectedAudioTrackId =
+           hasSelectedAudioTrackId ?? selectedAudioTrackId != null,
+       hasSelectedSubtitleTrackId =
+           hasSelectedSubtitleTrackId ?? selectedSubtitleTrackId != null;
 
   factory _AvKitEvent.fromMap(Map<String, Object?> map) => _AvKitEvent(
     type: _typeFrom(map['type'] as String?),
     position: map['positionMs'] is num
         ? Duration(milliseconds: (map['positionMs']! as num).round())
         : null,
+    audioTracks: _tracksFromMap(map['audioTracks']),
+    subtitleTracks: _tracksFromMap(map['subtitleTracks']),
+    selectedAudioTrackId: map['selectedAudioTrackId'] as String?,
+    selectedSubtitleTrackId: map['selectedSubtitleTrackId'] as String?,
+    hasSelectedAudioTrackId: map.containsKey('selectedAudioTrackId'),
+    hasSelectedSubtitleTrackId: map.containsKey('selectedSubtitleTrackId'),
     code: map['code'] as String?,
     message: map['message'] as String?,
     recoverable: map['recoverable'] == true,
@@ -253,9 +295,29 @@ class _AvKitEvent {
 
   final _AvKitEventType type;
   final Duration? position;
+  final List<PlaybackTrack>? audioTracks;
+  final List<PlaybackTrack>? subtitleTracks;
+  final String? selectedAudioTrackId;
+  final String? selectedSubtitleTrackId;
+  final bool hasSelectedAudioTrackId;
+  final bool hasSelectedSubtitleTrackId;
   final String? code;
   final String? message;
   final bool recoverable;
+
+  static List<PlaybackTrack>? _tracksFromMap(Object? raw) {
+    if (raw == null) return null;
+    return (raw as List<Object?>)
+        .map((item) => Map<String, Object?>.from(item! as Map<Object?, Object?>))
+        .map(
+          (track) => PlaybackTrack(
+            id: track['id']! as String,
+            label: track['label']! as String,
+            language: track['language'] as String?,
+          ),
+        )
+        .toList(growable: false);
+  }
 
   static _AvKitEventType _typeFrom(String? value) => switch (value) {
     'buffering' => _AvKitEventType.buffering,
