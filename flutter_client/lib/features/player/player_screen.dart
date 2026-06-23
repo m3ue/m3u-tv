@@ -12,6 +12,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
@@ -24,6 +25,7 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.progressReporter,
+    this.traktService,
     this.viewerId = '',
     this.onClose,
     super.key,
@@ -34,6 +36,7 @@ class PlayerScreen extends StatefulWidget {
   final EpgService epgService;
   final XtreamService? xtreamService;
   final void Function(Progress progress)? progressReporter;
+  final TraktService? traktService;
   final String viewerId;
   final VoidCallback? onClose;
 
@@ -88,6 +91,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<PlaybackError>? _errorSubscription;
 
   bool _disposed = false;
+  bool _traktScrobbleActive = false;
 
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
@@ -132,9 +136,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer = null;
   }
 
+  void _scrobble(String action) {
+    final service = widget.traktService;
+    if (service == null || service.status != TraktAuthStatus.connected) return;
+    if (_isLive) return;
+    final duration = _duration.inSeconds;
+    if (duration <= 0) return;
+    final progress = (_currentPosition.inSeconds / duration * 100).clamp(
+      0.0,
+      100.0,
+    );
+    final args = widget.args;
+    unawaited(
+      service.scrobble(
+        action: action,
+        title: args.title,
+        seriesTitle: args.type == 'series'
+            ? args.metadata['series_name'] as String?
+            : null,
+        season: args.seasonNumber ?? args.metadata['season_number'] as int?,
+        episode: args.metadata['episode_number'] as int?,
+        tmdbId: args.metadata['tmdb_id'] as int?,
+        progress: progress,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    if (_traktScrobbleActive) _scrobble('stop');
     _loadingTimer?.cancel();
     _overlayHideTimer?.cancel();
     _progressTimer?.cancel();
@@ -221,13 +252,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _isPlaying = true;
         _errorMessage = null;
         if (!_isLive) _startPositionTimer();
+        _traktScrobbleActive = true;
+        _scrobble('start');
       } else if (state.status == PlaybackStatus.paused ||
           state.status == PlaybackStatus.buffering) {
-        if (state.status == PlaybackStatus.paused) _isPlaying = false;
+        if (state.status == PlaybackStatus.paused) {
+          _isPlaying = false;
+          if (_traktScrobbleActive) _scrobble('pause');
+        }
         _stopPositionTimer();
       } else if (state.status == PlaybackStatus.completed) {
         _isPlaying = false;
         _stopPositionTimer();
+        if (_traktScrobbleActive) {
+          _traktScrobbleActive = false;
+          _scrobble('stop');
+        }
         _goBack();
       }
     });

@@ -410,6 +410,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     }),
                   );
                 },
+                traktService: _appState.traktService,
                 onClose: _closePlayer,
               ),
         ),
@@ -956,6 +957,9 @@ class _ContentNavigator extends StatelessWidget {
             streamId: progress.streamId,
             seriesId: progress.seriesId,
             seasonNumber: progress.seasonNumber,
+            metadata: <String, Object?>{
+              if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+            },
           ),
         );
       }

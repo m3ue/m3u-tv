@@ -30,10 +30,14 @@ class SeriesDetailsScreen extends StatefulWidget {
 }
 
 class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
-  late final Future<SeriesInfo> _future = widget.xtreamService.getSeriesInfo(
-    widget.seriesId,
-  );
+  late final Future<SeriesInfo> _future = widget.xtreamService
+      .getSeriesInfo(widget.seriesId)
+      .then((info) {
+        _seriesInfo = info;
+        return info;
+      });
   int? _selectedSeason;
+  SeriesInfo? _seriesInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +107,8 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           'episode_number': episode.episodeNumber,
           'episode_title': episode.title,
           'series_name': widget.seriesName,
+          if (_seriesInfo?.series.tmdbId != null)
+            'tmdb_id': _seriesInfo!.series.tmdbId,
         },
       ),
     );

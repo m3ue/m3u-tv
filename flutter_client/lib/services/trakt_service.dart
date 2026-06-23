@@ -169,16 +169,65 @@ class TraktService extends ChangeNotifier {
     await _storage.delete(_kKeyExpiry);
   }
 
+  /// Scrobbles the current playback position to Trakt.
+  ///
+  /// [action] is one of `'start'`, `'pause'`, or `'stop'`.
+  /// Pass [seriesTitle], [season], and [episode] for TV episodes; omit for movies.
+  /// [progress] is 0–100.
+  ///
+  /// Errors are silently ignored — scrobbling is best-effort.
+  Future<void> scrobble({
+    required String action,
+    required String title,
+    String? seriesTitle,
+    int? season,
+    int? episode,
+    int? tmdbId,
+    required double progress,
+  }) async {
+    final token = _accessToken;
+    if (_status != TraktAuthStatus.connected || token == null) return;
+    final Map<String, Object> body;
+    if (seriesTitle != null && season != null && episode != null) {
+      body = {
+        'show': <String, Object>{
+          'title': seriesTitle,
+          if (tmdbId != null) 'ids': <String, Object>{'tmdb': tmdbId},
+        },
+        'episode': <String, Object>{'season': season, 'number': episode},
+        'progress': progress,
+      };
+    } else {
+      body = {
+        'movie': <String, Object>{
+          'title': title,
+          if (tmdbId != null) 'ids': <String, Object>{'tmdb': tmdbId},
+        },
+        'progress': progress,
+      };
+    }
+    try {
+      await _post('/scrobble/$action', body, accessToken: token);
+    } on Object {
+      // Scrobble is best-effort; silently ignore errors.
+    }
+  }
+
   Future<Map<String, Object?>> _post(
     String path,
-    Map<String, Object> body,
-  ) async {
+    Map<String, Object> body, {
+    String? accessToken,
+  }) async {
     final encoded = utf8.encode(jsonEncode(body));
     final req = await _http.postUrl(Uri.parse('$_kApi$path'));
     req
       ..headers.contentType = ContentType.json
       ..headers.set('trakt-api-version', '2')
-      ..headers.set('trakt-api-key', _kClientId)
+      ..headers.set('trakt-api-key', _kClientId);
+    if (accessToken != null) {
+      req.headers.set('Authorization', 'Bearer $accessToken');
+    }
+    req
       ..contentLength = encoded.length
       ..add(encoded);
     final res = await req.close();
