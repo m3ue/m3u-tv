@@ -57,8 +57,10 @@ class PersistentJsonStore {
     await _file.parent.create(recursive: true);
     final temp = File('${_file.path}.tmp');
     await temp.writeAsString(jsonEncode(data), flush: true);
-    if (await _file.exists()) {
+    try {
       await _file.delete();
+    } on PathNotFoundException {
+      // File may not exist yet or was already removed by a concurrent write.
     }
     await temp.rename(_file.path);
     _cache = data;

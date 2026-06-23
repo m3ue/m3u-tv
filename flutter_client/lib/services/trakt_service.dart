@@ -137,11 +137,9 @@ class TraktService extends ChangeNotifier {
     _accessToken = '${data['access_token'] ?? ''}';
     final expiresIn = (data['expires_in'] as num?)?.toInt() ?? 7776000;
     final expiry = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + expiresIn;
-    await Future.wait([
-      _storage.write(_kKeyAccess, _accessToken!),
-      _storage.write(_kKeyRefresh, '${data['refresh_token'] ?? ''}'),
-      _storage.write(_kKeyExpiry, '$expiry'),
-    ]);
+    await _storage.write(_kKeyAccess, _accessToken!);
+    await _storage.write(_kKeyRefresh, '${data['refresh_token'] ?? ''}');
+    await _storage.write(_kKeyExpiry, '$expiry');
     _status = TraktAuthStatus.connected;
     _pending = null;
     notifyListeners();
@@ -166,11 +164,9 @@ class TraktService extends ChangeNotifier {
   }
 
   Future<void> _clearStorage() async {
-    await Future.wait([
-      _storage.delete(_kKeyAccess),
-      _storage.delete(_kKeyRefresh),
-      _storage.delete(_kKeyExpiry),
-    ]);
+    await _storage.delete(_kKeyAccess);
+    await _storage.delete(_kKeyRefresh);
+    await _storage.delete(_kKeyExpiry);
   }
 
   Future<Map<String, Object?>> _post(

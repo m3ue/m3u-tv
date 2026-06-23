@@ -687,14 +687,17 @@ class _TraktDisconnected extends StatelessWidget {
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
-        DpadFocusable(
-          autofocus: true,
-          onSelect: traktService.startDeviceAuth,
-          effects: _kStadiumEffect,
-          child: FilledButton.icon(
-            onPressed: traktService.startDeviceAuth,
-            icon: const Icon(Icons.link),
-            label: const Text('Connect with Trakt'),
+        SizedBox(
+          width: double.infinity,
+          child: DpadFocusable(
+            autofocus: true,
+            onSelect: traktService.startDeviceAuth,
+            effects: _kStadiumEffect,
+            child: FilledButton.icon(
+              onPressed: traktService.startDeviceAuth,
+              icon: const Icon(Icons.link),
+              label: const Text('Connect with Trakt'),
+            ),
           ),
         ),
       ],
