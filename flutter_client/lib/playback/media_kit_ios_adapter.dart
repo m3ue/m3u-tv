@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
 import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
-class MediaKitIosAdapter implements PlayerAdapter, VideoTextureProvider {
+class MediaKitIosAdapter
+    implements PlayerAdapter, VideoTextureProvider, SubtitleControllerProvider {
   MediaKitIosAdapter() {
     _player = mk.Player();
     _controller = mkv.VideoController(_player);
@@ -28,6 +31,9 @@ class MediaKitIosAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   int? get textureId => _controller.id.value;
+
+  @override
+  mkv.VideoController get subtitleController => _controller;
 
   @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.appleMpvKit;
@@ -68,6 +74,38 @@ class MediaKitIosAdapter implements PlayerAdapter, VideoTextureProvider {
       ..add(
         _player.stream.duration.listen((dur) {
           _emit(_state.copyWith(duration: dur));
+        }),
+      )
+      ..add(
+        _player.stream.tracks.listen((tracks) {
+          _emit(
+            _state.copyWith(
+              audioTracks: mediaKitAudioTracksToPlaybackTracks(tracks.audio),
+              subtitleTracks: mediaKitSubtitleTracksToPlaybackTracks(
+                tracks.subtitle,
+              ),
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                _player.state.track.audio,
+                tracks.audio,
+              ),
+            ),
+          );
+        }),
+      )
+      ..add(
+        _player.stream.track.listen((track) {
+          _emit(
+            _state.copyWith(
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                track.audio,
+                _player.state.tracks.audio,
+              ),
+              selectedSubtitleTrackId:
+                  track.subtitle.id == 'no' || track.subtitle.id == 'auto'
+                  ? null
+                  : track.subtitle.id,
+            ),
+          );
         }),
       )
       ..add(
@@ -119,10 +157,28 @@ class MediaKitIosAdapter implements PlayerAdapter, VideoTextureProvider {
   }
 
   @override
-  Future<void> setAudioTrack(String? trackId) async {}
+  Future<void> setAudioTrack(String? trackId) async {
+    final track = trackId == null
+        ? mk.AudioTrack.no()
+        : _player.state.tracks.audio.firstWhere(
+            (t) => t.id == trackId,
+            orElse: () => mk.AudioTrack(trackId, null, null),
+          );
+    await _player.setAudioTrack(track);
+    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+  }
 
   @override
-  Future<void> setSubtitleTrack(String? trackId) async {}
+  Future<void> setSubtitleTrack(String? trackId) async {
+    final track = trackId == null
+        ? mk.SubtitleTrack.no()
+        : _player.state.tracks.subtitle.firstWhere(
+            (t) => t.id == trackId,
+            orElse: () => mk.SubtitleTrack(trackId, null, null),
+          );
+    await _player.setSubtitleTrack(track);
+    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+  }
 
   @override
   Future<void> setPlaybackSpeed(double speed) => _player.setRate(speed);

@@ -14,6 +14,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -54,14 +55,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isPlaying = false;
   double _videoAspectRatio = 16 / 9;
 
-  // Track state (used for future track selector integration)
-  // ignore: unused_field
   List<PlaybackTrack> _audioTracks = [];
-  // ignore: unused_field
   List<PlaybackTrack> _subtitleTracks = [];
-  // ignore: unused_field
   String? _selectedAudioTrackId;
-  // ignore: unused_field
   String? _selectedSubtitleTrackId;
 
   EpgCurrentNext? _epgData;
@@ -381,13 +377,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(position));
   }
 
-  // Track selection handlers (for future track selector integration)
-  // ignore: unused_element
   void _handleAudioTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setAudioTrack(trackId));
   }
 
-  // ignore: unused_element
   void _handleSubtitleTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
@@ -478,6 +471,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ),
                 ),
 
+                if (widget.orchestrator.activeSubtitleController != null)
+                  Positioned.fill(
+                    child: mkv.SubtitleView(
+                      controller: widget.orchestrator.activeSubtitleController!,
+                      configuration: const mkv.SubtitleViewConfiguration(),
+                    ),
+                  ),
+
                 // Loading indicator
                 if (_status == PlaybackStatus.loading && _errorMessage == null)
                   const Center(
@@ -554,6 +555,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     onPlayPause: _togglePlayPause,
                     onSeek: _seekTo,
                     onBack: _goBack,
+                    audioTracks: _audioTracks,
+                    subtitleTracks: _subtitleTracks,
+                    selectedAudioTrackId: _selectedAudioTrackId,
+                    selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                    onAudioTrackSelected: _handleAudioTrackSelected,
+                    onSubtitleTrackSelected: _handleSubtitleTrackSelected,
                     fallbackReason: _fallbackReason,
                     playPauseFocusNode: _controlsFocusNode,
                   ),

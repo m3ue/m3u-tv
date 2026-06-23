@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
 import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
-class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
+class MediaKitDesktopAdapter
+    implements PlayerAdapter, VideoTextureProvider, SubtitleControllerProvider {
   MediaKitDesktopAdapter() {
     _player = mk.Player();
     _controller = mkv.VideoController(_player);
@@ -28,6 +30,9 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   int? get textureId => _controller.id.value;
+
+  @override
+  mkv.VideoController get subtitleController => _controller;
 
   @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
@@ -69,6 +74,35 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
       ..add(
         _player.stream.duration.listen((dur) {
           _emit(_state.copyWith(duration: dur));
+        }),
+      )
+      ..add(
+        _player.stream.tracks.listen((tracks) {
+          _emit(
+            _state.copyWith(
+              audioTracks: mediaKitAudioTracksToPlaybackTracks(tracks.audio),
+              subtitleTracks: mediaKitSubtitleTracksToPlaybackTracks(
+                tracks.subtitle,
+              ),
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                _player.state.track.audio,
+                tracks.audio,
+              ),
+            ),
+          );
+        }),
+      )
+      ..add(
+        _player.stream.track.listen((track) {
+          _emit(
+            _state.copyWith(
+              selectedAudioTrackId: selectedMediaKitAudioTrackId(
+                track.audio,
+                _player.state.tracks.audio,
+              ),
+              selectedSubtitleTrackId: _selectedTrackId(track.subtitle.id),
+            ),
+          );
         }),
       )
       ..add(
@@ -121,12 +155,26 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> setAudioTrack(String? trackId) async {
-    // Track selection via media_kit typed objects is deferred.
+    final track = trackId == null
+        ? mk.AudioTrack.no()
+        : _player.state.tracks.audio.firstWhere(
+            (track) => track.id == trackId,
+            orElse: () => mk.AudioTrack(trackId, null, null),
+          );
+    await _player.setAudioTrack(track);
+    _emit(_state.copyWith(selectedAudioTrackId: trackId));
   }
 
   @override
   Future<void> setSubtitleTrack(String? trackId) async {
-    // Track selection via media_kit typed objects is deferred.
+    final track = trackId == null
+        ? mk.SubtitleTrack.no()
+        : _player.state.tracks.subtitle.firstWhere(
+            (track) => track.id == trackId,
+            orElse: () => mk.SubtitleTrack(trackId, null, null),
+          );
+    await _player.setSubtitleTrack(track);
+    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
   }
 
   @override
@@ -148,3 +196,70 @@ class MediaKitDesktopAdapter implements PlayerAdapter, VideoTextureProvider {
     if (!_stateController.isClosed) _stateController.add(state);
   }
 }
+
+List<PlaybackTrack> mediaKitAudioTracksToPlaybackTracks(
+  List<mk.AudioTrack> tracks,
+) {
+  return tracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .map(
+        (track) => PlaybackTrack(
+          id: track.id,
+          label: _mediaKitTrackLabel(
+            id: track.id,
+            title: track.title,
+            language: track.language,
+          ),
+          language: track.language,
+        ),
+      )
+      .toList(growable: false);
+}
+
+List<PlaybackTrack> mediaKitSubtitleTracksToPlaybackTracks(
+  List<mk.SubtitleTrack> tracks,
+) {
+  return tracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .map(
+        (track) => PlaybackTrack(
+          id: track.id,
+          label: _mediaKitTrackLabel(
+            id: track.id,
+            title: track.title,
+            language: track.language,
+          ),
+          language: track.language,
+        ),
+      )
+      .toList(growable: false);
+}
+
+String _mediaKitTrackLabel({
+  required String id,
+  required String? title,
+  required String? language,
+}) {
+  final cleanTitle = title?.trim();
+  if (cleanTitle != null && cleanTitle.isNotEmpty) return cleanTitle;
+  final cleanLanguage = language?.trim();
+  if (cleanLanguage != null && cleanLanguage.isNotEmpty) return cleanLanguage;
+  return 'Track $id';
+}
+
+String? selectedMediaKitAudioTrackId(
+  mk.AudioTrack selectedTrack,
+  List<mk.AudioTrack> availableTracks,
+) {
+  if (selectedTrack.id == 'no') return null;
+  if (selectedTrack.id != 'auto') return selectedTrack.id;
+
+  return availableTracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .firstOrNull
+      ?.id;
+}
+
+String? _selectedTrackId(String id) => id == 'no' || id == 'auto' ? null : id;
+
+bool _isMediaKitSentinelTrack(String id) => id == 'auto' || id == 'no';

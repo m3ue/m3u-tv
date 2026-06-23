@@ -4,6 +4,8 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/features/player/track_selector.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Playback controls overlay for the player screen.
@@ -21,6 +23,12 @@ class PlaybackControls extends StatelessWidget {
     required this.onPlayPause,
     required this.onSeek,
     required this.onBack,
+    this.audioTracks = const <PlaybackTrack>[],
+    this.subtitleTracks = const <PlaybackTrack>[],
+    this.selectedAudioTrackId,
+    this.selectedSubtitleTrackId,
+    this.onAudioTrackSelected,
+    this.onSubtitleTrackSelected,
     this.fallbackReason,
     this.playPauseFocusNode,
     super.key,
@@ -34,6 +42,12 @@ class PlaybackControls extends StatelessWidget {
   final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onBack;
+  final List<PlaybackTrack> audioTracks;
+  final List<PlaybackTrack> subtitleTracks;
+  final String? selectedAudioTrackId;
+  final String? selectedSubtitleTrackId;
+  final ValueChanged<String?>? onAudioTrackSelected;
+  final ValueChanged<String?>? onSubtitleTrackSelected;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
 
@@ -110,6 +124,7 @@ class PlaybackControls extends StatelessWidget {
 
   Widget _buildControlsBar(ColorScheme colorScheme) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.black87,
@@ -126,6 +141,20 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
+  bool get _hasTrackControls =>
+      audioTracks.isNotEmpty || subtitleTracks.isNotEmpty;
+
+  Widget _buildTrackControls() {
+    return TrackSelector(
+      audioTracks: audioTracks,
+      subtitleTracks: subtitleTracks,
+      selectedAudioTrackId: selectedAudioTrackId,
+      selectedSubtitleTrackId: selectedSubtitleTrackId,
+      onAudioTrackSelected: onAudioTrackSelected ?? (_) {},
+      onSubtitleTrackSelected: onSubtitleTrackSelected ?? (_) {},
+    );
+  }
+
   Widget _buildProgressBar(ColorScheme colorScheme) {
     return _SeekBar(
       currentPosition: currentPosition,
@@ -135,8 +164,8 @@ class PlaybackControls extends StatelessWidget {
   }
 
   Widget _buildControlRow(ColorScheme colorScheme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final transportControls = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (!isLive)
           _ControlButton(
@@ -176,6 +205,43 @@ class PlaybackControls extends StatelessWidget {
             colorScheme: colorScheme,
           ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackControlsWidth = _hasTrackControls
+            ? TrackSelector.controlsWidth
+            : 0.0;
+        final transportWidth = isLive ? 56.0 : 168.0;
+        final hasRoomForCenteredTransport =
+            constraints.maxWidth >= transportWidth + (trackControlsWidth * 2);
+
+        if (_hasTrackControls && !hasRoomForCenteredTransport) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(child: transportControls),
+              const SizedBox(height: 12),
+              Center(child: _buildTrackControls()),
+            ],
+          );
+        }
+
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(child: transportControls),
+            if (_hasTrackControls)
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: TrackSelector.controlsWidth,
+                  child: _buildTrackControls(),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
