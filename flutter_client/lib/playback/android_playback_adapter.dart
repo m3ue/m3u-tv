@@ -307,6 +307,7 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
         status: status,
         position: event.position ?? _state.position,
         duration: event.duration,
+        videoAspectRatio: event.videoAspectRatio,
       ),
     );
   }
@@ -407,6 +408,7 @@ class AndroidMedia3Event {
     this.position,
     this.duration,
     this.textureId,
+    this.videoAspectRatio,
     this.code,
     this.message,
     this.recoverable = false,
@@ -423,6 +425,14 @@ class AndroidMedia3Event {
           ? Duration(milliseconds: (map['durationMs']! as num).round())
           : null,
       textureId: (map['textureId'] as num?)?.toInt(),
+      videoAspectRatio: playbackAspectRatioFromValues(
+        aspectRatio:
+            map['videoAspectRatio'] ??
+            map['displayAspectRatio'] ??
+            map['aspectRatio'],
+        width: map['videoWidth'] ?? map['width'],
+        height: map['videoHeight'] ?? map['height'],
+      ),
       code: map['code'] as String?,
       message: map['message'] as String?,
       recoverable: map['recoverable'] == true,
@@ -434,6 +444,7 @@ class AndroidMedia3Event {
   final Duration? position;
   final Duration? duration;
   final int? textureId;
+  final double? videoAspectRatio;
   final String? code;
   final String? message;
   final bool recoverable;

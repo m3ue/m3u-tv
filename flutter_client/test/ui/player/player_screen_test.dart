@@ -618,6 +618,58 @@ void main() {
       expect(texture.textureId, 42);
     });
 
+    testWidgets(
+      'preserves reported source aspect ratio for the video surface',
+      (
+        tester,
+      ) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.binding.setSurfaceSize(const Size(1600, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/four-three.m3u8',
+                title: '4:3 Fixture',
+                type: 'vod',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.ready,
+            videoAspectRatio: 4 / 3,
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final textureSize = tester.getSize(find.byType(Texture));
+        expect(textureSize.width, moreOrLessEquals(1200));
+        expect(textureSize.height, moreOrLessEquals(900));
+      },
+    );
+
     testWidgets('shows live EPG as soon as playback is ready', (tester) async {
       final now = DateTime.utc(2026, 1, 1, 12);
       final adapter = FakePlayerAdapter(

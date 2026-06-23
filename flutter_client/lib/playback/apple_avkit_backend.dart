@@ -134,6 +134,7 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
         backend: PlaybackBackend.appleAvKit,
         status: status,
         position: event.position ?? _state.position,
+        videoAspectRatio: event.videoAspectRatio,
       ),
     );
   }
@@ -236,6 +237,7 @@ class _AvKitEvent {
   const _AvKitEvent({
     required this.type,
     this.position,
+    this.videoAspectRatio,
     this.code,
     this.message,
     this.recoverable = false,
@@ -246,6 +248,14 @@ class _AvKitEvent {
     position: map['positionMs'] is num
         ? Duration(milliseconds: (map['positionMs']! as num).round())
         : null,
+    videoAspectRatio: playbackAspectRatioFromValues(
+      aspectRatio:
+          map['videoAspectRatio'] ??
+          map['displayAspectRatio'] ??
+          map['aspectRatio'],
+      width: map['videoWidth'] ?? map['width'],
+      height: map['videoHeight'] ?? map['height'],
+    ),
     code: map['code'] as String?,
     message: map['message'] as String?,
     recoverable: map['recoverable'] == true,
@@ -253,6 +263,7 @@ class _AvKitEvent {
 
   final _AvKitEventType type;
   final Duration? position;
+  final double? videoAspectRatio;
   final String? code;
   final String? message;
   final bool recoverable;

@@ -178,6 +178,7 @@ class Media3PlaybackPlugin(
         positionMs: Long? = null,
         durationMs: Long? = null,
         textureId: Long? = null,
+        videoAspectRatio: Double? = null,
         code: String? = null,
         message: String? = null,
         recoverable: Boolean? = null,
@@ -187,6 +188,7 @@ class Media3PlaybackPlugin(
         if (positionMs != null) event["positionMs"] = positionMs
         if (durationMs != null) event["durationMs"] = durationMs
         if (textureId != null) event["textureId"] = textureId
+        if (videoAspectRatio != null) event["videoAspectRatio"] = videoAspectRatio
         if (code != null) event["code"] = code
         if (message != null) event["message"] = message
         if (recoverable != null) event["recoverable"] = recoverable
@@ -198,6 +200,13 @@ class Media3PlaybackPlugin(
             val state = playerState ?: return
             if (videoSize.width > 0 && videoSize.height > 0) {
                 state.surfaceProducer.setSize(videoSize.width, videoSize.height)
+                val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
+                emit(
+                    "ready",
+                    positionMs = state.player.currentPosition,
+                    durationMs = state.player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                    videoAspectRatio = aspectRatio.toDouble(),
+                )
             }
         }
 

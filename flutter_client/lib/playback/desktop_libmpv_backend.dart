@@ -68,7 +68,20 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       _errorController.add(PlaybackError.fromException(error));
       throw error;
     }
-    _emit(_state.copyWith(status: PlaybackStatus.ready, source: source));
+    _emit(
+      _state.copyWith(
+        status: PlaybackStatus.ready,
+        source: source,
+        videoAspectRatio: playbackAspectRatioFromValues(
+          aspectRatio:
+              response?['videoAspectRatio'] ??
+              response?['displayAspectRatio'] ??
+              response?['aspectRatio'],
+          width: response?['videoWidth'] ?? response?['width'],
+          height: response?['videoHeight'] ?? response?['height'],
+        ),
+      ),
+    );
   }
 
   @override
