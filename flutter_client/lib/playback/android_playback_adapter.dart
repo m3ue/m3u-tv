@@ -400,16 +400,18 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   Future<void> stop() => _methodChannel.invokeMethod<void>('stop');
 
   @override
-  Future<void> setAudioTrack(String? trackId) => _methodChannel.invokeMethod<void>(
-    'setAudioTrack',
-    <String, Object?>{'trackId': trackId},
-  );
+  Future<void> setAudioTrack(String? trackId) =>
+      _methodChannel.invokeMethod<void>(
+        'setAudioTrack',
+        <String, Object?>{'trackId': trackId},
+      );
 
   @override
-  Future<void> setSubtitleTrack(String? trackId) => _methodChannel.invokeMethod<void>(
-    'setSubtitleTrack',
-    <String, Object?>{'trackId': trackId},
-  );
+  Future<void> setSubtitleTrack(String? trackId) =>
+      _methodChannel.invokeMethod<void>(
+        'setSubtitleTrack',
+        <String, Object?>{'trackId': trackId},
+      );
 
   @override
   Future<void> dispose() async {
@@ -493,7 +495,9 @@ class AndroidMedia3Event {
   static List<PlaybackTrack>? _tracksFromMap(Object? raw) {
     if (raw == null) return null;
     return (raw as List<Object?>)
-        .map((item) => Map<String, Object?>.from(item! as Map<Object?, Object?>))
+        .map(
+          (item) => Map<String, Object?>.from(item! as Map<Object?, Object?>),
+        )
         .map(
           (track) => PlaybackTrack(
             id: track['id']! as String,

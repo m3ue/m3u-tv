@@ -308,7 +308,9 @@ class _AvKitEvent {
   static List<PlaybackTrack>? _tracksFromMap(Object? raw) {
     if (raw == null) return null;
     return (raw as List<Object?>)
-        .map((item) => Map<String, Object?>.from(item! as Map<Object?, Object?>))
+        .map(
+          (item) => Map<String, Object?>.from(item! as Map<Object?, Object?>),
+        )
         .map(
           (track) => PlaybackTrack(
             id: track['id']! as String,
