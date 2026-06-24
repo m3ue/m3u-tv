@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -55,15 +56,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _errorMessage;
   String? _fallbackReason;
   bool _isPlaying = false;
+  double _videoAspectRatio = 16 / 9;
 
-  // Track state (used for future track selector integration)
-  // ignore: unused_field
   List<PlaybackTrack> _audioTracks = [];
-  // ignore: unused_field
   List<PlaybackTrack> _subtitleTracks = [];
-  // ignore: unused_field
   String? _selectedAudioTrackId;
-  // ignore: unused_field
   String? _selectedSubtitleTrackId;
 
   EpgCurrentNext? _epgData;
@@ -199,11 +196,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final source = widget.args.toPlaybackSource();
 
-    unawaited(
-      widget.orchestrator.open(source).catchError((Object error) {
-        if (!_disposed && mounted) _setErrorMessage(error.toString());
-      }),
-    );
+    unawaited(_openAndSeek(source));
+  }
+
+  Future<void> _openAndSeek(PlaybackSource source) async {
+    try {
+      await widget.orchestrator.open(source);
+      if (_disposed || !mounted || source.isLive) return;
+      if (source.startPosition > Duration.zero) {
+        await widget.orchestrator.seek(source.startPosition);
+      }
+    } on Object catch (error) {
+      if (!_disposed && mounted) _setErrorMessage(error.toString());
+    }
   }
 
   void _startLoadingTimeout() {
@@ -247,6 +252,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _subtitleTracks = state.subtitleTracks;
       _selectedAudioTrackId = state.selectedAudioTrackId;
       _selectedSubtitleTrackId = state.selectedSubtitleTrackId;
+
+      final aspectRatio =
+          state.videoAspectRatio ?? state.source?.videoAspectRatio;
+      if (aspectRatio != null) {
+        _videoAspectRatio = aspectRatio;
+      }
 
       if (state.status == PlaybackStatus.playing) {
         _isPlaying = true;
@@ -312,22 +323,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(_progressInterval, (_) {
       if (_disposed || !mounted) return;
-      widget.progressReporter?.call(
-        Progress(
-          viewerId: widget.viewerId,
-          contentType: _isLive
-              ? ContentType.live
-              : (widget.args.type == 'series'
-                    ? ContentType.episode
-                    : ContentType.vod),
-          streamId: widget.args.streamId ?? 0,
-          positionSeconds: _currentPosition.inSeconds,
-          durationSeconds: _duration.inSeconds > 0 ? _duration.inSeconds : null,
-          seriesId: widget.args.seriesId,
-          seasonNumber: widget.args.seasonNumber,
-        ),
-      );
+      _reportProgress(_currentPosition);
     });
+  }
+
+  void _reportProgress(Duration position) {
+    if (_isLive || widget.progressReporter == null) return;
+    widget.progressReporter!(
+      Progress(
+        viewerId: widget.viewerId,
+        contentType: widget.args.type == 'series'
+            ? ContentType.episode
+            : ContentType.vod,
+        streamId: widget.args.streamId ?? 0,
+        positionSeconds: position.inSeconds,
+        durationSeconds: _duration.inSeconds > 0 ? _duration.inSeconds : null,
+        seriesId: widget.args.seriesId,
+        seasonNumber: widget.args.seasonNumber,
+      ),
+    );
   }
 
   void _startEpgRefresh() {
@@ -411,16 +425,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _seekTo(Duration position) {
     if (!_canSeek) return;
-    unawaited(widget.orchestrator.seek(position));
+    final clamped = position < Duration.zero
+        ? Duration.zero
+        : (position > _duration ? _duration : position);
+    setState(() => _currentPosition = clamped);
+    _reportProgress(clamped);
+    unawaited(widget.orchestrator.seek(clamped));
   }
 
-  // Track selection handlers (for future track selector integration)
-  // ignore: unused_element
   void _handleAudioTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setAudioTrack(trackId));
   }
 
-  // ignore: unused_element
   void _handleSubtitleTrackSelected(String? trackId) {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
@@ -507,8 +523,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 Positioned.fill(
                   child: _VideoSurface(
                     textureId: widget.orchestrator.activeTextureId,
+                    aspectRatio: _videoAspectRatio,
                   ),
                 ),
+
+                if (widget.orchestrator.activeSubtitleController != null)
+                  Positioned.fill(
+                    child: mkv.SubtitleView(
+                      controller: widget.orchestrator.activeSubtitleController!,
+                      configuration: const mkv.SubtitleViewConfiguration(),
+                    ),
+                  ),
 
                 // Loading indicator
                 if (_status == PlaybackStatus.loading && _errorMessage == null)
@@ -586,6 +611,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     onPlayPause: _togglePlayPause,
                     onSeek: _seekTo,
                     onBack: _goBack,
+                    audioTracks: _audioTracks,
+                    subtitleTracks: _subtitleTracks,
+                    selectedAudioTrackId: _selectedAudioTrackId,
+                    selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                    onAudioTrackSelected: _handleAudioTrackSelected,
+                    onSubtitleTrackSelected: _handleSubtitleTrackSelected,
                     fallbackReason: _fallbackReason,
                     playPauseFocusNode: _controlsFocusNode,
                   ),
@@ -632,9 +663,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 }
 
 class _VideoSurface extends StatelessWidget {
-  const _VideoSurface({required this.textureId});
+  const _VideoSurface({required this.textureId, required this.aspectRatio});
 
   final int? textureId;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -644,7 +676,7 @@ class _VideoSurface extends StatelessWidget {
       color: Colors.black,
       child: Center(
         child: AspectRatio(
-          aspectRatio: 16 / 9,
+          aspectRatio: aspectRatio,
           child: Texture(textureId: id),
         ),
       ),

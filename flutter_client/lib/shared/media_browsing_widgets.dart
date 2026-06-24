@@ -1,5 +1,7 @@
 import 'package:dpad/dpad.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 class CategoryTabData {
@@ -253,6 +255,26 @@ class ScrollableCategoryBar extends StatefulWidget {
 class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
   final ScrollController _controller = ScrollController();
 
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) {
+      return;
+    }
+
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) {
+      return;
+    }
+
+    final position = _controller.position;
+    final target = (_controller.offset + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _controller.jumpTo(target);
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -276,21 +298,28 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
             child: SizedBox(
               height: 36,
               child: ExcludeSemantics(
-                child: ListView.separated(
-                  controller: _controller,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: widget.tabs.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
-                  itemBuilder: (context, index) {
-                    final tab = widget.tabs[index];
-                    return CategoryFilterChip(
-                      label: tab.name,
-                      isSelected: widget.selectedId == tab.id,
-                      onTap: () => widget.onSelected(tab.id),
-                    );
-                  },
+                child: Listener(
+                  onPointerSignal: _handlePointerSignal,
+                  child: Scrollbar(
+                    controller: _controller,
+                    child: ListView.separated(
+                      controller: _controller,
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.zero,
+                      itemCount: widget.tabs.length,
+                      separatorBuilder: (_, _) => const SizedBox(
+                        width: MediaBrowsingMetrics.chipGap,
+                      ),
+                      itemBuilder: (context, index) {
+                        final tab = widget.tabs[index];
+                        return CategoryFilterChip(
+                          label: tab.name,
+                          isSelected: widget.selectedId == tab.id,
+                          onTap: () => widget.onSelected(tab.id),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -316,34 +345,25 @@ class CategoryFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(
-            Radius.circular(MediaBrowsingMetrics.chipRadius),
-          ),
-        ),
-      ],
-      child: Material(
-        color: isSelected
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.chipRadius),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(MediaBrowsingMetrics.chipRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: isSelected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
+    const radius = BorderRadius.all(
+      Radius.circular(MediaBrowsingMetrics.chipRadius),
+    );
+    return DpadInkWell(
+      onTap: onTap,
+      effects: const [GradientBorderEffect(borderRadius: radius)],
+      color: isSelected
+          ? colorScheme.primaryContainer
+          : colorScheme.surfaceContainerHigh,
+      borderRadius: radius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: isSelected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),

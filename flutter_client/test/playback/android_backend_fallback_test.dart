@@ -240,6 +240,72 @@ void main() {
     );
 
     test(
+      'maps native Media3 track events and forwards track selection',
+      () async {
+        final host = _FakeAndroidMedia3Host();
+        final adapter = AndroidPlaybackAdapter(
+          probe: const AndroidPlaybackProbe(
+            hardwareCodecs: <VideoCodec>{VideoCodec.h264},
+            passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
+            mpvAvailable: false,
+            serverTranscodeAvailable: false,
+          ),
+          media3Host: host,
+        );
+        final states = <PlaybackState>[];
+        final subscription = adapter.onState.listen(states.add);
+
+        await adapter.load(
+          const PlaybackSource(uri: 'https://fixtures.example/movie.m3u8'),
+        );
+        host.emit(
+          const AndroidMedia3Event(
+            type: AndroidMedia3EventType.ready,
+            audioTracks: <PlaybackTrack>[
+              PlaybackTrack(id: 'audio:0:0', label: 'English', language: 'en'),
+              PlaybackTrack(id: 'audio:0:1', label: 'Deutsch', language: 'de'),
+            ],
+            subtitleTracks: <PlaybackTrack>[
+              PlaybackTrack(
+                id: 'subtitle:1:0',
+                label: 'English CC',
+                language: 'en',
+              ),
+            ],
+            selectedAudioTrackId: 'audio:0:0',
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(states.last.audioTracks.map((track) => track.label), <String>[
+          'English',
+          'Deutsch',
+        ]);
+        expect(states.last.subtitleTracks.single.label, 'English CC');
+        expect(states.last.selectedAudioTrackId, 'audio:0:0');
+
+        await adapter.setAudioTrack('audio:0:1');
+        await adapter.setSubtitleTrack('subtitle:1:0');
+        await adapter.setSubtitleTrack(null);
+        await pumpEventQueue();
+
+        expect(
+          host.commands,
+          containsAll(<String>[
+            'setAudioTrack:audio:0:1',
+            'setSubtitleTrack:subtitle:1:0',
+            'setSubtitleTrack:null',
+          ]),
+        );
+        expect(states.last.selectedAudioTrackId, 'audio:0:1');
+        expect(states.last.selectedSubtitleTrackId, isNull);
+
+        await subscription.cancel();
+        await adapter.dispose();
+      },
+    );
+
+    test(
       'maps ExoPlayer commands and typed native events through Media3 host',
       () async {
         final host = _FakeAndroidMedia3Host();
@@ -408,6 +474,14 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
 
   @override
   Future<void> stop() async => commands.add('stop');
+
+  @override
+  Future<void> setAudioTrack(String? trackId) async =>
+      commands.add('setAudioTrack:$trackId');
+
+  @override
+  Future<void> setSubtitleTrack(String? trackId) async =>
+      commands.add('setSubtitleTrack:$trackId');
 
   @override
   Future<void> dispose() async {

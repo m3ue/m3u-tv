@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Track selector widget for audio and subtitle track selection.
 ///
@@ -18,6 +20,9 @@ class TrackSelector extends StatelessWidget {
     required this.onSubtitleTrackSelected,
     super.key,
   });
+
+  static const double buttonWidth = 136;
+  static const double controlsWidth = buttonWidth * 2 + 8;
 
   /// Available audio tracks.
   final List<PlaybackTrack> audioTracks;
@@ -45,7 +50,7 @@ class TrackSelector extends StatelessWidget {
         if (audioTracks.isNotEmpty)
           _TrackButton(
             icon: Icons.audiotrack,
-            label: _audioLabel,
+            label: 'Audio',
             onTap: () => _showAudioDialog(context),
           ),
         if (audioTracks.isNotEmpty && subtitleTracks.isNotEmpty)
@@ -53,28 +58,15 @@ class TrackSelector extends StatelessWidget {
         if (subtitleTracks.isNotEmpty)
           _TrackButton(
             icon: Icons.subtitles,
-            label: _subtitleLabel,
+            label: 'Subtitles',
             onTap: () => _showSubtitleDialog(context),
           ),
       ],
     );
   }
 
-  String get _audioLabel {
-    if (selectedAudioTrackId == null) return 'Disabled';
-    final track = audioTracks
-        .where((t) => t.id == selectedAudioTrackId)
-        .firstOrNull;
-    return track?.label ?? 'Select';
-  }
-
-  String get _subtitleLabel {
-    if (selectedSubtitleTrackId == null) return 'Off';
-    final track = subtitleTracks
-        .where((t) => t.id == selectedSubtitleTrackId)
-        .firstOrNull;
-    return track?.label ?? 'Select';
-  }
+  String? get _effectiveAudioTrackId =>
+      selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
 
   void _showAudioDialog(BuildContext context) {
     unawaited(
@@ -83,12 +75,11 @@ class TrackSelector extends StatelessWidget {
         builder: (context) {
           return AlertDialog(
             title: const Text('Audio Track'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            content: _TrackDialogList(
               children: [
                 ListTile(
                   title: const Text('Disable'),
-                  selected: selectedAudioTrackId == null,
+                  selected: _effectiveAudioTrackId == null,
                   onTap: () {
                     onAudioTrackSelected(null);
                     Navigator.of(context).pop();
@@ -97,7 +88,7 @@ class TrackSelector extends StatelessWidget {
                 ...audioTracks.map(
                   (track) => ListTile(
                     title: Text(track.label),
-                    selected: track.id == selectedAudioTrackId,
+                    selected: track.id == _effectiveAudioTrackId,
                     onTap: () {
                       onAudioTrackSelected(track.id);
                       Navigator.of(context).pop();
@@ -119,8 +110,7 @@ class TrackSelector extends StatelessWidget {
         builder: (context) {
           return AlertDialog(
             title: const Text('Subtitle Track'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+            content: _TrackDialogList(
               children: [
                 ListTile(
                   title: const Text('Off'),
@@ -149,6 +139,30 @@ class TrackSelector extends StatelessWidget {
   }
 }
 
+class _TrackDialogList extends StatelessWidget {
+  const _TrackDialogList({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.55;
+    return SizedBox(
+      width: double.maxFinite,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Scrollbar(
+          thumbVisibility: true,
+          child: ListView(
+            shrinkWrap: true,
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackButton extends StatelessWidget {
   const _TrackButton({
     required this.icon,
@@ -164,29 +178,43 @@ class _TrackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(8),
+    return DpadFocusable(
+      onSelect: onTap,
+      effects: const [
+        GradientBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: colorScheme.onSurface),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+      ],
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: TrackSelector.buttonWidth,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: colorScheme.onSurface),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                  ),
+                ],
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ],
+          ),
         ),
       ),
     );

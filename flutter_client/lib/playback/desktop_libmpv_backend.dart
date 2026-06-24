@@ -42,7 +42,13 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> load(PlaybackSource source) async {
-    _emit(_state.copyWith(status: PlaybackStatus.loading, source: source));
+    _emit(
+      _state.copyWith(
+        status: PlaybackStatus.loading,
+        source: source,
+        position: source.startPosition,
+      ),
+    );
     final response = await _channel.invokeMapMethod<String, Object?>('load', {
       'uri': source.uri,
       'title': source.title,
@@ -68,7 +74,25 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       _errorController.add(PlaybackError.fromException(error));
       throw error;
     }
-    _emit(_state.copyWith(status: PlaybackStatus.ready, source: source));
+    final initialAspectRatio = playbackAspectRatioFromValues(
+      aspectRatio:
+          response?['videoAspectRatio'] ??
+          response?['displayAspectRatio'] ??
+          response?['aspectRatio'],
+      width: response?['videoWidth'] ?? response?['width'],
+      height: response?['videoHeight'] ?? response?['height'],
+    );
+    _emit(
+      _state.copyWith(
+        status: PlaybackStatus.ready,
+        source: source,
+        position: source.startPosition,
+        videoAspectRatio: initialAspectRatio,
+      ),
+    );
+    if (initialAspectRatio == null) {
+      unawaited(_refreshVideoAspectRatio());
+    }
   }
 
   @override
@@ -128,6 +152,39 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
     }
     await _stateController.close();
     await _errorController.close();
+  }
+
+  Future<void> _refreshVideoAspectRatio() async {
+    final handle = _handle;
+    if (handle == null) return;
+
+    for (final delay in <Duration>[
+      Duration.zero,
+      const Duration(milliseconds: 100),
+      const Duration(milliseconds: 250),
+      const Duration(milliseconds: 500),
+      const Duration(seconds: 1),
+    ]) {
+      if (delay > Duration.zero) await Future<void>.delayed(delay);
+      if (_handle != handle) return;
+
+      final response = await _channel.invokeMapMethod<String, Object?>(
+        'getVideoAspectRatio',
+        <String, Object?>{'handle': handle},
+      );
+      final aspectRatio = playbackAspectRatioFromValues(
+        aspectRatio:
+            response?['videoAspectRatio'] ??
+            response?['displayAspectRatio'] ??
+            response?['aspectRatio'],
+        width: response?['videoWidth'] ?? response?['width'],
+        height: response?['videoHeight'] ?? response?['height'],
+      );
+      if (aspectRatio != null) {
+        _emit(_state.copyWith(videoAspectRatio: aspectRatio));
+        return;
+      }
+    }
   }
 
   Future<void> _invokeControl(

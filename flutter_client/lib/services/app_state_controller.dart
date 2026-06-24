@@ -324,6 +324,11 @@ class AppStateController extends ChangeNotifier {
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
 
+      final activeViewer = await viewerService.resolveActiveViewer(viewers);
+      final progress = activeViewer == null
+          ? const <Progress>[]
+          : await _loadRecentlyWatched(activeViewer.ulid);
+
       _sourceType = AppSourceType.xtream;
       _liveCategories = liveCategories;
       _vodCategories = vodCategories;
@@ -331,14 +336,13 @@ class AppStateController extends ChangeNotifier {
       _channels = channels;
       _vodItems = vodItems;
       _seriesList = seriesList;
+      _viewers = viewers;
+      _activeViewer = activeViewer;
+      _progressList = progress;
       _error = null;
       notifyListeners();
 
       await _loadXtreamEpg(channels);
-      final activeViewer = await viewerService.resolveActiveViewer(viewers);
-      final progress = activeViewer == null
-          ? const <Progress>[]
-          : await _loadRecentlyWatched(activeViewer.ulid);
 
       if (clearCache) await cacheService.clear();
       await cacheService.set('sourceType', 'xtream');
@@ -360,7 +364,7 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
       return true;
     } on Object catch (error) {
-      _error = _redact('$error', xtreamService.credentials);
+      _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
       return false;
     }
   }
@@ -430,28 +434,30 @@ class AppStateController extends ChangeNotifier {
           // Local wins if it has enrichment; remote wins otherwise so the
           // latest server position is reflected.
           if (l != null && l.title != null && l.title!.isNotEmpty) {
-            // Merge: keep enriched metadata but adopt the server's position.
-            if (r.positionSeconds != l.positionSeconds ||
-                r.completed != l.completed) {
-              return Progress(
-                viewerId: l.viewerId,
-                contentType: l.contentType,
-                streamId: l.streamId,
-                positionSeconds: r.positionSeconds,
-                durationSeconds: r.durationSeconds ?? l.durationSeconds,
-                completed: r.completed,
-                seriesId: l.seriesId ?? r.seriesId,
-                seasonNumber: l.seasonNumber ?? r.seasonNumber,
-                title: l.title,
-                episodeTitle: l.episodeTitle,
-                seriesName: l.seriesName,
-                thumbnailUrl: l.thumbnailUrl,
-                backdropUrl: l.backdropUrl,
-                rating: l.rating,
-                runtime: l.runtime,
-              );
-            }
-            return l;
+            // Always merge: keep enriched local metadata but adopt server
+            // position and fill in any fields the local entry may be missing
+            // (e.g. fields added to the API after the local entry was cached).
+            return Progress(
+              viewerId: l.viewerId,
+              contentType: l.contentType,
+              streamId: l.streamId,
+              positionSeconds: r.positionSeconds,
+              durationSeconds: r.durationSeconds ?? l.durationSeconds,
+              completed: r.completed,
+              seriesId: l.seriesId ?? r.seriesId,
+              seasonNumber: l.seasonNumber ?? r.seasonNumber,
+              episodeNumber: l.episodeNumber ?? r.episodeNumber,
+              title: l.title,
+              episodeTitle: l.episodeTitle,
+              seriesName: l.seriesName,
+              thumbnailUrl: l.thumbnailUrl,
+              backdropUrl: l.backdropUrl,
+              rating: l.rating ?? r.rating,
+              runtime: l.runtime ?? r.runtime,
+              plot: l.plot ?? r.plot,
+              genre: l.genre ?? r.genre,
+              year: l.year ?? r.year,
+            );
           }
           return r;
         }(),

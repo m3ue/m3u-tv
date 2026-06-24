@@ -18,7 +18,7 @@ jobs:
       run:
         working-directory: flutter_client
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Provision pinned Flutter SDK path
         run: |

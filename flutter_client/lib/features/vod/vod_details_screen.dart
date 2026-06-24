@@ -14,11 +14,13 @@ class VodDetailsScreen extends StatefulWidget {
     super.key,
     required this.item,
     this.xtreamService,
+    this.progressList = const [],
     this.onPlay,
   });
 
   final VodItem item;
   final XtreamService? xtreamService;
+  final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
 
   @override
@@ -54,7 +56,11 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
         ),
       ),
       body: _future == null
-          ? _VodDetailsBody(item: widget.item, onPlay: widget.onPlay)
+          ? _VodDetailsBody(
+              item: widget.item,
+              progressList: widget.progressList,
+              onPlay: widget.onPlay,
+            )
           : FutureBuilder<VodInfo?>(
               future: _future,
               builder: (context, snapshot) {
@@ -62,6 +68,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   item: widget.item,
                   info: snapshot.hasError ? null : snapshot.data,
                   isLoading: snapshot.connectionState != ConnectionState.done,
+                  progressList: widget.progressList,
                   onPlay: widget.onPlay,
                 );
               },
@@ -75,12 +82,14 @@ class _VodDetailsBody extends StatelessWidget {
     required this.item,
     this.info,
     this.isLoading = false,
+    this.progressList = const [],
     this.onPlay,
   });
 
   final VodItem item;
   final VodInfo? info;
   final bool isLoading;
+  final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
 
   static const double _wideBreakpoint = 600;
@@ -89,20 +98,34 @@ class _VodDetailsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final details = _ResolvedVodDetails(item, info);
+    final progress = _resumeProgress;
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < _wideBreakpoint) {
-          return _buildNarrow(context, theme, details);
+          return _buildNarrow(context, theme, details, progress);
         }
-        return _buildWide(context, theme, details);
+        return _buildWide(context, theme, details, progress);
       },
     );
+  }
+
+  Progress? get _resumeProgress {
+    for (final progress in progressList) {
+      if (progress.contentType == ContentType.vod &&
+          progress.streamId == item.id &&
+          progress.positionSeconds >= 30 &&
+          !progress.completed) {
+        return progress;
+      }
+    }
+    return null;
   }
 
   Widget _buildWide(
     BuildContext context,
     ThemeData theme,
     _ResolvedVodDetails details,
+    Progress? progress,
   ) {
     final backdrop = details.backdropUrl;
     final content = Padding(
@@ -124,7 +147,9 @@ class _VodDetailsBody extends StatelessWidget {
           ),
           const SizedBox(width: MediaBrowsingMetrics.pagePadding),
           Expanded(
-            child: SingleChildScrollView(child: _infoColumn(theme, details)),
+            child: SingleChildScrollView(
+              child: _infoColumn(theme, details, progress),
+            ),
           ),
         ],
       ),
@@ -166,6 +191,7 @@ class _VodDetailsBody extends StatelessWidget {
     BuildContext context,
     ThemeData theme,
     _ResolvedVodDetails details,
+    Progress? progress,
   ) {
     final backdrop = details.backdropUrl;
     return Column(
@@ -203,7 +229,12 @@ class _VodDetailsBody extends StatelessWidget {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: _infoColumn(theme, details, fullWidthButton: true),
+            child: _infoColumn(
+              theme,
+              details,
+              progress,
+              fullWidthButton: true,
+            ),
           ),
         ),
       ],
@@ -212,9 +243,12 @@ class _VodDetailsBody extends StatelessWidget {
 
   Widget _infoColumn(
     ThemeData theme,
-    _ResolvedVodDetails details, {
+    _ResolvedVodDetails details,
+    Progress? progress, {
     bool fullWidthButton = false,
   }) {
+    final progressValue = _progressValue(progress);
+    final buttonLabel = progress == null ? 'Play movie' : 'Continue movie';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -240,18 +274,22 @@ class _VodDetailsBody extends StatelessWidget {
             width: double.infinity,
             child: FilledButton.icon(
               autofocus: true,
-              onPressed: () => _play(details),
+              onPressed: () => _play(details, progress),
               icon: const Icon(Icons.play_arrow),
-              label: const Text('Play movie'),
+              label: Text(buttonLabel),
             ),
           )
         else
           FilledButton.icon(
             autofocus: true,
-            onPressed: () => _play(details),
+            onPressed: () => _play(details, progress),
             icon: const Icon(Icons.play_arrow),
-            label: const Text('Play movie'),
+            label: Text(buttonLabel),
           ),
+        if (progressValue != null) ...[
+          const SizedBox(height: MediaBrowsingMetrics.chipGap),
+          LinearProgressIndicator(value: progressValue, minHeight: 4),
+        ],
         const SizedBox(height: MediaBrowsingMetrics.pagePadding),
         if (isLoading) ...[
           const LinearProgressIndicator(),
@@ -274,14 +312,22 @@ class _VodDetailsBody extends StatelessWidget {
     );
   }
 
-  void _play(_ResolvedVodDetails details) {
+  double? _progressValue(Progress? progress) {
+    final duration = progress?.durationSeconds;
+    if (progress == null || duration == null || duration <= 0) return null;
+    return (progress.positionSeconds / duration).clamp(0.0, 1.0);
+  }
+
+  void _play(_ResolvedVodDetails details, Progress? progress) {
     onPlay?.call(
       PlayerArgs(
         streamUrl: item.streamUrl,
         title: details.name,
         type: 'vod',
         streamId: item.id,
+        startPosition: progress?.positionSeconds.toDouble(),
         metadata: <String, Object?>{
+          'title': details.name,
           if (details.containerExtension != null)
             'container_extension': details.containerExtension,
           if (details.duration != null) 'duration': details.duration,

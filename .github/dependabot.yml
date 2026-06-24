@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Flutter / Dart packages
+  - package-ecosystem: "pub"
+    directory: "/flutter_client"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    groups:
+      flutter-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      flutter-dev:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    # Major version bumps are intentionally excluded from groups so they
+    # each open an individual PR requiring manual review.
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

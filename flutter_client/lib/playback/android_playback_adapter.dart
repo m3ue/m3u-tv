@@ -195,11 +195,17 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> setAudioTrack(String? trackId) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setAudioTrack(trackId);
+    }
     _emit(_state.copyWith(selectedAudioTrackId: trackId));
   }
 
   @override
   Future<void> setSubtitleTrack(String? trackId) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setSubtitleTrack(trackId);
+    }
     _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
   }
 
@@ -301,14 +307,26 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
       AndroidMedia3EventType.disposed => PlaybackStatus.stopped,
       AndroidMedia3EventType.error => _state.status,
     };
-    _emit(
-      _state.copyWith(
-        backend: PlaybackBackend.androidExoPlayer,
-        status: status,
-        position: event.position ?? _state.position,
-        duration: event.duration,
-      ),
+    var nextState = _state.copyWith(
+      backend: PlaybackBackend.androidExoPlayer,
+      status: status,
+      position: event.position ?? _state.position,
+      duration: event.duration,
+      audioTracks: event.audioTracks,
+      subtitleTracks: event.subtitleTracks,
+      videoAspectRatio: event.videoAspectRatio,
     );
+    if (event.hasSelectedAudioTrackId) {
+      nextState = nextState.copyWith(
+        selectedAudioTrackId: event.selectedAudioTrackId,
+      );
+    }
+    if (event.hasSelectedSubtitleTrackId) {
+      nextState = nextState.copyWith(
+        selectedSubtitleTrackId: event.selectedSubtitleTrackId,
+      );
+    }
+    _emit(nextState);
   }
 }
 
@@ -320,6 +338,8 @@ abstract class AndroidMedia3Host {
   Future<void> pause();
   Future<void> seek(Duration position);
   Future<void> stop();
+  Future<void> setAudioTrack(String? trackId);
+  Future<void> setSubtitleTrack(String? trackId);
   Future<void> dispose();
 }
 
@@ -381,6 +401,20 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   Future<void> stop() => _methodChannel.invokeMethod<void>('stop');
 
   @override
+  Future<void> setAudioTrack(String? trackId) =>
+      _methodChannel.invokeMethod<void>(
+        'setAudioTrack',
+        <String, Object?>{'trackId': trackId},
+      );
+
+  @override
+  Future<void> setSubtitleTrack(String? trackId) =>
+      _methodChannel.invokeMethod<void>(
+        'setSubtitleTrack',
+        <String, Object?>{'trackId': trackId},
+      );
+
+  @override
   Future<void> dispose() async {
     try {
       await _methodChannel.invokeMethod<void>('dispose');
@@ -407,10 +441,20 @@ class AndroidMedia3Event {
     this.position,
     this.duration,
     this.textureId,
+    this.videoAspectRatio,
+    this.audioTracks,
+    this.subtitleTracks,
+    this.selectedAudioTrackId,
+    this.selectedSubtitleTrackId,
+    bool? hasSelectedAudioTrackId,
+    bool? hasSelectedSubtitleTrackId,
     this.code,
     this.message,
     this.recoverable = false,
-  });
+  }) : hasSelectedAudioTrackId =
+           hasSelectedAudioTrackId ?? selectedAudioTrackId != null,
+       hasSelectedSubtitleTrackId =
+           hasSelectedSubtitleTrackId ?? selectedSubtitleTrackId != null;
 
   factory AndroidMedia3Event.fromMap(Map<String, Object?> map) {
     return AndroidMedia3Event(
@@ -423,6 +467,20 @@ class AndroidMedia3Event {
           ? Duration(milliseconds: (map['durationMs']! as num).round())
           : null,
       textureId: (map['textureId'] as num?)?.toInt(),
+      videoAspectRatio: playbackAspectRatioFromValues(
+        aspectRatio:
+            map['videoAspectRatio'] ??
+            map['displayAspectRatio'] ??
+            map['aspectRatio'],
+        width: map['videoWidth'] ?? map['width'],
+        height: map['videoHeight'] ?? map['height'],
+      ),
+      audioTracks: _tracksFromMap(map['audioTracks']),
+      subtitleTracks: _tracksFromMap(map['subtitleTracks']),
+      selectedAudioTrackId: map['selectedAudioTrackId'] as String?,
+      selectedSubtitleTrackId: map['selectedSubtitleTrackId'] as String?,
+      hasSelectedAudioTrackId: map.containsKey('selectedAudioTrackId'),
+      hasSelectedSubtitleTrackId: map.containsKey('selectedSubtitleTrackId'),
       code: map['code'] as String?,
       message: map['message'] as String?,
       recoverable: map['recoverable'] == true,
@@ -434,9 +492,32 @@ class AndroidMedia3Event {
   final Duration? position;
   final Duration? duration;
   final int? textureId;
+  final double? videoAspectRatio;
+  final List<PlaybackTrack>? audioTracks;
+  final List<PlaybackTrack>? subtitleTracks;
+  final String? selectedAudioTrackId;
+  final String? selectedSubtitleTrackId;
+  final bool hasSelectedAudioTrackId;
+  final bool hasSelectedSubtitleTrackId;
   final String? code;
   final String? message;
   final bool recoverable;
+
+  static List<PlaybackTrack>? _tracksFromMap(Object? raw) {
+    if (raw == null) return null;
+    return (raw as List<Object?>)
+        .map(
+          (item) => Map<String, Object?>.from(item! as Map<Object?, Object?>),
+        )
+        .map(
+          (track) => PlaybackTrack(
+            id: track['id']! as String,
+            label: track['label']! as String,
+            language: track['language'] as String?,
+          ),
+        )
+        .toList(growable: false);
+  }
 
   static AndroidMedia3EventType _typeFromString(String? value) {
     return switch (value) {

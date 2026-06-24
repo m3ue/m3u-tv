@@ -60,7 +60,7 @@ class AuthNotifier extends ChangeNotifier {
       notifyListeners();
       return false;
     } on Object catch (e) {
-      _error = _redact(e.toString(), credentials);
+      _error = _redact(userFacingXtreamError(e), credentials);
       _isLoading = false;
       notifyListeners();
       return false;

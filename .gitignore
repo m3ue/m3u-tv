@@ -9,11 +9,12 @@
 *.sln
 *.sw?
 
-# GitHub Actions — only keep the Flutter workflow
+# GitHub Actions — only keep the Flutter workflow and Dependabot config
 .github/*
+!.github/dependabot.yml
 !.github/workflows/
 .github/workflows/*
-!.github/workflows/flutter-client.yml
+!.github/workflows/ci.yml
 
 # Flutter
 flutter_client/build/

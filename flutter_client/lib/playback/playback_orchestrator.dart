@@ -4,7 +4,9 @@ import 'dart:async';
 
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 abstract class PlaybackTranscodeGateway {
   Future<TranscodeResponse> startServerTranscode(StreamRequest request);
@@ -70,6 +72,12 @@ class PlaybackOrchestrator {
     final adapter = _activeAdapter;
     if (adapter is! VideoTextureProvider) return null;
     return (adapter! as VideoTextureProvider).textureId;
+  }
+
+  mkv.VideoController? get activeSubtitleController {
+    final adapter = _activeAdapter;
+    if (adapter == null || adapter is! SubtitleControllerProvider) return null;
+    return (adapter as SubtitleControllerProvider).subtitleController;
   }
 
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);

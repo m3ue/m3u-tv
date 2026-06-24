@@ -71,13 +71,56 @@ void main() {
       expect(playerArgs?.type, 'vod');
       expect(playerArgs?.metadata['container_extension'], 'mkv');
     });
+
+    testWidgets('shows resume action and progress for started movies', (
+      tester,
+    ) async {
+      PlayerArgs? playerArgs;
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: const VodInfo(
+              id: 201,
+              name: 'Big Buck Bunny',
+              plot: 'Server synopsis',
+              duration: '01:40:00',
+              containerExtension: 'mkv',
+            ),
+          ),
+          progressList: const <Progress>[
+            Progress(
+              viewerId: 'viewer-admin',
+              contentType: ContentType.vod,
+              streamId: 201,
+              positionSeconds: 1500,
+              durationSeconds: 6000,
+            ),
+          ],
+          onPlay: (args) => playerArgs = args,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue movie'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      await tester.tap(find.text('Continue movie'));
+      await tester.pump();
+
+      expect(playerArgs?.startPosition, 1500.0);
+    });
   });
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp({required this.service, this.onPlay});
+  const _TestApp({
+    required this.service,
+    this.progressList = const <Progress>[],
+    this.onPlay,
+  });
 
   final XtreamService service;
+  final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
 
   @override
@@ -93,6 +136,7 @@ class _TestApp extends StatelessWidget {
           rating: 3.5,
         ),
         xtreamService: service,
+        progressList: progressList,
         onPlay: onPlay,
       ),
     );
