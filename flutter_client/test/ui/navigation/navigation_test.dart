@@ -744,10 +744,12 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
 }
 
 Future<void> _waitForText(WidgetTester tester, String text) async {
-  for (var i = 0; i < 10; i += 1) {
-    await _pumpAppFrame(tester);
-    if (find.text(text).evaluate().isNotEmpty) return;
+  final finder = find.text(text);
+  for (var i = 0; i < 60; i += 1) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (finder.evaluate().isNotEmpty) return;
   }
+  expect(finder, findsOneWidget);
 }
 
 /// Test app that wraps AppShell with a controlled device type.
