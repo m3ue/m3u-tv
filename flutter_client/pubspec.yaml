@@ -12,7 +12,7 @@ dependencies:
   dpad: ^3.0.0
   flutter:
     sdk: flutter
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^10.3.1
   flutter_secure_storage_tvos:
     path: packages/flutter_secure_storage_tvos
   flutter_svg: ^2.3.0
