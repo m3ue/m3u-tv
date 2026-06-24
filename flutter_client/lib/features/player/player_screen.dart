@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -165,13 +164,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _errorSubscription = widget.orchestrator.onError.listen(_handleError);
 
     final source = widget.args.toPlaybackSource();
-    if (kDebugMode) {
-      debugPrint(
-        '[resume-debug] player start '
-        'type=${widget.args.type} streamId=${widget.args.streamId} '
-        'argStart=${widget.args.startPosition} sourceStart=${source.startPosition.inSeconds}s',
-      );
-    }
 
     unawaited(_openAndSeek(source));
   }
@@ -181,11 +173,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       await widget.orchestrator.open(source);
       if (_disposed || !mounted || source.isLive) return;
       if (source.startPosition > Duration.zero) {
-        if (kDebugMode) {
-          debugPrint(
-            '[resume-debug] post-load seek ${source.startPosition.inSeconds}s',
-          );
-        }
         await widget.orchestrator.seek(source.startPosition);
       }
     } on Object catch (error) {
@@ -302,13 +289,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _reportProgress(Duration position) {
     if (_isLive || widget.progressReporter == null) return;
-    if (kDebugMode) {
-      debugPrint(
-        '[resume-debug] player progress '
-        'type=${widget.args.type} streamId=${widget.args.streamId} '
-        'position=${position.inSeconds}s duration=${_duration.inSeconds}s',
-      );
-    }
     widget.progressReporter!(
       Progress(
         viewerId: widget.viewerId,
@@ -408,12 +388,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
-    if (kDebugMode) {
-      debugPrint(
-        '[resume-debug] player seek request '
-        'target=${position.inSeconds}s clamped=${clamped.inSeconds}s',
-      );
-    }
     setState(() => _currentPosition = clamped);
     _reportProgress(clamped);
     unawaited(widget.orchestrator.seek(clamped));

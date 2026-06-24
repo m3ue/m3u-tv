@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
@@ -140,13 +139,6 @@ class MediaKitDesktopAdapter
   @override
   Future<void> load(PlaybackSource source) async {
     _emit(_state.copyWith(status: PlaybackStatus.loading, source: source));
-    if (kDebugMode) {
-      debugPrint(
-        '[resume-debug] media_kit load '
-        'uri=${source.uri} start=${source.startPosition.inSeconds}s '
-        'headers=${source.headers.length}',
-      );
-    }
     await _player.open(mediaKitMediaFromPlaybackSource(source));
   }
 
