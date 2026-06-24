@@ -960,13 +960,20 @@ class _ContentNavigator extends StatelessWidget {
         onOpenPlayer?.call(
           PlayerArgs(
             streamUrl: streamUrl,
-            title: series.name,
+            title: progress.episodeTitle ?? series.name,
             type: 'series',
             streamId: progress.streamId,
             seriesId: progress.seriesId,
             seasonNumber: progress.seasonNumber,
             metadata: <String, Object?>{
               if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+              'series_name': progress.seriesName ?? series.name,
+              if (progress.episodeNumber != null)
+                'episode_number': progress.episodeNumber,
+              if (progress.seasonNumber != null)
+                'season_number': progress.seasonNumber,
+              if (progress.episodeTitle != null)
+                'episode_title': progress.episodeTitle,
             },
           ),
         );

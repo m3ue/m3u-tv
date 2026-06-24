@@ -94,11 +94,15 @@ class TraktService extends ChangeNotifier {
     final code = _pending?.deviceCode;
     if (code == null) return;
     try {
-      final data = await _post('/oauth/device/token', {
-        'code': code,
-        'client_id': _kClientId,
-        'client_secret': _kClientSecret,
-      });
+      final data = await _post(
+        '/oauth/device/token',
+        {
+          'code': code,
+          'client_id': _kClientId,
+          'client_secret': _kClientSecret,
+        },
+        isPollEndpoint: true,
+      );
       await _saveTokens(data);
     } on _TraktPendingException {
       // authorization_pending — keep polling
@@ -208,8 +212,9 @@ class TraktService extends ChangeNotifier {
     }
     try {
       await _post('/scrobble/$action', body, accessToken: token);
-    } on Object {
-      // Scrobble is best-effort; silently ignore errors.
+      debugPrint('[Trakt] scrobble/$action OK — ${jsonEncode(body)}');
+    } on Object catch (e) {
+      debugPrint('[Trakt] scrobble/$action FAILED: $e — ${jsonEncode(body)}');
     }
   }
 
@@ -217,6 +222,7 @@ class TraktService extends ChangeNotifier {
     String path,
     Map<String, Object> body, {
     String? accessToken,
+    bool isPollEndpoint = false,
   }) async {
     final encoded = utf8.encode(jsonEncode(body));
     final req = await _http.postUrl(Uri.parse('$_kApi$path'));
@@ -232,13 +238,14 @@ class TraktService extends ChangeNotifier {
       ..add(encoded);
     final res = await req.close();
     final text = await utf8.decodeStream(res);
-    // 400 = authorization_pending; 404 = expired or already used
-    if (res.statusCode == 400 || res.statusCode == 404) {
+    if (isPollEndpoint && (res.statusCode == 400 || res.statusCode == 404)) {
+      // 400 = authorization_pending; 404 = device code expired / already used
       throw _TraktPendingException();
     }
     if (res.statusCode >= 400) {
-      throw Exception('Trakt HTTP ${res.statusCode}');
+      throw Exception('Trakt HTTP ${res.statusCode}: $text');
     }
+    if (text.isEmpty) return const {};
     return jsonDecode(text) as Map<String, Object?>;
   }
 

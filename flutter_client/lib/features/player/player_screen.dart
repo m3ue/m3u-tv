@@ -138,11 +138,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (service == null || service.status != TraktAuthStatus.connected) return;
     if (_isLive) return;
     final duration = _duration.inSeconds;
-    if (duration <= 0) return;
-    final progress = (_currentPosition.inSeconds / duration * 100).clamp(
-      0.0,
-      100.0,
-    );
+    final progress = duration > 0
+        ? (_currentPosition.inSeconds / duration * 100).clamp(0.0, 100.0)
+        : (action == 'start' ? 0.0 : null);
+    if (progress == null) return;
     final args = widget.args;
     unawaited(
       service.scrobble(
