@@ -89,6 +89,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   bool _disposed = false;
   bool _traktScrobbleActive = false;
+  double _lastValidProgress = 0;
 
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
@@ -138,10 +139,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (service == null || service.status != TraktAuthStatus.connected) return;
     if (_isLive) return;
     final duration = _duration.inSeconds;
-    final progress = duration > 0
+    var progress = duration > 0
         ? (_currentPosition.inSeconds / duration * 100).clamp(0.0, 100.0)
         : (action == 'start' ? 0.0 : null);
     if (progress == null) return;
+    // Trakt rejects pause with < 1% progress. Skip rather than spam 422s.
+    if (action == 'pause' && progress < 1.0) return;
+    // For stop, fall back to the last known valid progress so we always record.
+    if (action == 'stop' && progress < 1.0 && _lastValidProgress > 0) {
+      progress = _lastValidProgress;
+    }
+    if (progress > 0) _lastValidProgress = progress;
     final args = widget.args;
     unawaited(
       service.scrobble(
@@ -323,6 +331,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer = Timer.periodic(_progressInterval, (_) {
       if (_disposed || !mounted) return;
       _reportProgress(_currentPosition);
+      if (_traktScrobbleActive) _scrobble('start');
     });
   }
 
