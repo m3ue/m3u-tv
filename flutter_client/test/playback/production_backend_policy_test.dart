@@ -178,6 +178,20 @@ void main() {
       },
     );
 
+    test('desktop libmpv load applies resume start position', () {
+      final linuxBackend = File(
+        'linux/desktop_libmpv_backend.cc',
+      ).readAsStringSync();
+      final windowsBackend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+
+      expect(linuxBackend, contains('startPositionMs'));
+      expect(linuxBackend, contains('start='));
+      expect(windowsBackend, contains('startPositionMs'));
+      expect(windowsBackend, contains('start='));
+    });
+
     test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
       final media3Plugin = File(
         'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',

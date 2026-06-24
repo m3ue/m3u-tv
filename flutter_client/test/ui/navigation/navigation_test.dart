@@ -298,9 +298,10 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('selecting Home continue watching movie opens player route', (
+  testWidgets('selecting Home continue watching movie resumes saved position', (
     tester,
   ) async {
+    PlayerArgs? capturedArgs;
     final appState = _testAppState(
       xtreamService: _NavigationXtreamService(
         recentlyWatched: const <Progress>[
@@ -324,7 +325,14 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _TestApp(deviceType: DeviceType.tv, appState: appState),
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        playerRouteBuilder: (args) {
+          capturedArgs = args;
+          return _testPlayerRoute(args);
+        },
+      ),
     );
     await _pumpAppFrame(tester);
 
@@ -342,6 +350,67 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Player route: Route Movie'), findsOneWidget);
+    expect(capturedArgs?.startPosition, 91.0);
+    expect(
+      capturedArgs?.toPlaybackSource().startPosition,
+      const Duration(seconds: 91),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('start from beginning clears saved resume position', (
+    tester,
+  ) async {
+    PlayerArgs? capturedArgs;
+    final appState = _testAppState(
+      xtreamService: _NavigationXtreamService(
+        recentlyWatched: const <Progress>[
+          Progress(
+            viewerId: 'viewer-1',
+            contentType: ContentType.vod,
+            streamId: 201,
+            positionSeconds: 91,
+            durationSeconds: 600,
+          ),
+        ],
+      ),
+    );
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        playerRouteBuilder: (args) {
+          capturedArgs = args;
+          return _testPlayerRoute(args);
+        },
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Resume Route Movie'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Resume Watching'), findsOneWidget);
+    await tester.tap(find.text('Start from Beginning'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Route Movie'), findsOneWidget);
+    expect(capturedArgs?.startPosition, isNull);
+    expect(
+      capturedArgs?.toPlaybackSource().startPosition,
+      Duration.zero,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

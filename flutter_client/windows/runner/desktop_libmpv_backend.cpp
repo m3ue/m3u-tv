@@ -377,7 +377,15 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
   api.render_context_set_update_callback(render_context, RenderUpdate, player.get());
 
   const std::string uri = StringArg(args, "uri");
-  const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
+  const int64_t start_position_ms = IntArg(args, "startPositionMs");
+  std::string start_option;
+  if (start_position_ms > 0) {
+    const double seconds = static_cast<double>(start_position_ms) / 1000.0;
+    start_option = "start=" + std::to_string(seconds);
+  }
+  const char* load_args[] = {"loadfile", uri.c_str(), "replace",
+                             start_option.empty() ? nullptr : start_option.c_str(),
+                             nullptr};
   rc = api.command(handle, load_args);
   if (rc < 0) return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
 
