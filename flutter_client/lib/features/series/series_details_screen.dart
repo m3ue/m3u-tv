@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -414,7 +415,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   }
 }
 
-class _SeasonChips extends StatelessWidget {
+class _SeasonChips extends StatefulWidget {
   const _SeasonChips({
     required this.seasons,
     required this.selectedSeason,
@@ -426,23 +427,58 @@ class _SeasonChips extends StatelessWidget {
   final ValueChanged<int> onSeasonSelected;
 
   @override
+  State<_SeasonChips> createState() => _SeasonChipsState();
+}
+
+class _SeasonChipsState extends State<_SeasonChips> {
+  final ScrollController _controller = ScrollController();
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) return;
+    final position = _controller.position;
+    final target = (_controller.offset + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _controller.jumpTo(target);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (seasons.isEmpty) return const SizedBox.shrink();
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: seasons
-            .map((season) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: CategoryFilterChip(
-                  label: season.name,
-                  isSelected: season.number == selectedSeason,
-                  onTap: () => onSeasonSelected(season.number),
-                ),
-              );
-            })
-            .toList(growable: false),
+    if (widget.seasons.isEmpty) return const SizedBox.shrink();
+    return Listener(
+      onPointerSignal: _handlePointerSignal,
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: widget.seasons
+                .map((season) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: CategoryFilterChip(
+                      label: season.name,
+                      isSelected: season.number == widget.selectedSeason,
+                      onTap: () => widget.onSeasonSelected(season.number),
+                    ),
+                  );
+                })
+                .toList(growable: false),
+          ),
+        ),
       ),
     );
   }
