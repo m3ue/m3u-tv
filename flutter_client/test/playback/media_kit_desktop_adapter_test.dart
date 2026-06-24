@@ -69,6 +69,21 @@ void main() {
       expect(selectedTrackId, isNull);
     });
 
+    test('passes playback source start position to media_kit media', () {
+      final media = mediaKitMediaFromPlaybackSource(
+        const PlaybackSource(
+          uri: 'https://example.com/movie.mkv',
+          title: 'Resume Fixture',
+          startPosition: Duration(minutes: 43, seconds: 13),
+          headers: <String, String>{'User-Agent': 'm3u-tv'},
+        ),
+      );
+
+      expect(media.uri, 'https://example.com/movie.mkv');
+      expect(media.start, const Duration(minutes: 43, seconds: 13));
+      expect(media.httpHeaders, <String, String>{'User-Agent': 'm3u-tv'});
+    });
+
     test('maps video params aspect ratio with display size fallback', () {
       expect(
         mediaKitVideoAspectRatio(

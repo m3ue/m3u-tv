@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -115,8 +116,21 @@ class _VodDetailsBody extends StatelessWidget {
           progress.streamId == item.id &&
           progress.positionSeconds >= 30 &&
           !progress.completed) {
+        if (kDebugMode) {
+          debugPrint(
+            '[resume-debug] vod details progress match '
+            'streamId=${item.id} position=${progress.positionSeconds} '
+            'progressList=${progressList.length}',
+          );
+        }
         return progress;
       }
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[resume-debug] vod details progress miss '
+        'streamId=${item.id} progressList=${progressList.length}',
+      );
     }
     return null;
   }

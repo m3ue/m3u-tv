@@ -135,7 +135,22 @@ RouteFactory buildAppRouter({
   Widget Function(PlayerArgs args)? playerRouteBuilder,
   void Function(PlayerArgs)? onOpenPlayer,
   List<Progress> progressList = const [],
+  Listenable? progressListenable,
+  List<Progress> Function()? progressListProvider,
 }) {
+  Widget withProgressUpdates(
+    Widget Function(List<Progress> progressList) builder,
+  ) {
+    final listenable = progressListenable;
+    if (listenable == null) return builder(progressList);
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, child) => builder(
+        progressListProvider?.call() ?? progressList,
+      ),
+    );
+  }
+
   return (RouteSettings settings) {
     final routeName = settings.name;
 
@@ -210,11 +225,13 @@ RouteFactory buildAppRouter({
       if (args is DetailsArgs && args.item != null) {
         return _buildSlideRoute(
           settings,
-          VodDetailsScreen(
-            item: args.item!,
-            xtreamService: xtreamService,
-            onPlay: onOpenPlayer,
-            progressList: progressList,
+          withProgressUpdates(
+            (progressList) => VodDetailsScreen(
+              item: args.item!,
+              xtreamService: xtreamService,
+              onPlay: onOpenPlayer,
+              progressList: progressList,
+            ),
           ),
         );
       }
@@ -226,12 +243,14 @@ RouteFactory buildAppRouter({
       if (args is SeriesDetailsArgs && xtreamService != null) {
         return _buildSlideRoute(
           settings,
-          SeriesDetailsScreen(
-            seriesId: args.seriesId,
-            seriesName: args.seriesName,
-            xtreamService: xtreamService,
-            onPlay: onOpenPlayer,
-            progressList: progressList,
+          withProgressUpdates(
+            (progressList) => SeriesDetailsScreen(
+              seriesId: args.seriesId,
+              seriesName: args.seriesName,
+              xtreamService: xtreamService,
+              onPlay: onOpenPlayer,
+              progressList: progressList,
+            ),
           ),
         );
       }

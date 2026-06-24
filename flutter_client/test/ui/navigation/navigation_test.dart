@@ -452,6 +452,51 @@ void main() {
   );
 
   testWidgets(
+    'open movie details updates to continue when progress changes behind route',
+    (tester) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(_sidebarText('Movies'));
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route Movie').last);
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Play movie'), findsOneWidget);
+      expect(find.text('Continue movie'), findsNothing);
+
+      await appState.resumeService.save(
+        Progress(
+          viewerId: appState.activeViewer!.ulid,
+          contentType: ContentType.vod,
+          streamId: 201,
+          positionSeconds: 43 * 60 + 13,
+          durationSeconds: 6480,
+          title: 'Route Movie',
+        ),
+      );
+      await appState.refreshLocalState();
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Continue movie'), findsOneWidget);
+      expect(find.text('Play movie'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'selecting started movie from app shell opens details with continue action',
     (tester) async {
       PlayerArgs? capturedArgs;

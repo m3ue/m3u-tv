@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -192,6 +193,14 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             p.positionSeconds >= 30 &&
             !p.completed,
       );
+      if (kDebugMode) {
+        debugPrint(
+          '[resume-debug] openPlayer lookup '
+          'type=${resolvedArgs.type} streamId=${resolvedArgs.streamId} '
+          'start=${resolvedArgs.startPosition} progressList=${_appState.progressList.length} '
+          'match=${progress?.positionSeconds}',
+        );
+      }
       if (progress != null && context.mounted) {
         final startPos = await showResumeModal(
           context,
@@ -208,6 +217,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _openPlayerDirect(PlayerArgs args) {
+    if (kDebugMode) {
+      debugPrint(
+        '[resume-debug] openPlayer direct '
+        'type=${args.type} streamId=${args.streamId} start=${args.startPosition}',
+      );
+    }
     final oldOrch = _playerOrchestrator;
     final newOrch =
         widget.playbackOrchestratorBuilder?.call() ??
@@ -400,15 +415,45 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     genre: progress.genre ?? existing?.genre,
                     year: progress.year ?? existing?.year,
                   );
+                  if (kDebugMode) {
+                    debugPrint(
+                      '[resume-debug] app progress report '
+                      'viewer=${toSave.viewerId} type=${toSave.contentType.wireName} '
+                      'streamId=${toSave.streamId} position=${toSave.positionSeconds} '
+                      'duration=${toSave.durationSeconds}',
+                    );
+                  }
                   if (_appState.sourceType == AppSourceType.xtream) {
                     unawaited(
                       _appState.xtreamService
                           .updateProgress(toSave)
-                          .catchError((_) {}),
+                          .then((_) {
+                            if (kDebugMode) {
+                              debugPrint(
+                                '[resume-debug] xtream update_progress ok '
+                                'type=${toSave.contentType.wireName} streamId=${toSave.streamId} '
+                                'position=${toSave.positionSeconds}',
+                              );
+                            }
+                          })
+                          .catchError((Object error) {
+                            if (kDebugMode) {
+                              debugPrint(
+                                '[resume-debug] xtream update_progress failed: $error',
+                              );
+                            }
+                          }),
                     );
                   }
                   unawaited(
                     _appState.resumeService.save(toSave).then((_) {
+                      if (kDebugMode) {
+                        debugPrint(
+                          '[resume-debug] local resume save ok '
+                          'type=${toSave.contentType.wireName} streamId=${toSave.streamId} '
+                          'position=${toSave.positionSeconds}',
+                        );
+                      }
                       if (mounted) unawaited(_appState.refreshLocalState());
                     }),
                   );
@@ -852,6 +897,8 @@ class _ContentNavigator extends StatelessWidget {
       playerRouteBuilder: playerRouteBuilder,
       onOpenPlayer: onOpenPlayer,
       progressList: appState.progressList,
+      progressListenable: appState,
+      progressListProvider: () => appState.progressList,
     );
 
     return Navigator(
