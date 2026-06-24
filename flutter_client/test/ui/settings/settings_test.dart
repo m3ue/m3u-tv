@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
@@ -863,6 +864,7 @@ Widget _settingsApp(
     home: Scaffold(
       body: SettingsScreen(
         authNotifier: notifier,
+        traktService: TraktService(storage: InMemorySecureStorage()),
         activeViewer: activeViewer,
         sourceError: sourceError,
         isConfiguredOverride: isConfiguredOverride,

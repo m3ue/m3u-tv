@@ -409,10 +409,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   }
                   unawaited(
                     _appState.resumeService.save(toSave).then((_) {
-                      if (mounted) unawaited(_appState.refreshLocalState());
+                      if (mounted) _appState.updateProgressEntry(toSave);
                     }),
                   );
                 },
+                traktService: _appState.traktService,
                 onClose: _closePlayer,
               ),
         ),
@@ -959,11 +960,21 @@ class _ContentNavigator extends StatelessWidget {
         onOpenPlayer?.call(
           PlayerArgs(
             streamUrl: streamUrl,
-            title: series.name,
+            title: progress.episodeTitle ?? series.name,
             type: 'series',
             streamId: progress.streamId,
             seriesId: progress.seriesId,
             seasonNumber: progress.seasonNumber,
+            metadata: <String, Object?>{
+              if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+              'series_name': progress.seriesName ?? series.name,
+              if (progress.episodeNumber != null)
+                'episode_number': progress.episodeNumber,
+              if (progress.seasonNumber != null)
+                'season_number': progress.seasonNumber,
+              if (progress.episodeTitle != null)
+                'episode_title': progress.episodeTitle,
+            },
           ),
         );
       }
@@ -1045,6 +1056,7 @@ class _ContentNavigator extends StatelessWidget {
             isConfiguredOverride: appState.isConfigured,
             epgRefreshInterval: appState.epgRefreshInterval,
             epgRefreshOptions: AppStateController.epgRefreshOptions,
+            traktService: appState.traktService,
             onConnect: appState.connectXtream,
             onDisconnect: () => unawaited(appState.disconnect()),
             onSwitchViewer: (viewer) =>
@@ -1199,10 +1211,16 @@ class _HomeScreen extends StatelessWidget {
         final subtitle = plot != null
             ? (plot.length > 120 ? '${plot.substring(0, 117)}…' : plot)
             : null;
+        final vodFallbackLogo = (!hasBackdrop && progress.thumbnailUrl == null)
+            ? appState.vodItems
+                  .firstWhereOrNull((v) => v.id == progress.streamId)
+                  ?.logoUrl
+            : null;
         return MediaPreviewItem(
           title: progress.title!,
           subtitle: subtitle,
-          imageUrl: progress.backdropUrl ?? progress.thumbnailUrl,
+          imageUrl:
+              progress.backdropUrl ?? progress.thumbnailUrl ?? vodFallbackLogo,
           fallbackIcon: Icons.movie,
           imageFit: hasBackdrop ? BoxFit.cover : BoxFit.contain,
           imageBackgroundColor: hasBackdrop ? null : Colors.black,
@@ -1261,11 +1279,17 @@ class _HomeScreen extends StatelessWidget {
             (progress.seasonNumber != null
                 ? 'Season ${progress.seasonNumber}'
                 : null);
+        final seriesFallback = appState.seriesList.firstWhereOrNull(
+          (s) => s.id == progress.seriesId,
+        );
         return MediaPreviewItem(
           title: displayTitle,
           subtitle: episodeSubtitle,
-          // Episode-specific thumbnail first; series backdrop as fallback.
-          imageUrl: progress.thumbnailUrl ?? progress.backdropUrl,
+          imageUrl:
+              progress.thumbnailUrl ??
+              progress.backdropUrl ??
+              seriesFallback?.backdropUrl ??
+              seriesFallback?.coverUrl,
           fallbackIcon: Icons.tv,
           fallbackTitle: displayTitle,
           progressFraction: fraction,

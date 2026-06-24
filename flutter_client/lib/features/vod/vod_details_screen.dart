@@ -334,6 +334,7 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.rating != null) 'rating': '${details.rating}',
           if (details.backdropUrl != null) 'backdrop_url': details.backdropUrl,
           if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
+          if (details.tmdbId != null) 'tmdb_id': details.tmdbId,
         },
       ),
     );
@@ -358,6 +359,7 @@ class _ResolvedVodDetails {
   String? get backdropUrl => _notEmpty(info?.backdropUrl);
   String? get containerExtension =>
       _notEmpty(info?.containerExtension) ?? item.containerExtension;
+  int? get tmdbId => info?.tmdbId;
 }
 
 class _CreditLine extends StatelessWidget {

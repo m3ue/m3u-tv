@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 // M3 buttons and chips use StadiumBorder. A large radius makes the dpad
 // focus border match the pill shape regardless of widget height.
@@ -18,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.authNotifier,
+    required this.traktService,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -35,6 +38,7 @@ class SettingsScreen extends StatefulWidget {
   });
 
   final AuthNotifier authNotifier;
+  final TraktService traktService;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -117,6 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       body: _ConnectedView(
         authNotifier: widget.authNotifier,
+        traktService: widget.traktService,
         activeViewer: widget.activeViewer,
         viewers: widget.viewers,
         sourceLabel: widget.sourceLabel,
@@ -298,9 +303,12 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
 // Connected settings view
 // ---------------------------------------------------------------------------
 
-class _ConnectedView extends StatelessWidget {
+enum _SettingsTab { general, integrations }
+
+class _ConnectedView extends StatefulWidget {
   const _ConnectedView({
     required this.authNotifier,
+    required this.traktService,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -315,6 +323,7 @@ class _ConnectedView extends StatelessWidget {
   });
 
   final AuthNotifier authNotifier;
+  final TraktService traktService;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -327,25 +336,65 @@ class _ConnectedView extends StatelessWidget {
   final VoidCallback? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
 
+  @override
+  State<_ConnectedView> createState() => _ConnectedViewState();
+}
+
+class _ConnectedViewState extends State<_ConnectedView> {
+  _SettingsTab _tab = _SettingsTab.general;
+
   void _openViewerManagement(BuildContext context) {
     unawaited(
       showDialog<void>(
         context: context,
         builder: (_) => _ViewerManagementDialog(
-          viewers: viewers.isNotEmpty ? viewers : [activeViewer!],
-          activeViewer: activeViewer!,
-          onSwitch: onSwitchViewer ?? (_) {},
-          onCreateViewer: onCreateViewer,
+          viewers: widget.viewers.isNotEmpty
+              ? widget.viewers
+              : [widget.activeViewer!],
+          activeViewer: widget.activeViewer!,
+          onSwitch: widget.onSwitchViewer ?? (_) {},
+          onCreateViewer: widget.onCreateViewer,
         ),
       ),
     );
   }
 
+  Future<void> _handleClearCache() async {
+    final confirmed = await _showConfirmDialog(
+      context,
+      title: 'Clear Cache & Refresh?',
+      message:
+          'All cached content will be cleared and reloaded from your source.',
+      confirmLabel: 'Clear & Refresh',
+    );
+    if (!confirmed || !mounted) return;
+    widget.onClearCache?.call();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Cache cleared — content is refreshing in the background.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleDisconnect() async {
+    final confirmed = await _showConfirmDialog(
+      context,
+      title: 'Disconnect?',
+      message:
+          'You will be signed out and will need to re-enter your credentials to reconnect.',
+      confirmLabel: 'Disconnect',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    widget.onDisconnect();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final auth = authNotifier.authResponse;
-    final hasSourceError = sourceError != null && sourceError!.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -353,185 +402,545 @@ class _ConnectedView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Settings', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // ── Connection ────────────────────────────────────────────────────
-          _SettingsSection(
-            title: 'Connection',
-            child: Column(
-              children: [
-                const _StatusRow(
-                  label: 'Status',
-                  value: 'Connected',
-                  valueColor: Colors.green,
+          // ── Tab chips ─────────────────────────────────────────────────────
+          Row(
+            children: [
+              _IntervalChip(
+                label: 'General',
+                isSelected: _tab == _SettingsTab.general,
+                onTap: () => setState(() => _tab = _SettingsTab.general),
+              ),
+              const SizedBox(width: 8),
+              _IntervalChip(
+                label: 'Integrations',
+                isSelected: _tab == _SettingsTab.integrations,
+                onTap: () => setState(
+                  () => _tab = _SettingsTab.integrations,
                 ),
-                if (sourceLabel != null) ...[
-                  const Divider(),
-                  _StatusRow(label: 'Source', value: sourceLabel!),
-                ],
-                if (auth != null) ...[
-                  const Divider(),
-                  _StatusRow(
-                    label: 'm3u-editor',
-                    value: auth.m3uEditorVersion ?? 'Unknown',
-                  ),
-                ],
-                if (hasSourceError) ...[
-                  const Divider(),
-                  _StatusRow(
-                    label: 'Last error',
-                    value: sourceError!,
-                    valueColor: theme.colorScheme.error,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      DpadFocusable(
-                        onSelect: onClearCache,
-                        effects: _kStadiumEffect,
-                        child: FilledButton.tonalIcon(
-                          onPressed: onClearCache,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry connection'),
-                        ),
-                      ),
-                      DpadFocusable(
-                        onSelect: onDisconnect,
-                        effects: _kStadiumEffect,
-                        child: FilledButton.tonalIcon(
-                          onPressed: onDisconnect,
-                          icon: const Icon(Icons.settings),
-                          label: const Text('Edit server settings'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
 
-          // ── Viewer ────────────────────────────────────────────────────────
-          if (activeViewer != null) ...[
-            _SettingsSection(
-              title: 'Active Viewer',
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: Text(
-                      activeViewer!.name.isNotEmpty
-                          ? activeViewer!.name[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(color: theme.colorScheme.onPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activeViewer!.name,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        if (activeViewer!.isAdmin)
-                          Text(
-                            'Admin',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  DpadFocusable(
-                    onSelect: () => _openViewerManagement(context),
-                    effects: _kStadiumEffect,
-                    child: FilledButton.tonal(
-                      onPressed: () => _openViewerManagement(context),
-                      child: const Text('Manage Viewers'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
+          if (_tab == _SettingsTab.general) ...[
+            _buildGeneralTab(context),
+          ] else ...[
+            _buildIntegrationsTab(context),
           ],
-
-          // ── Cache ─────────────────────────────────────────────────────────
-          _SettingsSection(
-            title: 'Content Cache',
-            subtitle:
-                'Cached content loads instantly. Data refreshes automatically in the background.',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (epgRefreshOptions.isNotEmpty &&
-                    epgRefreshInterval != null) ...[
-                  Text(
-                    'EPG refresh interval',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: epgRefreshOptions.map((d) {
-                      return _IntervalChip(
-                        label: _intervalLabel(d),
-                        isSelected: d == epgRefreshInterval,
-                        onTap: () => onEpgIntervalChanged?.call(d),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  child: DpadFocusable(
-                    autofocus: epgRefreshOptions.isEmpty,
-                    onSelect: onClearCache,
-                    effects: _kStadiumEffect,
-                    child: FilledButton.tonalIcon(
-                      onPressed: onClearCache,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Clear Cache & Refresh'),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ── Account ───────────────────────────────────────────────────────
-          _SettingsSection(
-            title: 'Account',
-            child: SizedBox(
-              width: double.infinity,
-              child: DpadFocusable(
-                onSelect: onDisconnect,
-                effects: _kStadiumEffect,
-                child: FilledButton(
-                  onPressed: onDisconnect,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error,
-                    foregroundColor: theme.colorScheme.onError,
-                  ),
-                  child: const Text('Disconnect'),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
+
+  Widget _buildGeneralTab(BuildContext context) {
+    final theme = Theme.of(context);
+    final auth = widget.authNotifier.authResponse;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Connection ──────────────────────────────────────────────────────
+        _SettingsSection(
+          title: 'Connection',
+          child: Column(
+            children: [
+              const _StatusRow(
+                label: 'Status',
+                value: 'Connected',
+                valueColor: Colors.green,
+              ),
+              if (widget.sourceLabel != null) ...[
+                const Divider(),
+                _StatusRow(label: 'Source', value: widget.sourceLabel!),
+              ],
+              if (auth != null) ...[
+                const Divider(),
+                _StatusRow(
+                  label: 'm3u-editor',
+                  value: auth.m3uEditorVersion ?? 'Unknown',
+                ),
+              ],
+              if (widget.sourceError != null &&
+                  widget.sourceError!.isNotEmpty) ...[
+                const Divider(),
+                _StatusRow(
+                  label: 'Last error',
+                  value: widget.sourceError!,
+                  valueColor: theme.colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    DpadFocusable(
+                      onSelect: widget.onClearCache,
+                      effects: _kStadiumEffect,
+                      child: FilledButton.tonalIcon(
+                        onPressed: widget.onClearCache,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry connection'),
+                      ),
+                    ),
+                    DpadFocusable(
+                      onSelect: widget.onDisconnect,
+                      effects: _kStadiumEffect,
+                      child: FilledButton.tonalIcon(
+                        onPressed: widget.onDisconnect,
+                        icon: const Icon(Icons.settings),
+                        label: const Text('Edit server settings'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Viewer ──────────────────────────────────────────────────────────
+        if (widget.activeViewer != null) ...[
+          _SettingsSection(
+            title: 'Active Viewer',
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: theme.colorScheme.primary,
+                  child: Text(
+                    widget.activeViewer!.name.isNotEmpty
+                        ? widget.activeViewer!.name[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(color: theme.colorScheme.onPrimary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.activeViewer!.name,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      if (widget.activeViewer!.isAdmin)
+                        Text(
+                          'Admin',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                DpadFocusable(
+                  onSelect: () => _openViewerManagement(context),
+                  effects: _kStadiumEffect,
+                  child: FilledButton.tonal(
+                    onPressed: () => _openViewerManagement(context),
+                    child: const Text('Manage Viewers'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // ── Cache ────────────────────────────────────────────────────────────
+        _SettingsSection(
+          title: 'Content Cache',
+          subtitle:
+              'Cached content loads instantly. Data refreshes automatically in the background.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.epgRefreshOptions.isNotEmpty &&
+                  widget.epgRefreshInterval != null) ...[
+                Text(
+                  'EPG refresh interval',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: widget.epgRefreshOptions.map((d) {
+                    return _IntervalChip(
+                      label: _intervalLabel(d),
+                      isSelected: d == widget.epgRefreshInterval,
+                      onTap: () => widget.onEpgIntervalChanged?.call(d),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: DpadFocusable(
+                  autofocus: widget.epgRefreshOptions.isEmpty,
+                  onSelect: _handleClearCache,
+                  effects: _kStadiumEffect,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _handleClearCache,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Clear Cache & Refresh'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Account ──────────────────────────────────────────────────────────
+        _SettingsSection(
+          title: 'Account',
+          child: SizedBox(
+            width: double.infinity,
+            child: DpadFocusable(
+              onSelect: _handleDisconnect,
+              effects: _kStadiumEffect,
+              child: FilledButton(
+                onPressed: _handleDisconnect,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error,
+                  foregroundColor: theme.colorScheme.onError,
+                ),
+                child: const Text('Disconnect'),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIntegrationsTab(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SettingsSection(
+          title: 'Watch History',
+          subtitle:
+              'Sync your watch history with Trakt to track progress across apps and services.',
+          child: ListenableBuilder(
+            listenable: widget.traktService,
+            builder: (context, _) =>
+                _TraktCard(traktService: widget.traktService),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trakt integration card
+// ---------------------------------------------------------------------------
+
+class _TraktCard extends StatelessWidget {
+  const _TraktCard({required this.traktService});
+
+  final TraktService traktService;
+
+  static Widget get _logo => SvgPicture.asset(
+    'assets/icons/trakt-logo.svg',
+    height: 40,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final body = !traktService.isConfigured
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Trakt client credentials are not configured.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Register an app at trakt.tv/oauth/applications and set the '
+                'client ID and secret via --dart-define at build time.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          )
+        : switch (traktService.status) {
+            TraktAuthStatus.disconnected => _TraktDisconnected(
+              traktService: traktService,
+            ),
+            TraktAuthStatus.pending => _TraktPending(
+              traktService: traktService,
+            ),
+            TraktAuthStatus.connected => _TraktConnected(
+              traktService: traktService,
+            ),
+          };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _logo,
+        const SizedBox(height: 16),
+        body,
+      ],
+    );
+  }
+}
+
+class _TraktDisconnected extends StatelessWidget {
+  const _TraktDisconnected({required this.traktService});
+
+  final TraktService traktService;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Connect your Trakt account to automatically track what you watch.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: DpadFocusable(
+            autofocus: true,
+            onSelect: traktService.startDeviceAuth,
+            effects: _kStadiumEffect,
+            child: FilledButton.icon(
+              onPressed: traktService.startDeviceAuth,
+              icon: const Icon(Icons.link),
+              label: const Text('Connect with Trakt'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TraktPending extends StatelessWidget {
+  const _TraktPending({required this.traktService});
+
+  final TraktService traktService;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final pending = traktService.pending;
+
+    final url = pending?.verificationUrl ?? 'https://trakt.tv/activate';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Instructions + code
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'On your phone or computer, go to:',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                url,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Then enter this code:', style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  pending?.userCode ?? '––––––',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 8,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Waiting for authorization…',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        // QR code + cancel
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: QrImageView(
+                data: url,
+                size: 140,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Scan to open on your phone',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DpadFocusable(
+              autofocus: true,
+              onSelect: traktService.cancelAuth,
+              effects: _kStadiumEffect,
+              child: FilledButton.tonal(
+                onPressed: traktService.cancelAuth,
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TraktConnected extends StatelessWidget {
+  const _TraktConnected({required this.traktService});
+
+  final TraktService traktService;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(Icons.check_circle, color: theme.colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Connected to Trakt',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        DpadFocusable(
+          autofocus: true,
+          onSelect: traktService.disconnect,
+          effects: _kStadiumEffect,
+          child: FilledButton.tonal(
+            onPressed: traktService.disconnect,
+            child: const Text('Disconnect Trakt'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Confirm dialog helper
+// ---------------------------------------------------------------------------
+
+Future<bool> _showConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  bool isDestructive = false,
+}) async {
+  final theme = Theme.of(context);
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => Dialog(
+      child: SizedBox(
+        width: 480,
+        child: DpadRegion(
+          memoryKey: 'confirm-dialog',
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: theme.textTheme.titleLarge),
+                const SizedBox(height: 12),
+                Text(message, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    DpadFocusable(
+                      onSelect: () => Navigator.pop(ctx, false),
+                      effects: _kStadiumEffect,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    DpadFocusable(
+                      autofocus: true,
+                      onSelect: () => Navigator.pop(ctx, true),
+                      effects: _kStadiumEffect,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: isDestructive
+                            ? FilledButton.styleFrom(
+                                backgroundColor: theme.colorScheme.error,
+                                foregroundColor: theme.colorScheme.onError,
+                              )
+                            : null,
+                        child: Text(confirmLabel),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  return result ?? false;
 }
 
 // ---------------------------------------------------------------------------
@@ -627,7 +1036,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                 const SizedBox(height: 16),
 
                 if (_showAddForm) ...[
-                  // ── Add viewer form ──────────────────────────────────────
+                  // ── Add viewer form ────────────────────────────────────────
                   TextField(
                     controller: _nameController,
                     autofocus: true,
@@ -680,7 +1089,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     ],
                   ),
                 ] else ...[
-                  // ── Active viewer ────────────────────────────────────────
+                  // ── Active viewer ──────────────────────────────────────────
                   Text(
                     'Active Viewer',
                     style: theme.textTheme.labelLarge?.copyWith(
@@ -690,7 +1099,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                   const SizedBox(height: 8),
                   _ViewerRow(viewer: widget.activeViewer, isActive: true),
 
-                  // ── Switch viewer list ───────────────────────────────────
+                  // ── Switch viewer list ─────────────────────────────────────
                   if (others.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     const Divider(),
@@ -728,7 +1137,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     ),
                   ],
 
-                  // ── Add new viewer ───────────────────────────────────────
+                  // ── Add new viewer ─────────────────────────────────────────
                   if (widget.onCreateViewer != null) ...[
                     const SizedBox(height: 16),
                     const Divider(),

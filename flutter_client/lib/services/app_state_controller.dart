@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -53,6 +54,7 @@ class AppStateController extends ChangeNotifier {
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
       m3uParser: m3uParser ?? M3UParser(),
+      traktService: TraktService(storage: resolvedSecureStorage),
     );
   }
 
@@ -66,6 +68,7 @@ class AppStateController extends ChangeNotifier {
     required this.viewerService,
     required this.epgService,
     required this.m3uParser,
+    required this.traktService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -86,6 +89,7 @@ class AppStateController extends ChangeNotifier {
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
+  final TraktService traktService;
 
   AppSourceType _sourceType = AppSourceType.none;
   bool _isBootstrapping = false;
@@ -125,6 +129,7 @@ class AppStateController extends ChangeNotifier {
     _isBootstrapping = true;
     _error = null;
     notifyListeners();
+    unawaited(traktService.init());
 
     final savedIntervalRaw = await secureStorage.read(_epgIntervalKey);
     if (savedIntervalRaw != null) {
@@ -287,6 +292,22 @@ class AppStateController extends ChangeNotifier {
     final viewer = _activeViewer;
     if (viewer != null) {
       _progressList = await resumeService.all(viewer.ulid);
+    }
+    notifyListeners();
+  }
+
+  void updateProgressEntry(Progress updated) {
+    final idx = _progressList.indexWhere(
+      (p) =>
+          p.contentType == updated.contentType &&
+          p.streamId == updated.streamId,
+    );
+    if (idx >= 0) {
+      final next = List<Progress>.of(_progressList);
+      next[idx] = updated;
+      _progressList = next;
+    } else {
+      _progressList = [updated, ..._progressList];
     }
     notifyListeners();
   }
@@ -456,13 +477,9 @@ class AppStateController extends ChangeNotifier {
           }
           return r;
         }(),
-      // Include local-only entries (e.g. M3U source, or server not yet synced).
-      for (final l in local)
-        if (!remote.any(
-          (r) => r.contentType == l.contentType && r.streamId == l.streamId,
-        ))
-          l,
     ];
+    // Remote is authoritative for which entries exist. Local-only entries
+    // (cleared on the server) are excluded so ghost cards don't reappear.
 
     // Persist the merged list so future local reads are up to date.
     for (final p in result) {
