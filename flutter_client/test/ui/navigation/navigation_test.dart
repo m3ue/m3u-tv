@@ -395,6 +395,7 @@ void main() {
       ),
     );
     await _pumpAppFrame(tester);
+    await _waitForText(tester, 'Resume Route Movie');
 
     await tester.tap(find.text('Resume Route Movie'));
     await tester.pump();
@@ -740,6 +741,13 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+}
+
+Future<void> _waitForText(WidgetTester tester, String text) async {
+  for (var i = 0; i < 10; i += 1) {
+    await _pumpAppFrame(tester);
+    if (find.text(text).evaluate().isNotEmpty) return;
+  }
 }
 
 /// Test app that wraps AppShell with a controlled device type.
