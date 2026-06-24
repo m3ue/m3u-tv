@@ -34,7 +34,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   mockito: ^5.4.4
-  very_good_analysis: ^10.2.0
+  very_good_analysis: ^10.3.0
 
 flutter:
   uses-material-design: true
