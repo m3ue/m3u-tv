@@ -435,37 +435,37 @@ class Progress {
   final String? genre;
   final String? year;
 
-  factory Progress.fromJson(Map<String, Object?> json, {String? viewerId}) =>
-      Progress(
-        viewerId: viewerId ?? '${json['viewer_id'] ?? ''}',
-        contentType: contentTypeFromWire('${json['content_type'] ?? 'vod'}'),
-        streamId: _asInt(json['stream_id']),
-        positionSeconds: _asInt(json['position_seconds']),
-        durationSeconds: json.containsKey('duration_seconds')
-            ? _asInt(json['duration_seconds'])
-            : null,
-        completed: json['completed'] == true || json['completed'] == 1,
-        seriesId: json.containsKey('series_id')
-            ? _asInt(json['series_id'])
-            : null,
-        seasonNumber: json.containsKey('season_number')
-            ? _asInt(json['season_number'])
-            : null,
-        episodeNumber: json.containsKey('episode_number')
-            ? _asInt(json['episode_number'])
-            : null,
-        title: json['title'] as String?,
-        episodeTitle: json['episode_title'] as String?,
-        seriesName: json['series_name'] as String?,
-        thumbnailUrl: json['thumbnail_url'] as String?,
-        backdropUrl: json['backdrop_url'] as String?,
-        rating: json['rating'] != null ? '${json['rating']}' : null,
-        runtime: json['runtime'] as String?,
-        tmdbId: json.containsKey('tmdb_id') ? _asIntOrNull(json['tmdb_id']) : null,
-        plot: json['plot'] as String?,
-        genre: json['genre'] as String?,
-        year: json['year'] != null ? '${json['year']}' : null,
-      );
+  factory Progress.fromJson(
+    Map<String, Object?> json, {
+    String? viewerId,
+  }) => Progress(
+    viewerId: viewerId ?? '${json['viewer_id'] ?? ''}',
+    contentType: contentTypeFromWire('${json['content_type'] ?? 'vod'}'),
+    streamId: _asInt(json['stream_id']),
+    positionSeconds: _asInt(json['position_seconds']),
+    durationSeconds: json.containsKey('duration_seconds')
+        ? _asInt(json['duration_seconds'])
+        : null,
+    completed: json['completed'] == true || json['completed'] == 1,
+    seriesId: json.containsKey('series_id') ? _asInt(json['series_id']) : null,
+    seasonNumber: json.containsKey('season_number')
+        ? _asInt(json['season_number'])
+        : null,
+    episodeNumber: json.containsKey('episode_number')
+        ? _asInt(json['episode_number'])
+        : null,
+    title: json['title'] as String?,
+    episodeTitle: json['episode_title'] as String?,
+    seriesName: json['series_name'] as String?,
+    thumbnailUrl: json['thumbnail_url'] as String?,
+    backdropUrl: json['backdrop_url'] as String?,
+    rating: json['rating'] != null ? '${json['rating']}' : null,
+    runtime: json['runtime'] as String?,
+    tmdbId: json.containsKey('tmdb_id') ? _asIntOrNull(json['tmdb_id']) : null,
+    plot: json['plot'] as String?,
+    genre: json['genre'] as String?,
+    year: json['year'] != null ? '${json['year']}' : null,
+  );
 
   Map<String, Object?> toJson() => {
     'viewer_id': viewerId,

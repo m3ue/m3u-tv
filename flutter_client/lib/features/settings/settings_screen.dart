@@ -470,6 +470,31 @@ class _ConnectedViewState extends State<_ConnectedView> {
                   value: widget.sourceError!,
                   valueColor: theme.colorScheme.error,
                 ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    DpadFocusable(
+                      onSelect: widget.onClearCache,
+                      effects: _kStadiumEffect,
+                      child: FilledButton.tonalIcon(
+                        onPressed: widget.onClearCache,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry connection'),
+                      ),
+                    ),
+                    DpadFocusable(
+                      onSelect: widget.onDisconnect,
+                      effects: _kStadiumEffect,
+                      child: FilledButton.tonalIcon(
+                        onPressed: widget.onDisconnect,
+                        icon: const Icon(Icons.settings),
+                        label: const Text('Edit server settings'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ],
           ),
