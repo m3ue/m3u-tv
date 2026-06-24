@@ -19,6 +19,7 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 void main() {
@@ -295,6 +296,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(capturedArgs?.epgChannelId, 'Route News');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Home continue watching uses portrait cards without stream IDs', (
+    tester,
+  ) async {
+    final appState = _testAppState(
+      xtreamService: _NavigationXtreamService(
+        recentlyWatched: const <Progress>[
+          Progress(
+            viewerId: 'viewer-1',
+            contentType: ContentType.vod,
+            streamId: 201,
+            positionSeconds: 91,
+            durationSeconds: 600,
+          ),
+        ],
+      ),
+    );
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.tv, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Continue Watching'), findsOneWidget);
+    expect(find.text('Resume Route Movie'), findsOneWidget);
+    expect(find.text('Stream 201'), findsNothing);
+
+    final cardFinder = find.ancestor(
+      of: find.text('Resume Route Movie'),
+      matching: find.byType(MediaPreviewCard),
+    );
+    expect(cardFinder, findsOneWidget);
+    final cardSize = tester.getSize(cardFinder);
+    expect(cardSize.height, greaterThan(cardSize.width));
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

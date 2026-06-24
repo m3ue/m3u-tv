@@ -1091,7 +1091,7 @@ class _HomeScreen extends StatelessWidget {
       title: 'Continue Watching',
       emptyLabel: 'No Continue Watching available',
       items: continueWatchingItems,
-      landscapeStyle: true,
+      posterStyle: true,
       onSidebarActivate: onSidebarActivate,
     );
     final liveSection = MediaPreviewSection(
@@ -1178,24 +1178,33 @@ class _HomeScreen extends StatelessWidget {
         !progress.completed;
   }
 
+  double? _resumeProgressFraction(Progress progress) {
+    final duration = progress.durationSeconds;
+    if (duration == null || duration <= 0) {
+      return null;
+    }
+    return (progress.positionSeconds / duration).clamp(0.0, 1.0);
+  }
+
+  String? _resumeProgressSubtitle(Progress progress) {
+    final fraction = _resumeProgressFraction(progress);
+    if (fraction == null) {
+      return null;
+    }
+    final percent = (fraction * 100).round().clamp(1, 99);
+    return '$percent% watched';
+  }
+
   MediaPreviewItem? _resumePreviewItem(Progress progress) {
     if (progress.contentType == ContentType.vod) {
       // Use enriched API data when available.
       if (progress.title != null) {
-        final hasBackdrop = progress.backdropUrl != null;
-        final fraction =
-            (progress.durationSeconds != null && progress.durationSeconds! > 0)
-            ? (progress.positionSeconds / progress.durationSeconds!).clamp(
-                0.0,
-                1.0,
-              )
-            : null;
+        final fraction = _resumeProgressFraction(progress);
         return MediaPreviewItem(
           title: progress.title!,
-          imageUrl: progress.backdropUrl ?? progress.thumbnailUrl,
+          imageUrl: progress.thumbnailUrl ?? progress.backdropUrl,
+          subtitle: _resumeProgressSubtitle(progress),
           fallbackIcon: Icons.movie,
-          imageFit: hasBackdrop ? BoxFit.cover : BoxFit.contain,
-          imageBackgroundColor: hasBackdrop ? null : Colors.black,
           fallbackTitle: progress.title,
           progressFraction: fraction,
           overlayBadges: <String>[
@@ -1213,11 +1222,10 @@ class _HomeScreen extends StatelessWidget {
       return MediaPreviewItem(
         title: 'Resume ${item.name}',
         imageUrl: item.logoUrl,
-        subtitle: 'Stream ${progress.streamId}',
-        fallbackIcon: Icons.play_circle_outline,
-        imageFit: BoxFit.contain,
-        imageBackgroundColor: Colors.black,
+        subtitle: _resumeProgressSubtitle(progress),
+        fallbackIcon: Icons.movie,
         fallbackTitle: item.name,
+        progressFraction: _resumeProgressFraction(progress),
         onTap: () => onProgressSelect(progress),
       );
     }
@@ -1228,13 +1236,7 @@ class _HomeScreen extends StatelessWidget {
       if (progress.seriesId != null &&
           (progress.seriesName != null || progress.title != null)) {
         final displayTitle = progress.seriesName ?? progress.title!;
-        final fraction =
-            (progress.durationSeconds != null && progress.durationSeconds! > 0)
-            ? (progress.positionSeconds / progress.durationSeconds!).clamp(
-                0.0,
-                1.0,
-              )
-            : null;
+        final fraction = _resumeProgressFraction(progress);
         final episodeSubtitle =
             progress.episodeTitle ??
             (progress.seasonNumber != null
