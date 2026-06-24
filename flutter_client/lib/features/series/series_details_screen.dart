@@ -460,7 +460,6 @@ class _SeasonChipsState extends State<_SeasonChips> {
       onPointerSignal: _handlePointerSignal,
       child: Scrollbar(
         controller: _controller,
-        thumbVisibility: true,
         child: SingleChildScrollView(
           controller: _controller,
           scrollDirection: Axis.horizontal,

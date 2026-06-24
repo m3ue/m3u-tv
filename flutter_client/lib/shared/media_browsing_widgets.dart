@@ -302,7 +302,6 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
                   onPointerSignal: _handlePointerSignal,
                   child: Scrollbar(
                     controller: _controller,
-                    thumbVisibility: true,
                     child: ListView.separated(
                       controller: _controller,
                       scrollDirection: Axis.horizontal,
