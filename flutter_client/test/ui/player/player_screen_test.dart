@@ -945,6 +945,61 @@ void main() {
       expect(adapter.seekCalls, <Duration>[const Duration(seconds: 47)]);
     });
 
+    testWidgets('reports VOD progress immediately when seeking', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final reports = <Progress>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/movie.mkv',
+              title: 'Progress Fixture',
+              type: 'vod',
+              streamId: 201,
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+            viewerId: 'viewer-1',
+            progressReporter: reports.add,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+          duration: Duration(minutes: 10),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+
+      expect(adapter.seekCalls.last, const Duration(seconds: 10));
+      expect(reports, hasLength(1));
+      expect(reports.single.viewerId, 'viewer-1');
+      expect(reports.single.contentType, ContentType.vod);
+      expect(reports.single.streamId, 201);
+      expect(reports.single.positionSeconds, 10);
+      expect(reports.single.durationSeconds, 600);
+    });
+
     testWidgets(
       'preserves reported source aspect ratio for the video surface',
       (
