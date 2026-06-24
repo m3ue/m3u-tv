@@ -451,6 +451,65 @@ void main() {
     },
   );
 
+  testWidgets(
+    'selecting started movie from app shell opens details with continue action',
+    (tester) async {
+      PlayerArgs? capturedArgs;
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          recentlyWatched: const <Progress>[
+            Progress(
+              viewerId: 'viewer-1',
+              contentType: ContentType.vod,
+              streamId: 201,
+              positionSeconds: 91,
+              durationSeconds: 600,
+              title: 'Route Movie',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          playerRouteBuilder: (args) {
+            capturedArgs = args;
+            return _testPlayerRoute(args);
+          },
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(_sidebarText('Movies'));
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route Movie').last);
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Continue movie'), findsOneWidget);
+      await tester.tap(find.text('Continue movie'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Player route: Route Movie'), findsOneWidget);
+      expect(capturedArgs?.startPosition, 91.0);
+      expect(
+        capturedArgs?.toPlaybackSource().startPosition,
+        const Duration(seconds: 91),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('selecting series from app shell opens series details route', (
     tester,
   ) async {

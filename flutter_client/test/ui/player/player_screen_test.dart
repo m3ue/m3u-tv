@@ -908,6 +908,43 @@ void main() {
       expect(texture.textureId, 42);
     });
 
+    testWidgets('seeks to resume position after backend load', (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/movie.mkv',
+              title: 'Resume Fixture',
+              type: 'vod',
+              startPosition: 47,
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        adapter.loadCalls.single.startPosition,
+        const Duration(seconds: 47),
+      );
+      expect(adapter.seekCalls, <Duration>[const Duration(seconds: 47)]);
+    });
+
     testWidgets(
       'preserves reported source aspect ratio for the video surface',
       (

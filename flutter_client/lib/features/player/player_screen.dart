@@ -165,11 +165,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final source = widget.args.toPlaybackSource();
 
-    unawaited(
-      widget.orchestrator.open(source).catchError((Object error) {
-        if (!_disposed && mounted) _setErrorMessage(error.toString());
-      }),
-    );
+    unawaited(_openAndSeek(source));
+  }
+
+  Future<void> _openAndSeek(PlaybackSource source) async {
+    try {
+      await widget.orchestrator.open(source);
+      if (_disposed || !mounted || source.isLive) return;
+      if (source.startPosition > Duration.zero) {
+        await widget.orchestrator.seek(source.startPosition);
+      }
+    } on Object catch (error) {
+      if (!_disposed && mounted) _setErrorMessage(error.toString());
+    }
   }
 
   void _startLoadingTimeout() {
