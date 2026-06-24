@@ -19,6 +19,8 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 void main() {
@@ -298,9 +300,10 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('selecting Home continue watching movie opens player route', (
+  testWidgets('selecting Home continue watching movie resumes saved position', (
     tester,
   ) async {
+    PlayerArgs? capturedArgs;
     final appState = _testAppState(
       xtreamService: _NavigationXtreamService(
         recentlyWatched: const <Progress>[
@@ -310,6 +313,7 @@ void main() {
             streamId: 201,
             positionSeconds: 91,
             durationSeconds: 600,
+            title: 'Resume Route Movie',
           ),
         ],
       ),
@@ -324,24 +328,94 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _TestApp(deviceType: DeviceType.tv, appState: appState),
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        playerRouteBuilder: (args) {
+          capturedArgs = args;
+          return _testPlayerRoute(args);
+        },
+      ),
     );
     await _pumpAppFrame(tester);
 
-    // CW card uses the legacy VOD-list lookup when progress has no title yet.
-    expect(find.text('Route Movie'), findsAtLeastNWidgets(1));
+    // Continue Watching card uses enriched progress metadata when available.
+    expect(find.text('Resume Route Movie'), findsAtLeast(1));
 
-    await tester.tap(find.text('Route Movie').last);
+    await tester.tap(_mediaPreviewCardWithText('Resume Route Movie'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     // Resume modal lets the user choose to resume from saved position or restart.
     expect(find.text('Resume Watching'), findsOneWidget);
-    await tester.tap(find.text('Resume'));
+    await tester.tap(_dpadInkWellWithText('Continue'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Player route: Route Movie'), findsOneWidget);
+    expect(find.text('Player route: Resume Route Movie'), findsOneWidget);
+    expect(capturedArgs?.startPosition, 91.0);
+    expect(
+      capturedArgs?.toPlaybackSource().startPosition,
+      const Duration(seconds: 91),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('start from beginning clears saved resume position', (
+    tester,
+  ) async {
+    PlayerArgs? capturedArgs;
+    final appState = _testAppState(
+      xtreamService: _NavigationXtreamService(
+        recentlyWatched: const <Progress>[
+          Progress(
+            viewerId: 'viewer-1',
+            contentType: ContentType.vod,
+            streamId: 201,
+            positionSeconds: 91,
+            durationSeconds: 600,
+            title: 'Resume Route Movie',
+          ),
+        ],
+      ),
+    );
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        playerRouteBuilder: (args) {
+          capturedArgs = args;
+          return _testPlayerRoute(args);
+        },
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await _waitForText(tester, 'Resume Route Movie');
+
+    await tester.tap(_mediaPreviewCardWithText('Resume Route Movie'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Resume Watching'), findsOneWidget);
+    await tester.tap(find.text('Start from Beginning'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Resume Route Movie'), findsOneWidget);
+    expect(capturedArgs?.startPosition, isNull);
+    expect(
+      capturedArgs?.toPlaybackSource().startPosition,
+      Duration.zero,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -373,6 +447,110 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Player route: Route Movie'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'open movie details updates to continue when progress changes behind route',
+    (tester) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(_sidebarText('Movies'));
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route Movie').last);
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Play movie'), findsOneWidget);
+      expect(find.text('Continue movie'), findsNothing);
+
+      await appState.resumeService.save(
+        Progress(
+          viewerId: appState.activeViewer!.ulid,
+          contentType: ContentType.vod,
+          streamId: 201,
+          positionSeconds: 43 * 60 + 13,
+          durationSeconds: 6480,
+          title: 'Route Movie',
+        ),
+      );
+      await appState.refreshLocalState();
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Continue movie'), findsOneWidget);
+      expect(find.text('Play movie'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'selecting started movie from app shell opens details with continue action',
+    (tester) async {
+      PlayerArgs? capturedArgs;
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          recentlyWatched: const <Progress>[
+            Progress(
+              viewerId: 'viewer-1',
+              contentType: ContentType.vod,
+              streamId: 201,
+              positionSeconds: 91,
+              durationSeconds: 600,
+              title: 'Route Movie',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          playerRouteBuilder: (args) {
+            capturedArgs = args;
+            return _testPlayerRoute(args);
+          },
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(_sidebarText('Movies'));
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route Movie').last);
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Continue movie'), findsOneWidget);
+      await tester.tap(find.text('Continue movie'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Player route: Route Movie'), findsOneWidget);
+      expect(capturedArgs?.startPosition, 91.0);
+      expect(
+        capturedArgs?.toPlaybackSource().startPosition,
+        const Duration(seconds: 91),
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -657,6 +835,20 @@ Finder _sidebarText(String label) {
   );
 }
 
+Finder _mediaPreviewCardWithText(String text) {
+  return find.ancestor(
+    of: find.text(text).first,
+    matching: find.byType(MediaPreviewCard),
+  );
+}
+
+Finder _dpadInkWellWithText(String text) {
+  return find.ancestor(
+    of: find.text(text).first,
+    matching: find.byType(DpadInkWell),
+  );
+}
+
 Future<void> _expandSidebar(WidgetTester tester) async {
   final finder = find.descendant(
     of: find.byType(NavigationSidebar),
@@ -671,6 +863,15 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+}
+
+Future<void> _waitForText(WidgetTester tester, String text) async {
+  final finder = find.text(text);
+  for (var i = 0; i < 60; i += 1) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (finder.evaluate().isNotEmpty) return;
+  }
+  expect(finder, findsOneWidget);
 }
 
 /// Test app that wraps AppShell with a controlled device type.

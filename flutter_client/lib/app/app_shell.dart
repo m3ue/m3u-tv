@@ -852,6 +852,8 @@ class _ContentNavigator extends StatelessWidget {
       playerRouteBuilder: playerRouteBuilder,
       onOpenPlayer: onOpenPlayer,
       progressList: appState.progressList,
+      progressListenable: appState,
+      progressListProvider: () => appState.progressList,
     );
 
     return Navigator(

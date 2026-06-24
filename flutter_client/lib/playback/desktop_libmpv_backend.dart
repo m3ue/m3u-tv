@@ -42,7 +42,13 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> load(PlaybackSource source) async {
-    _emit(_state.copyWith(status: PlaybackStatus.loading, source: source));
+    _emit(
+      _state.copyWith(
+        status: PlaybackStatus.loading,
+        source: source,
+        position: source.startPosition,
+      ),
+    );
     final response = await _channel.invokeMapMethod<String, Object?>('load', {
       'uri': source.uri,
       'title': source.title,
@@ -80,6 +86,7 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       _state.copyWith(
         status: PlaybackStatus.ready,
         source: source,
+        position: source.startPosition,
         videoAspectRatio: initialAspectRatio,
       ),
     );

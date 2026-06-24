@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Shows a resume/start-over dialog before opening a VOD or Series episode.
@@ -53,35 +54,42 @@ class _ResumeModal extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 20),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: colorScheme.primary,
-                          child: Icon(
-                            Icons.play_arrow,
-                            color: colorScheme.onPrimary,
+                DpadInkWell(
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop(positionSeconds.toDouble()),
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: colorScheme.primary,
+                            child: Icon(
+                              Icons.play_arrow,
+                              color: colorScheme.onPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Continue',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            Text(
-                              'From ${formatTime(Duration(seconds: positionSeconds))}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Continue',
+                                style: theme.textTheme.titleMedium,
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              Text(
+                                'From ${formatTime(Duration(seconds: positionSeconds))}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

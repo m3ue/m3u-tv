@@ -94,6 +94,47 @@ void main() {
       },
     );
 
+    test('Xtream progress is visible before EPG refresh finishes', () async {
+      final storage = InMemorySecureStorage();
+      final epgGate = Completer<Object?>();
+      final controller = _controller(
+        storage: storage,
+        transport: _FakeXtreamTransport.success()
+            .withResponse('get_recently_watched', <Map<String, Object?>>[
+              <String, Object?>{
+                'content_type': 'vod',
+                'stream_id': 201,
+                'position_seconds': 91,
+                'duration_seconds': 600,
+                'title': 'Big Buck Bunny',
+              },
+            ])
+            .withResponse('get_epg_batch', epgGate.future)
+            .call,
+      );
+      addTearDown(controller.dispose);
+
+      final connect = controller.connectXtream(
+        const UserCredentials(
+          server: 'https://fixture.example',
+          username: 'fixture-user',
+          password: 'fixture-password',
+        ),
+      );
+      for (var pumpCount = 0; pumpCount < 10; pumpCount += 1) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(controller.vodItems.single.name, 'Big Buck Bunny');
+      expect(controller.activeViewer?.ulid, 'viewer-admin');
+      expect(controller.progressList.single.positionSeconds, 91);
+
+      epgGate.complete(
+        _FakeXtreamTransport.success().responses['get_epg_batch'],
+      );
+      expect(await connect, isTrue);
+    });
+
     testWidgets(
       'saved_source boots connected app state without constructor fixtures',
       (tester) async {

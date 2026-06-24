@@ -139,12 +139,7 @@ class MediaKitDesktopAdapter
   @override
   Future<void> load(PlaybackSource source) async {
     _emit(_state.copyWith(status: PlaybackStatus.loading, source: source));
-    await _player.open(
-      mk.Media(
-        source.uri,
-        httpHeaders: source.headers.isEmpty ? null : source.headers,
-      ),
-    );
+    await _player.open(mediaKitMediaFromPlaybackSource(source));
   }
 
   @override
@@ -204,6 +199,14 @@ class MediaKitDesktopAdapter
     _state = state;
     if (!_stateController.isClosed) _stateController.add(state);
   }
+}
+
+mk.Media mediaKitMediaFromPlaybackSource(PlaybackSource source) {
+  return mk.Media(
+    source.uri,
+    httpHeaders: source.headers.isEmpty ? null : source.headers,
+    start: source.startPosition > Duration.zero ? source.startPosition : null,
+  );
 }
 
 List<PlaybackTrack> mediaKitAudioTracksToPlaybackTracks(
