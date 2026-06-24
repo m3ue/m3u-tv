@@ -110,6 +110,12 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           'series_name': widget.seriesName,
           if (_seriesInfo?.series.tmdbId != null)
             'tmdb_id': _seriesInfo!.series.tmdbId,
+          if (_seriesInfo?.series.backdropUrl != null)
+            'backdrop_url': _seriesInfo!.series.backdropUrl,
+          if (episode.thumbnailUrl != null)
+            'thumbnail_url': episode.thumbnailUrl,
+          if (episode.rating != null) 'rating': '${episode.rating}',
+          if (episode.duration != null) 'duration': episode.duration,
         },
       ),
     );

@@ -296,6 +296,22 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateProgressEntry(Progress updated) {
+    final idx = _progressList.indexWhere(
+      (p) =>
+          p.contentType == updated.contentType &&
+          p.streamId == updated.streamId,
+    );
+    if (idx >= 0) {
+      final next = List<Progress>.of(_progressList);
+      next[idx] = updated;
+      _progressList = next;
+    } else {
+      _progressList = [updated, ..._progressList];
+    }
+    notifyListeners();
+  }
+
   Future<bool> _replaceWithXtreamContent({required bool clearCache}) async {
     try {
       final liveCategoriesFuture = xtreamService.getLiveCategories();
@@ -461,13 +477,9 @@ class AppStateController extends ChangeNotifier {
           }
           return r;
         }(),
-      // Include local-only entries (e.g. M3U source, or server not yet synced).
-      for (final l in local)
-        if (!remote.any(
-          (r) => r.contentType == l.contentType && r.streamId == l.streamId,
-        ))
-          l,
     ];
+    // Remote is authoritative for which entries exist. Local-only entries
+    // (cleared on the server) are excluded so ghost cards don't reappear.
 
     // Persist the merged list so future local reads are up to date.
     for (final p in result) {

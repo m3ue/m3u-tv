@@ -208,7 +208,18 @@ void main() {
         final restarted = _controller(
           storage: storage,
           localMemory: localMemory,
-          transport: _FakeXtreamTransport.success().call,
+          transport: _FakeXtreamTransport.success().withResponse(
+            'get_recently_watched',
+            <Map<String, Object?>>[
+              <String, Object?>{
+                'content_type': 'vod',
+                'stream_id': 201,
+                'position_seconds': 91,
+                'duration_seconds': 600,
+                'title': 'Big Buck Bunny',
+              },
+            ],
+          ).call,
         );
         await restarted.boot();
         await _waitForXtreamRefresh(restarted);
@@ -347,7 +358,17 @@ void main() {
         final restarted = AppStateController(
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
-            transport: _FakeXtreamTransport.success().call,
+            transport: _FakeXtreamTransport.success().withResponse(
+              'get_recently_watched',
+              <Map<String, Object?>>[
+                <String, Object?>{
+                  'content_type': 'vod',
+                  'stream_id': 201,
+                  'position_seconds': 91,
+                  'duration_seconds': 600,
+                },
+              ],
+            ).call,
           ),
         );
         await restarted.boot();
