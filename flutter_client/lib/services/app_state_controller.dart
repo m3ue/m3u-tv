@@ -319,6 +319,11 @@ class AppStateController extends ChangeNotifier {
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
 
+      final activeViewer = await viewerService.resolveActiveViewer(viewers);
+      final progress = activeViewer == null
+          ? const <Progress>[]
+          : await _loadRecentlyWatched(activeViewer.ulid);
+
       _sourceType = AppSourceType.xtream;
       _liveCategories = liveCategories;
       _vodCategories = vodCategories;
@@ -326,14 +331,13 @@ class AppStateController extends ChangeNotifier {
       _channels = channels;
       _vodItems = vodItems;
       _seriesList = seriesList;
+      _viewers = viewers;
+      _activeViewer = activeViewer;
+      _progressList = progress;
       _error = null;
       notifyListeners();
 
       await _loadXtreamEpg(channels);
-      final activeViewer = await viewerService.resolveActiveViewer(viewers);
-      final progress = activeViewer == null
-          ? const <Progress>[]
-          : await _loadRecentlyWatched(activeViewer.ulid);
 
       if (clearCache) await cacheService.clear();
       await cacheService.set('sourceType', 'xtream');

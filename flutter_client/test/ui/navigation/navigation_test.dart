@@ -19,6 +19,7 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
@@ -347,7 +348,7 @@ void main() {
 
     // Resume modal lets the user choose to resume from saved position or restart.
     expect(find.text('Resume Watching'), findsOneWidget);
-    await tester.tap(find.text('Resume'));
+    await tester.tap(_dpadInkWellWithText('Continue'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -734,6 +735,13 @@ Finder _mediaPreviewCardWithText(String text) {
   return find.ancestor(
     of: find.text(text).first,
     matching: find.byType(MediaPreviewCard),
+  );
+}
+
+Finder _dpadInkWellWithText(String text) {
+  return find.ancestor(
+    of: find.text(text).first,
+    matching: find.byType(DpadInkWell),
   );
 }
 
