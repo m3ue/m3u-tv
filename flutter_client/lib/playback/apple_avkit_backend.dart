@@ -137,6 +137,7 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
       position: event.position ?? _state.position,
       audioTracks: event.audioTracks,
       subtitleTracks: event.subtitleTracks,
+      videoAspectRatio: event.videoAspectRatio,
     );
     if (event.hasSelectedAudioTrackId) {
       nextState = nextState.copyWith(
@@ -263,6 +264,7 @@ class _AvKitEvent {
   const _AvKitEvent({
     required this.type,
     this.position,
+    this.videoAspectRatio,
     this.audioTracks,
     this.subtitleTracks,
     this.selectedAudioTrackId,
@@ -282,6 +284,14 @@ class _AvKitEvent {
     position: map['positionMs'] is num
         ? Duration(milliseconds: (map['positionMs']! as num).round())
         : null,
+    videoAspectRatio: playbackAspectRatioFromValues(
+      aspectRatio:
+          map['videoAspectRatio'] ??
+          map['displayAspectRatio'] ??
+          map['aspectRatio'],
+      width: map['videoWidth'] ?? map['width'],
+      height: map['videoHeight'] ?? map['height'],
+    ),
     audioTracks: _tracksFromMap(map['audioTracks']),
     subtitleTracks: _tracksFromMap(map['subtitleTracks']),
     selectedAudioTrackId: map['selectedAudioTrackId'] as String?,
@@ -295,6 +305,7 @@ class _AvKitEvent {
 
   final _AvKitEventType type;
   final Duration? position;
+  final double? videoAspectRatio;
   final List<PlaybackTrack>? audioTracks;
   final List<PlaybackTrack>? subtitleTracks;
   final String? selectedAudioTrackId;

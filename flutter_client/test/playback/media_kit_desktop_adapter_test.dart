@@ -68,5 +68,23 @@ void main() {
 
       expect(selectedTrackId, isNull);
     });
+
+    test('maps video params aspect ratio with display size fallback', () {
+      expect(
+        mediaKitVideoAspectRatio(
+          const mk.VideoParams(aspect: 4 / 3, w: 720, h: 576),
+        ),
+        closeTo(4 / 3, 0.0001),
+      );
+      expect(
+        mediaKitVideoAspectRatio(const mk.VideoParams(dw: 1024, dh: 576)),
+        closeTo(16 / 9, 0.0001),
+      );
+      expect(
+        mediaKitVideoAspectRatio(const mk.VideoParams(w: 720, h: 576)),
+        closeTo(1.25, 0.0001),
+      );
+      expect(mediaKitVideoAspectRatio(const mk.VideoParams()), isNull);
+    });
   });
 }

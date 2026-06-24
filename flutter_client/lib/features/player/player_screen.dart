@@ -53,6 +53,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _errorMessage;
   String? _fallbackReason;
   bool _isPlaying = false;
+  double _videoAspectRatio = 16 / 9;
 
   List<PlaybackTrack> _audioTracks = [];
   List<PlaybackTrack> _subtitleTracks = [];
@@ -212,6 +213,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _subtitleTracks = state.subtitleTracks;
       _selectedAudioTrackId = state.selectedAudioTrackId;
       _selectedSubtitleTrackId = state.selectedSubtitleTrackId;
+
+      final aspectRatio =
+          state.videoAspectRatio ?? state.source?.videoAspectRatio;
+      if (aspectRatio != null) {
+        _videoAspectRatio = aspectRatio;
+      }
 
       if (state.status == PlaybackStatus.playing) {
         _isPlaying = true;
@@ -460,6 +467,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 Positioned.fill(
                   child: _VideoSurface(
                     textureId: widget.orchestrator.activeTextureId,
+                    aspectRatio: _videoAspectRatio,
                   ),
                 ),
 
@@ -599,9 +607,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 }
 
 class _VideoSurface extends StatelessWidget {
-  const _VideoSurface({required this.textureId});
+  const _VideoSurface({required this.textureId, required this.aspectRatio});
 
   final int? textureId;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -611,7 +620,7 @@ class _VideoSurface extends StatelessWidget {
       color: Colors.black,
       child: Center(
         child: AspectRatio(
-          aspectRatio: 16 / 9,
+          aspectRatio: aspectRatio,
           child: Texture(textureId: id),
         ),
       ),

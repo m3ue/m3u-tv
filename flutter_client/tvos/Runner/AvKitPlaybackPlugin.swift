@@ -163,7 +163,11 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         switch item.status {
         case .readyToPlay:
             let posMs = currentPositionMs()
-            emit(type: s.player.rate > 0 ? "playing" : "ready", positionMs: posMs)
+            emit(
+                type: s.player.rate > 0 ? "playing" : "ready",
+                positionMs: posMs,
+                videoAspectRatio: videoAspectRatio(for: item)
+            )
         case .failed:
             let msg = item.error?.localizedDescription ?? "AVPlayer item failed"
             emit(type: "error", code: "avkit-item-failed", message: msg, recoverable: true)
@@ -188,11 +192,18 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         return seconds.isFinite ? Int64(seconds * 1000) : 0
     }
 
+    private func videoAspectRatio(for item: AVPlayerItem) -> Double? {
+        let size = item.presentationSize
+        guard size.width > 0, size.height > 0 else { return nil }
+        return Double(size.width / size.height)
+    }
+
     private func emit(
         type: String,
         textureId: Int64? = nil,
         uri: String? = nil,
         positionMs: Int64? = nil,
+        videoAspectRatio: Double? = nil,
         code: String? = nil,
         message: String? = nil,
         recoverable: Bool = false
@@ -201,6 +212,7 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         if let id = textureId  { event["textureId"]   = id       }
         if let u  = uri         { event["uri"]         = u        }
         if let p  = positionMs  { event["positionMs"]  = p        }
+        if let ar = videoAspectRatio { event["videoAspectRatio"] = ar }
         if let c  = code        { event["code"]        = c        }
         if let m  = message     { event["message"]     = m        }
         if recoverable          { event["recoverable"] = true      }
