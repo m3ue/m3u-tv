@@ -402,6 +402,9 @@ class Progress {
     this.backdropUrl,
     this.rating,
     this.runtime,
+    this.plot,
+    this.genre,
+    this.year,
   });
 
   final String viewerId;
@@ -420,6 +423,9 @@ class Progress {
   final String? backdropUrl;
   final String? rating;
   final String? runtime;
+  final String? plot;
+  final String? genre;
+  final String? year;
 
   factory Progress.fromJson(Map<String, Object?> json, {String? viewerId}) =>
       Progress(
@@ -447,6 +453,9 @@ class Progress {
         backdropUrl: json['backdrop_url'] as String?,
         rating: json['rating'] != null ? '${json['rating']}' : null,
         runtime: json['runtime'] as String?,
+        plot: json['plot'] as String?,
+        genre: json['genre'] as String?,
+        year: json['year'] != null ? '${json['year']}' : null,
       );
 
   Map<String, Object?> toJson() => {
@@ -466,6 +475,9 @@ class Progress {
     if (backdropUrl != null) 'backdrop_url': backdropUrl,
     if (rating != null) 'rating': rating,
     if (runtime != null) 'runtime': runtime,
+    if (plot != null) 'plot': plot,
+    if (genre != null) 'genre': genre,
+    if (year != null) 'year': year,
   };
 
   @override

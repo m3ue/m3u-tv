@@ -371,7 +371,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     title:
                         progress.title ??
                         args.metadata['title'] as String? ??
-                        existing?.title,
+                        args.title,
                     episodeTitle:
                         progress.episodeTitle ??
                         args.metadata['episode_title'] as String? ??
@@ -396,6 +396,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         progress.runtime ??
                         args.metadata['duration'] as String? ??
                         existing?.runtime,
+                    plot: progress.plot ?? existing?.plot,
+                    genre: progress.genre ?? existing?.genre,
+                    year: progress.year ?? existing?.year,
                   );
                   if (_appState.sourceType == AppSourceType.xtream) {
                     unawaited(
@@ -1190,14 +1193,20 @@ class _HomeScreen extends StatelessWidget {
                 1.0,
               )
             : null;
+        final plot = progress.plot;
+        final subtitle = plot != null
+            ? (plot.length > 120 ? '${plot.substring(0, 117)}…' : plot)
+            : null;
         return MediaPreviewItem(
           title: progress.title!,
+          subtitle: subtitle,
           imageUrl: progress.backdropUrl ?? progress.thumbnailUrl,
           fallbackIcon: Icons.movie,
           imageFit: hasBackdrop ? BoxFit.cover : BoxFit.contain,
           imageBackgroundColor: hasBackdrop ? null : Colors.black,
           fallbackTitle: progress.title,
           progressFraction: fraction,
+          overlayLabel: progress.year,
           overlayBadges: <String>[
             if (progress.rating != null) '★ ${progress.rating}',
             if (progress.runtime != null) progress.runtime!,
@@ -1210,14 +1219,24 @@ class _HomeScreen extends StatelessWidget {
         (item) => item.id == progress.streamId,
       );
       if (item == null) return null;
+      final fraction =
+          (progress.durationSeconds != null && progress.durationSeconds! > 0)
+          ? (progress.positionSeconds / progress.durationSeconds!).clamp(
+              0.0,
+              1.0,
+            )
+          : null;
       return MediaPreviewItem(
-        title: 'Resume ${item.name}',
+        title: item.name,
         imageUrl: item.logoUrl,
-        subtitle: 'Stream ${progress.streamId}',
-        fallbackIcon: Icons.play_circle_outline,
+        fallbackIcon: Icons.movie,
         imageFit: BoxFit.contain,
         imageBackgroundColor: Colors.black,
         fallbackTitle: item.name,
+        progressFraction: fraction,
+        overlayBadges: <String>[
+          if (item.rating != null) '★ ${item.rating!.toStringAsFixed(1)}',
+        ],
         onTap: () => onProgressSelect(progress),
       );
     }

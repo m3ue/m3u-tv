@@ -282,6 +282,7 @@ class _VodDetailsBody extends StatelessWidget {
         type: 'vod',
         streamId: item.id,
         metadata: <String, Object?>{
+          'title': details.name,
           if (details.containerExtension != null)
             'container_extension': details.containerExtension,
           if (details.duration != null) 'duration': details.duration,

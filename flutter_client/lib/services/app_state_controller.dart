@@ -425,28 +425,30 @@ class AppStateController extends ChangeNotifier {
           // Local wins if it has enrichment; remote wins otherwise so the
           // latest server position is reflected.
           if (l != null && l.title != null && l.title!.isNotEmpty) {
-            // Merge: keep enriched metadata but adopt the server's position.
-            if (r.positionSeconds != l.positionSeconds ||
-                r.completed != l.completed) {
-              return Progress(
-                viewerId: l.viewerId,
-                contentType: l.contentType,
-                streamId: l.streamId,
-                positionSeconds: r.positionSeconds,
-                durationSeconds: r.durationSeconds ?? l.durationSeconds,
-                completed: r.completed,
-                seriesId: l.seriesId ?? r.seriesId,
-                seasonNumber: l.seasonNumber ?? r.seasonNumber,
-                title: l.title,
-                episodeTitle: l.episodeTitle,
-                seriesName: l.seriesName,
-                thumbnailUrl: l.thumbnailUrl,
-                backdropUrl: l.backdropUrl,
-                rating: l.rating,
-                runtime: l.runtime,
-              );
-            }
-            return l;
+            // Always merge: keep enriched local metadata but adopt server
+            // position and fill in any fields the local entry may be missing
+            // (e.g. fields added to the API after the local entry was cached).
+            return Progress(
+              viewerId: l.viewerId,
+              contentType: l.contentType,
+              streamId: l.streamId,
+              positionSeconds: r.positionSeconds,
+              durationSeconds: r.durationSeconds ?? l.durationSeconds,
+              completed: r.completed,
+              seriesId: l.seriesId ?? r.seriesId,
+              seasonNumber: l.seasonNumber ?? r.seasonNumber,
+              episodeNumber: l.episodeNumber ?? r.episodeNumber,
+              title: l.title,
+              episodeTitle: l.episodeTitle,
+              seriesName: l.seriesName,
+              thumbnailUrl: l.thumbnailUrl,
+              backdropUrl: l.backdropUrl,
+              rating: l.rating ?? r.rating,
+              runtime: l.runtime ?? r.runtime,
+              plot: l.plot ?? r.plot,
+              genre: l.genre ?? r.genre,
+              year: l.year ?? r.year,
+            );
           }
           return r;
         }(),
