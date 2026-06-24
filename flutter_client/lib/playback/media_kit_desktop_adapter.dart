@@ -77,6 +77,15 @@ class MediaKitDesktopAdapter
         }),
       )
       ..add(
+        _player.stream.videoParams.listen((params) {
+          _emit(
+            _state.copyWith(
+              videoAspectRatio: mediaKitVideoAspectRatio(params),
+            ),
+          );
+        }),
+      )
+      ..add(
         _player.stream.tracks.listen((tracks) {
           _emit(
             _state.copyWith(
@@ -233,6 +242,14 @@ List<PlaybackTrack> mediaKitSubtitleTracksToPlaybackTracks(
         ),
       )
       .toList(growable: false);
+}
+
+double? mediaKitVideoAspectRatio(mk.VideoParams params) {
+  return playbackAspectRatioFromValues(
+    aspectRatio: params.aspect,
+    width: params.dw ?? params.w,
+    height: params.dh ?? params.h,
+  );
 }
 
 String _mediaKitTrackLabel({

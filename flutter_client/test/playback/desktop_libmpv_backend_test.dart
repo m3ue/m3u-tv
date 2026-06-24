@@ -137,6 +137,7 @@ void main() {
       expect(calls, <String>[
         'probe',
         'load',
+        'getVideoAspectRatio',
         'play',
         'pause',
         'seek',
@@ -148,6 +149,51 @@ void main() {
 
       await backend.dispose();
     });
+
+    test(
+      'polls libmpv video dimensions when load response lacks aspect ratio',
+      () async {
+        final states = <PlaybackState>[];
+        final calls = <String>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call.method);
+              switch (call.method) {
+                case 'load':
+                  return <String, Object?>{
+                    'ok': true,
+                    'handle': 77,
+                    'textureId': 7700,
+                  };
+                case 'getVideoAspectRatio':
+                  expect(call.arguments, <String, Object?>{'handle': 77});
+                  return <String, Object?>{
+                    'videoWidth': 720,
+                    'videoHeight': 576,
+                  };
+                default:
+                  return null;
+              }
+            });
+
+        final backend = DesktopLibmpvBackend(channel: channel);
+        final subscription = backend.onState.listen(states.add);
+
+        await backend.load(
+          const PlaybackSource(uri: 'https://example.test/4-3.ts'),
+        );
+        await pumpEventQueue();
+
+        expect(
+          calls,
+          containsAllInOrder(<String>['load', 'getVideoAspectRatio']),
+        );
+        expect(states.last.videoAspectRatio, 1.25);
+
+        await subscription.cancel();
+        await backend.dispose();
+      },
+    );
 
     test('windows probe reports bundled DLL diagnostics', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -261,6 +307,7 @@ void main() {
       expect(backend.textureId, isNull);
       expect(calls.map((call) => call.method), <String>[
         'load',
+        'getVideoAspectRatio',
         'play',
         'pause',
         'seek',
@@ -270,20 +317,20 @@ void main() {
         'stop',
         'dispose',
       ]);
-      expect(calls[1].arguments, <String, Object?>{'handle': 41});
-      expect(calls[3].arguments, <String, Object?>{
+      expect(calls[2].arguments, <String, Object?>{'handle': 41});
+      expect(calls[4].arguments, <String, Object?>{
         'handle': 41,
         'positionMs': 2500,
       });
-      expect(calls[4].arguments, <String, Object?>{
+      expect(calls[5].arguments, <String, Object?>{
         'handle': 41,
         'trackId': null,
       });
-      expect(calls[5].arguments, <String, Object?>{
+      expect(calls[6].arguments, <String, Object?>{
         'handle': 41,
         'trackId': '3',
       });
-      expect(calls[6].arguments, <String, Object?>{
+      expect(calls[7].arguments, <String, Object?>{
         'handle': 41,
         'speed': 0.75,
       });

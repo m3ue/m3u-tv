@@ -173,6 +173,10 @@ void main() {
 
         expect(linuxBackend, contains('char format[] = "rgba";'));
         expect(windowsBackend, contains('char format[] = "rgba";'));
+        expect(linuxBackend, contains('mpv_get_property'));
+        expect(windowsBackend, contains('mpv_get_property'));
+        expect(linuxBackend, contains('getVideoAspectRatio'));
+        expect(windowsBackend, contains('getVideoAspectRatio'));
         expect(linuxBackend, isNot(contains('char format[] = "bgra";')));
         expect(windowsBackend, isNot(contains('char format[] = "bgra";')));
       },

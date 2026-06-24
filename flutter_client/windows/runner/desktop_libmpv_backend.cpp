@@ -34,6 +34,7 @@ using mpv_create_fn = mpv_handle* (*)();
 using mpv_initialize_fn = int (*)(mpv_handle*);
 using mpv_command_fn = int (*)(mpv_handle*, const char**);
 using mpv_set_option_string_fn = int (*)(mpv_handle*, const char*, const char*);
+using mpv_get_property_fn = int (*)(mpv_handle*, const char*, int, void*);
 using mpv_terminate_destroy_fn = void (*)(mpv_handle*);
 using mpv_render_update_fn = void (*)(void*);
 using mpv_render_context = struct mpv_render_context;
@@ -46,6 +47,8 @@ struct mpv_render_param {
   int type;
   void* data;
 };
+
+constexpr int MPV_FORMAT_DOUBLE = 5;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
@@ -96,6 +99,7 @@ struct LibmpvApi {
   mpv_initialize_fn initialize = nullptr;
   mpv_command_fn command = nullptr;
   mpv_set_option_string_fn set_option_string = nullptr;
+  mpv_get_property_fn get_property = nullptr;
   mpv_terminate_destroy_fn terminate_destroy = nullptr;
   mpv_render_context_create_fn render_context_create = nullptr;
   mpv_render_context_set_update_callback_fn render_context_set_update_callback = nullptr;
@@ -107,7 +111,7 @@ struct LibmpvApi {
   bool client_available() const {
     return library != nullptr && create != nullptr && initialize != nullptr &&
            command != nullptr && set_option_string != nullptr &&
-           terminate_destroy != nullptr;
+           get_property != nullptr && terminate_destroy != nullptr;
   }
 
   bool render_api_available() const {
@@ -218,6 +222,7 @@ LibmpvApi& Api() {
   g_api.initialize = reinterpret_cast<mpv_initialize_fn>(LoadSymbol(g_api.library, "mpv_initialize"));
   g_api.command = reinterpret_cast<mpv_command_fn>(LoadSymbol(g_api.library, "mpv_command"));
   g_api.set_option_string = reinterpret_cast<mpv_set_option_string_fn>(LoadSymbol(g_api.library, "mpv_set_option_string"));
+  g_api.get_property = reinterpret_cast<mpv_get_property_fn>(LoadSymbol(g_api.library, "mpv_get_property"));
   g_api.terminate_destroy = reinterpret_cast<mpv_terminate_destroy_fn>(LoadSymbol(g_api.library, "mpv_terminate_destroy"));
   g_api.render_context_create = reinterpret_cast<mpv_render_context_create_fn>(LoadSymbol(g_api.library, "mpv_render_context_create"));
   g_api.render_context_set_update_callback = reinterpret_cast<mpv_render_context_set_update_callback_fn>(LoadSymbol(g_api.library, "mpv_render_context_set_update_callback"));
@@ -391,6 +396,54 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
   };
 }
 
+
+bool DoubleProperty(PlayerInstance* player, const char* name, double* value) {
+  if (player == nullptr || player->api == nullptr ||
+      player->api->get_property == nullptr) {
+    return false;
+  }
+  double current = 0.0;
+  const int rc = player->api->get_property(
+      player->handle, name, MPV_FORMAT_DOUBLE, &current);
+  if (rc < 0 || current <= 0.0) return false;
+  *value = current;
+  return true;
+}
+
+ProbeMap VideoAspectRatioResult(PlayerInstance* player) {
+  ProbeMap result{
+      {flutter::EncodableValue("ok"), flutter::EncodableValue(true)},
+  };
+
+  double aspect = 0.0;
+  if (DoubleProperty(player, "video-params/aspect", &aspect)) {
+    result[flutter::EncodableValue("videoAspectRatio")] =
+        flutter::EncodableValue(aspect);
+  }
+
+  double width = 0.0;
+  double height = 0.0;
+  if (DoubleProperty(player, "dwidth", &width) &&
+      DoubleProperty(player, "dheight", &height)) {
+    result[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(width);
+    result[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(height);
+    if (aspect <= 0.0) {
+      result[flutter::EncodableValue("videoAspectRatio")] =
+          flutter::EncodableValue(width / height);
+    }
+  }
+  return result;
+}
+
+ProbeMap VideoAspectRatioForHandle(const flutter::EncodableMap* args) {
+  const int64_t id = IntArg(args, "handle");
+  auto it = g_players.find(id);
+  if (it == g_players.end()) {
+    return ProbeMap{{flutter::EncodableValue("ok"), flutter::EncodableValue(false)}};
+  }
+  return VideoAspectRatioResult(it->second.get());
+}
+
 void Control(const std::string& method, const flutter::EncodableMap* args) {
   const int64_t id = IntArg(args, "handle");
   auto it = g_players.find(id);
@@ -457,6 +510,10 @@ class DesktopLibmpvBackendPlugin : public flutter::Plugin {
     }
     if (method == "load") {
       result->Success(flutter::EncodableValue(Load(args, hwnd_)));
+      return;
+    }
+    if (method == "getVideoAspectRatio") {
+      result->Success(flutter::EncodableValue(VideoAspectRatioForHandle(args)));
       return;
     }
     Control(method, args);

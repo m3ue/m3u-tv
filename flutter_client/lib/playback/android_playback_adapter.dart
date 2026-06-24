@@ -314,6 +314,7 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
       duration: event.duration,
       audioTracks: event.audioTracks,
       subtitleTracks: event.subtitleTracks,
+      videoAspectRatio: event.videoAspectRatio,
     );
     if (event.hasSelectedAudioTrackId) {
       nextState = nextState.copyWith(
@@ -440,6 +441,7 @@ class AndroidMedia3Event {
     this.position,
     this.duration,
     this.textureId,
+    this.videoAspectRatio,
     this.audioTracks,
     this.subtitleTracks,
     this.selectedAudioTrackId,
@@ -465,6 +467,14 @@ class AndroidMedia3Event {
           ? Duration(milliseconds: (map['durationMs']! as num).round())
           : null,
       textureId: (map['textureId'] as num?)?.toInt(),
+      videoAspectRatio: playbackAspectRatioFromValues(
+        aspectRatio:
+            map['videoAspectRatio'] ??
+            map['displayAspectRatio'] ??
+            map['aspectRatio'],
+        width: map['videoWidth'] ?? map['width'],
+        height: map['videoHeight'] ?? map['height'],
+      ),
       audioTracks: _tracksFromMap(map['audioTracks']),
       subtitleTracks: _tracksFromMap(map['subtitleTracks']),
       selectedAudioTrackId: map['selectedAudioTrackId'] as String?,
@@ -482,6 +492,7 @@ class AndroidMedia3Event {
   final Duration? position;
   final Duration? duration;
   final int? textureId;
+  final double? videoAspectRatio;
   final List<PlaybackTrack>? audioTracks;
   final List<PlaybackTrack>? subtitleTracks;
   final String? selectedAudioTrackId;

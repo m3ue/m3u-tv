@@ -144,6 +144,42 @@ class PlaybackSource {
   final String? userAgent;
   final Map<String, String> headers;
   final Map<String, Object?> metadata;
+
+  double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
+}
+
+double? playbackAspectRatioFromMetadata(Map<String, Object?> metadata) {
+  return playbackAspectRatioFromValues(
+    aspectRatio:
+        metadata['videoAspectRatio'] ??
+        metadata['displayAspectRatio'] ??
+        metadata['aspectRatio'],
+    width: metadata['videoWidth'] ?? metadata['width'],
+    height: metadata['videoHeight'] ?? metadata['height'],
+  );
+}
+
+double? playbackAspectRatioFromValues({
+  Object? aspectRatio,
+  Object? width,
+  Object? height,
+}) {
+  final parsedRatio = _asPositiveDouble(aspectRatio);
+  if (parsedRatio != null) return parsedRatio;
+
+  final parsedWidth = _asPositiveDouble(width);
+  final parsedHeight = _asPositiveDouble(height);
+  if (parsedWidth == null || parsedHeight == null) return null;
+  return parsedWidth / parsedHeight;
+}
+
+double? _asPositiveDouble(Object? value) {
+  if (value is num && value > 0) return value.toDouble();
+  if (value is String) {
+    final parsed = double.tryParse(value.trim());
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return null;
 }
 
 class PlaybackTrack {
@@ -166,6 +202,7 @@ class PlaybackState {
     this.selectedAudioTrackId,
     this.selectedSubtitleTrackId,
     this.playbackSpeed = 1,
+    this.videoAspectRatio,
   });
 
   const PlaybackState.idle({required this.backend})
@@ -177,7 +214,8 @@ class PlaybackState {
       subtitleTracks = const <PlaybackTrack>[],
       selectedAudioTrackId = null,
       selectedSubtitleTrackId = null,
-      playbackSpeed = 1;
+      playbackSpeed = 1,
+      videoAspectRatio = null;
 
   final PlaybackBackend backend;
   final PlaybackStatus status;
@@ -189,6 +227,7 @@ class PlaybackState {
   final String? selectedAudioTrackId;
   final String? selectedSubtitleTrackId;
   final double playbackSpeed;
+  final double? videoAspectRatio;
 
   PlaybackState copyWith({
     PlaybackBackend? backend,
@@ -201,6 +240,7 @@ class PlaybackState {
     Object? selectedAudioTrackId = _unchanged,
     Object? selectedSubtitleTrackId = _unchanged,
     double? playbackSpeed,
+    double? videoAspectRatio,
   }) {
     return PlaybackState(
       backend: backend ?? this.backend,
@@ -217,6 +257,7 @@ class PlaybackState {
           ? this.selectedSubtitleTrackId
           : selectedSubtitleTrackId as String?,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      videoAspectRatio: videoAspectRatio ?? this.videoAspectRatio,
     );
   }
 }
