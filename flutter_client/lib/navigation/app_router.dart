@@ -214,6 +214,7 @@ RouteFactory buildAppRouter({
             item: args.item!,
             xtreamService: xtreamService,
             onPlay: onOpenPlayer,
+            progressList: progressList,
           ),
         );
       }
