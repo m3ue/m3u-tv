@@ -19,6 +19,7 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 void main() {
@@ -311,6 +312,7 @@ void main() {
             streamId: 201,
             positionSeconds: 91,
             durationSeconds: 600,
+            title: 'Resume Route Movie',
           ),
         ],
       ),
@@ -336,10 +338,10 @@ void main() {
     );
     await _pumpAppFrame(tester);
 
-    // CW card uses the legacy VOD-list lookup when progress has no title yet.
-    expect(find.text('Resume Route Movie'), findsOneWidget);
+    // Continue Watching card uses enriched progress metadata when available.
+    expect(find.text('Resume Route Movie'), findsAtLeast(1));
 
-    await tester.tap(find.text('Resume Route Movie'));
+    await tester.tap(_mediaPreviewCardWithText('Resume Route Movie'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -349,7 +351,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Player route: Route Movie'), findsOneWidget);
+    expect(find.text('Player route: Resume Route Movie'), findsOneWidget);
     expect(capturedArgs?.startPosition, 91.0);
     expect(
       capturedArgs?.toPlaybackSource().startPosition,
@@ -371,6 +373,7 @@ void main() {
             streamId: 201,
             positionSeconds: 91,
             durationSeconds: 600,
+            title: 'Resume Route Movie',
           ),
         ],
       ),
@@ -397,7 +400,7 @@ void main() {
     await _pumpAppFrame(tester);
     await _waitForText(tester, 'Resume Route Movie');
 
-    await tester.tap(find.text('Resume Route Movie'));
+    await tester.tap(_mediaPreviewCardWithText('Resume Route Movie'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -406,7 +409,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Player route: Route Movie'), findsOneWidget);
+    expect(find.text('Player route: Resume Route Movie'), findsOneWidget);
     expect(capturedArgs?.startPosition, isNull);
     expect(
       capturedArgs?.toPlaybackSource().startPosition,
@@ -724,6 +727,13 @@ NavigatorState _findInnerNavigator(WidgetTester tester) {
 Finder _sidebarText(String label) {
   return find.byWidgetPredicate(
     (widget) => widget is SidebarDestinationItem && widget.label == label,
+  );
+}
+
+Finder _mediaPreviewCardWithText(String text) {
+  return find.ancestor(
+    of: find.text(text).first,
+    matching: find.byType(MediaPreviewCard),
   );
 }
 
