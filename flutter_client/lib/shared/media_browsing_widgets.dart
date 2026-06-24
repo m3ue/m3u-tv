@@ -793,6 +793,31 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
                   ),
                 if (hasProgress)
                   Positioned(
+                    right: 8,
+                    top: 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          '${(widget.item.progressFraction! * 100).round()}%',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (hasProgress)
+                  Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
