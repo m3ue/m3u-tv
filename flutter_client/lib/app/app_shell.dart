@@ -179,7 +179,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
     var resolvedArgs = args;
-    if (resolvedArgs.type != 'live' &&
+    if ((resolvedArgs.type == 'vod' || resolvedArgs.type == 'series') &&
         resolvedArgs.startPosition == null &&
         resolvedArgs.streamId != null) {
       final target = resolvedArgs.type == 'series'
@@ -877,6 +877,36 @@ class _ContentNavigator extends StatelessWidget {
     );
   }
 
+  void _openCatchupProgram(Channel channel, EpgProgram program) {
+    if (appState.sourceType != AppSourceType.xtream) {
+      _openChannel(channel);
+      return;
+    }
+    final duration = program.end.difference(program.start);
+    final streamUrl = appState.xtreamService.getCatchupStreamUrl(
+      channel.id,
+      program.start,
+      duration,
+    );
+    onOpenPlayer?.call(
+      PlayerArgs(
+        streamUrl: streamUrl,
+        title: '${channel.name} - ${program.title}',
+        type: 'catchup',
+        streamId: channel.id,
+        startPosition: 0,
+        epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+        headers: channel.headers,
+        metadata: <String, Object?>{
+          'catchup': true,
+          'program_title': program.title,
+          'program_start': program.start.toIso8601String(),
+          'program_end': program.end.toIso8601String(),
+        },
+      ),
+    );
+  }
+
   Future<void> _pushNamed(String routeName, {Object? arguments}) async {
     // Yield one microtask so that any requestFocus() call made synchronously
     // in InkWell.onTap (which itself schedules a microtask) has resolved before
@@ -1029,6 +1059,7 @@ class _ContentNavigator extends StatelessWidget {
             favoritesService: appState.favoritesService,
             epgService: appState.epgService,
             onChannelSelect: _openChannel,
+            onCatchupProgramSelect: _openCatchupProgram,
             onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.vod => VodScreen(

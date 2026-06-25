@@ -55,7 +55,7 @@ class PlayerArgs {
 
   final String streamUrl;
   final String title;
-  final String type; // 'live' | 'vod' | 'series'
+  final String type; // 'live' | 'vod' | 'series' | 'catchup'
   final int? streamId;
   final int? seriesId;
   final int? seasonNumber;

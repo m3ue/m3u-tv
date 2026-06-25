@@ -336,7 +336,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _reportProgress(Duration position) {
-    if (_isLive || widget.progressReporter == null) return;
+    if (_isLive ||
+        widget.args.type == 'catchup' ||
+        widget.progressReporter == null) {
+      return;
+    }
     widget.progressReporter!(
       Progress(
         viewerId: widget.viewerId,

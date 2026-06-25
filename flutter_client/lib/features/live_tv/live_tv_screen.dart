@@ -29,6 +29,7 @@ class LiveTvScreen extends StatefulWidget {
     required this.favoritesService,
     required this.epgService,
     required this.onChannelSelect,
+    this.onCatchupProgramSelect,
     this.onSidebarActivate,
   });
 
@@ -39,6 +40,7 @@ class LiveTvScreen extends StatefulWidget {
   final FavoritesService favoritesService;
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
+  final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -161,6 +163,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                       channels: filtered,
                       epgService: widget.epgService,
                       onChannelSelect: widget.onChannelSelect,
+                      onCatchupProgramSelect: widget.onCatchupProgramSelect,
                     ),
                     _ViewMode.logoGrid => _buildGridView(filtered),
                     _ViewMode.list => _buildListView(filtered),

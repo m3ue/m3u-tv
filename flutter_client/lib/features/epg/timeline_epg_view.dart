@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 
+typedef CatchupProgramSelect =
+    void Function(Channel channel, EpgProgram program);
+
 const double _kChannelColW = 128;
 const double _kTimeHeaderH = 28;
 const double _kRowH = 60;
@@ -21,12 +24,14 @@ class TimelineEpgView extends StatefulWidget {
     required this.channels,
     required this.epgService,
     required this.onChannelSelect,
+    this.onCatchupProgramSelect,
     this.windowHours = 6,
   });
 
   final List<Channel> channels;
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
+  final CatchupProgramSelect? onCatchupProgramSelect;
 
   /// How many hours the visible window spans (default 6).
   final int windowHours;
@@ -259,7 +264,20 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                               pixelsPerMinute: _kPxPerMin,
                               totalWidth: _totalW,
                               rowHeight: _kRowH,
-                              onTap: () => widget.onChannelSelect(channel),
+                              onTap: (program) {
+                                final canReplay =
+                                    channel.catchupSupported &&
+                                    program.end.isBefore(DateTime.now());
+                                if (canReplay &&
+                                    widget.onCatchupProgramSelect != null) {
+                                  widget.onCatchupProgramSelect!(
+                                    channel,
+                                    program,
+                                  );
+                                  return;
+                                }
+                                widget.onChannelSelect(channel);
+                              },
                             ),
                           ),
                         );
@@ -445,7 +463,7 @@ class _ProgramsRow extends StatelessWidget {
   final double pixelsPerMinute;
   final double totalWidth;
   final double rowHeight;
-  final VoidCallback onTap;
+  final void Function(EpgProgram program) onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -489,7 +507,10 @@ class _ProgramsRow extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: onTap,
+              key: ValueKey(
+                'timeline-program-${p.channelId}-${p.start.toIso8601String()}',
+              ),
+              onTap: () => onTap(p),
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 decoration: BoxDecoration(
