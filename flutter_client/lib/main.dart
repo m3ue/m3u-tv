@@ -98,6 +98,17 @@ class MyApp extends StatelessWidget {
               surfaceContainerHigh: card,
               surfaceContainerHighest: elevated,
             ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: primary,
+          contentTextStyle: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
       themeMode: ThemeMode.dark,
       home: Builder(
