@@ -136,6 +136,61 @@ void main() {
     });
 
     testWidgets(
+      'saved_source offline boot keeps configured shell and outage actions',
+      (tester) async {
+        final storage = InMemorySecureStorage();
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': 'https://fixture.example',
+            'username': 'fixture-user',
+            'password': 'fixture-password',
+          }),
+        );
+        await storage.write(
+          'm3ue_tv_source',
+          jsonEncode(<String, String>{'type': 'xtream'}),
+        );
+
+        final controller = _controller(
+          storage: storage,
+          transport: (request) async {
+            throw XtreamHttpException(
+              statusCode: 503,
+              method: request.method,
+              uri: Uri.parse('${request.credentials.server}/player_api.php'),
+              reasonPhrase: 'Service Unavailable',
+            );
+          },
+        );
+
+        await tester.pumpWidget(_TestApp(controller: controller));
+        await _pumpAppState(tester);
+
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.isConfigured, isTrue);
+        expect(
+          _visibleText(tester),
+          contains('Server is currently unavailable.'),
+        );
+        expect(_visibleText(tester), contains('Connected source: Xtream'));
+        expect(
+          _visibleText(tester),
+          isNot(contains('Please connect to your service in Settings')),
+        );
+        expect(_sidebarDestination('Settings'), findsOneWidget);
+
+        await _tapSidebarDestination(tester, 'Settings');
+        await _pumpAppState(tester);
+
+        expect(find.text('Server is currently unavailable.'), findsWidgets);
+        expect(find.text('Retry connection'), findsOneWidget);
+        expect(find.text('Edit server settings'), findsOneWidget);
+        expect(find.text('Server URL'), findsNothing);
+      },
+    );
+
+    testWidgets(
       'saved_source boots connected app state without constructor fixtures',
       (tester) async {
         final storage = InMemorySecureStorage();

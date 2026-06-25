@@ -167,6 +167,10 @@ class AppStateController extends ChangeNotifier {
           return;
         }
         await _replaceWithXtreamContent(clearCache: false);
+      } else if (savedSource == AppSourceType.xtream &&
+          authNotifier.error != null) {
+        _sourceType = AppSourceType.xtream;
+        _error = authNotifier.error;
       }
     } else if (savedSource == AppSourceType.m3u) {
       await _loadSavedM3uSource();
@@ -277,6 +281,11 @@ class AppStateController extends ChangeNotifier {
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
+    if (_sourceType == AppSourceType.xtream && !authNotifier.isConfigured) {
+      _isLoadingContent = false;
+      await boot();
+      return;
+    }
     await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();

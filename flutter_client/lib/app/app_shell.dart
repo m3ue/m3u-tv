@@ -1076,6 +1076,37 @@ class _ContentNavigator extends StatelessWidget {
   }
 }
 
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeScreen extends StatefulWidget {
   const _HomeScreen({
     required this.appState,
@@ -1218,6 +1249,10 @@ class _HomeScreenState extends State<_HomeScreen> {
           Text('Home', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
           Text('Connected source: ${appState.sourceLabel}'),
+          if (appState.error != null && appState.error!.isNotEmpty) ...[
+            const SizedBox(height: MediaBrowsingMetrics.chipGap),
+            _OfflineBanner(message: appState.error!),
+          ],
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
           liveSection,
