@@ -3,11 +3,17 @@
 import 'package:m3u_tv/services/persistent_store.dart';
 
 class FavoritesService {
-  FavoritesService({Map<String, Object?>? memory, PersistentJsonStore? store})
-    : _memory = memory ?? <String, Object?>{},
-      _store = store;
+  FavoritesService({
+    Map<String, Object?>? memory,
+    PersistentJsonStore? store,
+    String namespace = '',
+  }) : _memory = memory ?? <String, Object?>{},
+       _store = store,
+       _favoritesKey = namespace.isEmpty
+           ? 'm3ue_favorites'
+           : 'm3ue_favorites_$namespace';
 
-  static const _favoritesKey = 'm3ue_favorites';
+  final String _favoritesKey;
   static const _lastCategoryKey = 'm3ue_last_category';
   static const _lastViewModeKey = 'm3ue_last_view_mode';
 

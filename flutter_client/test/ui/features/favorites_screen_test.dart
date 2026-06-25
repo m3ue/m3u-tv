@@ -37,18 +37,15 @@ void main() {
     });
 
     testWidgets('renders favorites screen with tabs', (tester) async {
-      final favoritesService = FavoritesService();
-      await favoritesService.add(1);
-
-      final favIds = await favoritesService.all();
+      final channelService = FavoritesService();
+      await channelService.add(1);
 
       await tester.pumpWidget(
         _TestApp(
           channels: testChannels,
           vodItems: testVodItems,
           seriesList: testSeriesList,
-          favoriteChannelIds: favIds,
-          favoritesService: favoritesService,
+          channelFavoritesService: channelService,
         ),
       );
       await tester.pumpAndSettle();
@@ -59,18 +56,15 @@ void main() {
     });
 
     testWidgets('shows favorited live channels in Live TV tab', (tester) async {
-      final favoritesService = FavoritesService();
-      await favoritesService.add(1); // BBC One
-
-      final favIds = await favoritesService.all();
+      final channelService = FavoritesService();
+      await channelService.add(1); // BBC One
 
       await tester.pumpWidget(
         _TestApp(
           channels: testChannels,
           vodItems: testVodItems,
           seriesList: testSeriesList,
-          favoriteChannelIds: favIds,
-          favoritesService: favoritesService,
+          channelFavoritesService: channelService,
         ),
       );
       await tester.pumpAndSettle();
@@ -79,15 +73,15 @@ void main() {
     });
 
     testWidgets('shows favorited VOD items in Movies tab', (tester) async {
-      final favoritesService = FavoritesService();
+      final vodService = FavoritesService(namespace: 'vod');
+      await vodService.add(10);
 
       await tester.pumpWidget(
         _TestApp(
           channels: testChannels,
           vodItems: testVodItems,
           seriesList: testSeriesList,
-          favoriteVodIds: const {10},
-          favoritesService: favoritesService,
+          vodFavoritesService: vodService,
         ),
       );
       await tester.pumpAndSettle();
@@ -99,15 +93,15 @@ void main() {
     });
 
     testWidgets('shows favorited series in Series tab', (tester) async {
-      final favoritesService = FavoritesService();
+      final seriesService = FavoritesService(namespace: 'series');
+      await seriesService.add(20);
 
       await tester.pumpWidget(
         _TestApp(
           channels: testChannels,
           vodItems: testVodItems,
           seriesList: testSeriesList,
-          favoriteSeriesIds: const {20},
-          favoritesService: favoritesService,
+          seriesFavoritesService: seriesService,
         ),
       );
       await tester.pumpAndSettle();
@@ -157,20 +151,18 @@ class _TestApp extends StatelessWidget {
     required this.channels,
     required this.vodItems,
     required this.seriesList,
-    this.favoriteChannelIds = const {},
-    this.favoriteVodIds = const {},
-    this.favoriteSeriesIds = const {},
-    this.favoritesService,
+    this.channelFavoritesService,
+    this.vodFavoritesService,
+    this.seriesFavoritesService,
     this.isConfigured = true,
   });
 
   final List<Channel> channels;
   final List<VodItem> vodItems;
   final List<Series> seriesList;
-  final Set<int> favoriteChannelIds;
-  final Set<int> favoriteVodIds;
-  final Set<int> favoriteSeriesIds;
-  final FavoritesService? favoritesService;
+  final FavoritesService? channelFavoritesService;
+  final FavoritesService? vodFavoritesService;
+  final FavoritesService? seriesFavoritesService;
   final bool isConfigured;
 
   @override
@@ -181,11 +173,12 @@ class _TestApp extends StatelessWidget {
         channels: channels,
         vodItems: vodItems,
         seriesList: seriesList,
-        favoriteChannelIds: favoriteChannelIds,
-        favoriteVodIds: favoriteVodIds,
-        favoriteSeriesIds: favoriteSeriesIds,
         isConfigured: isConfigured,
-        favoritesService: favoritesService ?? FavoritesService(),
+        channelFavoritesService: channelFavoritesService ?? FavoritesService(),
+        vodFavoritesService:
+            vodFavoritesService ?? FavoritesService(namespace: 'vod'),
+        seriesFavoritesService:
+            seriesFavoritesService ?? FavoritesService(namespace: 'series'),
         onChannelSelect: (_) {},
         onVodSelect: (_) {},
         onSeriesSelect: (_) {},

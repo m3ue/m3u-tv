@@ -25,6 +25,8 @@ class AppStateController extends ChangeNotifier {
     SecureStorage? secureStorage,
     CacheService? cacheService,
     FavoritesService? favoritesService,
+    FavoritesService? vodFavoritesService,
+    FavoritesService? seriesFavoritesService,
     ResumeService? resumeService,
     ViewerService? viewerService,
     EpgService? epgService,
@@ -50,6 +52,12 @@ class AppStateController extends ChangeNotifier {
       secureStorage: resolvedSecureStorage,
       cacheService: resolvedCacheService,
       favoritesService: favoritesService ?? FavoritesService(store: store),
+      vodFavoritesService:
+          vodFavoritesService ??
+          FavoritesService(store: store, namespace: 'vod'),
+      seriesFavoritesService:
+          seriesFavoritesService ??
+          FavoritesService(store: store, namespace: 'series'),
       resumeService: resumeService ?? ResumeService(store: store),
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
@@ -64,6 +72,8 @@ class AppStateController extends ChangeNotifier {
     required this.secureStorage,
     required this.cacheService,
     required this.favoritesService,
+    required this.vodFavoritesService,
+    required this.seriesFavoritesService,
     required this.resumeService,
     required this.viewerService,
     required this.epgService,
@@ -85,6 +95,8 @@ class AppStateController extends ChangeNotifier {
   final SecureStorage secureStorage;
   final CacheService cacheService;
   final FavoritesService favoritesService;
+  final FavoritesService vodFavoritesService;
+  final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
   final ViewerService viewerService;
   final EpgService epgService;
