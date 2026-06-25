@@ -73,6 +73,9 @@ Object? _encodeCacheData(String key, Object? data) {
   if (data is List<Series>) {
     return data.map(_seriesToJson).toList(growable: false);
   }
+  if (data is List<Viewer>) {
+    return data.map((viewer) => viewer.toJson()).toList(growable: false);
+  }
   if (data is String || data is num || data is bool || data == null) {
     return data;
   }
@@ -134,6 +137,12 @@ Object? _decodeCacheData(String key, Object? raw) {
       list
           ?.map((item) => Series.fromXtream(_asMap(item)))
           .toList(growable: false),
+    'viewers' =>
+      list
+          ?.map((item) => Viewer.fromJson(_asMap(item)))
+          .toList(
+            growable: false,
+          ),
     _ => raw,
   };
 }
