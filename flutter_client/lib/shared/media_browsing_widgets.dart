@@ -492,7 +492,7 @@ class MediaPreviewItem {
   final EdgeInsets imagePadding;
   final Color? imageBackgroundColor;
 
-  /// 0.0–1.0 progress shown as a bar along the bottom of the image.
+  /// 0.0-1.0 progress shown as a bar along the bottom of the image.
   final double? progressFraction;
 
   /// Short text labels rendered as chips overlaid on the image (right-aligned).
@@ -538,10 +538,6 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     final visibleItems = widget.items.take(12).toList(growable: false);
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Scale card dimensions proportionally on wide TV screens (e.g. tvOS
-        // logical 1920px → scale 1.5). Clamped to 1.0 minimum so mobile and
-        // standard-density Android TV are unaffected.
-        final scale = (constraints.maxWidth / 1280.0).clamp(1.0, 2.0);
         final double baseWidth;
         final double baseHeight;
         if (widget.landscapeStyle) {
@@ -554,6 +550,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
           baseWidth = MediaBrowsingMetrics.previewCardWidth;
           baseHeight = MediaBrowsingMetrics.previewCardHeight;
         }
+        final scale = _previewCardScale(constraints.maxWidth);
         final cardWidth = baseWidth * scale;
         final cardHeight = baseHeight * scale;
 
@@ -614,6 +611,11 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
         );
       },
     );
+  }
+
+  double _previewCardScale(double availableWidth) {
+    if (availableWidth >= 1600) return 1;
+    return (availableWidth / 1280.0).clamp(1.0, 1.15);
   }
 }
 

@@ -38,6 +38,84 @@ void main() {
       );
     });
 
+    testWidgets(
+      'large desktop Home rows keep preview cards comfortably sized',
+      (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        for (final viewport in [
+          const Size(1440, 900),
+          const Size(1920, 1080),
+          const Size(2560, 1440),
+        ]) {
+          tester.view.physicalSize = viewport;
+          final appState = _testAppState(
+            xtreamService: _NavigationXtreamService(
+              liveChannels: List<Channel>.generate(
+                16,
+                (index) => Channel(
+                  id: 100 + index,
+                  name: 'Desktop Channel $index',
+                  streamUrl: 'http://example.com/live/$index.m3u8',
+                  categoryId: 'live',
+                ),
+              ),
+              vodItems: List<VodItem>.generate(
+                16,
+                (index) => VodItem(
+                  id: 200 + index,
+                  name: 'Desktop Movie $index',
+                  streamUrl: 'http://example.com/movie/$index.mp4',
+                  containerExtension: 'mp4',
+                  categoryId: 'vod',
+                ),
+              ),
+              seriesList: List<Series>.generate(
+                16,
+                (index) => Series(
+                  id: 300 + index,
+                  name: 'Desktop Series $index',
+                  categoryId: 'series',
+                ),
+              ),
+            ),
+          );
+          addTearDown(appState.dispose);
+          await appState.connectXtream(
+            const UserCredentials(
+              server: 'http://example.com',
+              username: 'user',
+              password: 'pass',
+            ),
+          );
+
+          await tester.pumpWidget(
+            _TestApp(deviceType: DeviceType.desktop, appState: appState),
+          );
+          await _pumpAppFrame(tester);
+
+          expect(tester.takeException(), isNull);
+          final firstMovieCard = find.byWidgetPredicate(
+            (widget) =>
+                widget is MediaPreviewCard &&
+                widget.item.title == 'Desktop Movie 0',
+          );
+          final firstSeriesCard = find.byWidgetPredicate(
+            (widget) =>
+                widget is MediaPreviewCard &&
+                widget.item.title == 'Desktop Series 0',
+          );
+          expect(firstMovieCard, findsOneWidget);
+          expect(firstSeriesCard, findsOneWidget);
+          expect(tester.getSize(firstMovieCard).width, lessThanOrEqualTo(190));
+          expect(tester.getSize(firstSeriesCard).width, lessThanOrEqualTo(190));
+        }
+      },
+    );
+
     testWidgets('navigating to LiveTV shows Live TV screen', (tester) async {
       await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
       await tester.pumpAndSettle();
@@ -1018,8 +1096,38 @@ class _NavigationTranscodeGateway implements PlaybackTranscodeGateway {
 }
 
 class _NavigationXtreamService extends XtreamService {
-  _NavigationXtreamService({this.recentlyWatched = const <Progress>[]});
+  _NavigationXtreamService({
+    this.liveChannels = const <Channel>[
+      Channel(
+        id: 101,
+        name: 'Route News',
+        streamUrl: 'http://example.com/live/101.m3u8',
+        categoryId: 'live',
+      ),
+    ],
+    this.vodItems = const <VodItem>[
+      VodItem(
+        id: 201,
+        name: 'Route Movie',
+        streamUrl: 'http://example.com/movie/201.mp4',
+        containerExtension: 'mp4',
+        categoryId: 'vod',
+      ),
+    ],
+    this.seriesList = const <Series>[
+      Series(
+        id: 301,
+        name: 'Route Series',
+        categoryId: 'series',
+        plot: 'Route series plot',
+      ),
+    ],
+    this.recentlyWatched = const <Progress>[],
+  });
 
+  final List<Channel> liveChannels;
+  final List<VodItem> vodItems;
+  final List<Series> seriesList;
   final List<Progress> recentlyWatched;
 
   @override
@@ -1048,36 +1156,13 @@ class _NavigationXtreamService extends XtreamService {
 
   @override
   Future<List<Channel>> getLiveStreams({String? categoryId}) async =>
-      const <Channel>[
-        Channel(
-          id: 101,
-          name: 'Route News',
-          streamUrl: 'http://example.com/live/101.m3u8',
-          categoryId: 'live',
-        ),
-      ];
+      liveChannels;
 
   @override
-  Future<List<VodItem>> getVodStreams({String? categoryId}) async =>
-      const <VodItem>[
-        VodItem(
-          id: 201,
-          name: 'Route Movie',
-          streamUrl: 'http://example.com/movie/201.mp4',
-          containerExtension: 'mp4',
-          categoryId: 'vod',
-        ),
-      ];
+  Future<List<VodItem>> getVodStreams({String? categoryId}) async => vodItems;
 
   @override
-  Future<List<Series>> getSeries({String? categoryId}) async => const <Series>[
-    Series(
-      id: 301,
-      name: 'Route Series',
-      categoryId: 'series',
-      plot: 'Route series plot',
-    ),
-  ];
+  Future<List<Series>> getSeries({String? categoryId}) async => seriesList;
 
   @override
   Future<VodInfo> getVodInfo(int vodId) async => const VodInfo(
