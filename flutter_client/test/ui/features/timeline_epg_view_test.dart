@@ -5,6 +5,45 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 
 void main() {
+  testWidgets('catchup channels show replay availability indicator', (
+    tester,
+  ) async {
+    final epgService = EpgService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 300,
+            child: TimelineEpgView(
+              channels: const [
+                Channel(
+                  id: 101,
+                  name: 'BBC One',
+                  streamUrl: 'https://streams.example/live/101.m3u8',
+                  catchupSupported: true,
+                  catchupDays: 7,
+                ),
+                Channel(
+                  id: 102,
+                  name: 'BBC Two',
+                  streamUrl: 'https://streams.example/live/102.m3u8',
+                ),
+              ],
+              epgService: epgService,
+              onChannelSelect: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.replay_rounded), findsOneWidget);
+    expect(find.text('7d'), findsOneWidget);
+  });
+
   testWidgets('tapping past catchup program invokes catchup callback', (
     tester,
   ) async {
