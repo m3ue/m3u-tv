@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
+import 'package:m3u_tv/services/notification_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -31,6 +32,7 @@ class AppStateController extends ChangeNotifier {
     ViewerService? viewerService,
     EpgService? epgService,
     M3UParser? m3uParser,
+    AppNotificationService? notificationService,
     PersistentJsonStore? persistentStore,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
@@ -62,6 +64,7 @@ class AppStateController extends ChangeNotifier {
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
       m3uParser: m3uParser ?? M3UParser(),
+      notificationService: notificationService ?? AppNotificationService(),
       traktService: TraktService(storage: resolvedSecureStorage),
     );
   }
@@ -78,6 +81,7 @@ class AppStateController extends ChangeNotifier {
     required this.viewerService,
     required this.epgService,
     required this.m3uParser,
+    required this.notificationService,
     required this.traktService,
   });
 
@@ -101,6 +105,7 @@ class AppStateController extends ChangeNotifier {
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
+  final AppNotificationService notificationService;
   final TraktService traktService;
 
   AppSourceType _sourceType = AppSourceType.none;

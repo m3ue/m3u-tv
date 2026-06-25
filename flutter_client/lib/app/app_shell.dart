@@ -16,6 +16,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -53,6 +54,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final AppStateController _appState;
   late final bool _ownsAppState;
+  StreamSubscription<List<AppNotification>>? _notificationSubscription;
 
   DateTime? _lastBackPress;
 
@@ -74,6 +76,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _appState.addListener(_onAppStateChanged);
+    _notificationSubscription = _appState
+        .notificationService
+        .notificationsStream
+        .listen(_showNotifications);
     if (!_appState.isConfigured) {
       unawaited(_appState.boot());
     }
@@ -123,6 +129,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
     _appState.removeListener(_onAppStateChanged);
+    unawaited(_notificationSubscription?.cancel());
     if (_ownsAppState) _appState.dispose();
     super.dispose();
   }
@@ -145,6 +152,24 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         }),
       );
     }
+  }
+
+  void _showNotifications(List<AppNotification> notifications) {
+    if (!mounted || notifications.isEmpty) return;
+    final notification = notifications.last;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(notification.title),
+            Text(notification.message),
+          ],
+        ),
+      ),
+    );
+    _appState.notificationService.dismiss(notification.id);
   }
 
   void _activateSidebar() {
@@ -1065,6 +1090,7 @@ class _ContentNavigator extends StatelessWidget {
                 unawaited(appState.switchViewer(viewer)),
             onCreateViewer: appState.createViewer,
             onClearCache: () => unawaited(appState.clearAndRefresh()),
+            notificationService: appState.notificationService,
             onEpgIntervalChanged: (d) =>
                 unawaited(appState.setEpgRefreshInterval(d)),
             onConnected: onConnected,

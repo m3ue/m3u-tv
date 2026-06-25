@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/notification_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -33,6 +34,7 @@ class SettingsScreen extends StatefulWidget {
     this.onSwitchViewer,
     this.onCreateViewer,
     this.onClearCache,
+    this.notificationService,
     this.onEpgIntervalChanged,
     this.onConnected,
   });
@@ -51,6 +53,7 @@ class SettingsScreen extends StatefulWidget {
   final Duration? epgRefreshInterval;
   final List<Duration> epgRefreshOptions;
   final VoidCallback? onClearCache;
+  final AppNotificationService? notificationService;
   final void Function(Duration interval)? onEpgIntervalChanged;
 
   /// Called after a successful connection so the parent can navigate to Home.
@@ -133,6 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onSwitchViewer: widget.onSwitchViewer,
         onCreateViewer: widget.onCreateViewer,
         onClearCache: widget.onClearCache,
+        notificationService: widget.notificationService,
         onEpgIntervalChanged: widget.onEpgIntervalChanged,
       ),
     );
@@ -319,6 +323,7 @@ class _ConnectedView extends StatefulWidget {
     this.onSwitchViewer,
     this.onCreateViewer,
     this.onClearCache,
+    this.notificationService,
     this.onEpgIntervalChanged,
   });
 
@@ -334,6 +339,7 @@ class _ConnectedView extends StatefulWidget {
   final void Function(Viewer viewer)? onSwitchViewer;
   final Future<Viewer?> Function(String name)? onCreateViewer;
   final VoidCallback? onClearCache;
+  final AppNotificationService? notificationService;
   final void Function(Duration interval)? onEpgIntervalChanged;
 
   @override
@@ -370,12 +376,12 @@ class _ConnectedViewState extends State<_ConnectedView> {
     if (!confirmed || !mounted) return;
     widget.onClearCache?.call();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Cache cleared — content is refreshing in the background.',
-        ),
-      ),
+    widget.notificationService?.publish(
+      severity: AppNotificationSeverity.success,
+      title: 'Cache cleared',
+      message: 'Content is refreshing in the background.',
+      source: 'settings',
+      category: 'cache',
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
+import 'package:m3u_tv/services/notification_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -590,6 +591,46 @@ void main() {
       expect(find.text('Content Cache'), findsOneWidget);
     });
 
+    testWidgets('clear cache publishes a decoupled notification', (
+      tester,
+    ) async {
+      var cleared = false;
+      final service = AppNotificationService(clock: () => DateTime(2026));
+      addTearDown(service.dispose);
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          isConfiguredOverride: true,
+          notificationService: service,
+          onClearCache: () => cleared = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Clear Cache & Refresh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear & Refresh'));
+      await tester.pumpAndSettle();
+
+      expect(cleared, isTrue);
+      expect(service.notifications, hasLength(1));
+      final notification = service.notifications.single;
+      expect(notification.severity, AppNotificationSeverity.success);
+      expect(notification.title, 'Cache cleared');
+      expect(
+        notification.message,
+        'Content is refreshing in the background.',
+      );
+      expect(notification.source, 'settings');
+      expect(notification.category, 'cache');
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
     testWidgets('shows viewer section when m3u-editor and viewer available', (
       tester,
     ) async {
@@ -856,6 +897,7 @@ Widget _settingsApp(
   Viewer? activeViewer,
   String? sourceError,
   bool? isConfiguredOverride,
+  AppNotificationService? notificationService,
   VoidCallback? onClearCache,
   VoidCallback? onDisconnect,
 }) {
@@ -868,6 +910,7 @@ Widget _settingsApp(
         activeViewer: activeViewer,
         sourceError: sourceError,
         isConfiguredOverride: isConfiguredOverride,
+        notificationService: notificationService,
         onClearCache: onClearCache,
         onDisconnect: onDisconnect ?? () => notifier.disconnect(),
       ),

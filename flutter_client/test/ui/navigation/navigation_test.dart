@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/notification_service.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
@@ -99,6 +100,39 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Server URL'), findsOneWidget);
+    });
+
+    testWidgets('renders published app notifications through the shell', (
+      tester,
+    ) async {
+      final notificationService = AppNotificationService(
+        clock: () => DateTime(2026),
+      );
+      addTearDown(notificationService.dispose);
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(),
+        notificationService: notificationService,
+      );
+      addTearDown(appState.dispose);
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await tester.pumpAndSettle();
+
+      notificationService.publish(
+        severity: AppNotificationSeverity.warning,
+        title: 'Cache warning',
+        message: 'The cache needs attention.',
+        source: 'settings',
+        category: 'cache',
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.text('Cache warning'), findsOneWidget);
+      expect(find.text('The cache needs attention.'), findsOneWidget);
+      expect(notificationService.notifications, isEmpty);
     });
 
     testWidgets('sidebar labels remain visible after selecting a route', (
@@ -916,7 +950,10 @@ class _TestAppState extends State<_TestApp> {
   }
 }
 
-AppStateController _testAppState({required XtreamService xtreamService}) {
+AppStateController _testAppState({
+  required XtreamService xtreamService,
+  AppNotificationService? notificationService,
+}) {
   final memory = <String, Object?>{};
   return AppStateController(
     xtreamService: xtreamService,
@@ -925,6 +962,7 @@ AppStateController _testAppState({required XtreamService xtreamService}) {
     favoritesService: FavoritesService(memory: memory),
     resumeService: ResumeService(memory: memory),
     viewerService: ViewerService(memory: memory),
+    notificationService: notificationService,
   );
 }
 
