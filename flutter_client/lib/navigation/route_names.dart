@@ -1,6 +1,6 @@
 /// Route name constants matching the current RN navigation structure.
 ///
-/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, Settings.
+/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR, Settings.
 /// Modal/overlay routes: Player, Details, SeriesDetails, ViewerSelection.
 class RouteNames {
   RouteNames._();
@@ -11,6 +11,7 @@ class RouteNames {
   static const String liveTv = '/live-tv';
   static const String vod = '/vod';
   static const String series = '/series';
+  static const String dvr = '/dvr';
   static const String settings = '/settings';
 
   // Modal/overlay routes
@@ -26,6 +27,7 @@ class RouteNames {
     liveTv,
     vod,
     series,
+    dvr,
     settings,
   ];
 
@@ -36,6 +38,7 @@ class RouteNames {
     liveTv: 'Live TV',
     vod: 'Movies',
     series: 'Series',
+    dvr: 'DVR',
     settings: 'Settings',
   };
 }
