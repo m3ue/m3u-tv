@@ -186,6 +186,8 @@ void main() {
       );
 
       expect(response.isAuthenticated, isTrue);
+      expect(response.features, containsAll(<String>['progress', 'dvr']));
+      expect(response.hasFeature('dvr'), isTrue);
       expect(await service.getLiveCategories(), [
         const Category(id: '10', name: 'Live News'),
       ]);
@@ -736,6 +738,7 @@ void main() {
 Map<String, Object?> xtreamAuth({
   required int auth,
   String status = 'Active',
+  List<String> features = const <String>['progress', 'dvr'],
 }) => {
   'user_info': {
     'username': 'demo',
@@ -751,7 +754,7 @@ Map<String, Object?> xtreamAuth({
   },
   'm3u_editor': {
     'version': '0.10.0',
-    'features': <String>['progress'],
+    'features': features,
   },
 };
 

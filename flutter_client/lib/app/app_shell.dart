@@ -66,7 +66,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
 
-  List<String> get _mainRoutes => RouteNames.mainRoutes;
+  List<String> get _mainRoutes => RouteNames.mainRoutes
+      .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
+      .toList(growable: false);
 
   @override
   void initState() {
@@ -105,12 +107,26 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   void _onAppStateChanged() {
     if (!mounted) return;
+    _syncSidebarFocusNodes();
+    final routes = _mainRoutes;
+    if (_currentIndex >= routes.length) {
+      _currentIndex = 0;
+      unawaited(_navigatorKey.currentState?.pushReplacementNamed(routes.first));
+    }
     setState(() {});
   }
 
   void _initSidebarFocusNodes() {
-    for (var i = 0; i < _mainRoutes.length; i++) {
+    _syncSidebarFocusNodes();
+  }
+
+  void _syncSidebarFocusNodes() {
+    final routes = _mainRoutes;
+    while (_sidebarFocusNodes.length < routes.length) {
       _sidebarFocusNodes.add(FocusNode());
+    }
+    while (_sidebarFocusNodes.length > routes.length) {
+      _sidebarFocusNodes.removeLast().dispose();
     }
   }
 
@@ -129,12 +145,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _navigateTo(int index) {
-    if (index == _currentIndex) return;
+    final routes = _mainRoutes;
+    if (index < 0 || index >= routes.length || index == _currentIndex) return;
     setState(() {
       _currentIndex = index;
     });
     unawaited(
-      _navigatorKey.currentState?.pushReplacementNamed(_mainRoutes[index]),
+      _navigatorKey.currentState?.pushReplacementNamed(routes[index]),
     );
     // On TV, navigating from sidebar collapses it
     if (shouldUseSidebar(widget.deviceType)) {
@@ -146,6 +163,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         }),
       );
     }
+  }
+
+  void _navigateToRoute(String routeName) {
+    final index = _mainRoutes.indexOf(routeName);
+    if (index >= 0) _navigateTo(index);
   }
 
   void _activateSidebar() {
@@ -441,7 +463,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 child: _ContentNavigator(
                   navigatorKey: _navigatorKey,
                   currentIndex: _currentIndex,
+                  mainRoutes: _mainRoutes,
                   appState: _appState,
+                  onNavigateToRoute: _navigateToRoute,
                   onConnected: () => _navigateTo(0),
                   onOpenPlayer: openPlayer,
                   playbackOrchestratorBuilder:
@@ -472,7 +496,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         child: _ContentNavigator(
                           navigatorKey: _navigatorKey,
                           currentIndex: _currentIndex,
+                          mainRoutes: _mainRoutes,
                           appState: _appState,
+                          onNavigateToRoute: _navigateToRoute,
                           onSidebarActivate: _activateSidebar,
                           onConnected: () => _navigateTo(0),
                           onOpenPlayer: openPlayer,
@@ -490,6 +516,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   bottom: 0,
                   child: NavigationSidebar(
                     currentIndex: _currentIndex,
+                    routes: _mainRoutes,
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
@@ -513,7 +540,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         child: _ContentNavigator(
           navigatorKey: _navigatorKey,
           currentIndex: _currentIndex,
+          mainRoutes: _mainRoutes,
           appState: _appState,
+          onNavigateToRoute: _navigateToRoute,
           onConnected: () => _navigateTo(0),
           onOpenPlayer: openPlayer,
           playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
@@ -543,6 +572,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.dvr => Icons.video_library,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -554,6 +584,7 @@ class NavigationSidebar extends StatelessWidget {
   const NavigationSidebar({
     super.key,
     required this.currentIndex,
+    required this.routes,
     required this.sidebarActive,
     required this.focusNodes,
     required this.scopeNode,
@@ -563,6 +594,7 @@ class NavigationSidebar extends StatelessWidget {
   });
 
   final int currentIndex;
+  final List<String> routes;
   final bool sidebarActive;
   final List<FocusNode> focusNodes;
   final FocusScopeNode scopeNode;
@@ -572,7 +604,6 @@ class NavigationSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const routes = RouteNames.mainRoutes;
     final theme = Theme.of(context);
     final expanded = sidebarActive;
     final width = expanded ? 200.0 : 64.0;
@@ -676,6 +707,7 @@ class NavigationSidebar extends StatelessWidget {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.dvr => Icons.video_library,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -825,7 +857,9 @@ class _ContentNavigator extends StatelessWidget {
   const _ContentNavigator({
     required this.navigatorKey,
     required this.currentIndex,
+    required this.mainRoutes,
     required this.appState,
+    this.onNavigateToRoute,
     this.onSidebarActivate,
     this.onConnected,
     this.onOpenPlayer,
@@ -835,7 +869,9 @@ class _ContentNavigator extends StatelessWidget {
 
   final GlobalKey<NavigatorState> navigatorKey;
   final int currentIndex;
+  final List<String> mainRoutes;
   final AppStateController appState;
+  final void Function(String routeName)? onNavigateToRoute;
   final VoidCallback? onSidebarActivate;
   final VoidCallback? onConnected;
   final void Function(PlayerArgs args)? onOpenPlayer;
@@ -844,8 +880,8 @@ class _ContentNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const routes = RouteNames.mainRoutes;
-    final currentRoute = routes[currentIndex];
+    final currentRoute =
+        mainRoutes[currentIndex.clamp(0, mainRoutes.length - 1)];
     final router = buildAppRouter(
       mainRouteBuilder: _buildMainRoute,
       xtreamService: appState.xtreamService,
@@ -994,21 +1030,8 @@ class _ContentNavigator extends StatelessWidget {
     );
   }
 
-  Future<void> _openRecordings() async {
-    await Future<void>.microtask(() {});
-    final savedFocus = FocusManager.instance.primaryFocus;
-    await navigatorKey.currentState?.push(
-      MaterialPageRoute<void>(
-        builder: (_) => DvrRecordingsScreen(
-          recordings: appState.dvrRecordings,
-          isLoading: appState.isLoadingContent,
-          isConfigured: appState.isConfigured,
-          onPlay: (args) => onOpenPlayer?.call(args),
-          onSidebarActivate: onSidebarActivate,
-        ),
-      ),
-    );
-    savedFocus?.requestFocus();
+  void _openRecordings() {
+    onNavigateToRoute?.call(RouteNames.dvr);
   }
 
   Widget _buildMainRoute(String routeName) {
@@ -1066,6 +1089,13 @@ class _ContentNavigator extends StatelessWidget {
             isConfigured: appState.isConfigured,
             onSeriesSelect: _openSeries,
             favoritesService: appState.seriesFavoritesService,
+            onSidebarActivate: onSidebarActivate,
+          ),
+          RouteNames.dvr => DvrRecordingsScreen(
+            recordings: appState.dvrRecordings,
+            isLoading: appState.isLoadingContent,
+            isConfigured: appState.isConfigured,
+            onPlay: (args) => onOpenPlayer?.call(args),
             onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.settings => SettingsScreen(
@@ -1257,10 +1287,10 @@ class _HomeScreenState extends State<_HomeScreen> {
           Text('Connected source: ${appState.sourceLabel}'),
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
-          recordingsSection,
           liveSection,
           moviesSection,
           seriesSection,
+          if (appState.hasDvrFeature) recordingsSection,
         ],
       ),
     );

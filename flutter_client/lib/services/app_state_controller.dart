@@ -133,6 +133,8 @@ class AppStateController extends ChangeNotifier {
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
   List<Progress> get progressList => _progressList;
+  bool get hasDvrFeature =>
+      authNotifier.authResponse?.hasFeature('dvr') ?? false;
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
     AppSourceType.m3u => 'M3U',
@@ -336,9 +338,11 @@ class AppStateController extends ChangeNotifier {
       final channelsFuture = xtreamService.getLiveStreams();
       final vodItemsFuture = xtreamService.getVodStreams();
       final seriesFuture = xtreamService.getSeries();
-      final recordingsFuture = xtreamService.getDvrRecordings().catchError(
-        (Object _) => const <DvrRecording>[],
-      );
+      final recordingsFuture = hasDvrFeature
+          ? xtreamService.getDvrRecordings().catchError(
+              (Object _) => const <DvrRecording>[],
+            )
+          : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
       final viewersFuture = xtreamService.getViewers();
 
       final results = await Future.wait<Object>(<Future<Object>>[

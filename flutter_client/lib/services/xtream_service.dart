@@ -129,11 +129,15 @@ class XtreamAuthResponse {
     required this.isAuthenticated,
     this.status,
     this.m3uEditorVersion,
+    this.features = const <String>[],
   });
 
   final bool isAuthenticated;
   final String? status;
   final String? m3uEditorVersion;
+  final List<String> features;
+
+  bool hasFeature(String feature) => features.contains(feature);
 }
 
 class XtreamService {
@@ -190,10 +194,15 @@ class XtreamService {
 
     _credentials = normalized;
     _isM3UEditor = true;
+    final features = _asList(m3uEditor['features'])
+        .map((feature) => '$feature')
+        .where((feature) => feature.isNotEmpty)
+        .toList(growable: false);
     return XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
       m3uEditorVersion: '${m3uEditor['version'] ?? ''}',
+      features: features,
     );
   }
 
