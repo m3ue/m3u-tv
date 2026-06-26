@@ -322,6 +322,146 @@ class SeriesInfo {
   final Map<int, List<Episode>> episodesBySeason;
 }
 
+enum DvrRecordingStatus {
+  scheduled,
+  recording,
+  completed,
+  failed,
+  cancelled,
+  unknown,
+}
+
+extension DvrRecordingStatusDisplay on DvrRecordingStatus {
+  String get label => switch (this) {
+    DvrRecordingStatus.scheduled => 'Scheduled',
+    DvrRecordingStatus.recording => 'Recording',
+    DvrRecordingStatus.completed => 'Completed',
+    DvrRecordingStatus.failed => 'Failed',
+    DvrRecordingStatus.cancelled => 'Cancelled',
+    DvrRecordingStatus.unknown => 'Unknown',
+  };
+}
+
+DvrRecordingStatus dvrRecordingStatusFromWire(String value) {
+  return switch (value.trim().toLowerCase()) {
+    'scheduled' => DvrRecordingStatus.scheduled,
+    'recording' ||
+    'in_progress' ||
+    'in-progress' => DvrRecordingStatus.recording,
+    'completed' || 'complete' => DvrRecordingStatus.completed,
+    'failed' || 'error' => DvrRecordingStatus.failed,
+    'cancelled' || 'canceled' => DvrRecordingStatus.cancelled,
+    _ => DvrRecordingStatus.unknown,
+  };
+}
+
+class DvrRecording {
+  const DvrRecording({
+    required this.uuid,
+    required this.title,
+    required this.status,
+    this.subtitle,
+    this.channelId,
+    this.channelName,
+    this.channelIconUrl,
+    this.scheduledStart,
+    this.scheduledEnd,
+    this.actualStart,
+    this.actualEnd,
+    this.durationSeconds,
+    this.fileSizeBytes,
+    this.seasonNumber,
+    this.episodeNumber,
+    this.streamUrl,
+    this.liveUrl,
+    this.edlUrl,
+    this.metadata = const <String, Object?>{},
+    this.errorMessage,
+  });
+
+  final String uuid;
+  final String title;
+  final String? subtitle;
+  final DvrRecordingStatus status;
+  final int? channelId;
+  final String? channelName;
+  final String? channelIconUrl;
+  final DateTime? scheduledStart;
+  final DateTime? scheduledEnd;
+  final DateTime? actualStart;
+  final DateTime? actualEnd;
+  final int? durationSeconds;
+  final int? fileSizeBytes;
+  final int? seasonNumber;
+  final int? episodeNumber;
+  final String? streamUrl;
+  final String? liveUrl;
+  final String? edlUrl;
+  final Map<String, Object?> metadata;
+  final String? errorMessage;
+
+  bool get isInProgress => status == DvrRecordingStatus.recording;
+  bool get isCompleted => status == DvrRecordingStatus.completed;
+
+  String? get playbackUrl {
+    if (isInProgress && liveUrl != null) return liveUrl;
+    if (isCompleted && streamUrl != null) return streamUrl;
+    return streamUrl ?? liveUrl;
+  }
+
+  bool get isPlayable => playbackUrl != null && playbackUrl!.isNotEmpty;
+
+  factory DvrRecording.fromXtream(Map<String, Object?> json) {
+    Object? pick(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value != null && '$value'.isNotEmpty) return value;
+      }
+      return null;
+    }
+
+    final title = _asNullableString(pick(['title', 'name'])) ?? 'Recording';
+    return DvrRecording(
+      uuid: _asNullableString(pick(['uuid', 'id'])) ?? '',
+      title: title,
+      subtitle: _asNullableString(
+        pick(['subtitle', 'episode_title', 'description']),
+      ),
+      status: dvrRecordingStatusFromWire('${pick(['status', 'state']) ?? ''}'),
+      channelId: _asIntOrNull(pick(['channel_id', 'stream_id'])),
+      channelName: _asNullableString(
+        pick(['channel_name', 'channel', 'stream_name']),
+      ),
+      channelIconUrl: _asNullableString(
+        pick(['channel_icon', 'channel_logo', 'stream_icon']),
+      ),
+      scheduledStart: _asDateTimeOrNull(
+        pick(['scheduled_start', 'start_time', 'starts_at']),
+      ),
+      scheduledEnd: _asDateTimeOrNull(
+        pick(['scheduled_end', 'end_time', 'ends_at']),
+      ),
+      actualStart: _asDateTimeOrNull(pick(['actual_start', 'started_at'])),
+      actualEnd: _asDateTimeOrNull(pick(['actual_end', 'ended_at'])),
+      durationSeconds: _asIntOrNull(
+        pick(['duration_seconds', 'duration_secs', 'duration']),
+      ),
+      fileSizeBytes: _asIntOrNull(
+        pick(['file_size_bytes', 'file_size', 'size_bytes']),
+      ),
+      seasonNumber: _asIntOrNull(pick(['season_number', 'season'])),
+      episodeNumber: _asIntOrNull(pick(['episode_number', 'episode'])),
+      streamUrl: _asNullableString(pick(['stream_url'])),
+      liveUrl: _asNullableString(pick(['live_url'])),
+      edlUrl: _asNullableString(pick(['edl_url'])),
+      metadata: _asMap(pick(['metadata', 'meta'])),
+      errorMessage: _asNullableString(
+        pick(['error', 'error_message', 'message']),
+      ),
+    );
+  }
+}
+
 class EpgProgram {
   const EpgProgram({
     required this.channelId,
@@ -582,6 +722,24 @@ String _durationFromSeconds(int seconds) {
 Object? _firstListItem(Object? value) {
   if (value is List && value.isNotEmpty) return value.first;
   return value;
+}
+
+DateTime? _asDateTimeOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is DateTime) return value.toUtc();
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true);
+  }
+  if (value is num) {
+    return DateTime.fromMillisecondsSinceEpoch(
+      value.toInt() * 1000,
+      isUtc: true,
+    );
+  }
+  final text = '$value'.trim();
+  if (text.isEmpty) return null;
+  final parsed = DateTime.tryParse(text);
+  return parsed?.toUtc();
 }
 
 String? _yearFromDate(String? value) {

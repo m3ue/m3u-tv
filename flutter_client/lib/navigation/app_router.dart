@@ -190,6 +190,20 @@ RouteFactory buildAppRouter({
             const PlaceholderScreen(title: 'Series'),
       );
     }
+    if (routeName == RouteNames.dvr) {
+      return _buildRoute(
+        settings,
+        mainRouteBuilder?.call(RouteNames.dvr) ??
+            const PlaceholderScreen(title: 'DVR'),
+      );
+    }
+    if (routeName == RouteNames.requests) {
+      return _buildRoute(
+        settings,
+        mainRouteBuilder?.call(RouteNames.requests) ??
+            const PlaceholderScreen(title: 'Requests'),
+      );
+    }
     if (routeName == RouteNames.settings) {
       return _buildRoute(
         settings,
