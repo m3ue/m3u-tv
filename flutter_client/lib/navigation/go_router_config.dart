@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show AppShell, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
+import 'package:m3u_tv/features/requests/request_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -218,7 +219,29 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: Notifications
+          // Branch 6: Requests
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.requests,
+                pageBuilder: (context, state) {
+                  final actions = ContentActions.of(context);
+                  return NoTransitionPage(
+                    child: _withGradient(
+                      ListenableBuilder(
+                        listenable: actions.appState,
+                        builder: (context, _) => RequestScreen(
+                          isConfigured: actions.appState.isConfigured,
+                          onSidebarActivate: actions.onSidebarActivate,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          // Branch 7: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -231,7 +254,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Settings
+          // Branch 8: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

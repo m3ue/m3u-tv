@@ -168,7 +168,10 @@ void main() {
 
     test('auth success loads categories and typed content', () async {
       final transport = FakeXtreamTransport({
-        'auth': xtreamAuth(auth: 1),
+        'auth': xtreamAuth(
+          auth: 1,
+          features: const <String>['progress', 'dvr', 'requests'],
+        ),
         'get_live_categories': [category('10', 'Live News')],
         'get_vod_categories': [category('20', 'Movies')],
         'get_series_categories': [category('30', 'Series')],
@@ -187,6 +190,12 @@ void main() {
       );
 
       expect(response.isAuthenticated, isTrue);
+      expect(
+        response.features,
+        containsAll(<String>['progress', 'dvr', 'requests']),
+      );
+      expect(response.hasFeature('dvr'), isTrue);
+      expect(response.hasFeature('requests'), isTrue);
       expect(await service.getLiveCategories(), [
         const Category(id: '10', name: 'Live News'),
       ]);
@@ -920,6 +929,7 @@ https://streams.example/live/bbc-one.m3u8
 Map<String, Object?> xtreamAuth({
   required int auth,
   String status = 'Active',
+  List<String> features = const <String>['progress'],
 }) => {
   'user_info': {
     'username': 'demo',
@@ -935,7 +945,7 @@ Map<String, Object?> xtreamAuth({
   },
   'm3u_editor': {
     'version': '0.10.0',
-    'features': <String>['progress'],
+    'features': features,
   },
 };
 
