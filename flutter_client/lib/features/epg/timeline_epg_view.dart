@@ -477,10 +477,6 @@ class _ProgramsRow extends StatelessWidget {
       final fgColor = isCurrent
           ? colorScheme.onPrimaryContainer
           : colorScheme.onSecondaryContainer;
-      final borderColor = isCurrent
-          ? colorScheme.primary.withValues(alpha: 0.6)
-          : colorScheme.outline.withValues(alpha: 0.25);
-
       blocks.add(
         Positioned(
           left: left + 1,
@@ -494,7 +490,6 @@ class _ProgramsRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: borderColor),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child: Text(

@@ -157,11 +157,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                     ),
                   )
                 : switch (_viewMode) {
-                    _ViewMode.epgGrid => TimelineEpgView(
-                      channels: filtered,
-                      epgService: widget.epgService,
-                      onChannelSelect: widget.onChannelSelect,
-                    ),
+                    _ViewMode.epgGrid => _buildEpgGrid(filtered),
                     _ViewMode.logoGrid => _buildGridView(filtered),
                     _ViewMode.list => _buildListView(filtered),
                   },
@@ -243,6 +239,23 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEpgGrid(List<Channel> channels) {
+    return DpadRegion(
+      memoryKey: 'live-tv/epg',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: TimelineEpgView(
+        channels: channels,
+        epgService: widget.epgService,
+        onChannelSelect: widget.onChannelSelect,
       ),
     );
   }
