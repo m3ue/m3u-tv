@@ -67,6 +67,12 @@ class _DpadInkWellState extends State<DpadInkWell> {
   }
 
   @override
+  void didUpdateWidget(DpadInkWell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_hovered && !_isInteractive) setState(() => _hovered = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final effects =
         widget.effects ??
