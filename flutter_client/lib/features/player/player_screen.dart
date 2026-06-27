@@ -137,7 +137,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _scrobble(String action) {
     final service = widget.traktService;
     if (service == null || service.status != TraktAuthStatus.connected) return;
-    if (_isLive) return;
+    if (_isLive || widget.args.type == 'catchup') return;
     final duration = _duration.inSeconds;
     var progress = duration > 0
         ? (_currentPosition.inSeconds / duration * 100).clamp(0.0, 100.0)
