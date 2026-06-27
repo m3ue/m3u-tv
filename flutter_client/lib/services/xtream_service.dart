@@ -432,6 +432,19 @@ class XtreamService {
     return '${c.server}/live/${c.username}/${c.password}/$streamId.$format';
   }
 
+  String getCatchupStreamUrl(
+    int streamId,
+    DateTime start,
+    Duration duration, {
+    String extension = 'ts',
+  }) {
+    final c = _requireCredentials();
+    final normalizedStart = start.toUtc();
+    final startText = _formatTimeshiftStart(normalizedStart);
+    final durationMinutes = duration.inMinutes;
+    return '${c.server}/timeshift/${c.username}/${c.password}/$durationMinutes/$startText/$streamId.$extension';
+  }
+
   String getVodStreamUrl(int streamId, [String extension = 'mp4']) {
     final c = _requireCredentials();
     return '${c.server}/movie/${c.username}/${c.password}/$streamId.$extension';
@@ -657,6 +670,16 @@ String _decodeBase64WhenApplicable(String value) {
   } on FormatException {
     return value;
   }
+}
+
+String _formatTimeshiftStart(DateTime value) {
+  String twoDigits(int number) => number.toString().padLeft(2, '0');
+  final year = value.year.toString().padLeft(4, '0');
+  final month = twoDigits(value.month);
+  final day = twoDigits(value.day);
+  final hour = twoDigits(value.hour);
+  final minute = twoDigits(value.minute);
+  return '$year-$month-$day:$hour-$minute';
 }
 
 String? _stringOrNull(Object? value) {

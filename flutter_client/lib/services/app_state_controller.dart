@@ -116,6 +116,8 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> _vodItems = const <VodItem>[];
   List<Series> _seriesList = const <Series>[];
   List<Progress> _progressList = const <Progress>[];
+  Future<List<Progress>>? _recentlyWatchedRefresh;
+  String? _recentlyWatchedRefreshViewerId;
 
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
@@ -159,11 +161,8 @@ class AppStateController extends ChangeNotifier {
         if (await _hydrateCachedXtreamContent()) {
           _isBootstrapping = false;
           notifyListeners();
-          unawaited(
-            _replaceWithXtreamContent(
-              clearCache: false,
-            ).then((_) => notifyListeners()),
-          );
+          unawaited(_refreshRecentlyWatchedForActiveViewer());
+          unawaited(_replaceWithXtreamContent(clearCache: false));
           return;
         }
         await _replaceWithXtreamContent(clearCache: false);
@@ -362,9 +361,13 @@ class AppStateController extends ChangeNotifier {
       final seriesList = results[5] as List<Series>;
 
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
-      final progress = activeViewer == null
+      final fetched = activeViewer == null
           ? const <Progress>[]
-          : await _loadRecentlyWatched(activeViewer.ulid);
+          : await _loadRecentlyWatchedDeduped(activeViewer.ulid);
+      // Keep local progress if the server returned nothing (e.g. sync lag).
+      final progress = fetched.isEmpty && _progressList.isNotEmpty
+          ? _progressList
+          : fetched;
 
       _sourceType = AppSourceType.xtream;
       _liveCategories = liveCategories;
@@ -389,16 +392,11 @@ class AppStateController extends ChangeNotifier {
       await cacheService.set('liveStreams', channels);
       await cacheService.set('vodStreams', vodItems);
       await cacheService.set('seriesStreams', seriesList);
+      await cacheService.set('viewers', viewers);
       await secureStorage.write(
         _sourceKey,
         jsonEncode(<String, Object?>{'type': 'xtream'}),
       );
-
-      _viewers = viewers;
-      _activeViewer = activeViewer;
-      _progressList = progress;
-      _error = null;
-      notifyListeners();
       return true;
     } on Object catch (error) {
       _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
@@ -428,7 +426,9 @@ class AppStateController extends ChangeNotifier {
     final seriesList =
         (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
         const <Series>[];
-
+    final viewers =
+        (await cacheService.get<List<Viewer>>('viewers'))?.data ??
+        const <Viewer>[];
     final hasContent =
         liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
@@ -445,8 +445,42 @@ class AppStateController extends ChangeNotifier {
     _channels = channels;
     _vodItems = vodItems;
     _seriesList = seriesList;
+    _viewers = viewers;
+    _activeViewer = await viewerService.resolveActiveViewer(viewers);
+    final activeViewer = _activeViewer;
+    _progressList = activeViewer == null
+        ? const <Progress>[]
+        : await resumeService.all(activeViewer.ulid);
     _error = null;
     return true;
+  }
+
+  Future<void> _refreshRecentlyWatchedForActiveViewer() async {
+    final viewer = _activeViewer;
+    if (viewer == null) return;
+    try {
+      final progress = await _loadRecentlyWatchedDeduped(viewer.ulid);
+      if (progress.isEmpty && _progressList.isNotEmpty) return;
+      _progressList = progress;
+      notifyListeners();
+    } on Object catch (_) {}
+  }
+
+  Future<List<Progress>> _loadRecentlyWatchedDeduped(String viewerId) {
+    final inFlight = _recentlyWatchedRefresh;
+    if (inFlight != null && _recentlyWatchedRefreshViewerId == viewerId) {
+      return inFlight;
+    }
+    late final Future<List<Progress>> future;
+    _recentlyWatchedRefreshViewerId = viewerId;
+    future = _loadRecentlyWatched(viewerId).whenComplete(() {
+      if (identical(_recentlyWatchedRefresh, future)) {
+        _recentlyWatchedRefresh = null;
+        _recentlyWatchedRefreshViewerId = null;
+      }
+    });
+    _recentlyWatchedRefresh = future;
+    return future;
   }
 
   Future<List<Progress>> _loadRecentlyWatched(String viewerId) async {

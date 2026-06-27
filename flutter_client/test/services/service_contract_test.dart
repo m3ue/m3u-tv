@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -195,6 +196,60 @@ void main() {
       expect((await service.getVodStreams()).single.containerExtension, 'mp4');
       expect((await service.getSeries()).single.id, 301);
       expect(transport.lastHeaders['X-M3UE-Client'], 'm3u-tv');
+    });
+
+    test('live streams parse Xtream catchup metadata', () async {
+      final service = XtreamService(
+        transport: FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_live_streams': [
+            {
+              ...liveStream(101, 'BBC One', '10', 'bbc.one'),
+              'tv_archive': 1,
+              'tv_archive_duration': '7',
+            },
+            liveStream(102, 'BBC Two', '10', 'bbc.two'),
+          ],
+        }).call,
+      );
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final channels = await service.getLiveStreams();
+
+      expect(channels.first.catchupSupported, isTrue);
+      expect(channels.first.catchupDays, 7);
+      expect(channels.last.catchupSupported, isFalse);
+      expect(channels.last.catchupDays, isNull);
+    });
+
+    test('builds Xtream catchup timeshift URL from program window', () async {
+      final service = XtreamService(
+        transport: FakeXtreamTransport({'auth': xtreamAuth(auth: 1)}).call,
+      );
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example/',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final url = service.getCatchupStreamUrl(
+        101,
+        DateTime.utc(2026, 1, 1, 12, 30),
+        const Duration(minutes: 45),
+      );
+
+      expect(
+        url,
+        'https://xtream.example/timeshift/demo/secret/45/2026-01-01:12-30/101.ts',
+      );
     });
 
     test(
@@ -550,6 +605,23 @@ void main() {
       },
     );
 
+    test('parses M3U catchup attributes into channel metadata', () {
+      final playlist = M3UParser().parse('''
+#EXTM3U
+#EXTINF:-1 tvg-id="bbc.one" tvg-name="BBC One" group-title="News" catchup="default" catchup-days="3" catchup-source="https://archive.example/{utc:Y-m-d:H-M}/{duration}/{channel-id}",BBC One
+https://streams.example/live/bbc-one.m3u8
+''');
+
+      final channel = playlist.channels.single;
+
+      expect(channel.catchupSupported, isTrue);
+      expect(channel.catchupDays, 3);
+      expect(
+        channel.catchupSource,
+        'https://archive.example/{utc:Y-m-d:H-M}/{duration}/{channel-id}',
+      );
+    });
+
     test('malformed playlist reports a typed parse error', () async {
       final text = await io.File(
         'test/fixtures/malformed_playlist.m3u',
@@ -627,6 +699,38 @@ void main() {
   });
 
   group('Local state services', () {
+    test('cache preserves channel catchup metadata', () async {
+      final file = io.File(
+        '${io.Directory.systemTemp.path}/m3u_tv_cache_catchup_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+      final store = PersistentJsonStore(file: file);
+      final cache = CacheService(store: store);
+      await cache.set('liveStreams', const <Channel>[
+        Channel(
+          id: 101,
+          name: 'BBC One',
+          streamUrl: 'https://streams.example/live/bbc-one.m3u8',
+          catchupSupported: true,
+          catchupDays: 7,
+          catchupSource: 'https://archive.example/{utc}/{duration}',
+        ),
+      ]);
+
+      final restored = await CacheService(
+        store: PersistentJsonStore(file: file),
+      ).get<List<Channel>>('liveStreams');
+
+      expect(restored?.data.single.catchupSupported, isTrue);
+      expect(restored?.data.single.catchupDays, 7);
+      expect(
+        restored?.data.single.catchupSource,
+        'https://archive.example/{utc}/{duration}',
+      );
+    });
+
     test('favorites add and remove channel ids', () async {
       final service = FavoritesService(memory: <String, Object?>{});
 

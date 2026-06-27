@@ -159,6 +159,10 @@ class _PendingEntry {
   Channel toChannel(int id, String streamUrl) {
     final group = _normalizeGroup(attributes['group-title']);
     final tvgName = attributes['tvg-name'];
+    final catchupSource = attributes['catchup-source'];
+    final catchupType = attributes['catchup'];
+    final catchupSupported =
+        catchupSource != null || (catchupType != null && catchupType != '0');
     return Channel(
       id: id,
       name: name.isNotEmpty ? name : (tvgName ?? 'Channel $id'),
@@ -169,6 +173,9 @@ class _PendingEntry {
       epgChannelId: attributes['tvg-id'],
       tvgName: tvgName,
       headers: Map.unmodifiable(headers),
+      catchupSupported: catchupSupported,
+      catchupDays: int.tryParse(attributes['catchup-days'] ?? ''),
+      catchupSource: catchupSource,
     );
   }
 }

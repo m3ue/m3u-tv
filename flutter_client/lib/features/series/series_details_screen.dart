@@ -556,11 +556,17 @@ class _EpisodeTile extends StatefulWidget {
 
 class _EpisodeTileState extends State<_EpisodeTile> {
   final FocusNode _focusNode = FocusNode();
+  bool _hovered = false;
 
   @override
   void dispose() {
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _setHovered(bool v) {
+    if (_hovered == v) return;
+    setState(() => _hovered = v);
   }
 
   @override
@@ -588,132 +594,146 @@ class _EpisodeTileState extends State<_EpisodeTile> {
       if (episode.releaseDate != null) episode.releaseDate!,
     ];
 
-    return DpadFocusable(
-      autofocus: autofocus,
-      focusNode: _focusNode,
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: DpadFocusable(
+        autofocus: autofocus,
+        focusNode: _focusNode,
+        onSelect: onTap,
+        builder: (context, state, child) => DpadEffect.wrap(
+          context,
+          const [
+            GradientBorderEffect(
+              borderRadius: BorderRadius.all(Radius.circular(16)),
+            ),
+          ],
+          DpadFocusState(
+            focused: state.focused || _hovered,
+            pressed: state.pressed,
+          ),
+          child,
         ),
-      ],
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            InkWell(
-              onTap: () {
-                _focusNode.requestFocus();
-                onTap();
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Thumbnail or episode-number badge
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: SizedBox(
-                        width: 120,
-                        height: 68,
-                        child: hasThumbnail
-                            ? Image.network(
-                                episode.thumbnailUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) =>
-                                    _episodeNumberBadge(colorScheme),
-                              )
-                            : _episodeNumberBadge(colorScheme),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () {
+                  _focusNode.requestFocus();
+                  onTap();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Thumbnail or episode-number badge
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: SizedBox(
+                          width: 120,
+                          height: 68,
+                          child: hasThumbnail
+                              ? Image.network(
+                                  episode.thumbnailUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _episodeNumberBadge(colorScheme),
+                                )
+                              : _episodeNumberBadge(colorScheme),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Title, meta chips, description
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text.rich(
-                                  TextSpan(
-                                    style: theme.textTheme.titleSmall,
-                                    children: [
-                                      TextSpan(
-                                        text: 'E${episode.episodeNumber} · ',
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                              color:
-                                                  colorScheme.onSurfaceVariant,
-                                            ),
-                                      ),
-                                      TextSpan(text: episode.title),
-                                    ],
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.play_arrow, size: 20),
-                            ],
-                          ),
-                          if (metaChips.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: metaChips
-                                  .map(
-                                    (chip) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.surfaceBright,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        chip,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                              color: colorScheme.onPrimary,
-                                            ),
-                                      ),
+                      const SizedBox(width: 12),
+                      // Title, meta chips, description
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text.rich(
+                                    TextSpan(
+                                      style: theme.textTheme.titleSmall,
+                                      children: [
+                                        TextSpan(
+                                          text: 'E${episode.episodeNumber} · ',
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                        TextSpan(text: episode.title),
+                                      ],
                                     ),
-                                  )
-                                  .toList(),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.play_arrow, size: 20),
+                              ],
                             ),
-                          ],
-                          if (episode.plot != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              episode.plot!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                            if (metaChips.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: metaChips
+                                    .map(
+                                      (chip) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.surfaceBright,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          chip,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                                color: colorScheme.onPrimary,
+                                              ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            ],
+                            if (episode.plot != null) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                episode.plot!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (progressValue != null)
-              LinearProgressIndicator(
-                value: progressValue,
-                minHeight: 3,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation(colorScheme.primary),
-              ),
-          ],
+              if (progressValue != null)
+                LinearProgressIndicator(
+                  value: progressValue,
+                  minHeight: 3,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+                ),
+            ],
+          ),
         ),
       ),
     );

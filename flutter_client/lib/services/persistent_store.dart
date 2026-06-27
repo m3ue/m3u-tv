@@ -6,35 +6,51 @@ class PersistentJsonStore {
 
   final File _file;
   Map<String, Object?>? _cache;
+  Future<void> _pendingWrite = Future<void>.value();
 
   Future<Object?> read(String key) async {
-    final data = await _readAll();
+    await _pendingWrite;
+    final data = await _readAllUnlocked();
     return data[key];
   }
 
   Future<void> write(String key, Object? value) async {
-    final data = await _readAll();
-    data[key] = value;
-    await _writeAll(data);
+    await _queueWrite(() async {
+      final data = await _readAllUnlocked();
+      data[key] = value;
+      await _writeAll(data);
+    });
   }
 
   Future<void> delete(String key) async {
-    final data = await _readAll();
-    data.remove(key);
-    await _writeAll(data);
+    await _queueWrite(() async {
+      final data = await _readAllUnlocked();
+      data.remove(key);
+      await _writeAll(data);
+    });
   }
 
   Future<Map<String, Object?>> snapshot() async {
-    return Map<String, Object?>.from(await _readAll());
+    await _pendingWrite;
+    return Map<String, Object?>.from(await _readAllUnlocked());
   }
 
   Future<void> removeWhere(bool Function(String key) test) async {
-    final data = await _readAll();
-    data.removeWhere((key, value) => test(key));
-    await _writeAll(data);
+    await _queueWrite(() async {
+      final data = await _readAllUnlocked();
+      data.removeWhere((key, value) => test(key));
+      await _writeAll(data);
+    });
   }
 
-  Future<Map<String, Object?>> _readAll() async {
+  Future<void> _queueWrite(Future<void> Function() operation) {
+    final previous = _pendingWrite;
+    final next = previous.then((_) => operation(), onError: (_) => operation());
+    _pendingWrite = next.catchError((_) {});
+    return next;
+  }
+
+  Future<Map<String, Object?>> _readAllUnlocked() async {
     final cached = _cache;
     if (cached != null) return cached;
     if (!await _file.exists()) {

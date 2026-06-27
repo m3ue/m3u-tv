@@ -179,7 +179,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
     var resolvedArgs = args;
-    if (resolvedArgs.type != 'live' &&
+    if ((resolvedArgs.type == 'vod' || resolvedArgs.type == 'series') &&
         resolvedArgs.startPosition == null &&
         resolvedArgs.streamId != null) {
       final target = resolvedArgs.type == 'series'
@@ -705,6 +705,7 @@ class SidebarDestinationItem extends StatefulWidget {
 
 class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   bool _focused = false;
+  bool _hovered = false;
 
   @override
   void initState() {
@@ -724,6 +725,11 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     });
   }
 
+  void _setHovered(bool v) {
+    if (_hovered == v) return;
+    setState(() => _hovered = v);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -734,85 +740,93 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     if (widget.selected) {
       backgroundColor = colorScheme.primaryContainer;
       foregroundColor = colorScheme.onPrimaryContainer;
-    } else if (_focused) {
+    } else if (_focused || _hovered) {
       backgroundColor = colorScheme.surfaceContainerHigh;
       foregroundColor = colorScheme.onSurface;
     }
 
-    return Focus(
-      focusNode: widget.focusNode,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.select ||
-            event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: InkWell(
-        onTap: () {
-          widget.focusNode.requestFocus();
-          widget.onTap();
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: Focus(
+        focusNode: widget.focusNode,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.select ||
+              event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.enter) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
-        customBorder: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: OverflowBox(
-                maxWidth: 200,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, color: foregroundColor, size: 24),
-                    if (widget.expanded) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        widget.label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: foregroundColor,
+        child: InkWell(
+          onTap: () {
+            widget.focusNode.requestFocus();
+            widget.onTap();
+          },
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: OverflowBox(
+                  maxWidth: 200,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(widget.icon, color: foregroundColor, size: 24),
+                      if (widget.expanded) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          widget.label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: foregroundColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _focused && !widget.selected ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: CustomPaint(
-                    painter: GradientBorderPainter(
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      width: 2.5,
-                      gradient: LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.secondary,
-                        ],
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: (_focused || _hovered) && !widget.selected
+                        ? 1.0
+                        : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: CustomPaint(
+                      painter: GradientBorderPainter(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(8),
+                        ),
+                        width: 2.5,
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.secondary,
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -873,6 +887,36 @@ class _ContentNavigator extends StatelessWidget {
         streamId: channel.id,
         epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
         headers: channel.headers,
+      ),
+    );
+  }
+
+  void _openCatchupProgram(Channel channel, EpgProgram program) {
+    if (appState.sourceType != AppSourceType.xtream) {
+      _openChannel(channel);
+      return;
+    }
+    final duration = program.end.difference(program.start);
+    final streamUrl = appState.xtreamService.getCatchupStreamUrl(
+      channel.id,
+      program.start,
+      duration,
+    );
+    onOpenPlayer?.call(
+      PlayerArgs(
+        streamUrl: streamUrl,
+        title: '${channel.name} - ${program.title}',
+        type: 'catchup',
+        streamId: channel.id,
+        startPosition: 0,
+        epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+        headers: channel.headers,
+        metadata: <String, Object?>{
+          'catchup': true,
+          'program_title': program.title,
+          'program_start': program.start.toIso8601String(),
+          'program_end': program.end.toIso8601String(),
+        },
       ),
     );
   }
@@ -1029,6 +1073,7 @@ class _ContentNavigator extends StatelessWidget {
             favoritesService: appState.favoritesService,
             epgService: appState.epgService,
             onChannelSelect: _openChannel,
+            onCatchupProgramSelect: _openCatchupProgram,
             onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.vod => VodScreen(

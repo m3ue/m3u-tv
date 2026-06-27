@@ -73,6 +73,9 @@ Object? _encodeCacheData(String key, Object? data) {
   if (data is List<Series>) {
     return data.map(_seriesToJson).toList(growable: false);
   }
+  if (data is List<Viewer>) {
+    return data.map((viewer) => viewer.toJson()).toList(growable: false);
+  }
   if (data is String || data is num || data is bool || data == null) {
     return data;
   }
@@ -112,6 +115,9 @@ Object? _decodeCacheData(String key, Object? raw) {
               groupTitle: _nullableString(json['group_title']),
               epgChannelId: _nullableString(json['epg_channel_id']),
               tvgName: _nullableString(json['tvg_name']),
+              catchupSupported: _asBool(json['catchup_supported']),
+              catchupDays: _asIntOrNull(json['catchup_days']),
+              catchupSource: _nullableString(json['catchup_source']),
             );
           })
           .toList(growable: false),
@@ -134,6 +140,12 @@ Object? _decodeCacheData(String key, Object? raw) {
       list
           ?.map((item) => Series.fromXtream(_asMap(item)))
           .toList(growable: false),
+    'viewers' =>
+      list
+          ?.map((item) => Viewer.fromJson(_asMap(item)))
+          .toList(
+            growable: false,
+          ),
     _ => raw,
   };
 }
@@ -153,6 +165,9 @@ Map<String, Object?> _channelToJson(Channel channel) => <String, Object?>{
   if (channel.groupTitle != null) 'group_title': channel.groupTitle,
   if (channel.epgChannelId != null) 'epg_channel_id': channel.epgChannelId,
   if (channel.tvgName != null) 'tvg_name': channel.tvgName,
+  if (channel.catchupSupported) 'catchup_supported': channel.catchupSupported,
+  if (channel.catchupDays != null) 'catchup_days': channel.catchupDays,
+  if (channel.catchupSource != null) 'catchup_source': channel.catchupSource,
 };
 
 Map<String, Object?> _vodToJson(VodItem item) => <String, Object?>{
@@ -179,8 +194,22 @@ Map<String, Object?> _asMap(Object? value) =>
 
 int _asInt(Object? value) => value is int ? value : int.tryParse('$value') ?? 0;
 
+int? _asIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
+}
+
 double? _asDouble(Object? value) =>
     value is num ? value.toDouble() : double.tryParse('$value');
+
+bool _asBool(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final text = '$value'.trim().toLowerCase();
+  return text == '1' || text == 'true' || text == 'yes';
+}
 
 String? _nullableString(Object? value) {
   if (value == null) return null;

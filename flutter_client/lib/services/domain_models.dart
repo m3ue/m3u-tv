@@ -59,6 +59,9 @@ class Channel {
     this.epgChannelId,
     this.tvgName,
     this.headers = const {},
+    this.catchupSupported = false,
+    this.catchupDays,
+    this.catchupSource,
   });
 
   final int id;
@@ -70,16 +73,33 @@ class Channel {
   final String? epgChannelId;
   final String? tvgName;
   final Map<String, String> headers;
+  final bool catchupSupported;
+  final int? catchupDays;
+  final String? catchupSource;
 
-  factory Channel.fromXtream(Map<String, Object?> json, String streamUrl) =>
-      Channel(
-        id: _asInt(json['stream_id']),
-        name: '${json['name'] ?? ''}',
-        streamUrl: streamUrl,
-        logoUrl: _asNullableString(json['stream_icon']),
-        categoryId: _asNullableString(json['category_id']),
-        epgChannelId: _asNullableString(json['epg_channel_id']),
-      );
+  factory Channel.fromXtream(Map<String, Object?> json, String streamUrl) {
+    final catchupSource = _asNullableString(json['catchup_source']);
+    final catchupDays = _asIntOrNull(
+      json['tv_archive_duration'] ??
+          json['catchup_days'] ??
+          json['catchup-days'],
+    );
+    final catchupType = _asNullableString(json['catchup']);
+    final hasCatchupType = catchupType != null && catchupType != '0';
+    final catchupSupported =
+        _asBool(json['tv_archive']) || hasCatchupType || catchupSource != null;
+    return Channel(
+      id: _asInt(json['stream_id']),
+      name: '${json['name'] ?? ''}',
+      streamUrl: streamUrl,
+      logoUrl: _asNullableString(json['stream_icon']),
+      categoryId: _asNullableString(json['category_id']),
+      epgChannelId: _asNullableString(json['epg_channel_id']),
+      catchupSupported: catchupSupported,
+      catchupDays: catchupDays,
+      catchupSource: catchupSource,
+    );
+  }
 }
 
 class VodItem {
@@ -547,6 +567,13 @@ double? _asDoubleOrNull(Object? value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse('$value');
+}
+
+bool _asBool(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final text = '$value'.trim().toLowerCase();
+  return text == '1' || text == 'true' || text == 'yes' || text == 'default';
 }
 
 String? _asNullableString(Object? value) {
