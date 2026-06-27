@@ -446,10 +446,16 @@ class _ConnectedViewState extends State<_ConnectedView> {
           title: 'Connection',
           child: Column(
             children: [
-              const _StatusRow(
+              _StatusRow(
                 label: 'Status',
-                value: 'Connected',
-                valueColor: Colors.green,
+                value:
+                    widget.sourceError != null && widget.sourceError!.isNotEmpty
+                    ? 'Unavailable'
+                    : 'Connected',
+                valueColor:
+                    widget.sourceError != null && widget.sourceError!.isNotEmpty
+                    ? Colors.orange
+                    : Colors.green,
               ),
               if (widget.sourceLabel != null) ...[
                 const Divider(),
@@ -485,10 +491,10 @@ class _ConnectedViewState extends State<_ConnectedView> {
                       ),
                     ),
                     DpadFocusable(
-                      onSelect: widget.onDisconnect,
+                      onSelect: _handleDisconnect,
                       effects: _kStadiumEffect,
                       child: FilledButton.tonalIcon(
-                        onPressed: widget.onDisconnect,
+                        onPressed: _handleDisconnect,
                         icon: const Icon(Icons.settings),
                         label: const Text('Edit server settings'),
                       ),
