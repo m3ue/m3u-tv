@@ -705,6 +705,7 @@ class SidebarDestinationItem extends StatefulWidget {
 
 class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   bool _focused = false;
+  bool _hovered = false;
 
   @override
   void initState() {
@@ -724,6 +725,11 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     });
   }
 
+  void _setHovered(bool v) {
+    if (_hovered == v) return;
+    setState(() => _hovered = v);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -734,85 +740,93 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     if (widget.selected) {
       backgroundColor = colorScheme.primaryContainer;
       foregroundColor = colorScheme.onPrimaryContainer;
-    } else if (_focused) {
+    } else if (_focused || _hovered) {
       backgroundColor = colorScheme.surfaceContainerHigh;
       foregroundColor = colorScheme.onSurface;
     }
 
-    return Focus(
-      focusNode: widget.focusNode,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.select ||
-            event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: InkWell(
-        onTap: () {
-          widget.focusNode.requestFocus();
-          widget.onTap();
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: Focus(
+        focusNode: widget.focusNode,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.select ||
+              event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.enter) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
-        customBorder: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: OverflowBox(
-                maxWidth: 200,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, color: foregroundColor, size: 24),
-                    if (widget.expanded) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        widget.label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: foregroundColor,
+        child: InkWell(
+          onTap: () {
+            widget.focusNode.requestFocus();
+            widget.onTap();
+          },
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: OverflowBox(
+                  maxWidth: 200,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(widget.icon, color: foregroundColor, size: 24),
+                      if (widget.expanded) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          widget.label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: foregroundColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _focused && !widget.selected ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: CustomPaint(
-                    painter: GradientBorderPainter(
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      width: 2.5,
-                      gradient: LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.secondary,
-                        ],
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: (_focused || _hovered) && !widget.selected
+                        ? 1.0
+                        : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: CustomPaint(
+                      painter: GradientBorderPainter(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(8),
+                        ),
+                        width: 2.5,
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.secondary,
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1068,6 +1082,7 @@ class _ContentNavigator extends StatelessWidget {
             isLoading: appState.isLoadingContent,
             isConfigured: appState.isConfigured,
             onVodSelect: _openVod,
+            favoritesService: appState.vodFavoritesService,
             onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.series => SeriesScreen(
@@ -1076,6 +1091,7 @@ class _ContentNavigator extends StatelessWidget {
             isLoading: appState.isLoadingContent,
             isConfigured: appState.isConfigured,
             onSeriesSelect: _openSeries,
+            favoritesService: appState.seriesFavoritesService,
             onSidebarActivate: onSidebarActivate,
           ),
           RouteNames.settings => SettingsScreen(
@@ -1105,7 +1121,7 @@ class _ContentNavigator extends StatelessWidget {
   }
 }
 
-class _HomeScreen extends StatelessWidget {
+class _HomeScreen extends StatefulWidget {
   const _HomeScreen({
     required this.appState,
     required this.onChannelSelect,
@@ -1123,7 +1139,34 @@ class _HomeScreen extends StatelessWidget {
   final VoidCallback? onSidebarActivate;
 
   @override
+  State<_HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<_HomeScreen> {
+  Set<int> _favoriteVodIds = {};
+  Set<int> _favoriteSeriesIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadFavorites());
+  }
+
+  Future<void> _loadFavorites() async {
+    final appState = widget.appState;
+    final vod = await appState.vodFavoritesService.all();
+    final series = await appState.seriesFavoritesService.all();
+    if (mounted) {
+      setState(() {
+        _favoriteVodIds = vod;
+        _favoriteSeriesIds = series;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final appState = widget.appState;
     if (!appState.isConfigured) {
       return const Scaffold(
         body: Center(child: Text('Please connect to your service in Settings')),
@@ -1140,7 +1183,7 @@ class _HomeScreen extends StatelessWidget {
       emptyLabel: 'No Continue Watching available',
       items: continueWatchingItems,
       landscapeStyle: true,
-      onSidebarActivate: onSidebarActivate,
+      onSidebarActivate: widget.onSidebarActivate,
     );
     final liveSection = MediaPreviewSection(
       title: 'Live TV',
@@ -1161,11 +1204,11 @@ class _HomeScreen extends StatelessWidget {
               imageFit: BoxFit.contain,
               imagePadding: const EdgeInsets.all(10),
               imageBackgroundColor: Colors.transparent,
-              onTap: () => onChannelSelect(channel),
+              onTap: () => widget.onChannelSelect(channel),
             ),
           )
           .toList(growable: false),
-      onSidebarActivate: onSidebarActivate,
+      onSidebarActivate: widget.onSidebarActivate,
     );
     final moviesSection = MediaPreviewSection(
       title: 'Movies',
@@ -1179,11 +1222,16 @@ class _HomeScreen extends StatelessWidget {
               subtitle: item.rating == null ? 'Movie' : '★ ${item.rating}',
               fallbackIcon: Icons.movie,
               fallbackTitle: item.name,
-              onTap: () => onVodSelect(item),
+              isFavorite: _favoriteVodIds.contains(item.id),
+              onTap: () => widget.onVodSelect(item),
+              onLongTap: () async {
+                await appState.vodFavoritesService.toggle(item.id);
+                await _loadFavorites();
+              },
             ),
           )
           .toList(growable: false),
-      onSidebarActivate: onSidebarActivate,
+      onSidebarActivate: widget.onSidebarActivate,
     );
     final seriesSection = MediaPreviewSection(
       title: 'Series',
@@ -1197,11 +1245,16 @@ class _HomeScreen extends StatelessWidget {
               subtitle: series.rating == null ? 'Series' : '★ ${series.rating}',
               fallbackIcon: Icons.tv,
               fallbackTitle: series.name,
-              onTap: () => onSeriesSelect(series),
+              isFavorite: _favoriteSeriesIds.contains(series.id),
+              onTap: () => widget.onSeriesSelect(series),
+              onLongTap: () async {
+                await appState.seriesFavoritesService.toggle(series.id);
+                await _loadFavorites();
+              },
             ),
           )
           .toList(growable: false),
-      onSidebarActivate: onSidebarActivate,
+      onSidebarActivate: widget.onSidebarActivate,
     );
     return Scaffold(
       body: ListView(
@@ -1243,7 +1296,7 @@ class _HomeScreen extends StatelessWidget {
             ? (plot.length > 120 ? '${plot.substring(0, 117)}…' : plot)
             : null;
         final vodFallbackLogo = (!hasBackdrop && progress.thumbnailUrl == null)
-            ? appState.vodItems
+            ? widget.appState.vodItems
                   .firstWhereOrNull((v) => v.id == progress.streamId)
                   ?.logoUrl
             : null;
@@ -1262,11 +1315,11 @@ class _HomeScreen extends StatelessWidget {
             if (progress.rating != null) '★ ${progress.rating}',
             if (progress.runtime != null) progress.runtime!,
           ],
-          onTap: () => onProgressSelect(progress),
+          onTap: () => widget.onProgressSelect(progress),
         );
       }
       // Legacy fallback: look up from local VOD list.
-      final item = appState.vodItems.firstWhereOrNull(
+      final item = widget.appState.vodItems.firstWhereOrNull(
         (item) => item.id == progress.streamId,
       );
       if (item == null) return null;
@@ -1288,7 +1341,7 @@ class _HomeScreen extends StatelessWidget {
         overlayBadges: <String>[
           if (item.rating != null) '★ ${item.rating!.toStringAsFixed(1)}',
         ],
-        onTap: () => onProgressSelect(progress),
+        onTap: () => widget.onProgressSelect(progress),
       );
     }
 
@@ -1310,7 +1363,7 @@ class _HomeScreen extends StatelessWidget {
             (progress.seasonNumber != null
                 ? 'Season ${progress.seasonNumber}'
                 : null);
-        final seriesFallback = appState.seriesList.firstWhereOrNull(
+        final seriesFallback = widget.appState.seriesList.firstWhereOrNull(
           (s) => s.id == progress.seriesId,
         );
         return MediaPreviewItem(
@@ -1331,12 +1384,12 @@ class _HomeScreen extends StatelessWidget {
             if (progress.rating != null) '★ ${progress.rating}',
             if (progress.runtime != null) progress.runtime!,
           ],
-          onTap: () => onProgressSelect(progress),
+          onTap: () => widget.onProgressSelect(progress),
         );
       }
       // Legacy fallback: look up from local series list.
       if (progress.seriesId != null) {
-        final series = appState.seriesList.firstWhereOrNull(
+        final series = widget.appState.seriesList.firstWhereOrNull(
           (series) => series.id == progress.seriesId,
         );
         if (series == null) return null;
@@ -1348,7 +1401,7 @@ class _HomeScreen extends StatelessWidget {
               : 'Series',
           fallbackIcon: Icons.tv,
           fallbackTitle: series.name,
-          onTap: () => onProgressSelect(progress),
+          onTap: () => widget.onProgressSelect(progress),
         );
       }
     }

@@ -46,6 +46,7 @@ class DpadInkWell extends StatefulWidget {
 
 class _DpadInkWellState extends State<DpadInkWell> {
   final FocusNode _focusNode = FocusNode();
+  bool _hovered = false;
 
   @override
   void dispose() {
@@ -56,6 +57,19 @@ class _DpadInkWellState extends State<DpadInkWell> {
   void _onTap() {
     _focusNode.requestFocus();
     widget.onTap?.call();
+  }
+
+  bool get _isInteractive => widget.onTap != null || widget.onLongTap != null;
+
+  void _setHovered(bool hovered) {
+    if (!_isInteractive || _hovered == hovered) return;
+    setState(() => _hovered = hovered);
+  }
+
+  @override
+  void didUpdateWidget(DpadInkWell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_hovered && !_isInteractive) setState(() => _hovered = false);
   }
 
   @override
@@ -69,23 +83,35 @@ class _DpadInkWellState extends State<DpadInkWell> {
                 const BorderRadius.all(Radius.circular(8)),
           ),
         ];
-    return DpadFocusable(
-      focusNode: _focusNode,
-      onSelect: widget.onTap == null ? null : _onTap,
-      onLongSelect: widget.onLongTap,
-      effects: effects,
-      autofocus: widget.autofocus,
-      entry: widget.entry,
-      scrollPadding: widget.scrollPadding,
-      child: Material(
-        color: widget.color ?? Colors.transparent,
-        borderRadius: widget.borderRadius,
-        clipBehavior: widget.clipBehavior,
-        child: InkWell(
-          onTap: widget.onTap == null ? null : _onTap,
-          onLongPress: widget.onLongTap,
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: DpadFocusable(
+        focusNode: _focusNode,
+        onSelect: widget.onTap == null ? null : _onTap,
+        onLongSelect: widget.onLongTap,
+        builder: (context, state, child) => DpadEffect.wrap(
+          context,
+          effects,
+          DpadFocusState(
+            focused: state.focused || _hovered,
+            pressed: state.pressed,
+          ),
+          child,
+        ),
+        autofocus: widget.autofocus,
+        entry: widget.entry,
+        scrollPadding: widget.scrollPadding,
+        child: Material(
+          color: widget.color ?? Colors.transparent,
           borderRadius: widget.borderRadius,
-          child: widget.child,
+          clipBehavior: widget.clipBehavior,
+          child: InkWell(
+            onTap: widget.onTap == null ? null : _onTap,
+            onLongPress: widget.onLongTap,
+            borderRadius: widget.borderRadius,
+            child: widget.child,
+          ),
         ),
       ),
     );

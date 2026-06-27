@@ -465,6 +465,8 @@ class MediaPreviewItem {
     required this.title,
     required this.fallbackIcon,
     required this.onTap,
+    this.onLongTap,
+    this.isFavorite = false,
     this.imageUrl,
     this.subtitle,
     this.imageFit = BoxFit.cover,
@@ -482,6 +484,8 @@ class MediaPreviewItem {
   final String? subtitle;
   final IconData fallbackIcon;
   final VoidCallback onTap;
+  final VoidCallback? onLongTap;
+  final bool isFavorite;
   final BoxFit imageFit;
   final double? imageAspectRatio;
   final String? fallbackTitle;
@@ -634,14 +638,6 @@ class MediaPreviewCard extends StatefulWidget {
 }
 
 class _MediaPreviewCardState extends State<MediaPreviewCard> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -655,30 +651,19 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
 
-    final card = Material(
-      color: colorScheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          // Explicitly request focus so that navigation (pushNamed / player
-          // open) can snapshot primaryFocus and restore it on pop/close.
-          // DpadFocusable.onTapDown also calls requestFocus, but that fires
-          // asynchronously and may lose the race on fast taps.
-          _focusNode.requestFocus();
-          item.onTap();
-        },
+    return SizedBox(
+      width: width,
+      child: DpadInkWell(
+        autofocus: widget.autofocus,
+        onTap: item.onTap,
+        onLongTap: item.onLongTap,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+        clipBehavior: Clip.antiAlias,
         child: widget.landscapeStyle
             ? _buildLandscapeContent(context, colorScheme, width)
             : _buildDefaultContent(context, colorScheme, isRating),
       ),
-    );
-
-    return DpadFocusable(
-      autofocus: widget.autofocus,
-      focusNode: _focusNode,
-      onSelect: item.onTap,
-      child: SizedBox(width: width, child: card),
     );
   }
 
@@ -876,14 +861,29 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
         Expanded(
           child: Padding(
             padding: widget.item.imagePadding,
-            child: ResilientMediaImage(
-              imageUrl: item.imageUrl,
-              fallbackIcon: item.fallbackIcon,
-              fit: item.imageFit,
-              aspectRatio: item.imageAspectRatio,
-              fallbackTitle: item.fallbackTitle,
-              backgroundColor: item.imageBackgroundColor,
-              borderRadius: 0,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ResilientMediaImage(
+                  imageUrl: item.imageUrl,
+                  fallbackIcon: item.fallbackIcon,
+                  fit: item.imageFit,
+                  aspectRatio: item.imageAspectRatio,
+                  fallbackTitle: item.fallbackTitle,
+                  backgroundColor: item.imageBackgroundColor,
+                  borderRadius: 0,
+                ),
+                if (item.isFavorite)
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Icon(
+                      Icons.star,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

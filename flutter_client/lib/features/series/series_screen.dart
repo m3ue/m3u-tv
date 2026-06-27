@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Series screen with category filtering and poster grid.
@@ -18,6 +22,7 @@ class SeriesScreen extends StatefulWidget {
     required this.isLoading,
     required this.isConfigured,
     required this.onSeriesSelect,
+    this.favoritesService,
     this.onSidebarActivate,
   });
 
@@ -26,6 +31,7 @@ class SeriesScreen extends StatefulWidget {
   final bool isLoading;
   final bool isConfigured;
   final void Function(Series) onSeriesSelect;
+  final FavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -35,18 +41,39 @@ class SeriesScreen extends StatefulWidget {
 class _SeriesScreenState extends State<SeriesScreen> {
   static const double _minPosterCardWidth = 120;
   static const int _desktopPosterColumns = 5;
+  static const _kFavoritesCategoryId = '__FAVORITES__';
 
   String? _selectedCategory;
   String _query = '';
+  Set<int> _favoriteIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadFavorites());
+  }
+
+  Future<void> _loadFavorites() async {
+    final service = widget.favoritesService;
+    if (service == null) return;
+    final ids = await service.all();
+    if (mounted) setState(() => _favoriteIds = ids);
+  }
 
   List<Series> get _filteredItems {
     final selectedCategory = _selectedCategory;
-    final categoryFiltered =
-        selectedCategory == null || selectedCategory.isEmpty
-        ? widget.seriesList
-        : widget.seriesList.where(
-            (item) => item.categoryId == selectedCategory,
-          );
+    final Iterable<Series> categoryFiltered;
+    if (selectedCategory == _kFavoritesCategoryId) {
+      categoryFiltered = widget.seriesList.where(
+        (item) => _favoriteIds.contains(item.id),
+      );
+    } else if (selectedCategory == null || selectedCategory.isEmpty) {
+      categoryFiltered = widget.seriesList;
+    } else {
+      categoryFiltered = widget.seriesList.where(
+        (item) => item.categoryId == selectedCategory,
+      );
+    }
     final normalizedQuery = _query.trim().toLowerCase();
     if (normalizedQuery.isEmpty) {
       return categoryFiltered.toList(growable: false);
@@ -114,6 +141,8 @@ class _SeriesScreenState extends State<SeriesScreen> {
   Widget _buildCategoryBar() {
     final tabs = [
       const CategoryTabData(id: '', name: 'All Series'),
+      if (_favoriteIds.isNotEmpty)
+        const CategoryTabData(id: _kFavoritesCategoryId, name: '★ Favorites'),
       ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
 
@@ -156,7 +185,14 @@ class _SeriesScreenState extends State<SeriesScreen> {
               return _SeriesCard(
                 item: item,
                 autofocus: index == 0,
+                isFavorite: _favoriteIds.contains(item.id),
                 onTap: () => widget.onSeriesSelect(item),
+                onLongTap: widget.favoritesService == null
+                    ? null
+                    : () async {
+                        await widget.favoritesService!.toggle(item.id);
+                        await _loadFavorites();
+                      },
               );
             },
           ),
@@ -166,48 +202,33 @@ class _SeriesScreenState extends State<SeriesScreen> {
   }
 }
 
-class _SeriesCard extends StatefulWidget {
+class _SeriesCard extends StatelessWidget {
   const _SeriesCard({
     required this.item,
     required this.onTap,
+    this.onLongTap,
+    this.isFavorite = false,
     this.autofocus = false,
   });
 
   final Series item;
   final VoidCallback onTap;
+  final VoidCallback? onLongTap;
+  final bool isFavorite;
   final bool autofocus;
 
   @override
-  State<_SeriesCard> createState() => _SeriesCardState();
-}
-
-class _SeriesCardState extends State<_SeriesCard> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final item = widget.item;
-    return DpadFocusable(
-      autofocus: widget.autofocus,
-      focusNode: _focusNode,
-      onSelect: widget.onTap,
-      child: Material(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            _focusNode.requestFocus();
-            widget.onTap();
-          },
-          child: Column(
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onTap,
+      onLongTap: onLongTap,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: Stack(
+        children: [
+          Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
@@ -242,7 +263,17 @@ class _SeriesCardState extends State<_SeriesCard> {
               ),
             ],
           ),
-        ),
+          if (isFavorite)
+            Positioned(
+              top: 4,
+              left: 4,
+              child: Icon(
+                Icons.star,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+            ),
+        ],
       ),
     );
   }

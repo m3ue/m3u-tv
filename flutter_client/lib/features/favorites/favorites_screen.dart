@@ -1,24 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 /// Favorites screen with tabs for Live TV, Movies, and Series favorites.
 ///
-/// Mirrors the RN LiveTVScreen favorites behavior:
-/// - Live TV favorites are a pseudo-category (live-only)
-/// - VOD and Series favorites are separate tabs
-/// - Toggle favorites via long-press
+/// Long-press any item to toggle its favorite status.
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({
     super.key,
     required this.channels,
     required this.vodItems,
     required this.seriesList,
-    required this.favoriteChannelIds,
-    required this.favoriteVodIds,
-    required this.favoriteSeriesIds,
     required this.isConfigured,
-    required this.favoritesService,
+    required this.channelFavoritesService,
+    required this.vodFavoritesService,
+    required this.seriesFavoritesService,
     required this.onChannelSelect,
     required this.onVodSelect,
     required this.onSeriesSelect,
@@ -27,11 +26,10 @@ class FavoritesScreen extends StatefulWidget {
   final List<Channel> channels;
   final List<VodItem> vodItems;
   final List<Series> seriesList;
-  final Set<int> favoriteChannelIds;
-  final Set<int> favoriteVodIds;
-  final Set<int> favoriteSeriesIds;
   final bool isConfigured;
-  final FavoritesService favoritesService;
+  final FavoritesService channelFavoritesService;
+  final FavoritesService vodFavoritesService;
+  final FavoritesService seriesFavoritesService;
   final void Function(Channel) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
@@ -43,6 +41,9 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Set<int> _favoriteChannelIds = {};
+  Set<int> _favoriteVodIds = {};
+  Set<int> _favoriteSeriesIds = {};
 
   static const _tabs = [
     Tab(text: 'Live TV'),
@@ -54,6 +55,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    unawaited(_loadFavorites());
   }
 
   @override
@@ -62,16 +64,27 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     super.dispose();
   }
 
-  List<Channel> get _favoriteChannels => widget.channels
-      .where((c) => widget.favoriteChannelIds.contains(c.id))
-      .toList();
+  Future<void> _loadFavorites() async {
+    final channels = await widget.channelFavoritesService.all();
+    final vod = await widget.vodFavoritesService.all();
+    final series = await widget.seriesFavoritesService.all();
+    if (mounted) {
+      setState(() {
+        _favoriteChannelIds = channels;
+        _favoriteVodIds = vod;
+        _favoriteSeriesIds = series;
+      });
+    }
+  }
 
-  List<VodItem> get _favoriteVodItems => widget.vodItems
-      .where((v) => widget.favoriteVodIds.contains(v.id))
-      .toList();
+  List<Channel> get _favoriteChannels =>
+      widget.channels.where((c) => _favoriteChannelIds.contains(c.id)).toList();
+
+  List<VodItem> get _favoriteVodItems =>
+      widget.vodItems.where((v) => _favoriteVodIds.contains(v.id)).toList();
 
   List<Series> get _favoriteSeriesList => widget.seriesList
-      .where((s) => widget.favoriteSeriesIds.contains(s.id))
+      .where((s) => _favoriteSeriesIds.contains(s.id))
       .toList();
 
   bool get _hasAnyFavorites =>
@@ -134,21 +147,26 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       itemCount: favorites.length,
       itemBuilder: (context, index) {
         final channel = favorites[index];
-        return ListTile(
-          leading: channel.logoUrl != null && channel.logoUrl!.isNotEmpty
-              ? CircleAvatar(
-                  backgroundImage: NetworkImage(channel.logoUrl!),
-                  onBackgroundImageError: (_, _) {},
-                  child: const Icon(Icons.tv),
-                )
-              : const CircleAvatar(child: Icon(Icons.tv)),
-          title: Text(channel.name),
-          trailing: const Icon(Icons.star, color: Color(0xFFFFCC00)),
+        return DpadInkWell(
           onTap: () => widget.onChannelSelect(channel),
-          onLongPress: () async {
-            await widget.favoritesService.toggle(channel.id);
-            setState(() {});
+          onLongTap: () async {
+            await widget.channelFavoritesService.toggle(channel.id);
+            await _loadFavorites();
           },
+          child: ListTile(
+            leading: channel.logoUrl != null && channel.logoUrl!.isNotEmpty
+                ? CircleAvatar(
+                    backgroundImage: NetworkImage(channel.logoUrl!),
+                    onBackgroundImageError: (_, _) {},
+                    child: const Icon(Icons.tv),
+                  )
+                : const CircleAvatar(child: Icon(Icons.tv)),
+            title: Text(channel.name),
+            trailing: Icon(
+              Icons.star,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
         );
       },
     );
@@ -170,8 +188,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       itemCount: favorites.length,
       itemBuilder: (context, index) {
         final item = favorites[index];
-        return InkWell(
+        return DpadInkWell(
           onTap: () => widget.onVodSelect(item),
+          onLongTap: () async {
+            await widget.vodFavoritesService.toggle(item.id);
+            await _loadFavorites();
+          },
           borderRadius: BorderRadius.circular(8),
           child: Container(
             decoration: BoxDecoration(
@@ -179,26 +201,39 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               borderRadius: BorderRadius.circular(8),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Stack(
               children: [
-                Expanded(
-                  child: item.logoUrl != null && item.logoUrl!.isNotEmpty
-                      ? Image.network(
-                          item.logoUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.movie, size: 48),
-                        )
-                      : const Icon(Icons.movie, size: 48),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: item.logoUrl != null && item.logoUrl!.isNotEmpty
+                          ? Image.network(
+                              item.logoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  const Icon(Icons.movie, size: 48),
+                            )
+                          : const Icon(Icons.movie, size: 48),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Text(
+                        item.name,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Text(
-                    item.name,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Icon(
+                    Icons.star,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
                   ),
                 ),
               ],
@@ -225,8 +260,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       itemCount: favorites.length,
       itemBuilder: (context, index) {
         final item = favorites[index];
-        return InkWell(
+        return DpadInkWell(
           onTap: () => widget.onSeriesSelect(item),
+          onLongTap: () async {
+            await widget.seriesFavoritesService.toggle(item.id);
+            await _loadFavorites();
+          },
           borderRadius: BorderRadius.circular(8),
           child: Container(
             decoration: BoxDecoration(
@@ -234,26 +273,39 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               borderRadius: BorderRadius.circular(8),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Stack(
               children: [
-                Expanded(
-                  child: item.coverUrl != null && item.coverUrl!.isNotEmpty
-                      ? Image.network(
-                          item.coverUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.tv, size: 48),
-                        )
-                      : const Icon(Icons.tv, size: 48),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: item.coverUrl != null && item.coverUrl!.isNotEmpty
+                          ? Image.network(
+                              item.coverUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  const Icon(Icons.tv, size: 48),
+                            )
+                          : const Icon(Icons.tv, size: 48),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Text(
+                        item.name,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Text(
-                    item.name,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Icon(
+                    Icons.star,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
                   ),
                 ),
               ],
