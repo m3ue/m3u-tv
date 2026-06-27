@@ -477,29 +477,31 @@ class _ConnectedViewState extends State<_ConnectedView> {
                   valueColor: theme.colorScheme.error,
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    DpadFocusable(
-                      onSelect: widget.onClearCache,
-                      effects: _kStadiumEffect,
-                      child: FilledButton.tonalIcon(
-                        onPressed: widget.onClearCache,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Retry connection'),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: DpadFocusable(
+                    autofocus: true,
+                    onSelect: widget.onClearCache,
+                    effects: _kStadiumEffect,
+                    child: FilledButton.tonalIcon(
+                      onPressed: widget.onClearCache,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry connection'),
                     ),
-                    DpadFocusable(
-                      onSelect: _handleDisconnect,
-                      effects: _kStadiumEffect,
-                      child: FilledButton.tonalIcon(
-                        onPressed: _handleDisconnect,
-                        icon: const Icon(Icons.settings),
-                        label: const Text('Edit server settings'),
-                      ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: DpadFocusable(
+                    onSelect: _handleDisconnect,
+                    effects: _kStadiumEffect,
+                    child: FilledButton.tonalIcon(
+                      onPressed: _handleDisconnect,
+                      icon: const Icon(Icons.settings),
+                      label: const Text('Edit server settings'),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ],
