@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
+import 'package:m3u_tv/features/notifications/notifications_screen.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
@@ -510,6 +511,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
+                    unreadNotificationCount: _appState.unreadNotificationCount,
                     onNavigate: _navigateTo,
                     onActivateSidebar: _activateSidebar,
                     onDeactivateSidebar: _deactivateSidebar,
@@ -524,6 +526,19 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Widget _buildMobileLayout(void Function(PlayerArgs) openPlayer) {
+    final primaryCount = RouteNames.mobilePrimaryCount.clamp(
+      0,
+      _mainRoutes.length,
+    );
+    final overflowRoutes = _mainRoutes.skip(primaryCount).toList();
+    final overflowUnread = overflowRoutes.contains(RouteNames.notifications)
+        ? _appState.unreadNotificationCount
+        : 0;
+    final moreTabIndex = primaryCount;
+    final displayedIndex = _currentIndex < primaryCount
+        ? _currentIndex
+        : moreTabIndex;
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -539,17 +554,64 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
-        onTap: _navigateTo,
+        currentIndex: displayedIndex,
+        onTap: (index) => index == moreTabIndex
+            ? _showMoreSheet(overflowRoutes, primaryCount)
+            : _navigateTo(index),
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        items: _mainRoutes.map((route) {
-          final label = RouteNames.routeLabels[route] ?? route;
-          return BottomNavigationBarItem(
-            icon: Icon(_routeIcon(route)),
-            label: label,
-          );
-        }).toList(),
+        items: [
+          ..._mainRoutes.take(primaryCount).map((route) {
+            final label = RouteNames.routeLabels[route] ?? route;
+            return BottomNavigationBarItem(
+              icon: Icon(_routeIcon(route)),
+              label: label,
+            );
+          }),
+          if (overflowRoutes.isNotEmpty)
+            BottomNavigationBarItem(
+              icon: Badge(
+                isLabelVisible: overflowUnread > 0,
+                label: Text('$overflowUnread'),
+                child: const Icon(Icons.more_vert),
+              ),
+              label: 'More',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showMoreSheet(
+    List<String> overflowRoutes,
+    int primaryCount,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (var i = 0; i < overflowRoutes.length; i++)
+              ListTile(
+                leading: Badge(
+                  isLabelVisible: overflowRoutes[i] == RouteNames.notifications &&
+                      _appState.unreadNotificationCount > 0,
+                  label: Text('${_appState.unreadNotificationCount}'),
+                  child: Icon(_routeIcon(overflowRoutes[i])),
+                ),
+                title: Text(
+                  RouteNames.routeLabels[overflowRoutes[i]] ??
+                      overflowRoutes[i],
+                ),
+                selected: _currentIndex == primaryCount + i,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _navigateTo(primaryCount + i);
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -560,6 +622,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -574,6 +637,7 @@ class NavigationSidebar extends StatelessWidget {
     required this.sidebarActive,
     required this.focusNodes,
     required this.scopeNode,
+    this.unreadNotificationCount = 0,
     required this.onNavigate,
     required this.onActivateSidebar,
     required this.onDeactivateSidebar,
@@ -583,6 +647,7 @@ class NavigationSidebar extends StatelessWidget {
   final bool sidebarActive;
   final List<FocusNode> focusNodes;
   final FocusScopeNode scopeNode;
+  final int unreadNotificationCount;
   final ValueChanged<int> onNavigate;
   final VoidCallback onActivateSidebar;
   final VoidCallback onDeactivateSidebar;
@@ -676,6 +741,9 @@ class NavigationSidebar extends StatelessWidget {
                     selected: index == currentIndex,
                     expanded: expanded,
                     focusNode: focusNodes[index],
+                    badgeCount: routes[index] == RouteNames.notifications
+                        ? unreadNotificationCount
+                        : 0,
                     onTap: () => onNavigate(index),
                   ),
                 );
@@ -693,6 +761,7 @@ class NavigationSidebar extends StatelessWidget {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -708,6 +777,7 @@ class SidebarDestinationItem extends StatefulWidget {
     required this.focusNode,
     required this.onTap,
     this.expanded = true,
+    this.badgeCount = 0,
   });
 
   final String label;
@@ -716,6 +786,7 @@ class SidebarDestinationItem extends StatefulWidget {
   final FocusNode focusNode;
   final VoidCallback onTap;
   final bool expanded;
+  final int badgeCount;
 
   @override
   State<SidebarDestinationItem> createState() => _SidebarDestinationItemState();
@@ -802,15 +873,21 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(widget.icon, color: foregroundColor, size: 24),
+                      Badge(
+                        isLabelVisible: widget.badgeCount > 0,
+                        label: Text('${widget.badgeCount}'),
+                        child: Icon(widget.icon, color: foregroundColor, size: 24),
+                      ),
                       if (widget.expanded) ...[
                         const SizedBox(width: 12),
-                        Text(
-                          widget.label,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: foregroundColor,
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: foregroundColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],
@@ -1115,6 +1192,7 @@ class _ContentNavigator extends StatelessWidget {
             favoritesService: appState.seriesFavoritesService,
             onSidebarActivate: onSidebarActivate,
           ),
+          RouteNames.notifications => NotificationsScreen(appState: appState),
           RouteNames.settings => SettingsScreen(
             authNotifier: appState.authNotifier,
             activeViewer: appState.activeViewer,

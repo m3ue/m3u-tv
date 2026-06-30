@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -35,6 +36,7 @@ class AppStateController extends ChangeNotifier {
     M3UParser? m3uParser,
     PersistentJsonStore? persistentStore,
     TvNotificationService? tvNotificationService,
+    TvNotificationStore? tvNotificationStore,
     ReverbService? reverbService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
@@ -68,6 +70,7 @@ class AppStateController extends ChangeNotifier {
       m3uParser: m3uParser ?? M3UParser(),
       traktService: TraktService(storage: resolvedSecureStorage),
       tvNotificationService: tvNotificationService ?? TvNotificationService(),
+      notificationStore: tvNotificationStore ?? TvNotificationStore(store: store),
       reverbService: reverbService ?? ReverbService(),
     );
   }
@@ -86,6 +89,7 @@ class AppStateController extends ChangeNotifier {
     required this.m3uParser,
     required this.traktService,
     required this._tvNotificationService,
+    required this.notificationStore,
     required this._reverbService,
   });
 
@@ -107,15 +111,50 @@ class AppStateController extends ChangeNotifier {
   final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
   final TvNotificationService _tvNotificationService;
+  final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
+  int _unreadNotificationCount = 0;
 
   /// Stream of incoming TV push notifications (from Reverb WebSocket or
   /// unread notifications fetched on boot). Listen to this in the UI to
   /// show snackbars or banners.
   Stream<TvNotificationItem> get tvNotifications =>
       _tvNotificationController.stream;
+
+  int get unreadNotificationCount => _unreadNotificationCount;
+
+  Future<void> _refreshUnreadNotificationCount() async {
+    _unreadNotificationCount = await notificationStore.unreadCount();
+    notifyListeners();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await notificationStore.markRead(id);
+    await _refreshUnreadNotificationCount();
+    final credentials = authNotifier.credentials;
+    if (credentials != null) {
+      unawaited(
+        _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+      );
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final unread = (await notificationStore.all()).where((n) => !n.isRead);
+    final credentials = authNotifier.credentials;
+    final ids = unread.map((n) => n.item.id).toList(growable: false);
+    await notificationStore.markAllRead();
+    await _refreshUnreadNotificationCount();
+    if (credentials != null) {
+      for (final id in ids) {
+        unawaited(
+          _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+        );
+      }
+    }
+  }
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
@@ -279,21 +318,29 @@ class AppStateController extends ChangeNotifier {
       final (session, unread) = await _tvNotificationService.fetchUnread(
         credentials,
       );
+      for (final item in unread) {
+        await notificationStore.add(item);
+        _tvNotificationController.add(item);
+      }
+      await _refreshUnreadNotificationCount();
       // Older server versions don't return Reverb config — skip WebSocket setup
       // rather than hammering a connection that can never succeed.
       if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) return;
-      for (final item in unread) {
-        _tvNotificationController.add(item);
-        unawaited(_tvNotificationService.markRead(credentials, item.id));
-      }
       await _reverbService.connect(
         session: session,
         credentials: credentials,
-        onNotification: _tvNotificationController.add,
+        onNotification: _onPushNotification,
       );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
     }
+  }
+
+  void _onPushNotification(TvNotificationItem item) {
+    unawaited(
+      notificationStore.add(item).then((_) => _refreshUnreadNotificationCount()),
+    );
+    _tvNotificationController.add(item);
   }
 
   Future<void> disconnect() async {

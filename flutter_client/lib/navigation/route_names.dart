@@ -11,6 +11,7 @@ class RouteNames {
   static const String liveTv = '/live-tv';
   static const String vod = '/vod';
   static const String series = '/series';
+  static const String notifications = '/notifications';
   static const String settings = '/settings';
 
   // Modal/overlay routes
@@ -19,15 +20,23 @@ class RouteNames {
   static const String seriesDetails = '/series-details';
   static const String viewerSelection = '/viewer-selection';
 
-  /// All main tab routes in sidebar/tab order.
+  /// All main tab/sidebar destinations, in display order. The TV/desktop
+  /// sidebar shows all of these flat (plenty of vertical room). The mobile
+  /// bottom nav only has room for [mobilePrimaryCount] before it gets
+  /// cramped, so it shows that many directly and collapses the rest into a
+  /// "More" sheet — see `AppShellState._buildMobileLayout`.
   static const List<String> mainRoutes = [
     home,
     search,
     liveTv,
     vod,
     series,
+    notifications,
     settings,
   ];
+
+  /// How many leading [mainRoutes] the mobile bottom nav shows directly.
+  static const int mobilePrimaryCount = 5;
 
   /// Human-readable labels for main routes.
   static const Map<String, String> routeLabels = {
@@ -36,6 +45,7 @@ class RouteNames {
     liveTv: 'Live TV',
     vod: 'Movies',
     series: 'Series',
+    notifications: 'Notifications',
     settings: 'Settings',
   };
 }

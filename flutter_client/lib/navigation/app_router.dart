@@ -190,6 +190,13 @@ RouteFactory buildAppRouter({
             const PlaceholderScreen(title: 'Series'),
       );
     }
+    if (routeName == RouteNames.notifications) {
+      return _buildRoute(
+        settings,
+        mainRouteBuilder?.call(RouteNames.notifications) ??
+            const PlaceholderScreen(title: 'Notifications'),
+      );
+    }
     if (routeName == RouteNames.settings) {
       return _buildRoute(
         settings,
