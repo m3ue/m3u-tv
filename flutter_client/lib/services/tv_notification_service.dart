@@ -36,6 +36,30 @@ class ReverbConfig {
   );
 }
 
+/// A notification channel defined in the m3u-editor settings.
+class TvNotificationChannel {
+  const TvNotificationChannel({required this.name, required this.label});
+
+  /// Slug used in notification payloads (e.g. 'dvr_recording_completed').
+  final String name;
+
+  /// Human-readable label configured in the editor, or empty if not set.
+  final String label;
+
+  /// Returns [label] when non-empty, otherwise [name] with the first letter capitalised.
+  String get displayName => label.isNotEmpty
+      ? label
+      : name.isEmpty
+      ? name
+      : '${name[0].toUpperCase()}${name.substring(1)}';
+
+  factory TvNotificationChannel.fromJson(Map<String, Object?> json) =>
+      TvNotificationChannel(
+        name: '${json['name'] ?? ''}',
+        label: '${json['label'] ?? ''}',
+      );
+}
+
 /// Playlist identity returned alongside unread notifications on boot.
 class TvPlaylistSession {
   const TvPlaylistSession({
@@ -44,6 +68,7 @@ class TvPlaylistSession {
     required this.isAdmin,
     required this.channelName,
     required this.reverb,
+    this.availableChannels = const [],
   });
 
   final int notifiableId;
@@ -56,6 +81,10 @@ class TvPlaylistSession {
   final String channelName;
 
   final ReverbConfig reverb;
+
+  /// Notification channels configured in the editor (Settings → TV App).
+  /// Empty when the server hasn't configured any, or is an older version.
+  final List<TvNotificationChannel> availableChannels;
 }
 
 /// A single TV notification (from REST or WebSocket push).
@@ -123,12 +152,20 @@ class TvNotificationService {
 
     final reverbJson = (json['reverb'] as Map?)?.cast<String, Object?>() ?? {};
 
+    final rawChannels = json['available_channels'] as List? ?? const [];
+    final availableChannels = rawChannels
+        .whereType<Map<String, Object?>>()
+        .map(TvNotificationChannel.fromJson)
+        .where((c) => c.name.isNotEmpty)
+        .toList(growable: false);
+
     final session = TvPlaylistSession(
       notifiableId: _asInt(json['notifiable_id']),
       notifiableType: '${json['notifiable_type'] ?? ''}',
       isAdmin: json['is_admin'] == true,
       channelName: '${reverbJson['channel'] ?? ''}',
       reverb: ReverbConfig.fromJson(reverbJson),
+      availableChannels: availableChannels,
     );
 
     final rawList = json['notifications'] as List? ?? const [];
