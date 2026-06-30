@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // M3 buttons and chips use StadiumBorder. A large radius makes the dpad
 // focus border match the pill shape regardless of widget height.
@@ -746,74 +747,47 @@ class _TraktPending extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final pending = traktService.pending;
-
     final url = pending?.verificationUrl ?? 'https://trakt.tv/activate';
+    final userCode = pending?.userCode ?? '––––––';
 
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= 600
+          ? _TraktPendingWide(
+              url: url,
+              userCode: userCode,
+              onCancel: traktService.cancelAuth,
+            )
+          : _TraktPendingNarrow(
+              url: url,
+              userCode: userCode,
+              onCancel: traktService.cancelAuth,
+            ),
+    );
+  }
+}
+
+class _TraktPendingWide extends StatelessWidget {
+  const _TraktPendingWide({
+    required this.url,
+    required this.userCode,
+    required this.onCancel,
+  });
+
+  final String url;
+  final String userCode;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Instructions + code
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'On your phone or computer, go to:',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                url,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Then enter this code:', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  pending?.userCode ?? '––––––',
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Waiting for authorization…',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          child: _TraktPendingInstructions(url: url, userCode: userCode),
         ),
         const SizedBox(width: 24),
-        // QR code + cancel
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -835,11 +809,135 @@ class _TraktPending extends StatelessWidget {
             const SizedBox(height: 12),
             DpadFocusable(
               autofocus: true,
-              onSelect: traktService.cancelAuth,
+              onSelect: onCancel,
               effects: _kStadiumEffect,
               child: FilledButton.tonal(
-                onPressed: traktService.cancelAuth,
+                onPressed: onCancel,
                 child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TraktPendingNarrow extends StatelessWidget {
+  const _TraktPendingNarrow({
+    required this.url,
+    required this.userCode,
+    required this.onCancel,
+  });
+
+  final String url;
+  final String userCode;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _TraktPendingInstructions(
+          url: url,
+          userCode: userCode,
+          urlTappable: true,
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: () => launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            ),
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open in browser'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonal(
+            onPressed: onCancel,
+            child: const Text('Cancel'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TraktPendingInstructions extends StatelessWidget {
+  const _TraktPendingInstructions({
+    required this.url,
+    required this.userCode,
+    this.urlTappable = false,
+  });
+
+  final String url;
+  final String userCode;
+  final bool urlTappable;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final urlStyle = theme.textTheme.titleMedium?.copyWith(
+      color: theme.colorScheme.primary,
+      fontWeight: FontWeight.bold,
+      decoration: urlTappable ? TextDecoration.underline : null,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'On your phone or computer, go to:',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 4),
+        if (urlTappable)
+          GestureDetector(
+            onTap: () => launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: Text(url, style: urlStyle),
+          )
+        else
+          Text(url, style: urlStyle),
+        const SizedBox(height: 16),
+        Text('Then enter this code:', style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            userCode,
+            style: theme.textTheme.displaySmall?.copyWith(
+              color: theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Waiting for authorization…',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
