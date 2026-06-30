@@ -70,7 +70,8 @@ class AppStateController extends ChangeNotifier {
       m3uParser: m3uParser ?? M3UParser(),
       traktService: TraktService(storage: resolvedSecureStorage),
       tvNotificationService: tvNotificationService ?? TvNotificationService(),
-      notificationStore: tvNotificationStore ?? TvNotificationStore(store: store),
+      notificationStore:
+          tvNotificationStore ?? TvNotificationStore(store: store),
       reverbService: reverbService ?? ReverbService(),
     );
   }
@@ -126,7 +127,10 @@ class AppStateController extends ChangeNotifier {
   int get unreadNotificationCount => _unreadNotificationCount;
 
   Future<void> _refreshUnreadNotificationCount() async {
-    _unreadNotificationCount = await notificationStore.unreadCount();
+    final subscribed = await notificationStore.subscribedChannels();
+    _unreadNotificationCount = await notificationStore.unreadCount(
+      channelFilter: subscribed.isEmpty ? null : subscribed,
+    );
     notifyListeners();
   }
 
@@ -155,6 +159,12 @@ class AppStateController extends ChangeNotifier {
       }
     }
   }
+
+  Future<void> setNotificationChannels(Set<String> channels) async {
+    await notificationStore.setSubscribedChannels(channels);
+    await _refreshUnreadNotificationCount();
+  }
+
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
@@ -318,6 +328,9 @@ class AppStateController extends ChangeNotifier {
       final (session, unread) = await _tvNotificationService.fetchUnread(
         credentials,
       );
+      if (session.availableChannels.isNotEmpty) {
+        await notificationStore.setServerChannels(session.availableChannels);
+      }
       for (final item in unread) {
         await notificationStore.add(item);
         _tvNotificationController.add(item);
@@ -337,10 +350,18 @@ class AppStateController extends ChangeNotifier {
   }
 
   void _onPushNotification(TvNotificationItem item) {
-    unawaited(
-      notificationStore.add(item).then((_) => _refreshUnreadNotificationCount()),
-    );
-    _tvNotificationController.add(item);
+    unawaited(_storeAndNotify(item));
+  }
+
+  Future<void> _storeAndNotify(TvNotificationItem item) async {
+    await notificationStore.add(item);
+    await _refreshUnreadNotificationCount();
+    // Only surface the notification in the stream (banners/toasts) if the
+    // channel passes the user's subscription filter.
+    final subscribed = await notificationStore.subscribedChannels();
+    if (subscribed.isEmpty || subscribed.contains(item.channel)) {
+      _tvNotificationController.add(item);
+    }
   }
 
   Future<void> disconnect() async {

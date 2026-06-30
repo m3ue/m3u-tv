@@ -595,7 +595,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             for (var i = 0; i < overflowRoutes.length; i++)
               ListTile(
                 leading: Badge(
-                  isLabelVisible: overflowRoutes[i] == RouteNames.notifications &&
+                  isLabelVisible:
+                      overflowRoutes[i] == RouteNames.notifications &&
                       _appState.unreadNotificationCount > 0,
                   label: Text('${_appState.unreadNotificationCount}'),
                   child: Icon(_routeIcon(overflowRoutes[i])),
@@ -876,7 +877,11 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                       Badge(
                         isLabelVisible: widget.badgeCount > 0,
                         label: Text('${widget.badgeCount}'),
-                        child: Icon(widget.icon, color: foregroundColor, size: 24),
+                        child: Icon(
+                          widget.icon,
+                          color: foregroundColor,
+                          size: 24,
+                        ),
                       ),
                       if (widget.expanded) ...[
                         const SizedBox(width: 12),

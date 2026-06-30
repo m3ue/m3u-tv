@@ -303,8 +303,6 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
 // Connected settings view
 // ---------------------------------------------------------------------------
 
-enum _SettingsTab { general, integrations }
-
 class _ConnectedView extends StatefulWidget {
   const _ConnectedView({
     required this.authNotifier,
@@ -340,8 +338,15 @@ class _ConnectedView extends StatefulWidget {
   State<_ConnectedView> createState() => _ConnectedViewState();
 }
 
-class _ConnectedViewState extends State<_ConnectedView> {
-  _SettingsTab _tab = _SettingsTab.general;
+class _ConnectedViewState extends State<_ConnectedView>
+    with SingleTickerProviderStateMixin {
+  late final _tabController = TabController(length: 2, vsync: this);
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   void _openViewerManagement(BuildContext context) {
     unawaited(
@@ -396,41 +401,36 @@ class _ConnectedViewState extends State<_ConnectedView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Settings', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 16),
-
-          // ── Tab chips ─────────────────────────────────────────────────────
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: Text('Settings', style: theme.textTheme.headlineMedium),
+        ),
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'General'),
+            Tab(text: 'Integrations'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
             children: [
-              _IntervalChip(
-                label: 'General',
-                isSelected: _tab == _SettingsTab.general,
-                onTap: () => setState(() => _tab = _SettingsTab.general),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: _buildGeneralTab(context),
               ),
-              const SizedBox(width: 8),
-              _IntervalChip(
-                label: 'Integrations',
-                isSelected: _tab == _SettingsTab.integrations,
-                onTap: () => setState(
-                  () => _tab = _SettingsTab.integrations,
-                ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: _buildIntegrationsTab(context),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          if (_tab == _SettingsTab.general) ...[
-            _buildGeneralTab(context),
-          ] else ...[
-            _buildIntegrationsTab(context),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
