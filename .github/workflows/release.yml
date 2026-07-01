@@ -238,6 +238,12 @@ jobs:
       #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
       #     cp "$PP" ~/Library/MobileDevice/Provisioning\ Profiles/
 
+      - name: Pin CocoaPods to 1.15.x
+        # CocoaPods 1.16+ has a bug where `pod install` exits non-zero when the
+        # Podfile has no CocoaPods dependencies (all tvOS plugins use SPM).
+        # flutter-tvos calls pod install internally and treats non-zero as fatal.
+        run: sudo gem install cocoapods --version '1.15.2' --no-document
+
       - name: Disable code signing in tvOS project
         # flutter-tvos ignores FLUTTER_XCODE_* env vars for signing. Strip the
         # DEVELOPMENT_TEAM from the project so Xcode won't look for profiles.
