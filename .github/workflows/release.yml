@@ -254,7 +254,7 @@ jobs:
             echo "  s.homepage = 'https://github.com/m3ue/m3u-tv'"
             echo "  s.license  = { :type => 'MIT', :text => 'MIT' }"
             echo "  s.author   = { 'CI' => 'ci@example.com' }"
-            echo "  s.source   = { :path => '.' }"
+            echo "  s.source   = { :git => '' }"
             echo "  s.tvos.deployment_target = '13.0'"
             echo "  s.source_files = 'Sources/**/*.{h,m}'"
             echo 'end'
@@ -272,6 +272,11 @@ jobs:
           sed -i '' \
             's/DEVELOPMENT_TEAM = [A-Z0-9]*/DEVELOPMENT_TEAM = ""/g' \
             tvos/Runner.xcodeproj/project.pbxproj
+
+      - name: Diagnose pod install (remove after fix)
+        # Runs pod install manually to capture stdout (the real CocoaPods error).
+        # flutter-tvos only captures stderr, so the root cause is invisible there.
+        run: cd tvos && pod install 2>&1 || true
 
       - name: Build tvOS (unsigned)
         run: |
