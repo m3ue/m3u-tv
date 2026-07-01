@@ -241,12 +241,13 @@ jobs:
       - name: Disable code signing in tvOS project
         # flutter-tvos ignores FLUTTER_XCODE_* env vars for signing. Strip the
         # DEVELOPMENT_TEAM from the project so Xcode won't look for profiles.
-        # Use [^;]* (not [A-Z0-9]*) so the substitution is idempotent: if the
-        # field already contains "" the alphanumeric pattern matches zero chars
-        # and doubles the quotes, corrupting the pbxproj plist.
+        # Two sed expressions are needed: one for the plain key and one for the
+        # SDK-conditional override "DEVELOPMENT_TEAM[sdk=appletvos*]" which
+        # takes precedence over the plain key when building for appletvos.
         run: |
           sed -i '' \
-            's/DEVELOPMENT_TEAM = [^;]*/DEVELOPMENT_TEAM = ""/g' \
+            -e 's/DEVELOPMENT_TEAM = [^;]*/DEVELOPMENT_TEAM = ""/g' \
+            -e 's/"DEVELOPMENT_TEAM\[sdk=appletvos\*\]" = [^;]*/"DEVELOPMENT_TEAM[sdk=appletvos*]" = ""/g' \
             tvos/Runner.xcodeproj/project.pbxproj
 
       - name: Build tvOS (unsigned)
