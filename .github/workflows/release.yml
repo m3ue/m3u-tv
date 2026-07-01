@@ -238,13 +238,20 @@ jobs:
       #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
       #     cp "$PP" ~/Library/MobileDevice/Provisioning\ Profiles/
 
-      - name: Install CocoaPods 1.15.x
-        # CocoaPods 1.16+ has a nil-crash bug when a Podfile has zero CocoaPods
-        # dependencies (all tvOS plugins use SPM). Install 1.15.2 via Homebrew's Ruby
-        # into the user gem dir and prepend it to PATH so flutter-tvos picks it up.
+      - name: Pre-seed CocoaPods lock files
+        # CocoaPods 1.16+ crashes with "undefined method 'map' for nil" when the
+        # Podfile has zero CocoaPods dependencies (all tvOS plugins use SPM).
+        # Locally the build works because Pods/Manifest.lock already exists from a
+        # prior install, causing CocoaPods to skip dependency resolution entirely.
+        # In CI (clean checkout) the Pods directory is absent, so we pre-seed
+        # matching Podfile.lock + Pods/Manifest.lock to reproduce the "up to date"
+        # state — CocoaPods sees the checksums match and skips the crashing resolver.
         run: |
-          /opt/homebrew/bin/gem install cocoapods --version '1.15.2' --no-document --user-install
-          echo "$(/opt/homebrew/bin/ruby -e 'puts Gem.user_dir')/bin" >> "$GITHUB_PATH"
+          CHECKSUM=$(openssl dgst -sha1 tvos/Podfile | awk '{print $NF}')
+          CP_VERSION=$(pod --version 2>/dev/null || echo "1.16.2")
+          mkdir -p tvos/Pods
+          printf 'PODFILE CHECKSUM: %s\n\nCOCOAPODS: %s\n' \
+            "$CHECKSUM" "$CP_VERSION" | tee tvos/Podfile.lock tvos/Pods/Manifest.lock > /dev/null
 
       - name: Disable code signing in tvOS project
         # flutter-tvos ignores FLUTTER_XCODE_* env vars for signing. Strip the
