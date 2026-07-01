@@ -303,11 +303,33 @@ jobs:
         run: |
           sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
 
+      - name: Install signing certificate
+        env:
+          CERT_B64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p "" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "" "$KC"
+          echo "$CERT_B64" | base64 --decode -o "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PWD" -A -t cert -f pkcs12 -k "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | xargs)
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KC"
+
+      - name: Set up App Store Connect API key
+        env:
+          API_KEY_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_B64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_B64" | base64 --decode \
+            > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+
       - name: Install CocoaPods dependencies
         run: cd macos && pod install --repo-update
 
-      - name: Build macOS app
-        # flutter build macos has no --no-codesign flag; override via FLUTTER_XCODE_* env vars.
+      - name: Build macOS app (unsigned)
+        # Sign separately after build so we control the identity and entitlements.
         env:
           FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
           FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
@@ -317,6 +339,22 @@ jobs:
           flutter build macos --release \
             --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Sign app bundle
+        # Hardened Runtime (--options runtime) is required for notarization.
+        # --deep re-signs all nested frameworks with the same identity.
+        # Release.entitlements enables sandbox + network client access.
+        run: |
+          APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep -E '"(Developer ID Application|Apple Distribution)[^"]*"' \
+            | head -1 | sed -E 's/.*"(.+)".*/\1/')
+          echo "Signing with: $IDENTITY"
+          codesign --deep --force --options runtime \
+            --sign "$IDENTITY" \
+            --entitlements macos/Runner/Release.entitlements \
+            "$APP"
+          codesign --verify --verbose "$APP"
 
       - name: Package as DMG
         run: |
@@ -331,6 +369,19 @@ jobs:
             -srcfolder "$APP" \
             -ov -format UDZO \
             "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+
+      - name: Notarize DMG
+        run: |
+          xcrun notarytool submit \
+            "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg" \
+            --key ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 \
+            --key-id ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            --issuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
+            --wait
+
+      - name: Staple notarization ticket
+        run: |
+          xcrun stapler staple "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
