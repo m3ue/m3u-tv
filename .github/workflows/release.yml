@@ -239,8 +239,14 @@ jobs:
       #     cp "$PP" ~/Library/MobileDevice/Provisioning\ Profiles/
 
       - name: Build tvOS (unsigned)
+        # flutter-tvos build tvos has no --no-codesign flag; disable via FLUTTER_XCODE_* env vars.
+        env:
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
         run: |
-          flutter-tvos build tvos --release --no-codesign \
+          flutter-tvos build tvos --release \
             --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 
