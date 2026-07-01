@@ -395,7 +395,6 @@ jobs:
     name: Build Windows ZIP
     runs-on: windows-latest
     needs: validate
-    continue-on-error: true  # custom desktop_libmpv_backend.cpp has unresolved linker symbols
     defaults:
       run:
         working-directory: flutter_client
@@ -439,7 +438,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [validate, build-android, build-ios, build-tvos, build-macos, build-linux]
+    needs: [validate, build-android, build-ios, build-tvos, build-macos, build-linux, build-windows]
     permissions:
       contents: write
     steps:
@@ -464,7 +463,6 @@ jobs:
             PREV_FLAG="--notes-start-tag $PREV_TAG"
           fi
 
-          # Collect artifacts — Windows zip may be absent if that build failed.
           ASSETS=$(find artifacts -type f \( \
             -name "*.apk" -o -name "*.ipa" -o \
             -name "*.dmg" -o -name "*.tar.gz" -o -name "*.zip" \
