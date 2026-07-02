@@ -341,20 +341,32 @@ jobs:
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 
       - name: Sign app bundle
-        # --options runtime enables Hardened Runtime (required for notarization).
-        # --timestamp embeds a secure timestamp (required for notarization).
-        # --deep re-signs all nested frameworks with the same identity.
+        # Notarization requires: Developer ID Application cert, Hardened Runtime
+        # (--options runtime), and a secure timestamp (--timestamp).
+        # Sign inside-out: dylibs and framework bundles first, then the .app.
+        # codesign --deep is unreliable for complex bundles with many frameworks.
         run: |
           APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
           IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" \
             | grep -o '"[^"]*"' | head -1 | tr -d '"')
-          echo "Signing with: [$IDENTITY]"
           if [ -z "$IDENTITY" ]; then
-            echo "ERROR: No valid signing identity found in keychain"
-            security find-identity -v
+            echo "ERROR: No 'Developer ID Application' certificate found."
+            echo "Available identities:"
+            security find-identity -v -p codesigning
             exit 1
           fi
-          codesign --deep --force --options runtime --timestamp \
+          echo "Signing with: $IDENTITY"
+          # Sign all dylibs
+          find "$APP" -name "*.dylib" | while read f; do
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$f"
+          done
+          # Sign framework bundles inside-out (deepest paths first)
+          find "$APP" -name "*.framework" | sort -r | while read fw; do
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$fw"
+          done
+          # Finally sign the .app with entitlements
+          codesign --force --options runtime --timestamp \
             --sign "$IDENTITY" \
             --entitlements macos/Runner/Release.entitlements \
             "$APP"
