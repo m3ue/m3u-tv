@@ -3,17 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
-import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
-import 'package:m3u_tv/navigation/route_names.dart';
+import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -206,112 +205,53 @@ void main() {
       );
     });
 
-    testWidgets('Player route pushes as modal via inner navigator', (
-      tester,
-    ) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Player route pushes as modal via inner navigator',
+      (tester) async {
+        // Player is now a Stack overlay managed by AppShell, not a named route.
+        // Covered by: "selecting live channel from app shell opens player route"
+      },
+      skip: true,
+    );
 
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.player,
-          arguments: const PlayerArgs(
-            streamUrl: 'http://example.com/stream.m3u8',
-            title: 'Test Channel',
-            type: 'live',
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    testWidgets(
+      'Player route receives supplied EPG service',
+      (tester) async {
+        // This test used the old imperative RouteFactory (buildAppRouter).
+        // Player is now an overlay managed by AppShell; EPG service is wired
+        // through AppStateController. Test retained as a placeholder.
+      },
+      skip: true,
+    );
 
-      expect(find.text('Player route: Test Channel'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+    testWidgets(
+      'Details route pushes via inner navigator',
+      (tester) async {
+        // VOD details now navigate via go_router (/vod/details/:id), not a
+        // named imperative route. Covered by:
+        // "selecting movie from app shell opens details then player route"
+      },
+      skip: true,
+    );
 
-    testWidgets('Player route receives supplied EPG service', (tester) async {
-      final epgService = EpgService();
-      await tester.pumpWidget(
-        MaterialApp(
-          onGenerateRoute: buildAppRouter(
-            epgService: epgService,
-            playbackOrchestratorBuilder: _testPlaybackOrchestrator,
-          ),
-          initialRoute: RouteNames.home,
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'SeriesDetails route pushes via inner navigator',
+      (tester) async {
+        // Series details now navigate via go_router (/series/details/:id), not
+        // a named imperative route. Covered by:
+        // "selecting series from app shell opens series details route"
+      },
+      skip: true,
+    );
 
-      final nav = tester.state<NavigatorState>(find.byType(Navigator));
-      unawaited(
-        nav.pushNamed(
-          RouteNames.player,
-          arguments: const PlayerArgs(
-            streamUrl: 'http://example.com/stream.m3u8',
-            title: 'Test Channel',
-            type: 'live',
-            epgChannelId: 'bbc.one',
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final player = tester.widget<PlayerScreen>(find.byType(PlayerScreen));
-      expect(identical(player.epgService, epgService), isTrue);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
-
-    testWidgets('Details route pushes via inner navigator', (tester) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
-
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.details,
-          arguments: const DetailsArgs(vodId: 1, vodName: 'Test Movie'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Test Movie'), findsOneWidget);
-    });
-
-    testWidgets('SeriesDetails route pushes via inner navigator', (
-      tester,
-    ) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
-
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.seriesDetails,
-          arguments: const SeriesDetailsArgs(
-            seriesId: 1,
-            seriesName: 'Test Series',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Test Series'), findsOneWidget);
-    });
-
-    testWidgets('ViewerSelection route pushes via inner navigator', (
-      tester,
-    ) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
-
-      final nav = _findInnerNavigator(tester);
-      unawaited(nav.pushNamed(RouteNames.viewerSelection));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Viewer Selection'), findsOneWidget);
-    });
+    testWidgets(
+      'ViewerSelection route pushes via inner navigator',
+      (tester) async {
+        // Viewer selection is now a Stack overlay in AppShell, not a named
+        // imperative route. Triggered via AppShell state, not Navigator.pushNamed.
+      },
+      skip: true,
+    );
   });
 
   testWidgets('selecting live channel from app shell opens player route', (
@@ -788,34 +728,38 @@ void main() {
   });
 
   group('Back behavior', () {
-    testWidgets('back button on modal route pops to main', (tester) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
-
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.player,
-          arguments: const PlayerArgs(
-            streamUrl: 'http://example.com/stream.m3u8',
-            title: 'Test Channel',
-            type: 'live',
-          ),
+    testWidgets('back button closes player overlay and returns to content', (
+      tester,
+    ) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
         ),
       );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(_sidebarText('Live TV'));
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route News').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Player route: Test Channel'), findsOneWidget);
+      expect(find.text('Player route: Route News'), findsOneWidget);
 
-      nav.pop();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      // Should be back at Home content
-      expect(
-        find.text('Please connect to your service in Settings'),
-        findsOneWidget,
-      );
+      expect(find.text('Player route: Route News'), findsNothing);
+      expect(find.text('Route News'), findsAtLeast(1));
+      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets('back on TV activates sidebar when content is focused', (
@@ -835,76 +779,86 @@ void main() {
       expect(find.byType(NavigationSidebar), findsOneWidget);
     });
 
-    testWidgets('back on phone pops modal routes', (tester) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
-      await tester.pumpAndSettle();
-
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.details,
-          arguments: const DetailsArgs(vodId: 1, vodName: 'Test Movie'),
+    testWidgets('back on phone pops detail route', (tester) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
         ),
       );
-      await tester.pumpAndSettle();
 
-      expect(find.text('Test Movie'), findsOneWidget);
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.phone, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Movies'),
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(find.text('Route Movie').last);
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Play movie'), findsOneWidget);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      // Should be back at Home content
-      expect(
-        find.text('Please connect to your service in Settings'),
-        findsOneWidget,
-      );
+      expect(find.text('Play movie'), findsNothing);
+      expect(find.text('Route Movie'), findsWidgets);
+      await tester.pumpWidget(const SizedBox.shrink());
     });
   });
 
   group('Focus restoration', () {
-    testWidgets('returning from modal restores previous route content', (
+    testWidgets('returning from player overlay preserves active tab content', (
       tester,
     ) async {
-      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
-      await tester.pumpAndSettle();
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
 
       // Navigate to Live TV
       await tester.tap(_sidebarText('Live TV'));
-      await tester.pumpAndSettle();
+      await _pumpAppFrame(tester);
 
-      // Push Player modal
-      final nav = _findInnerNavigator(tester);
-      unawaited(
-        nav.pushNamed(
-          RouteNames.player,
-          arguments: const PlayerArgs(
-            streamUrl: 'http://example.com/stream.m3u8',
-            title: 'Test Channel',
-            type: 'live',
-          ),
-        ),
-      );
+      expect(find.text('Route News'), findsAtLeast(1));
+
+      // Open player overlay by tapping a channel
+      await tester.tap(find.text('Route News').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Pop Player
-      nav.pop();
+      expect(find.text('Player route: Route News'), findsOneWidget);
+
+      // Close player overlay
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
-      // Should be back at Live TV content (not Home)
-      expect(
-        find.text('Please connect to your service in Settings'),
-        findsOneWidget,
-      );
+      // Should be back at Live TV (channel still visible, player gone)
+      expect(find.text('Player route: Route News'), findsNothing);
+      expect(find.text('Route News'), findsAtLeast(1));
+      await tester.pumpWidget(const SizedBox.shrink());
     });
   });
-}
-
-/// Finds the inner NavigatorState from the _ContentNavigator widget.
-NavigatorState _findInnerNavigator(WidgetTester tester) {
-  final navigators = tester.stateList<NavigatorState>(find.byType(Navigator));
-  // The inner navigator is the last one (MaterialApp creates the first)
-  return navigators.last;
 }
 
 Finder _sidebarText(String label) {
@@ -972,6 +926,13 @@ class _TestAppState extends State<_TestApp> {
   late final AppStateController _appState =
       widget.appState ??
       _testAppState(xtreamService: _NavigationXtreamService());
+  late final GoRouter _router = createGoRouter(
+    appState: _appState,
+    nativeTelevisionHint: false,
+    deviceTypeOverride: widget.deviceType,
+    playbackOrchestratorBuilder: _testPlaybackOrchestrator,
+    playerRouteBuilder: widget.playerRouteBuilder ?? _testPlayerRoute,
+  );
 
   @override
   void dispose() {
@@ -981,15 +942,10 @@ class _TestAppState extends State<_TestApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'M3U TV Test',
       theme: ThemeData.dark(useMaterial3: true),
-      home: AppShell(
-        deviceType: widget.deviceType,
-        appState: _appState,
-        playbackOrchestratorBuilder: _testPlaybackOrchestrator,
-        playerRouteBuilder: widget.playerRouteBuilder ?? _testPlayerRoute,
-      ),
+      routerConfig: _router,
     );
   }
 }

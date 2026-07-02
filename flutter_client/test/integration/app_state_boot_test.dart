@@ -4,7 +4,9 @@ import 'dart:io' as io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -604,16 +606,27 @@ Future<void> _tapSidebarDestination(WidgetTester tester, String label) async {
   await tester.tap(_sidebarDestination(label));
 }
 
-class _TestApp extends StatelessWidget {
+class _TestApp extends StatefulWidget {
   const _TestApp({required this.controller});
 
   final AppStateController controller;
 
   @override
+  State<_TestApp> createState() => _TestAppState();
+}
+
+class _TestAppState extends State<_TestApp> {
+  late final GoRouter _router = createGoRouter(
+    appState: widget.controller,
+    nativeTelevisionHint: false,
+    deviceTypeOverride: DeviceType.tv,
+  );
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       theme: ThemeData.dark(useMaterial3: true),
-      home: AppShell(deviceType: DeviceType.tv, appState: controller),
+      routerConfig: _router,
     );
   }
 }

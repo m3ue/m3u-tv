@@ -5,8 +5,9 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:m3u_tv/app/app_shell.dart';
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -36,28 +37,36 @@ Future<AppStateController> _buildAppState() async {
       secureStorage: FlutterSecureStorageAdapter(),
     );
   }
-  // Desktop (macOS, Linux, Windows): existing _defaultPath() logic is correct.
   return AppStateController();
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key, this.nativeTelevisionHint = false, this.appState});
 
   final bool nativeTelevisionHint;
   final AppStateController? appState;
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final GoRouter _router = createGoRouter(
+    appState: widget.appState ?? AppStateController(),
+    nativeTelevisionHint: widget.nativeTelevisionHint,
+  );
+
+  @override
   Widget build(BuildContext context) {
     const primary = Color(0xFF4f39f6);
     const secondary = Color(0xFFec003f);
-    const background = Color(0xFF09090b); // scaffold / page bg
-    const card = Color(0xFF18181b); // cards, list rows, sidebar
-    const elevated = Color(
-      0xFF18181b,
-    ); // modals, chips, high-elevation surfaces
+    const background = Color(0xFF09090b);
+    const card = Color(0xFF18181b);
+    const elevated = Color(0xFF18181b);
 
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'M3U TV',
+      routerConfig: _router,
       builder: Dpad.wrap(
         theme: const DpadThemeData(
           effects: [
@@ -103,7 +112,6 @@ class MyApp extends StatelessWidget {
             if (states.contains(WidgetState.pressed)) {
               return Colors.white.withValues(alpha: 0.16);
             }
-            // Focused (D-pad) and hovered look identical.
             if (states.contains(WidgetState.focused) ||
                 states.contains(WidgetState.hovered)) {
               return Colors.white.withValues(alpha: 0.10);
@@ -124,15 +132,6 @@ class MyApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.dark,
-      home: Builder(
-        builder: (context) => AppShell(
-          deviceType: resolveDeviceType(
-            context,
-            nativeTelevisionHint: nativeTelevisionHint,
-          ),
-          appState: appState,
-        ),
-      ),
     );
   }
 }

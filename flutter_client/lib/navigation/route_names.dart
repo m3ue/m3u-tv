@@ -38,6 +38,16 @@ class RouteNames {
   /// How many leading [mainRoutes] the mobile bottom nav shows directly.
   static const int mobilePrimaryCount = 5;
 
+  // Nested detail route path templates
+  static const String vodDetailsPath = '/vod/details/:vodId';
+  static const String seriesDetailsPath = '/series/details/:seriesId';
+
+  /// Builds a path to a VOD details screen for deep linking.
+  static String vodDetailsFor(int vodId) => '/vod/details/$vodId';
+
+  /// Builds a path to a series details screen for deep linking.
+  static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
+
   /// Human-readable labels for main routes.
   static const Map<String, String> routeLabels = {
     home: 'Home',

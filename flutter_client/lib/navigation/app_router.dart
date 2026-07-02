@@ -2,10 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:m3u_tv/features/player/player_screen.dart';
-import 'package:m3u_tv/features/series/series_details_screen.dart';
-import 'package:m3u_tv/features/vod/vod_details_screen.dart';
-import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
@@ -14,12 +10,9 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/epg_service.dart';
-import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
-/// Placeholder screen for routes not yet implemented.
-/// Shows the route name so navigation is visually verifiable.
+/// Placeholder screen used when a route target cannot be resolved.
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key, required this.title});
 
@@ -35,7 +28,7 @@ class PlaceholderScreen extends StatelessWidget {
   }
 }
 
-/// Player route arguments matching the RN RootStackParamList.Player type.
+/// Player route arguments.
 class PlayerArgs {
   const PlayerArgs({
     required this.streamUrl,
@@ -122,218 +115,6 @@ class SeriesDetailsArgs {
   final String seriesName;
 }
 
-/// Builds the app router using Navigator 2.0 with named routes.
-///
-/// Route structure mirrors the RN app:
-/// - Main stack: Home, Search, LiveTV, VOD, Series, Settings
-/// - Modal stack: Player (fullscreen), Details, SeriesDetails, ViewerSelection
-RouteFactory buildAppRouter({
-  Widget Function(String routeName)? mainRouteBuilder,
-  XtreamService? xtreamService,
-  EpgService? epgService,
-  PlaybackOrchestrator Function()? playbackOrchestratorBuilder,
-  Widget Function(PlayerArgs args)? playerRouteBuilder,
-  void Function(PlayerArgs)? onOpenPlayer,
-  List<Progress> progressList = const [],
-  Listenable? progressListenable,
-  List<Progress> Function()? progressListProvider,
-}) {
-  Widget withProgressUpdates(
-    Widget Function(List<Progress> progressList) builder,
-  ) {
-    final listenable = progressListenable;
-    if (listenable == null) return builder(progressList);
-    return ListenableBuilder(
-      listenable: listenable,
-      builder: (context, child) => builder(
-        progressListProvider?.call() ?? progressList,
-      ),
-    );
-  }
-
-  return (RouteSettings settings) {
-    final routeName = settings.name;
-
-    // Main tab routes
-    if (routeName == RouteNames.home) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.home) ??
-            const PlaceholderScreen(title: 'Home'),
-      );
-    }
-    if (routeName == RouteNames.search) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.search) ??
-            const PlaceholderScreen(title: 'Search'),
-      );
-    }
-    if (routeName == RouteNames.liveTv) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.liveTv) ??
-            const PlaceholderScreen(title: 'Live TV'),
-      );
-    }
-    if (routeName == RouteNames.vod) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.vod) ??
-            const PlaceholderScreen(title: 'Movies'),
-      );
-    }
-    if (routeName == RouteNames.series) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.series) ??
-            const PlaceholderScreen(title: 'Series'),
-      );
-    }
-    if (routeName == RouteNames.notifications) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.notifications) ??
-            const PlaceholderScreen(title: 'Notifications'),
-      );
-    }
-    if (routeName == RouteNames.settings) {
-      return _buildRoute(
-        settings,
-        mainRouteBuilder?.call(RouteNames.settings) ??
-            const PlaceholderScreen(title: 'Settings'),
-      );
-    }
-
-    // Modal routes
-    if (routeName == RouteNames.player) {
-      final args = settings.arguments;
-      if (args is PlayerArgs) {
-        return _buildModalRoute(
-          settings,
-          playerRouteBuilder?.call(args) ??
-              PlayerScreen(
-                args: args,
-                orchestrator:
-                    playbackOrchestratorBuilder?.call() ??
-                    buildPlaybackOrchestrator(),
-                epgService: epgService ?? EpgService(),
-                xtreamService: xtreamService,
-              ),
-        );
-      }
-      return _buildModalRoute(
-        settings,
-        const PlaceholderScreen(title: 'Player unavailable'),
-      );
-    }
-    if (routeName == RouteNames.details) {
-      final args = settings.arguments;
-      if (args is DetailsArgs && args.item != null) {
-        return _buildSlideRoute(
-          settings,
-          withProgressUpdates(
-            (progressList) => VodDetailsScreen(
-              item: args.item!,
-              xtreamService: xtreamService,
-              onPlay: onOpenPlayer,
-              progressList: progressList,
-            ),
-          ),
-        );
-      }
-      final detailTitle = args is DetailsArgs ? args.vodName : 'Details';
-      return _buildSlideRoute(settings, PlaceholderScreen(title: detailTitle));
-    }
-    if (routeName == RouteNames.seriesDetails) {
-      final args = settings.arguments;
-      if (args is SeriesDetailsArgs && xtreamService != null) {
-        return _buildSlideRoute(
-          settings,
-          withProgressUpdates(
-            (progressList) => SeriesDetailsScreen(
-              seriesId: args.seriesId,
-              seriesName: args.seriesName,
-              xtreamService: xtreamService,
-              onPlay: onOpenPlayer,
-              progressList: progressList,
-            ),
-          ),
-        );
-      }
-      final detailTitle = args is SeriesDetailsArgs
-          ? args.seriesName
-          : 'Series Details';
-      return _buildSlideRoute(settings, PlaceholderScreen(title: detailTitle));
-    }
-    if (routeName == RouteNames.viewerSelection) {
-      return _buildModalRoute(
-        settings,
-        const PlaceholderScreen(title: 'Viewer Selection'),
-      );
-    }
-
-    // Unknown route → Home
-    return _buildRoute(
-      const RouteSettings(name: RouteNames.home),
-      const PlaceholderScreen(title: 'Home'),
-    );
-  };
-}
-
-const BoxDecoration _kGradientBg = BoxDecoration(
-  gradient: LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF1a1528), // dark purple tint
-      Color(0xFF09090b), // background
-      Color(0xFF09090b), // slightly deeper
-    ],
-    stops: [0.0, 0.45, 1.0],
-  ),
-);
-
-Widget _withGradient(Widget screen) =>
-    DecoratedBox(decoration: _kGradientBg, child: screen);
-
-MaterialPageRoute<void> _buildRoute(RouteSettings settings, Widget screen) {
-  return MaterialPageRoute<void>(
-    settings: settings,
-    builder: (_) => _withGradient(screen),
-  );
-}
-
-PageRoute<void> _buildModalRoute(RouteSettings settings, Widget screen) {
-  return PageRouteBuilder<void>(
-    settings: settings,
-    opaque: false,
-    pageBuilder: (_, _, _) => screen,
-    transitionsBuilder: (_, animation, _, child) {
-      return FadeTransition(opacity: animation, child: child);
-    },
-  );
-}
-
-PageRoute<void> _buildSlideRoute(RouteSettings settings, Widget screen) {
-  return PageRouteBuilder<void>(
-    settings: settings,
-    pageBuilder: (context, _, _) => ColoredBox(
-      color: Theme.of(context).colorScheme.surface,
-      child: screen,
-    ),
-    transitionsBuilder: (_, animation, _, child) {
-      return SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
-      );
-    },
-  );
-}
-
 PlaybackOrchestrator buildPlaybackOrchestrator() {
   final platform = _playbackPlatformForCurrentTarget();
   final adapters = <PlaybackBackend, PlayerAdapter>{};
@@ -348,7 +129,6 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       ),
     );
   } else if (platform == PlaybackPlatform.apple) {
-    // media_kit doesn't support tvOS; only register it on standard iOS/macOS.
     if (!kIsWeb && Platform.operatingSystem != 'tvos') {
       adapters[PlaybackBackend.appleMpvKit] = MediaKitIosAdapter();
     }
