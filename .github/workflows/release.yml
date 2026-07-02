@@ -118,7 +118,7 @@ jobs:
       - name: Stage artifact
         run: cp build/app/outputs/flutter-apk/app-release.apk m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android-apk
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
@@ -173,7 +173,7 @@ jobs:
           cp -r "$APP" build/ios/Payload/Runner.app
           (cd build/ios && zip -qr "../../m3u-tv-v${VERSION}-ios.ipa" Payload/)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ios-ipa
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa
@@ -274,7 +274,7 @@ jobs:
           cd build/tvos && zip -qr \
             "../../m3u-tv-v${VERSION}-tvos.ipa" Payload/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tvos-ipa
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa
@@ -410,7 +410,7 @@ jobs:
         run: |
           xcrun stapler staple "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg
@@ -458,7 +458,7 @@ jobs:
           tar -czf "m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz" \
             -C build/linux/x64/release/bundle .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-tarball
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz
@@ -507,7 +507,7 @@ jobs:
             -Path "build\windows\x64\runner\Release\*" `
             -DestinationPath "m3u-tv-v${V}-windows.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-zip
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip
