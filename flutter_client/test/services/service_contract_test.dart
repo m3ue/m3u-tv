@@ -199,6 +199,86 @@ void main() {
       expect(transport.lastHeaders['X-M3UE-Client'], 'm3u-tv');
     });
 
+    test('schedules DVR recordings through m3u-editor action', () async {
+      final transport = FakeXtreamTransport({
+        'auth': xtreamAuth(auth: 1),
+        'schedule_dvr': <String, Object?>{
+          'uuid': 'rec-scheduled',
+          'title': 'Late Show',
+          'status': 'scheduled',
+          'channel_id': 101,
+          'scheduled_start': '2026-06-25T21:30:00Z',
+          'scheduled_end': '2026-06-25T22:15:00Z',
+        },
+      });
+      final service = XtreamService(transport: transport.call);
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example/',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final recording = await service.scheduleDvr(
+        channelId: 101,
+        title: 'Late Show',
+        startTime: DateTime.utc(2026, 6, 25, 21, 30),
+        endTime: DateTime.utc(2026, 6, 25, 22, 15),
+      );
+      final request = transport.requests.last;
+
+      expect(request.action, 'schedule_dvr');
+      expect(request.method, 'POST');
+      expect(request.body, {
+        'channel_id': '101',
+        'title': 'Late Show',
+        'start_time': '2026-06-25T21:30:00.000Z',
+        'end_time': '2026-06-25T22:15:00.000Z',
+      });
+      expect(recording.uuid, 'rec-scheduled');
+      expect(recording.status, DvrRecordingStatus.scheduled);
+    });
+
+    test(
+      'schedule DVR normalizes offset EPG dates to UTC request dates',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'schedule_dvr': <String, Object?>{
+            'uuid': 'rec-timezone',
+            'title': 'Offset News',
+            'status': 'scheduled',
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.scheduleDvr(
+          channelId: 202,
+          title: 'Offset News',
+          startTime: DateTime.parse('2026-06-25T21:30:00+02:00'),
+          endTime: DateTime.parse('2026-06-25T23:00:00+02:00'),
+        );
+
+        expect(transport.requests.last.body, containsPair('channel_id', '202'));
+        expect(
+          transport.requests.last.body['start_time'],
+          '2026-06-25T19:30:00.000Z',
+        );
+        expect(
+          transport.requests.last.body['end_time'],
+          '2026-06-25T21:00:00.000Z',
+        );
+      },
+    );
+
     test(
       'loads DVR recordings list and detail through m3u-editor actions',
       () async {

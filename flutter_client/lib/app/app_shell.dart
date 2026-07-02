@@ -17,6 +17,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -1034,6 +1035,25 @@ class _ContentNavigator extends StatelessWidget {
     onNavigateToRoute?.call(RouteNames.dvr);
   }
 
+  Future<void> _scheduleDvr(
+    BuildContext context,
+    Channel channel,
+    EpgProgram program,
+  ) async {
+    try {
+      await appState.scheduleDvr(channel, program);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recording scheduled: ${program.title}')),
+      );
+    } on Object catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingXtreamError(error))),
+      );
+    }
+  }
+
   Widget _buildMainRoute(String routeName) {
     return ListenableBuilder(
       listenable: appState,
@@ -1072,6 +1092,8 @@ class _ContentNavigator extends StatelessWidget {
             epgService: appState.epgService,
             onChannelSelect: _openChannel,
             onSidebarActivate: onSidebarActivate,
+            onScheduleProgram: (channel, program) =>
+                unawaited(_scheduleDvr(context, channel, program)),
           ),
           RouteNames.vod => VodScreen(
             vodItems: appState.vodItems,
@@ -1369,7 +1391,7 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
 
     if (progress.contentType == ContentType.episode) {
-      // Use enriched API data when available — but only if we can actually play
+      // Use enriched API data when available, but only if we can actually play
       // it (seriesId is required by _openProgress to look up the stream URL).
       if (progress.seriesId != null &&
           (progress.seriesName != null || progress.title != null)) {

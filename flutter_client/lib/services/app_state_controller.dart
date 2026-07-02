@@ -314,6 +314,18 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<DvrRecording> scheduleDvr(Channel channel, EpgProgram program) async {
+    final recording = await xtreamService.scheduleDvr(
+      channelId: channel.id,
+      title: program.title,
+      startTime: program.start,
+      endTime: program.end,
+    );
+    _dvrRecordings = [recording, ..._dvrRecordings];
+    notifyListeners();
+    return recording;
+  }
+
   void updateProgressEntry(Progress updated) {
     final idx = _progressList.indexWhere(
       (p) =>
@@ -530,7 +542,7 @@ class AppStateController extends ChangeNotifier {
       }
     } on Object catch (e) {
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
-      // Don't clear existing EPG data on a batch failure — a transient network
+      // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.
     }
   }

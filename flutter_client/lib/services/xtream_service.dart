@@ -280,6 +280,25 @@ class XtreamService {
     return DvrRecording.fromXtream(_asMap(response));
   }
 
+  Future<DvrRecording> scheduleDvr({
+    required int channelId,
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    final response = await _request(
+      'schedule_dvr',
+      method: 'POST',
+      body: {
+        'channel_id': '$channelId',
+        'title': title,
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime.toUtc().toIso8601String(),
+      },
+    );
+    return DvrRecording.fromXtream(_asMap(response));
+  }
+
   Future<SeriesInfo> getSeriesInfo(int seriesId) async {
     final response = await _request(
       'get_series_info',

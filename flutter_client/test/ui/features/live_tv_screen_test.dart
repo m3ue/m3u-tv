@@ -245,6 +245,47 @@ void main() {
       expect(selectedChannel, isNotNull);
       expect(selectedChannel!.id, 1);
     });
+
+    testWidgets(
+      'shows EPG schedule action and calls back with program context',
+      (
+        tester,
+      ) async {
+        Channel? scheduledChannel;
+        EpgProgram? scheduledProgram;
+        final epgService =
+            EpgService(clock: () => DateTime.utc(2026, 6, 25, 20))
+              ..loadPrograms([
+                EpgProgram(
+                  channelId: 'bbc.one',
+                  title: 'Late Show',
+                  description: 'Fixture episode',
+                  start: DateTime.utc(2026, 6, 25, 20),
+                  end: DateTime.utc(2026, 6, 25, 21),
+                ),
+              ]);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            epgService: epgService,
+            onScheduleProgram: (channel, program) {
+              scheduledChannel = channel;
+              scheduledProgram = program;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Record'), findsOneWidget);
+        await tester.tap(find.text('Record'));
+        await tester.pumpAndSettle();
+
+        expect(scheduledChannel?.id, 1);
+        expect(scheduledProgram?.title, 'Late Show');
+      },
+    );
   });
 }
 
@@ -255,7 +296,9 @@ class _TestApp extends StatelessWidget {
     this.isLoading = false,
     this.isConfigured = true,
     this.favoritesService,
+    this.epgService,
     this.onChannelSelect,
+    this.onScheduleProgram,
   });
 
   final List<Channel> channels;
@@ -263,7 +306,9 @@ class _TestApp extends StatelessWidget {
   final bool isLoading;
   final bool isConfigured;
   final FavoritesService? favoritesService;
+  final EpgService? epgService;
   final void Function(Channel)? onChannelSelect;
+  final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
   Widget build(BuildContext context) {
@@ -275,8 +320,9 @@ class _TestApp extends StatelessWidget {
         isLoading: isLoading,
         isConfigured: isConfigured,
         favoritesService: favoritesService ?? FavoritesService(),
-        epgService: EpgService(),
+        epgService: epgService ?? EpgService(),
         onChannelSelect: onChannelSelect ?? (_) {},
+        onScheduleProgram: onScheduleProgram,
       ),
     );
   }
