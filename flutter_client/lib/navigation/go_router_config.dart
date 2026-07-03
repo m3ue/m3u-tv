@@ -203,7 +203,20 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: Notifications
+          // Branch 6: Requests
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.requests,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(
+                    _tabScreen(context, RouteNames.requests),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Branch 7: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -216,7 +229,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Settings
+          // Branch 8: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

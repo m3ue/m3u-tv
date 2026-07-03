@@ -232,6 +232,63 @@ void main() {
       expect(find.text('Route Recording'), findsOneWidget);
     });
 
+    testWidgets('hides Requests navigation when backend lacks requests', (
+      tester,
+    ) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          features: const <String>['progress', 'dvr'],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _expandSidebar(tester);
+
+      expect(_sidebarText('Requests'), findsNothing);
+      expect(find.text('Request Content'), findsNothing);
+    });
+
+    testWidgets('Requests appears and opens when backend advertises requests', (
+      tester,
+    ) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          features: const <String>['progress', 'requests'],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _expandSidebar(tester);
+
+      await tester.tap(_sidebarText('Requests'));
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Request Content'), findsOneWidget);
+      expect(find.text('Full request workflow coming soon.'), findsOneWidget);
+    });
+
     testWidgets('sidebar labels remain visible after selecting a route', (
       tester,
     ) async {

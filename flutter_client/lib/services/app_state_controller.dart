@@ -204,6 +204,8 @@ class AppStateController extends ChangeNotifier {
   List<Progress> get progressList => _progressList;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
+  bool get hasRequestsFeature =>
+      authNotifier.authResponse?.hasFeature('requests') ?? false;
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
     AppSourceType.m3u => 'M3U',
