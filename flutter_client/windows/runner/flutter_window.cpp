@@ -33,6 +33,10 @@ bool FlutterWindow::OnCreate() {
   RegisterDesktopLibmpvBackend(registrar, GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  // Show the shell immediately so Windows users are never left with only a
+  // background process if Dart startup work delays the first Flutter frame.
+  this->Show();
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
