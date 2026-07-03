@@ -21,6 +21,7 @@ dependencies:
   media_kit_libs_ios_video: ^1.1.4
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_macos_video: ^1.1.4
+  media_kit_libs_windows_video: ^1.0.11
   media_kit_video: ^2.0.1
   path_provider: ^2.1.0
   path_provider_tvos: ^0.0.1
@@ -46,5 +47,3 @@ flutter:
   assets:
     - assets/icons/
 
-  shaders:
-    - shaders/ink_sparkle.frag

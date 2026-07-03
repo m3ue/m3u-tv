@@ -61,6 +61,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final bool _ownsAppState;
 
   DateTime? _lastBackPress;
+  int _lastNavMs = 0;
+  int _lastNavIndex = -1;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
 
   PlayerArgs? _playerArgs;
@@ -177,6 +179,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (index < 0 || index >= routes.length || index == _currentIndex) return;
     final branchIndex = RouteNames.mainRoutes.indexOf(routes[index]);
     if (branchIndex < 0) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (index == _lastNavIndex && now - _lastNavMs < 350) return;
+    _lastNavMs = now;
+    _lastNavIndex = index;
     widget.navigationShell.goBranch(
       branchIndex,
       initialLocation: branchIndex == widget.navigationShell.currentIndex,
@@ -224,6 +230,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }),
     );
   }
+
+  // Stable method tearoff passed to ContentActions.onOpenPlayer.
+  // Must NOT be a local closure in build() — closures are always new instances,
+  // which makes ContentActions.updateShouldNotify return true on every rebuild
+  // and cascade unnecessary rebuilds to all feature screens.
+  void _openPlayerFromActions(PlayerArgs args) =>
+      unawaited(_openPlayer(context, args));
 
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
     var resolvedArgs = args;
@@ -588,11 +601,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
-    void openPlayer(PlayerArgs args) => unawaited(_openPlayer(context, args));
-
     final contentShell = ContentActions(
       appState: _appState,
-      onOpenPlayer: openPlayer,
+      onOpenPlayer: _openPlayerFromActions,
       onChannelSelect: _openChannel,
       onCatchupSelect: _openCatchupProgram,
       onVodSelect: _openVod,
@@ -836,7 +847,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     List<String> overflowRoutes,
     int primaryCount,
   ) async {
-    await showModalBottomSheet<void>(
+    // Return the chosen index and navigate after the sheet is fully dismissed.
+    // Calling _navigateTo synchronously inside ListTile.onTap while the sheet
+    // is still in the overlay can cause a double interaction event on some
+    // platforms (goBranch fires a route change mid-pop animation).
+    final index = await showModalBottomSheet<int>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: ListView(
@@ -856,15 +871,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                       overflowRoutes[i],
                 ),
                 selected: _currentIndex == primaryCount + i,
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _navigateTo(primaryCount + i);
-                },
+                onTap: () => Navigator.of(sheetContext).pop(primaryCount + i),
               ),
           ],
         ),
       ),
     );
+    if (index != null && mounted) _navigateTo(index);
   }
 
   IconData _routeIcon(String route) => switch (route) {
@@ -1049,6 +1062,11 @@ class SidebarDestinationItem extends StatefulWidget {
 class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   bool _focused = false;
   bool _hovered = false;
+  // Timestamp debounce: prevents double-fire when a platform (e.g. tvOS Siri
+  // Remote, desktop Enter key) generates both a KeyDownEvent (onKeyEvent) AND
+  // a synthesized pointer tap (InkWell.onTap) for the same physical press.
+  // Order-independent: works whether key arrives before or after pointer.
+  int _lastActivationMs = 0;
 
   @override
   void initState() {
@@ -1098,6 +1116,9 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                   event.logicalKey == LogicalKeyboardKey.select ||
               event is KeyDownEvent &&
                   event.logicalKey == LogicalKeyboardKey.enter) {
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - _lastActivationMs < 350) return KeyEventResult.handled;
+            _lastActivationMs = now;
             widget.onTap();
             return KeyEventResult.handled;
           }
@@ -1105,6 +1126,9 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
         },
         child: InkWell(
           onTap: () {
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - _lastActivationMs < 350) return;
+            _lastActivationMs = now;
             widget.focusNode.requestFocus();
             widget.onTap();
           },

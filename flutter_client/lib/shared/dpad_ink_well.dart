@@ -90,6 +90,13 @@ class _DpadInkWellState extends State<DpadInkWell> {
         focusNode: _focusNode,
         onSelect: widget.onTap == null ? null : _onTap,
         onLongSelect: widget.onLongTap,
+        // InkWell handles touch taps; DpadFocusable.onSelect handles D-pad key
+        // events. The default tapToSelect: true wraps the child in a
+        // GestureDetector whose onTapDown calls requestFocus() before the
+        // gesture arena resolves. On a scroll gesture this schedules a
+        // DpadScroll.ensureVisible that can interrupt a fling with an
+        // animateTo() counter-animation.
+        tapToSelect: false,
         builder: (context, state, child) => DpadEffect.wrap(
           context,
           effects,

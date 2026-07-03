@@ -198,4 +198,41 @@ void main() {
       }
     },
   );
+
+  test('Windows runner shows the shell before waiting for first frame', () {
+    final flutterWindow = readFile('windows/runner/flutter_window.cpp');
+    final attachViewIndex = flutterWindow.indexOf(
+      'SetChildContent(flutter_controller_->view()->GetNativeWindow());',
+    );
+    final immediateShowIndex = flutterWindow.indexOf(
+      'this->Show();',
+      attachViewIndex,
+    );
+
+    expect(attachViewIndex, isNonNegative);
+    expect(
+      immediateShowIndex,
+      isNonNegative,
+      reason:
+          'Windows startup must call Show() immediately after SetChildContent',
+    );
+    // Regression guard: the old deferred-show approach (SetNextFrameCallback)
+    // was removed because Show() is now called immediately. If this fails,
+    // someone re-added the callback path — ensure the immediate Show() is
+    // still present and comes first.
+    expect(
+      flutterWindow,
+      isNot(contains('SetNextFrameCallback')),
+      reason:
+          'Window must not defer Show() to SetNextFrameCallback — app must appear immediately on startup',
+    );
+  });
+
+  test('Windows bundles MediaKit native video libraries', () {
+    final pubspec = readFile('pubspec.yaml');
+    final windowsPlugins = readFile('windows/flutter/generated_plugins.cmake');
+
+    expect(pubspec, contains('media_kit_libs_windows_video:'));
+    expect(windowsPlugins, contains('media_kit_libs_windows_video'));
+  });
 }
