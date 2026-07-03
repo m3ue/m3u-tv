@@ -208,19 +208,22 @@ void main() {
       'this->Show();',
       attachViewIndex,
     );
-    final firstFrameIndex = flutterWindow.indexOf(
-      'SetNextFrameCallback',
-      attachViewIndex,
-    );
 
     expect(attachViewIndex, isNonNegative);
-    expect(immediateShowIndex, isNonNegative);
-    expect(firstFrameIndex, isNonNegative);
     expect(
       immediateShowIndex,
-      lessThan(firstFrameIndex),
+      isNonNegative,
+      reason: 'Windows startup must call Show() immediately after SetChildContent',
+    );
+    // Regression guard: the old deferred-show approach (SetNextFrameCallback)
+    // was removed because Show() is now called immediately. If this fails,
+    // someone re-added the callback path — ensure the immediate Show() is
+    // still present and comes first.
+    expect(
+      flutterWindow,
+      isNot(contains('SetNextFrameCallback')),
       reason:
-          'Windows startup must expose a window even if Dart delays frame 1',
+          'Window must not defer Show() to SetNextFrameCallback — app must appear immediately on startup',
     );
   });
 
