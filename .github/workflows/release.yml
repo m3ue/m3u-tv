@@ -1,0 +1,574 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.3)'
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Gate: analyze, test, resolve version/prev-tag ─────────────────────────
+  validate:
+    name: Validate & Test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      prev_tag: ${{ steps.version.outputs.prev_tag }}
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          VERSION="${TAG#v}"
+          BUILD_NUMBER="${{ github.run_number }}"
+          PREV_TAG=$(git tag --sort=-version:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -v "^${TAG}$" \
+            | head -1 || echo "")
+          echo "version=$VERSION"           >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "prev_tag=$PREV_TAG"         >> $GITHUB_OUTPUT
+          echo "Building v$VERSION (build $BUILD_NUMBER) — prev: ${PREV_TAG:-none}"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  # ── Android phone + Android TV (single APK, leanback optional) ────────────
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set version
+        run: |
+          sed -i "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_B64" | base64 --decode > upload-keystore.jks
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+        env:
+          ANDROID_KEYSTORE_PATH: ../upload-keystore.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Stage artifact
+        run: cp build/app/outputs/flutter-apk/app-release.apk m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
+
+  # ── iOS (unsigned IPA — sideload via AltStore / TestFlight with Apple certs) ──
+  #
+  # To enable signed distribution add secrets and uncomment the certificate
+  # install step (same pattern as the tvOS job below).
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set version
+        run: |
+          sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      - name: Build iOS IPA (unsigned)
+        run: |
+          flutter build ipa --release --no-codesign \
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Stage artifact
+        # flutter build ipa --no-codesign creates an xcarchive, not a Payload IPA.
+        # The .app is inside the xcarchive; we package it manually into a Payload zip.
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          APP="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app"
+          if [ ! -d "$APP" ]; then
+            echo "ERROR: Runner.app not found at expected xcarchive path — listing build/ios/:"
+            find build/ios -name "*.app" | head -10
+            find build/ios -name "*.xcarchive" | head -5
+            exit 1
+          fi
+          mkdir -p build/ios/Payload
+          cp -r "$APP" build/ios/Payload/Runner.app
+          (cd build/ios && zip -qr "../../m3u-tv-v${VERSION}-ios.ipa" Payload/)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-ipa
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa
+
+  # ── Apple TV / tvOS ───────────────────────────────────────────────────────
+  #
+  # The tvOS Xcode project uses manual copy-phases for Flutter artifacts
+  # rather than the standard Flutter backend build phase, so CI pre-builds
+  # the Flutter bundle and stages it before archiving with xcodebuild.
+  #
+  # To enable signed/TestFlight distribution uncomment the certificate step
+  # below and add these secrets:
+  #   APPLE_CERTIFICATE_BASE64       — p12 (base64)
+  #   APPLE_CERTIFICATE_PASSWORD     — p12 password
+  #   APPLE_PROVISIONING_PROFILE_B64 — .mobileprovision (base64)
+  # ─────────────────────────────────────────────────────────────────────────
+  build-tvos:
+    name: Build tvOS IPA
+    runs-on: macos-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install flutter-tvos
+        # flutter-tvos is a companion CLI (github.com/fluttertv/flutter-tvos) that
+        # provides the tvOS Flutter engine and build toolchain. It is separate from
+        # the standard Flutter SDK and must be installed before building tvOS targets.
+        run: |
+          git clone --depth 1 --branch v3.44.2-tvos.1.3.1 \
+            https://github.com/fluttertv/flutter-tvos.git $HOME/flutter-tvos
+          echo "$HOME/flutter-tvos/bin" >> $GITHUB_PATH
+
+      - name: Precache tvOS engine artifacts
+        run: flutter-tvos precache
+
+      - name: Get dependencies
+        run: flutter-tvos pub get
+
+      - name: Set version
+        run: |
+          sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      # Uncomment to enable signed builds (add secrets listed in the job comment above):
+      # - name: Install Apple certificate & provisioning profile
+      #   env:
+      #     CERT_B64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+      #     CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #     PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_B64 }}
+      #   run: |
+      #     KC=$RUNNER_TEMP/build.keychain
+      #     security create-keychain -p "" $KC
+      #     security set-keychain-settings -lut 21600 $KC
+      #     security unlock-keychain -p "" $KC
+      #     echo "$CERT_B64" | base64 --decode -o $RUNNER_TEMP/cert.p12
+      #     security import $RUNNER_TEMP/cert.p12 -P "$CERT_PWD" -A -t cert -f pkcs12 -k $KC
+      #     security list-keychain -d user -s $KC
+      #     PP=$RUNNER_TEMP/profile.mobileprovision
+      #     echo "$PROFILE_B64" | base64 --decode -o "$PP"
+      #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+      #     cp "$PP" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Disable code signing in tvOS project
+        # flutter-tvos ignores FLUTTER_XCODE_* env vars for signing. Clear all
+        # signing-related build settings so xcodebuild doesn't search for profiles.
+        # SDK-conditional keys ("KEY[sdk=appletvos*]") take precedence over their
+        # base equivalents when building for physical tvOS hardware, so both must
+        # be cleared. Use [^;]* (not [A-Z0-9]*) to avoid zero-length matches that
+        # double-quote an already-empty value and corrupt the pbxproj plist.
+        run: |
+          sed -i '' \
+            -e 's/DEVELOPMENT_TEAM = [^;]*/DEVELOPMENT_TEAM = ""/g' \
+            -e 's/"DEVELOPMENT_TEAM\[sdk=appletvos\*\]" = [^;]*/"DEVELOPMENT_TEAM[sdk=appletvos*]" = ""/g' \
+            -e 's/"PROVISIONING_PROFILE_SPECIFIER\[sdk=appletvos\*\]" = [^;]*/"PROVISIONING_PROFILE_SPECIFIER[sdk=appletvos*]" = ""/g' \
+            -e 's/"CODE_SIGN_IDENTITY\[sdk=appletvos\*\]" = [^;]*/"CODE_SIGN_IDENTITY[sdk=appletvos*]" = ""/g' \
+            tvos/Runner.xcodeproj/project.pbxproj
+
+      - name: Build tvOS (unsigned)
+        run: |
+          flutter-tvos build tvos --release \
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Package IPA
+        # flutter-tvos build tvos creates an xcarchive; package the .app manually.
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          APP=$(find build/tvos -name "Runner.app" | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: Runner.app not found — listing build/tvos/:"
+            find build/tvos -name "*.app" -o -name "*.xcarchive" || true
+            exit 1
+          fi
+          mkdir -p build/tvos/Payload
+          cp -r "$APP" build/tvos/Payload/Runner.app
+          cd build/tvos && zip -qr \
+            "../../m3u-tv-v${VERSION}-tvos.ipa" Payload/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tvos-ipa
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa
+
+  # ── macOS ─────────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set version
+        run: |
+          sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      - name: Install signing certificate
+        env:
+          CERT_B64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p "" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "" "$KC"
+          echo "$CERT_B64" | base64 --decode -o "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PWD" -A -t cert -f pkcs12 -k "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | xargs)
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$KC"
+
+      - name: Set up App Store Connect API key
+        env:
+          API_KEY_B64: ${{ secrets.APP_STORE_CONNECT_API_KEY_B64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_B64" | base64 --decode \
+            > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+
+      - name: Install CocoaPods dependencies
+        run: cd macos && pod install --repo-update
+
+      - name: Build macOS app (unsigned)
+        # Sign separately after build so we control the identity and entitlements.
+        env:
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
+        run: |
+          flutter build macos --release \
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Sign app bundle
+        # Notarization requires: Developer ID Application cert, Hardened Runtime
+        # (--options runtime), and a secure timestamp (--timestamp).
+        # Sign inside-out: dylibs and framework bundles first, then the .app.
+        # codesign --deep is unreliable for complex bundles with many frameworks.
+        run: |
+          APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" \
+            | grep -o '"[^"]*"' | head -1 | tr -d '"')
+          if [ -z "$IDENTITY" ]; then
+            echo "ERROR: No 'Developer ID Application' certificate found."
+            echo "Available identities:"
+            security find-identity -v -p codesigning
+            exit 1
+          fi
+          echo "Signing with: $IDENTITY"
+          # Sign all dylibs
+          find "$APP" -name "*.dylib" | while read f; do
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$f"
+          done
+          # Sign framework bundles inside-out (deepest paths first)
+          find "$APP" -name "*.framework" | sort -r | while read fw; do
+            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$fw"
+          done
+          # Finally sign the .app with entitlements
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            --entitlements macos/Runner/Release.entitlements \
+            "$APP"
+          codesign --verify --verbose "$APP"
+
+      - name: Package as DMG
+        run: |
+          APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: .app not found — listing build/macos/:"
+            find build/macos -name "*.app" | head -10
+            exit 1
+          fi
+          hdiutil create \
+            -volname "M3U TV" \
+            -srcfolder "$APP" \
+            -ov -format UDZO \
+            "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+
+      - name: Notarize DMG
+        run: |
+          KEY=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+          RESULT=$(xcrun notarytool submit \
+            "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg" \
+            --key "$KEY" \
+            --key-id ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+            --issuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
+            --wait --output-format json)
+          STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+          ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "Notarization status: $STATUS — fetching Apple rejection log:"
+            xcrun notarytool log "$ID" \
+              --key "$KEY" \
+              --key-id ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
+              --issuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+            exit 1
+          fi
+
+      - name: Staple notarization ticket
+        run: |
+          xcrun stapler staple "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg
+
+  # ── Linux ─────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Build Linux tarball
+    runs-on: ubuntu-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libmpv-dev \
+            libsecret-1-dev libjsoncpp-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set version
+        run: |
+          sed -i "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      - name: Build Linux app
+        run: |
+          flutter build linux --release \
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Package as tarball
+        run: |
+          tar -czf "m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz" \
+            -C build/linux/x64/release/bundle .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-tarball
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz
+
+  # ── Windows ───────────────────────────────────────────────────────────────
+  #
+  # Note: the Windows target uses a custom libmpv backend (desktop_libmpv_backend.cpp).
+  # The build output will not include libmpv.dll — users may need to install
+  # the mpv runtime or bundle libmpv.dll separately for video playback.
+  # ─────────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows ZIP
+    runs-on: windows-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Set version
+        run: |
+          (Get-Content pubspec.yaml) `
+            -replace '^version: .*', "version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}" `
+            | Set-Content pubspec.yaml
+
+      - name: Build Windows app
+        run: |
+          flutter build windows --release `
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} `
+            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Package as ZIP
+        run: |
+          $V = "${{ needs.validate.outputs.version }}"
+          Compress-Archive `
+            -Path "build\windows\x64\runner\Release\*" `
+            -DestinationPath "m3u-tv-v${V}-windows.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-zip
+          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip
+
+  # ── GitHub Release ─────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, build-android, build-ios, build-tvos, build-macos, build-linux, build-windows]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ needs.validate.outputs.version }}"
+          PREV_TAG="${{ needs.validate.outputs.prev_tag }}"
+          PREV_FLAG=""
+          if [ -n "$PREV_TAG" ]; then
+            PREV_FLAG="--notes-start-tag $PREV_TAG"
+          fi
+
+          ASSETS=$(find artifacts -type f \( \
+            -name "*.apk" -o -name "*.ipa" -o \
+            -name "*.dmg" -o -name "*.tar.gz" -o -name "*.zip" \
+          \))
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG"
+            echo "$ASSETS" | xargs gh release upload "$TAG" --clobber
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              $PREV_FLAG \
+              $(echo "$ASSETS" | tr '\n' ' ')
+          fi
+
+      - name: Release summary
+        run: |
+          V="v${{ needs.validate.outputs.version }}"
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $V | **Build:** ${{ needs.validate.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Artifact |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Android + Android TV | \`m3u-tv-${V}-android.apk\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| iOS | \`m3u-tv-${V}-ios.ipa\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| tvOS (Apple TV) | \`m3u-tv-${V}-tvos.ipa\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | \`m3u-tv-${V}-macos.dmg\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | \`m3u-tv-${V}-linux.tar.gz\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY

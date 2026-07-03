@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Search screen with client-side filtering across Live TV, Movies, and Series.
@@ -40,12 +41,7 @@ class _SearchScreenState extends State<SearchScreen>
   late TabController _tabController;
   String _query = '';
 
-  static const _tabs = [
-    Tab(text: 'All'),
-    Tab(text: 'Live TV'),
-    Tab(text: 'Movies'),
-    Tab(text: 'Series'),
-  ];
+  static const _tabs = ['All', 'Live TV', 'Movies', 'Series'];
 
   @override
   void initState() {
@@ -110,8 +106,7 @@ class _SearchScreenState extends State<SearchScreen>
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
-          // Tabs
-          TabBar(controller: _tabController, tabs: _tabs),
+          DpadTabBar(controller: _tabController, tabs: _tabs),
           // Content
           Expanded(
             child: TabBarView(

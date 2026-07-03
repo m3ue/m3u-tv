@@ -4,8 +4,10 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
+import 'package:m3u_tv/features/notifications/notifications_screen.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
@@ -13,11 +15,12 @@ import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -34,12 +37,14 @@ bool shouldUseSidebar(DeviceType deviceType) =>
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
+    required this.navigationShell,
     required this.deviceType,
     this.appState,
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
   });
 
+  final StatefulNavigationShell navigationShell;
   final DeviceType deviceType;
   final AppStateController? appState;
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
@@ -50,19 +55,17 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  int _currentIndex = 0;
   bool _sidebarActive = false;
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final AppStateController _appState;
   late final bool _ownsAppState;
 
   DateTime? _lastBackPress;
+  StreamSubscription<TvNotificationItem>? _tvNotificationSub;
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
   FocusNode? _focusBeforePlayer;
 
-  // Focus nodes for sidebar items
   final List<FocusNode> _sidebarFocusNodes = [];
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
@@ -71,6 +74,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
       .toList(growable: false);
 
+  int get _currentIndex {
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    final visibleIndex = _mainRoutes.indexOf(route);
+    return visibleIndex < 0 ? 0 : visibleIndex;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +87,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _appState.addListener(_onAppStateChanged);
+    _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
     if (!_appState.isConfigured) {
       unawaited(_appState.boot());
     }
@@ -92,7 +102,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final now = DateTime.now();
     final last = _lastBackPress;
     if (last != null && now.difference(last) < const Duration(seconds: 2)) {
-      return false; // Let Android exit the app.
+      return false;
     }
     _lastBackPress = now;
     if (mounted) {
@@ -109,10 +119,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void _onAppStateChanged() {
     if (!mounted) return;
     _syncSidebarFocusNodes();
-    final routes = _mainRoutes;
-    if (_currentIndex >= routes.length) {
-      _currentIndex = 0;
-      unawaited(_navigatorKey.currentState?.pushReplacementNamed(routes.first));
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    if (!_mainRoutes.contains(route)) {
+      widget.navigationShell.goBranch(0, initialLocation: true);
     }
     setState(() {});
   }
@@ -122,17 +131,31 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _syncSidebarFocusNodes() {
-    final routes = _mainRoutes;
-    while (_sidebarFocusNodes.length < routes.length) {
+    while (_sidebarFocusNodes.length < _mainRoutes.length) {
       _sidebarFocusNodes.add(FocusNode());
     }
-    while (_sidebarFocusNodes.length > routes.length) {
+    while (_sidebarFocusNodes.length > _mainRoutes.length) {
       _sidebarFocusNodes.removeLast().dispose();
     }
   }
 
+  void _onTvNotification(TvNotificationItem item) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          item.body != null && item.body!.isNotEmpty
+              ? '${item.title}: ${item.body}'
+              : item.title,
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _tvNotificationSub?.cancel().ignore();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
@@ -148,16 +171,14 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void _navigateTo(int index) {
     final routes = _mainRoutes;
     if (index < 0 || index >= routes.length || index == _currentIndex) return;
-    setState(() {
-      _currentIndex = index;
-    });
-    unawaited(
-      _navigatorKey.currentState?.pushReplacementNamed(routes[index]),
+    final branchIndex = RouteNames.mainRoutes.indexOf(routes[index]);
+    if (branchIndex < 0) return;
+    widget.navigationShell.goBranch(
+      branchIndex,
+      initialLocation: branchIndex == widget.navigationShell.currentIndex,
     );
-    // On TV, navigating from sidebar collapses it
     if (shouldUseSidebar(widget.deviceType)) {
-      _sidebarActive = false;
-      // Move focus to content after navigation
+      setState(() => _sidebarActive = false);
       unawaited(
         Future.microtask(() {
           if (mounted) _contentFocusNode.requestFocus();
@@ -175,7 +196,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     setState(() {
       _sidebarActive = true;
     });
-    // Focus the current sidebar item
     if (_sidebarFocusNodes.isNotEmpty) {
       final node =
           _sidebarFocusNodes[_currentIndex.clamp(
@@ -203,7 +223,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
     var resolvedArgs = args;
-    if (resolvedArgs.type != 'live' &&
+    if ((resolvedArgs.type == 'vod' || resolvedArgs.type == 'series') &&
         resolvedArgs.startPosition == null &&
         resolvedArgs.streamId != null) {
       final target = resolvedArgs.type == 'series'
@@ -249,7 +269,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _playerArgs = args;
       _playerOrchestrator = newOrch;
     });
-    // Dispose old orchestrator after the frame so it can finish stopping.
     if (oldOrch != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => oldOrch.dispose().ignore(),
@@ -277,9 +296,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       orch?.dispose().ignore();
       if (!mounted) return;
-      // Restore to the exact node that had focus before the player opened.
-      // If that node is gone, fall back to the content scope (which uses
-      // whatever _focusedChild it still has).
       if (savedFocus != null && savedFocus.canRequestFocus) {
         savedFocus.requestFocus();
       } else {
@@ -294,13 +310,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return true;
     }
 
-    final nav = _navigatorKey.currentState;
-    if (nav != null && nav.canPop()) {
-      nav.pop();
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
       return true;
     }
 
-    // On TV/desktop: if content is focused, activate sidebar
     if (shouldUseSidebar(widget.deviceType) && !_sidebarActive) {
       _activateSidebar();
       return true;
@@ -309,11 +324,279 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return false;
   }
 
+  void _openChannel(Channel channel) {
+    unawaited(
+      _openPlayer(
+        context,
+        PlayerArgs(
+          streamUrl: channel.streamUrl,
+          title: channel.name,
+          type: 'live',
+          streamId: channel.id,
+          epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+          headers: channel.headers,
+        ),
+      ),
+    );
+  }
+
+  void _openCatchupProgram(Channel channel, EpgProgram program) {
+    if (_appState.sourceType != AppSourceType.xtream) {
+      _openChannel(channel);
+      return;
+    }
+    final duration = program.end.difference(program.start);
+    final streamUrl = _appState.xtreamService.getCatchupStreamUrl(
+      channel.id,
+      program.start,
+      duration,
+    );
+    unawaited(
+      _openPlayer(
+        context,
+        PlayerArgs(
+          streamUrl: streamUrl,
+          title: '${channel.name} - ${program.title}',
+          type: 'catchup',
+          streamId: channel.id,
+          startPosition: 0,
+          epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+          headers: channel.headers,
+          metadata: <String, Object?>{
+            'catchup': true,
+            'program_title': program.title,
+            'program_start': program.start.toIso8601String(),
+            'program_end': program.end.toIso8601String(),
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _scheduleDvr(
+    BuildContext context,
+    Channel channel,
+    EpgProgram program,
+  ) async {
+    try {
+      await _appState.scheduleDvr(channel, program);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recording scheduled: ${program.title}')),
+      );
+    } on Object catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not schedule recording: $error')),
+      );
+    }
+  }
+
+  Future<void> _pushDetail(String path, {Object? extra}) async {
+    await Future<void>.microtask(() {});
+    final savedFocus = FocusManager.instance.primaryFocus;
+    // ignore: use_build_context_synchronously
+    await context.push(path, extra: extra);
+    if (mounted) {
+      if (savedFocus != null && savedFocus.canRequestFocus) {
+        savedFocus.requestFocus();
+      } else {
+        _contentFocusNode.requestFocus();
+      }
+    }
+  }
+
+  void _openVod(VodItem item) {
+    unawaited(_pushDetail(RouteNames.vodDetailsFor(item.id), extra: item));
+  }
+
+  void _openSeries(Series series) {
+    unawaited(
+      _pushDetail(RouteNames.seriesDetailsFor(series.id), extra: series),
+    );
+  }
+
+  void _openProgress(Progress progress) {
+    if (progress.contentType == ContentType.vod) {
+      final item = _appState.vodItems.firstWhereOrNull(
+        (item) => item.id == progress.streamId,
+      );
+      if (item != null) {
+        unawaited(
+          _openPlayer(
+            context,
+            PlayerArgs(
+              streamUrl: item.streamUrl,
+              title: progress.title ?? item.name,
+              type: 'vod',
+              streamId: item.id,
+              metadata: <String, Object?>{
+                'container_extension': item.containerExtension,
+                if (progress.backdropUrl != null)
+                  'backdrop_url': progress.backdropUrl,
+                if (progress.thumbnailUrl != null)
+                  'thumbnail_url': progress.thumbnailUrl,
+                if (progress.rating != null) 'rating': progress.rating,
+                if (progress.runtime != null) 'duration': progress.runtime,
+              },
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (progress.contentType == ContentType.episode &&
+        progress.seriesId != null) {
+      final series = _appState.seriesList.firstWhereOrNull(
+        (s) => s.id == progress.seriesId,
+      );
+      if (series != null) {
+        final streamUrl = _appState.xtreamService.getSeriesStreamUrl(
+          progress.streamId.toString(),
+        );
+        unawaited(
+          _openPlayer(
+            context,
+            PlayerArgs(
+              streamUrl: streamUrl,
+              title: progress.episodeTitle ?? series.name,
+              type: 'series',
+              streamId: progress.streamId,
+              seriesId: progress.seriesId,
+              seasonNumber: progress.seasonNumber,
+              metadata: <String, Object?>{
+                if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+                'series_name': progress.seriesName ?? series.name,
+                if (progress.episodeNumber != null)
+                  'episode_number': progress.episodeNumber,
+                if (progress.seasonNumber != null)
+                  'season_number': progress.seasonNumber,
+                if (progress.episodeTitle != null)
+                  'episode_title': progress.episodeTitle,
+              },
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildTabScreen(String routeName) {
+    return ListenableBuilder(
+      listenable: _appState,
+      builder: (context, _) {
+        if (_appState.isBootstrapping) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return switch (routeName) {
+          RouteNames.home => _HomeScreen(
+            appState: _appState,
+            onChannelSelect: _openChannel,
+            onVodSelect: _openVod,
+            onSeriesSelect: _openSeries,
+            onProgressSelect: _openProgress,
+            onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.search => SearchScreen(
+            channels: _appState.channels,
+            vodItems: _appState.vodItems,
+            seriesList: _appState.seriesList,
+            isConfigured: _appState.isConfigured,
+            onChannelSelect: _openChannel,
+            onVodSelect: _openVod,
+            onSeriesSelect: _openSeries,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.liveTv => LiveTvScreen(
+            channels: _appState.channels,
+            categories: _appState.liveCategories,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            favoritesService: _appState.favoritesService,
+            epgService: _appState.epgService,
+            onChannelSelect: _openChannel,
+            onCatchupProgramSelect: _openCatchupProgram,
+            onSidebarActivate: _activateSidebar,
+            onScheduleProgram: (channel, program) =>
+                unawaited(_scheduleDvr(context, channel, program)),
+          ),
+          RouteNames.vod => VodScreen(
+            vodItems: _appState.vodItems,
+            categories: _appState.vodCategories,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            onVodSelect: _openVod,
+            favoritesService: _appState.vodFavoritesService,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.series => SeriesScreen(
+            seriesList: _appState.seriesList,
+            categories: _appState.seriesCategories,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            onSeriesSelect: _openSeries,
+            favoritesService: _appState.seriesFavoritesService,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.dvr => DvrRecordingsScreen(
+            recordings: _appState.dvrRecordings,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            onPlay: _openPlayerDirect,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.notifications => NotificationsScreen(appState: _appState),
+          RouteNames.settings => SettingsScreen(
+            authNotifier: _appState.authNotifier,
+            activeViewer: _appState.activeViewer,
+            viewers: _appState.viewers,
+            sourceLabel: _appState.sourceLabel,
+            sourceError: _appState.error,
+            isConfiguredOverride: _appState.isConfigured,
+            epgRefreshInterval: _appState.epgRefreshInterval,
+            epgRefreshOptions: AppStateController.epgRefreshOptions,
+            traktService: _appState.traktService,
+            onConnect: _appState.connectXtream,
+            onDisconnect: () => unawaited(_appState.disconnect()),
+            onSwitchViewer: (viewer) =>
+                unawaited(_appState.switchViewer(viewer)),
+            onCreateViewer: _appState.createViewer,
+            onClearCache: () => unawaited(_appState.clearAndRefresh()),
+            onEpgIntervalChanged: (d) =>
+                unawaited(_appState.setEpgRefreshInterval(d)),
+            onConnected: () => _navigateTo(0),
+          ),
+          _ => const PlaceholderScreen(title: 'Home'),
+        };
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
     void openPlayer(PlayerArgs args) => unawaited(_openPlayer(context, args));
+
+    final contentShell = ContentActions(
+      appState: _appState,
+      onOpenPlayer: openPlayer,
+      onChannelSelect: _openChannel,
+      onCatchupSelect: _openCatchupProgram,
+      onVodSelect: _openVod,
+      onSeriesSelect: _openSeries,
+      onProgressSelect: _openProgress,
+      onSidebarActivate: _activateSidebar,
+      buildTabScreen: _buildTabScreen,
+      child: FocusScope(
+        node: _contentFocusNode,
+        child: widget.navigationShell,
+      ),
+    );
 
     final shell = Shortcuts(
       shortcuts: <LogicalKeySet, Intent>{
@@ -330,9 +613,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         child: Focus(
           autofocus: true,
           onKeyEvent: (node, event) {
-            // Only intercept left arrow when content scope has no focused
-            // descendant (empty/unconfigured state). When content has focus,
-            // let dpad handle traversal via its Shortcuts before we intercept.
             if (event is KeyDownEvent &&
                 event.logicalKey == LogicalKeyboardKey.arrowLeft &&
                 useSidebar &&
@@ -343,8 +623,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return KeyEventResult.ignored;
           },
           child: useSidebar
-              ? _buildTvLayout(openPlayer)
-              : _buildMobileLayout(openPlayer),
+              ? _buildTvLayout(contentShell)
+              : _buildMobileLayout(contentShell),
         ),
       ),
     );
@@ -369,9 +649,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 xtreamService: _appState.xtreamService,
                 viewerId: viewerId,
                 progressReporter: (progress) {
-                  // Carry forward enriched metadata (title, backdrop, etc.) that
-                  // the player doesn't know about. Prefer args.metadata (set by
-                  // the launching context), then the existing progress list entry.
                   final existing = _appState.progressList.firstWhereOrNull(
                     (p) =>
                         p.contentType == progress.contentType &&
@@ -445,11 +722,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTvLayout(void Function(PlayerArgs) openPlayer) {
+  Widget _buildTvLayout(Widget contentShell) {
     return MediaQuery.removePadding(
-      // Strip all system safe-area insets for the TV layout. On tvOS, the
-      // system reports status-bar / overscan padding that would otherwise make
-      // Scaffold AppBars taller and push body content down unnecessarily.
       context: context,
       removeTop: true,
       removeBottom: true,
@@ -458,23 +732,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth < 240 || constraints.maxHeight < 120) {
-            return Scaffold(
-              body: FocusScope(
-                node: _contentFocusNode,
-                child: _ContentNavigator(
-                  navigatorKey: _navigatorKey,
-                  currentIndex: _currentIndex,
-                  mainRoutes: _mainRoutes,
-                  appState: _appState,
-                  onNavigateToRoute: _navigateToRoute,
-                  onConnected: () => _navigateTo(0),
-                  onOpenPlayer: openPlayer,
-                  playbackOrchestratorBuilder:
-                      widget.playbackOrchestratorBuilder,
-                  playerRouteBuilder: widget.playerRouteBuilder,
-                ),
-              ),
-            );
+            return Scaffold(body: contentShell);
           }
 
           return Scaffold(
@@ -492,22 +750,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           _activateSidebar();
                         }
                       },
-                      child: FocusScope(
-                        node: _contentFocusNode,
-                        child: _ContentNavigator(
-                          navigatorKey: _navigatorKey,
-                          currentIndex: _currentIndex,
-                          mainRoutes: _mainRoutes,
-                          appState: _appState,
-                          onNavigateToRoute: _navigateToRoute,
-                          onSidebarActivate: _activateSidebar,
-                          onConnected: () => _navigateTo(0),
-                          onOpenPlayer: openPlayer,
-                          playbackOrchestratorBuilder:
-                              widget.playbackOrchestratorBuilder,
-                          playerRouteBuilder: widget.playerRouteBuilder,
-                        ),
-                      ),
+                      child: contentShell,
                     ),
                   ),
                 ),
@@ -521,6 +764,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
+                    unreadNotificationCount: _appState.unreadNotificationCount,
                     onNavigate: _navigateTo,
                     onActivateSidebar: _activateSidebar,
                     onDeactivateSidebar: _deactivateSidebar,
@@ -534,35 +778,83 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMobileLayout(void Function(PlayerArgs) openPlayer) {
+  Widget _buildMobileLayout(Widget contentShell) {
+    final primaryCount = RouteNames.mobilePrimaryCount.clamp(
+      0,
+      _mainRoutes.length,
+    );
+    final overflowRoutes = _mainRoutes.skip(primaryCount).toList();
+    final overflowUnread = overflowRoutes.contains(RouteNames.notifications)
+        ? _appState.unreadNotificationCount
+        : 0;
+    final moreTabIndex = primaryCount;
+    final displayedIndex = _currentIndex < primaryCount
+        ? _currentIndex
+        : moreTabIndex;
+
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: _ContentNavigator(
-          navigatorKey: _navigatorKey,
-          currentIndex: _currentIndex,
-          mainRoutes: _mainRoutes,
-          appState: _appState,
-          onNavigateToRoute: _navigateToRoute,
-          onConnected: () => _navigateTo(0),
-          onOpenPlayer: openPlayer,
-          playbackOrchestratorBuilder: widget.playbackOrchestratorBuilder,
-          playerRouteBuilder: widget.playerRouteBuilder,
-        ),
-      ),
+      body: SafeArea(bottom: false, child: contentShell),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
-        onTap: _navigateTo,
+        currentIndex: displayedIndex,
+        onTap: (index) => index == moreTabIndex
+            ? _showMoreSheet(overflowRoutes, primaryCount)
+            : _navigateTo(index),
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        items: _mainRoutes.map((route) {
-          final label = RouteNames.routeLabels[route] ?? route;
-          return BottomNavigationBarItem(
-            icon: Icon(_routeIcon(route)),
-            label: label,
-          );
-        }).toList(),
+        items: [
+          ..._mainRoutes.take(primaryCount).map((route) {
+            final label = RouteNames.routeLabels[route] ?? route;
+            return BottomNavigationBarItem(
+              icon: Icon(_routeIcon(route)),
+              label: label,
+            );
+          }),
+          if (overflowRoutes.isNotEmpty)
+            BottomNavigationBarItem(
+              icon: Badge(
+                isLabelVisible: overflowUnread > 0,
+                label: Text('$overflowUnread'),
+                child: const Icon(Icons.more_vert),
+              ),
+              label: 'More',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showMoreSheet(
+    List<String> overflowRoutes,
+    int primaryCount,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (var i = 0; i < overflowRoutes.length; i++)
+              ListTile(
+                leading: Badge(
+                  isLabelVisible:
+                      overflowRoutes[i] == RouteNames.notifications &&
+                      _appState.unreadNotificationCount > 0,
+                  label: Text('${_appState.unreadNotificationCount}'),
+                  child: Icon(_routeIcon(overflowRoutes[i])),
+                ),
+                title: Text(
+                  RouteNames.routeLabels[overflowRoutes[i]] ??
+                      overflowRoutes[i],
+                ),
+                selected: _currentIndex == primaryCount + i,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _navigateTo(primaryCount + i);
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -574,6 +866,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
     RouteNames.dvr => Icons.video_library,
+    RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -589,6 +882,7 @@ class NavigationSidebar extends StatelessWidget {
     required this.sidebarActive,
     required this.focusNodes,
     required this.scopeNode,
+    this.unreadNotificationCount = 0,
     required this.onNavigate,
     required this.onActivateSidebar,
     required this.onDeactivateSidebar,
@@ -599,6 +893,7 @@ class NavigationSidebar extends StatelessWidget {
   final bool sidebarActive;
   final List<FocusNode> focusNodes;
   final FocusScopeNode scopeNode;
+  final int unreadNotificationCount;
   final ValueChanged<int> onNavigate;
   final VoidCallback onActivateSidebar;
   final VoidCallback onDeactivateSidebar;
@@ -640,7 +935,6 @@ class NavigationSidebar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo header
               SizedBox(
                 height: 72,
                 child: Padding(
@@ -677,7 +971,6 @@ class NavigationSidebar extends StatelessWidget {
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 8),
-              // Nav items
               ...List.generate(routes.length, (index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(
@@ -691,6 +984,9 @@ class NavigationSidebar extends StatelessWidget {
                     selected: index == currentIndex,
                     expanded: expanded,
                     focusNode: focusNodes[index],
+                    badgeCount: routes[index] == RouteNames.notifications
+                        ? unreadNotificationCount
+                        : 0,
                     onTap: () => onNavigate(index),
                   ),
                 );
@@ -709,6 +1005,7 @@ class NavigationSidebar extends StatelessWidget {
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
     RouteNames.dvr => Icons.video_library,
+    RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
@@ -724,6 +1021,7 @@ class SidebarDestinationItem extends StatefulWidget {
     required this.focusNode,
     required this.onTap,
     this.expanded = true,
+    this.badgeCount = 0,
   });
 
   final String label;
@@ -732,6 +1030,7 @@ class SidebarDestinationItem extends StatefulWidget {
   final FocusNode focusNode;
   final VoidCallback onTap;
   final bool expanded;
+  final int badgeCount;
 
   @override
   State<SidebarDestinationItem> createState() => _SidebarDestinationItemState();
@@ -739,6 +1038,7 @@ class SidebarDestinationItem extends StatefulWidget {
 
 class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   bool _focused = false;
+  bool _hovered = false;
 
   @override
   void initState() {
@@ -758,6 +1058,11 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     });
   }
 
+  void _setHovered(bool v) {
+    if (_hovered == v) return;
+    setState(() => _hovered = v);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -768,381 +1073,136 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     if (widget.selected) {
       backgroundColor = colorScheme.primaryContainer;
       foregroundColor = colorScheme.onPrimaryContainer;
-    } else if (_focused) {
+    } else if (_focused || _hovered) {
       backgroundColor = colorScheme.surfaceContainerHigh;
       foregroundColor = colorScheme.onSurface;
     }
 
-    return Focus(
-      focusNode: widget.focusNode,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.select ||
-            event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: InkWell(
-        onTap: () {
-          widget.focusNode.requestFocus();
-          widget.onTap();
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: Focus(
+        focusNode: widget.focusNode,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.select ||
+              event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.enter) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
-        customBorder: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: OverflowBox(
-                maxWidth: 200,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, color: foregroundColor, size: 24),
-                    if (widget.expanded) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        widget.label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+        child: InkWell(
+          onTap: () {
+            widget.focusNode.requestFocus();
+            widget.onTap();
+          },
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: OverflowBox(
+                  maxWidth: 200,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Badge(
+                        isLabelVisible: widget.badgeCount > 0,
+                        label: Text('${widget.badgeCount}'),
+                        child: Icon(
+                          widget.icon,
                           color: foregroundColor,
+                          size: 24,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (widget.expanded) ...[
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: foregroundColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _focused && !widget.selected ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: CustomPaint(
-                    painter: GradientBorderPainter(
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      width: 2.5,
-                      gradient: LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.secondary,
-                        ],
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: (_focused || _hovered) && !widget.selected
+                        ? 1.0
+                        : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: CustomPaint(
+                      painter: GradientBorderPainter(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(8),
+                        ),
+                        width: 2.5,
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.secondary,
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Content area navigator that shows the current main route.
-class _ContentNavigator extends StatelessWidget {
-  const _ContentNavigator({
-    required this.navigatorKey,
-    required this.currentIndex,
-    required this.mainRoutes,
-    required this.appState,
-    this.onNavigateToRoute,
-    this.onSidebarActivate,
-    this.onConnected,
-    this.onOpenPlayer,
-    this.playbackOrchestratorBuilder,
-    this.playerRouteBuilder,
-  });
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner({required this.message});
 
-  final GlobalKey<NavigatorState> navigatorKey;
-  final int currentIndex;
-  final List<String> mainRoutes;
-  final AppStateController appState;
-  final void Function(String routeName)? onNavigateToRoute;
-  final VoidCallback? onSidebarActivate;
-  final VoidCallback? onConnected;
-  final void Function(PlayerArgs args)? onOpenPlayer;
-  final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
-  final Widget Function(PlayerArgs args)? playerRouteBuilder;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final currentRoute =
-        mainRoutes[currentIndex.clamp(0, mainRoutes.length - 1)];
-    final router = buildAppRouter(
-      mainRouteBuilder: _buildMainRoute,
-      xtreamService: appState.xtreamService,
-      epgService: appState.epgService,
-      playbackOrchestratorBuilder: playbackOrchestratorBuilder,
-      playerRouteBuilder: playerRouteBuilder,
-      onOpenPlayer: onOpenPlayer,
-      progressList: appState.progressList,
-      progressListenable: appState,
-      progressListProvider: () => appState.progressList,
-    );
-
-    return Navigator(
-      key: navigatorKey,
-      onGenerateRoute: router,
-      initialRoute: currentRoute,
-    );
-  }
-
-  void _openChannel(Channel channel) {
-    onOpenPlayer?.call(
-      PlayerArgs(
-        streamUrl: channel.streamUrl,
-        title: channel.name,
-        type: 'live',
-        streamId: channel.id,
-        epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
-        headers: channel.headers,
-      ),
-    );
-  }
-
-  Future<void> _pushNamed(String routeName, {Object? arguments}) async {
-    // Yield one microtask so that any requestFocus() call made synchronously
-    // in InkWell.onTap (which itself schedules a microtask) has resolved before
-    // we snapshot primaryFocus for restoration on pop.
-    await Future<void>.microtask(() {});
-    final savedFocus = FocusManager.instance.primaryFocus;
-    await navigatorKey.currentState?.pushNamed(routeName, arguments: arguments);
-    savedFocus?.requestFocus();
-  }
-
-  void _openVod(VodItem item, {double? startPosition}) {
-    if (startPosition == null) {
-      unawaited(
-        _pushNamed(
-          RouteNames.details,
-          arguments: DetailsArgs(
-            vodId: item.id,
-            vodName: item.name,
-            item: item,
-          ),
-        ),
-      );
-      return;
-    }
-
-    _playVod(item, startPosition: startPosition);
-  }
-
-  void _playVod(VodItem item, {double? startPosition}) {
-    onOpenPlayer?.call(
-      PlayerArgs(
-        streamUrl: item.streamUrl,
-        title: item.name,
-        type: 'vod',
-        streamId: item.id,
-        startPosition: startPosition,
-        metadata: <String, Object?>{
-          'container_extension': item.containerExtension,
-        },
-      ),
-    );
-  }
-
-  void _openProgress(Progress progress) {
-    if (progress.contentType == ContentType.vod) {
-      final item = appState.vodItems.firstWhereOrNull(
-        (item) => item.id == progress.streamId,
-      );
-      if (item != null) {
-        // Pass enriched metadata from progress so it survives playback saves.
-        onOpenPlayer?.call(
-          PlayerArgs(
-            streamUrl: item.streamUrl,
-            title: progress.title ?? item.name,
-            type: 'vod',
-            streamId: item.id,
-            metadata: <String, Object?>{
-              'container_extension': item.containerExtension,
-              if (progress.backdropUrl != null)
-                'backdrop_url': progress.backdropUrl,
-              if (progress.thumbnailUrl != null)
-                'thumbnail_url': progress.thumbnailUrl,
-              if (progress.rating != null) 'rating': progress.rating,
-              if (progress.runtime != null) 'duration': progress.runtime,
-            },
-          ),
-        );
-      }
-      return;
-    }
-
-    if (progress.contentType == ContentType.episode &&
-        progress.seriesId != null) {
-      final series = appState.seriesList.firstWhereOrNull(
-        (s) => s.id == progress.seriesId,
-      );
-      if (series != null) {
-        final streamUrl = appState.xtreamService.getSeriesStreamUrl(
-          progress.streamId.toString(),
-        );
-        onOpenPlayer?.call(
-          PlayerArgs(
-            streamUrl: streamUrl,
-            title: progress.episodeTitle ?? series.name,
-            type: 'series',
-            streamId: progress.streamId,
-            seriesId: progress.seriesId,
-            seasonNumber: progress.seasonNumber,
-            metadata: <String, Object?>{
-              if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
-              'series_name': progress.seriesName ?? series.name,
-              if (progress.episodeNumber != null)
-                'episode_number': progress.episodeNumber,
-              if (progress.seasonNumber != null)
-                'season_number': progress.seasonNumber,
-              if (progress.episodeTitle != null)
-                'episode_title': progress.episodeTitle,
-            },
-          ),
-        );
-      }
-    }
-  }
-
-  void _openSeries(Series series) {
-    unawaited(
-      _pushNamed(
-        RouteNames.seriesDetails,
-        arguments: SeriesDetailsArgs(
-          seriesId: series.id,
-          seriesName: series.name,
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  void _openRecordings() {
-    onNavigateToRoute?.call(RouteNames.dvr);
-  }
-
-  Future<void> _scheduleDvr(
-    BuildContext context,
-    Channel channel,
-    EpgProgram program,
-  ) async {
-    try {
-      await appState.scheduleDvr(channel, program);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recording scheduled: ${program.title}')),
-      );
-    } on Object catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingXtreamError(error))),
-      );
-    }
-  }
-
-  Widget _buildMainRoute(String routeName) {
-    return ListenableBuilder(
-      listenable: appState,
-      builder: (context, _) {
-        if (appState.isBootstrapping) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return switch (routeName) {
-          RouteNames.home => _HomeScreen(
-            appState: appState,
-            onChannelSelect: _openChannel,
-            onVodSelect: _openVod,
-            onSeriesSelect: _openSeries,
-            onProgressSelect: _openProgress,
-            onRecordingsSelect: _openRecordings,
-            onSidebarActivate: onSidebarActivate,
-          ),
-          RouteNames.search => SearchScreen(
-            channels: appState.channels,
-            vodItems: appState.vodItems,
-            seriesList: appState.seriesList,
-            isConfigured: appState.isConfigured,
-            onChannelSelect: _openChannel,
-            onVodSelect: _openVod,
-            onSeriesSelect: _openSeries,
-            onSidebarActivate: onSidebarActivate,
-          ),
-          RouteNames.liveTv => LiveTvScreen(
-            channels: appState.channels,
-            categories: appState.liveCategories,
-            isLoading: appState.isLoadingContent,
-            isConfigured: appState.isConfigured,
-            favoritesService: appState.favoritesService,
-            epgService: appState.epgService,
-            onChannelSelect: _openChannel,
-            onSidebarActivate: onSidebarActivate,
-            onScheduleProgram: (channel, program) =>
-                unawaited(_scheduleDvr(context, channel, program)),
-          ),
-          RouteNames.vod => VodScreen(
-            vodItems: appState.vodItems,
-            categories: appState.vodCategories,
-            isLoading: appState.isLoadingContent,
-            isConfigured: appState.isConfigured,
-            onVodSelect: _openVod,
-            favoritesService: appState.vodFavoritesService,
-            onSidebarActivate: onSidebarActivate,
-          ),
-          RouteNames.series => SeriesScreen(
-            seriesList: appState.seriesList,
-            categories: appState.seriesCategories,
-            isLoading: appState.isLoadingContent,
-            isConfigured: appState.isConfigured,
-            onSeriesSelect: _openSeries,
-            favoritesService: appState.seriesFavoritesService,
-            onSidebarActivate: onSidebarActivate,
-          ),
-          RouteNames.dvr => DvrRecordingsScreen(
-            recordings: appState.dvrRecordings,
-            isLoading: appState.isLoadingContent,
-            isConfigured: appState.isConfigured,
-            onPlay: (args) => onOpenPlayer?.call(args),
-            onSidebarActivate: onSidebarActivate,
-          ),
-          RouteNames.settings => SettingsScreen(
-            authNotifier: appState.authNotifier,
-            activeViewer: appState.activeViewer,
-            viewers: appState.viewers,
-            sourceLabel: appState.sourceLabel,
-            sourceError: appState.error,
-            isConfiguredOverride: appState.isConfigured,
-            epgRefreshInterval: appState.epgRefreshInterval,
-            epgRefreshOptions: AppStateController.epgRefreshOptions,
-            traktService: appState.traktService,
-            onConnect: appState.connectXtream,
-            onDisconnect: () => unawaited(appState.disconnect()),
-            onSwitchViewer: (viewer) =>
-                unawaited(appState.switchViewer(viewer)),
-            onCreateViewer: appState.createViewer,
-            onClearCache: () => unawaited(appState.clearAndRefresh()),
-            onEpgIntervalChanged: (d) =>
-                unawaited(appState.setEpgRefreshInterval(d)),
-            onConnected: onConnected,
-          ),
-          _ => const PlaceholderScreen(title: 'Home'),
-        };
-      },
     );
   }
 }
@@ -1210,22 +1270,6 @@ class _HomeScreenState extends State<_HomeScreen> {
       title: 'Continue Watching',
       emptyLabel: 'No Continue Watching available',
       items: continueWatchingItems,
-      landscapeStyle: true,
-      onSidebarActivate: widget.onSidebarActivate,
-    );
-    final recordingsSection = MediaPreviewSection(
-      title: 'DVR',
-      emptyLabel: 'No DVR recordings available',
-      items: [
-        MediaPreviewItem(
-          title: 'DVR Recordings',
-          subtitle: widget.appState.dvrRecordings.isEmpty
-              ? 'Browse completed and in-progress recordings'
-              : '${widget.appState.dvrRecordings.length} recordings',
-          fallbackIcon: Icons.video_library,
-          onTap: widget.onRecordingsSelect,
-        ),
-      ],
       landscapeStyle: true,
       onSidebarActivate: widget.onSidebarActivate,
     );
@@ -1300,6 +1344,21 @@ class _HomeScreenState extends State<_HomeScreen> {
           .toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );
+    final recordingsSection = MediaPreviewSection(
+      title: 'DVR',
+      emptyLabel: 'No DVR recordings available',
+      items: [
+        MediaPreviewItem(
+          title: 'DVR Recordings',
+          subtitle: appState.dvrRecordings.isEmpty
+              ? 'Browse completed and in-progress recordings'
+              : '${appState.dvrRecordings.length} recordings',
+          fallbackIcon: Icons.video_library,
+          onTap: () => widget.onRecordingsSelect(),
+        ),
+      ],
+      onSidebarActivate: widget.onSidebarActivate,
+    );
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
@@ -1307,6 +1366,10 @@ class _HomeScreenState extends State<_HomeScreen> {
           Text('Home', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
           Text('Connected source: ${appState.sourceLabel}'),
+          if (appState.error != null && appState.error!.isNotEmpty) ...[
+            const SizedBox(height: MediaBrowsingMetrics.chipGap),
+            _OfflineBanner(message: appState.error!),
+          ],
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
           liveSection,
@@ -1326,7 +1389,6 @@ class _HomeScreenState extends State<_HomeScreen> {
 
   MediaPreviewItem? _resumePreviewItem(Progress progress) {
     if (progress.contentType == ContentType.vod) {
-      // Use enriched API data when available.
       if (progress.title != null) {
         final hasBackdrop = progress.backdropUrl != null;
         final fraction =
@@ -1363,7 +1425,6 @@ class _HomeScreenState extends State<_HomeScreen> {
           onTap: () => widget.onProgressSelect(progress),
         );
       }
-      // Legacy fallback: look up from local VOD list.
       final item = widget.appState.vodItems.firstWhereOrNull(
         (item) => item.id == progress.streamId,
       );
@@ -1391,8 +1452,6 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
 
     if (progress.contentType == ContentType.episode) {
-      // Use enriched API data when available, but only if we can actually play
-      // it (seriesId is required by _openProgress to look up the stream URL).
       if (progress.seriesId != null &&
           (progress.seriesName != null || progress.title != null)) {
         final displayTitle = progress.seriesName ?? progress.title!;
@@ -1432,7 +1491,6 @@ class _HomeScreenState extends State<_HomeScreen> {
           onTap: () => widget.onProgressSelect(progress),
         );
       }
-      // Legacy fallback: look up from local series list.
       if (progress.seriesId != null) {
         final series = widget.appState.seriesList.firstWhereOrNull(
           (series) => series.id == progress.seriesId,

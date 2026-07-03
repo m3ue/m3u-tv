@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 void main() {
   group('SeriesScreen', () {
@@ -50,6 +51,43 @@ void main() {
       expect(find.text('All Series'), findsOneWidget);
       expect(find.text('Thriller'), findsOneWidget);
       expect(find.text('Sci-Fi'), findsOneWidget);
+    });
+
+    testWidgets('large desktop grids keep series cards comfortably sized', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final manySeries = List<Series>.generate(
+        40,
+        (index) => Series(
+          id: index,
+          name: 'Desktop Series $index',
+          coverUrl: 'http://example.com/$index.jpg',
+          categoryId: '30',
+        ),
+      );
+
+      for (final viewport in [
+        const Size(1440, 900),
+        const Size(1920, 1080),
+        const Size(2560, 1440),
+      ]) {
+        tester.view.physicalSize = viewport;
+        await tester.pumpWidget(
+          _TestApp(seriesList: manySeries, categories: testCategories),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        final firstSeriesCard = find.ancestor(
+          of: find.text('Desktop Series 0'),
+          matching: find.byType(DpadInkWell),
+        );
+        expect(firstSeriesCard, findsOneWidget);
+        expect(tester.getSize(firstSeriesCard).width, lessThanOrEqualTo(220));
+      }
     });
 
     testWidgets('tapping category tab filters series', (tester) async {

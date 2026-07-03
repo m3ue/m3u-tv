@@ -40,7 +40,7 @@ class SeriesScreen extends StatefulWidget {
 
 class _SeriesScreenState extends State<SeriesScreen> {
   static const double _minPosterCardWidth = 120;
-  static const int _desktopPosterColumns = 5;
+  static const double _maxPosterCardWidth = 220;
   static const _kFavoritesCategoryId = '__FAVORITES__';
 
   String? _selectedCategory;
@@ -158,11 +158,7 @@ class _SeriesScreenState extends State<SeriesScreen> {
       builder: (context, constraints) {
         final availableWidth =
             constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
-        final columnCount =
-            ((availableWidth + MediaBrowsingMetrics.itemGap) /
-                    (_minPosterCardWidth + MediaBrowsingMetrics.itemGap))
-                .floor()
-                .clamp(1, _desktopPosterColumns);
+        final columnCount = _posterColumnCount(availableWidth);
 
         return DpadRegion(
           memoryKey: 'series/grid',
@@ -199,6 +195,18 @@ class _SeriesScreenState extends State<SeriesScreen> {
         );
       },
     );
+  }
+
+  int _posterColumnCount(double availableWidth) {
+    final minimumColumns =
+        ((availableWidth + MediaBrowsingMetrics.itemGap) /
+                (_maxPosterCardWidth + MediaBrowsingMetrics.itemGap))
+            .ceil();
+    final maximumColumns =
+        ((availableWidth + MediaBrowsingMetrics.itemGap) /
+                (_minPosterCardWidth + MediaBrowsingMetrics.itemGap))
+            .floor();
+    return minimumColumns.clamp(1, maximumColumns.clamp(1, 100));
   }
 }
 

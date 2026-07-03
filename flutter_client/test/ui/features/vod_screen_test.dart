@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 void main() {
   group('VodScreen', () {
@@ -69,6 +70,44 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Big Buck Bunny'), findsOneWidget);
       expect(find.text('★ 4.5'), findsOneWidget);
+    });
+
+    testWidgets('large desktop grids keep movie cards comfortably sized', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final manyMovies = List<VodItem>.generate(
+        40,
+        (index) => VodItem(
+          id: index,
+          name: 'Desktop Movie $index',
+          streamUrl: 'http://example.com/$index.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+        ),
+      );
+
+      for (final viewport in [
+        const Size(1440, 900),
+        const Size(1920, 1080),
+        const Size(2560, 1440),
+      ]) {
+        tester.view.physicalSize = viewport;
+        await tester.pumpWidget(
+          _TestApp(vodItems: manyMovies, categories: testCategories),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        final firstMovieCard = find.ancestor(
+          of: find.text('Desktop Movie 0'),
+          matching: find.byType(DpadInkWell),
+        );
+        expect(firstMovieCard, findsOneWidget);
+        expect(tester.getSize(firstMovieCard).width, lessThanOrEqualTo(220));
+      }
     });
 
     testWidgets('renders All Movies and category tabs', (tester) async {

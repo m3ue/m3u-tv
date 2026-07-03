@@ -119,6 +119,40 @@ flutter build windows --release \
   --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
 ```
 
+## Updating icons and splash screens
+
+All platform icons and splash screens are generated from the SVG source at `../logo.svg`.
+Do not hand-edit the generated PNGs — run the script instead.
+
+### Prerequisites
+
+```bash
+brew install librsvg imagemagick
+```
+
+### Run the generator
+
+```bash
+bash scripts/setup-icons.sh
+```
+
+This script:
+1. Renders `logo.svg` → transparent PNGs at the required sizes
+2. Builds `assets/icons/icon.png` (opaque, for iOS/macOS/Windows) and `adaptive-icon.png` / `splash-icon.png` (transparent)
+3. Runs `dart run flutter_launcher_icons` — Android, iOS, macOS, Web, Windows, Linux
+4. Runs `dart run flutter_native_splash:create` — Android + iOS splash screens
+5. Generates the **tvOS layered icons** (Back / Middle / Front layers for the parallax effect) and the **Top Shelf image** — these are not covered by `flutter_launcher_icons`
+
+After running, rebuild the tvOS target in Xcode to pick up the refreshed icons.
+
+### tvOS icon sizes (for reference)
+
+| Asset | Size |
+|---|---|
+| App Icon — Large (focused) | 1280 × 768 px per layer |
+| App Icon — Small (home shelf) | 400 × 240 px (1x), 800 × 480 px (2x) per layer |
+| Top Shelf Image | 1920 × 720 px |
+
 ## Trakt setup
 
 Trakt credentials are injected at compile time via `--dart-define` and are never stored in source control.

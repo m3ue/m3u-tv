@@ -29,6 +29,7 @@ class LiveTvScreen extends StatefulWidget {
     required this.favoritesService,
     required this.epgService,
     required this.onChannelSelect,
+    this.onCatchupProgramSelect,
     this.onSidebarActivate,
     this.onScheduleProgram,
   });
@@ -40,6 +41,7 @@ class LiveTvScreen extends StatefulWidget {
   final FavoritesService favoritesService;
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
+  final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
 
@@ -159,11 +161,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                     ),
                   )
                 : switch (_viewMode) {
-                    _ViewMode.epgGrid => TimelineEpgView(
-                      channels: filtered,
-                      epgService: widget.epgService,
-                      onChannelSelect: widget.onChannelSelect,
-                    ),
+                    _ViewMode.epgGrid => _buildEpgGrid(filtered),
                     _ViewMode.logoGrid => _buildGridView(filtered),
                     _ViewMode.list => _buildListView(filtered),
                   },
@@ -246,6 +244,24 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             onScheduleProgram: widget.onScheduleProgram,
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEpgGrid(List<Channel> channels) {
+    return DpadRegion(
+      memoryKey: 'live-tv/epg',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: TimelineEpgView(
+        channels: channels,
+        epgService: widget.epgService,
+        onChannelSelect: widget.onChannelSelect,
+        onCatchupProgramSelect: widget.onCatchupProgramSelect,
       ),
     );
   }

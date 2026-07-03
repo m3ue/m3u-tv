@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 void main() {
@@ -78,8 +79,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tab bar should have all four tabs
-      expect(find.byType(TabBar), findsOneWidget);
-      expect(find.byType(Tab), findsNWidgets(4));
+      expect(find.byType(DpadTabBar), findsOneWidget);
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Live TV'), findsOneWidget);
+      expect(find.text('Movies'), findsOneWidget);
+      expect(find.text('Series'), findsOneWidget);
     });
 
     testWidgets('shows prompt instead of immediate results before query', (
@@ -133,8 +137,12 @@ void main() {
       await tester.enterText(find.byType(TextField), 'news');
       await tester.pumpAndSettle();
 
-      // Switch to Live TV tab (index 1)
-      await tester.tap(find.byType(Tab).at(1));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpadTabBar),
+          matching: find.text('Live TV'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('BBC News'), findsOneWidget);
@@ -154,8 +162,12 @@ void main() {
       await tester.enterText(find.byType(TextField), 'matrix');
       await tester.pumpAndSettle();
 
-      // Switch to Movies tab (index 2)
-      await tester.tap(find.byType(Tab).at(2));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpadTabBar),
+          matching: find.text('Movies'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('The Matrix'), findsOneWidget);
@@ -176,8 +188,12 @@ void main() {
       await tester.enterText(find.byType(TextField), 'bad');
       await tester.pumpAndSettle();
 
-      // Switch to Series tab (index 3)
-      await tester.tap(find.byType(Tab).at(3));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpadTabBar),
+          matching: find.text('Series'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Breaking Bad'), findsOneWidget);

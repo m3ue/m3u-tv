@@ -1,6 +1,7 @@
 /// Route name constants matching the current RN navigation structure.
 ///
-/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR, Settings.
+/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR,
+/// Notifications, Settings.
 /// Modal/overlay routes: Player, Details, SeriesDetails, ViewerSelection.
 class RouteNames {
   RouteNames._();
@@ -12,6 +13,7 @@ class RouteNames {
   static const String vod = '/vod';
   static const String series = '/series';
   static const String dvr = '/dvr';
+  static const String notifications = '/notifications';
   static const String settings = '/settings';
 
   // Modal/overlay routes
@@ -20,7 +22,11 @@ class RouteNames {
   static const String seriesDetails = '/series-details';
   static const String viewerSelection = '/viewer-selection';
 
-  /// All main tab routes in sidebar/tab order.
+  /// All main tab/sidebar destinations, in display order. The TV/desktop
+  /// sidebar shows all of these flat (plenty of vertical room). The mobile
+  /// bottom nav only has room for [mobilePrimaryCount] before it gets
+  /// cramped, so it shows that many directly and collapses the rest into a
+  /// "More" sheet — see `AppShellState._buildMobileLayout`.
   static const List<String> mainRoutes = [
     home,
     search,
@@ -28,8 +34,22 @@ class RouteNames {
     vod,
     series,
     dvr,
+    notifications,
     settings,
   ];
+
+  /// How many leading [mainRoutes] the mobile bottom nav shows directly.
+  static const int mobilePrimaryCount = 5;
+
+  // Nested detail route path templates
+  static const String vodDetailsPath = '/vod/details/:vodId';
+  static const String seriesDetailsPath = '/series/details/:seriesId';
+
+  /// Builds a path to a VOD details screen for deep linking.
+  static String vodDetailsFor(int vodId) => '/vod/details/$vodId';
+
+  /// Builds a path to a series details screen for deep linking.
+  static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
 
   /// Human-readable labels for main routes.
   static const Map<String, String> routeLabels = {
@@ -39,6 +59,7 @@ class RouteNames {
     vod: 'Movies',
     series: 'Series',
     dvr: 'DVR',
+    notifications: 'Notifications',
     settings: 'Settings',
   };
 }

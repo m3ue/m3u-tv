@@ -4,7 +4,9 @@ import 'dart:io' as io;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -22,6 +24,7 @@ void main() {
       () async {
         final storage = InMemorySecureStorage();
         final cacheMemory = <String, Object?>{};
+        final localMemory = <String, Object?>{};
         final catalogGate = Completer<Object?>();
         await storage.write(
           'm3ue_tv_credentials',
@@ -61,10 +64,24 @@ void main() {
         await cache.set('seriesStreams', const <Series>[
           Series(id: 903, name: 'Cached Show'),
         ]);
+        await cache.set('viewers', const <Viewer>[
+          Viewer(id: 1, ulid: 'viewer-admin', name: 'Admin', isAdmin: true),
+        ]);
+        await ResumeService(memory: localMemory).save(
+          const Progress(
+            viewerId: 'viewer-admin',
+            contentType: ContentType.vod,
+            streamId: 902,
+            positionSeconds: 91,
+            durationSeconds: 600,
+            title: 'Cached Movie',
+          ),
+        );
 
         final controller = _controller(
           storage: storage,
           cacheMemory: cacheMemory,
+          localMemory: localMemory,
           transport: _FakeXtreamTransport.success()
               .withResponse('get_live_categories', catalogGate.future)
               .call,
@@ -80,6 +97,9 @@ void main() {
         expect(controller.channels.single.name, 'Cached BBC');
         expect(controller.vodItems.single.name, 'Cached Movie');
         expect(controller.seriesList.single.name, 'Cached Show');
+        expect(controller.activeViewer?.ulid, 'viewer-admin');
+        expect(controller.progressList.single.streamId, 902);
+        expect(controller.progressList.single.title, 'Cached Movie');
         await boot;
 
         catalogGate.complete(
@@ -91,6 +111,82 @@ void main() {
 
         expect(controller.liveCategories.single.name, 'News');
         expect(controller.channels.single.name, 'BBC One');
+      },
+    );
+
+    test(
+      'cached Xtream boot refreshes remote progress before catalog refresh finishes',
+      () async {
+        final storage = InMemorySecureStorage();
+        final cacheMemory = <String, Object?>{};
+        final catalogGate = Completer<Object?>();
+        final recentlyWatchedGate = Completer<Object?>();
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': 'https://fixture.example',
+            'username': 'fixture-user',
+            'password': 'fixture-password',
+          }),
+        );
+        await storage.write(
+          'm3ue_tv_source',
+          jsonEncode(<String, String>{'type': 'xtream'}),
+        );
+
+        final cache = CacheService(memory: cacheMemory);
+        await cache.set('sourceType', 'xtream');
+        await cache.set('liveStreams', const <Channel>[
+          Channel(id: 901, name: 'Cached BBC', streamUrl: 'cached-live-url'),
+        ]);
+        await cache.set('vodStreams', const <VodItem>[
+          VodItem(
+            id: 902,
+            name: 'Cached Movie',
+            streamUrl: 'cached-vod-url',
+            containerExtension: 'mp4',
+          ),
+        ]);
+        await cache.set('viewers', const <Viewer>[
+          Viewer(id: 1, ulid: 'viewer-admin', name: 'Admin', isAdmin: true),
+        ]);
+
+        final controller = _controller(
+          storage: storage,
+          cacheMemory: cacheMemory,
+          transport: _FakeXtreamTransport.success()
+              .withResponse('get_live_categories', catalogGate.future)
+              .withResponse('get_recently_watched', recentlyWatchedGate.future)
+              .call,
+        );
+
+        final boot = controller.boot();
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.channels.single.name, 'Cached BBC');
+        expect(controller.progressList, isEmpty);
+
+        recentlyWatchedGate.complete(<Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'vod',
+            'stream_id': 902,
+            'position_seconds': 121,
+            'duration_seconds': 600,
+            'title': 'Remote Cached Movie',
+          },
+        ]);
+        for (var pumpCount = 0; pumpCount < 5; pumpCount += 1) {
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(controller.progressList.single.streamId, 902);
+        expect(controller.progressList.single.title, 'Remote Cached Movie');
+        expect(controller.channels.single.name, 'Cached BBC');
+
+        await boot;
+        catalogGate.complete(
+          _FakeXtreamTransport.success().responses['get_live_categories'],
+        );
       },
     );
 
@@ -134,6 +230,61 @@ void main() {
       );
       expect(await connect, isTrue);
     });
+
+    testWidgets(
+      'saved_source offline boot keeps configured shell and outage actions',
+      (tester) async {
+        final storage = InMemorySecureStorage();
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': 'https://fixture.example',
+            'username': 'fixture-user',
+            'password': 'fixture-password',
+          }),
+        );
+        await storage.write(
+          'm3ue_tv_source',
+          jsonEncode(<String, String>{'type': 'xtream'}),
+        );
+
+        final controller = _controller(
+          storage: storage,
+          transport: (request) async {
+            throw XtreamHttpException(
+              statusCode: 503,
+              method: request.method,
+              uri: Uri.parse('${request.credentials.server}/player_api.php'),
+              reasonPhrase: 'Service Unavailable',
+            );
+          },
+        );
+
+        await tester.pumpWidget(_TestApp(controller: controller));
+        await _pumpAppState(tester);
+
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.isConfigured, isTrue);
+        expect(
+          _visibleText(tester),
+          contains('Server is currently unavailable.'),
+        );
+        expect(_visibleText(tester), contains('Connected source: Xtream'));
+        expect(
+          _visibleText(tester),
+          isNot(contains('Please connect to your service in Settings')),
+        );
+        expect(_sidebarDestination('Settings'), findsOneWidget);
+
+        await _tapSidebarDestination(tester, 'Settings');
+        await _pumpAppState(tester);
+
+        expect(find.text('Server is currently unavailable.'), findsWidgets);
+        expect(find.text('Retry connection'), findsOneWidget);
+        expect(find.text('Edit server settings'), findsOneWidget);
+        expect(find.text('Server URL'), findsNothing);
+      },
+    );
 
     testWidgets(
       'saved_source boots connected app state without constructor fixtures',
@@ -455,16 +606,27 @@ Future<void> _tapSidebarDestination(WidgetTester tester, String label) async {
   await tester.tap(_sidebarDestination(label));
 }
 
-class _TestApp extends StatelessWidget {
+class _TestApp extends StatefulWidget {
   const _TestApp({required this.controller});
 
   final AppStateController controller;
 
   @override
+  State<_TestApp> createState() => _TestAppState();
+}
+
+class _TestAppState extends State<_TestApp> {
+  late final GoRouter _router = createGoRouter(
+    appState: widget.controller,
+    nativeTelevisionHint: false,
+    deviceTypeOverride: DeviceType.tv,
+  );
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       theme: ThemeData.dark(useMaterial3: true),
-      home: AppShell(deviceType: DeviceType.tv, appState: controller),
+      routerConfig: _router,
     );
   }
 }

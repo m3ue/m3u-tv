@@ -11,8 +11,11 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
+import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -32,6 +35,9 @@ class AppStateController extends ChangeNotifier {
     EpgService? epgService,
     M3UParser? m3uParser,
     PersistentJsonStore? persistentStore,
+    TvNotificationService? tvNotificationService,
+    TvNotificationStore? tvNotificationStore,
+    ReverbService? reverbService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -63,6 +69,10 @@ class AppStateController extends ChangeNotifier {
       epgService: epgService ?? EpgService(),
       m3uParser: m3uParser ?? M3UParser(),
       traktService: TraktService(storage: resolvedSecureStorage),
+      tvNotificationService: tvNotificationService ?? TvNotificationService(),
+      notificationStore:
+          tvNotificationStore ?? TvNotificationStore(store: store),
+      reverbService: reverbService ?? ReverbService(),
     );
   }
 
@@ -79,6 +89,9 @@ class AppStateController extends ChangeNotifier {
     required this.epgService,
     required this.m3uParser,
     required this.traktService,
+    required this._tvNotificationService,
+    required this.notificationStore,
+    required this._reverbService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -98,6 +111,60 @@ class AppStateController extends ChangeNotifier {
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
+  final TvNotificationService _tvNotificationService;
+  final TvNotificationStore notificationStore;
+  final ReverbService _reverbService;
+  final StreamController<TvNotificationItem> _tvNotificationController =
+      StreamController<TvNotificationItem>.broadcast();
+  int _unreadNotificationCount = 0;
+
+  /// Stream of incoming TV push notifications (from Reverb WebSocket or
+  /// unread notifications fetched on boot). Listen to this in the UI to
+  /// show snackbars or banners.
+  Stream<TvNotificationItem> get tvNotifications =>
+      _tvNotificationController.stream;
+
+  int get unreadNotificationCount => _unreadNotificationCount;
+
+  Future<void> _refreshUnreadNotificationCount() async {
+    final subscribed = await notificationStore.subscribedChannels();
+    _unreadNotificationCount = await notificationStore.unreadCount(
+      channelFilter: subscribed.isEmpty ? null : subscribed,
+    );
+    notifyListeners();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await notificationStore.markRead(id);
+    await _refreshUnreadNotificationCount();
+    final credentials = authNotifier.credentials;
+    if (credentials != null) {
+      unawaited(
+        _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+      );
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final unread = (await notificationStore.all()).where((n) => !n.isRead);
+    final credentials = authNotifier.credentials;
+    final ids = unread.map((n) => n.item.id).toList(growable: false);
+    await notificationStore.markAllRead();
+    await _refreshUnreadNotificationCount();
+    if (credentials != null) {
+      for (final id in ids) {
+        unawaited(
+          _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+        );
+      }
+    }
+  }
+
+  Future<void> setNotificationChannels(Set<String> channels) async {
+    await notificationStore.setSubscribedChannels(channels);
+    await _refreshUnreadNotificationCount();
+  }
+
   final ViewerService viewerService;
   final EpgService epgService;
   final M3UParser m3uParser;
@@ -117,6 +184,8 @@ class AppStateController extends ChangeNotifier {
   List<Series> _seriesList = const <Series>[];
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
   List<Progress> _progressList = const <Progress>[];
+  Future<List<Progress>>? _recentlyWatchedRefresh;
+  String? _recentlyWatchedRefreshViewerId;
 
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
@@ -160,17 +229,23 @@ class AppStateController extends ChangeNotifier {
         savedSource == AppSourceType.none) {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
+        final credentials = authNotifier.credentials!;
         if (await _hydrateCachedXtreamContent()) {
           _isBootstrapping = false;
           notifyListeners();
-          unawaited(
-            _replaceWithXtreamContent(
-              clearCache: false,
-            ).then((_) => notifyListeners()),
-          );
+          unawaited(_refreshRecentlyWatchedForActiveViewer());
+          unawaited(_replaceWithXtreamContent(clearCache: false));
+          unawaited(_connectTvNotifications(credentials));
           return;
         }
-        await _replaceWithXtreamContent(clearCache: false);
+        final loaded = await _replaceWithXtreamContent(clearCache: false);
+        if (loaded) {
+          unawaited(_connectTvNotifications(credentials));
+        }
+      } else if (savedSource == AppSourceType.xtream &&
+          authNotifier.error != null) {
+        _sourceType = AppSourceType.xtream;
+        _error = authNotifier.error;
       }
     } else if (savedSource == AppSourceType.m3u) {
       await _loadSavedM3uSource();
@@ -199,6 +274,9 @@ class AppStateController extends ChangeNotifier {
     final loaded = await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
+    if (loaded) {
+      unawaited(_connectTvNotifications(credentials));
+    }
     return loaded;
   }
 
@@ -250,7 +328,56 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
+  Future<void> _connectTvNotifications(UserCredentials credentials) async {
+    try {
+      final (session, unread) = await _tvNotificationService.fetchUnread(
+        credentials,
+      );
+      if (session.availableChannels.isNotEmpty) {
+        await notificationStore.setServerChannels(session.availableChannels);
+      }
+      // Sync local store with the server's authoritative unread list: stale
+      // local unreads are marked read, new server items are added. Only
+      // genuinely new items (not seen before) are surfaced as toasts — boot
+      // should not replay banners for notifications the user already received.
+      final newItems = await notificationStore.syncUnreadWithServer(unread);
+      await _refreshUnreadNotificationCount();
+      final subscribed = await notificationStore.subscribedChannels();
+      for (final item in newItems) {
+        if (subscribed.isEmpty || subscribed.contains(item.channel)) {
+          _tvNotificationController.add(item);
+        }
+      }
+      // Older server versions don't return Reverb config — skip WebSocket setup
+      // rather than hammering a connection that can never succeed.
+      if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) return;
+      await _reverbService.connect(
+        session: session,
+        credentials: credentials,
+        onNotification: _onPushNotification,
+      );
+    } on Object catch (_) {
+      // TV notifications are best-effort; a failure here must not crash the app.
+    }
+  }
+
+  void _onPushNotification(TvNotificationItem item) {
+    unawaited(_storeAndNotify(item));
+  }
+
+  Future<void> _storeAndNotify(TvNotificationItem item) async {
+    await notificationStore.add(item);
+    await _refreshUnreadNotificationCount();
+    // Only surface the notification in the stream (banners/toasts) if the
+    // channel passes the user's subscription filter.
+    final subscribed = await notificationStore.subscribedChannels();
+    if (subscribed.isEmpty || subscribed.contains(item.channel)) {
+      _tvNotificationController.add(item);
+    }
+  }
+
   Future<void> disconnect() async {
+    await _reverbService.disconnect();
     await authNotifier.disconnect();
     await secureStorage.delete(_sourceKey);
     _sourceType = AppSourceType.none;
@@ -283,6 +410,11 @@ class AppStateController extends ChangeNotifier {
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
+    if (_sourceType == AppSourceType.xtream && !authNotifier.isConfigured) {
+      _isLoadingContent = false;
+      await boot();
+      return;
+    }
     await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -378,9 +510,13 @@ class AppStateController extends ChangeNotifier {
       final dvrRecordings = results[6] as List<DvrRecording>;
 
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
-      final progress = activeViewer == null
+      final fetched = activeViewer == null
           ? const <Progress>[]
-          : await _loadRecentlyWatched(activeViewer.ulid);
+          : await _loadRecentlyWatchedDeduped(activeViewer.ulid);
+      // Keep local progress if the server returned nothing (e.g. sync lag).
+      final progress = fetched.isEmpty && _progressList.isNotEmpty
+          ? _progressList
+          : fetched;
 
       _sourceType = AppSourceType.xtream;
       _liveCategories = liveCategories;
@@ -406,16 +542,11 @@ class AppStateController extends ChangeNotifier {
       await cacheService.set('liveStreams', channels);
       await cacheService.set('vodStreams', vodItems);
       await cacheService.set('seriesStreams', seriesList);
+      await cacheService.set('viewers', viewers);
       await secureStorage.write(
         _sourceKey,
         jsonEncode(<String, Object?>{'type': 'xtream'}),
       );
-
-      _viewers = viewers;
-      _activeViewer = activeViewer;
-      _progressList = progress;
-      _error = null;
-      notifyListeners();
       return true;
     } on Object catch (error) {
       _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
@@ -445,7 +576,9 @@ class AppStateController extends ChangeNotifier {
     final seriesList =
         (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
         const <Series>[];
-
+    final viewers =
+        (await cacheService.get<List<Viewer>>('viewers'))?.data ??
+        const <Viewer>[];
     final hasContent =
         liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
@@ -463,8 +596,42 @@ class AppStateController extends ChangeNotifier {
     _vodItems = vodItems;
     _seriesList = seriesList;
     _dvrRecordings = const <DvrRecording>[];
+    _viewers = viewers;
+    _activeViewer = await viewerService.resolveActiveViewer(viewers);
+    final activeViewer = _activeViewer;
+    _progressList = activeViewer == null
+        ? const <Progress>[]
+        : await resumeService.all(activeViewer.ulid);
     _error = null;
     return true;
+  }
+
+  Future<void> _refreshRecentlyWatchedForActiveViewer() async {
+    final viewer = _activeViewer;
+    if (viewer == null) return;
+    try {
+      final progress = await _loadRecentlyWatchedDeduped(viewer.ulid);
+      if (progress.isEmpty && _progressList.isNotEmpty) return;
+      _progressList = progress;
+      notifyListeners();
+    } on Object catch (_) {}
+  }
+
+  Future<List<Progress>> _loadRecentlyWatchedDeduped(String viewerId) {
+    final inFlight = _recentlyWatchedRefresh;
+    if (inFlight != null && _recentlyWatchedRefreshViewerId == viewerId) {
+      return inFlight;
+    }
+    late final Future<List<Progress>> future;
+    _recentlyWatchedRefreshViewerId = viewerId;
+    future = _loadRecentlyWatched(viewerId).whenComplete(() {
+      if (identical(_recentlyWatchedRefresh, future)) {
+        _recentlyWatchedRefresh = null;
+        _recentlyWatchedRefreshViewerId = null;
+      }
+    });
+    _recentlyWatchedRefresh = future;
+    return future;
   }
 
   Future<List<Progress>> _loadRecentlyWatched(String viewerId) async {

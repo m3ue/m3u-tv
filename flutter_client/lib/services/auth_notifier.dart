@@ -21,11 +21,16 @@ class AuthNotifier extends ChangeNotifier {
 
   bool _isConfigured = false;
   XtreamAuthResponse? _authResponse;
+  UserCredentials? _credentials;
   String? _error;
   bool _isLoading = false;
 
   bool get isConfigured => _isConfigured;
   XtreamAuthResponse? get authResponse => _authResponse;
+
+  /// The credentials used for the current session. Null when not connected.
+  UserCredentials? get credentials => _credentials;
+
   String? get error => _error;
   bool get isLoading => _isLoading;
 
@@ -51,6 +56,7 @@ class AuthNotifier extends ChangeNotifier {
 
       _isConfigured = true;
       _authResponse = response;
+      _credentials = credentials;
       _isLoading = false;
       notifyListeners();
       return true;
@@ -73,6 +79,7 @@ class AuthNotifier extends ChangeNotifier {
     xtreamService.clearCredentials();
     _isConfigured = false;
     _authResponse = null;
+    _credentials = null;
     _error = null;
     _isLoading = false;
     notifyListeners();

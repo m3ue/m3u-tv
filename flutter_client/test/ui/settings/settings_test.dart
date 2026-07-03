@@ -535,6 +535,14 @@ void main() {
 
       await tester.tap(find.text('Edit server settings'));
       await tester.pumpAndSettle();
+      expect(find.text('Disconnect?'), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.text('Disconnect'),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(edited, isTrue);
     });
 
