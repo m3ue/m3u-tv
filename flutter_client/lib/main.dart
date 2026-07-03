@@ -28,7 +28,9 @@ Future<void> main() async {
 }
 
 Future<AppStateController> _buildAppState() async {
-  if (Platform.isAndroid || Platform.isIOS || Platform.operatingSystem == 'tvos') {
+  if (Platform.isAndroid ||
+      Platform.isIOS ||
+      Platform.operatingSystem == 'tvos') {
     final dir = await getApplicationDocumentsDirectory();
     final store = PersistentJsonStore(
       file: File('${dir.path}/app_state.json'),
