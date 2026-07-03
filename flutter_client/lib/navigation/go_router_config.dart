@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show AppShell, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
-import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -198,23 +197,9 @@ GoRouter createGoRouter({
             routes: [
               GoRoute(
                 path: RouteNames.dvr,
-                pageBuilder: (context, state) {
-                  final actions = ContentActions.of(context);
-                  return NoTransitionPage(
-                    child: _withGradient(
-                      ListenableBuilder(
-                        listenable: actions.appState,
-                        builder: (context, _) => DvrRecordingsScreen(
-                          recordings: actions.appState.dvrRecordings,
-                          isLoading: actions.appState.isLoadingContent,
-                          isConfigured: actions.appState.isConfigured,
-                          onPlay: actions.onOpenPlayer,
-                          onSidebarActivate: actions.onSidebarActivate,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(_tabScreen(context, RouteNames.dvr)),
+                ),
               ),
             ],
           ),

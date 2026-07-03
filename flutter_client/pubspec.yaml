@@ -47,5 +47,3 @@ flutter:
   assets:
     - assets/icons/
 
-  shaders:
-    - shaders/ink_sparkle.frag
