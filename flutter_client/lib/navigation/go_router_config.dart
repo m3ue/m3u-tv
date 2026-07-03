@@ -209,7 +209,9 @@ GoRouter createGoRouter({
               GoRoute(
                 path: RouteNames.requests,
                 pageBuilder: (context, state) => NoTransitionPage(
-                  child: _withGradient(_tabScreen(context, RouteNames.requests)),
+                  child: _withGradient(
+                    _tabScreen(context, RouteNames.requests),
+                  ),
                 ),
               ),
             ],
