@@ -60,8 +60,9 @@ class ContentActions extends InheritedWidget {
 
   @override
   bool updateShouldNotify(ContentActions oldWidget) =>
-      appState != oldWidget.appState ||
-      onOpenPlayer != oldWidget.onOpenPlayer ||
-      onVodSelect != oldWidget.onVodSelect ||
-      onSeriesSelect != oldWidget.onSeriesSelect;
+      // Only the appState instance ever changes. All callbacks are stable
+      // method tearoffs from AppShellState — comparing them would always return
+      // false (equal), but if any were closures they'd always return true and
+      // flood every feature screen with unnecessary rebuilds on each tab switch.
+      appState != oldWidget.appState;
 }

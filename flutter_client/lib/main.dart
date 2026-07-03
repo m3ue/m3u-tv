@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/app/app_shell.dart' show shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
@@ -67,20 +68,37 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp.router(
       title: 'M3U TV',
       routerConfig: _router,
-      builder: Dpad.wrap(
-        theme: const DpadThemeData(
-          effects: [
-            GradientBorderEffect(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-            ),
-          ],
-        ),
-        onFocusChange: (node) {
-          if (node != null) {
-            unawaited(SystemSound.play(SystemSoundType.click));
-          }
-        },
-      ),
+      builder: (context, child) {
+        final deviceType = resolveDeviceType(
+          context,
+          nativeTelevisionHint: widget.nativeTelevisionHint,
+        );
+        final isTvOrDesktop = shouldUseSidebar(deviceType);
+        return Dpad(
+          theme: const DpadThemeData(
+            effects: [
+              GradientBorderEffect(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+            ],
+          ),
+          // restoreFocus keeps focus alive on TV/desktop (needed for D-pad).
+          // On phone/tablet it actively harms scroll: when focus drifts to a
+          // FocusScopeNode during a fling, _scheduleRestore fires, calls
+          // requestFocus(lastFocused), and DpadScroll.ensureVisible kills the
+          // fling mid-scroll with an animateTo() counter-animation.
+          restoreFocus: isTvOrDesktop,
+          // Click sound is D-pad navigation feedback — not wanted on touch.
+          onFocusChange: isTvOrDesktop
+              ? (node) {
+                  if (node != null) {
+                    unawaited(SystemSound.play(SystemSoundType.click));
+                  }
+                }
+              : null,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: primary),
         useMaterial3: true,
