@@ -213,7 +213,8 @@ void main() {
     expect(
       immediateShowIndex,
       isNonNegative,
-      reason: 'Windows startup must call Show() immediately after SetChildContent',
+      reason:
+          'Windows startup must call Show() immediately after SetChildContent',
     );
     // Regression guard: the old deferred-show approach (SetNextFrameCallback)
     // was removed because Show() is now called immediately. If this fails,
