@@ -198,4 +198,37 @@ void main() {
       }
     },
   );
+
+  test('Windows runner shows the shell before waiting for first frame', () {
+    final flutterWindow = readFile('windows/runner/flutter_window.cpp');
+    final attachViewIndex = flutterWindow.indexOf(
+      'SetChildContent(flutter_controller_->view()->GetNativeWindow());',
+    );
+    final immediateShowIndex = flutterWindow.indexOf(
+      'this->Show();',
+      attachViewIndex,
+    );
+    final firstFrameIndex = flutterWindow.indexOf(
+      'SetNextFrameCallback',
+      attachViewIndex,
+    );
+
+    expect(attachViewIndex, isNonNegative);
+    expect(immediateShowIndex, isNonNegative);
+    expect(firstFrameIndex, isNonNegative);
+    expect(
+      immediateShowIndex,
+      lessThan(firstFrameIndex),
+      reason:
+          'Windows startup must expose a window even if Dart delays frame 1',
+    );
+  });
+
+  test('Windows bundles MediaKit native video libraries', () {
+    final pubspec = readFile('pubspec.yaml');
+    final windowsPlugins = readFile('windows/flutter/generated_plugins.cmake');
+
+    expect(pubspec, contains('media_kit_libs_windows_video:'));
+    expect(windowsPlugins, contains('media_kit_libs_windows_video'));
+  });
 }
