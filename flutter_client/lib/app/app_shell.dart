@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/features/notifications/notifications_screen.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
@@ -71,8 +72,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
 
-  List<String> get _mainRoutes => RouteNames.mainRoutes;
-  int get _currentIndex => widget.navigationShell.currentIndex;
+  List<String> get _mainRoutes => RouteNames.mainRoutes
+      .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
+      .toList(growable: false);
+
+  int get _currentIndex {
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    final visibleIndex = _mainRoutes.indexOf(route);
+    return visibleIndex < 0 ? 0 : visibleIndex;
+  }
 
   @override
   void initState() {
@@ -112,12 +120,24 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   void _onAppStateChanged() {
     if (!mounted) return;
+    _syncSidebarFocusNodes();
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    if (!_mainRoutes.contains(route)) {
+      widget.navigationShell.goBranch(0, initialLocation: true);
+    }
     setState(() {});
   }
 
   void _initSidebarFocusNodes() {
-    for (var i = 0; i < _mainRoutes.length; i++) {
+    _syncSidebarFocusNodes();
+  }
+
+  void _syncSidebarFocusNodes() {
+    while (_sidebarFocusNodes.length < _mainRoutes.length) {
       _sidebarFocusNodes.add(FocusNode());
+    }
+    while (_sidebarFocusNodes.length > _mainRoutes.length) {
+      _sidebarFocusNodes.removeLast().dispose();
     }
   }
 
@@ -151,13 +171,17 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _navigateTo(int index) {
+    final routes = _mainRoutes;
+    if (index < 0 || index >= routes.length || index == _currentIndex) return;
+    final branchIndex = RouteNames.mainRoutes.indexOf(routes[index]);
+    if (branchIndex < 0) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (index == _lastNavIndex && now - _lastNavMs < 350) return;
     _lastNavMs = now;
     _lastNavIndex = index;
     widget.navigationShell.goBranch(
-      index,
-      initialLocation: index == _currentIndex,
+      branchIndex,
+      initialLocation: branchIndex == widget.navigationShell.currentIndex,
     );
     if (shouldUseSidebar(widget.deviceType)) {
       setState(() => _sidebarActive = false);
@@ -167,6 +191,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         }),
       );
     }
+  }
+
+  void _navigateToRoute(String routeName) {
+    final index = _mainRoutes.indexOf(routeName);
+    if (index >= 0) _navigateTo(index);
   }
 
   void _activateSidebar() {
@@ -357,6 +386,25 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _scheduleDvr(
+    BuildContext context,
+    Channel channel,
+    EpgProgram program,
+  ) async {
+    try {
+      await _appState.scheduleDvr(channel, program);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recording scheduled: ${program.title}')),
+      );
+    } on Object catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not schedule recording: $error')),
+      );
+    }
+  }
+
   Future<void> _pushDetail(String path, {Object? extra}) async {
     await Future<void>.microtask(() {});
     final savedFocus = FocusManager.instance.primaryFocus;
@@ -463,6 +511,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             onVodSelect: _openVod,
             onSeriesSelect: _openSeries,
             onProgressSelect: _openProgress,
+            onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.search => SearchScreen(
@@ -485,6 +534,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             onChannelSelect: _openChannel,
             onCatchupProgramSelect: _openCatchupProgram,
             onSidebarActivate: _activateSidebar,
+            onScheduleProgram: (channel, program) =>
+                unawaited(_scheduleDvr(context, channel, program)),
           ),
           RouteNames.vod => VodScreen(
             vodItems: _appState.vodItems,
@@ -502,6 +553,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             isConfigured: _appState.isConfigured,
             onSeriesSelect: _openSeries,
             favoritesService: _appState.seriesFavoritesService,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.dvr => DvrRecordingsScreen(
+            recordings: _appState.dvrRecordings,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            onPlay: _openPlayerDirect,
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.notifications => NotificationsScreen(appState: _appState),
@@ -713,6 +771,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   bottom: 0,
                   child: NavigationSidebar(
                     currentIndex: _currentIndex,
+                    routes: _mainRoutes,
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
@@ -819,6 +878,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.dvr => Icons.video_library,
     RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
@@ -831,6 +891,7 @@ class NavigationSidebar extends StatelessWidget {
   const NavigationSidebar({
     super.key,
     required this.currentIndex,
+    required this.routes,
     required this.sidebarActive,
     required this.focusNodes,
     required this.scopeNode,
@@ -841,6 +902,7 @@ class NavigationSidebar extends StatelessWidget {
   });
 
   final int currentIndex;
+  final List<String> routes;
   final bool sidebarActive;
   final List<FocusNode> focusNodes;
   final FocusScopeNode scopeNode;
@@ -851,7 +913,6 @@ class NavigationSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const routes = RouteNames.mainRoutes;
     final theme = Theme.of(context);
     final expanded = sidebarActive;
     final width = expanded ? 200.0 : 64.0;
@@ -956,6 +1017,7 @@ class NavigationSidebar extends StatelessWidget {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.dvr => Icons.video_library,
     RouteNames.notifications => Icons.notifications,
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
@@ -1176,6 +1238,7 @@ class _HomeScreen extends StatefulWidget {
     required this.onVodSelect,
     required this.onSeriesSelect,
     required this.onProgressSelect,
+    required this.onRecordingsSelect,
     this.onSidebarActivate,
   });
 
@@ -1184,6 +1247,7 @@ class _HomeScreen extends StatefulWidget {
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
+  final VoidCallback onRecordingsSelect;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -1304,6 +1368,21 @@ class _HomeScreenState extends State<_HomeScreen> {
           .toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );
+    final recordingsSection = MediaPreviewSection(
+      title: 'DVR',
+      emptyLabel: 'No DVR recordings available',
+      items: [
+        MediaPreviewItem(
+          title: 'DVR Recordings',
+          subtitle: appState.dvrRecordings.isEmpty
+              ? 'Browse completed and in-progress recordings'
+              : '${appState.dvrRecordings.length} recordings',
+          fallbackIcon: Icons.video_library,
+          onTap: () => widget.onRecordingsSelect(),
+        ),
+      ],
+      onSidebarActivate: widget.onSidebarActivate,
+    );
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
@@ -1320,6 +1399,7 @@ class _HomeScreenState extends State<_HomeScreen> {
           liveSection,
           moviesSection,
           seriesSection,
+          if (appState.hasDvrFeature) recordingsSection,
         ],
       ),
     );

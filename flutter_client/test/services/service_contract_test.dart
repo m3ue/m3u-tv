@@ -252,6 +252,146 @@ void main() {
       );
     });
 
+    test('schedules DVR recordings through m3u-editor action', () async {
+      final transport = FakeXtreamTransport({
+        'auth': xtreamAuth(auth: 1),
+        'schedule_dvr': <String, Object?>{
+          'uuid': 'rec-scheduled',
+          'title': 'Late Show',
+          'status': 'scheduled',
+          'channel_id': 101,
+          'scheduled_start': '2026-06-25T21:30:00Z',
+          'scheduled_end': '2026-06-25T22:15:00Z',
+        },
+      });
+      final service = XtreamService(transport: transport.call);
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example/',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final recording = await service.scheduleDvr(
+        channelId: 101,
+        title: 'Late Show',
+        startTime: DateTime.utc(2026, 6, 25, 21, 30),
+        endTime: DateTime.utc(2026, 6, 25, 22, 15),
+      );
+      final request = transport.requests.last;
+
+      expect(request.action, 'schedule_dvr');
+      expect(request.method, 'POST');
+      expect(request.body, {
+        'channel_id': '101',
+        'title': 'Late Show',
+        'start_time': '2026-06-25T21:30:00.000Z',
+        'end_time': '2026-06-25T22:15:00.000Z',
+      });
+      expect(recording.uuid, 'rec-scheduled');
+      expect(recording.status, DvrRecordingStatus.scheduled);
+    });
+
+    test(
+      'schedule DVR normalizes offset EPG dates to UTC request dates',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'schedule_dvr': <String, Object?>{
+            'uuid': 'rec-timezone',
+            'title': 'Offset News',
+            'status': 'scheduled',
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.scheduleDvr(
+          channelId: 202,
+          title: 'Offset News',
+          startTime: DateTime.parse('2026-06-25T21:30:00+02:00'),
+          endTime: DateTime.parse('2026-06-25T23:00:00+02:00'),
+        );
+
+        expect(transport.requests.last.body, containsPair('channel_id', '202'));
+        expect(
+          transport.requests.last.body['start_time'],
+          '2026-06-25T19:30:00.000Z',
+        );
+        expect(
+          transport.requests.last.body['end_time'],
+          '2026-06-25T21:00:00.000Z',
+        );
+      },
+    );
+
+    test(
+      'loads DVR recordings list and detail through m3u-editor actions',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_dvr_recordings': [
+            completedDvrRecording(),
+            recordingDvrRecording(),
+          ],
+          'get_dvr_recording': completedDvrRecording(
+            includeDetail: true,
+            metadata: {'tmdb_id': 12345},
+            errorMessage: 'transient probe warning',
+          ),
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        final recordings = await service.getDvrRecordings();
+        final completed = recordings.first;
+        final inProgress = recordings.last;
+
+        expect(recordings, hasLength(2));
+        expect(completed.uuid, 'rec-completed');
+        expect(completed.title, 'Evening Movie');
+        expect(completed.subtitle, 'Director Cut');
+        expect(completed.status, DvrRecordingStatus.completed);
+        expect(completed.channelId, 101);
+        expect(completed.channelName, 'BBC One');
+        expect(completed.scheduledStart, DateTime.utc(2026, 6, 25, 18));
+        expect(completed.actualEnd, DateTime.utc(2026, 6, 25, 20, 2));
+        expect(completed.durationSeconds, 7200);
+        expect(completed.fileSizeBytes, 1234567890);
+        expect(completed.seasonNumber, 2);
+        expect(completed.episodeNumber, 5);
+        expect(
+          completed.playbackUrl,
+          'https://xtream.example/dvr/demo/secret/rec-completed.mp4',
+        );
+        expect(completed.isPlayable, isTrue);
+        expect(inProgress.status, DvrRecordingStatus.recording);
+        expect(
+          inProgress.playbackUrl,
+          'https://xtream.example/dvr/demo/secret/rec-recording/live.m3u8',
+        );
+        expect(inProgress.isInProgress, isTrue);
+
+        final detail = await service.getDvrRecording('rec-completed');
+        expect(detail.metadata, {'tmdb_id': 12345});
+        expect(detail.errorMessage, 'transient probe warning');
+        expect(transport.requests.last.params['uuid'], 'rec-completed');
+      },
+    );
+
     test(
       'expired credentials return typed auth error without cache corruption',
       () async {
@@ -844,6 +984,48 @@ Map<String, Object?> episode(int id, int episodeNum, String title) => {
   'container_extension': 'mp4',
   'season': 1,
   'info': {'plot': 'Fixture episode'},
+};
+
+Map<String, Object?> completedDvrRecording({
+  bool includeDetail = false,
+  Map<String, Object?>? metadata,
+  String? errorMessage,
+}) => {
+  'uuid': 'rec-completed',
+  'title': 'Evening Movie',
+  'subtitle': 'Director Cut',
+  'status': 'completed',
+  'channel_id': 101,
+  'channel_name': 'BBC One',
+  'channel_icon': 'https://img.example/bbc-one.png',
+  'scheduled_start': '2026-06-25T18:00:00Z',
+  'scheduled_end': '2026-06-25T20:00:00Z',
+  'actual_start': '2026-06-25T18:01:00Z',
+  'actual_end': '2026-06-25T20:02:00Z',
+  'duration_seconds': 7200,
+  'file_size_bytes': 1234567890,
+  'season_number': 2,
+  'episode_number': 5,
+  'stream_url': 'https://xtream.example/dvr/demo/secret/rec-completed.mp4',
+  'live_url': null,
+  'edl_url': 'https://xtream.example/dvr/demo/secret/rec-completed.edl',
+  if (includeDetail) 'metadata': metadata ?? const <String, Object?>{},
+  'error': ?errorMessage,
+};
+
+Map<String, Object?> recordingDvrRecording() => {
+  'uuid': 'rec-recording',
+  'title': 'Live News',
+  'status': 'recording',
+  'channel_id': 102,
+  'channel_name': 'News 24',
+  'scheduled_start': '2026-06-25T21:00:00Z',
+  'scheduled_end': '2026-06-25T22:00:00Z',
+  'actual_start': '2026-06-25T21:00:30Z',
+  'duration_seconds': 3600,
+  'file_size_bytes': 0,
+  'stream_url': null,
+  'live_url': 'https://xtream.example/dvr/demo/secret/rec-recording/live.m3u8',
 };
 
 class FakeXtreamTransport {

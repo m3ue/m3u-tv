@@ -31,6 +31,7 @@ class LiveTvScreen extends StatefulWidget {
     required this.onChannelSelect,
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
+    this.onScheduleProgram,
   });
 
   final List<Channel> channels;
@@ -42,6 +43,7 @@ class LiveTvScreen extends StatefulWidget {
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
+  final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
   State<LiveTvScreen> createState() => _LiveTvScreenState();
@@ -239,6 +241,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
               await widget.favoritesService.toggle(channel.id);
               await _loadFavorites();
             },
+            onScheduleProgram: widget.onScheduleProgram,
           );
         },
       ),
@@ -307,6 +310,7 @@ class _ChannelRow extends StatelessWidget {
     required this.autofocus,
     required this.onTap,
     required this.onLongPress,
+    this.onScheduleProgram,
   });
 
   final Channel channel;
@@ -315,6 +319,7 @@ class _ChannelRow extends StatelessWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +399,16 @@ class _ChannelRow extends StatelessWidget {
                       Icons.star,
                       color: colorScheme.tertiary,
                       size: 20,
+                    ),
+                  ),
+                if (epg != null && onScheduleProgram != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: FilledButton.tonalIcon(
+                      onPressed: () =>
+                          onScheduleProgram!(channel, epg!.current),
+                      icon: const Icon(Icons.fiber_manual_record, size: 16),
+                      label: const Text('Record'),
                     ),
                   ),
                 // Next program

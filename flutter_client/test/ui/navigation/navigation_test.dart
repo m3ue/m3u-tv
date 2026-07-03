@@ -178,6 +178,60 @@ void main() {
       expect(find.text('Server URL'), findsOneWidget);
     });
 
+    testWidgets('hides DVR navigation when backend does not advertise DVR', (
+      tester,
+    ) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _expandSidebar(tester);
+
+      expect(_sidebarText('DVR'), findsNothing);
+      expect(find.text('DVR Recordings'), findsNothing);
+    });
+
+    testWidgets('DVR appears in sidebar when backend advertises DVR', (
+      tester,
+    ) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          features: const <String>['progress', 'dvr'],
+          dvrRecordings: <DvrRecording>[_routeRecording()],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _expandSidebar(tester);
+
+      await tester.tap(_sidebarText('DVR'));
+      await _pumpAppFrame(tester);
+
+      expect(find.text('DVR Recordings'), findsOneWidget);
+      expect(find.text('Route Recording'), findsOneWidget);
+    });
+
     testWidgets('sidebar labels remain visible after selecting a route', (
       tester,
     ) async {
@@ -817,6 +871,41 @@ void main() {
     });
   });
 
+  testWidgets('Home shows DVR recordings at the bottom when DVR is enabled', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final appState = _testAppState(
+      xtreamService: _NavigationXtreamService(
+        features: const <String>['progress', 'dvr'],
+        dvrRecordings: <DvrRecording>[_routeRecording()],
+      ),
+    );
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.tv, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+
+    final liveTop = tester.getTopLeft(find.text('Live TV').last).dy;
+    final moviesTop = tester.getTopLeft(find.text('Movies').last).dy;
+    final seriesTop = tester.getTopLeft(find.text('Series').last).dy;
+    final dvrTop = tester.getTopLeft(find.text('DVR').last).dy;
+
+    expect(liveTop, lessThan(moviesTop));
+    expect(moviesTop, lessThan(seriesTop));
+    expect(seriesTop, lessThan(dvrTop));
+  });
+
   group('Focus restoration', () {
     testWidgets('returning from player overlay preserves active tab content', (
       tester,
@@ -1051,6 +1140,14 @@ class _NavigationTranscodeGateway implements PlaybackTranscodeGateway {
   }) async {}
 }
 
+DvrRecording _routeRecording() => const DvrRecording(
+  uuid: 'route-rec-1',
+  title: 'Route Recording',
+  status: DvrRecordingStatus.completed,
+  channelName: 'Route News',
+  streamUrl: 'http://example.com/dvr/route-rec-1.mp4',
+);
+
 class _NavigationXtreamService extends XtreamService {
   _NavigationXtreamService({
     this.liveChannels = const <Channel>[
@@ -1079,19 +1176,24 @@ class _NavigationXtreamService extends XtreamService {
       ),
     ],
     this.recentlyWatched = const <Progress>[],
+    this.features = const <String>['progress'],
+    this.dvrRecordings = const <DvrRecording>[],
   });
 
   final List<Channel> liveChannels;
   final List<VodItem> vodItems;
   final List<Series> seriesList;
   final List<Progress> recentlyWatched;
+  final List<String> features;
+  final List<DvrRecording> dvrRecordings;
 
   @override
   Future<XtreamAuthResponse> authenticate(UserCredentials credentials) async {
-    return const XtreamAuthResponse(
+    return XtreamAuthResponse(
       isAuthenticated: true,
       status: 'Active',
       m3uEditorVersion: 'test',
+      features: features,
     );
   }
 
@@ -1158,6 +1260,9 @@ class _NavigationXtreamService extends XtreamService {
   Future<List<Viewer>> getViewers() async => const <Viewer>[
     Viewer(id: 1, ulid: 'viewer-1', name: 'Viewer', isAdmin: true),
   ];
+
+  @override
+  Future<List<DvrRecording>> getDvrRecordings() async => dvrRecordings;
 
   @override
   Future<List<Progress>> getRecentlyWatched(

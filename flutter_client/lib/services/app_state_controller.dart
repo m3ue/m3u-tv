@@ -182,6 +182,7 @@ class AppStateController extends ChangeNotifier {
   List<Channel> _channels = const <Channel>[];
   List<VodItem> _vodItems = const <VodItem>[];
   List<Series> _seriesList = const <Series>[];
+  List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -199,7 +200,10 @@ class AppStateController extends ChangeNotifier {
   List<Channel> get channels => _channels;
   List<VodItem> get vodItems => _vodItems;
   List<Series> get seriesList => _seriesList;
+  List<DvrRecording> get dvrRecordings => _dvrRecordings;
   List<Progress> get progressList => _progressList;
+  bool get hasDvrFeature =>
+      authNotifier.authResponse?.hasFeature('dvr') ?? false;
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
     AppSourceType.m3u => 'M3U',
@@ -305,6 +309,7 @@ class AppStateController extends ChangeNotifier {
       _channels = playlist.channels;
       _vodItems = const <VodItem>[];
       _seriesList = const <Series>[];
+      _dvrRecordings = const <DvrRecording>[];
       _activeViewer = const Viewer(
         id: 0,
         ulid: 'local-m3u',
@@ -384,6 +389,7 @@ class AppStateController extends ChangeNotifier {
     _channels = const <Channel>[];
     _vodItems = const <VodItem>[];
     _seriesList = const <Series>[];
+    _dvrRecordings = const <DvrRecording>[];
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -440,6 +446,18 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<DvrRecording> scheduleDvr(Channel channel, EpgProgram program) async {
+    final recording = await xtreamService.scheduleDvr(
+      channelId: channel.id,
+      title: program.title,
+      startTime: program.start,
+      endTime: program.end,
+    );
+    _dvrRecordings = [recording, ..._dvrRecordings];
+    notifyListeners();
+    return recording;
+  }
+
   void updateProgressEntry(Progress updated) {
     final idx = _progressList.indexWhere(
       (p) =>
@@ -464,6 +482,11 @@ class AppStateController extends ChangeNotifier {
       final channelsFuture = xtreamService.getLiveStreams();
       final vodItemsFuture = xtreamService.getVodStreams();
       final seriesFuture = xtreamService.getSeries();
+      final recordingsFuture = hasDvrFeature
+          ? xtreamService.getDvrRecordings().catchError(
+              (Object _) => const <DvrRecording>[],
+            )
+          : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
       final viewersFuture = xtreamService.getViewers();
 
       final results = await Future.wait<Object>(<Future<Object>>[
@@ -473,16 +496,18 @@ class AppStateController extends ChangeNotifier {
         channelsFuture,
         vodItemsFuture,
         seriesFuture,
+        recordingsFuture,
         viewersFuture,
       ]);
 
-      final viewers = results[6] as List<Viewer>;
+      final viewers = results[7] as List<Viewer>;
       final channels = results[3] as List<Channel>;
       final liveCategories = results[0] as List<Category>;
       final vodCategories = results[1] as List<Category>;
       final seriesCategories = results[2] as List<Category>;
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
+      final dvrRecordings = results[6] as List<DvrRecording>;
 
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
       final fetched = activeViewer == null
@@ -500,6 +525,7 @@ class AppStateController extends ChangeNotifier {
       _channels = channels;
       _vodItems = vodItems;
       _seriesList = seriesList;
+      _dvrRecordings = dvrRecordings;
       _viewers = viewers;
       _activeViewer = activeViewer;
       _progressList = progress;
@@ -569,6 +595,7 @@ class AppStateController extends ChangeNotifier {
     _channels = channels;
     _vodItems = vodItems;
     _seriesList = seriesList;
+    _dvrRecordings = const <DvrRecording>[];
     _viewers = viewers;
     _activeViewer = await viewerService.resolveActiveViewer(viewers);
     final activeViewer = _activeViewer;
@@ -682,7 +709,7 @@ class AppStateController extends ChangeNotifier {
       }
     } on Object catch (e) {
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
-      // Don't clear existing EPG data on a batch failure — a transient network
+      // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.
     }
   }

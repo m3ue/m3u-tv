@@ -129,11 +129,15 @@ class XtreamAuthResponse {
     required this.isAuthenticated,
     this.status,
     this.m3uEditorVersion,
+    this.features = const <String>[],
   });
 
   final bool isAuthenticated;
   final String? status;
   final String? m3uEditorVersion;
+  final List<String> features;
+
+  bool hasFeature(String feature) => features.contains(feature);
 }
 
 class XtreamService {
@@ -190,10 +194,15 @@ class XtreamService {
 
     _credentials = normalized;
     _isM3UEditor = true;
+    final features = _asList(m3uEditor['features'])
+        .map((feature) => '$feature')
+        .where((feature) => feature.isNotEmpty)
+        .toList(growable: false);
     return XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
       m3uEditorVersion: '${m3uEditor['version'] ?? ''}',
+      features: features,
     );
   }
 
@@ -254,6 +263,40 @@ class XtreamService {
     return _asList(
       response,
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
+  }
+
+  Future<List<DvrRecording>> getDvrRecordings() async {
+    final response = await _request('get_dvr_recordings');
+    return _asList(response)
+        .map((item) => DvrRecording.fromXtream(_asMap(item)))
+        .toList(growable: false);
+  }
+
+  Future<DvrRecording> getDvrRecording(String uuid) async {
+    final response = await _request(
+      'get_dvr_recording',
+      params: {'uuid': uuid},
+    );
+    return DvrRecording.fromXtream(_asMap(response));
+  }
+
+  Future<DvrRecording> scheduleDvr({
+    required int channelId,
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    final response = await _request(
+      'schedule_dvr',
+      method: 'POST',
+      body: {
+        'channel_id': '$channelId',
+        'title': title,
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime.toUtc().toIso8601String(),
+      },
+    );
+    return DvrRecording.fromXtream(_asMap(response));
   }
 
   Future<SeriesInfo> getSeriesInfo(int seriesId) async {

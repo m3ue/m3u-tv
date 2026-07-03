@@ -192,7 +192,18 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 5: Notifications
+          // Branch 5: DVR
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.dvr,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(_tabScreen(context, RouteNames.dvr)),
+                ),
+              ),
+            ],
+          ),
+          // Branch 6: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -205,7 +216,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: Settings
+          // Branch 7: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(
