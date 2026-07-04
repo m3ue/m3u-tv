@@ -101,7 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // widget already holds focus when the player opens via the AppShell Stack).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Overlay is visible on open — focus the play/pause button directly
+        // Overlay is visible on open, so focus the play/pause button directly
         // so D-pad traversal works immediately. Falls back to _screenFocusNode
         // if somehow the overlay was already hidden.
         if (_overlayVisible) {
@@ -461,24 +461,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _hideOverlay() {
-    _overlayHideTimer?.cancel();
-    setState(() => _overlayVisible = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_overlayVisible) _screenFocusNode.requestFocus();
-    });
-  }
-
   void _handleBack() {
-    if (_errorMessage != null) {
-      _goBack();
-      return;
-    }
-    if (_overlayVisible) {
-      _hideOverlay();
-    } else {
-      _goBack();
-    }
+    _goBack();
   }
 
   @override
@@ -491,7 +475,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const _PlayPauseIntent(),
-          // Only claim arrow keys when the overlay is hidden — when visible,
+          // Only claim arrow keys when the overlay is hidden. When visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
@@ -518,10 +502,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
               if (event is KeyDownEvent &&
                   !_overlayVisible &&
                   _errorMessage == null) {
-                // Don't intercept back/escape — let the Shortcuts above handle
-                // it as a direct back action. Intercepting it here would set
-                // _overlayVisible = true, causing _handleBack() to call
-                // _hideOverlay() instead of _goBack(), making back a no-op.
+                // Don't intercept back/escape. Let the Shortcuts above handle
+                // it as a direct back action. Intercepting it here would show
+                // the overlay instead of closing the player.
                 final key = event.logicalKey;
                 final isBack =
                     key == LogicalKeyboardKey.escape ||
@@ -651,6 +634,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       onTap: _showOverlay,
                       child: const SizedBox.expand(),
                     ),
+                  ),
+
+                if (_errorMessage == null)
+                  Positioned(
+                    top: 40,
+                    left: 40,
+                    child: _PlayerBackButton(onBack: _goBack),
                   ),
 
                 // EPG overlay (live only)
@@ -901,6 +891,40 @@ class _PlaybackDiagnosticsSnapshot {
       PlaybackBackend.serverTranscode => 'Server transcode fallback',
       null => 'Selecting backend',
     };
+  }
+}
+
+class _PlayerBackButton extends StatelessWidget {
+  const _PlayerBackButton({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadFocusable(
+      onSelect: onBack,
+      effects: const [
+        GradientBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(50)),
+        ),
+      ],
+      child: GestureDetector(
+        key: const Key('player-back-button'),
+        onTap: onBack,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+            size: 24,
+          ),
+        ),
+      ),
+    );
   }
 }
 

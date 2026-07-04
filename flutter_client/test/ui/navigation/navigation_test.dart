@@ -580,6 +580,86 @@ void main() {
     },
   );
 
+  testWidgets('Android system back exits app only on second root back press', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    final platformCalls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        platformCalls.add(call);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+    platformCalls.clear();
+
+    final firstBackHandled = await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(firstBackHandled, isTrue);
+    expect(find.text('Press back again to exit'), findsOneWidget);
+    expect(platformCalls, isEmpty);
+
+    final secondBackHandled = await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(secondBackHandled, isTrue);
+    expect(
+      platformCalls.map((call) => call.method),
+      contains('SystemNavigator.pop'),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android predictive back is intercepted by the app shell', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+
+    final hasBlockingPopScope = tester
+        .widgetList(find.byType(PopScope<void>))
+        .any(
+          (widget) => widget is PopScope<void> && !widget.canPop,
+        );
+
+    expect(hasBlockingPopScope, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('Android system back closes player overlay before app exit', (
     tester,
   ) async {
@@ -611,6 +691,289 @@ void main() {
     expect(find.text('Player route: Route News'), findsNothing);
     expect(find.text('Route News'), findsWidgets);
     expect(find.text('Press back again to exit'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android live player keeps a visible touch back button', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        useProductionPlayer: true,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 9));
+
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('player-back-button')));
+    await _pumpAppFrame(tester);
+
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android native back channel closes live player', (tester) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        playerRouteBuilder: _testPlayerRoute,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Route News'), findsOneWidget);
+
+    await _sendNativeSystemBack(tester);
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Player route: Route News'), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android native back channel closes movie player from overview', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        playerRouteBuilder: _testPlayerRoute,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('Movies'),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route Movie').last);
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Play movie'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Route Movie'), findsOneWidget);
+
+    await _sendNativeSystemBack(tester);
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Player route: Route Movie'), findsNothing);
+    expect(find.text('Route Movie'), findsWidgets);
+    expect(find.text('Play movie'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android native back channel closes series player from details', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        playerRouteBuilder: _testPlayerRoute,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('Series'),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route Series').last);
+    await _pumpAppFrame(tester);
+    await tester.tap(find.textContaining('Pilot'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Pilot'), findsOneWidget);
+
+    await _sendNativeSystemBack(tester);
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Player route: Pilot'), findsNothing);
+    expect(find.text('Season 1'), findsOneWidget);
+    expect(find.textContaining('Pilot'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android system back closes live player after controls hide', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    final platformCalls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        platformCalls.add(call);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        useProductionPlayer: true,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 9));
+    platformCalls.clear();
+
+    final handled = await tester.binding.handlePopRoute();
+    await _pumpAppFrame(tester);
+
+    expect(handled, isTrue);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    expect(
+      platformCalls.map((call) => call.method),
+      isNot(contains('SystemNavigator.pop')),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Android system back closes movie player after controls hide', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    final platformCalls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        platformCalls.add(call);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        useProductionPlayer: true,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('Movies'),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route Movie').last);
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Play movie'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 9));
+    platformCalls.clear();
+
+    expect(find.byKey(const Key('player-back-button')), findsOneWidget);
+
+    final handled = await tester.binding.handlePopRoute();
+    await _pumpAppFrame(tester);
+
+    expect(handled, isTrue);
+    expect(find.byKey(const Key('player-back-button')), findsNothing);
+    expect(find.text('Route Movie'), findsWidgets);
+    expect(
+      platformCalls.map((call) => call.method),
+      isNot(contains('SystemNavigator.pop')),
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -1077,6 +1440,17 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
 }
 
+Future<void> _sendNativeSystemBack(WidgetTester tester) async {
+  final message = const StandardMethodCodec().encodeMethodCall(
+    const MethodCall('systemBack'),
+  );
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    'm3u_tv/navigation',
+    message,
+    (_) {},
+  );
+}
+
 Future<void> _waitForText(WidgetTester tester, String text) async {
   final finder = find.text(text);
   for (var i = 0; i < 60; i += 1) {
@@ -1092,11 +1466,13 @@ class _TestApp extends StatefulWidget {
     required this.deviceType,
     this.appState,
     this.playerRouteBuilder,
+    this.useProductionPlayer = false,
   });
 
   final DeviceType deviceType;
   final AppStateController? appState;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
+  final bool useProductionPlayer;
 
   @override
   State<_TestApp> createState() => _TestAppState();
@@ -1111,7 +1487,9 @@ class _TestAppState extends State<_TestApp> {
     nativeTelevisionHint: false,
     deviceTypeOverride: widget.deviceType,
     playbackOrchestratorBuilder: _testPlaybackOrchestrator,
-    playerRouteBuilder: widget.playerRouteBuilder ?? _testPlayerRoute,
+    playerRouteBuilder: widget.useProductionPlayer
+        ? null
+        : widget.playerRouteBuilder ?? _testPlayerRoute,
   );
 
   @override

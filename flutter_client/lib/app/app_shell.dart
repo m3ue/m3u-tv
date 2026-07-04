@@ -56,6 +56,10 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell> {
+  static const MethodChannel _navigationChannel = MethodChannel(
+    'm3u_tv/navigation',
+  );
+
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
@@ -97,6 +101,16 @@ class AppShellState extends State<AppShell> {
       unawaited(_appState.boot());
     }
     _initSidebarFocusNodes();
+    _navigationChannel.setMethodCallHandler(_handleNavigationMethodCall);
+  }
+
+  Future<Object?> _handleNavigationMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'systemBack':
+        return _handleSystemBackButton();
+      default:
+        throw MissingPluginException('No handler for ${call.method}');
+    }
   }
 
   Future<bool> _handleSystemBackButton() async {
@@ -106,7 +120,10 @@ class AppShellState extends State<AppShell> {
     final now = DateTime.now();
     final last = _lastBackPress;
     if (last != null && now.difference(last) < const Duration(seconds: 2)) {
-      return false;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      await SystemNavigator.pop();
+
+      return true;
     }
     _lastBackPress = now;
     if (mounted) {
@@ -118,6 +135,19 @@ class AppShellState extends State<AppShell> {
       );
     }
     return true;
+  }
+
+  Widget _buildBackAwareShell(Widget child) {
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handleSystemBackButton());
+      },
+      child: BackButtonListener(
+        onBackButtonPressed: _handleSystemBackButton,
+        child: child,
+      ),
+    );
   }
 
   void _onAppStateChanged() {
@@ -159,6 +189,7 @@ class AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _navigationChannel.setMethodCallHandler(null);
     _tvNotificationSub?.cancel().ignore();
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
@@ -229,7 +260,7 @@ class AppShellState extends State<AppShell> {
   }
 
   // Stable method tearoff passed to ContentActions.onOpenPlayer.
-  // Must NOT be a local closure in build() — closures are always new instances,
+  // Must NOT be a local closure in build(). Closures are always new instances,
   // which makes ContentActions.updateShouldNotify return true on every rebuild
   // and cascade unnecessary rebuilds to all feature screens.
   void _openPlayerFromActions(PlayerArgs args) =>
@@ -647,17 +678,12 @@ class AppShellState extends State<AppShell> {
 
     final args = _playerArgs;
     final orch = _playerOrchestrator;
-    final backAwareShell = BackButtonListener(
-      onBackButtonPressed: _handleSystemBackButton,
-      child: shell,
-    );
-    if (args == null || orch == null) return backAwareShell;
+    if (args == null || orch == null) return _buildBackAwareShell(shell);
 
     final viewerId = _appState.activeViewer?.ulid ?? '';
 
-    return BackButtonListener(
-      onBackButtonPressed: _handleSystemBackButton,
-      child: Stack(
+    return _buildBackAwareShell(
+      Stack(
         children: [
           shell,
           Positioned.fill(
