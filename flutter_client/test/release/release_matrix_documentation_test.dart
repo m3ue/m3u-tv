@@ -146,7 +146,6 @@ void main() {
 
   test('android manifest exposes Android TV launcher metadata', () {
     final manifest = readFile('android/app/src/main/AndroidManifest.xml');
-    final mainDart = readFile('lib/main.dart');
 
     expect(manifest, contains('android.software.leanback'));
     expect(manifest, contains('android.hardware.touchscreen'));
@@ -154,7 +153,15 @@ void main() {
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
     expect(manifest, contains('android:exported="true"'));
+  });
+
+  test('android fullscreen mode is configured at startup and on resume', () {
+    final mainDart = readFile('lib/main.dart');
+    final appShell = readFile('lib/app/app_shell.dart');
+
     expect(mainDart, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('AppLifecycleState.resumed'));
   });
 
   test('release matrix documents signing, store, and license gates', () {

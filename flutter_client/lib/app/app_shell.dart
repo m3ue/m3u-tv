@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -172,6 +174,17 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _appState.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // immersiveSticky is reset by the OS on background/foreground transitions;
+    // re-apply it each time the app resumes to keep the layout full-screen.
+    if (state == AppLifecycleState.resumed && !kIsWeb && Platform.isAndroid) {
+      unawaited(
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+      );
+    }
   }
 
   void _navigateTo(int index) {
