@@ -17,7 +17,7 @@ import 'package:m3u_tv/transcoding/transcoding.dart';
 void main() {
   group('production backend policy', () {
     testWidgets(
-      'unsupported_codec: Android uses Media3 then server transcode and renders diagnostics',
+      'unsupported_codec: Android uses Media3 then server transcode without player diagnostics',
       (tester) async {
         final media3 = _PolicyPlayerAdapter(
           capabilities: PlaybackCapabilities.androidExoPlayer,
@@ -88,17 +88,17 @@ void main() {
           contains('active-backend:serverTranscode:ready'),
         );
 
-        expect(find.text('Backend'), findsOneWidget);
-        expect(find.text('Server transcode fallback'), findsWidgets);
-        expect(find.text('Fallback'), findsOneWidget);
+        expect(find.text('Backend'), findsNothing);
+        expect(find.text('Server transcode fallback'), findsNothing);
+        expect(find.text('Fallback'), findsNothing);
         expect(
           find.textContaining('Unsupported codec hevc/aac'),
-          findsOneWidget,
+          findsNothing,
         );
-        expect(find.text('Transcode'), findsOneWidget);
-        expect(find.textContaining('unsupported-session'), findsOneWidget);
-        expect(find.text('Android mpv/libmpv'), findsOneWidget);
-        expect(find.textContaining('disabled'), findsOneWidget);
+        expect(find.text('Transcode'), findsNothing);
+        expect(find.textContaining('unsupported-session'), findsNothing);
+        expect(find.text('Android mpv/libmpv'), findsNothing);
+        expect(find.textContaining('disabled'), findsNothing);
 
         await tester.pumpWidget(const SizedBox.shrink());
       },
