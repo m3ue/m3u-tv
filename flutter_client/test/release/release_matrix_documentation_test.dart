@@ -146,6 +146,7 @@ void main() {
 
   test('android manifest exposes Android TV launcher metadata', () {
     final manifest = readFile('android/app/src/main/AndroidManifest.xml');
+    final mainDart = readFile('lib/main.dart');
 
     expect(manifest, contains('android.software.leanback'));
     expect(manifest, contains('android.hardware.touchscreen'));
@@ -153,6 +154,7 @@ void main() {
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
     expect(manifest, contains('android:exported="true"'));
+    expect(mainDart, contains('SystemUiMode.immersiveSticky'));
   });
 
   test('release matrix documents signing, store, and license gates', () {

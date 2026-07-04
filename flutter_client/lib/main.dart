@@ -18,6 +18,7 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _configureSystemUi();
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
   if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
@@ -27,14 +28,17 @@ Future<void> main() async {
   runApp(MyApp(nativeTelevisionHint: nativeTelevisionHint, appState: appState));
 }
 
+Future<void> _configureSystemUi() async {
+  if (kIsWeb || !Platform.isAndroid) return;
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+}
+
 Future<AppStateController> _buildAppState() async {
   if (Platform.isAndroid ||
       Platform.isIOS ||
       Platform.operatingSystem == 'tvos') {
     final dir = await getApplicationDocumentsDirectory();
-    final store = PersistentJsonStore(
-      file: File('${dir.path}/app_state.json'),
-    );
+    final store = PersistentJsonStore(file: File('${dir.path}/app_state.json'));
     return AppStateController(
       persistentStore: store,
       secureStorage: FlutterSecureStorageAdapter(),
@@ -146,9 +150,7 @@ class _MyAppState extends State<MyApp> {
             fontWeight: FontWeight.w500,
           ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       themeMode: ThemeMode.dark,

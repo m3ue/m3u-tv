@@ -226,9 +226,7 @@ void main() {
 
     testWidgets(
       'stacks track selectors below transport controls on narrow portrait screens',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(430, 932));
         addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -277,9 +275,7 @@ void main() {
 
     testWidgets(
       'keeps audio and subtitle selectors visible without transport overlap in landscape',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(932, 430));
         addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -325,9 +321,7 @@ void main() {
       },
     );
 
-    testWidgets('labels track controls by type only', (
-      tester,
-    ) async {
+    testWidgets('labels track controls by type only', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: PlaybackControls(
@@ -375,9 +369,7 @@ void main() {
 
     testWidgets(
       'marks first audio track active while selected track is unknown',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.pumpWidget(
           MaterialApp(
             home: PlaybackControls(
@@ -629,9 +621,7 @@ void main() {
         MaterialApp(
           home: TrackSelector(
             audioTracks: const [],
-            subtitleTracks: const [
-              PlaybackTrack(id: '1', label: 'English'),
-            ],
+            subtitleTracks: const [PlaybackTrack(id: '1', label: 'English')],
             selectedAudioTrackId: null,
             selectedSubtitleTrackId: null,
             onAudioTrackSelected: (_) {},
@@ -719,10 +709,7 @@ void main() {
           home: TrackSelector(
             audioTracks: List<PlaybackTrack>.generate(
               12,
-              (index) => PlaybackTrack(
-                id: '$index',
-                label: 'Language $index',
-              ),
+              (index) => PlaybackTrack(id: '$index', label: 'Language $index'),
             ),
             subtitleTracks: const [],
             selectedAudioTrackId: '0',
@@ -790,10 +777,7 @@ void main() {
     testWidgets('hides next title when null', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: EpgOverlay(
-            currentTitle: 'Current Show',
-            currentProgress: 0.3,
-          ),
+          home: EpgOverlay(currentTitle: 'Current Show', currentProgress: 0.3),
         ),
       );
       expect(find.byType(EpgOverlay), findsOneWidget);
@@ -906,6 +890,8 @@ void main() {
 
       final texture = tester.widget<Texture>(find.byType(Texture));
       expect(texture.textureId, 42);
+      expect(find.text('Backend'), findsNothing);
+      expect(find.text('Desktop libmpv'), findsNothing);
     });
 
     testWidgets('seeks to resume position after backend load', (tester) async {
@@ -1002,9 +988,7 @@ void main() {
 
     testWidgets(
       'preserves reported source aspect ratio for the video surface',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final adapter = FakePlayerAdapter(
           capabilities: PlaybackCapabilities.desktopLibmpv,
           textureId: 42,
@@ -1067,17 +1051,15 @@ void main() {
       );
       addTearDown(orchestrator.dispose);
       final epgService = EpgService(clock: () => now)
-        ..loadPrograms(
-          <EpgProgram>[
-            EpgProgram(
-              channelId: 'bbc.one',
-              title: 'Current News',
-              description: 'Fixture bulletin',
-              start: now.subtract(const Duration(minutes: 10)),
-              end: now.add(const Duration(minutes: 20)),
-            ),
-          ],
-        );
+        ..loadPrograms(<EpgProgram>[
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Current News',
+            description: 'Fixture bulletin',
+            start: now.subtract(const Duration(minutes: 10)),
+            end: now.add(const Duration(minutes: 20)),
+          ),
+        ]);
 
       await tester.pumpWidget(
         MaterialApp(
