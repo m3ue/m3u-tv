@@ -580,6 +580,40 @@ void main() {
     },
   );
 
+  testWidgets('Android system back closes player overlay before app exit', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.tv, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Route News'), findsOneWidget);
+
+    final handled = await tester.binding.handlePopRoute();
+    await _pumpAppFrame(tester);
+
+    expect(handled, isTrue);
+    expect(find.text('Player route: Route News'), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    expect(find.text('Press back again to exit'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'open movie details updates to continue when progress changes behind route',
     (tester) async {

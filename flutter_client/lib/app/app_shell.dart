@@ -55,7 +55,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class AppShellState extends State<AppShell> {
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
@@ -89,7 +89,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _appState.addListener(_onAppStateChanged);
@@ -100,8 +99,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _initSidebarFocusNodes();
   }
 
-  @override
-  Future<bool> didPopRoute() async {
+  Future<bool> _handleSystemBackButton() async {
     if (_handleBackPress()) return true;
 
     // Double-back to exit: require two back presses within 2 seconds.
@@ -162,7 +160,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _tvNotificationSub?.cancel().ignore();
-    WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
       node.dispose();
@@ -650,94 +647,101 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     final args = _playerArgs;
     final orch = _playerOrchestrator;
-    if (args == null || orch == null) return shell;
+    final backAwareShell = BackButtonListener(
+      onBackButtonPressed: _handleSystemBackButton,
+      child: shell,
+    );
+    if (args == null || orch == null) return backAwareShell;
 
     final viewerId = _appState.activeViewer?.ulid ?? '';
 
-    return Stack(
-      children: [
-        shell,
-        Positioned.fill(
-          child:
-              widget.playerRouteBuilder?.call(args) ??
-              PlayerScreen(
-                key: ValueKey(args.streamUrl),
-                args: args,
-                orchestrator: orch,
-                epgService: _appState.epgService,
-                xtreamService: _appState.xtreamService,
-                viewerId: viewerId,
-                progressReporter: (progress) {
-                  final existing = _appState.progressList.firstWhereOrNull(
-                    (p) =>
-                        p.contentType == progress.contentType &&
-                        p.streamId == progress.streamId,
-                  );
-                  final toSave = Progress(
-                    viewerId: progress.viewerId,
-                    contentType: progress.contentType,
-                    streamId: progress.streamId,
-                    positionSeconds: progress.positionSeconds,
-                    durationSeconds:
-                        progress.durationSeconds ?? existing?.durationSeconds,
-                    completed: progress.completed,
-                    seriesId: progress.seriesId ?? existing?.seriesId,
-                    seasonNumber:
-                        progress.seasonNumber ?? existing?.seasonNumber,
-                    episodeNumber:
-                        progress.episodeNumber ??
-                        (args.metadata['episode_number'] as int?) ??
-                        existing?.episodeNumber,
-                    title:
-                        progress.title ??
-                        args.metadata['title'] as String? ??
-                        args.title,
-                    episodeTitle:
-                        progress.episodeTitle ??
-                        args.metadata['episode_title'] as String? ??
-                        existing?.episodeTitle,
-                    seriesName:
-                        progress.seriesName ??
-                        args.metadata['series_name'] as String? ??
-                        existing?.seriesName,
-                    thumbnailUrl:
-                        progress.thumbnailUrl ??
-                        args.metadata['thumbnail_url'] as String? ??
-                        existing?.thumbnailUrl,
-                    backdropUrl:
-                        progress.backdropUrl ??
-                        args.metadata['backdrop_url'] as String? ??
-                        existing?.backdropUrl,
-                    rating:
-                        progress.rating ??
-                        args.metadata['rating'] as String? ??
-                        existing?.rating,
-                    runtime:
-                        progress.runtime ??
-                        args.metadata['duration'] as String? ??
-                        existing?.runtime,
-                    plot: progress.plot ?? existing?.plot,
-                    genre: progress.genre ?? existing?.genre,
-                    year: progress.year ?? existing?.year,
-                  );
-                  if (_appState.sourceType == AppSourceType.xtream) {
-                    unawaited(
-                      _appState.xtreamService
-                          .updateProgress(toSave)
-                          .catchError((_) {}),
+    return BackButtonListener(
+      onBackButtonPressed: _handleSystemBackButton,
+      child: Stack(
+        children: [
+          shell,
+          Positioned.fill(
+            child:
+                widget.playerRouteBuilder?.call(args) ??
+                PlayerScreen(
+                  key: ValueKey(args.streamUrl),
+                  args: args,
+                  orchestrator: orch,
+                  epgService: _appState.epgService,
+                  xtreamService: _appState.xtreamService,
+                  viewerId: viewerId,
+                  progressReporter: (progress) {
+                    final existing = _appState.progressList.firstWhereOrNull(
+                      (p) =>
+                          p.contentType == progress.contentType &&
+                          p.streamId == progress.streamId,
                     );
-                  }
-                  unawaited(
-                    _appState.resumeService.save(toSave).then((_) {
-                      if (mounted) _appState.updateProgressEntry(toSave);
-                    }),
-                  );
-                },
-                traktService: _appState.traktService,
-                onClose: _closePlayer,
-              ),
-        ),
-      ],
+                    final toSave = Progress(
+                      viewerId: progress.viewerId,
+                      contentType: progress.contentType,
+                      streamId: progress.streamId,
+                      positionSeconds: progress.positionSeconds,
+                      durationSeconds:
+                          progress.durationSeconds ?? existing?.durationSeconds,
+                      completed: progress.completed,
+                      seriesId: progress.seriesId ?? existing?.seriesId,
+                      seasonNumber:
+                          progress.seasonNumber ?? existing?.seasonNumber,
+                      episodeNumber:
+                          progress.episodeNumber ??
+                          (args.metadata['episode_number'] as int?) ??
+                          existing?.episodeNumber,
+                      title:
+                          progress.title ??
+                          args.metadata['title'] as String? ??
+                          args.title,
+                      episodeTitle:
+                          progress.episodeTitle ??
+                          args.metadata['episode_title'] as String? ??
+                          existing?.episodeTitle,
+                      seriesName:
+                          progress.seriesName ??
+                          args.metadata['series_name'] as String? ??
+                          existing?.seriesName,
+                      thumbnailUrl:
+                          progress.thumbnailUrl ??
+                          args.metadata['thumbnail_url'] as String? ??
+                          existing?.thumbnailUrl,
+                      backdropUrl:
+                          progress.backdropUrl ??
+                          args.metadata['backdrop_url'] as String? ??
+                          existing?.backdropUrl,
+                      rating:
+                          progress.rating ??
+                          args.metadata['rating'] as String? ??
+                          existing?.rating,
+                      runtime:
+                          progress.runtime ??
+                          args.metadata['duration'] as String? ??
+                          existing?.runtime,
+                      plot: progress.plot ?? existing?.plot,
+                      genre: progress.genre ?? existing?.genre,
+                      year: progress.year ?? existing?.year,
+                    );
+                    if (_appState.sourceType == AppSourceType.xtream) {
+                      unawaited(
+                        _appState.xtreamService
+                            .updateProgress(toSave)
+                            .catchError((_) {}),
+                      );
+                    }
+                    unawaited(
+                      _appState.resumeService.save(toSave).then((_) {
+                        if (mounted) _appState.updateProgressEntry(toSave);
+                      }),
+                    );
+                  },
+                  traktService: _appState.traktService,
+                  onClose: _closePlayer,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
