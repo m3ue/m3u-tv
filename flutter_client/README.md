@@ -181,6 +181,24 @@ For CI (GitHub Actions), store `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` as re
 --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 ```
 
+## Developer dart-defines
+
+These compile-time flags are for local development and debugging. Pass them via `--dart-define` — they default to off and are never required for normal builds.
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `TRAKT_CLIENT_ID` | _(empty)_ | Trakt API client ID — required for Trakt scrobbling. See [Trakt setup](#trakt-setup). |
+| `TRAKT_CLIENT_SECRET` | _(empty)_ | Trakt API client secret — required for Trakt scrobbling. See [Trakt setup](#trakt-setup). |
+| `M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS` | `false` | Renders the in-player backend diagnostics panel and fallback reason badge. Useful when debugging playback fallback behaviour. |
+
+Example enabling diagnostics on a debug run:
+
+```bash
+flutter run \
+  --dart-define=M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS=true \
+  -d <device-id>
+```
+
 ## Project structure
 
 ```
