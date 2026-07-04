@@ -17,7 +17,7 @@ enum _ViewMode { list, logoGrid, epgGrid }
 /// - All Channels + ★ Favorites pseudo-category + real categories
 /// - List view with EPG current/next info and progress bars
 /// - Toggle between list and grid view modes
-/// - Long-press to toggle favorites
+/// - Long-press context menu for favorites and recording actions
 /// - Lazy EPG loading for visible channels
 class LiveTvScreen extends StatefulWidget {
   const LiveTvScreen({
@@ -124,6 +124,67 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
       if (result != null) {
         _epgMap[channel.id] = result;
       }
+    }
+  }
+
+  Future<void> _toggleFavorite(Channel channel) async {
+    await widget.favoritesService.toggle(channel.id);
+    await _loadFavorites();
+  }
+
+  Future<void> _openChannelContextMenu(
+    BuildContext context,
+    Channel channel,
+    EpgCurrentNext? epg,
+  ) async {
+    final action = await showModalBottomSheet<_ChannelContextAction>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.tv),
+              title: Text(channel.name),
+              enabled: false,
+            ),
+            if (epg != null && widget.onScheduleProgram != null)
+              ListTile(
+                leading: const Icon(Icons.fiber_manual_record),
+                title: const Text('Record'),
+                subtitle: Text(epg.current.title),
+                onTap: () => Navigator.of(
+                  sheetContext,
+                ).pop(_ChannelContextAction.record),
+              ),
+            ListTile(
+              leading: Icon(
+                _favoriteIds.contains(channel.id)
+                    ? Icons.star
+                    : Icons.star_border,
+              ),
+              title: Text(
+                _favoriteIds.contains(channel.id)
+                    ? 'Remove favorite'
+                    : 'Favorite',
+              ),
+              onTap: () => Navigator.of(
+                sheetContext,
+              ).pop(_ChannelContextAction.toggleFavorite),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    switch (action) {
+      case _ChannelContextAction.record:
+        final current = epg?.current;
+        if (current != null) widget.onScheduleProgram?.call(channel, current);
+      case _ChannelContextAction.toggleFavorite:
+        await _toggleFavorite(channel);
+      case null:
+        break;
     }
   }
 
@@ -237,10 +298,8 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             isFavorite: isFav,
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
-            onLongPress: () async {
-              await widget.favoritesService.toggle(channel.id);
-              await _loadFavorites();
-            },
+            onLongPress: () =>
+                unawaited(_openChannelContextMenu(context, channel, epg)),
             onScheduleProgram: widget.onScheduleProgram,
           );
         },
@@ -285,22 +344,23 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
         itemCount: channels.length,
         itemBuilder: (context, index) {
           final channel = channels[index];
+          final epg = _epgMap[channel.id];
           final isFav = _favoriteIds.contains(channel.id);
           return _ChannelGridItem(
             channel: channel,
             isFavorite: isFav,
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
-            onLongPress: () async {
-              await widget.favoritesService.toggle(channel.id);
-              await _loadFavorites();
-            },
+            onLongPress: () =>
+                unawaited(_openChannelContextMenu(context, channel, epg)),
           );
         },
       ),
     );
   }
 }
+
+enum _ChannelContextAction { record, toggleFavorite }
 
 class _ChannelRow extends StatelessWidget {
   const _ChannelRow({
@@ -365,9 +425,7 @@ class _ChannelRow extends StatelessWidget {
                         Text(
                           epg!.current.title,
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -422,16 +480,12 @@ class _ChannelRow extends StatelessWidget {
                         Text(
                           'NEXT',
                           style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           epg!.next!.title,
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.right,
