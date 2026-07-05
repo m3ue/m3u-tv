@@ -137,7 +137,7 @@ void main() {
     final settingsGradle = readFile('android/settings.gradle.kts');
 
     // builtInKotlin=false keeps Flutter's own bundled packages (e.g. integration_test)
-    // working — they still declare org.jetbrains.kotlin.android explicitly and break
+    // working because they still declare org.jetbrains.kotlin.android explicitly and break
     // when AGP 9 enforces builtInKotlin=true.
     expect(gradleProperties, contains('android.builtInKotlin=false'));
     expect(gradleProperties, contains('android.newDsl=false'));
@@ -152,6 +152,7 @@ void main() {
     expect(manifest, contains('android:banner="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
+    expect(manifest, contains('android:enableOnBackInvokedCallback="true"'));
     expect(manifest, contains('android:exported="true"'));
   });
 
