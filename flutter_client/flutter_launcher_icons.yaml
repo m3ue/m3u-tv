@@ -1,11 +1,14 @@
 flutter_launcher_icons:
-  # Source icon — 1024×1024 PNG generated from logo.svg by generate-icons.sh
+  # Source icon, 1024x1024 PNG generated from logo.svg by scripts/setup-icons.sh
   image_path: "assets/icons/icon.png"
 
   android: "launcher_icon"
-  # Adaptive icon (Android 8+): dark background + centred foreground logo
+  # Adaptive icon (Android 8+): dark background + centred foreground logo.
+  # Keep the foreground inset at 0 so the logo fills Android's adaptive safe zone
+  # instead of being double-shrunk by the generated icon XML.
   adaptive_icon_background: "#0a0a0f"
   adaptive_icon_foreground: "assets/icons/adaptive-icon.png"
+  adaptive_icon_foreground_inset: 0
   min_sdk_android: 21
 
   ios: true
