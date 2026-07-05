@@ -155,6 +155,15 @@ void main() {
     expect(manifest, contains('android:exported="true"'));
   });
 
+  test('android fullscreen mode is configured at startup and on resume', () {
+    final mainDart = readFile('lib/main.dart');
+    final appShell = readFile('lib/app/app_shell.dart');
+
+    expect(mainDart, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('AppLifecycleState.resumed'));
+  });
+
   test('release matrix documents signing, store, and license gates', () {
     final releaseMatrix = readFile(releaseMatrixPath);
 
