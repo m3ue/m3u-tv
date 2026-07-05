@@ -149,11 +149,28 @@ void main() {
 
     expect(manifest, contains('android.software.leanback'));
     expect(manifest, contains('android.hardware.touchscreen'));
+    final launcherIcon = readFile(
+      'android/app/src/main/res/mipmap-anydpi-v26/launcher_icon.xml',
+    );
+    final launcherIconConfig = readFile('flutter_launcher_icons.yaml');
+
     expect(manifest, contains('android:banner="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
     expect(manifest, contains('android:enableOnBackInvokedCallback="true"'));
     expect(manifest, contains('android:exported="true"'));
+    expect(launcherIconConfig, contains('adaptive_icon_foreground_inset: 0'));
+    expect(launcherIcon, contains('android:inset="0%"'));
+    expect(launcherIcon, isNot(contains('android:inset="16%"')));
+  });
+
+  test('android fullscreen mode is configured at startup and on resume', () {
+    final mainDart = readFile('lib/main.dart');
+    final appShell = readFile('lib/app/app_shell.dart');
+
+    expect(mainDart, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('SystemUiMode.immersiveSticky'));
+    expect(appShell, contains('AppLifecycleState.resumed'));
   });
 
   test('release matrix documents signing, store, and license gates', () {
