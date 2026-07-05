@@ -278,6 +278,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await tester.longPress(find.text('BBC One'));
+        await tester.pumpAndSettle();
+
         expect(find.text('Record'), findsOneWidget);
         await tester.tap(find.text('Record'));
         await tester.pumpAndSettle();

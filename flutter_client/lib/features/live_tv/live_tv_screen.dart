@@ -137,43 +137,57 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
     Channel channel,
     EpgCurrentNext? epg,
   ) async {
-    final action = await showModalBottomSheet<_ChannelContextAction>(
+    final hasRecord = epg != null && widget.onScheduleProgram != null;
+    final isFavorite = _favoriteIds.contains(channel.id);
+
+    final action = await showDialog<_ChannelContextAction>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
+      builder: (dialogContext) => SimpleDialog(
+        title: Row(
           children: [
-            ListTile(
-              leading: const Icon(Icons.tv),
-              title: Text(channel.name),
-              enabled: false,
-            ),
-            if (epg != null && widget.onScheduleProgram != null)
-              ListTile(
-                leading: const Icon(Icons.fiber_manual_record),
-                title: const Text('Record'),
-                subtitle: Text(epg.current.title),
-                onTap: () => Navigator.of(
-                  sheetContext,
-                ).pop(_ChannelContextAction.record),
+            const Icon(Icons.tv, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                channel.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ListTile(
-              leading: Icon(
-                _favoriteIds.contains(channel.id)
-                    ? Icons.star
-                    : Icons.star_border,
-              ),
-              title: Text(
-                _favoriteIds.contains(channel.id)
-                    ? 'Remove favorite'
-                    : 'Favorite',
-              ),
-              onTap: () => Navigator.of(
-                sheetContext,
-              ).pop(_ChannelContextAction.toggleFavorite),
             ),
           ],
         ),
+        children: [
+          DpadRegion(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasRecord)
+                  _ContextMenuOption(
+                    icon: Icons.fiber_manual_record,
+                    label: 'Record',
+                    subtitle: epg.current.title,
+                    autofocus: true,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_ChannelContextAction.record),
+                  ),
+                _ContextMenuOption(
+                  icon: isFavorite ? Icons.star : Icons.star_border,
+                  label: isFavorite ? 'Remove favorite' : 'Favorite',
+                  autofocus: !hasRecord,
+                  onTap: () => Navigator.of(
+                    dialogContext,
+                  ).pop(_ChannelContextAction.toggleFavorite),
+                ),
+                _ContextMenuOption(
+                  icon: Icons.close,
+                  label: 'Cancel',
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
 
@@ -300,7 +314,6 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             onTap: () => widget.onChannelSelect(channel),
             onLongPress: () =>
                 unawaited(_openChannelContextMenu(context, channel, epg)),
-            onScheduleProgram: widget.onScheduleProgram,
           );
         },
       ),
@@ -362,6 +375,55 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
 
 enum _ChannelContextAction { record, toggleFavorite }
 
+class _ContextMenuOption extends StatelessWidget {
+  const _ContextMenuOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.autofocus = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final String? subtitle;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: subtitle != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label),
+                        Text(
+                          subtitle!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    )
+                  : Text(label),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChannelRow extends StatelessWidget {
   const _ChannelRow({
     required this.channel,
@@ -370,7 +432,6 @@ class _ChannelRow extends StatelessWidget {
     required this.autofocus,
     required this.onTap,
     required this.onLongPress,
-    this.onScheduleProgram,
   });
 
   final Channel channel;
@@ -379,7 +440,6 @@ class _ChannelRow extends StatelessWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
   Widget build(BuildContext context) {
@@ -457,16 +517,6 @@ class _ChannelRow extends StatelessWidget {
                       Icons.star,
                       color: colorScheme.tertiary,
                       size: 20,
-                    ),
-                  ),
-                if (epg != null && onScheduleProgram != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: FilledButton.tonalIcon(
-                      onPressed: () =>
-                          onScheduleProgram!(channel, epg!.current),
-                      icon: const Icon(Icons.fiber_manual_record, size: 16),
-                      label: const Text('Record'),
                     ),
                   ),
                 // Next program
