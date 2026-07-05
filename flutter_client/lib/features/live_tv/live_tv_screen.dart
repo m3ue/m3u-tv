@@ -17,7 +17,7 @@ enum _ViewMode { list, logoGrid, epgGrid }
 /// - All Channels + ★ Favorites pseudo-category + real categories
 /// - List view with EPG current/next info and progress bars
 /// - Toggle between list and grid view modes
-/// - Long-press to toggle favorites
+/// - Long-press context menu for favorites and recording actions
 /// - Lazy EPG loading for visible channels
 class LiveTvScreen extends StatefulWidget {
   const LiveTvScreen({
@@ -124,6 +124,81 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
       if (result != null) {
         _epgMap[channel.id] = result;
       }
+    }
+  }
+
+  Future<void> _toggleFavorite(Channel channel) async {
+    await widget.favoritesService.toggle(channel.id);
+    await _loadFavorites();
+  }
+
+  Future<void> _openChannelContextMenu(
+    BuildContext context,
+    Channel channel,
+    EpgCurrentNext? epg,
+  ) async {
+    final hasRecord = epg != null && widget.onScheduleProgram != null;
+    final isFavorite = _favoriteIds.contains(channel.id);
+
+    final action = await showDialog<_ChannelContextAction>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.tv, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                channel.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        children: [
+          DpadRegion(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasRecord)
+                  _ContextMenuOption(
+                    icon: Icons.fiber_manual_record,
+                    label: 'Record',
+                    subtitle: epg.current.title,
+                    autofocus: true,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_ChannelContextAction.record),
+                  ),
+                _ContextMenuOption(
+                  icon: isFavorite ? Icons.star : Icons.star_border,
+                  label: isFavorite ? 'Remove favorite' : 'Favorite',
+                  autofocus: !hasRecord,
+                  onTap: () => Navigator.of(
+                    dialogContext,
+                  ).pop(_ChannelContextAction.toggleFavorite),
+                ),
+                _ContextMenuOption(
+                  icon: Icons.close,
+                  label: 'Cancel',
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    switch (action) {
+      case _ChannelContextAction.record:
+        final current = epg?.current;
+        if (current != null) widget.onScheduleProgram?.call(channel, current);
+      case _ChannelContextAction.toggleFavorite:
+        await _toggleFavorite(channel);
+      case null:
+        break;
     }
   }
 
@@ -237,11 +312,8 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
             isFavorite: isFav,
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
-            onLongPress: () async {
-              await widget.favoritesService.toggle(channel.id);
-              await _loadFavorites();
-            },
-            onScheduleProgram: widget.onScheduleProgram,
+            onLongPress: () =>
+                unawaited(_openChannelContextMenu(context, channel, epg)),
           );
         },
       ),
@@ -285,18 +357,68 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
         itemCount: channels.length,
         itemBuilder: (context, index) {
           final channel = channels[index];
+          final epg = _epgMap[channel.id];
           final isFav = _favoriteIds.contains(channel.id);
           return _ChannelGridItem(
             channel: channel,
             isFavorite: isFav,
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
-            onLongPress: () async {
-              await widget.favoritesService.toggle(channel.id);
-              await _loadFavorites();
-            },
+            onLongPress: () =>
+                unawaited(_openChannelContextMenu(context, channel, epg)),
           );
         },
+      ),
+    );
+  }
+}
+
+enum _ChannelContextAction { record, toggleFavorite }
+
+class _ContextMenuOption extends StatelessWidget {
+  const _ContextMenuOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.autofocus = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final String? subtitle;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: subtitle != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label),
+                        Text(
+                          subtitle!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    )
+                  : Text(label),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -310,7 +432,6 @@ class _ChannelRow extends StatelessWidget {
     required this.autofocus,
     required this.onTap,
     required this.onLongPress,
-    this.onScheduleProgram,
   });
 
   final Channel channel;
@@ -319,7 +440,6 @@ class _ChannelRow extends StatelessWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
   Widget build(BuildContext context) {
@@ -365,9 +485,7 @@ class _ChannelRow extends StatelessWidget {
                         Text(
                           epg!.current.title,
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -401,16 +519,6 @@ class _ChannelRow extends StatelessWidget {
                       size: 20,
                     ),
                   ),
-                if (epg != null && onScheduleProgram != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: FilledButton.tonalIcon(
-                      onPressed: () =>
-                          onScheduleProgram!(channel, epg!.current),
-                      icon: const Icon(Icons.fiber_manual_record, size: 16),
-                      label: const Text('Record'),
-                    ),
-                  ),
                 // Next program
                 if (epg?.next != null)
                   SizedBox(
@@ -422,16 +530,12 @@ class _ChannelRow extends StatelessWidget {
                         Text(
                           'NEXT',
                           style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           epg!.next!.title,
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.right,
