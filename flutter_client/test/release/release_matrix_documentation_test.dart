@@ -157,6 +157,7 @@ void main() {
     expect(manifest, contains('android:banner="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
+    expect(manifest, contains('android:enableOnBackInvokedCallback="true"'));
     expect(manifest, contains('android:exported="true"'));
     expect(launcherIconConfig, contains('adaptive_icon_foreground_inset: 0'));
     expect(launcherIcon, contains('android:inset="0%"'));
