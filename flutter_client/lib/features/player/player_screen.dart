@@ -17,6 +17,10 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
+const bool _showPlaybackDiagnostics = bool.fromEnvironment(
+  'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
+);
+
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
 class PlayerScreen extends StatefulWidget {
@@ -629,11 +633,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     selectedSubtitleTrackId: _selectedSubtitleTrackId,
                     onAudioTrackSelected: _handleAudioTrackSelected,
                     onSubtitleTrackSelected: _handleSubtitleTrackSelected,
-                    fallbackReason: _fallbackReason,
+                    fallbackReason: _showPlaybackDiagnostics
+                        ? _fallbackReason
+                        : null,
                     playPauseFocusNode: _controlsFocusNode,
                   ),
 
-                if (_overlayVisible && _errorMessage == null)
+                if (_showPlaybackDiagnostics &&
+                    _overlayVisible &&
+                    _errorMessage == null)
                   Positioned(
                     top: 40,
                     right: 40,
