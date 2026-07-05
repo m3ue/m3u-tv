@@ -37,6 +37,44 @@ enum BroadcastStatus {
   }
 }
 
+class ClientPlaybackCapabilities {
+  const ClientPlaybackCapabilities({
+    required this.profile,
+    required this.platform,
+    required this.backend,
+    this.videoCodecs = const <String>[],
+    this.audioCodecs = const <String>[],
+    this.containers = const <String>[],
+    this.maxHeight,
+    this.maxBitrateKbps,
+    this.hdr,
+  });
+
+  final String profile;
+  final String platform;
+  final String backend;
+  final List<String> videoCodecs;
+  final List<String> audioCodecs;
+  final List<String> containers;
+  final int? maxHeight;
+  final int? maxBitrateKbps;
+  final bool? hdr;
+
+  Map<String, Object?> toJson() {
+    return _withoutNulls(<String, Object?>{
+      'profile': profile,
+      'platform': platform,
+      'backend': backend,
+      'video_codecs': videoCodecs.isEmpty ? null : videoCodecs,
+      'audio_codecs': audioCodecs.isEmpty ? null : audioCodecs,
+      'containers': containers.isEmpty ? null : containers,
+      'max_height': maxHeight,
+      'max_bitrate_kbps': maxBitrateKbps,
+      'hdr': hdr,
+    });
+  }
+}
+
 class StreamRequest {
   const StreamRequest({
     required this.url,
@@ -52,6 +90,7 @@ class StreamRequest {
     this.videoCodec,
     this.audioCodec,
     this.sessionId,
+    this.clientCapabilities,
   });
 
   final String url;
@@ -67,6 +106,7 @@ class StreamRequest {
   final String? videoCodec;
   final String? audioCodec;
   final String? sessionId;
+  final ClientPlaybackCapabilities? clientCapabilities;
 
   Map<String, Object?> toJson() {
     return _withoutNulls(<String, Object?>{
@@ -83,6 +123,7 @@ class StreamRequest {
       'video_codec': videoCodec,
       'audio_codec': audioCodec,
       'session_id': sessionId,
+      'client_capabilities': clientCapabilities?.toJson(),
     });
   }
 }

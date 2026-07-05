@@ -340,6 +340,38 @@ class PlaybackOrchestrator {
       videoCodec: source.videoCodec,
       audioCodec: source.audioCodec,
       sessionId: source.metadata['transcode_session_id'] as String?,
+      clientCapabilities: _clientCapabilitiesForTranscode(),
+    );
+  }
+
+  ClientPlaybackCapabilities? _clientCapabilitiesForTranscode() {
+    for (final backend in _nativeBackends()) {
+      final capabilities = _adapters[backend]?.capabilities;
+      if (capabilities != null) {
+        return _clientCapabilitiesFromPlayback(capabilities);
+      }
+    }
+    return null;
+  }
+
+  ClientPlaybackCapabilities _clientCapabilitiesFromPlayback(
+    PlaybackCapabilities capabilities,
+  ) {
+    return ClientPlaybackCapabilities(
+      profile: capabilities.backend.name,
+      platform: capabilities.platform.name,
+      backend: capabilities.backend.name,
+      videoCodecs: capabilities.supportsAdvancedCodecs
+          ? const <String>['h264', 'h265', 'hevc', 'mpeg2video', 'vp9', 'av1']
+          : const <String>['h264'],
+      audioCodecs: capabilities.supportsAdvancedCodecs
+          ? const <String>['aac', 'mp3', 'ac3', 'eac3', 'dts', 'opus']
+          : const <String>['aac', 'mp3', 'ac3'],
+      containers: <String>[
+        if (capabilities.supportsHls) 'hls',
+        if (capabilities.supportsMpegTs) 'mpegts',
+        if (capabilities.supportsMp4) 'mp4',
+      ],
     );
   }
 

@@ -124,6 +124,17 @@ void main() {
 
         expect(transcode.startedServerRequests.single.videoCodec, 'hevc');
         expect(
+          transcode.startedServerRequests.single.clientCapabilities?.toJson(),
+          <String, Object?>{
+            'profile': 'androidExoPlayer',
+            'platform': 'android',
+            'backend': 'androidExoPlayer',
+            'video_codecs': <String>['h264'],
+            'audio_codecs': <String>['aac', 'mp3', 'ac3'],
+            'containers': <String>['hls', 'mpegts', 'mp4'],
+          },
+        );
+        expect(
           transcode.startedServerRequests.single.mode,
           TranscodeMode.server,
         );

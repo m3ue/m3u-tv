@@ -28,6 +28,14 @@ void main() {
         profile: 'h264-aac-720p',
         videoCodec: 'h264',
         audioCodec: 'aac',
+        clientCapabilities: ClientPlaybackCapabilities(
+          profile: 'android-tv-safe',
+          platform: 'android',
+          backend: 'androidExoPlayer',
+          videoCodecs: <String>['h264'],
+          audioCodecs: <String>['aac', 'ac3'],
+          containers: <String>['hls', 'mpegts'],
+        ),
       );
 
       expect(request.toJson(), <String, Object?>{
@@ -42,6 +50,14 @@ void main() {
         'profile': 'h264-aac-720p',
         'video_codec': 'h264',
         'audio_codec': 'aac',
+        'client_capabilities': <String, Object?>{
+          'profile': 'android-tv-safe',
+          'platform': 'android',
+          'backend': 'androidExoPlayer',
+          'video_codecs': <String>['h264'],
+          'audio_codecs': <String>['aac', 'ac3'],
+          'containers': <String>['hls', 'mpegts'],
+        },
       });
     });
 
