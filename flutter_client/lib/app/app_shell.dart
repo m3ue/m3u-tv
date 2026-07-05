@@ -21,6 +21,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -1265,6 +1266,7 @@ class _HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<_HomeScreen> {
+  Set<int> _favoriteChannelIds = {};
   Set<int> _favoriteVodIds = {};
   Set<int> _favoriteSeriesIds = {};
 
@@ -1275,15 +1277,21 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _loadFavorites() async {
-    final appState = widget.appState;
-    final vod = await appState.vodFavoritesService.all();
-    final series = await appState.seriesFavoritesService.all();
-    if (mounted) {
-      setState(() {
-        _favoriteVodIds = vod;
-        _favoriteSeriesIds = series;
-      });
+    Future<Set<int>> readFavorites(FavoritesService service) async {
+      try {
+        return await service.all();
+      } on Object catch (_) {
+        return <int>{};
+      }
     }
+
+    final appState = widget.appState;
+    final channels = await readFavorites(appState.favoritesService);
+    if (mounted) setState(() => _favoriteChannelIds = channels);
+    final vod = await readFavorites(appState.vodFavoritesService);
+    if (mounted) setState(() => _favoriteVodIds = vod);
+    final series = await readFavorites(appState.seriesFavoritesService);
+    if (mounted) setState(() => _favoriteSeriesIds = series);
   }
 
   @override
@@ -1307,28 +1315,35 @@ class _HomeScreenState extends State<_HomeScreen> {
       landscapeStyle: true,
       onSidebarActivate: widget.onSidebarActivate,
     );
+    MediaPreviewItem liveChannelItem(Channel channel) => MediaPreviewItem(
+      title: channel.name,
+      imageUrl: channel.logoUrl,
+      subtitle:
+          appState.epgService.lookupForChannel(channel)?.current.title ??
+          channel.groupTitle ??
+          'Live channel',
+      fallbackIcon: Icons.live_tv,
+      imageFit: BoxFit.contain,
+      imagePadding: const EdgeInsets.all(10),
+      imageBackgroundColor: Colors.transparent,
+      isFavorite: _favoriteChannelIds.contains(channel.id),
+      onTap: () => widget.onChannelSelect(channel),
+      onLongTap: () async {
+        await appState.favoritesService.toggle(channel.id);
+        await _loadFavorites();
+      },
+    );
+
+    final favoriteChannels = appState.channels
+        .where((channel) => _favoriteChannelIds.contains(channel.id))
+        .toList(growable: false);
     final liveSection = MediaPreviewSection(
-      title: 'Live TV',
-      emptyLabel: 'No Live TV available',
-      items: appState.channels
-          .map(
-            (channel) => MediaPreviewItem(
-              title: channel.name,
-              imageUrl: channel.logoUrl,
-              subtitle:
-                  appState.epgService
-                      .lookupForChannel(channel)
-                      ?.current
-                      .title ??
-                  channel.groupTitle ??
-                  'Live channel',
-              fallbackIcon: Icons.live_tv,
-              imageFit: BoxFit.contain,
-              imagePadding: const EdgeInsets.all(10),
-              imageBackgroundColor: Colors.transparent,
-              onTap: () => widget.onChannelSelect(channel),
-            ),
-          )
+      title: favoriteChannels.isEmpty ? 'Live TV' : 'Favorite Channels',
+      emptyLabel: favoriteChannels.isEmpty
+          ? 'No Live TV available'
+          : 'No favorite channels available',
+      items: (favoriteChannels.isEmpty ? appState.channels : favoriteChannels)
+          .map(liveChannelItem)
           .toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );
