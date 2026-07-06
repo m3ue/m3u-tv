@@ -30,7 +30,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navRequests => 'Anfragen';
 
   @override
-  String get navNotifications => 'Benachrichtigungen';
+  String get navNotifications => 'Mitteilungen';
 
   @override
   String get navSettings => 'Einstellungen';
@@ -273,10 +273,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeMovie => 'Film';
 
   @override
-  String get notificationsTitle => 'Benachrichtigungen';
+  String get notificationsTitle => 'Mitteilungen';
 
   @override
-  String get notificationsTabNotifications => 'Benachrichtigungen';
+  String get notificationsTabNotifications => 'Mitteilungen';
 
   @override
   String get notificationsTabChannelSettings => 'Kanaleinstellungen';
