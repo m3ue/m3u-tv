@@ -607,7 +607,9 @@ class _ConnectedViewState extends State<_ConnectedView>
                   effects: _kStadiumEffect,
                   child: FilledButton.tonal(
                     onPressed: () => _openViewerManagement(context),
-                    child: Text(AppLocalizations.of(context).settingsManageViewers),
+                    child: Text(
+                      AppLocalizations.of(context).settingsManageViewers,
+                    ),
                   ),
                 ),
               ],
@@ -966,7 +968,10 @@ class _TraktPendingInstructions extends StatelessWidget {
         else
           Text(url, style: urlStyle),
         const SizedBox(height: 16),
-        Text(AppLocalizations.of(context).traktPendingEnterCode, style: theme.textTheme.bodyMedium),
+        Text(
+          AppLocalizations.of(context).traktPendingEnterCode,
+          style: theme.textTheme.bodyMedium,
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1183,7 +1188,9 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                 Row(
                   children: [
                     Text(
-                      _showAddForm ? AppLocalizations.of(context).settingsAddViewer : AppLocalizations.of(context).settingsManageViewers,
+                      _showAddForm
+                          ? AppLocalizations.of(context).settingsAddViewer
+                          : AppLocalizations.of(context).settingsManageViewers,
                       style: theme.textTheme.titleLarge,
                     ),
                     const Spacer(),
@@ -1313,7 +1320,9 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                       child: FilledButton.icon(
                         onPressed: () => setState(() => _showAddForm = true),
                         icon: const Icon(Icons.person_add),
-                        label: Text(AppLocalizations.of(context).settingsAddViewer),
+                        label: Text(
+                          AppLocalizations.of(context).settingsAddViewer,
+                        ),
                       ),
                     ),
                   ],

@@ -265,7 +265,8 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildPromptState() => _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
+  Widget _buildPromptState() =>
+      _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
 
   Widget _buildEmptyState(String label) {
     return Center(

@@ -102,11 +102,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            child: Text(l.notificationsTitle, style: theme.textTheme.headlineMedium),
+            child: Text(
+              l.notificationsTitle,
+              style: theme.textTheme.headlineMedium,
+            ),
           ),
           DpadTabBar(
             controller: _tabController,
-            tabs: [l.notificationsTabNotifications, l.notificationsTabChannelSettings],
+            tabs: [
+              l.notificationsTabNotifications,
+              l.notificationsTabChannelSettings,
+            ],
           ),
           Expanded(
             child: TabBarView(
@@ -191,7 +197,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l.notificationsChannelSubscriptions, style: theme.textTheme.titleMedium),
+        Text(
+          l.notificationsChannelSubscriptions,
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: 4),
         Text(
           l.notificationsChannelSubtitle,
@@ -328,7 +337,9 @@ class _NotificationTile extends StatelessWidget {
       'danger' => (Icons.error, theme.colorScheme.error),
       _ => (Icons.info, theme.colorScheme.secondary),
     };
-    final receivedStr = l.notificationsReceivedAt(_formatTimestamp(l, notification.receivedAt));
+    final receivedStr = l.notificationsReceivedAt(
+      _formatTimestamp(l, notification.receivedAt),
+    );
     final readStr = notification.readAt != null
         ? ' · ${l.notificationsReadAt(_formatTimestamp(l, notification.readAt!))}'
         : '';

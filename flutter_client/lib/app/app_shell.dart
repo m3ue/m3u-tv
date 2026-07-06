@@ -1402,7 +1402,9 @@ class _HomeScreenState extends State<_HomeScreen> {
             (series) => MediaPreviewItem(
               title: series.name,
               imageUrl: series.coverUrl,
-              subtitle: series.rating == null ? l.navSeries : '★ ${series.rating}',
+              subtitle: series.rating == null
+                  ? l.navSeries
+                  : '★ ${series.rating}',
               fallbackIcon: Icons.tv,
               fallbackTitle: series.name,
               isFavorite: _favoriteSeriesIds.contains(series.id),
