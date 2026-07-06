@@ -232,6 +232,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAddViewer => 'Nuevo usuario';
 
   @override
+  String get settingsSwitchViewer => 'Cambiar usuario';
+
+  @override
+  String get settingsViewerNameLabel => 'Nombre de usuario';
+
+  @override
+  String get settingsCreate => 'Crear';
+
+  @override
   String get settingsAccount => 'Cuenta';
 
   @override

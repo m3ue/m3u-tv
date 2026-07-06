@@ -229,6 +229,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAddViewer => '添加新用户';
 
   @override
+  String get settingsSwitchViewer => '切换用户';
+
+  @override
+  String get settingsViewerNameLabel => '用户名称';
+
+  @override
+  String get settingsCreate => '创建';
+
+  @override
   String get settingsAccount => '账户';
 
   @override

@@ -1081,7 +1081,7 @@ Future<bool> _showConfirmDialog(
                       effects: _kStadiumEffect,
                       child: TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
+                        child: Text(AppLocalizations.of(ctx).cancel),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1212,7 +1212,9 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     controller: _nameController,
                     autofocus: true,
                     decoration: InputDecoration(
-                      labelText: 'Viewer name',
+                      labelText: AppLocalizations.of(
+                        context,
+                      ).settingsViewerNameLabel,
                       errorText: _createError,
                       border: const OutlineInputBorder(),
                     ),
@@ -1237,7 +1239,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                             _nameController.clear();
                             _createError = null;
                           }),
-                          child: const Text('Cancel'),
+                          child: Text(AppLocalizations.of(context).cancel),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1254,7 +1256,9 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Create'),
+                              : Text(
+                                  AppLocalizations.of(context).settingsCreate,
+                                ),
                         ),
                       ),
                     ],
@@ -1262,7 +1266,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                 ] else ...[
                   // ── Active viewer ──────────────────────────────────────────
                   Text(
-                    'Active Viewer',
+                    AppLocalizations.of(context).settingsActiveViewer,
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1276,7 +1280,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     const Divider(),
                     const SizedBox(height: 8),
                     Text(
-                      'Switch Viewer',
+                      AppLocalizations.of(context).settingsSwitchViewer,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

@@ -232,6 +232,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAddViewer => 'Add New Viewer';
 
   @override
+  String get settingsSwitchViewer => 'Switch Viewer';
+
+  @override
+  String get settingsViewerNameLabel => 'Viewer name';
+
+  @override
+  String get settingsCreate => 'Create';
+
+  @override
   String get settingsAccount => 'Account';
 
   @override

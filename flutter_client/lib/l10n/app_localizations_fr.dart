@@ -232,6 +232,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAddViewer => 'Nouvel utilisateur';
 
   @override
+  String get settingsSwitchViewer => 'Changer d\'utilisateur';
+
+  @override
+  String get settingsViewerNameLabel => 'Nom d\'utilisateur';
+
+  @override
+  String get settingsCreate => 'Créer';
+
+  @override
   String get settingsAccount => 'Compte';
 
   @override

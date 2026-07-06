@@ -233,6 +233,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAddViewer => 'Neuer Zuschauer';
 
   @override
+  String get settingsSwitchViewer => 'Zuschauer wechseln';
+
+  @override
+  String get settingsViewerNameLabel => 'Name des Zuschauers';
+
+  @override
+  String get settingsCreate => 'Erstellen';
+
+  @override
   String get settingsAccount => 'Konto';
 
   @override

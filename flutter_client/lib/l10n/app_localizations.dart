@@ -524,6 +524,24 @@ abstract class AppLocalizations {
   /// **'Add New Viewer'**
   String get settingsAddViewer;
 
+  /// No description provided for @settingsSwitchViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Viewer'**
+  String get settingsSwitchViewer;
+
+  /// No description provided for @settingsViewerNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer name'**
+  String get settingsViewerNameLabel;
+
+  /// No description provided for @settingsCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get settingsCreate;
+
   /// No description provided for @settingsAccount.
   ///
   /// In en, this message translates to:
