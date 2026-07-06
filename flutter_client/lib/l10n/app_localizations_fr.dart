@@ -15,13 +15,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get navSearch => 'Rechercher';
 
   @override
-  String get navLiveTv => 'TV en direct';
+  String get navLiveTv => 'Télévision en direct';
 
   @override
   String get navVod => 'Films';
 
   @override
-  String get navSeries => 'Séries';
+  String get navSeries => 'Série';
 
   @override
   String get navDvr => 'DVR';
@@ -64,10 +64,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get unknown => 'Inconnu';
 
   @override
-  String get admin => 'Admin';
+  String get admin => 'Administrateur';
 
   @override
-  String get liveTvSearchHint => 'Rechercher dans la TV en direct…';
+  String get liveTvSearchHint => 'Rechercher dans la Télévision en direct…';
 
   @override
   String get liveTvNoChannels => 'Aucune chaîne disponible';
@@ -114,16 +114,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerResume => 'Reprendre';
 
   @override
-  String get searchHint => 'Rechercher TV en direct, films et séries…';
+  String get searchHint => 'Rechercher Télévision en direct, films et séries…';
 
   @override
-  String get searchSectionLiveTv => 'TV en direct';
+  String get searchSectionLiveTv => 'Télévision en direct';
 
   @override
   String get searchSectionMovies => 'Films';
 
   @override
-  String get searchSectionSeries => 'Séries';
+  String get searchSectionSeries => 'Série';
 
   @override
   String get vodSearchHint => 'Rechercher des films…';
@@ -251,7 +251,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeNoContinueWatching => 'Rien à reprendre';
 
   @override
-  String get homeNoLiveTv => 'Pas de TV en direct disponible';
+  String get homeNoLiveTv => 'Pas de Télévision en direct disponible';
 
   @override
   String get homeNoMovies => 'Pas de films disponibles';

@@ -15,13 +15,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navSearch => 'Buscar';
 
   @override
-  String get navLiveTv => 'TV en vivo';
+  String get navLiveTv => 'Televisión en vivo';
 
   @override
-  String get navVod => 'Películas';
+  String get navVod => 'Cine';
 
   @override
-  String get navSeries => 'Series';
+  String get navSeries => 'Serie';
 
   @override
   String get navDvr => 'DVR';
@@ -64,10 +64,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unknown => 'Desconocido';
 
   @override
-  String get admin => 'Admin';
+  String get admin => 'Administración';
 
   @override
-  String get liveTvSearchHint => 'Buscar TV en vivo…';
+  String get liveTvSearchHint => 'Buscar Televisión en vivo…';
 
   @override
   String get liveTvNoChannels => 'No hay canales disponibles';
@@ -114,19 +114,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerResume => 'Reanudar';
 
   @override
-  String get searchHint => 'Buscar TV en vivo, películas y series…';
+  String get searchHint => 'Buscar Televisión en vivo, cine y series…';
 
   @override
-  String get searchSectionLiveTv => 'TV en vivo';
+  String get searchSectionLiveTv => 'Televisión en vivo';
 
   @override
-  String get searchSectionMovies => 'Películas';
+  String get searchSectionMovies => 'Cine';
 
   @override
-  String get searchSectionSeries => 'Series';
+  String get searchSectionSeries => 'Serie';
 
   @override
-  String get vodSearchHint => 'Buscar películas…';
+  String get vodSearchHint => 'Buscar cine…';
 
   @override
   String get seriesSearchHint => 'Buscar series…';
@@ -251,10 +251,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeNoContinueWatching => 'Nada para continuar viendo';
 
   @override
-  String get homeNoLiveTv => 'No hay TV en vivo disponible';
+  String get homeNoLiveTv => 'No hay Televisión en vivo disponible';
 
   @override
-  String get homeNoMovies => 'No hay películas disponibles';
+  String get homeNoMovies => 'No hay cine disponible';
 
   @override
   String get homeLiveChannel => 'Canal en vivo';
@@ -375,7 +375,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get traktDisconnectButton => 'Desconectar Trakt';
 
   @override
-  String get vodAllMovies => 'Todas las películas';
+  String get vodAllMovies => 'Todo el cine';
 
   @override
   String get seriesAllSeries => 'Todas las series';
