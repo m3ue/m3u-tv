@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -41,12 +42,10 @@ class _SearchScreenState extends State<SearchScreen>
   late TabController _tabController;
   String _query = '';
 
-  static const _tabs = ['All', 'Live TV', 'Movies', 'Series'];
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -102,11 +101,19 @@ class _SearchScreenState extends State<SearchScreen>
             padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
             child: InlineMediaSearchField(
               query: _query,
-              hintText: 'Search live TV, movies, and series...',
+              hintText: AppLocalizations.of(context).searchHint,
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
-          DpadTabBar(controller: _tabController, tabs: _tabs),
+          DpadTabBar(
+            controller: _tabController,
+            tabs: [
+              'All',
+              AppLocalizations.of(context).searchSectionLiveTv,
+              AppLocalizations.of(context).searchSectionMovies,
+              AppLocalizations.of(context).searchSectionSeries,
+            ],
+          ),
           // Content
           Expanded(
             child: TabBarView(
@@ -146,7 +153,9 @@ class _SearchScreenState extends State<SearchScreen>
       child: ListView(
         children: [
           if (channels.isNotEmpty) ...[
-            const _SectionHeader(title: 'Live TV'),
+            _SectionHeader(
+              title: AppLocalizations.of(context).searchSectionLiveTv,
+            ),
             ...channels.map(
               (c) => _ChannelListTile(
                 channel: c,
@@ -155,13 +164,17 @@ class _SearchScreenState extends State<SearchScreen>
             ),
           ],
           if (vodItems.isNotEmpty) ...[
-            const _SectionHeader(title: 'Movies'),
+            _SectionHeader(
+              title: AppLocalizations.of(context).searchSectionMovies,
+            ),
             ...vodItems.map(
               (v) => _VodListTile(item: v, onTap: () => widget.onVodSelect(v)),
             ),
           ],
           if (seriesList.isNotEmpty) ...[
-            const _SectionHeader(title: 'Series'),
+            _SectionHeader(
+              title: AppLocalizations.of(context).searchSectionSeries,
+            ),
             ...seriesList.map(
               (s) => _SeriesListTile(
                 item: s,
@@ -252,7 +265,7 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildPromptState() => _buildEmptyState('Type to search');
+  Widget _buildPromptState() => _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
 
   Widget _buildEmptyState(String label) {
     return Center(

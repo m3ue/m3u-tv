@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
@@ -37,6 +38,8 @@ class SettingsScreen extends StatefulWidget {
     this.onClearCache,
     this.onEpgIntervalChanged,
     this.onConnected,
+    this.locale,
+    this.onLocaleChanged,
   });
 
   final AuthNotifier authNotifier;
@@ -57,6 +60,8 @@ class SettingsScreen extends StatefulWidget {
 
   /// Called after a successful connection so the parent can navigate to Home.
   final VoidCallback? onConnected;
+  final Locale? locale;
+  final void Function(Locale?)? onLocaleChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -136,6 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onCreateViewer: widget.onCreateViewer,
         onClearCache: widget.onClearCache,
         onEpgIntervalChanged: widget.onEpgIntervalChanged,
+        locale: widget.locale,
+        onLocaleChanged: widget.onLocaleChanged,
       ),
     );
   }
@@ -320,6 +327,8 @@ class _ConnectedView extends StatefulWidget {
     this.onCreateViewer,
     this.onClearCache,
     this.onEpgIntervalChanged,
+    this.locale,
+    this.onLocaleChanged,
   });
 
   final AuthNotifier authNotifier;
@@ -335,6 +344,8 @@ class _ConnectedView extends StatefulWidget {
   final Future<Viewer?> Function(String name)? onCreateViewer;
   final VoidCallback? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
+  final Locale? locale;
+  final void Function(Locale?)? onLocaleChanged;
 
   @override
   State<_ConnectedView> createState() => _ConnectedViewState();
@@ -367,32 +378,30 @@ class _ConnectedViewState extends State<_ConnectedView>
   }
 
   Future<void> _handleClearCache() async {
+    final l = AppLocalizations.of(context);
     final confirmed = await _showConfirmDialog(
       context,
-      title: 'Clear Cache & Refresh?',
-      message:
-          'All cached content will be cleared and reloaded from your source.',
-      confirmLabel: 'Clear & Refresh',
+      title: l.settingsClearCacheTitle,
+      message: l.settingsClearCacheBody,
+      confirmLabel: l.settingsClearCacheConfirm,
     );
     if (!confirmed || !mounted) return;
     widget.onClearCache?.call();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Cache cleared — content is refreshing in the background.',
-        ),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).settingsCacheCleared),
       ),
     );
   }
 
   Future<void> _handleDisconnect() async {
+    final l = AppLocalizations.of(context);
     final confirmed = await _showConfirmDialog(
       context,
-      title: 'Disconnect?',
-      message:
-          'You will be signed out and will need to re-enter your credentials to reconnect.',
-      confirmLabel: 'Disconnect',
+      title: l.settingsDisconnectTitle,
+      message: l.settingsDisconnectBody,
+      confirmLabel: l.settingsDisconnectConfirm,
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
@@ -408,11 +417,17 @@ class _ConnectedViewState extends State<_ConnectedView>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: Text('Settings', style: theme.textTheme.headlineMedium),
+          child: Text(
+            AppLocalizations.of(context).settingsTitle,
+            style: theme.textTheme.headlineMedium,
+          ),
         ),
         DpadTabBar(
           controller: _tabController,
-          tabs: const ['General', 'Integrations'],
+          tabs: [
+            AppLocalizations.of(context).settingsGeneral,
+            AppLocalizations.of(context).settingsIntegrations,
+          ],
         ),
         Expanded(
           child: TabBarView(
@@ -436,21 +451,63 @@ class _ConnectedViewState extends State<_ConnectedView>
   Widget _buildGeneralTab(BuildContext context) {
     final theme = Theme.of(context);
     final auth = widget.authNotifier.authResponse;
+    final l = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Language ────────────────────────────────────────────────────────
+        _SettingsSection(
+          title: l.settingsLanguage,
+          child: Wrap(
+            spacing: 8,
+            children: [
+              _LocaleChip(
+                label: l.settingsLanguageSystem,
+                isSelected: widget.locale == null,
+                onTap: () => widget.onLocaleChanged?.call(null),
+              ),
+              _LocaleChip(
+                label: 'English',
+                isSelected: widget.locale?.languageCode == 'en',
+                onTap: () => widget.onLocaleChanged?.call(const Locale('en')),
+              ),
+              _LocaleChip(
+                label: 'Deutsch',
+                isSelected: widget.locale?.languageCode == 'de',
+                onTap: () => widget.onLocaleChanged?.call(const Locale('de')),
+              ),
+              _LocaleChip(
+                label: 'Español',
+                isSelected: widget.locale?.languageCode == 'es',
+                onTap: () => widget.onLocaleChanged?.call(const Locale('es')),
+              ),
+              _LocaleChip(
+                label: 'Français',
+                isSelected: widget.locale?.languageCode == 'fr',
+                onTap: () => widget.onLocaleChanged?.call(const Locale('fr')),
+              ),
+              _LocaleChip(
+                label: '简体中文',
+                isSelected: widget.locale?.languageCode == 'zh',
+                onTap: () => widget.onLocaleChanged?.call(const Locale('zh')),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
         // ── Connection ──────────────────────────────────────────────────────
         _SettingsSection(
-          title: 'Connection',
+          title: l.settingsConnection,
           child: Column(
             children: [
               _StatusRow(
-                label: 'Status',
+                label: l.settingsStatusLabel,
                 value:
                     widget.sourceError != null && widget.sourceError!.isNotEmpty
-                    ? 'Unavailable'
-                    : 'Connected',
+                    ? l.settingsStatusUnavailable
+                    : l.settingsStatusConnected,
                 valueColor:
                     widget.sourceError != null && widget.sourceError!.isNotEmpty
                     ? Colors.orange
@@ -458,20 +515,23 @@ class _ConnectedViewState extends State<_ConnectedView>
               ),
               if (widget.sourceLabel != null) ...[
                 const Divider(),
-                _StatusRow(label: 'Source', value: widget.sourceLabel!),
+                _StatusRow(
+                  label: l.settingsSourceLabel,
+                  value: widget.sourceLabel!,
+                ),
               ],
               if (auth != null) ...[
                 const Divider(),
                 _StatusRow(
                   label: 'm3u-editor',
-                  value: auth.m3uEditorVersion ?? 'Unknown',
+                  value: auth.m3uEditorVersion ?? l.unknown,
                 ),
               ],
               if (widget.sourceError != null &&
                   widget.sourceError!.isNotEmpty) ...[
                 const Divider(),
                 _StatusRow(
-                  label: 'Last error',
+                  label: l.settingsLastError,
                   value: widget.sourceError!,
                   valueColor: theme.colorScheme.error,
                 ),
@@ -485,7 +545,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                     child: FilledButton.tonalIcon(
                       onPressed: widget.onClearCache,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Retry connection'),
+                      label: Text(l.settingsRetryConnection),
                     ),
                   ),
                 ),
@@ -498,7 +558,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                     child: FilledButton.tonalIcon(
                       onPressed: _handleDisconnect,
                       icon: const Icon(Icons.settings),
-                      label: const Text('Edit server settings'),
+                      label: Text(l.settingsEditServer),
                     ),
                   ),
                 ),
@@ -511,7 +571,7 @@ class _ConnectedViewState extends State<_ConnectedView>
         // ── Viewer ──────────────────────────────────────────────────────────
         if (widget.activeViewer != null) ...[
           _SettingsSection(
-            title: 'Active Viewer',
+            title: l.settingsActiveViewer,
             child: Row(
               children: [
                 CircleAvatar(
@@ -534,7 +594,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                       ),
                       if (widget.activeViewer!.isAdmin)
                         Text(
-                          'Admin',
+                          l.admin,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.primary,
                           ),
@@ -547,7 +607,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                   effects: _kStadiumEffect,
                   child: FilledButton.tonal(
                     onPressed: () => _openViewerManagement(context),
-                    child: const Text('Manage Viewers'),
+                    child: Text(AppLocalizations.of(context).settingsManageViewers),
                   ),
                 ),
               ],
@@ -558,16 +618,15 @@ class _ConnectedViewState extends State<_ConnectedView>
 
         // ── Cache ────────────────────────────────────────────────────────────
         _SettingsSection(
-          title: 'Content Cache',
-          subtitle:
-              'Cached content loads instantly. Data refreshes automatically in the background.',
+          title: l.settingsContentCache,
+          subtitle: l.settingsCacheSubtitle,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (widget.epgRefreshOptions.isNotEmpty &&
                   widget.epgRefreshInterval != null) ...[
                 Text(
-                  'EPG refresh interval',
+                  l.settingsEpgRefreshInterval,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
@@ -575,7 +634,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                   spacing: 8,
                   children: widget.epgRefreshOptions.map((d) {
                     return _IntervalChip(
-                      label: _intervalLabel(d),
+                      label: _intervalLabel(l, d),
                       isSelected: d == widget.epgRefreshInterval,
                       onTap: () => widget.onEpgIntervalChanged?.call(d),
                     );
@@ -594,7 +653,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                   child: FilledButton.tonalIcon(
                     onPressed: _handleClearCache,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Clear Cache & Refresh'),
+                    label: Text(l.settingsClearCacheConfirm),
                   ),
                 ),
               ),
@@ -605,7 +664,7 @@ class _ConnectedViewState extends State<_ConnectedView>
 
         // ── Account ──────────────────────────────────────────────────────────
         _SettingsSection(
-          title: 'Account',
+          title: l.settingsAccount,
           child: SizedBox(
             width: double.infinity,
             child: DpadFocusable(
@@ -617,7 +676,7 @@ class _ConnectedViewState extends State<_ConnectedView>
                   backgroundColor: theme.colorScheme.error,
                   foregroundColor: theme.colorScheme.onError,
                 ),
-                child: const Text('Disconnect'),
+                child: Text(l.disconnect),
               ),
             ),
           ),
@@ -627,13 +686,13 @@ class _ConnectedViewState extends State<_ConnectedView>
   }
 
   Widget _buildIntegrationsTab(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SettingsSection(
-          title: 'Watch History',
-          subtitle:
-              'Sync your watch history with Trakt to track progress across apps and services.',
+          title: l.traktWatchHistory,
+          subtitle: l.traktWatchHistorySubtitle,
           child: ListenableBuilder(
             listenable: widget.traktService,
             builder: (context, _) =>
@@ -663,18 +722,18 @@ class _TraktCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final l = AppLocalizations.of(context);
     final body = !traktService.isConfigured
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Trakt client credentials are not configured.',
+                l.traktNotConfigured,
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'Register an app at trakt.tv/oauth/applications and set the '
-                'client ID and secret via --dart-define at build time.',
+                l.traktNotConfiguredHint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -712,11 +771,12 @@ class _TraktDisconnected extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Connect your Trakt account to automatically track what you watch.',
+          l.traktConnectPrompt,
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -729,7 +789,7 @@ class _TraktDisconnected extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: traktService.startDeviceAuth,
               icon: const Icon(Icons.link),
-              label: const Text('Connect with Trakt'),
+              label: Text(l.traktConnectButton),
             ),
           ),
         ),
@@ -799,7 +859,7 @@ class _TraktPendingWide extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Scan to open on your phone',
+              AppLocalizations.of(context).traktScanQr,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -811,7 +871,7 @@ class _TraktPendingWide extends StatelessWidget {
               effects: _kStadiumEffect,
               child: FilledButton.tonal(
                 onPressed: onCancel,
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context).cancel),
               ),
             ),
           ],
@@ -851,7 +911,7 @@ class _TraktPendingNarrow extends StatelessWidget {
               mode: LaunchMode.externalApplication,
             ),
             icon: const Icon(Icons.open_in_new),
-            label: const Text('Open in browser'),
+            label: Text(AppLocalizations.of(context).traktOpenBrowser),
           ),
         ),
         const SizedBox(height: 8),
@@ -859,7 +919,7 @@ class _TraktPendingNarrow extends StatelessWidget {
           width: double.infinity,
           child: FilledButton.tonal(
             onPressed: onCancel,
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
         ),
       ],
@@ -891,7 +951,7 @@ class _TraktPendingInstructions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'On your phone or computer, go to:',
+          AppLocalizations.of(context).traktPendingGoTo,
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 4),
@@ -906,7 +966,7 @@ class _TraktPendingInstructions extends StatelessWidget {
         else
           Text(url, style: urlStyle),
         const SizedBox(height: 16),
-        Text('Then enter this code:', style: theme.textTheme.bodyMedium),
+        Text(AppLocalizations.of(context).traktPendingEnterCode, style: theme.textTheme.bodyMedium),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -933,7 +993,7 @@ class _TraktPendingInstructions extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              'Waiting for authorization…',
+              AppLocalizations.of(context).traktPendingWaiting,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -959,7 +1019,7 @@ class _TraktConnected extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Connected to Trakt',
+            AppLocalizations.of(context).traktConnected,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),
@@ -971,7 +1031,7 @@ class _TraktConnected extends StatelessWidget {
           effects: _kStadiumEffect,
           child: FilledButton.tonal(
             onPressed: traktService.disconnect,
-            child: const Text('Disconnect Trakt'),
+            child: Text(AppLocalizations.of(context).traktDisconnectButton),
           ),
         ),
       ],
@@ -1123,7 +1183,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                 Row(
                   children: [
                     Text(
-                      _showAddForm ? 'Add New Viewer' : 'Manage Viewers',
+                      _showAddForm ? AppLocalizations.of(context).settingsAddViewer : AppLocalizations.of(context).settingsManageViewers,
                       style: theme.textTheme.titleLarge,
                     ),
                     const Spacer(),
@@ -1253,7 +1313,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                       child: FilledButton.icon(
                         onPressed: () => setState(() => _showAddForm = true),
                         icon: const Icon(Icons.person_add),
-                        label: const Text('Add New Viewer'),
+                        label: Text(AppLocalizations.of(context).settingsAddViewer),
                       ),
                     ),
                   ],
@@ -1294,7 +1354,7 @@ class _ViewerRow extends StatelessWidget {
         children: [
           if (viewer.isAdmin)
             Text(
-              'Admin',
+              AppLocalizations.of(context).admin,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.primary,
               ),
@@ -1411,6 +1471,8 @@ class _IntervalChip extends StatelessWidget {
   }
 }
 
+typedef _LocaleChip = _IntervalChip;
+
 class _StatusRow extends StatelessWidget {
   const _StatusRow({required this.label, required this.value, this.valueColor});
 
@@ -1447,10 +1509,10 @@ class _StatusRow extends StatelessWidget {
   }
 }
 
-String _intervalLabel(Duration d) {
+String _intervalLabel(AppLocalizations l, Duration d) {
   if (d.inHours >= 1) {
     final h = d.inHours;
-    return h == 1 ? '1 hour' : '$h hours';
+    return h == 1 ? l.settingsEpgDurationHour : l.settingsEpgDurationHours(h);
   }
-  return '${d.inMinutes} min';
+  return l.settingsEpgDurationMinutes(d.inMinutes);
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -112,8 +113,14 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
 
   List<CategoryTabData> get _categoryTabs {
     return [
-      const CategoryTabData(id: '', name: 'All Channels'),
-      const CategoryTabData(id: _favoritesCategoryId, name: '★ Favorites'),
+      CategoryTabData(
+        id: '',
+        name: AppLocalizations.of(context).liveTvAllChannels,
+      ),
+      CategoryTabData(
+        id: _favoritesCategoryId,
+        name: AppLocalizations.of(context).liveTvFavorites,
+      ),
       ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
   }
@@ -164,7 +171,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                 if (hasRecord)
                   _ContextMenuOption(
                     icon: Icons.fiber_manual_record,
-                    label: 'Record',
+                    label: AppLocalizations.of(dialogContext).liveTvRecord,
                     subtitle: epg.current.title,
                     autofocus: true,
                     onTap: () => Navigator.of(
@@ -173,7 +180,9 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                   ),
                 _ContextMenuOption(
                   icon: isFavorite ? Icons.star : Icons.star_border,
-                  label: isFavorite ? 'Remove favorite' : 'Favorite',
+                  label: isFavorite
+                      ? AppLocalizations.of(dialogContext).liveTvRemoveFavorite
+                      : AppLocalizations.of(dialogContext).liveTvFavorite,
                   autofocus: !hasRecord,
                   onTap: () => Navigator.of(
                     dialogContext,
@@ -181,7 +190,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                 ),
                 _ContextMenuOption(
                   icon: Icons.close,
-                  label: 'Cancel',
+                  label: AppLocalizations.of(dialogContext).cancel,
                   onTap: () => Navigator.of(dialogContext).pop(),
                 ),
               ],
@@ -231,7 +240,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                 : filtered.isEmpty
                 ? Center(
                     child: Text(
-                      'No channels available',
+                      AppLocalizations.of(context).liveTvNoChannels,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   )
@@ -256,7 +265,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
       ),
       child: InlineMediaSearchField(
         query: _query,
-        hintText: 'Search live TV...',
+        hintText: AppLocalizations.of(context).liveTvSearchHint,
         onChanged: (value) => setState(() => _query = value),
       ),
     );
@@ -499,7 +508,7 @@ class _ChannelRow extends StatelessWidget {
                         ),
                       ] else
                         Text(
-                          'No program info',
+                          AppLocalizations.of(context).liveTvNoProgram,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
@@ -528,7 +537,7 @@ class _ChannelRow extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'NEXT',
+                          AppLocalizations.of(context).liveTvNext,
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),

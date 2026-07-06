@@ -27,6 +27,16 @@ This is the TV frontend for the `m3u-editor` system. It focuses on video playbac
 4. **Edge navigation**: Leaf `DpadRegion`s use `horizontalEdge: DpadEdgeBehavior.stop` + `onEdge` to activate the sidebar on left-edge press.
 5. **Back handling**: Handled globally in `AppShell` via `Shortcuts` mapping Escape / GoBack → `_BackIntent`.
 
+### Localization (mandatory)
+The app uses Flutter `gen_l10n`. All user-visible strings **must** be localized — no hard-coded string literals in widget trees.
+
+- **ARB files**: `lib/l10n/app_en.arb` (source of truth) + `app_de.arb`, `app_es.arb`, `app_fr.arb`, `app_zh.arb`.
+- **Usage**: `AppLocalizations.of(context).<key>` — throws if delegates are missing, so always add `localizationsDelegates: AppLocalizations.localizationsDelegates` to every `MaterialApp` (including test helpers).
+- **Generated files**: Run `flutter gen-l10n` after adding/changing ARB keys; never edit `lib/l10n/app_localizations*.dart` directly.
+- **Import order**: `package:m3u_tv/l10n/app_localizations.dart` sorts under `l10n/` — place it after all `features/` imports and before `navigation/` imports.
+- **Tests**: Every `MaterialApp` that renders a localized widget must include `localizationsDelegates: AppLocalizations.localizationsDelegates` and `supportedLocales: AppLocalizations.supportedLocales`.
+- **New keys**: Add to all five ARBs before running gen-l10n. Keys follow the `<screen><Concept>` pattern (e.g. `settingsAccount`, `liveTvRecord`).
+
 ### Style
 - Material 3 throughout. No `OutlinedButton` — use `FilledButton`, `FilledButton.tonal`, `FilledButton.icon`, or `FilledButton.tonalIcon`.
 - Match existing file conventions. No new comments unless the WHY is non-obvious.

@@ -1,0 +1,199 @@
+{
+  "@@locale": "de",
+
+  "navHome": "Startseite",
+  "navSearch": "Suche",
+  "navLiveTv": "Live-TV",
+  "navVod": "Filme",
+  "navSeries": "Serien",
+  "navDvr": "DVR",
+  "navRequests": "Anfragen",
+  "navNotifications": "Benachrichtigungen",
+  "navSettings": "Einstellungen",
+  "navMore": "Mehr",
+
+  "appBackToExit": "Zum Beenden erneut Zurück drücken",
+  "appRecordingScheduled": "Aufnahme geplant: {title}",
+  "@appRecordingScheduled": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "appRecordingFailed": "Aufnahme konnte nicht geplant werden: {error}",
+  "@appRecordingFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "appNotConfigured": "Bitte verbinde deinen Dienst in den Einstellungen",
+
+  "cancel": "Abbrechen",
+  "disconnect": "Trennen",
+  "unknown": "Unbekannt",
+  "admin": "Admin",
+
+  "liveTvSearchHint": "Live-TV durchsuchen …",
+  "liveTvNoChannels": "Keine Sender verfügbar",
+  "liveTvAllChannels": "Alle Sender",
+  "liveTvFavorites": "★ Favoriten",
+  "liveTvNoProgram": "Keine Programminfo",
+  "liveTvNext": "NÄCHSTES",
+  "liveTvRecord": "Aufnehmen",
+  "liveTvFavorite": "Favorit",
+  "liveTvRemoveFavorite": "Aus Favoriten entfernen",
+
+  "playerGoBack": "Zurück",
+  "playerResumeWatching": "Weiterschauen",
+  "playerContinue": "Fortsetzen",
+  "playerFromTime": "Ab {time}",
+  "@playerFromTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "playerStartFromBeginning": "Von vorne abspielen",
+  "playerResume": "Fortsetzen",
+
+  "searchHint": "Live-TV, Filme und Serien durchsuchen …",
+  "searchSectionLiveTv": "Live-TV",
+  "searchSectionMovies": "Filme",
+  "searchSectionSeries": "Serien",
+
+  "vodSearchHint": "Filme durchsuchen …",
+  "seriesSearchHint": "Serien durchsuchen …",
+
+  "settingsTitle": "Einstellungen",
+  "settingsGeneral": "Allgemein",
+  "settingsIntegrations": "Integrationen",
+  "settingsLanguage": "Sprache",
+  "settingsLanguageSystem": "Systemsprache",
+  "settingsLangEnglish": "Englisch",
+  "settingsLangGerman": "Deutsch",
+  "settingsLangSpanish": "Spanisch",
+  "settingsLangFrench": "Französisch",
+  "settingsLangChinese": "Chinesisch (Vereinfacht)",
+  "settingsConnection": "Verbindung",
+  "settingsStatusConnected": "Verbunden",
+  "settingsStatusUnavailable": "Nicht verfügbar",
+  "settingsStatusLabel": "Status",
+  "settingsSourceLabel": "Quelle",
+  "settingsLastError": "Letzter Fehler",
+  "settingsRetryConnection": "Verbindung wiederherstellen",
+  "settingsEditServer": "Servereinstellungen bearbeiten",
+  "settingsActiveViewer": "Aktiver Nutzer",
+  "settingsClearCacheTitle": "Cache löschen und aktualisieren?",
+  "settingsClearCacheBody": "Alle gecachten Inhalte werden gelöscht und von deiner Quelle neu geladen.",
+  "settingsClearCacheConfirm": "Löschen und aktualisieren",
+  "settingsCacheCleared": "Cache geleert – Inhalte werden im Hintergrund aktualisiert.",
+  "settingsAccount": "Konto",
+  "settingsDisconnectTitle": "Trennen?",
+  "settingsDisconnectBody": "Du wirst abgemeldet und musst deine Anmeldedaten erneut eingeben, um dich wieder zu verbinden.",
+  "settingsDisconnectConfirm": "Trennen",
+
+  "settingsContentCache": "Inhaltscache",
+
+  "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",
+
+  "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",
+
+  "settingsEpgDurationMinutes": "{count} Min",
+  "@settingsEpgDurationMinutes": {"placeholders": {"count": {"type": "int"}}},
+
+  "settingsEpgDurationHour": "1 Stunde",
+
+  "settingsEpgDurationHours": "{count} Stunden",
+  "@settingsEpgDurationHours": {"placeholders": {"count": {"type": "int"}}},
+
+  "settingsManageViewers": "Zuschauer verwalten",
+
+  "settingsAddViewer": "Neuer Zuschauer",
+
+  "homeContinueWatching": "Weiterschauen",
+
+  "homeNoContinueWatching": "Nichts zum Weiterschauen",
+
+  "homeNoLiveTv": "Kein Live-TV verfügbar",
+
+  "homeNoMovies": "Keine Filme verfügbar",
+
+  "homeLiveChannel": "Live-Sender",
+
+  "homeMovie": "Film",
+
+  "notificationsTitle": "Benachrichtigungen",
+
+  "notificationsTabNotifications": "Benachrichtigungen",
+
+  "notificationsTabChannelSettings": "Kanaleinstellungen",
+
+  "notificationsMarkAllRead": "Alle als gelesen markieren",
+
+  "notificationsEmpty": "Noch keine Benachrichtigungen",
+
+  "notificationsEmptyFiltered": "Keine Benachrichtigungen für deine abonnierten Kanäle",
+
+  "notificationsChannelSubscriptions": "Kanalabonnements",
+
+  "notificationsChannelSubtitle": "Wähle aus, welche Kanäle du empfangen möchtest. Lasse alle deaktiviert, um alles zu empfangen.",
+
+  "notificationsAllChannels": "Alle Kanäle",
+
+  "notificationsNoChannels": "Noch keine Kanäle — sie erscheinen hier, wenn Benachrichtigungen eingehen.",
+
+  "notificationsJustNow": "gerade eben",
+
+  "notificationsMinutesAgo": "vor {count} Min",
+  "@notificationsMinutesAgo": {"placeholders": {"count": {"type": "int"}}},
+
+  "notificationsHoursAgo": "vor {count} Std",
+  "@notificationsHoursAgo": {"placeholders": {"count": {"type": "int"}}},
+
+  "notificationsDaysAgo": "vor {count} T",
+  "@notificationsDaysAgo": {"placeholders": {"count": {"type": "int"}}},
+
+  "notificationsReceivedAt": "Empfangen {time}",
+  "@notificationsReceivedAt": {"placeholders": {"time": {"type": "String"}}},
+
+  "notificationsReadAt": "Gelesen {time}",
+  "@notificationsReadAt": {"placeholders": {"time": {"type": "String"}}},
+
+  "homeNoSeries": "Keine Serien verfügbar",
+
+  "homeSeason": "Staffel {number}",
+  "@homeSeason": {"placeholders": {"number": {"type": "int"}}},
+
+  "traktWatchHistory": "Wiedergabeverlauf",
+
+  "traktWatchHistorySubtitle": "Synchronisiere deinen Wiedergabeverlauf mit Trakt, um den Fortschritt über Apps und Dienste hinweg zu verfolgen.",
+
+  "traktNotConfigured": "Trakt-Client-Anmeldedaten sind nicht konfiguriert.",
+
+  "traktNotConfiguredHint": "Registriere eine App auf trakt.tv/oauth/applications und setze Client-ID und Secret via --dart-define zur Build-Zeit.",
+
+  "traktConnectPrompt": "Verbinde deinen Trakt-Account, um automatisch zu verfolgen, was du schaust.",
+
+  "traktConnectButton": "Mit Trakt verbinden",
+
+  "traktScanQr": "Scannen, um auf deinem Handy zu öffnen",
+
+  "traktOpenBrowser": "Im Browser öffnen",
+
+  "traktPendingGoTo": "Gehe auf deinem Telefon oder Computer zu:",
+
+  "traktPendingEnterCode": "Gib dann diesen Code ein:",
+
+  "traktPendingWaiting": "Warte auf Autorisierung…",
+
+  "traktConnected": "Mit Trakt verbunden",
+
+  "traktDisconnectButton": "Trakt trennen",
+
+  "vodAllMovies": "Alle Filme",
+
+  "seriesAllSeries": "Alle Serien",
+
+  "homeConnectedSource": "Verbundene Quelle: {label}",
+  "@homeConnectedSource": {"placeholders": {"label": {"type": "String"}}},
+
+  "searchTypeToSearch": "Zum Suchen tippen"
+}
