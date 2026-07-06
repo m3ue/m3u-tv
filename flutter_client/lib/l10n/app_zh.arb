@@ -1,6 +1,5 @@
 {
   "@@locale": "zh",
-
   "navHome": "主页",
   "navSearch": "搜索",
   "navLiveTv": "直播电视",
@@ -11,27 +10,28 @@
   "navNotifications": "通知",
   "navSettings": "设置",
   "navMore": "更多",
-
   "appBackToExit": "再次按返回键退出",
   "appRecordingScheduled": "录制已安排：{title}",
   "@appRecordingScheduled": {
     "placeholders": {
-      "title": { "type": "String" }
+      "title": {
+        "type": "String"
+      }
     }
   },
   "appRecordingFailed": "无法安排录制：{error}",
   "@appRecordingFailed": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "appNotConfigured": "请在设置中连接您的服务",
-
   "cancel": "取消",
   "disconnect": "断开连接",
   "unknown": "未知",
   "admin": "管理员",
-
   "liveTvSearchHint": "搜索直播电视…",
   "liveTvNoChannels": "暂无可用频道",
   "liveTvAllChannels": "全部频道",
@@ -41,27 +41,25 @@
   "liveTvRecord": "录制",
   "liveTvFavorite": "收藏",
   "liveTvRemoveFavorite": "取消收藏",
-
   "playerGoBack": "返回",
   "playerResumeWatching": "继续观看",
   "playerContinue": "继续",
   "playerFromTime": "从 {time} 开始",
   "@playerFromTime": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "playerStartFromBeginning": "从头开始",
   "playerResume": "恢复播放",
-
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",
   "searchSectionSeries": "剧集",
-
   "vodSearchHint": "搜索电影…",
   "seriesSearchHint": "搜索剧集…",
-
   "settingsTitle": "设置",
   "settingsGeneral": "通用",
   "settingsIntegrations": "集成",
@@ -89,111 +87,118 @@
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",
-
   "settingsContentCache": "内容缓存",
-
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",
-
   "settingsEpgRefreshInterval": "EPG 刷新间隔",
-
   "settingsEpgDurationMinutes": "{count} 分钟",
-  "@settingsEpgDurationMinutes": {"placeholders": {"count": {"type": "int"}}},
-
+  "@settingsEpgDurationMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsEpgDurationHour": "1 小时",
-
   "settingsEpgDurationHours": "{count} 小时",
-  "@settingsEpgDurationHours": {"placeholders": {"count": {"type": "int"}}},
-
+  "@settingsEpgDurationHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsManageViewers": "管理用户",
-
   "settingsAddViewer": "添加新用户",
-
   "homeContinueWatching": "继续观看",
-
   "homeNoContinueWatching": "暂无可继续观看的内容",
-
   "homeNoLiveTv": "暂无直播电视",
-
   "homeNoMovies": "暂无电影",
-
   "homeLiveChannel": "直播频道",
-
   "homeMovie": "电影",
-
   "notificationsTitle": "通知",
-
   "notificationsTabNotifications": "通知",
-
   "notificationsTabChannelSettings": "频道设置",
-
   "notificationsMarkAllRead": "全部标为已读",
-
   "notificationsEmpty": "暂无通知",
-
   "notificationsEmptyFiltered": "订阅频道暂无通知",
-
   "notificationsChannelSubscriptions": "频道订阅",
-
   "notificationsChannelSubtitle": "选择您希望接收的频道。全部不选则接收所有通知。",
-
   "notificationsAllChannels": "全部频道",
-
   "notificationsNoChannels": "暂无频道 — 收到通知后将在此显示。",
-
   "notificationsJustNow": "刚刚",
-
   "notificationsMinutesAgo": "{count}分钟前",
-  "@notificationsMinutesAgo": {"placeholders": {"count": {"type": "int"}}},
-
+  "@notificationsMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationsHoursAgo": "{count}小时前",
-  "@notificationsHoursAgo": {"placeholders": {"count": {"type": "int"}}},
-
+  "@notificationsHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationsDaysAgo": "{count}天前",
-  "@notificationsDaysAgo": {"placeholders": {"count": {"type": "int"}}},
-
+  "@notificationsDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationsReceivedAt": "收到 {time}",
-  "@notificationsReceivedAt": {"placeholders": {"time": {"type": "String"}}},
-
+  "@notificationsReceivedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "notificationsReadAt": "已读 {time}",
-  "@notificationsReadAt": {"placeholders": {"time": {"type": "String"}}},
-
+  "@notificationsReadAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "homeNoSeries": "暂无剧集",
-
   "homeSeason": "第{number}季",
-  "@homeSeason": {"placeholders": {"number": {"type": "int"}}},
-
+  "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
   "traktWatchHistory": "观看历史",
-
   "traktWatchHistorySubtitle": "将您的观看历史与 Trakt 同步，在各应用和服务间追踪进度。",
-
   "traktNotConfigured": "Trakt 客户端凭据未配置。",
-
   "traktNotConfiguredHint": "在 trakt.tv/oauth/applications 注册应用，并在构建时通过 --dart-define 设置 client ID 和 secret。",
-
   "traktConnectPrompt": "连接您的 Trakt 账户，自动记录您的观看内容。",
-
   "traktConnectButton": "连接 Trakt",
-
   "traktScanQr": "扫描以在手机上打开",
-
   "traktOpenBrowser": "在浏览器中打开",
-
   "traktPendingGoTo": "在您的手机或电脑上，访问：",
-
   "traktPendingEnterCode": "然后输入此代码：",
-
   "traktPendingWaiting": "等待授权…",
-
   "traktConnected": "已连接到 Trakt",
-
   "traktDisconnectButton": "断开 Trakt",
-
   "vodAllMovies": "全部电影",
-
   "seriesAllSeries": "全部剧集",
-
   "homeConnectedSource": "已连接来源：{label}",
-  "@homeConnectedSource": {"placeholders": {"label": {"type": "String"}}},
-
-  "searchTypeToSearch": "输入以搜索"
+  "@homeConnectedSource": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "searchTypeToSearch": "输入以搜索",
+  "vodPlayMovie": "播放电影",
+  "vodContinueMovie": "继续播放"
 }

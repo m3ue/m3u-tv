@@ -85,7 +85,14 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  void _onAppStateChanged() => setState(() {});
+  void _onAppStateChanged() {
+    // boot() calls notifyListeners() synchronously from AppShellState.initState,
+    // which fires mid-build. Deferring to post-frame avoids the setState-during-
+    // build assertion in all phases (idle mount, persistent-callbacks frame, etc.)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

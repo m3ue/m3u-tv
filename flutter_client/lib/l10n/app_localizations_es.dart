@@ -387,4 +387,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get searchTypeToSearch => 'Escribe para buscar';
+
+  @override
+  String get vodPlayMovie => 'Reproducir película';
+
+  @override
+  String get vodContinueMovie => 'Continuar película';
 }

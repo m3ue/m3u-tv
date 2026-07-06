@@ -388,4 +388,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get searchTypeToSearch => 'Saisir pour rechercher';
+
+  @override
+  String get vodPlayMovie => 'Lire le film';
+
+  @override
+  String get vodContinueMovie => 'Continuer le film';
 }

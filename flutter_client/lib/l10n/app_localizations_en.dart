@@ -387,4 +387,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchTypeToSearch => 'Type to search';
+
+  @override
+  String get vodPlayMovie => 'Play movie';
+
+  @override
+  String get vodContinueMovie => 'Continue movie';
 }

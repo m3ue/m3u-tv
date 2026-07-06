@@ -377,4 +377,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchTypeToSearch => '输入以搜索';
+
+  @override
+  String get vodPlayMovie => '播放电影';
+
+  @override
+  String get vodContinueMovie => '继续播放';
 }

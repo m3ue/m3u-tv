@@ -793,6 +793,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Type to search'**
   String get searchTypeToSearch;
+
+  /// No description provided for @vodPlayMovie.
+  ///
+  /// In en, this message translates to:
+  /// **'Play movie'**
+  String get vodPlayMovie;
+
+  /// No description provided for @vodContinueMovie.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue movie'**
+  String get vodContinueMovie;
 }
 
 class _AppLocalizationsDelegate

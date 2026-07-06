@@ -1,6 +1,5 @@
 {
   "@@locale": "en",
-
   "navHome": "Home",
   "navSearch": "Search",
   "navLiveTv": "Live TV",
@@ -11,27 +10,28 @@
   "navNotifications": "Notifications",
   "navSettings": "Settings",
   "navMore": "More",
-
   "appBackToExit": "Press back again to exit",
   "appRecordingScheduled": "Recording scheduled: {title}",
   "@appRecordingScheduled": {
     "placeholders": {
-      "title": { "type": "String" }
+      "title": {
+        "type": "String"
+      }
     }
   },
   "appRecordingFailed": "Could not schedule recording: {error}",
   "@appRecordingFailed": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "appNotConfigured": "Please connect to your service in Settings",
-
   "cancel": "Cancel",
   "disconnect": "Disconnect",
   "unknown": "Unknown",
   "admin": "Admin",
-
   "liveTvSearchHint": "Search live TV...",
   "liveTvNoChannels": "No channels available",
   "liveTvAllChannels": "All Channels",
@@ -41,27 +41,25 @@
   "liveTvRecord": "Record",
   "liveTvFavorite": "Favorite",
   "liveTvRemoveFavorite": "Remove favorite",
-
   "playerGoBack": "Go back",
   "playerResumeWatching": "Resume Watching",
   "playerContinue": "Continue",
   "playerFromTime": "From {time}",
   "@playerFromTime": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "playerStartFromBeginning": "Start from Beginning",
   "playerResume": "Resume",
-
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
   "searchSectionSeries": "Series",
-
   "vodSearchHint": "Search movies...",
   "seriesSearchHint": "Search series...",
-
   "settingsTitle": "Settings",
   "settingsGeneral": "General",
   "settingsIntegrations": "Integrations",
@@ -90,12 +88,20 @@
   "settingsEpgRefreshInterval": "EPG refresh interval",
   "settingsEpgDurationMinutes": "{count} min",
   "@settingsEpgDurationMinutes": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "settingsEpgDurationHour": "1 hour",
   "settingsEpgDurationHours": "{count} hours",
   "@settingsEpgDurationHours": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "settingsManageViewers": "Manage Viewers",
   "settingsAddViewer": "Add New Viewer",
@@ -103,14 +109,12 @@
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",
-
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
   "homeNoLiveTv": "No Live TV available",
   "homeNoMovies": "No Movies available",
   "homeLiveChannel": "Live channel",
   "homeMovie": "Movie",
-
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",
   "notificationsTabChannelSettings": "Channel Settings",
@@ -124,62 +128,77 @@
   "notificationsJustNow": "just now",
   "notificationsMinutesAgo": "{count}m ago",
   "@notificationsMinutesAgo": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "notificationsHoursAgo": "{count}h ago",
   "@notificationsHoursAgo": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "notificationsDaysAgo": "{count}d ago",
   "@notificationsDaysAgo": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "notificationsReceivedAt": "Received {time}",
   "@notificationsReceivedAt": {
-    "placeholders": { "time": { "type": "String" } }
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "notificationsReadAt": "Read {time}",
   "@notificationsReadAt": {
-    "placeholders": { "time": { "type": "String" } }
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
-
   "homeNoSeries": "No Series available",
-
   "homeSeason": "Season {number}",
-  "@homeSeason": {"placeholders": {"number": {"type": "int"}}},
-
+  "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
   "traktWatchHistory": "Watch History",
-
   "traktWatchHistorySubtitle": "Sync your watch history with Trakt to track progress across apps and services.",
-
   "traktNotConfigured": "Trakt client credentials are not configured.",
-
   "traktNotConfiguredHint": "Register an app at trakt.tv/oauth/applications and set the client ID and secret via --dart-define at build time.",
-
   "traktConnectPrompt": "Connect your Trakt account to automatically track what you watch.",
-
   "traktConnectButton": "Connect with Trakt",
-
   "traktScanQr": "Scan to open on your phone",
-
   "traktOpenBrowser": "Open in browser",
-
   "traktPendingGoTo": "On your phone or computer, go to:",
-
   "traktPendingEnterCode": "Then enter this code:",
-
   "traktPendingWaiting": "Waiting for authorization…",
-
   "traktConnected": "Connected to Trakt",
-
   "traktDisconnectButton": "Disconnect Trakt",
-
   "vodAllMovies": "All Movies",
-
   "seriesAllSeries": "All Series",
-
   "homeConnectedSource": "Connected source: {label}",
-  "@homeConnectedSource": {"placeholders": {"label": {"type": "String"}}},
-
-  "searchTypeToSearch": "Type to search"
+  "@homeConnectedSource": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "searchTypeToSearch": "Type to search",
+  "vodPlayMovie": "Play movie",
+  "vodContinueMovie": "Continue movie"
 }

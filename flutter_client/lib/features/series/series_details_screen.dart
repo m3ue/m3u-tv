@@ -4,6 +4,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -468,6 +469,7 @@ class _SeasonChipsState extends State<_SeasonChips> {
   @override
   Widget build(BuildContext context) {
     if (widget.seasons.isEmpty) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context);
     return Listener(
       onPointerSignal: _handlePointerSignal,
       child: Scrollbar(
@@ -481,7 +483,7 @@ class _SeasonChipsState extends State<_SeasonChips> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: CategoryFilterChip(
-                      label: season.name,
+                      label: l.homeSeason(season.number),
                       isSelected: season.number == widget.selectedSeason,
                       onTap: () => widget.onSeasonSelected(season.number),
                     ),
