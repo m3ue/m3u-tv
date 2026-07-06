@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' hide Category;
+import 'package:flutter/widgets.dart' show Locale;
 
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -96,6 +97,7 @@ class AppStateController extends ChangeNotifier {
 
   static const _sourceKey = 'm3ue_tv_source';
   static const _epgIntervalKey = 'm3ue_tv_epg_interval_minutes';
+  static const _localeKey = 'm3ue_tv_locale';
 
   static const List<Duration> epgRefreshOptions = <Duration>[
     Duration(minutes: 30),
@@ -174,6 +176,7 @@ class AppStateController extends ChangeNotifier {
   bool _isBootstrapping = false;
   bool _isLoadingContent = false;
   String? _error;
+  Locale? _locale;
   Viewer? _activeViewer;
   List<Viewer> _viewers = const <Viewer>[];
   List<Category> _liveCategories = const <Category>[];
@@ -190,6 +193,7 @@ class AppStateController extends ChangeNotifier {
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
   bool get isLoadingContent => _isLoadingContent;
+  Locale? get locale => _locale;
   bool get isConfigured => _sourceType != AppSourceType.none;
   String? get error => _error ?? authNotifier.error;
   Viewer? get activeViewer => _activeViewer;
@@ -217,6 +221,9 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
+
+    final savedLocale = await secureStorage.read(_localeKey);
+    if (savedLocale != null) _locale = Locale(savedLocale);
 
     final savedIntervalRaw = await secureStorage.read(_epgIntervalKey);
     if (savedIntervalRaw != null) {
@@ -405,6 +412,16 @@ class AppStateController extends ChangeNotifier {
       _epgIntervalKey,
       '${interval.inMinutes}',
     );
+    notifyListeners();
+  }
+
+  Future<void> setLocale(Locale? locale) async {
+    _locale = locale;
+    if (locale == null) {
+      await secureStorage.delete(_localeKey);
+    } else {
+      await secureStorage.write(_localeKey, locale.languageCode);
+    }
     notifyListeners();
   }
 

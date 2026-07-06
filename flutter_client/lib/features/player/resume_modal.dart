@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
@@ -43,7 +44,10 @@ class _ResumeModal extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Resume Watching', style: theme.textTheme.titleLarge),
+                Text(
+                  AppLocalizations.of(context).playerResumeWatching,
+                  style: theme.textTheme.titleLarge,
+                ),
                 const SizedBox(height: 4),
                 Text(
                   title,
@@ -77,11 +81,15 @@ class _ResumeModal extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Continue',
+                                AppLocalizations.of(context).playerContinue,
                                 style: theme.textTheme.titleMedium,
                               ),
                               Text(
-                                'From ${formatTime(Duration(seconds: positionSeconds))}',
+                                AppLocalizations.of(context).playerFromTime(
+                                  formatTime(
+                                    Duration(seconds: positionSeconds),
+                                  ),
+                                ),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
@@ -107,7 +115,9 @@ class _ResumeModal extends StatelessWidget {
                       backgroundColor: colorScheme.surfaceContainerHighest,
                       child: Icon(Icons.replay, color: colorScheme.onSurface),
                     ),
-                    title: const Text('Start from Beginning'),
+                    title: Text(
+                      AppLocalizations.of(context).playerStartFromBeginning,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -128,7 +138,7 @@ class _ResumeModal extends StatelessWidget {
                       ],
                       child: FilledButton.tonal(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -145,7 +155,7 @@ class _ResumeModal extends StatelessWidget {
                         onPressed: () => Navigator.of(
                           context,
                         ).pop(positionSeconds.toDouble()),
-                        child: const Text('Resume'),
+                        child: Text(AppLocalizations.of(context).playerResume),
                       ),
                     ),
                   ],

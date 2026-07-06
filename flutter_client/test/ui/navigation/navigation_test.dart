@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -1174,6 +1175,8 @@ class _TestAppState extends State<_TestApp> {
       title: 'M3U TV Test',
       theme: ThemeData.dark(useMaterial3: true),
       routerConfig: _router,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
     );
   }
 }

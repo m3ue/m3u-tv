@@ -205,6 +205,7 @@ flutter run \
 lib/
   app/            App shell, device type detection
   features/       Screen-level widgets (live_tv, vod, series, player, …)
+  l10n/           ARB source files + generated AppLocalizations
   navigation/     Router, route names, PlayerArgs
   playback/       Platform playback adapters and orchestrator
   services/       Domain models, Xtream API, EPG, state controller
@@ -214,6 +215,36 @@ ios/              iOS Xcode runner
 android/          Android Gradle project
 packages/         Local Flutter packages (flutter_secure_storage_tvos, …)
 test/             Unit and widget tests
+```
+
+## Localization
+
+The app is fully localized using Flutter `gen_l10n`. Supported languages: **English** (`en`), **German** (`de`), **Spanish** (`es`), **French** (`fr`), **Simplified Chinese** (`zh`). Users can override the system language in Settings → Language.
+
+### Adding or updating strings
+
+1. Edit `lib/l10n/app_en.arb` (source of truth) — add the new key and English value.
+2. Add the translated key to all other ARB files (`app_de.arb`, `app_es.arb`, `app_fr.arb`, `app_zh.arb`).
+3. Regenerate:
+   ```bash
+   flutter gen-l10n
+   ```
+4. Use `AppLocalizations.of(context).<key>` in your widget. Never hard-code user-visible strings in widget trees.
+
+### Adding a new language
+
+1. Create `lib/l10n/app_<locale>.arb` with all keys from `app_en.arb` translated.
+2. Add `Locale('<locale>')` to `supportedLocales` in `l10n.yaml`.
+3. Run `flutter gen-l10n`.
+4. Add a language chip to the picker in `settings_screen.dart`.
+
+### Tests
+
+Every `MaterialApp` that renders a localized widget must include:
+
+```dart
+localizationsDelegates: AppLocalizations.localizationsDelegates,
+supportedLocales: AppLocalizations.supportedLocales,
 ```
 
 ## Android release notes

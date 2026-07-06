@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -64,6 +65,36 @@ class _MyAppState extends State<MyApp> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    widget.appState?.addListener(_onAppStateChanged);
+  }
+
+  @override
+  void didUpdateWidget(MyApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.appState != widget.appState) {
+      oldWidget.appState?.removeListener(_onAppStateChanged);
+      widget.appState?.addListener(_onAppStateChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.appState?.removeListener(_onAppStateChanged);
+    super.dispose();
+  }
+
+  void _onAppStateChanged() {
+    // boot() calls notifyListeners() synchronously from AppShellState.initState,
+    // which fires mid-build. Deferring to post-frame avoids the setState-during-
+    // build assertion in all phases (idle mount, persistent-callbacks frame, etc.)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     const primary = Color(0xFF4f39f6);
     const secondary = Color(0xFFec003f);
@@ -74,6 +105,9 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp.router(
       title: 'M3U TV',
       routerConfig: _router,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: widget.appState?.locale,
       builder: (context, child) {
         final deviceType = resolveDeviceType(
           context,

@@ -14,6 +14,7 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 - **Favorites**: Save and manage favorite channels and content
 - **Continue Watching**: Resume playback from where you left off
 - **Settings**: Configure Xtream API connection with secure credential storage
+- **Localization**: Full UI in English, German, Spanish, French, and Simplified Chinese — language selectable in Settings, persisted across sessions
 
 ## Platforms Supported
 
@@ -112,6 +113,7 @@ The app will authenticate and fetch your content categories. Credentials are sto
 
 - Xtream API connection management
 - Connection status and statistics
+- Language picker: System default, English, German, Spanish, French, Simplified Chinese
 
 Keyboard shortcuts:
 
@@ -194,6 +196,7 @@ flutter-tvos upgrade
 - [x] Favorites/Watchlist
 - [x] Search functionality
 - [x] Apple TV (tvOS)
+- [x] Localization (en, de, es, fr, zh)
 - [ ] Parental controls
 - [ ] Stream quality selection
 - [ ] Catchup/DVR support

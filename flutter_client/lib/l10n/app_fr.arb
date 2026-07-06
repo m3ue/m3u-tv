@@ -1,0 +1,207 @@
+{
+  "@@locale": "fr",
+  "navHome": "Accueil",
+  "navSearch": "Rechercher",
+  "navLiveTv": "Télévision en direct",
+  "navVod": "Films",
+  "navSeries": "Série",
+  "navDvr": "DVR",
+  "navRequests": "Demandes",
+  "navNotifications": "Notifications",
+  "navSettings": "Paramètres",
+  "navMore": "Plus",
+  "appBackToExit": "Appuyez à nouveau sur Retour pour quitter",
+  "appRecordingScheduled": "Enregistrement programmé : {title}",
+  "@appRecordingScheduled": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "appRecordingFailed": "Impossible de programmer l'enregistrement : {error}",
+  "@appRecordingFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "appNotConfigured": "Connectez votre service dans les Paramètres",
+  "cancel": "Annuler",
+  "disconnect": "Déconnecter",
+  "unknown": "Inconnu",
+  "admin": "Administrateur",
+  "liveTvSearchHint": "Rechercher dans la Télévision en direct…",
+  "liveTvNoChannels": "Aucune chaîne disponible",
+  "liveTvAllChannels": "Toutes les chaînes",
+  "liveTvFavorites": "★ Favoris",
+  "liveTvNoProgram": "Aucune info programme",
+  "liveTvNext": "SUIVANT",
+  "liveTvRecord": "Enregistrer",
+  "liveTvFavorite": "Favori",
+  "liveTvRemoveFavorite": "Retirer des favoris",
+  "playerGoBack": "Retour",
+  "playerResumeWatching": "Reprendre la lecture",
+  "playerContinue": "Continuer",
+  "playerFromTime": "À partir de {time}",
+  "@playerFromTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "playerStartFromBeginning": "Recommencer depuis le début",
+  "playerResume": "Reprendre",
+  "searchHint": "Rechercher Télévision en direct, films et séries…",
+  "searchSectionLiveTv": "Télévision en direct",
+  "searchSectionMovies": "Films",
+  "searchSectionSeries": "Série",
+  "vodSearchHint": "Rechercher des films…",
+  "seriesSearchHint": "Rechercher des séries…",
+  "settingsTitle": "Paramètres",
+  "settingsGeneral": "Général",
+  "settingsIntegrations": "Intégrations",
+  "settingsLanguage": "Langue",
+  "settingsLanguageSystem": "Langue du système",
+  "settingsLangEnglish": "Anglais",
+  "settingsLangGerman": "Allemand",
+  "settingsLangSpanish": "Espagnol",
+  "settingsLangFrench": "Français",
+  "settingsLangChinese": "Chinois (Simplifié)",
+  "settingsConnection": "Connexion",
+  "settingsStatusConnected": "Connecté",
+  "settingsStatusUnavailable": "Indisponible",
+  "settingsStatusLabel": "Statut",
+  "settingsSourceLabel": "Source",
+  "settingsLastError": "Dernière erreur",
+  "settingsRetryConnection": "Réessayer la connexion",
+  "settingsEditServer": "Modifier les paramètres du serveur",
+  "settingsActiveViewer": "Utilisateur actif",
+  "settingsClearCacheTitle": "Vider le cache et actualiser ?",
+  "settingsClearCacheBody": "Tout le contenu en cache sera effacé et rechargé depuis votre source.",
+  "settingsClearCacheConfirm": "Vider et actualiser",
+  "settingsCacheCleared": "Cache vidé — le contenu est en cours d'actualisation en arrière-plan.",
+  "settingsAccount": "Compte",
+  "settingsDisconnectTitle": "Se déconnecter ?",
+  "settingsDisconnectBody": "Vous serez déconnecté et devrez saisir à nouveau vos identifiants pour vous reconnecter.",
+  "settingsDisconnectConfirm": "Déconnecter",
+  "settingsContentCache": "Cache de contenu",
+  "settingsCacheSubtitle": "Le contenu en cache se charge instantanément. Les données se rafraîchissent automatiquement en arrière-plan.",
+  "settingsEpgRefreshInterval": "Intervalle de rafraîchissement EPG",
+  "settingsEpgDurationMinutes": "{count} min",
+  "@settingsEpgDurationMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsEpgDurationHour": "1 heure",
+  "settingsEpgDurationHours": "{count} heures",
+  "@settingsEpgDurationHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsManageViewers": "Gérer les utilisateurs",
+  "settingsAddViewer": "Nouvel utilisateur",
+  "settingsSwitchViewer": "Changer d'utilisateur",
+  "settingsViewerNameLabel": "Nom d'utilisateur",
+  "settingsCreate": "Créer",
+  "homeContinueWatching": "Reprendre",
+  "homeNoContinueWatching": "Rien à reprendre",
+  "homeNoLiveTv": "Pas de Télévision en direct disponible",
+  "homeNoMovies": "Pas de films disponibles",
+  "homeLiveChannel": "Chaîne en direct",
+  "homeMovie": "Film",
+  "notificationsTitle": "Notifications",
+  "notificationsTabNotifications": "Notifications",
+  "notificationsTabChannelSettings": "Paramètres des chaînes",
+  "notificationsMarkAllRead": "Tout marquer comme lu",
+  "notificationsEmpty": "Aucune notification pour l'instant",
+  "notificationsEmptyFiltered": "Aucune notification pour vos chaînes abonnées",
+  "notificationsChannelSubscriptions": "Abonnements aux chaînes",
+  "notificationsChannelSubtitle": "Sélectionnez les chaînes que vous souhaitez recevoir. Laissez tout désélectionné pour tout recevoir.",
+  "notificationsAllChannels": "Toutes les chaînes",
+  "notificationsNoChannels": "Aucune chaîne pour l'instant — elles apparaissent ici à l'arrivée des notifications.",
+  "notificationsJustNow": "à l'instant",
+  "notificationsMinutesAgo": "il y a {count}m",
+  "@notificationsMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsHoursAgo": "il y a {count}h",
+  "@notificationsHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsDaysAgo": "il y a {count}j",
+  "@notificationsDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsReceivedAt": "Reçu {time}",
+  "@notificationsReceivedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationsReadAt": "Lu {time}",
+  "@notificationsReadAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "homeNoSeries": "Pas de séries disponibles",
+  "homeSeason": "Saison {number}",
+  "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "traktWatchHistory": "Historique de visionnage",
+  "traktWatchHistorySubtitle": "Synchronisez votre historique de visionnage avec Trakt pour suivre votre progression sur toutes les applications et services.",
+  "traktNotConfigured": "Les identifiants du client Trakt ne sont pas configurés.",
+  "traktNotConfiguredHint": "Enregistrez une application sur trakt.tv/oauth/applications et définissez le client ID et le secret via --dart-define lors de la compilation.",
+  "traktConnectPrompt": "Connectez votre compte Trakt pour suivre automatiquement ce que vous regardez.",
+  "traktConnectButton": "Connecter avec Trakt",
+  "traktScanQr": "Scanner pour ouvrir sur votre téléphone",
+  "traktOpenBrowser": "Ouvrir dans le navigateur",
+  "traktPendingGoTo": "Sur votre téléphone ou ordinateur, allez sur :",
+  "traktPendingEnterCode": "Saisissez ensuite ce code :",
+  "traktPendingWaiting": "En attente d'autorisation…",
+  "traktConnected": "Connecté à Trakt",
+  "traktDisconnectButton": "Déconnecter Trakt",
+  "vodAllMovies": "Tous les films",
+  "seriesAllSeries": "Toutes les séries",
+  "homeConnectedSource": "Source connectée : {label}",
+  "@homeConnectedSource": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "searchTypeToSearch": "Saisir pour rechercher",
+  "vodPlayMovie": "Lire le film",
+  "vodContinueMovie": "Continuer le film"
+}

@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/settings/connection_form.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/viewer_selector.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
@@ -855,6 +856,8 @@ class _FakeTransport {
 Widget _testApp(Widget child) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: child),
   );
 }
@@ -869,6 +872,8 @@ Widget _settingsApp(
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: SettingsScreen(
         authNotifier: notifier,
