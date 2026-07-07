@@ -118,6 +118,93 @@ void main() {
       },
     );
 
+    testWidgets('Home shows favorite live channels before full Live TV', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          liveChannels: const <Channel>[
+            Channel(
+              id: 101,
+              name: 'Favorite Route News',
+              streamUrl: 'http://example.com/live/101.m3u8',
+              categoryId: 'live',
+            ),
+            Channel(
+              id: 102,
+              name: 'Regular Route Sports',
+              streamUrl: 'http://example.com/live/102.m3u8',
+              categoryId: 'live',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+      await appState.favoritesService.add(101);
+      expect(await appState.favoritesService.all(), contains(101));
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _waitForText(tester, 'Favorite Channels');
+
+      expect(find.text('Favorite Channels'), findsOneWidget);
+      expect(find.text('Favorite Route News'), findsOneWidget);
+      expect(find.text('Regular Route Sports'), findsNothing);
+    });
+
+    testWidgets('Home keeps full Live TV section when no favorites exist', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          liveChannels: const <Channel>[
+            Channel(
+              id: 101,
+              name: 'Route News',
+              streamUrl: 'http://example.com/live/101.m3u8',
+              categoryId: 'live',
+            ),
+            Channel(
+              id: 102,
+              name: 'Route Sports',
+              streamUrl: 'http://example.com/live/102.m3u8',
+              categoryId: 'live',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Live TV'), findsAtLeast(1));
+      expect(find.text('Route News'), findsOneWidget);
+      expect(find.text('Route Sports'), findsOneWidget);
+    });
+
     testWidgets('navigating to LiveTV shows Live TV screen', (tester) async {
       await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
       await tester.pumpAndSettle();

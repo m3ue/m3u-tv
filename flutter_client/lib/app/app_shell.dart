@@ -1300,25 +1300,40 @@ class _HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<_HomeScreen> {
+  Set<int> _favoriteChannelIds = {};
   Set<int> _favoriteVodIds = {};
   Set<int> _favoriteSeriesIds = {};
 
   @override
   void initState() {
     super.initState();
+    widget.appState.favoritesService.addListener(_onChannelFavoritesChanged);
     unawaited(_loadFavorites());
+  }
+
+  @override
+  void dispose() {
+    widget.appState.favoritesService.removeListener(_onChannelFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onChannelFavoritesChanged() {
+    unawaited(_loadChannelFavorites());
+  }
+
+  Future<void> _loadChannelFavorites() async {
+    final ids = await widget.appState.favoritesService.all();
+    if (mounted) setState(() => _favoriteChannelIds = ids);
   }
 
   Future<void> _loadFavorites() async {
     final appState = widget.appState;
+    final channels = await appState.favoritesService.all();
+    if (mounted) setState(() => _favoriteChannelIds = channels);
     final vod = await appState.vodFavoritesService.all();
+    if (mounted) setState(() => _favoriteVodIds = vod);
     final series = await appState.seriesFavoritesService.all();
-    if (mounted) {
-      setState(() {
-        _favoriteVodIds = vod;
-        _favoriteSeriesIds = series;
-      });
-    }
+    if (mounted) setState(() => _favoriteSeriesIds = series);
   }
 
   @override
@@ -1345,28 +1360,33 @@ class _HomeScreenState extends State<_HomeScreen> {
       landscapeStyle: true,
       onSidebarActivate: widget.onSidebarActivate,
     );
+    MediaPreviewItem liveChannelItem(Channel channel) => MediaPreviewItem(
+      title: channel.name,
+      imageUrl: channel.logoUrl,
+      subtitle:
+          appState.epgService.lookupForChannel(channel)?.current.title ??
+          channel.groupTitle ??
+          l.homeLiveChannel,
+      fallbackIcon: Icons.live_tv,
+      imageFit: BoxFit.contain,
+      imagePadding: const EdgeInsets.all(10),
+      imageBackgroundColor: Colors.transparent,
+      isFavorite: _favoriteChannelIds.contains(channel.id),
+      onTap: () => widget.onChannelSelect(channel),
+      onLongTap: () async {
+        await appState.favoritesService.toggle(channel.id);
+        await _loadFavorites();
+      },
+    );
+
+    final favoriteChannels = appState.channels
+        .where((channel) => _favoriteChannelIds.contains(channel.id))
+        .toList(growable: false);
     final liveSection = MediaPreviewSection(
-      title: l.navLiveTv,
+      title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       emptyLabel: l.homeNoLiveTv,
-      items: appState.channels
-          .map(
-            (channel) => MediaPreviewItem(
-              title: channel.name,
-              imageUrl: channel.logoUrl,
-              subtitle:
-                  appState.epgService
-                      .lookupForChannel(channel)
-                      ?.current
-                      .title ??
-                  channel.groupTitle ??
-                  l.homeLiveChannel,
-              fallbackIcon: Icons.live_tv,
-              imageFit: BoxFit.contain,
-              imagePadding: const EdgeInsets.all(10),
-              imageBackgroundColor: Colors.transparent,
-              onTap: () => widget.onChannelSelect(channel),
-            ),
-          )
+      items: (favoriteChannels.isEmpty ? appState.channels : favoriteChannels)
+          .map(liveChannelItem)
           .toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );

@@ -259,6 +259,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNoLiveTv => '暂无直播电视';
 
   @override
+  String get homeFavoriteChannels => '收藏频道';
+
+  @override
+  String get homeNoFavoriteChannels => '暂无收藏频道';
+
+  @override
   String get homeNoMovies => '暂无电影';
 
   @override
