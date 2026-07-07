@@ -32,6 +32,39 @@ class AIOStreamsStream {
   bool get isValid => url.isNotEmpty;
 }
 
+/// A single episode entry from a series meta response.
+class AIOStreamsVideo {
+  const AIOStreamsVideo({
+    required this.id,
+    required this.title,
+    required this.season,
+    required this.episode,
+    this.thumbnail,
+    this.description,
+    this.released,
+  });
+
+  factory AIOStreamsVideo.fromJson(Map<String, dynamic> json) => AIOStreamsVideo(
+    id: '${json['id'] ?? ''}',
+    title: '${json['title'] ?? json['name'] ?? ''}',
+    season: _parseInt(json['season']) ?? 0,
+    episode: _parseInt(json['episode']) ?? 0,
+    thumbnail: json['thumbnail'] as String?,
+    description: json['overview'] is String
+        ? json['overview'] as String
+        : (json['description'] is String ? json['description'] as String : null),
+    released: json['released'] as String?,
+  );
+
+  final String id;
+  final String title;
+  final int season;
+  final int episode;
+  final String? thumbnail;
+  final String? description;
+  final String? released;
+}
+
 /// A catalog item (movie or series) from AIOStreams.
 class AIOStreamsItem {
   const AIOStreamsItem({
@@ -44,6 +77,7 @@ class AIOStreamsItem {
     this.year,
     this.imdbRating,
     this.genres = const <String>[],
+    this.videos = const <AIOStreamsVideo>[],
   });
 
   factory AIOStreamsItem.fromJson(Map<String, dynamic> json) {
@@ -51,6 +85,14 @@ class AIOStreamsItem {
     final genres = rawGenres is List
         ? rawGenres.map((e) => '$e').toList(growable: false)
         : <String>[];
+    final rawVideos = json['videos'];
+    final videos = rawVideos is List
+        ? rawVideos
+              .whereType<Map<String, dynamic>>()
+              .map(AIOStreamsVideo.fromJson)
+              .where((v) => v.id.isNotEmpty && v.season > 0)
+              .toList(growable: false)
+        : <AIOStreamsVideo>[];
     return AIOStreamsItem(
       id: '${json['id'] ?? ''}',
       type: '${json['type'] ?? ''}',
@@ -61,6 +103,7 @@ class AIOStreamsItem {
       year: json['year'] != null ? '${json['year']}' : null,
       imdbRating: json['imdbRating'] as String?,
       genres: genres,
+      videos: videos,
     );
   }
 
@@ -73,6 +116,14 @@ class AIOStreamsItem {
   final String? year;
   final String? imdbRating;
   final List<String> genres;
+  final List<AIOStreamsVideo> videos;
+}
+
+int? _parseInt(dynamic value) {
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 /// Proxies AIOStreams Stremio addon requests via m3u-editor's proxy endpoints.

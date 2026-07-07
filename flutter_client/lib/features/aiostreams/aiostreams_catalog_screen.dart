@@ -9,6 +9,21 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
+/// Returns a display-friendly title for a catalog, appending the media type
+/// label when the catalog name doesn't already imply it.
+String _catalogDisplayTitle(AppLocalizations l, AIOStreamsCatalog catalog) {
+  final name = catalog.name;
+  final lower = name.toLowerCase();
+  final hasTypeHint = lower.contains('movie') ||
+      lower.contains('series') ||
+      lower.contains('film') ||
+      lower.contains('show') ||
+      lower.contains(' tv');
+  if (hasTypeHint) return name;
+  final suffix = catalog.type == 'series' ? l.navSeries : l.navVod;
+  return '$name $suffix';
+}
+
 /// Full-screen catalog browser for a single AIOStreams catalog.
 /// Supports lazy pagination and optional text search.
 class AIOStreamsCatalogScreen extends StatefulWidget {
@@ -146,7 +161,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            widget.catalog.name,
+                            _catalogDisplayTitle(l, widget.catalog),
                             style: theme.textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -360,12 +375,13 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return FutureBuilder<List<AIOStreamsItem>>(
       future: _future,
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
         return MediaPreviewSection(
-          title: widget.catalog.name,
+          title: _catalogDisplayTitle(l, widget.catalog),
           emptyLabel: AppLocalizations.of(context).aiostrreamsCatalogEmpty,
           posterStyle: true,
           items: items
