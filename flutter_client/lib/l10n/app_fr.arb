@@ -206,4 +206,12 @@
   "searchTypeToSearch": "Saisir pour rechercher",
   "vodPlayMovie": "Lire le film",
   "vodContinueMovie": "Continuer le film"
+  ,"navAioStreams": "Streaming",
+  "aiostreamsGetStreams": "Get Streams",
+  "aiostreamsLoadingStreams": "Loading streams…",
+  "aiostreamsNoStreams": "No streams found",
+  "aiostreamsSelectStream": "Select a stream",
+  "aiostreamsLoadMore": "Load more",
+  "aiostreamsSearchHint": "Search movies & series…",
+  "aiostrreamsCatalogEmpty": "Nothing here yet"
 }
