@@ -115,6 +115,8 @@
   "homeContinueWatching": "Weiterschauen",
   "homeNoContinueWatching": "Nichts zum Weiterschauen",
   "homeNoLiveTv": "Kein Live-TV verfügbar",
+  "homeFavoriteChannels": "Lieblingssender",
+  "homeNoFavoriteChannels": "Keine Lieblingssender verfügbar",
   "homeNoMovies": "Keine Filme verfügbar",
   "homeLiveChannel": "Live-Sender",
   "homeMovie": "Film",

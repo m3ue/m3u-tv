@@ -115,6 +115,8 @@
   "homeContinueWatching": "继续观看",
   "homeNoContinueWatching": "暂无可继续观看的内容",
   "homeNoLiveTv": "暂无直播电视",
+  "homeFavoriteChannels": "收藏频道",
+  "homeNoFavoriteChannels": "暂无收藏频道",
   "homeNoMovies": "暂无电影",
   "homeLiveChannel": "直播频道",
   "homeMovie": "电影",

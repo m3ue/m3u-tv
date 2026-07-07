@@ -1328,18 +1328,12 @@ class _HomeScreenState extends State<_HomeScreen> {
 
   Future<void> _loadFavorites() async {
     final appState = widget.appState;
-    final results = await Future.wait([
-      appState.favoritesService.all(),
-      appState.vodFavoritesService.all(),
-      appState.seriesFavoritesService.all(),
-    ]);
-    if (mounted) {
-      setState(() {
-        _favoriteChannelIds = results[0];
-        _favoriteVodIds = results[1];
-        _favoriteSeriesIds = results[2];
-      });
-    }
+    final channels = await appState.favoritesService.all();
+    if (mounted) setState(() => _favoriteChannelIds = channels);
+    final vod = await appState.vodFavoritesService.all();
+    if (mounted) setState(() => _favoriteVodIds = vod);
+    final series = await appState.seriesFavoritesService.all();
+    if (mounted) setState(() => _favoriteSeriesIds = series);
   }
 
   @override

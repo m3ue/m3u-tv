@@ -263,6 +263,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeNoLiveTv => 'Pas de Télévision en direct disponible';
 
   @override
+  String get homeFavoriteChannels => 'Chaînes favorites';
+
+  @override
+  String get homeNoFavoriteChannels => 'Aucune chaîne favorite disponible';
+
+  @override
   String get homeNoMovies => 'Pas de films disponibles';
 
   @override

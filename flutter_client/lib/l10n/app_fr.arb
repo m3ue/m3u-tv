@@ -115,6 +115,8 @@
   "homeContinueWatching": "Reprendre",
   "homeNoContinueWatching": "Rien à reprendre",
   "homeNoLiveTv": "Pas de Télévision en direct disponible",
+  "homeFavoriteChannels": "Chaînes favorites",
+  "homeNoFavoriteChannels": "Aucune chaîne favorite disponible",
   "homeNoMovies": "Pas de films disponibles",
   "homeLiveChannel": "Chaîne en direct",
   "homeMovie": "Film",

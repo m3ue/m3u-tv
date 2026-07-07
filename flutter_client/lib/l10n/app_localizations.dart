@@ -584,6 +584,18 @@ abstract class AppLocalizations {
   /// **'No Live TV available'**
   String get homeNoLiveTv;
 
+  /// No description provided for @homeFavoriteChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite Channels'**
+  String get homeFavoriteChannels;
+
+  /// No description provided for @homeNoFavoriteChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite channels available'**
+  String get homeNoFavoriteChannels;
+
   /// No description provided for @homeNoMovies.
   ///
   /// In en, this message translates to:
