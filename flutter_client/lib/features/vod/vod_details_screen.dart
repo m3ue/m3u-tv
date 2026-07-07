@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -148,7 +149,7 @@ class _VodDetailsBody extends StatelessWidget {
           const SizedBox(width: MediaBrowsingMetrics.pagePadding),
           Expanded(
             child: SingleChildScrollView(
-              child: _infoColumn(theme, details, progress),
+              child: _infoColumn(context, theme, details, progress),
             ),
           ),
         ],
@@ -230,6 +231,7 @@ class _VodDetailsBody extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: _infoColumn(
+              context,
               theme,
               details,
               progress,
@@ -242,13 +244,15 @@ class _VodDetailsBody extends StatelessWidget {
   }
 
   Widget _infoColumn(
+    BuildContext context,
     ThemeData theme,
     _ResolvedVodDetails details,
     Progress? progress, {
     bool fullWidthButton = false,
   }) {
+    final l = AppLocalizations.of(context);
     final progressValue = _progressValue(progress);
-    final buttonLabel = progress == null ? 'Play movie' : 'Continue movie';
+    final buttonLabel = progress == null ? l.vodPlayMovie : l.vodContinueMovie;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

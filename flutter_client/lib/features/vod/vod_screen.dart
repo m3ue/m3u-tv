@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -131,17 +132,18 @@ class _VodScreenState extends State<VodScreen> {
       ),
       child: InlineMediaSearchField(
         query: _query,
-        hintText: 'Search movies...',
+        hintText: AppLocalizations.of(context).vodSearchHint,
         onChanged: (value) => setState(() => _query = value),
       ),
     );
   }
 
   Widget _buildCategoryBar() {
+    final l = AppLocalizations.of(context);
     final tabs = [
-      const CategoryTabData(id: '', name: 'All Movies'),
+      CategoryTabData(id: '', name: l.vodAllMovies),
       if (_favoriteIds.isNotEmpty)
-        const CategoryTabData(id: _kFavoritesCategoryId, name: '★ Favorites'),
+        CategoryTabData(id: _kFavoritesCategoryId, name: l.liveTvFavorites),
       ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
 
