@@ -207,7 +207,7 @@
   "vodPlayMovie": "Reproducir película",
   "vodContinueMovie": "Continuar película"
 ,
-  "navAioStreams": "Streaming",
+  "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "Obtener fuentes",
   "aiostreamsLoadingStreams": "Cargando fuentes…",
   "aiostreamsNoStreams": "No se encontraron fuentes",

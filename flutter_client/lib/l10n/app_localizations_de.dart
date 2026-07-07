@@ -411,7 +411,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vodContinueMovie => 'Film fortsetzen';
 
   @override
-  String get navAioStreams => 'Streaming';
+  String get navAioStreams => 'AIOStreams';
 
   @override
   String get aiostreamsGetStreams => 'Streams laden';

@@ -400,7 +400,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vodContinueMovie => '继续播放';
 
   @override
-  String get navAioStreams => '流媒体';
+  String get navAioStreams => 'AIOStreams';
 
   @override
   String get aiostreamsGetStreams => '获取播放源';

@@ -207,7 +207,7 @@
   "vodPlayMovie": "播放电影",
   "vodContinueMovie": "继续播放"
 ,
-  "navAioStreams": "流媒体",
+  "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "获取播放源",
   "aiostreamsLoadingStreams": "正在加载播放源…",
   "aiostreamsNoStreams": "未找到播放源",

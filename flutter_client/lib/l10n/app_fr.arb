@@ -207,7 +207,7 @@
   "vodPlayMovie": "Lire le film",
   "vodContinueMovie": "Continuer le film"
 ,
-  "navAioStreams": "Streaming",
+  "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "Obtenir les sources",
   "aiostreamsLoadingStreams": "Chargement des sources…",
   "aiostreamsNoStreams": "Aucune source trouvée",

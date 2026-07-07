@@ -839,7 +839,7 @@ abstract class AppLocalizations {
   /// No description provided for @navAioStreams.
   ///
   /// In en, this message translates to:
-  /// **'Streaming'**
+  /// **'AIOStreams'**
   String get navAioStreams;
 
   /// No description provided for @aiostreamsGetStreams.

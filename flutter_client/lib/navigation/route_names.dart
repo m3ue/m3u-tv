@@ -71,7 +71,7 @@ class RouteNames {
     liveTv: 'Live TV',
     vod: 'Movies',
     series: 'Series',
-    aiostreams: 'Streaming',
+    aiostreams: 'AIOStreams',
     dvr: 'DVR',
     requests: 'Requests',
     notifications: 'Notifications',
