@@ -61,7 +61,18 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
   @override
   void initState() {
     super.initState();
+    widget.favoritesService.addListener(_onFavoritesChanged);
     unawaited(_initCategory());
+  }
+
+  @override
+  void dispose() {
+    widget.favoritesService.removeListener(_onFavoritesChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    unawaited(_loadFavorites());
   }
 
   Future<void> _initCategory() async {
