@@ -151,12 +151,14 @@ class AIOStreamsIntegration {
     required this.id,
     required this.name,
     required this.catalogs,
+    this.logoUrl,
   });
 
   factory AIOStreamsIntegration.fromJson(Map<String, dynamic> json) =>
       AIOStreamsIntegration(
         id: _asInt(json['id']),
         name: '${json['name'] ?? ''}',
+        logoUrl: json['logo'] as String?,
         catalogs: _asList(json['catalogs'])
             .whereType<Map<String, dynamic>>()
             .map(AIOStreamsCatalog.fromJson)
@@ -165,6 +167,7 @@ class AIOStreamsIntegration {
 
   final int id;
   final String name;
+  final String? logoUrl;
   final List<AIOStreamsCatalog> catalogs;
 }
 

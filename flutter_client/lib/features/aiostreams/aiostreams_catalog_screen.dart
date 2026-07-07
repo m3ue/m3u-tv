@@ -321,6 +321,8 @@ class AIOStreamsHomeScreen extends StatelessWidget {
       }
     }
 
+    final logoUrl = integrations.firstOrNull?.logoUrl;
+
     return Scaffold(
       body: DpadRegion(
         horizontalEdge: DpadEdgeBehavior.stop,
@@ -332,9 +334,26 @@ class AIOStreamsHomeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
           children: [
-            Text(
-              l.navAioStreams,
-              style: theme.textTheme.headlineMedium,
+            Row(
+              children: [
+                if (logoUrl != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      logoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, e, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Text(
+                  l.navAioStreams,
+                  style: theme.textTheme.headlineMedium,
+                ),
+              ],
             ),
             const SizedBox(height: MediaBrowsingMetrics.pagePadding),
             ...rows,
