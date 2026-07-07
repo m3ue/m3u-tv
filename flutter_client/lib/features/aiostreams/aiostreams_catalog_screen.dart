@@ -14,7 +14,8 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 String _catalogDisplayTitle(AppLocalizations l, AIOStreamsCatalog catalog) {
   final name = catalog.name;
   final lower = name.toLowerCase();
-  final hasTypeHint = lower.contains('movie') ||
+  final hasTypeHint =
+      lower.contains('movie') ||
       lower.contains('series') ||
       lower.contains('film') ||
       lower.contains('show') ||

@@ -61,7 +61,10 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               PlayerArgs(
                 streamUrl: stream.url,
                 title: title,
-                type: type,
+                // AIOStreams streams are on-demand VOD/series regardless of
+                // how the type is labelled in the Stremio catalog.
+                type: type == 'series' ? 'series' : 'vod',
+                headers: _proxyRequestHeaders(stream.behaviorHints),
                 metadata: <String, Object?>{
                   'aiostreams': true,
                   'source': stream.name,
@@ -73,6 +76,26 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// Extracts request headers that the player must send when opening this
+  /// stream. AIOStreams (and the Stremio addon spec) puts these under
+  /// behaviorHints.proxyHeaders.request — typically a User-Agent that the
+  /// debrid/CDN server requires.
+  static Map<String, String> _proxyRequestHeaders(
+    Map<String, dynamic> behaviorHints,
+  ) {
+    final proxyHeaders = behaviorHints['proxyHeaders'];
+    if (proxyHeaders is! Map) return const {};
+    final request = proxyHeaders['request'];
+    if (request is! Map) return const {};
+    final result = <String, String>{};
+    request.forEach((key, value) {
+      if (key is String && value is String && value.isNotEmpty) {
+        result[key] = value;
+      }
+    });
+    return result.isEmpty ? const {} : result;
   }
 
   @override
@@ -109,8 +132,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
           future: _metaFuture,
           builder: (context, snapshot) {
             final item = snapshot.data ?? widget.item;
-            final isLoading =
-                snapshot.connectionState != ConnectionState.done;
+            final isLoading = snapshot.connectionState != ConnectionState.done;
             if (_isSeries) {
               if (isLoading) {
                 return const Center(child: CircularProgressIndicator());
@@ -386,7 +408,9 @@ class _SeriesBodyState extends State<_SeriesBody> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < _wideBreakpoint) return _buildNarrow(context);
+        if (constraints.maxWidth < _wideBreakpoint) {
+          return _buildNarrow(context);
+        }
         return _buildWide(context);
       },
     );
@@ -1029,23 +1053,46 @@ class _StreamPickerSheetState extends State<_StreamPickerSheet> {
                         borderRadius: BorderRadius.zero,
                         onTap: () => widget.onStreamSelected(stream),
                         autofocus: index == 0,
-                        child: ListTile(
-                          leading: const Icon(Icons.play_circle_outline),
-                          title: Text(
-                            stream.name.isEmpty ? stream.title : stream.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          subtitle: stream.title.isEmpty
-                              ? null
-                              : Text(
-                                  stream.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      stream.name.isEmpty
+                                          ? stream.title
+                                          : stream.name,
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                    if (stream.title.isNotEmpty &&
+                                        stream.name.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        stream.title,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => widget.onStreamSelected(stream),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2, left: 8),
+                                child: Icon(Icons.chevron_right),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

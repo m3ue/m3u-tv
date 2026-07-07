@@ -44,17 +44,20 @@ class AIOStreamsVideo {
     this.released,
   });
 
-  factory AIOStreamsVideo.fromJson(Map<String, dynamic> json) => AIOStreamsVideo(
-    id: '${json['id'] ?? ''}',
-    title: '${json['title'] ?? json['name'] ?? ''}',
-    season: _parseInt(json['season']) ?? 0,
-    episode: _parseInt(json['episode']) ?? 0,
-    thumbnail: json['thumbnail'] as String?,
-    description: json['overview'] is String
-        ? json['overview'] as String
-        : (json['description'] is String ? json['description'] as String : null),
-    released: json['released'] as String?,
-  );
+  factory AIOStreamsVideo.fromJson(Map<String, dynamic> json) =>
+      AIOStreamsVideo(
+        id: '${json['id'] ?? ''}',
+        title: '${json['title'] ?? json['name'] ?? ''}',
+        season: _parseInt(json['season']) ?? 0,
+        episode: _parseInt(json['episode']) ?? 0,
+        thumbnail: json['thumbnail'] as String?,
+        description: json['overview'] is String
+            ? json['overview'] as String
+            : (json['description'] is String
+                  ? json['description'] as String
+                  : null),
+        released: json['released'] as String?,
+      );
 
   final String id;
   final String title;
