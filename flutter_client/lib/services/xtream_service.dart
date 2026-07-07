@@ -124,20 +124,71 @@ class XtreamRequest {
   };
 }
 
+class AIOStreamsCatalog {
+  const AIOStreamsCatalog({
+    required this.id,
+    required this.type,
+    required this.name,
+    this.searchable = false,
+  });
+
+  factory AIOStreamsCatalog.fromJson(Map<String, dynamic> json) =>
+      AIOStreamsCatalog(
+        id: '${json['id'] ?? ''}',
+        type: '${json['type'] ?? ''}',
+        name: '${json['name'] ?? ''}',
+        searchable: json['searchable'] == true,
+      );
+
+  final String id;
+  final String type;
+  final String name;
+  final bool searchable;
+}
+
+class AIOStreamsIntegration {
+  const AIOStreamsIntegration({
+    required this.id,
+    required this.name,
+    required this.catalogs,
+    this.logoUrl,
+  });
+
+  factory AIOStreamsIntegration.fromJson(Map<String, dynamic> json) =>
+      AIOStreamsIntegration(
+        id: _asInt(json['id']),
+        name: '${json['name'] ?? ''}',
+        logoUrl: json['logo'] as String?,
+        catalogs: _asList(json['catalogs'])
+            .whereType<Map<String, dynamic>>()
+            .map(AIOStreamsCatalog.fromJson)
+            .toList(growable: false),
+      );
+
+  final int id;
+  final String name;
+  final String? logoUrl;
+  final List<AIOStreamsCatalog> catalogs;
+}
+
 class XtreamAuthResponse {
   const XtreamAuthResponse({
     required this.isAuthenticated,
     this.status,
     this.m3uEditorVersion,
     this.features = const <String>[],
+    this.aiostreamsIntegrations = const <AIOStreamsIntegration>[],
   });
 
   final bool isAuthenticated;
   final String? status;
   final String? m3uEditorVersion;
   final List<String> features;
+  final List<AIOStreamsIntegration> aiostreamsIntegrations;
 
   bool hasFeature(String feature) => features.contains(feature);
+  bool get hasAioStreams =>
+      hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
 }
 
 class XtreamService {
@@ -198,11 +249,16 @@ class XtreamService {
         .map((feature) => '$feature')
         .where((feature) => feature.isNotEmpty)
         .toList(growable: false);
+    final aiostreamsIntegrations = _asList(m3uEditor['aiostreams'])
+        .whereType<Map<String, dynamic>>()
+        .map(AIOStreamsIntegration.fromJson)
+        .toList(growable: false);
     return XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
       m3uEditorVersion: '${m3uEditor['version'] ?? ''}',
       features: features,
+      aiostreamsIntegrations: aiostreamsIntegrations,
     );
   }
 

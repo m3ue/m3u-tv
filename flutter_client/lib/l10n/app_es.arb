@@ -206,4 +206,13 @@
   "searchTypeToSearch": "Escribe para buscar",
   "vodPlayMovie": "Reproducir película",
   "vodContinueMovie": "Continuar película"
+,
+  "navAioStreams": "AIOStreams",
+  "aiostreamsGetStreams": "Obtener fuentes",
+  "aiostreamsLoadingStreams": "Cargando fuentes…",
+  "aiostreamsNoStreams": "No se encontraron fuentes",
+  "aiostreamsSelectStream": "Seleccionar fuente",
+  "aiostreamsLoadMore": "Cargar más",
+  "aiostreamsSearchHint": "Buscar películas y series…",
+  "aiostrreamsCatalogEmpty": "Nada aquí todavía"
 }

@@ -206,4 +206,13 @@
   "searchTypeToSearch": "输入以搜索",
   "vodPlayMovie": "播放电影",
   "vodContinueMovie": "继续播放"
+,
+  "navAioStreams": "AIOStreams",
+  "aiostreamsGetStreams": "获取播放源",
+  "aiostreamsLoadingStreams": "正在加载播放源…",
+  "aiostreamsNoStreams": "未找到播放源",
+  "aiostreamsSelectStream": "选择播放源",
+  "aiostreamsLoadMore": "加载更多",
+  "aiostreamsSearchHint": "搜索电影和剧集…",
+  "aiostrreamsCatalogEmpty": "暂无内容"
 }

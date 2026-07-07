@@ -398,4 +398,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vodContinueMovie => '继续播放';
+
+  @override
+  String get navAioStreams => 'AIOStreams';
+
+  @override
+  String get aiostreamsGetStreams => '获取播放源';
+
+  @override
+  String get aiostreamsLoadingStreams => '正在加载播放源…';
+
+  @override
+  String get aiostreamsNoStreams => '未找到播放源';
+
+  @override
+  String get aiostreamsSelectStream => '选择播放源';
+
+  @override
+  String get aiostreamsLoadMore => '加载更多';
+
+  @override
+  String get aiostreamsSearchHint => '搜索电影和剧集…';
+
+  @override
+  String get aiostrreamsCatalogEmpty => '暂无内容';
 }

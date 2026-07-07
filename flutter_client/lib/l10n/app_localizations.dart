@@ -835,6 +835,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue movie'**
   String get vodContinueMovie;
+
+  /// No description provided for @navAioStreams.
+  ///
+  /// In en, this message translates to:
+  /// **'AIOStreams'**
+  String get navAioStreams;
+
+  /// No description provided for @aiostreamsGetStreams.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Streams'**
+  String get aiostreamsGetStreams;
+
+  /// No description provided for @aiostreamsLoadingStreams.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading streams…'**
+  String get aiostreamsLoadingStreams;
+
+  /// No description provided for @aiostreamsNoStreams.
+  ///
+  /// In en, this message translates to:
+  /// **'No streams found'**
+  String get aiostreamsNoStreams;
+
+  /// No description provided for @aiostreamsSelectStream.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a stream'**
+  String get aiostreamsSelectStream;
+
+  /// No description provided for @aiostreamsLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get aiostreamsLoadMore;
+
+  /// No description provided for @aiostreamsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search movies & series…'**
+  String get aiostreamsSearchHint;
+
+  /// No description provided for @aiostrreamsCatalogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here yet'**
+  String get aiostrreamsCatalogEmpty;
 }
 
 class _AppLocalizationsDelegate

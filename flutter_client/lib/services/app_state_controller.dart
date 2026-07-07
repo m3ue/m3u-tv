@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
 
+import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -210,6 +211,12 @@ class AppStateController extends ChangeNotifier {
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
   bool get hasRequestsFeature =>
       authNotifier.authResponse?.hasFeature('requests') ?? false;
+  bool get hasAioStreams => authNotifier.authResponse?.hasAioStreams ?? false;
+  List<AIOStreamsIntegration> get aiostreamsIntegrations =>
+      authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
+  late final AIOStreamsApiService aiostreamsApiService = AIOStreamsApiService(
+    xtreamService: xtreamService,
+  );
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
     AppSourceType.m3u => 'M3U',
