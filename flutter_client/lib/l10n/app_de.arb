@@ -206,12 +206,13 @@
   "searchTypeToSearch": "Zum Suchen tippen",
   "vodPlayMovie": "Film abspielen",
   "vodContinueMovie": "Film fortsetzen"
-  ,"navAioStreams": "Streaming",
-  "aiostreamsGetStreams": "Get Streams",
-  "aiostreamsLoadingStreams": "Loading streams…",
-  "aiostreamsNoStreams": "No streams found",
-  "aiostreamsSelectStream": "Select a stream",
-  "aiostreamsLoadMore": "Load more",
-  "aiostreamsSearchHint": "Search movies & series…",
-  "aiostrreamsCatalogEmpty": "Nothing here yet"
+,
+  "navAioStreams": "Streaming",
+  "aiostreamsGetStreams": "Streams laden",
+  "aiostreamsLoadingStreams": "Streams werden geladen…",
+  "aiostreamsNoStreams": "Keine Streams gefunden",
+  "aiostreamsSelectStream": "Stream auswählen",
+  "aiostreamsLoadMore": "Mehr laden",
+  "aiostreamsSearchHint": "Filme & Serien suchen…",
+  "aiostrreamsCatalogEmpty": "Noch nichts vorhanden"
 }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/features/notifications/notifications_screen.dart';
@@ -22,6 +23,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
+import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -43,6 +45,7 @@ String _routeLabel(BuildContext context, String route) {
     RouteNames.liveTv => l.navLiveTv,
     RouteNames.vod => l.navVod,
     RouteNames.series => l.navSeries,
+    RouteNames.aiostreams => l.navAioStreams,
     RouteNames.dvr => l.navDvr,
     RouteNames.requests => l.navRequests,
     RouteNames.notifications => l.navNotifications,
@@ -93,6 +96,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
 
   List<String> get _mainRoutes => RouteNames.mainRoutes
+      .where(
+        (route) => route != RouteNames.aiostreams || _appState.hasAioStreams,
+      )
       .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
       .where(
         (route) => route != RouteNames.requests || _appState.hasRequestsFeature,
@@ -554,6 +560,16 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             onSeriesSelect: _openSeries,
             onProgressSelect: _openProgress,
             onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
+            onAioStreamsItemSelect: (item, integrationId) => unawaited(
+              _pushDetail(
+                RouteNames.aiostreamsDetailsFor(
+                  integrationId,
+                  item.type,
+                  item.id,
+                ),
+                extra: item,
+              ),
+            ),
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.search => SearchScreen(
@@ -595,6 +611,21 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             isConfigured: _appState.isConfigured,
             onSeriesSelect: _openSeries,
             favoritesService: _appState.seriesFavoritesService,
+            onSidebarActivate: _activateSidebar,
+          ),
+          RouteNames.aiostreams => AIOStreamsHomeScreen(
+            integrations: _appState.aiostreamsIntegrations,
+            apiService: _appState.aiostreamsApiService,
+            onItemSelect: (item, integrationId) => unawaited(
+              _pushDetail(
+                RouteNames.aiostreamsDetailsFor(
+                  integrationId,
+                  item.type,
+                  item.id,
+                ),
+                extra: item,
+              ),
+            ),
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.dvr => DvrRecordingsScreen(
@@ -922,6 +953,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.aiostreams => Icons.stream,
     RouteNames.dvr => Icons.video_library,
     RouteNames.requests => Icons.playlist_add,
     RouteNames.notifications => Icons.notifications,
@@ -1061,6 +1093,7 @@ class NavigationSidebar extends StatelessWidget {
     RouteNames.liveTv => Icons.live_tv,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
+    RouteNames.aiostreams => Icons.stream,
     RouteNames.dvr => Icons.video_library,
     RouteNames.requests => Icons.playlist_add,
     RouteNames.notifications => Icons.notifications,
@@ -1284,6 +1317,7 @@ class _HomeScreen extends StatefulWidget {
     required this.onSeriesSelect,
     required this.onProgressSelect,
     required this.onRecordingsSelect,
+    required this.onAioStreamsItemSelect,
     this.onSidebarActivate,
   });
 
@@ -1293,6 +1327,7 @@ class _HomeScreen extends StatefulWidget {
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
   final VoidCallback onRecordingsSelect;
+  final void Function(AIOStreamsItem, int integrationId) onAioStreamsItemSelect;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -1472,6 +1507,17 @@ class _HomeScreenState extends State<_HomeScreen> {
           liveSection,
           moviesSection,
           seriesSection,
+          if (appState.hasAioStreams)
+            for (final integration in appState.aiostreamsIntegrations)
+              for (final catalog in integration.catalogs)
+                AIOStreamsCatalogRow(
+                  catalog: catalog,
+                  integrationId: integration.id,
+                  apiService: appState.aiostreamsApiService,
+                  onItemSelect: (item) =>
+                      widget.onAioStreamsItemSelect(item, integration.id),
+                  onSidebarActivate: widget.onSidebarActivate,
+                ),
           if (appState.hasDvrFeature) recordingsSection,
         ],
       ),

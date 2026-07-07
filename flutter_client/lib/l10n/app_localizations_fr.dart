@@ -409,4 +409,28 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vodContinueMovie => 'Continuer le film';
+
+  @override
+  String get navAioStreams => 'Streaming';
+
+  @override
+  String get aiostreamsGetStreams => 'Obtenir les sources';
+
+  @override
+  String get aiostreamsLoadingStreams => 'Chargement des sources…';
+
+  @override
+  String get aiostreamsNoStreams => 'Aucune source trouvée';
+
+  @override
+  String get aiostreamsSelectStream => 'Sélectionner une source';
+
+  @override
+  String get aiostreamsLoadMore => 'Charger plus';
+
+  @override
+  String get aiostreamsSearchHint => 'Rechercher films et séries…';
+
+  @override
+  String get aiostrreamsCatalogEmpty => 'Rien ici pour l\'instant';
 }
