@@ -445,7 +445,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                         title: p.title ?? itemId,
                         imageUrl: p.thumbnailUrl ?? p.backdropUrl,
                         subtitle: p.episodeTitle,
-                        overlayLabel: seOverlay,
+                        overlayLabel: seOverlay ?? p.year,
                         fallbackIcon: isSeries ? Icons.tv : Icons.movie,
                         fallbackTitle: p.title ?? itemId,
                         progressFraction: fraction,

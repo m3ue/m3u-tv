@@ -794,9 +794,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         progress.runtime ??
                         args.metadata['duration'] as String? ??
                         existing?.runtime,
-                    plot: progress.plot ?? existing?.plot,
+                    plot:
+                        progress.plot ??
+                        args.metadata['plot'] as String? ??
+                        existing?.plot,
                     genre: progress.genre ?? existing?.genre,
-                    year: progress.year ?? existing?.year,
+                    year:
+                        progress.year ??
+                        args.metadata['year'] as String? ??
+                        existing?.year,
                   );
                   final aioItemId = args.metadata['aio_item_id'] as String?;
                   final aioIntegrationId =

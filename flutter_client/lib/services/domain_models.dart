@@ -614,10 +614,10 @@ class Progress {
     completed: json['completed'] == true || json['completed'] == 1,
     seriesId: json.containsKey('series_id') ? _asInt(json['series_id']) : null,
     seasonNumber: json.containsKey('season_number')
-        ? _asInt(json['season_number'])
+        ? _asIntOrNull(json['season_number'])
         : null,
     episodeNumber: json.containsKey('episode_number')
-        ? _asInt(json['episode_number'])
+        ? _asIntOrNull(json['episode_number'])
         : null,
     title: json['title'] as String?,
     episodeTitle: json['episode_title'] as String?,
