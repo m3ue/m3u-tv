@@ -1564,17 +1564,6 @@ class _HomeScreenState extends State<_HomeScreen> {
           liveSection,
           moviesSection,
           seriesSection,
-          if (appState.hasAioStreams)
-            for (final integration in appState.aiostreamsIntegrations)
-              for (final catalog in integration.catalogs)
-                AIOStreamsCatalogRow(
-                  catalog: catalog,
-                  integrationId: integration.id,
-                  apiService: appState.aiostreamsApiService,
-                  onItemSelect: (item) =>
-                      widget.onAioStreamsItemSelect(item, integration.id),
-                  onSidebarActivate: widget.onSidebarActivate,
-                ),
           if (appState.hasDvrFeature) recordingsSection,
         ],
       ),
