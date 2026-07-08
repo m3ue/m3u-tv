@@ -187,16 +187,21 @@ class TraktService extends ChangeNotifier {
     int? season,
     int? episode,
     int? tmdbId,
+    String? imdbId,
     required double progress,
   }) async {
     final token = _accessToken;
     if (_status != TraktAuthStatus.connected || token == null) return;
+    final ids = <String, Object>{
+      if ((tmdbId ?? 0) > 0) 'tmdb': tmdbId!,
+      if (imdbId != null && imdbId.startsWith('tt')) 'imdb': imdbId,
+    };
     final Map<String, Object> body;
     if (seriesTitle != null && season != null && episode != null) {
       body = {
         'show': <String, Object>{
           'title': seriesTitle,
-          if ((tmdbId ?? 0) > 0) 'ids': <String, Object>{'tmdb': tmdbId!},
+          if (ids.isNotEmpty) 'ids': ids,
         },
         'episode': <String, Object>{'season': season, 'number': episode},
         'progress': progress,
@@ -205,7 +210,7 @@ class TraktService extends ChangeNotifier {
       body = {
         'movie': <String, Object>{
           'title': title,
-          if ((tmdbId ?? 0) > 0) 'ids': <String, Object>{'tmdb': tmdbId!},
+          if (ids.isNotEmpty) 'ids': ids,
         },
         'progress': progress,
       };

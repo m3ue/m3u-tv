@@ -214,6 +214,8 @@ GoRouter createGoRouter({
                         AIOStreamsSearchScreen(
                           integrations: actions.appState.aiostreamsIntegrations,
                           apiService: actions.appState.aiostreamsApiService,
+                          favoritesService:
+                              actions.appState.aioFavoritesService,
                           onItemSelect: (item, integrationId) {
                             context.go(
                               RouteNames.aiostreamsDetailsFor(
@@ -246,9 +248,8 @@ GoRouter createGoRouter({
                           item: item,
                           integrationId: integrationId,
                           apiService: actions.appState.aiostreamsApiService,
+                          progressList: actions.appState.progressList,
                           onPlay: actions.onOpenPlayer,
-                          favoritesService:
-                              actions.appState.aioFavoritesService,
                           onSidebarActivate: actions.onSidebarActivate,
                         ),
                       );

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
-import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -19,16 +19,16 @@ class AIOStreamsDetailScreen extends StatefulWidget {
     required this.integrationId,
     required this.apiService,
     required this.onPlay,
-    this.favoritesService,
     this.onSidebarActivate,
+    this.progressList = const [],
   });
 
   final AIOStreamsItem item;
   final int integrationId;
   final AIOStreamsApiService apiService;
   final void Function(PlayerArgs) onPlay;
-  final AIOStreamsFavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
+  final List<Progress> progressList;
 
   @override
   State<AIOStreamsDetailScreen> createState() => _AIOStreamsDetailScreenState();
@@ -41,41 +41,14 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
     widget.item.id,
   );
 
-  bool _isFavorite = false;
-
   bool get _isSeries => widget.item.type == 'series';
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadFavoriteState());
-  }
-
-  Future<void> _loadFavoriteState() async {
-    final fav = await widget.favoritesService?.isFavorite(widget.item.id);
-    if (mounted && fav != null) setState(() => _isFavorite = fav);
-  }
-
-  Future<void> _toggleFavorite(AIOStreamsItem item) async {
-    final service = widget.favoritesService;
-    if (service == null) return;
-    final nowFav = await service.toggle(
-      AIOStreamsFavoriteItem(
-        id: item.id,
-        type: item.type,
-        name: item.name,
-        integrationId: widget.integrationId,
-        poster: item.poster,
-      ),
-    );
-    if (mounted) setState(() => _isFavorite = nowFav);
-  }
 
   void _openStreamPicker({
     required AIOStreamsItem item,
     required String type,
     required String id,
     required String title,
+    AIOStreamsVideo? video,
   }) {
     unawaited(
       showModalBottomSheet<void>(
@@ -93,18 +66,26 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               PlayerArgs(
                 streamUrl: stream.url,
                 title: title,
-                // AIOStreams streams are on-demand VOD/series regardless of
-                // how the type is labelled in the Stremio catalog.
                 type: type == 'series' ? 'series' : 'vod',
                 headers: _proxyRequestHeaders(stream.behaviorHints),
                 metadata: <String, Object?>{
                   'aiostreams': true,
-                  // Used by the progress reporter in AppShell to identify AIO content.
                   'aio_item_id': widget.item.id,
                   'aio_integration_id': widget.integrationId,
+                  // For series: title is the series name; series_name drives the
+                  // Trakt show/episode branch in _scrobble().
                   'title': widget.item.name,
-                  'thumbnail_url': item.poster,
-                  'backdrop_url': item.background,
+                  if (type == 'series') 'series_name': widget.item.name,
+                  // Episodes use episode thumb; movies/series fall back to backdrop, then poster.
+                  'thumbnail_url':
+                      video?.thumbnail ?? item.background ?? item.poster,
+                  'backdrop_url': item.background ?? item.poster,
+                  if (video != null) 'season_number': video.season,
+                  if (video != null) 'episode_number': video.episode,
+                  if (video != null) 'episode_title': video.title,
+                  if (item.year != null) 'year': item.year,
+                  if (item.imdbRating != null) 'rating': item.imdbRating,
+                  if (item.description != null) 'plot': item.description,
                   'source': stream.name,
                   'quality': stream.title,
                 },
@@ -165,31 +146,6 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               ),
             ),
           ),
-          actions: widget.favoritesService != null
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: DpadFocusable(
-                      onSelect: () => unawaited(_toggleFavorite(widget.item)),
-                      effects: const [
-                        GradientBorderEffect(
-                          borderRadius: BorderRadius.all(Radius.circular(50)),
-                        ),
-                      ],
-                      child: IconButton(
-                        tooltip: AppLocalizations.of(
-                          context,
-                        ).aiostreamsToggleFavorite,
-                        icon: Icon(
-                          _isFavorite ? Icons.favorite : Icons.favorite_border,
-                        ),
-                        onPressed: () =>
-                            unawaited(_toggleFavorite(widget.item)),
-                      ),
-                    ),
-                  ),
-                ]
-              : null,
         ),
         body: FutureBuilder<AIOStreamsItem?>(
           future: _metaFuture,
@@ -202,13 +158,14 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               }
               return _SeriesBody(
                 item: item,
-                onEpisodeSelected: (episodeId, episodeTitle) =>
-                    _openStreamPicker(
-                      item: item,
-                      type: 'series',
-                      id: episodeId,
-                      title: episodeTitle,
-                    ),
+                progressList: widget.progressList,
+                onEpisodeSelected: (video) => _openStreamPicker(
+                  item: item,
+                  type: 'series',
+                  id: video.id,
+                  title: video.title.isNotEmpty ? video.title : item.name,
+                  video: video,
+                ),
               );
             }
             return _MovieBody(
@@ -428,10 +385,12 @@ class _SeriesBody extends StatefulWidget {
   const _SeriesBody({
     required this.item,
     required this.onEpisodeSelected,
+    this.progressList = const [],
   });
 
   final AIOStreamsItem item;
-  final void Function(String episodeId, String episodeTitle) onEpisodeSelected;
+  final void Function(AIOStreamsVideo video) onEpisodeSelected;
+  final List<Progress> progressList;
 
   @override
   State<_SeriesBody> createState() => _SeriesBodyState();
@@ -463,8 +422,7 @@ class _SeriesBodyState extends State<_SeriesBody> {
       season == null ? const [] : _episodesBySeason[season] ?? const [];
 
   void _onEpisodeTap(AIOStreamsVideo video) {
-    final title = video.title.isNotEmpty ? video.title : widget.item.name;
-    widget.onEpisodeSelected(video.id, title);
+    widget.onEpisodeSelected(video);
   }
 
   static const double _wideBreakpoint = 600;
@@ -549,6 +507,8 @@ class _SeriesBodyState extends State<_SeriesBody> {
                         )
                       : _AIOEpisodeList(
                           episodes: episodes,
+                          progressList: widget.progressList,
+                          itemId: widget.item.id,
                           onEpisodeSelected: _onEpisodeTap,
                         ),
                 ),
@@ -740,8 +700,17 @@ class _SeriesBodyState extends State<_SeriesBody> {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final ep = episodes[index];
+                final progress = widget.progressList
+                    .where(
+                      (p) =>
+                          p.aioItemId == widget.item.id &&
+                          p.seasonNumber == ep.season &&
+                          p.episodeNumber == ep.episode,
+                    )
+                    .firstOrNull;
                 return _AIOEpisodeTile(
                   video: ep,
+                  progress: progress,
                   autofocus: index == 0,
                   onTap: () => _onEpisodeTap(ep),
                 );
@@ -835,10 +804,14 @@ class _AIOEpisodeList extends StatelessWidget {
   const _AIOEpisodeList({
     required this.episodes,
     required this.onEpisodeSelected,
+    this.progressList = const [],
+    this.itemId,
   });
 
   final List<AIOStreamsVideo> episodes;
   final ValueChanged<AIOStreamsVideo> onEpisodeSelected;
+  final List<Progress> progressList;
+  final String? itemId;
 
   @override
   Widget build(BuildContext context) {
@@ -847,8 +820,17 @@ class _AIOEpisodeList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final ep = episodes[index];
+        final progress = progressList
+            .where(
+              (p) =>
+                  p.aioItemId == itemId &&
+                  p.seasonNumber == ep.season &&
+                  p.episodeNumber == ep.episode,
+            )
+            .firstOrNull;
         return _AIOEpisodeTile(
           video: ep,
+          progress: progress,
           autofocus: index == 0,
           onTap: () => onEpisodeSelected(ep),
         );
@@ -866,11 +848,13 @@ class _AIOEpisodeTile extends StatefulWidget {
     required this.video,
     required this.autofocus,
     required this.onTap,
+    this.progress,
   });
 
   final AIOStreamsVideo video;
   final bool autofocus;
   final VoidCallback onTap;
+  final Progress? progress;
 
   @override
   State<_AIOEpisodeTile> createState() => _AIOEpisodeTileState();
@@ -896,8 +880,13 @@ class _AIOEpisodeTileState extends State<_AIOEpisodeTile> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final video = widget.video;
+    final p = widget.progress;
+    final progressValue =
+        p != null && p.durationSeconds != null && p.durationSeconds! > 0
+        ? (p.positionSeconds / p.durationSeconds!).clamp(0.0, 1.0)
+        : null;
 
-    return MouseRegion(
+    final tile = MouseRegion(
       onEnter: (_) => _setHovered(true),
       onExit: (_) => _setHovered(false),
       child: DpadFocusable(
@@ -1004,6 +993,20 @@ class _AIOEpisodeTileState extends State<_AIOEpisodeTile> {
           ),
         ),
       ),
+    );
+
+    if (progressValue == null) return tile;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        tile,
+        LinearProgressIndicator(
+          value: progressValue,
+          minHeight: 3,
+          backgroundColor: colorScheme.surfaceContainerHighest,
+          valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+        ),
+      ],
     );
   }
 

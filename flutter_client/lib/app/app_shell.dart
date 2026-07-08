@@ -24,7 +24,6 @@ import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
-import 'package:m3u_tv/services/aiostreams_progress_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -628,7 +627,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               ),
             ),
             favoritesService: _appState.aioFavoritesService,
-            progressService: _appState.aioProgressService,
+            progressList: _appState.progressList,
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.dvr => DvrRecordingsScreen(
@@ -742,10 +741,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 xtreamService: _appState.xtreamService,
                 viewerId: viewerId,
                 progressReporter: (progress) {
+                  final aioLookupId = args.metadata['aio_item_id'] as String?;
                   final existing = _appState.progressList.firstWhereOrNull(
                     (p) =>
                         p.contentType == progress.contentType &&
-                        p.streamId == progress.streamId,
+                        (p.contentType == ContentType.aiostreams
+                            ? p.aioItemId == aioLookupId
+                            : p.streamId == progress.streamId),
                   );
                   final toSave = Progress(
                     viewerId: progress.viewerId,
@@ -757,7 +759,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     completed: progress.completed,
                     seriesId: progress.seriesId ?? existing?.seriesId,
                     seasonNumber:
-                        progress.seasonNumber ?? existing?.seasonNumber,
+                        progress.seasonNumber ??
+                        (args.metadata['season_number'] as int?) ??
+                        existing?.seasonNumber,
                     episodeNumber:
                         progress.episodeNumber ??
                         (args.metadata['episode_number'] as int?) ??
@@ -795,31 +799,45 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     year: progress.year ?? existing?.year,
                   );
                   final aioItemId = args.metadata['aio_item_id'] as String?;
-                  if (aioItemId != null) {
-                    final aioItem = AIOStreamsProgressItem(
-                      itemId: aioItemId,
-                      type: args.type,
-                      name: toSave.title ?? args.title,
-                      integrationId:
-                          (args.metadata['aio_integration_id'] as int?) ?? 0,
-                      positionSeconds: toSave.positionSeconds,
-                      durationSeconds: toSave.durationSeconds,
-                      poster: toSave.thumbnailUrl,
-                      lastWatched: DateTime.now(),
-                    );
-                    _appState.aioProgressService.updateEntry(aioItem);
+                  final aioIntegrationId =
+                      args.metadata['aio_integration_id'] as int?;
+                  final aioToSave = aioItemId != null
+                      ? Progress(
+                          viewerId: toSave.viewerId,
+                          contentType: ContentType.aiostreams,
+                          streamId: 0,
+                          positionSeconds: toSave.positionSeconds,
+                          durationSeconds: toSave.durationSeconds,
+                          completed: toSave.completed,
+                          seasonNumber: toSave.seasonNumber,
+                          episodeNumber: toSave.episodeNumber,
+                          title: toSave.title,
+                          episodeTitle: toSave.episodeTitle,
+                          thumbnailUrl: toSave.thumbnailUrl,
+                          backdropUrl: toSave.backdropUrl,
+                          rating: toSave.rating,
+                          runtime: toSave.runtime,
+                          plot: toSave.plot,
+                          genre: toSave.genre,
+                          year: toSave.year,
+                          aioItemId: aioItemId,
+                          aioIntegrationId: aioIntegrationId,
+                        )
+                      : null;
+                  if (aioToSave != null) {
+                    if (_appState.sourceType == AppSourceType.xtream) {
+                      unawaited(
+                        _appState.xtreamService
+                            .updateProgress(aioToSave)
+                            .catchError((_) {}),
+                      );
+                    }
                     unawaited(
-                      _appState.aiostreamsApiService
-                          .saveProgress(
-                            integrationId: aioItem.integrationId,
-                            itemId: aioItem.itemId,
-                            itemType: aioItem.type,
-                            name: aioItem.name,
-                            positionSeconds: aioItem.positionSeconds,
-                            durationSeconds: aioItem.durationSeconds,
-                            posterUrl: aioItem.poster,
-                          )
-                          .catchError((_) => null),
+                      _appState.resumeService.save(aioToSave).then((_) {
+                        if (mounted) {
+                          _appState.updateProgressEntry(aioToSave);
+                        }
+                      }),
                     );
                   } else {
                     if (_appState.sourceType == AppSourceType.xtream) {

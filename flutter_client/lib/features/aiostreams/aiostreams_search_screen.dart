@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
@@ -17,12 +18,14 @@ class AIOStreamsSearchScreen extends StatefulWidget {
     required this.integrations,
     required this.apiService,
     required this.onItemSelect,
+    this.favoritesService,
     this.onSidebarActivate,
   });
 
   final List<AIOStreamsIntegration> integrations;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem item, int integrationId) onItemSelect;
+  final AIOStreamsFavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -41,6 +44,7 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
   bool _loading = false;
   String _query = '';
   List<_SearchResult> _allResults = const [];
+  Set<String> _favoriteIds = const {};
 
   late final List<(AIOStreamsIntegration, AIOStreamsCatalog)> _searchable = [
     for (final integration in widget.integrations)
@@ -60,14 +64,46 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _searchFocus.requestFocus();
     });
+    widget.favoritesService?.addListener(_onFavoritesChanged);
+    unawaited(_loadFavorites());
+  }
+
+  @override
+  void didUpdateWidget(AIOStreamsSearchScreen old) {
+    super.didUpdateWidget(old);
+    if (old.favoritesService != widget.favoritesService) {
+      old.favoritesService?.removeListener(_onFavoritesChanged);
+      widget.favoritesService?.addListener(_onFavoritesChanged);
+      unawaited(_loadFavorites());
+    }
   }
 
   @override
   void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
     _tabController.dispose();
     _searchFocus.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
+
+  Future<void> _loadFavorites() async {
+    final favs = await widget.favoritesService?.all() ?? const [];
+    if (mounted) setState(() => _favoriteIds = favs.map((f) => f.id).toSet());
+  }
+
+  Future<void> _toggleFavorite(_SearchResult result) async {
+    await widget.favoritesService?.toggle(
+      AIOStreamsFavoriteItem(
+        id: result.item.id,
+        type: result.item.type,
+        name: result.item.name,
+        integrationId: result.integrationId,
+        poster: result.item.poster,
+      ),
+    );
   }
 
   void _onQueryChanged(String value) {
@@ -222,7 +258,13 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
           borderRadius: const BorderRadius.all(Radius.circular(8)),
           autofocus: index == 0,
           onTap: () => widget.onItemSelect(result.item, result.integrationId),
-          child: _ResultCard(item: result.item),
+          onLongTap: widget.favoritesService == null
+              ? null
+              : () => unawaited(_toggleFavorite(result)),
+          child: _ResultCard(
+            item: result.item,
+            isFavorite: _favoriteIds.contains(result.item.id),
+          ),
         );
       },
     );
@@ -237,9 +279,10 @@ class _SearchResult {
 }
 
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.item});
+  const _ResultCard({required this.item, this.isFavorite = false});
 
   final AIOStreamsItem item;
+  final bool isFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -248,9 +291,24 @@ class _ResultCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: ResilientMediaImage(
-            imageUrl: item.poster,
-            fallbackIcon: item.type == 'series' ? Icons.tv : Icons.movie,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ResilientMediaImage(
+                imageUrl: item.poster,
+                fallbackIcon: item.type == 'series' ? Icons.tv : Icons.movie,
+              ),
+              if (isFavorite)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Icon(
+                    Icons.star,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 4),

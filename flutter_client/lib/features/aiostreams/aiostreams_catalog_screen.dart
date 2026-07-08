@@ -8,7 +8,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
-import 'package:m3u_tv/services/aiostreams_progress_service.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -294,7 +294,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
     required this.apiService,
     required this.onItemSelect,
     this.favoritesService,
-    this.progressService,
+    this.progressList = const [],
     this.onSidebarActivate,
   });
 
@@ -302,7 +302,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem, int integrationId) onItemSelect;
   final AIOStreamsFavoritesService? favoritesService;
-  final AIOStreamsProgressService? progressService;
+  final List<Progress> progressList;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -312,6 +312,8 @@ class AIOStreamsHomeScreen extends StatefulWidget {
 class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
   List<AIOStreamsFavoriteItem> _favorites = const [];
 
+  Set<String> get _favoriteIds => _favorites.map((f) => f.id).toSet();
+
   bool get _hasSearchableCatalog => widget.integrations.any(
     (i) => i.catalogs.any((c) => c.searchable),
   );
@@ -320,7 +322,6 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
   void initState() {
     super.initState();
     widget.favoritesService?.addListener(_onFavoritesChanged);
-    widget.progressService?.addListener(_onProgressChanged);
     unawaited(_loadFavorites());
   }
 
@@ -332,22 +333,15 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
       widget.favoritesService?.addListener(_onFavoritesChanged);
       unawaited(_loadFavorites());
     }
-    if (old.progressService != widget.progressService) {
-      old.progressService?.removeListener(_onProgressChanged);
-      widget.progressService?.addListener(_onProgressChanged);
-    }
   }
 
   @override
   void dispose() {
     widget.favoritesService?.removeListener(_onFavoritesChanged);
-    widget.progressService?.removeListener(_onProgressChanged);
     super.dispose();
   }
 
   void _onFavoritesChanged() => unawaited(_loadFavorites());
-
-  void _onProgressChanged() => setState(() {});
 
   Future<void> _loadFavorites() async {
     final favs = await widget.favoritesService?.all() ?? const [];
@@ -369,8 +363,9 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
       );
     }
 
-    final continueWatching =
-        widget.progressService?.continueWatching ?? const [];
+    final continueWatching = widget.progressList
+        .where((p) => p.aioItemId != null && !p.completed)
+        .toList(growable: false);
     final logoUrl = widget.integrations.firstOrNull?.logoUrl;
 
     return Scaffold(
@@ -424,44 +419,76 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
             ),
             const SizedBox(height: MediaBrowsingMetrics.pagePadding),
 
-            // Continue Watching row
-            if (continueWatching.isNotEmpty) ...[
-              _SectionHeader(title: l.aiostreamsContinueWatching),
+            // Continue Watching row (landscape style to match home screen)
+            if (continueWatching.isNotEmpty)
               MediaPreviewSection(
-                title: '',
+                title: l.aiostreamsContinueWatching,
                 emptyLabel: '',
-                posterStyle: true,
+                landscapeStyle: true,
                 items: continueWatching
-                    .map(
-                      (p) => MediaPreviewItem(
-                        title: p.name,
-                        imageUrl: p.poster,
-                        subtitle: p.type,
-                        fallbackIcon: p.type == 'series'
-                            ? Icons.tv
-                            : Icons.movie,
-                        fallbackTitle: p.name,
+                    .map((p) {
+                      final fraction =
+                          (p.durationSeconds != null && p.durationSeconds! > 0)
+                          ? (p.positionSeconds / p.durationSeconds!).clamp(
+                              0.0,
+                              1.0,
+                            )
+                          : null;
+                      final isSeries =
+                          p.seasonNumber != null || p.episodeNumber != null;
+                      final itemId = p.aioItemId!;
+                      final integrationId = p.aioIntegrationId ?? 0;
+                      final seOverlay = p.seasonNumber != null
+                          ? 'S${p.seasonNumber}${p.episodeNumber != null ? ' E${p.episodeNumber}' : ''}'
+                          : null;
+                      return MediaPreviewItem(
+                        title: p.title ?? itemId,
+                        imageUrl: p.thumbnailUrl ?? p.backdropUrl,
+                        subtitle: p.episodeTitle,
+                        overlayLabel: seOverlay,
+                        fallbackIcon: isSeries ? Icons.tv : Icons.movie,
+                        fallbackTitle: p.title ?? itemId,
+                        progressFraction: fraction,
+                        isFavorite: _favoriteIds.contains(itemId),
+                        overlayBadges: <String>[
+                          if (p.rating != null) '★ ${p.rating}',
+                          if (p.runtime != null) p.runtime!,
+                        ],
                         onTap: () => widget.onItemSelect(
                           AIOStreamsItem(
-                            id: p.itemId,
-                            type: p.type,
-                            name: p.name,
-                            poster: p.poster,
+                            id: itemId,
+                            type: isSeries ? 'series' : 'movie',
+                            name: p.title ?? itemId,
+                            poster: p.thumbnailUrl,
+                            description: p.plot,
+                            year: p.year,
+                            imdbRating: p.rating,
                           ),
-                          p.integrationId,
+                          integrationId,
                         ),
-                      ),
-                    )
+                        onLongTap: widget.favoritesService == null
+                            ? null
+                            : () => unawaited(
+                                widget.favoritesService!.toggle(
+                                  AIOStreamsFavoriteItem(
+                                    id: itemId,
+                                    type: isSeries ? 'series' : 'movie',
+                                    name: p.title ?? itemId,
+                                    integrationId: integrationId,
+                                    poster: p.thumbnailUrl,
+                                  ),
+                                ),
+                              ),
+                      );
+                    })
                     .toList(growable: false),
                 onSidebarActivate: widget.onSidebarActivate,
               ),
-            ],
 
             // My Favorites row
-            if (_favorites.isNotEmpty) ...[
-              _SectionHeader(title: l.aiostreamsMyFavorites),
+            if (_favorites.isNotEmpty)
               MediaPreviewSection(
-                title: '',
+                title: l.aiostreamsMyFavorites,
                 emptyLabel: '',
                 posterStyle: true,
                 items: _favorites
@@ -474,6 +501,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                             ? Icons.tv
                             : Icons.movie,
                         fallbackTitle: fav.name,
+                        isFavorite: true,
                         onTap: () => widget.onItemSelect(
                           AIOStreamsItem(
                             id: fav.id,
@@ -483,12 +511,24 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                           ),
                           fav.integrationId,
                         ),
+                        onLongTap: widget.favoritesService == null
+                            ? null
+                            : () => unawaited(
+                                widget.favoritesService!.toggle(
+                                  AIOStreamsFavoriteItem(
+                                    id: fav.id,
+                                    type: fav.type,
+                                    name: fav.name,
+                                    integrationId: fav.integrationId,
+                                    poster: fav.poster,
+                                  ),
+                                ),
+                              ),
                       ),
                     )
                     .toList(growable: false),
                 onSidebarActivate: widget.onSidebarActivate,
               ),
-            ],
 
             // Catalog rows
             for (final integration in widget.integrations)
@@ -497,29 +537,13 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                   catalog: catalog,
                   integrationId: integration.id,
                   apiService: widget.apiService,
+                  favoritesService: widget.favoritesService,
+                  favoriteIds: _favoriteIds,
                   onItemSelect: (item) =>
                       widget.onItemSelect(item, integration.id),
                   onSidebarActivate: widget.onSidebarActivate,
                 ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -534,6 +558,8 @@ class AIOStreamsCatalogRow extends StatefulWidget {
     required this.integrationId,
     required this.apiService,
     required this.onItemSelect,
+    this.favoritesService,
+    this.favoriteIds = const {},
     this.onSidebarActivate,
   });
 
@@ -541,6 +567,8 @@ class AIOStreamsCatalogRow extends StatefulWidget {
   final int integrationId;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem) onItemSelect;
+  final AIOStreamsFavoritesService? favoritesService;
+  final Set<String> favoriteIds;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -579,7 +607,21 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
                   subtitle: item.year ?? item.type,
                   fallbackIcon: item.type == 'series' ? Icons.tv : Icons.movie,
                   fallbackTitle: item.name,
+                  isFavorite: widget.favoriteIds.contains(item.id),
                   onTap: () => widget.onItemSelect(item),
+                  onLongTap: widget.favoritesService == null
+                      ? null
+                      : () => unawaited(
+                          widget.favoritesService!.toggle(
+                            AIOStreamsFavoriteItem(
+                              id: item.id,
+                              type: item.type,
+                              name: item.name,
+                              integrationId: widget.integrationId,
+                              poster: item.poster,
+                            ),
+                          ),
+                        ),
                 ),
               )
               .toList(growable: false),
@@ -624,7 +666,7 @@ class _CatalogRowSkeleton extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: 6,
                   separatorBuilder: (_, _) =>
-                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
+                      const SizedBox(width: MediaBrowsingMetrics.itemGap),
                   itemBuilder: (_, _) => ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox(

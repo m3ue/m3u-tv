@@ -1,6 +1,6 @@
 // ignore_for_file: sort_constructors_first
 
-enum ContentType { live, vod, episode }
+enum ContentType { live, vod, episode, aiostreams }
 
 class UserCredentials {
   const UserCredentials({
@@ -572,6 +572,8 @@ class Progress {
     this.plot,
     this.genre,
     this.year,
+    this.aioItemId,
+    this.aioIntegrationId,
   });
 
   final String viewerId;
@@ -594,6 +596,9 @@ class Progress {
   final String? plot;
   final String? genre;
   final String? year;
+  // AIOStreams-specific identity (IMDb ID like tt1234567)
+  final String? aioItemId;
+  final int? aioIntegrationId;
 
   factory Progress.fromJson(
     Map<String, Object?> json, {
@@ -625,6 +630,10 @@ class Progress {
     plot: json['plot'] as String?,
     genre: json['genre'] as String?,
     year: json['year'] != null ? '${json['year']}' : null,
+    aioItemId: json['aio_item_id'] as String?,
+    aioIntegrationId: json.containsKey('aio_integration_id')
+        ? _asIntOrNull(json['aio_integration_id'])
+        : null,
   );
 
   Map<String, Object?> toJson() => {
@@ -648,6 +657,8 @@ class Progress {
     if (plot != null) 'plot': plot,
     if (genre != null) 'genre': genre,
     if (year != null) 'year': year,
+    if (aioItemId != null) 'aio_item_id': aioItemId,
+    if (aioIntegrationId != null) 'aio_integration_id': aioIntegrationId,
   };
 
   @override
@@ -656,7 +667,10 @@ class Progress {
       other is Progress &&
           viewerId == other.viewerId &&
           contentType == other.contentType &&
-          streamId == other.streamId &&
+          // AIO items are keyed by aioItemId, not streamId.
+          (contentType == ContentType.aiostreams
+              ? aioItemId == other.aioItemId
+              : streamId == other.streamId) &&
           positionSeconds == other.positionSeconds &&
           durationSeconds == other.durationSeconds &&
           completed == other.completed &&
@@ -667,7 +681,7 @@ class Progress {
   int get hashCode => Object.hash(
     viewerId,
     contentType,
-    streamId,
+    contentType == ContentType.aiostreams ? aioItemId : streamId,
     positionSeconds,
     durationSeconds,
     completed,
@@ -681,12 +695,14 @@ extension ContentTypeWire on ContentType {
     ContentType.live => 'live',
     ContentType.vod => 'vod',
     ContentType.episode => 'episode',
+    ContentType.aiostreams => 'aiostreams',
   };
 }
 
 ContentType contentTypeFromWire(String value) => switch (value) {
   'live' => ContentType.live,
   'episode' => ContentType.episode,
+  'aiostreams' => ContentType.aiostreams,
   _ => ContentType.vod,
 };
 

@@ -166,6 +166,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         season: args.seasonNumber ?? args.metadata['season_number'] as int?,
         episode: args.metadata['episode_number'] as int?,
         tmdbId: args.metadata['tmdb_id'] as int?,
+        imdbId: args.metadata['aio_item_id'] as String?,
         progress: progress,
       ),
     );
