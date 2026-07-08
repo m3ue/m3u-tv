@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -20,7 +21,7 @@ class AIOStreamsDetailScreen extends StatefulWidget {
     required this.apiService,
     required this.onPlay,
     this.onSidebarActivate,
-    this.progressList = const [],
+    this.appStateController,
   });
 
   final AIOStreamsItem item;
@@ -28,7 +29,7 @@ class AIOStreamsDetailScreen extends StatefulWidget {
   final AIOStreamsApiService apiService;
   final void Function(PlayerArgs) onPlay;
   final VoidCallback? onSidebarActivate;
-  final List<Progress> progressList;
+  final AppStateController? appStateController;
 
   @override
   State<AIOStreamsDetailScreen> createState() => _AIOStreamsDetailScreenState();
@@ -55,7 +56,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => _StreamPickerSheet(
+        builder: (_) => AIOStreamsStreamPickerSheet(
           integrationId: widget.integrationId,
           type: type,
           id: id,
@@ -158,7 +159,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               }
               return _SeriesBody(
                 item: item,
-                progressList: widget.progressList,
+                appStateController: widget.appStateController,
                 onEpisodeSelected: (video) => _openStreamPicker(
                   item: item,
                   type: 'series',
@@ -385,12 +386,12 @@ class _SeriesBody extends StatefulWidget {
   const _SeriesBody({
     required this.item,
     required this.onEpisodeSelected,
-    this.progressList = const [],
+    this.appStateController,
   });
 
   final AIOStreamsItem item;
   final void Function(AIOStreamsVideo video) onEpisodeSelected;
-  final List<Progress> progressList;
+  final AppStateController? appStateController;
 
   @override
   State<_SeriesBody> createState() => _SeriesBodyState();
@@ -398,6 +399,16 @@ class _SeriesBody extends StatefulWidget {
 
 class _SeriesBodyState extends State<_SeriesBody> {
   int? _selectedSeason;
+
+  List<Progress> get _progressForSeries =>
+      widget.appStateController?.progressList
+          .where(
+            (p) =>
+                p.contentType == ContentType.aiostreams &&
+                p.aioItemId == widget.item.id,
+          )
+          .toList() ??
+      const [];
 
   Map<int, List<AIOStreamsVideo>> get _episodesBySeason {
     final map = <int, List<AIOStreamsVideo>>{};
@@ -429,6 +440,17 @@ class _SeriesBodyState extends State<_SeriesBody> {
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.appStateController;
+    if (controller != null) {
+      return ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => _buildLayout(context),
+      );
+    }
+    return _buildLayout(context);
+  }
+
+  Widget _buildLayout(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < _wideBreakpoint) {
@@ -507,7 +529,7 @@ class _SeriesBodyState extends State<_SeriesBody> {
                         )
                       : _AIOEpisodeList(
                           episodes: episodes,
-                          progressList: widget.progressList,
+                          progressList: _progressForSeries,
                           itemId: widget.item.id,
                           onEpisodeSelected: _onEpisodeTap,
                         ),
@@ -700,7 +722,7 @@ class _SeriesBodyState extends State<_SeriesBody> {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final ep = episodes[index];
-                final progress = widget.progressList
+                final progress = _progressForSeries
                     .where(
                       (p) =>
                           p.aioItemId == widget.item.id &&
@@ -1031,8 +1053,10 @@ class _AIOEpisodeTileState extends State<_AIOEpisodeTile> {
 // Stream picker bottom sheet
 // ---------------------------------------------------------------------------
 
-class _StreamPickerSheet extends StatefulWidget {
-  const _StreamPickerSheet({
+/// Public stream-picker bottom sheet — reused by continue-watching flows.
+class AIOStreamsStreamPickerSheet extends StatefulWidget {
+  const AIOStreamsStreamPickerSheet({
+    super.key,
     required this.integrationId,
     required this.type,
     required this.id,
@@ -1047,10 +1071,12 @@ class _StreamPickerSheet extends StatefulWidget {
   final void Function(AIOStreamsStream) onStreamSelected;
 
   @override
-  State<_StreamPickerSheet> createState() => _StreamPickerSheetState();
+  State<AIOStreamsStreamPickerSheet> createState() =>
+      _AIOStreamsStreamPickerSheetState();
 }
 
-class _StreamPickerSheetState extends State<_StreamPickerSheet> {
+class _AIOStreamsStreamPickerSheetState
+    extends State<AIOStreamsStreamPickerSheet> {
   late final Future<List<AIOStreamsStream>> _future = widget.apiService
       .getStreams(widget.integrationId, widget.type, widget.id);
 

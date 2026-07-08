@@ -626,6 +626,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 extra: item,
               ),
             ),
+            onPlay: _openPlayerFromActions,
             favoritesService: _appState.aioFavoritesService,
             progressList: _appState.progressList,
             onSidebarActivate: _activateSidebar,

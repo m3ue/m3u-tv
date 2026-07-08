@@ -248,7 +248,7 @@ GoRouter createGoRouter({
                           item: item,
                           integrationId: integrationId,
                           apiService: actions.appState.aiostreamsApiService,
-                          progressList: actions.appState.progressList,
+                          appStateController: actions.appState,
                           onPlay: actions.onOpenPlayer,
                           onSidebarActivate: actions.onSidebarActivate,
                         ),

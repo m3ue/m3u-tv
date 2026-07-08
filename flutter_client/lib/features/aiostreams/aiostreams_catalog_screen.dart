@@ -4,7 +4,10 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
+import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
@@ -293,6 +296,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
     required this.integrations,
     required this.apiService,
     required this.onItemSelect,
+    required this.onPlay,
     this.favoritesService,
     this.progressList = const [],
     this.onSidebarActivate,
@@ -301,6 +305,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
   final List<AIOStreamsIntegration> integrations;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem, int integrationId) onItemSelect;
+  final void Function(PlayerArgs) onPlay;
   final AIOStreamsFavoritesService? favoritesService;
   final List<Progress> progressList;
   final VoidCallback? onSidebarActivate;
@@ -350,6 +355,105 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
 
   void _openSearch(BuildContext context) {
     context.go(RouteNames.aiostreamsSearchPath);
+  }
+
+  Future<void> _playContinueWatching(
+    BuildContext context, {
+    required Progress progress,
+    required String itemId,
+    required int integrationId,
+    required bool isSeries,
+  }) async {
+    // 1. Resume modal when there is meaningful progress.
+    double startPosition = 0;
+    if (progress.positionSeconds > 0 && !progress.completed) {
+      final chosen = await showResumeModal(
+        context,
+        title: progress.title ?? itemId,
+        positionSeconds: progress.positionSeconds,
+      );
+      if (chosen == null) return; // dismissed
+      startPosition = chosen;
+    }
+
+    if (!context.mounted) return;
+
+    // 2. Build the stream ID. Series episodes use the Stremio
+    //    "{seriesId}:{season}:{episode}" convention.
+    final streamId =
+        isSeries &&
+            progress.seasonNumber != null &&
+            progress.episodeNumber != null
+        ? '$itemId:${progress.seasonNumber}:${progress.episodeNumber}'
+        : itemId;
+    final type = isSeries ? 'series' : 'movie';
+    final title = isSeries && progress.episodeTitle != null
+        ? '${progress.title ?? itemId} — ${progress.episodeTitle}'
+        : progress.title ?? itemId;
+
+    // 3. Show stream picker, then play.
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AIOStreamsStreamPickerSheet(
+        integrationId: integrationId,
+        type: type,
+        id: streamId,
+        apiService: widget.apiService,
+        onStreamSelected: (stream) {
+          Navigator.of(context).pop();
+          widget.onPlay(
+            PlayerArgs(
+              streamUrl: stream.url,
+              title: title,
+              type: type,
+              startPosition: startPosition,
+              headers: _proxyRequestHeaders(stream.behaviorHints),
+              metadata: <String, Object?>{
+                'aiostreams': true,
+                'aio_item_id': itemId,
+                'aio_integration_id': integrationId,
+                'title': progress.title ?? itemId,
+                if (isSeries && progress.title != null)
+                  'series_name': progress.title,
+                if (progress.thumbnailUrl != null)
+                  'thumbnail_url': progress.thumbnailUrl,
+                if (progress.backdropUrl != null)
+                  'backdrop_url': progress.backdropUrl,
+                if (progress.seasonNumber != null)
+                  'season_number': progress.seasonNumber,
+                if (progress.episodeNumber != null)
+                  'episode_number': progress.episodeNumber,
+                if (progress.episodeTitle != null)
+                  'episode_title': progress.episodeTitle,
+                if (progress.year != null) 'year': progress.year,
+                if (progress.rating != null) 'rating': progress.rating,
+                if (progress.plot != null) 'plot': progress.plot,
+                'source': stream.name,
+                'quality': stream.title,
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static Map<String, String> _proxyRequestHeaders(
+    Map<String, dynamic> behaviorHints,
+  ) {
+    final proxyHeaders = behaviorHints['proxyHeaders'];
+    if (proxyHeaders is! Map) return const {};
+    final request = proxyHeaders['request'];
+    if (request is! Map) return const {};
+    final result = <String, String>{};
+    request.forEach((key, value) {
+      if (key is String && value is String && value.isNotEmpty) {
+        result[key] = value;
+      }
+    });
+    return result.isEmpty ? const {} : result;
   }
 
   @override
@@ -454,17 +558,12 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                           if (p.rating != null) '★ ${p.rating}',
                           if (p.runtime != null) p.runtime!,
                         ],
-                        onTap: () => widget.onItemSelect(
-                          AIOStreamsItem(
-                            id: itemId,
-                            type: isSeries ? 'series' : 'movie',
-                            name: p.title ?? itemId,
-                            poster: p.thumbnailUrl,
-                            description: p.plot,
-                            year: p.year,
-                            imdbRating: p.rating,
-                          ),
-                          integrationId,
+                        onTap: () => _playContinueWatching(
+                          context,
+                          progress: p,
+                          itemId: itemId,
+                          integrationId: integrationId,
+                          isSeries: isSeries,
                         ),
                         onLongTap: widget.favoritesService == null
                             ? null
