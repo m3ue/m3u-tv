@@ -50,6 +50,7 @@ class RouteNames {
   static const String seriesDetailsPath = '/series/details/:seriesId';
   static const String aiostreamsDetailsPath =
       '/aiostreams/details/:integrationId/:type/:id';
+  static const String aiostreamsSearchPath = '/aiostreams/search';
 
   /// Builds a path to a VOD details screen for deep linking.
   static String vodDetailsFor(int vodId) => '/vod/details/$vodId';

@@ -214,5 +214,12 @@
   "aiostreamsSelectStream": "Seleccionar fuente",
   "aiostreamsLoadMore": "Cargar más",
   "aiostreamsSearchHint": "Buscar películas y series…",
-  "aiostrreamsCatalogEmpty": "Nada aquí todavía"
+  "aiostrreamsCatalogEmpty": "Nada aquí todavía",
+  "aiostreamsToggleFavorite": "Favorito",
+  "aiostreamsMyFavorites": "Mis Favoritos",
+  "aiostreamsContinueWatching": "Continuar Viendo",
+  "aiostreamsSearch": "Buscar en AIOStreams",
+  "aiostreamsSearchResults": "Resultados de búsqueda",
+  "aiostreamsNoResults": "No se encontraron resultados",
+  "aiostreamsSearchAll": "Todo"
 }

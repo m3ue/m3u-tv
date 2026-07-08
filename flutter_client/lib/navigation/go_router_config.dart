@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show AppShell, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -206,6 +207,29 @@ GoRouter createGoRouter({
                 ),
                 routes: [
                   GoRoute(
+                    path: 'search',
+                    pageBuilder: (context, state) {
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        AIOStreamsSearchScreen(
+                          integrations: actions.appState.aiostreamsIntegrations,
+                          apiService: actions.appState.aiostreamsApiService,
+                          onItemSelect: (item, integrationId) {
+                            context.go(
+                              RouteNames.aiostreamsDetailsFor(
+                                integrationId,
+                                item.type,
+                                item.id,
+                              ),
+                              extra: item,
+                            );
+                          },
+                          onSidebarActivate: actions.onSidebarActivate,
+                        ),
+                      );
+                    },
+                  ),
+                  GoRoute(
                     path: 'details/:integrationId/:type/:id',
                     pageBuilder: (context, state) {
                       final integrationId = int.parse(
@@ -223,6 +247,8 @@ GoRouter createGoRouter({
                           integrationId: integrationId,
                           apiService: actions.appState.aiostreamsApiService,
                           onPlay: actions.onOpenPlayer,
+                          favoritesService:
+                              actions.appState.aioFavoritesService,
                           onSidebarActivate: actions.onSidebarActivate,
                         ),
                       );

@@ -3,10 +3,15 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
+import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
+import 'package:m3u_tv/services/aiostreams_progress_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Returns a display-friendly title for a catalog, appending the media type
@@ -280,60 +285,106 @@ class _CatalogItemCard extends StatelessWidget {
 }
 
 /// Top-level screen for the AIOStreams nav tab.
-/// Shows all integrations with their catalogs as horizontal rows.
-class AIOStreamsHomeScreen extends StatelessWidget {
+/// Shows all integrations with their catalogs as horizontal rows,
+/// plus optional Continue Watching, My Favorites, and Search sections.
+class AIOStreamsHomeScreen extends StatefulWidget {
   const AIOStreamsHomeScreen({
     super.key,
     required this.integrations,
     required this.apiService,
     required this.onItemSelect,
+    this.favoritesService,
+    this.progressService,
     this.onSidebarActivate,
   });
 
   final List<AIOStreamsIntegration> integrations;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem, int integrationId) onItemSelect;
+  final AIOStreamsFavoritesService? favoritesService;
+  final AIOStreamsProgressService? progressService;
   final VoidCallback? onSidebarActivate;
+
+  @override
+  State<AIOStreamsHomeScreen> createState() => _AIOStreamsHomeScreenState();
+}
+
+class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
+  List<AIOStreamsFavoriteItem> _favorites = const [];
+
+  bool get _hasSearchableCatalog => widget.integrations.any(
+    (i) => i.catalogs.any((c) => c.searchable),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.favoritesService?.addListener(_onFavoritesChanged);
+    widget.progressService?.addListener(_onProgressChanged);
+    unawaited(_loadFavorites());
+  }
+
+  @override
+  void didUpdateWidget(AIOStreamsHomeScreen old) {
+    super.didUpdateWidget(old);
+    if (old.favoritesService != widget.favoritesService) {
+      old.favoritesService?.removeListener(_onFavoritesChanged);
+      widget.favoritesService?.addListener(_onFavoritesChanged);
+      unawaited(_loadFavorites());
+    }
+    if (old.progressService != widget.progressService) {
+      old.progressService?.removeListener(_onProgressChanged);
+      widget.progressService?.addListener(_onProgressChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
+    widget.progressService?.removeListener(_onProgressChanged);
+    super.dispose();
+  }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
+
+  void _onProgressChanged() => setState(() {});
+
+  Future<void> _loadFavorites() async {
+    final favs = await widget.favoritesService?.all() ?? const [];
+    if (mounted) setState(() => _favorites = favs);
+  }
+
+  void _openSearch(BuildContext context) {
+    context.go(RouteNames.aiostreamsSearchPath);
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    if (integrations.isEmpty) {
+    if (widget.integrations.isEmpty) {
       return Scaffold(
         body: Center(child: Text(l.aiostrreamsCatalogEmpty)),
       );
     }
 
-    final rows = <Widget>[];
-    for (final integration in integrations) {
-      for (final catalog in integration.catalogs) {
-        rows.add(
-          AIOStreamsCatalogRow(
-            catalog: catalog,
-            integrationId: integration.id,
-            apiService: apiService,
-            onItemSelect: (item) => onItemSelect(item, integration.id),
-            onSidebarActivate: onSidebarActivate,
-          ),
-        );
-      }
-    }
-
-    final logoUrl = integrations.firstOrNull?.logoUrl;
+    final continueWatching =
+        widget.progressService?.continueWatching ?? const [];
+    final logoUrl = widget.integrations.firstOrNull?.logoUrl;
 
     return Scaffold(
       body: DpadRegion(
         horizontalEdge: DpadEdgeBehavior.stop,
         onEdge: (direction) {
           if (direction == TraversalDirection.left) {
-            onSidebarActivate?.call();
+            widget.onSidebarActivate?.call();
           }
         },
         child: ListView(
           padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
           children: [
+            // Header row: logo + title + optional search button
             Row(
               children: [
                 if (logoUrl != null) ...[
@@ -344,20 +395,131 @@ class AIOStreamsHomeScreen extends StatelessWidget {
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, e, _) => const SizedBox.shrink(),
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                   const SizedBox(width: 12),
                 ],
-                Text(
-                  l.navAioStreams,
-                  style: theme.textTheme.headlineMedium,
+                Expanded(
+                  child: Text(
+                    l.navAioStreams,
+                    style: theme.textTheme.headlineMedium,
+                  ),
                 ),
+                if (_hasSearchableCatalog)
+                  DpadFocusable(
+                    onSelect: () => _openSearch(context),
+                    effects: const [
+                      GradientBorderEffect(
+                        borderRadius: BorderRadius.all(Radius.circular(50)),
+                      ),
+                    ],
+                    child: IconButton(
+                      tooltip: l.aiostreamsSearch,
+                      icon: const Icon(Icons.search),
+                      onPressed: () => _openSearch(context),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-            ...rows,
+
+            // Continue Watching row
+            if (continueWatching.isNotEmpty) ...[
+              _SectionHeader(title: l.aiostreamsContinueWatching),
+              MediaPreviewSection(
+                title: '',
+                emptyLabel: '',
+                posterStyle: true,
+                items: continueWatching
+                    .map(
+                      (p) => MediaPreviewItem(
+                        title: p.name,
+                        imageUrl: p.poster,
+                        subtitle: p.type,
+                        fallbackIcon: p.type == 'series'
+                            ? Icons.tv
+                            : Icons.movie,
+                        fallbackTitle: p.name,
+                        onTap: () => widget.onItemSelect(
+                          AIOStreamsItem(
+                            id: p.itemId,
+                            type: p.type,
+                            name: p.name,
+                            poster: p.poster,
+                          ),
+                          p.integrationId,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onSidebarActivate: widget.onSidebarActivate,
+              ),
+            ],
+
+            // My Favorites row
+            if (_favorites.isNotEmpty) ...[
+              _SectionHeader(title: l.aiostreamsMyFavorites),
+              MediaPreviewSection(
+                title: '',
+                emptyLabel: '',
+                posterStyle: true,
+                items: _favorites
+                    .map(
+                      (fav) => MediaPreviewItem(
+                        title: fav.name,
+                        imageUrl: fav.poster,
+                        subtitle: fav.type,
+                        fallbackIcon: fav.type == 'series'
+                            ? Icons.tv
+                            : Icons.movie,
+                        fallbackTitle: fav.name,
+                        onTap: () => widget.onItemSelect(
+                          AIOStreamsItem(
+                            id: fav.id,
+                            type: fav.type,
+                            name: fav.name,
+                            poster: fav.poster,
+                          ),
+                          fav.integrationId,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onSidebarActivate: widget.onSidebarActivate,
+              ),
+            ],
+
+            // Catalog rows
+            for (final integration in widget.integrations)
+              for (final catalog in integration.catalogs)
+                AIOStreamsCatalogRow(
+                  catalog: catalog,
+                  integrationId: integration.id,
+                  apiService: widget.apiService,
+                  onItemSelect: (item) =>
+                      widget.onItemSelect(item, integration.id),
+                  onSidebarActivate: widget.onSidebarActivate,
+                ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -399,6 +561,11 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
     return FutureBuilder<List<AIOStreamsItem>>(
       future: _future,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _CatalogRowSkeleton(
+            title: _catalogDisplayTitle(l, widget.catalog),
+          );
+        }
         final items = snapshot.data ?? const [];
         return MediaPreviewSection(
           title: _catalogDisplayTitle(l, widget.catalog),
@@ -419,6 +586,58 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
           onSidebarActivate: widget.onSidebarActivate,
         );
       },
+    );
+  }
+}
+
+class _CatalogRowSkeleton extends StatelessWidget {
+  const _CatalogRowSkeleton({required this.title});
+
+  final String title;
+
+  // Mirrors MediaPreviewSection._previewCardScale.
+  double _scale(double availableWidth) {
+    if (availableWidth >= 1600) return 1;
+    return (availableWidth / 1280.0).clamp(1.0, 1.15);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.surfaceContainerHigh;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.textTheme.titleLarge),
+          const SizedBox(height: MediaBrowsingMetrics.chipGap),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = _scale(constraints.maxWidth);
+              final cardWidth = MediaBrowsingMetrics.posterCardWidth * scale;
+              final cardHeight = MediaBrowsingMetrics.posterCardHeight * scale;
+              return SizedBox(
+                height: cardHeight + 16,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: 6,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: MediaBrowsingMetrics.chipGap),
+                  itemBuilder: (_, _) => ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: cardWidth,
+                      child: ColoredBox(color: color),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

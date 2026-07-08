@@ -213,5 +213,12 @@
   "aiostreamsSelectStream": "Select a stream",
   "aiostreamsLoadMore": "Load more",
   "aiostreamsSearchHint": "Search movies & series…",
-  "aiostrreamsCatalogEmpty": "Nothing here yet"
+  "aiostrreamsCatalogEmpty": "Nothing here yet",
+  "aiostreamsToggleFavorite": "Favorite",
+  "aiostreamsMyFavorites": "My Favorites",
+  "aiostreamsContinueWatching": "Continue Watching",
+  "aiostreamsSearch": "Search AIOStreams",
+  "aiostreamsSearchResults": "Search Results",
+  "aiostreamsNoResults": "No results found",
+  "aiostreamsSearchAll": "All"
 }

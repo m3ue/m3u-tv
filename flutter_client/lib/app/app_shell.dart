@@ -24,6 +24,7 @@ import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_progress_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -626,6 +627,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 extra: item,
               ),
             ),
+            favoritesService: _appState.aioFavoritesService,
+            progressService: _appState.aioProgressService,
             onSidebarActivate: _activateSidebar,
           ),
           RouteNames.dvr => DvrRecordingsScreen(
@@ -791,18 +794,47 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     genre: progress.genre ?? existing?.genre,
                     year: progress.year ?? existing?.year,
                   );
-                  if (_appState.sourceType == AppSourceType.xtream) {
+                  final aioItemId = args.metadata['aio_item_id'] as String?;
+                  if (aioItemId != null) {
+                    final aioItem = AIOStreamsProgressItem(
+                      itemId: aioItemId,
+                      type: args.type,
+                      name: toSave.title ?? args.title,
+                      integrationId:
+                          (args.metadata['aio_integration_id'] as int?) ?? 0,
+                      positionSeconds: toSave.positionSeconds,
+                      durationSeconds: toSave.durationSeconds,
+                      poster: toSave.thumbnailUrl,
+                      lastWatched: DateTime.now(),
+                    );
+                    _appState.aioProgressService.updateEntry(aioItem);
                     unawaited(
-                      _appState.xtreamService
-                          .updateProgress(toSave)
-                          .catchError((_) {}),
+                      _appState.aiostreamsApiService
+                          .saveProgress(
+                            integrationId: aioItem.integrationId,
+                            itemId: aioItem.itemId,
+                            itemType: aioItem.type,
+                            name: aioItem.name,
+                            positionSeconds: aioItem.positionSeconds,
+                            durationSeconds: aioItem.durationSeconds,
+                            posterUrl: aioItem.poster,
+                          )
+                          .catchError((_) => null),
+                    );
+                  } else {
+                    if (_appState.sourceType == AppSourceType.xtream) {
+                      unawaited(
+                        _appState.xtreamService
+                            .updateProgress(toSave)
+                            .catchError((_) {}),
+                      );
+                    }
+                    unawaited(
+                      _appState.resumeService.save(toSave).then((_) {
+                        if (mounted) _appState.updateProgressEntry(toSave);
+                      }),
                     );
                   }
-                  unawaited(
-                    _appState.resumeService.save(toSave).then((_) {
-                      if (mounted) _appState.updateProgressEntry(toSave);
-                    }),
-                  );
                 },
                 traktService: _appState.traktService,
                 onClose: _closePlayer,

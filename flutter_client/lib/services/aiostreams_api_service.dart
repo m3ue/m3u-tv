@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:m3u_tv/services/aiostreams_progress_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 /// A stream option returned by AIOStreams for a given IMDb/TMDB content ID.
@@ -157,6 +158,31 @@ class AIOStreamsApiService {
     }
   }
 
+  Future<Object?> _post(Uri uri, Map<String, String> fields) async {
+    try {
+      final request = await _httpClient.postUrl(uri);
+      final body = fields.entries
+          .map(
+            (e) =>
+                '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+          )
+          .join('&');
+      request.headers
+        ..set(
+          HttpHeaders.contentTypeHeader,
+          'application/x-www-form-urlencoded',
+        )
+        ..set(HttpHeaders.contentLengthHeader, body.length);
+      request.write(body);
+      final response = await request.close();
+      if (response.statusCode != HttpStatus.ok) return null;
+      final responseBody = await utf8.decodeStream(response);
+      return jsonDecode(responseBody);
+    } on Exception catch (_) {
+      return null;
+    }
+  }
+
   /// Browse a catalog. Returns a list of meta items.
   Future<List<AIOStreamsItem>> getCatalog(
     int integrationId,
@@ -222,5 +248,64 @@ class AIOStreamsApiService {
     if (meta is! Map<String, dynamic>) return null;
 
     return AIOStreamsItem.fromJson(meta);
+  }
+
+  /// Load all in-progress (non-completed) items for the current user from the server.
+  Future<List<AIOStreamsProgressItem>> loadProgress() async {
+    final uri = Uri.parse('$_base/progress');
+    try {
+      final request = await _httpClient.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode != HttpStatus.ok) return const [];
+      final body = await utf8.decodeStream(response);
+      final decoded = jsonDecode(body);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (json) =>
+                AIOStreamsProgressItem.fromJson(json.cast<String, Object?>()),
+          )
+          .toList(growable: false);
+    } on Exception catch (_) {
+      return const [];
+    }
+  }
+
+  /// Save or update watch progress on the server. Returns the saved item on success.
+  Future<AIOStreamsProgressItem?> saveProgress({
+    required int integrationId,
+    required String itemId,
+    required String itemType,
+    required String name,
+    required int positionSeconds,
+    int? durationSeconds,
+    String? posterUrl,
+  }) async {
+    final uri = Uri.parse('$_base/progress');
+    final fields = <String, String>{
+      'integration_id': '$integrationId',
+      'item_id': itemId,
+      'item_type': itemType,
+      'name': name,
+      'position_seconds': '$positionSeconds',
+    };
+    if (durationSeconds != null) {
+      fields['duration_seconds'] = '$durationSeconds';
+    }
+    if (posterUrl != null) fields['poster_url'] = posterUrl;
+    await _post(uri, fields);
+    // Return a local representation so the caller can update in-memory state
+    // without needing a follow-up network round-trip.
+    return AIOStreamsProgressItem(
+      itemId: itemId,
+      type: itemType,
+      name: name,
+      integrationId: integrationId,
+      positionSeconds: positionSeconds,
+      durationSeconds: durationSeconds,
+      poster: posterUrl,
+      lastWatched: DateTime.now(),
+    );
   }
 }

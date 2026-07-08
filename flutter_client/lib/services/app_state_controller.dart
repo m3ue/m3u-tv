@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
 
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
+import 'package:m3u_tv/services/aiostreams_progress_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -40,6 +42,8 @@ class AppStateController extends ChangeNotifier {
     TvNotificationService? tvNotificationService,
     TvNotificationStore? tvNotificationStore,
     ReverbService? reverbService,
+    AIOStreamsFavoritesService? aioFavoritesService,
+    AIOStreamsProgressService? aioProgressService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -75,6 +79,9 @@ class AppStateController extends ChangeNotifier {
       notificationStore:
           tvNotificationStore ?? TvNotificationStore(store: store),
       reverbService: reverbService ?? ReverbService(),
+      aioFavoritesService:
+          aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
+      aioProgressService: aioProgressService ?? AIOStreamsProgressService(),
     );
   }
 
@@ -94,6 +101,8 @@ class AppStateController extends ChangeNotifier {
     required this._tvNotificationService,
     required this.notificationStore,
     required this._reverbService,
+    required this.aioFavoritesService,
+    required this.aioProgressService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -114,6 +123,8 @@ class AppStateController extends ChangeNotifier {
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
+  final AIOStreamsFavoritesService aioFavoritesService;
+  final AIOStreamsProgressService aioProgressService;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -557,6 +568,15 @@ class AppStateController extends ChangeNotifier {
       _progressList = progress;
       _error = null;
       notifyListeners();
+
+      if (hasAioStreams) {
+        unawaited(
+          aiostreamsApiService
+              .loadProgress()
+              .then(aioProgressService.loadFromServer)
+              .catchError((_) {}),
+        );
+      }
 
       await _loadXtreamEpg(channels);
 

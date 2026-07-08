@@ -433,4 +433,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aiostrreamsCatalogEmpty => 'Rien ici pour l\'instant';
+
+  @override
+  String get aiostreamsToggleFavorite => 'Favori';
+
+  @override
+  String get aiostreamsMyFavorites => 'Mes Favoris';
+
+  @override
+  String get aiostreamsContinueWatching => 'Continuer à regarder';
+
+  @override
+  String get aiostreamsSearch => 'Rechercher dans AIOStreams';
+
+  @override
+  String get aiostreamsSearchResults => 'Résultats de recherche';
+
+  @override
+  String get aiostreamsNoResults => 'Aucun résultat trouvé';
+
+  @override
+  String get aiostreamsSearchAll => 'Tout';
 }

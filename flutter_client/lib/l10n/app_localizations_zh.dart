@@ -422,4 +422,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiostrreamsCatalogEmpty => '暂无内容';
+
+  @override
+  String get aiostreamsToggleFavorite => '收藏';
+
+  @override
+  String get aiostreamsMyFavorites => '我的收藏';
+
+  @override
+  String get aiostreamsContinueWatching => '继续观看';
+
+  @override
+  String get aiostreamsSearch => '搜索 AIOStreams';
+
+  @override
+  String get aiostreamsSearchResults => '搜索结果';
+
+  @override
+  String get aiostreamsNoResults => '未找到结果';
+
+  @override
+  String get aiostreamsSearchAll => '全部';
 }

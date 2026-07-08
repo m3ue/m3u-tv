@@ -883,6 +883,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing here yet'**
   String get aiostrreamsCatalogEmpty;
+
+  /// No description provided for @aiostreamsToggleFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get aiostreamsToggleFavorite;
+
+  /// No description provided for @aiostreamsMyFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'My Favorites'**
+  String get aiostreamsMyFavorites;
+
+  /// No description provided for @aiostreamsContinueWatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue Watching'**
+  String get aiostreamsContinueWatching;
+
+  /// No description provided for @aiostreamsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search AIOStreams'**
+  String get aiostreamsSearch;
+
+  /// No description provided for @aiostreamsSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Results'**
+  String get aiostreamsSearchResults;
+
+  /// No description provided for @aiostreamsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get aiostreamsNoResults;
+
+  /// No description provided for @aiostreamsSearchAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get aiostreamsSearchAll;
 }
 
 class _AppLocalizationsDelegate

@@ -432,4 +432,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiostrreamsCatalogEmpty => 'Nothing here yet';
+
+  @override
+  String get aiostreamsToggleFavorite => 'Favorite';
+
+  @override
+  String get aiostreamsMyFavorites => 'My Favorites';
+
+  @override
+  String get aiostreamsContinueWatching => 'Continue Watching';
+
+  @override
+  String get aiostreamsSearch => 'Search AIOStreams';
+
+  @override
+  String get aiostreamsSearchResults => 'Search Results';
+
+  @override
+  String get aiostreamsNoResults => 'No results found';
+
+  @override
+  String get aiostreamsSearchAll => 'All';
 }

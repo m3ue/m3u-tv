@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -18,6 +19,7 @@ class AIOStreamsDetailScreen extends StatefulWidget {
     required this.integrationId,
     required this.apiService,
     required this.onPlay,
+    this.favoritesService,
     this.onSidebarActivate,
   });
 
@@ -25,6 +27,7 @@ class AIOStreamsDetailScreen extends StatefulWidget {
   final int integrationId;
   final AIOStreamsApiService apiService;
   final void Function(PlayerArgs) onPlay;
+  final AIOStreamsFavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -38,9 +41,38 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
     widget.item.id,
   );
 
+  bool _isFavorite = false;
+
   bool get _isSeries => widget.item.type == 'series';
 
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadFavoriteState());
+  }
+
+  Future<void> _loadFavoriteState() async {
+    final fav = await widget.favoritesService?.isFavorite(widget.item.id);
+    if (mounted && fav != null) setState(() => _isFavorite = fav);
+  }
+
+  Future<void> _toggleFavorite(AIOStreamsItem item) async {
+    final service = widget.favoritesService;
+    if (service == null) return;
+    final nowFav = await service.toggle(
+      AIOStreamsFavoriteItem(
+        id: item.id,
+        type: item.type,
+        name: item.name,
+        integrationId: widget.integrationId,
+        poster: item.poster,
+      ),
+    );
+    if (mounted) setState(() => _isFavorite = nowFav);
+  }
+
   void _openStreamPicker({
+    required AIOStreamsItem item,
     required String type,
     required String id,
     required String title,
@@ -67,6 +99,12 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
                 headers: _proxyRequestHeaders(stream.behaviorHints),
                 metadata: <String, Object?>{
                   'aiostreams': true,
+                  // Used by the progress reporter in AppShell to identify AIO content.
+                  'aio_item_id': widget.item.id,
+                  'aio_integration_id': widget.integrationId,
+                  'title': widget.item.name,
+                  'thumbnail_url': item.poster,
+                  'backdrop_url': item.background,
                   'source': stream.name,
                   'quality': stream.title,
                 },
@@ -127,6 +165,31 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               ),
             ),
           ),
+          actions: widget.favoritesService != null
+              ? [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: DpadFocusable(
+                      onSelect: () => unawaited(_toggleFavorite(widget.item)),
+                      effects: const [
+                        GradientBorderEffect(
+                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                        ),
+                      ],
+                      child: IconButton(
+                        tooltip: AppLocalizations.of(
+                          context,
+                        ).aiostreamsToggleFavorite,
+                        icon: Icon(
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
+                        ),
+                        onPressed: () =>
+                            unawaited(_toggleFavorite(widget.item)),
+                      ),
+                    ),
+                  ),
+                ]
+              : null,
         ),
         body: FutureBuilder<AIOStreamsItem?>(
           future: _metaFuture,
@@ -141,6 +204,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
                 item: item,
                 onEpisodeSelected: (episodeId, episodeTitle) =>
                     _openStreamPicker(
+                      item: item,
                       type: 'series',
                       id: episodeId,
                       title: episodeTitle,
@@ -151,6 +215,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               item: item,
               isLoading: isLoading,
               onGetStreams: () => _openStreamPicker(
+                item: item,
                 type: 'movie',
                 id: item.id,
                 title: item.name,

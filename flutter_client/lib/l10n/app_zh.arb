@@ -214,5 +214,12 @@
   "aiostreamsSelectStream": "选择播放源",
   "aiostreamsLoadMore": "加载更多",
   "aiostreamsSearchHint": "搜索电影和剧集…",
-  "aiostrreamsCatalogEmpty": "暂无内容"
+  "aiostrreamsCatalogEmpty": "暂无内容",
+  "aiostreamsToggleFavorite": "收藏",
+  "aiostreamsMyFavorites": "我的收藏",
+  "aiostreamsContinueWatching": "继续观看",
+  "aiostreamsSearch": "搜索 AIOStreams",
+  "aiostreamsSearchResults": "搜索结果",
+  "aiostreamsNoResults": "未找到结果",
+  "aiostreamsSearchAll": "全部"
 }
