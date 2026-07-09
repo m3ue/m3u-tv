@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart'
     show StoredTvNotification, TvNotificationChannel;
@@ -93,6 +94,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
 
     return Scaffold(
       body: Column(
@@ -100,11 +102,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            child: Text('Notifications', style: theme.textTheme.headlineMedium),
+            child: Text(
+              l.notificationsTitle,
+              style: theme.textTheme.headlineMedium,
+            ),
           ),
           DpadTabBar(
             controller: _tabController,
-            tabs: const ['Notifications', 'Channel Settings'],
+            tabs: [
+              l.notificationsTabNotifications,
+              l.notificationsTabChannelSettings,
+            ],
           ),
           Expanded(
             child: TabBarView(
@@ -127,6 +135,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Widget _buildNotificationsTab(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     final filtered = _subscribed.isEmpty
         ? _notifications
         : _notifications
@@ -146,7 +155,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               child: FilledButton.tonalIcon(
                 onPressed: _markAllRead,
                 icon: const Icon(Icons.done_all),
-                label: const Text('Mark all read'),
+                label: Text(l.notificationsMarkAllRead),
               ),
             ),
           ),
@@ -162,8 +171,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             child: Center(
               child: Text(
                 _notifications.isEmpty
-                    ? 'No notifications yet'
-                    : 'No notifications for your subscribed channels',
+                    ? l.notificationsEmpty
+                    : l.notificationsEmptyFiltered,
                 style: theme.textTheme.titleMedium,
               ),
             ),
@@ -184,14 +193,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Widget _buildSettingsTab(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Channel subscriptions', style: theme.textTheme.titleMedium),
+        Text(
+          l.notificationsChannelSubscriptions,
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: 4),
         Text(
-          'Select which channels you want to receive. '
-          'Leave all unselected to receive everything.',
+          l.notificationsChannelSubtitle,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -201,7 +213,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           const Center(child: CircularProgressIndicator())
         else ...[
           _ChannelFilterChip(
-            label: 'All channels',
+            label: l.notificationsAllChannels,
             isSelected: _subscribed.isEmpty,
             onTap: _clearChannelFilter,
           ),
@@ -225,7 +237,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Text(
-                'No channels seen yet — they appear here as notifications arrive.',
+                l.notificationsNoChannels,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -293,13 +305,13 @@ class _ChannelFilterChip extends StatelessWidget {
 
 // ── Notification tile ────────────────────────────────────────────────────────
 
-String _formatTimestamp(DateTime dt) {
+String _formatTimestamp(AppLocalizations l, DateTime dt) {
   final now = DateTime.now();
   final diff = now.difference(dt);
-  if (diff.inSeconds < 60) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-  if (diff.inHours < 24) return '${diff.inHours}h ago';
-  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  if (diff.inSeconds < 60) return l.notificationsJustNow;
+  if (diff.inMinutes < 60) return l.notificationsMinutesAgo(diff.inMinutes);
+  if (diff.inHours < 24) return l.notificationsHoursAgo(diff.inHours);
+  if (diff.inDays < 7) return l.notificationsDaysAgo(diff.inDays);
   final month = dt.month.toString().padLeft(2, '0');
   final day = dt.day.toString().padLeft(2, '0');
   return '${dt.year}-$month-$day';
@@ -314,6 +326,7 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final item = notification.item;
     final dimStyle = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -324,6 +337,12 @@ class _NotificationTile extends StatelessWidget {
       'danger' => (Icons.error, theme.colorScheme.error),
       _ => (Icons.info, theme.colorScheme.secondary),
     };
+    final receivedStr = l.notificationsReceivedAt(
+      _formatTimestamp(l, notification.receivedAt),
+    );
+    final readStr = notification.readAt != null
+        ? ' · ${l.notificationsReadAt(_formatTimestamp(l, notification.readAt!))}'
+        : '';
 
     return DpadInkWell(
       onTap: onTap,
@@ -353,8 +372,7 @@ class _NotificationTile extends StatelessWidget {
                 const SizedBox(height: 4),
               ],
               Text(
-                'Received ${_formatTimestamp(notification.receivedAt)}'
-                '${notification.readAt != null ? ' · Read ${_formatTimestamp(notification.readAt!)}' : ''}',
+                '$receivedStr$readStr',
                 style: dimStyle,
               ),
             ],

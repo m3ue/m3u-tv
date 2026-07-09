@@ -12,6 +12,7 @@ class RouteNames {
   static const String liveTv = '/live-tv';
   static const String vod = '/vod';
   static const String series = '/series';
+  static const String aiostreams = '/aiostreams';
   static const String dvr = '/dvr';
   static const String requests = '/requests';
   static const String notifications = '/notifications';
@@ -34,6 +35,7 @@ class RouteNames {
     liveTv,
     vod,
     series,
+    aiostreams,
     dvr,
     requests,
     notifications,
@@ -46,12 +48,22 @@ class RouteNames {
   // Nested detail route path templates
   static const String vodDetailsPath = '/vod/details/:vodId';
   static const String seriesDetailsPath = '/series/details/:seriesId';
+  static const String aiostreamsDetailsPath =
+      '/aiostreams/details/:integrationId/:type/:id';
+  static const String aiostreamsSearchPath = '/aiostreams/search';
 
   /// Builds a path to a VOD details screen for deep linking.
   static String vodDetailsFor(int vodId) => '/vod/details/$vodId';
 
   /// Builds a path to a series details screen for deep linking.
   static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
+
+  /// Builds a path to an AIOStreams item detail screen.
+  static String aiostreamsDetailsFor(
+    int integrationId,
+    String type,
+    String id,
+  ) => '/aiostreams/details/$integrationId/$type/$id';
 
   /// Human-readable labels for main routes.
   static const Map<String, String> routeLabels = {
@@ -60,6 +72,7 @@ class RouteNames {
     liveTv: 'Live TV',
     vod: 'Movies',
     series: 'Series',
+    aiostreams: 'AIOStreams',
     dvr: 'DVR',
     requests: 'Requests',
     notifications: 'Notifications',

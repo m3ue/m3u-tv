@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show AppShell, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
+import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
@@ -192,7 +195,71 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 5: DVR
+          // Branch 5: AIOStreams with nested item detail
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.aiostreams,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(
+                    _tabScreen(context, RouteNames.aiostreams),
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'search',
+                    pageBuilder: (context, state) {
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        AIOStreamsSearchScreen(
+                          integrations: actions.appState.aiostreamsIntegrations,
+                          apiService: actions.appState.aiostreamsApiService,
+                          favoritesService:
+                              actions.appState.aioFavoritesService,
+                          onItemSelect: (item, integrationId) {
+                            context.go(
+                              RouteNames.aiostreamsDetailsFor(
+                                integrationId,
+                                item.type,
+                                item.id,
+                              ),
+                              extra: item,
+                            );
+                          },
+                          onSidebarActivate: actions.onSidebarActivate,
+                        ),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'details/:integrationId/:type/:id',
+                    pageBuilder: (context, state) {
+                      final integrationId = int.parse(
+                        state.pathParameters['integrationId']!,
+                      );
+                      final type = state.pathParameters['type']!;
+                      final id = state.pathParameters['id']!;
+                      final actions = ContentActions.of(context);
+                      final item =
+                          state.extra as AIOStreamsItem? ??
+                          AIOStreamsItem(id: id, type: type, name: id);
+                      return _slidePage(
+                        AIOStreamsDetailScreen(
+                          item: item,
+                          integrationId: integrationId,
+                          apiService: actions.appState.aiostreamsApiService,
+                          appStateController: actions.appState,
+                          onPlay: actions.onOpenPlayer,
+                          onSidebarActivate: actions.onSidebarActivate,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Branch 6: DVR
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -203,7 +270,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: Requests
+          // Branch 7: Requests
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -216,7 +283,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Notifications
+          // Branch 8: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -229,7 +296,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 8: Settings
+          // Branch 9: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

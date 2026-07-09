@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
@@ -165,6 +166,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         season: args.seasonNumber ?? args.metadata['season_number'] as int?,
         episode: args.metadata['episode_number'] as int?,
         tmdbId: args.metadata['tmdb_id'] as int?,
+        imdbId: args.metadata['aio_item_id'] as String?,
         progress: progress,
       ),
     );
@@ -608,7 +610,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             child: FilledButton.icon(
                               onPressed: _goBack,
                               icon: const Icon(Icons.arrow_back),
-                              label: const Text('Go back'),
+                              label: Text(
+                                AppLocalizations.of(context).playerGoBack,
+                              ),
                             ),
                           ),
                         ],

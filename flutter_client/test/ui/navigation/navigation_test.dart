@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/player_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -114,6 +117,93 @@ void main() {
         }
       },
     );
+
+    testWidgets('Home shows favorite live channels before full Live TV', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          liveChannels: const <Channel>[
+            Channel(
+              id: 101,
+              name: 'Favorite Route News',
+              streamUrl: 'http://example.com/live/101.m3u8',
+              categoryId: 'live',
+            ),
+            Channel(
+              id: 102,
+              name: 'Regular Route Sports',
+              streamUrl: 'http://example.com/live/102.m3u8',
+              categoryId: 'live',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+      await appState.favoritesService.add(101);
+      expect(await appState.favoritesService.all(), contains(101));
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await _waitForText(tester, 'Favorite Channels');
+
+      expect(find.text('Favorite Channels'), findsOneWidget);
+      expect(find.text('Favorite Route News'), findsOneWidget);
+      expect(find.text('Regular Route Sports'), findsNothing);
+    });
+
+    testWidgets('Home keeps full Live TV section when no favorites exist', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          liveChannels: const <Channel>[
+            Channel(
+              id: 101,
+              name: 'Route News',
+              streamUrl: 'http://example.com/live/101.m3u8',
+              categoryId: 'live',
+            ),
+            Channel(
+              id: 102,
+              name: 'Route Sports',
+              streamUrl: 'http://example.com/live/102.m3u8',
+              categoryId: 'live',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Live TV'), findsAtLeast(1));
+      expect(find.text('Route News'), findsOneWidget);
+      expect(find.text('Route Sports'), findsOneWidget);
+    });
 
     testWidgets('navigating to LiveTV shows Live TV screen', (tester) async {
       await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
@@ -579,6 +669,82 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('Android system back closes live player through didPopRoute', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Player route: Route News'), findsOneWidget);
+
+    final handled = await tester.binding.handlePopRoute();
+    await _pumpAppFrame(tester);
+
+    expect(handled, isTrue);
+    expect(find.text('Player route: Route News'), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    expect(find.text('Press back again to exit'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('TV back dismisses player controls before closing player', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        useProductionPlayer: true,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(PlaybackControls), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await _pumpAppFrame(tester);
+
+    expect(find.byType(PlaybackControls), findsNothing);
+    expect(find.byType(PlayerScreen), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await _pumpAppFrame(tester);
+
+    expect(find.byType(PlayerScreen), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'open movie details updates to continue when progress changes behind route',
@@ -1058,11 +1224,13 @@ class _TestApp extends StatefulWidget {
     required this.deviceType,
     this.appState,
     this.playerRouteBuilder,
+    this.useProductionPlayer = false,
   });
 
   final DeviceType deviceType;
   final AppStateController? appState;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
+  final bool useProductionPlayer;
 
   @override
   State<_TestApp> createState() => _TestAppState();
@@ -1077,7 +1245,9 @@ class _TestAppState extends State<_TestApp> {
     nativeTelevisionHint: false,
     deviceTypeOverride: widget.deviceType,
     playbackOrchestratorBuilder: _testPlaybackOrchestrator,
-    playerRouteBuilder: widget.playerRouteBuilder ?? _testPlayerRoute,
+    playerRouteBuilder: widget.useProductionPlayer
+        ? null
+        : widget.playerRouteBuilder ?? _testPlayerRoute,
   );
 
   @override
@@ -1092,6 +1262,8 @@ class _TestAppState extends State<_TestApp> {
       title: 'M3U TV Test',
       theme: ThemeData.dark(useMaterial3: true),
       routerConfig: _router,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
     );
   }
 }

@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' hide Category;
+import 'package:flutter/widgets.dart' show Locale;
 
+import 'package:m3u_tv/services/aiostreams_api_service.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -38,6 +41,7 @@ class AppStateController extends ChangeNotifier {
     TvNotificationService? tvNotificationService,
     TvNotificationStore? tvNotificationStore,
     ReverbService? reverbService,
+    AIOStreamsFavoritesService? aioFavoritesService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -73,6 +77,8 @@ class AppStateController extends ChangeNotifier {
       notificationStore:
           tvNotificationStore ?? TvNotificationStore(store: store),
       reverbService: reverbService ?? ReverbService(),
+      aioFavoritesService:
+          aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
     );
   }
 
@@ -92,10 +98,12 @@ class AppStateController extends ChangeNotifier {
     required this._tvNotificationService,
     required this.notificationStore,
     required this._reverbService,
+    required this.aioFavoritesService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
   static const _epgIntervalKey = 'm3ue_tv_epg_interval_minutes';
+  static const _localeKey = 'm3ue_tv_locale';
 
   static const List<Duration> epgRefreshOptions = <Duration>[
     Duration(minutes: 30),
@@ -111,6 +119,7 @@ class AppStateController extends ChangeNotifier {
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
+  final AIOStreamsFavoritesService aioFavoritesService;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -174,6 +183,7 @@ class AppStateController extends ChangeNotifier {
   bool _isBootstrapping = false;
   bool _isLoadingContent = false;
   String? _error;
+  Locale? _locale;
   Viewer? _activeViewer;
   List<Viewer> _viewers = const <Viewer>[];
   List<Category> _liveCategories = const <Category>[];
@@ -190,6 +200,7 @@ class AppStateController extends ChangeNotifier {
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
   bool get isLoadingContent => _isLoadingContent;
+  Locale? get locale => _locale;
   bool get isConfigured => _sourceType != AppSourceType.none;
   String? get error => _error ?? authNotifier.error;
   Viewer? get activeViewer => _activeViewer;
@@ -206,6 +217,12 @@ class AppStateController extends ChangeNotifier {
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
   bool get hasRequestsFeature =>
       authNotifier.authResponse?.hasFeature('requests') ?? false;
+  bool get hasAioStreams => authNotifier.authResponse?.hasAioStreams ?? false;
+  List<AIOStreamsIntegration> get aiostreamsIntegrations =>
+      authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
+  late final AIOStreamsApiService aiostreamsApiService = AIOStreamsApiService(
+    xtreamService: xtreamService,
+  );
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
     AppSourceType.m3u => 'M3U',
@@ -217,6 +234,9 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
+
+    final savedLocale = await secureStorage.read(_localeKey);
+    if (savedLocale != null) _locale = Locale(savedLocale);
 
     final savedIntervalRaw = await secureStorage.read(_epgIntervalKey);
     if (savedIntervalRaw != null) {
@@ -408,10 +428,21 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setLocale(Locale? locale) async {
+    _locale = locale;
+    if (locale == null) {
+      await secureStorage.delete(_localeKey);
+    } else {
+      await secureStorage.write(_localeKey, locale.languageCode);
+    }
+    notifyListeners();
+  }
+
   Future<void> clearAndRefresh() async {
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
+    aiostreamsApiService.clearCache();
     if (_sourceType == AppSourceType.xtream && !authNotifier.isConfigured) {
       _isLoadingContent = false;
       await boot();
@@ -461,11 +492,13 @@ class AppStateController extends ChangeNotifier {
   }
 
   void updateProgressEntry(Progress updated) {
-    final idx = _progressList.indexWhere(
-      (p) =>
-          p.contentType == updated.contentType &&
-          p.streamId == updated.streamId,
-    );
+    final idx = _progressList.indexWhere((p) {
+      if (p.contentType != updated.contentType) return false;
+      if (updated.contentType == ContentType.aiostreams) {
+        return p.aioItemId == updated.aioItemId;
+      }
+      return p.streamId == updated.streamId;
+    });
     if (idx >= 0) {
       final next = List<Progress>.of(_progressList);
       next[idx] = updated;
@@ -536,7 +569,10 @@ class AppStateController extends ChangeNotifier {
 
       await _loadXtreamEpg(channels);
 
-      if (clearCache) await cacheService.clear();
+      if (clearCache) {
+        await cacheService.clear();
+        aiostreamsApiService.clearCache();
+      }
       await cacheService.set('sourceType', 'xtream');
       await cacheService.set('liveCategories', liveCategories);
       await cacheService.set('vodCategories', vodCategories);
@@ -640,27 +676,31 @@ class AppStateController extends ChangeNotifier {
     final remote = await xtreamService.getRecentlyWatched(viewerId);
     final local = await resumeService.all(viewerId);
 
-    // Build a lookup of locally-stored entries keyed by (contentType, streamId).
-    // Local entries carry enriched metadata (title, thumbnail, etc.) that was
-    // saved during playback via progressReporter. Remote entries carry the
-    // authoritative server position but no enrichment.
+    // Regular items: keyed by (contentType, streamId).
+    // AIO items: keyed separately by aioItemId — all AIO items share streamId=0
+    // so a single map would collapse them.
     final localMap = {
-      for (final p in local) (p.contentType, p.streamId): p,
+      for (final p in local)
+        if (p.contentType != ContentType.aiostreams)
+          (p.contentType, p.streamId): p,
+    };
+    final localAioMap = {
+      for (final p in local)
+        if (p.contentType == ContentType.aiostreams && p.aioItemId != null)
+          p.aioItemId!: p,
     };
 
-    // For each remote entry, prefer the local copy when it has enriched
-    // metadata; otherwise use remote (which has the latest position).
-    // Any remote position advance is merged in by saving below.
+    // For each remote entry, prefer the local copy when it has richer metadata
+    // (thumbnail, title, etc. captured at playback time). Always adopt the
+    // server's position and completion flag as authoritative. For AIO items the
+    // server already stores all metadata, so server values win for those fields.
     final result = <Progress>[
       for (final r in remote)
         () {
-          final l = localMap[(r.contentType, r.streamId)];
-          // Local wins if it has enrichment; remote wins otherwise so the
-          // latest server position is reflected.
+          final l = r.contentType == ContentType.aiostreams
+              ? localAioMap[r.aioItemId]
+              : localMap[(r.contentType, r.streamId)];
           if (l != null && l.title != null && l.title!.isNotEmpty) {
-            // Always merge: keep enriched local metadata but adopt server
-            // position and fill in any fields the local entry may be missing
-            // (e.g. fields added to the API after the local entry was cached).
             return Progress(
               viewerId: l.viewerId,
               contentType: l.contentType,
@@ -672,24 +712,28 @@ class AppStateController extends ChangeNotifier {
               seasonNumber: l.seasonNumber ?? r.seasonNumber,
               episodeNumber: l.episodeNumber ?? r.episodeNumber,
               title: l.title,
-              episodeTitle: l.episodeTitle,
-              seriesName: l.seriesName,
-              thumbnailUrl: l.thumbnailUrl,
-              backdropUrl: l.backdropUrl,
-              rating: l.rating ?? r.rating,
-              runtime: l.runtime ?? r.runtime,
-              plot: l.plot ?? r.plot,
-              genre: l.genre ?? r.genre,
-              year: l.year ?? r.year,
+              // Prefer server value for episodeTitle — it may have been backfilled
+              // after the local entry was cached.
+              episodeTitle: r.episodeTitle ?? l.episodeTitle,
+              seriesName: l.seriesName ?? r.seriesName,
+              thumbnailUrl: l.thumbnailUrl ?? r.thumbnailUrl,
+              backdropUrl: l.backdropUrl ?? r.backdropUrl,
+              rating: r.rating ?? l.rating,
+              runtime: r.runtime ?? l.runtime,
+              plot: r.plot ?? l.plot,
+              genre: r.genre ?? l.genre,
+              year: r.year ?? l.year,
+              aioItemId: l.aioItemId ?? r.aioItemId,
+              aioIntegrationId: l.aioIntegrationId ?? r.aioIntegrationId,
             );
           }
           return r;
         }(),
     ];
-    // Remote is authoritative for which entries exist. Local-only entries
-    // (cleared on the server) are excluded so ghost cards don't reappear.
 
-    // Persist the merged list so future local reads are up to date.
+    // Remote is authoritative for all content types. Items absent from the
+    // server response were either cleared or are beyond the top-20 window —
+    // either way, don't show them. Persist so future metadata lookups are fast.
     for (final p in result) {
       await resumeService.save(p);
     }

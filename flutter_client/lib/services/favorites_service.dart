@@ -1,8 +1,9 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 
-class FavoritesService {
+class FavoritesService extends ChangeNotifier {
   FavoritesService({
     Map<String, Object?>? memory,
     PersistentJsonStore? store,
@@ -24,6 +25,7 @@ class FavoritesService {
     final ids = await all();
     ids.add(streamId);
     await _write(_favoritesKey, ids.toList()..sort());
+    notifyListeners();
     return true;
   }
 
@@ -31,6 +33,7 @@ class FavoritesService {
     final ids = await all();
     ids.remove(streamId);
     await _write(_favoritesKey, ids.toList()..sort());
+    notifyListeners();
     return false;
   }
 

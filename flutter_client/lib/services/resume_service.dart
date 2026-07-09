@@ -16,11 +16,7 @@ class ResumeService {
   final Duration promptThreshold;
 
   Future<void> save(Progress progress) async {
-    final key = _key(
-      progress.viewerId,
-      progress.contentType,
-      progress.streamId,
-    );
+    final key = _keyForProgress(progress);
     _memory[key] = progress;
     await _store?.write(key, progress.toJson());
   }
@@ -58,6 +54,12 @@ class ResumeService {
         !progress.completed &&
         progress.positionSeconds >= promptThreshold.inSeconds;
   }
+
+  String _keyForProgress(Progress progress) =>
+      progress.contentType == ContentType.aiostreams &&
+          progress.aioItemId != null
+      ? 'm3ue_resume_${progress.viewerId}_aiostreams_${progress.aioItemId}'
+      : 'm3ue_resume_${progress.viewerId}_${progress.contentType.wireName}_${progress.streamId}';
 
   String _key(String viewerId, ContentType contentType, int streamId) =>
       'm3ue_resume_${viewerId}_${contentType.wireName}_$streamId';
