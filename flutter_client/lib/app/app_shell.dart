@@ -673,6 +673,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    _syncSidebarFocusNodes();
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
     final contentShell = ContentActions(
