@@ -879,10 +879,17 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
                   Positioned(
                     top: 4,
                     left: 4,
-                    child: Icon(
-                      Icons.star,
-                      color: colorScheme.primary,
-                      size: 20,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.star,
+                        color: Color(0xFFFFFFFF),
+                        size: 14,
+                      ),
                     ),
                   ),
               ],
