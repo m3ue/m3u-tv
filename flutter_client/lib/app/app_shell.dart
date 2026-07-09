@@ -161,11 +161,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _syncSidebarFocusNodes();
   }
 
-  void _syncSidebarFocusNodes() {
-    while (_sidebarFocusNodes.length < _mainRoutes.length) {
+  void _syncSidebarFocusNodes([List<String>? routes]) {
+    final r = routes ?? _mainRoutes;
+    while (_sidebarFocusNodes.length < r.length) {
       _sidebarFocusNodes.add(FocusNode());
     }
-    while (_sidebarFocusNodes.length > _mainRoutes.length) {
+    while (_sidebarFocusNodes.length > r.length) {
       _sidebarFocusNodes.removeLast().dispose();
     }
   }
@@ -673,7 +674,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    _syncSidebarFocusNodes();
+    final routes = _mainRoutes;
+    _syncSidebarFocusNodes(routes);
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
     final contentShell = ContentActions(
@@ -717,8 +719,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return KeyEventResult.ignored;
           },
           child: useSidebar
-              ? _buildTvLayout(contentShell)
-              : _buildMobileLayout(contentShell),
+              ? _buildTvLayout(contentShell, routes)
+              : _buildMobileLayout(contentShell, routes),
         ),
       ),
     );
@@ -870,7 +872,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTvLayout(Widget contentShell) {
+  Widget _buildTvLayout(Widget contentShell, List<String> routes) {
     return MediaQuery.removePadding(
       context: context,
       removeTop: true,
@@ -908,7 +910,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   bottom: 0,
                   child: NavigationSidebar(
                     currentIndex: _currentIndex,
-                    routes: _mainRoutes,
+                    routes: routes,
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
@@ -926,12 +928,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMobileLayout(Widget contentShell) {
+  Widget _buildMobileLayout(Widget contentShell, List<String> routes) {
     final primaryCount = RouteNames.mobilePrimaryCount.clamp(
       0,
-      _mainRoutes.length,
+      routes.length,
     );
-    final overflowRoutes = _mainRoutes.skip(primaryCount).toList();
+    final overflowRoutes = routes.skip(primaryCount).toList();
     final overflowUnread = overflowRoutes.contains(RouteNames.notifications)
         ? _appState.unreadNotificationCount
         : 0;
@@ -951,7 +953,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
         items: [
-          ..._mainRoutes.take(primaryCount).map((route) {
+          ...routes.take(primaryCount).map((route) {
             return BottomNavigationBarItem(
               icon: Icon(_routeIcon(route)),
               label: _routeLabel(context, route),
