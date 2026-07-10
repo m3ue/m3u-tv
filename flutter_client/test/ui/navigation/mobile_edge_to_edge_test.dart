@@ -59,7 +59,10 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final router = await _pumpPhoneApp(tester, const EdgeInsets.only(top: 48));
+      final router = await _pumpPhoneApp(
+        tester,
+        const EdgeInsets.only(top: 48),
+      );
 
       router.go(
         '/vod/details/1',
