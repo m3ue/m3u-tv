@@ -279,7 +279,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   // Stable method tearoff passed to ContentActions.onOpenPlayer.
-  // Must NOT be a local closure in build() — closures are always new instances,
+  // Must NOT be a local closure in build() - closures are always new instances,
   // which makes ContentActions.updateShouldNotify return true on every rebuild
   // and cascade unnecessary rebuilds to all feature screens.
   void _openPlayerFromActions(PlayerArgs args) =>
@@ -965,7 +965,7 @@ class AppShellState extends ConsumerState<AppShell>
         : moreTabIndex;
 
     return Scaffold(
-      body: SafeArea(bottom: false, child: contentShell),
+      body: contentShell,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: displayedIndex,
