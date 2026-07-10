@@ -27,12 +27,17 @@ const BoxDecoration _kGradientBg = BoxDecoration(
   ),
 );
 
-Widget _withGradient(Widget screen) =>
-    DecoratedBox(decoration: _kGradientBg, child: screen);
+Widget _withGradient(Widget screen) => DecoratedBox(
+  decoration: _kGradientBg,
+  child: SafeArea(bottom: false, child: screen),
+);
 
 CustomTransitionPage<void> _slidePage(Widget screen) =>
     CustomTransitionPage<void>(
-      child: ColoredBox(color: const Color(0xFF09090b), child: screen),
+      child: ColoredBox(
+        color: const Color(0xFF09090b),
+        child: SafeArea(bottom: false, child: screen),
+      ),
       transitionsBuilder: (context, animation, _, child) => SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(1, 0),
