@@ -39,6 +39,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     with SingleTickerProviderStateMixin {
   late final _tabController = TabController(length: 2, vsync: this);
   late final TvNotificationStore _store;
+  late final StreamSubscription<void> _liveNotificationSub;
   List<StoredTvNotification> _notifications = const [];
   Set<String> _subscribed = const {};
   List<TvNotificationChannel> _knownChannels = const [];
@@ -48,11 +49,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
   void initState() {
     super.initState();
     _store = ref.read(notificationStoreProvider);
+    // Subscribe directly to the broadcast stream so new notifications trigger
+    // a reload regardless of Riverpod build-cycle timing.
+    _liveNotificationSub = ref
+        .read(tvNotificationsStreamProvider)
+        .listen((_) async => _reload());
     unawaited(_reload());
   }
 
   @override
   void dispose() {
+    unawaited(_liveNotificationSub.cancel());
     _tabController.dispose();
     super.dispose();
   }
@@ -75,10 +82,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
   Future<void> _markRead(StoredTvNotification notification) async {
     if (notification.isRead) return;
     await widget.onMarkRead(notification.item.id);
+    unawaited(_reload());
   }
 
   Future<void> _markAllRead() async {
     await widget.onMarkAllRead();
+    unawaited(_reload());
   }
 
   Future<void> _toggleChannel(String channel) async {
@@ -89,18 +98,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       next.add(channel);
     }
     await widget.onSetChannels(next);
+    unawaited(_reload());
   }
 
   Future<void> _clearChannelFilter() async {
     await widget.onSetChannels({});
+    unawaited(_reload());
   }
 
   @override
   Widget build(BuildContext context) {
-    // Reload whenever AppStateController notifies — covers incoming
-    // notifications, markRead mutations, and subscription changes.
-    ref.listen(appStateControllerProvider, (_, _) => unawaited(_reload()));
-
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
 

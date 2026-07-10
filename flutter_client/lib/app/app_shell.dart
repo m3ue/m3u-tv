@@ -85,6 +85,7 @@ class AppShellState extends ConsumerState<AppShell>
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
+  int _unreadCount = 0;
 
   DateTime? _lastBackPress;
   int _lastNavMs = 0;
@@ -121,6 +122,7 @@ class AppShellState extends ConsumerState<AppShell>
     WidgetsBinding.instance.addObserver(this);
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
+    _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
     if (!_appState.isConfigured) {
@@ -158,8 +160,10 @@ class AppShellState extends ConsumerState<AppShell>
     if (!_mainRoutes.contains(route)) {
       widget.navigationShell.goBranch(0, initialLocation: true);
     }
-    // No setState needed — ref.watch(appStateControllerProvider) in build()
-    // schedules the rebuild whenever notifyListeners fires.
+    final newCount = _appState.unreadNotificationCount;
+    if (_unreadCount != newCount) {
+      setState(() => _unreadCount = newCount);
+    }
   }
 
   void _initSidebarFocusNodes() {
@@ -667,11 +671,8 @@ class AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
-    // Watch only what AppShell.build() actually uses:
-    //   isConfigured  → recalculates feature-flag-gated routes on connect/disconnect
-    //   unreadCount   → drives notification badge without full-screen rebuilds
+    // isConfigured triggers route recalculation on connect/disconnect.
     ref.watch(isConfiguredProvider);
-    final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     final routes = _mainRoutes;
     _syncSidebarFocusNodes(routes);
@@ -718,8 +719,8 @@ class AppShellState extends ConsumerState<AppShell>
             return KeyEventResult.ignored;
           },
           child: useSidebar
-              ? _buildTvLayout(contentShell, routes, unreadCount)
-              : _buildMobileLayout(contentShell, routes, unreadCount),
+              ? _buildTvLayout(contentShell, routes, _unreadCount)
+              : _buildMobileLayout(contentShell, routes, _unreadCount),
         ),
       ),
     );

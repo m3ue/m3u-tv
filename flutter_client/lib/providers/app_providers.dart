@@ -4,6 +4,8 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/tv_notification_service.dart'
+    show TvNotificationItem;
 import 'package:m3u_tv/services/tv_notification_store.dart';
 
 // ---------------------------------------------------------------------------
@@ -106,10 +108,6 @@ final isBootstrappingProvider = Provider<bool>((ref) {
   return ref.watch(appStateControllerProvider).appState.isBootstrapping;
 });
 
-final unreadNotificationCountProvider = Provider<int>((ref) {
-  return ref.watch(appStateControllerProvider).appState.unreadNotificationCount;
-});
-
 final progressListProvider = Provider<List<Progress>>((ref) {
   return ref.watch(appStateControllerProvider).appState.progressList;
 });
@@ -148,4 +146,13 @@ final seriesFavoritesServiceProvider = Provider<FavoritesService>((ref) {
 
 final notificationStoreProvider = Provider<TvNotificationStore>((ref) {
   return ref.read(appStateControllerProvider).appState.notificationStore;
+});
+
+// Exposes the live notification broadcast stream so screens can subscribe
+// directly in initState — bypasses Riverpod change-detection timing issues
+// with ChangeNotifierProvider when the widget hasn't been built yet.
+final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>((
+  ref,
+) {
+  return ref.read(appStateControllerProvider).appState.tvNotifications;
 });
