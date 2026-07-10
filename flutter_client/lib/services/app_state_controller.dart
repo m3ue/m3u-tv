@@ -750,8 +750,10 @@ class AppStateController extends ChangeNotifier {
         );
       }
       if (programs.isNotEmpty) {
+        // EpgService.loadPrograms() calls notifyListeners() on the EpgService
+        // itself — widgets watching epgServiceProvider will rebuild without
+        // triggering a full AppStateController rebuild.
         epgService.loadPrograms(programs);
-        notifyListeners();
       }
     } on Object catch (e) {
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');

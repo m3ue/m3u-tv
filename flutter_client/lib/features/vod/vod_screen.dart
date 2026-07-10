@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -14,31 +16,23 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 /// - All Movies + category tabs
 /// - Grid layout with poster thumbnails and ratings
 /// - Category filtering
-class VodScreen extends StatefulWidget {
+class VodScreen extends ConsumerStatefulWidget {
   const VodScreen({
     super.key,
-    required this.vodItems,
-    required this.categories,
-    required this.isLoading,
-    required this.isConfigured,
     required this.onVodSelect,
     this.favoritesService,
     this.onSidebarActivate,
   });
 
-  final List<VodItem> vodItems;
-  final List<Category> categories;
-  final bool isLoading;
-  final bool isConfigured;
   final void Function(VodItem) onVodSelect;
   final FavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
-  State<VodScreen> createState() => _VodScreenState();
+  ConsumerState<VodScreen> createState() => _VodScreenState();
 }
 
-class _VodScreenState extends State<VodScreen> {
+class _VodScreenState extends ConsumerState<VodScreen> {
   static const double _minPosterCardWidth = 120;
   static const double _maxPosterCardWidth = 220;
   static const _kFavoritesCategoryId = '__FAVORITES__';
@@ -60,17 +54,17 @@ class _VodScreenState extends State<VodScreen> {
     if (mounted) setState(() => _favoriteIds = ids);
   }
 
-  List<VodItem> get _filteredItems {
+  List<VodItem> _filteredItems(List<VodItem> vodItems) {
     final selectedCategory = _selectedCategory;
     final Iterable<VodItem> categoryFiltered;
     if (selectedCategory == _kFavoritesCategoryId) {
-      categoryFiltered = widget.vodItems.where(
+      categoryFiltered = vodItems.where(
         (item) => _favoriteIds.contains(item.id),
       );
     } else if (selectedCategory == null || selectedCategory.isEmpty) {
-      categoryFiltered = widget.vodItems;
+      categoryFiltered = vodItems;
     } else {
-      categoryFiltered = widget.vodItems.where(
+      categoryFiltered = vodItems.where(
         (item) => item.categoryId == selectedCategory,
       );
     }
@@ -79,13 +73,25 @@ class _VodScreenState extends State<VodScreen> {
       return categoryFiltered.toList(growable: false);
     }
     return categoryFiltered
-        .where((item) => item.name.toLowerCase().contains(normalizedQuery))
+        .where(
+          (item) => item.name.toLowerCase().contains(normalizedQuery),
+        )
         .toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.isConfigured) {
+    final isBootstrapping = ref.watch(isBootstrappingProvider);
+    final isConfigured = ref.watch(isConfiguredProvider);
+    final isLoading = ref.watch(isLoadingContentProvider);
+    final vodItems = ref.watch(vodItemsProvider);
+    final categories = ref.watch(vodCategoriesProvider);
+
+    if (isBootstrapping) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!isConfigured) {
       return Scaffold(
         body: Center(
           child: Text(
@@ -96,17 +102,15 @@ class _VodScreenState extends State<VodScreen> {
       );
     }
 
-    final filtered = _filteredItems;
+    final filtered = _filteredItems(vodItems);
 
     return Scaffold(
       body: Column(
         children: [
           _buildSearchField(),
-          // Category bar
-          _buildCategoryBar(),
-          // Content area
+          _buildCategoryBar(categories),
           Expanded(
-            child: widget.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
                 ? Center(
@@ -138,13 +142,13 @@ class _VodScreenState extends State<VodScreen> {
     );
   }
 
-  Widget _buildCategoryBar() {
+  Widget _buildCategoryBar(List<Category> categories) {
     final l = AppLocalizations.of(context);
     final tabs = [
       CategoryTabData(id: '', name: l.vodAllMovies),
       if (_favoriteIds.isNotEmpty)
         CategoryTabData(id: _kFavoritesCategoryId, name: l.liveTvFavorites),
-      ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
+      ...categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
 
     return ScrollableCategoryBar(

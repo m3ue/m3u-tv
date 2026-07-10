@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -12,24 +14,30 @@ void main() {
   ) async {
     final favorites = FavoritesService(memory: <String, Object?>{});
     final epg = EpgService(clock: () => DateTime.utc(2026, 1, 1, 12));
+    const channels = [
+      Channel(
+        id: 101,
+        name: 'Route News',
+        streamUrl: 'https://example.com/news.m3u8',
+      ),
+    ];
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        home: LiveTvScreen(
-          channels: const [
-            Channel(
-              id: 101,
-              name: 'Route News',
-              streamUrl: 'https://example.com/news.m3u8',
-            ),
-          ],
-          categories: const [],
-          isLoading: false,
-          isConfigured: true,
-          favoritesService: favorites,
-          epgService: epg,
-          onChannelSelect: (_) {},
+      ProviderScope(
+        overrides: [
+          isBootstrappingProvider.overrideWith((_) => false),
+          isConfiguredProvider.overrideWith((_) => true),
+          isLoadingContentProvider.overrideWith((_) => false),
+          liveChannelsProvider.overrideWith((_) => channels),
+          liveCategoriesProvider.overrideWith((_) => const []),
+          epgServiceProvider.overrideWith((_) => epg),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: LiveTvScreen(
+            favoritesService: favorites,
+            onChannelSelect: (_) {},
+          ),
         ),
       ),
     );
@@ -65,30 +73,36 @@ void main() {
         ]);
       Channel? recordedChannel;
       EpgProgram? recordedProgram;
+      const channels = [
+        Channel(
+          id: 101,
+          name: 'Route News',
+          streamUrl: 'https://example.com/news.m3u8',
+          epgChannelId: 'news.epg',
+        ),
+      ];
 
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: LiveTvScreen(
-            channels: const [
-              Channel(
-                id: 101,
-                name: 'Route News',
-                streamUrl: 'https://example.com/news.m3u8',
-                epgChannelId: 'news.epg',
-              ),
-            ],
-            categories: const [],
-            isLoading: false,
-            isConfigured: true,
-            favoritesService: favorites,
-            epgService: epg,
-            onChannelSelect: (_) {},
-            onScheduleProgram: (channel, program) {
-              recordedChannel = channel;
-              recordedProgram = program;
-            },
+        ProviderScope(
+          overrides: [
+            isBootstrappingProvider.overrideWith((_) => false),
+            isConfiguredProvider.overrideWith((_) => true),
+            isLoadingContentProvider.overrideWith((_) => false),
+            liveChannelsProvider.overrideWith((_) => channels),
+            liveCategoriesProvider.overrideWith((_) => const []),
+            epgServiceProvider.overrideWith((_) => epg),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: LiveTvScreen(
+              favoritesService: favorites,
+              onChannelSelect: (_) {},
+              onScheduleProgram: (channel, program) {
+                recordedChannel = channel;
+                recordedProgram = program;
+              },
+            ),
           ),
         ),
       );

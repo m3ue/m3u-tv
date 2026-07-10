@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -318,17 +320,22 @@ class _TestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: SearchScreen(
-        channels: channels,
-        vodItems: vodItems,
-        seriesList: seriesList,
-        isConfigured: isConfigured,
-        onChannelSelect: onChannelSelect ?? (_) {},
-        onVodSelect: onVodSelect ?? (_) {},
-        onSeriesSelect: onSeriesSelect ?? (_) {},
+    return ProviderScope(
+      overrides: [
+        isBootstrappingProvider.overrideWith((_) => false),
+        isConfiguredProvider.overrideWith((_) => isConfigured),
+        liveChannelsProvider.overrideWith((_) => channels),
+        vodItemsProvider.overrideWith((_) => vodItems),
+        seriesListProvider.overrideWith((_) => seriesList),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: SearchScreen(
+          onChannelSelect: onChannelSelect ?? (_) {},
+          onVodSelect: onVodSelect ?? (_) {},
+          onSeriesSelect: onSeriesSelect ?? (_) {},
+        ),
       ),
     );
   }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
@@ -261,15 +263,20 @@ class _TestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: VodScreen(
-        vodItems: vodItems,
-        categories: categories,
-        isLoading: isLoading,
-        isConfigured: isConfigured,
-        onVodSelect: onVodSelect ?? (_) {},
+    return ProviderScope(
+      overrides: [
+        isBootstrappingProvider.overrideWith((_) => false),
+        isConfiguredProvider.overrideWith((_) => isConfigured),
+        isLoadingContentProvider.overrideWith((_) => isLoading),
+        vodItemsProvider.overrideWith((_) => vodItems),
+        vodCategoriesProvider.overrideWith((_) => categories),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: VodScreen(
+          onVodSelect: onVodSelect ?? (_) {},
+        ),
       ),
     );
   }

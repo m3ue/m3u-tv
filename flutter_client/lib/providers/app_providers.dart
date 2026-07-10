@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +43,7 @@ final appStateControllerProvider = ChangeNotifierProvider<_AppStateProxy>((_) {
   );
 });
 
-/// Creates a [ProviderOverride] that injects [appState] into the Riverpod
+/// Creates an [Override] that injects [appState] into the Riverpod
 /// provider tree without transferring disposal ownership to Riverpod.
 ///
 /// ```dart
@@ -66,6 +68,14 @@ final cacheServiceProvider = Provider<CacheService>((ref) {
 
 final xtreamServiceProvider = Provider<XtreamService>((ref) {
   return ref.read(appStateControllerProvider).appState.xtreamService;
+});
+
+// EpgService is its own ChangeNotifier — this provider subscribes directly to
+// EpgService.notifyListeners(), which fires only when EPG data loads.
+// Widgets watching this will NOT rebuild on unrelated AppStateController
+// notifications (channel refreshes, progress updates, etc.).
+final epgServiceProvider = ChangeNotifierProvider<EpgService>((ref) {
+  return ref.read(appStateControllerProvider).appState.epgService;
 });
 
 // ---------------------------------------------------------------------------
@@ -104,6 +114,50 @@ final isLoadingContentProvider = Provider<bool>((ref) {
 
 final isConfiguredProvider = Provider<bool>((ref) {
   return ref.watch(appStateControllerProvider).appState.isConfigured;
+});
+
+final isBootstrappingProvider = Provider<bool>((ref) {
+  return ref.watch(appStateControllerProvider).appState.isBootstrapping;
+});
+
+final unreadNotificationCountProvider = Provider<int>((ref) {
+  return ref.watch(appStateControllerProvider).appState.unreadNotificationCount;
+});
+
+final progressListProvider = Provider<List<Progress>>((ref) {
+  return ref.watch(appStateControllerProvider).appState.progressList;
+});
+
+final dvrRecordingsProvider = Provider<List<DvrRecording>>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrRecordings;
+});
+
+final sourceLabelProvider = Provider<String>((ref) {
+  return ref.watch(appStateControllerProvider).appState.sourceLabel;
+});
+
+final sourceErrorProvider = Provider<String?>((ref) {
+  return ref.watch(appStateControllerProvider).appState.error;
+});
+
+final hasDvrFeatureProvider = Provider<bool>((ref) {
+  return ref.watch(appStateControllerProvider).appState.hasDvrFeature;
+});
+
+// Favorites services are stable ChangeNotifier instances — they notify on
+// their own channel (not through AppStateController). Widgets that need to
+// react to favorites changes addListener() in initState as before; these
+// providers are here so AppShell can pass them without coupling to _appState.
+final liveFavoritesServiceProvider = Provider<FavoritesService>((ref) {
+  return ref.read(appStateControllerProvider).appState.favoritesService;
+});
+
+final vodFavoritesServiceProvider = Provider<FavoritesService>((ref) {
+  return ref.read(appStateControllerProvider).appState.vodFavoritesService;
+});
+
+final seriesFavoritesServiceProvider = Provider<FavoritesService>((ref) {
+  return ref.read(appStateControllerProvider).appState.seriesFavoritesService;
 });
 
 // ---------------------------------------------------------------------------
