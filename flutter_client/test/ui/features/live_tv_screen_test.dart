@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -316,18 +318,24 @@ class _TestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: LiveTvScreen(
-        channels: channels,
-        categories: categories,
-        isLoading: isLoading,
-        isConfigured: isConfigured,
-        favoritesService: favoritesService ?? FavoritesService(),
-        epgService: epgService ?? EpgService(),
-        onChannelSelect: onChannelSelect ?? (_) {},
-        onScheduleProgram: onScheduleProgram,
+    final epg = epgService ?? EpgService();
+    return ProviderScope(
+      overrides: [
+        isBootstrappingProvider.overrideWith((_) => false),
+        isConfiguredProvider.overrideWith((_) => isConfigured),
+        isLoadingContentProvider.overrideWith((_) => isLoading),
+        liveChannelsProvider.overrideWith((_) => channels),
+        liveCategoriesProvider.overrideWith((_) => categories),
+        epgServiceProvider.overrideWith((_) => epg),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: LiveTvScreen(
+          favoritesService: favoritesService ?? FavoritesService(),
+          onChannelSelect: onChannelSelect ?? (_) {},
+          onScheduleProgram: onScheduleProgram,
+        ),
       ),
     );
   }

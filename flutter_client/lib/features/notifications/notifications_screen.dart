@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
-import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart'
-    show StoredTvNotification, TvNotificationChannel;
+    show StoredTvNotification, TvNotificationChannel, TvNotificationStore;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -17,18 +18,28 @@ const _kStadiumEffect = [
 /// Lists TV push notifications with local read/unread state, letting the
 /// user flip through history, mark items as read, and configure channel
 /// subscriptions.
-class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key, required this.appState});
+class NotificationsScreen extends ConsumerStatefulWidget {
+  const NotificationsScreen({
+    super.key,
+    required this.onMarkRead,
+    required this.onMarkAllRead,
+    required this.onSetChannels,
+  });
 
-  final AppStateController appState;
+  final Future<void> Function(String id) onMarkRead;
+  final Future<void> Function() onMarkAllRead;
+  final Future<void> Function(Set<String> channels) onSetChannels;
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen>
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     with SingleTickerProviderStateMixin {
   late final _tabController = TabController(length: 2, vsync: this);
+  late final TvNotificationStore _store;
+  late final StreamSubscription<void> _liveNotificationSub;
   List<StoredTvNotification> _notifications = const [];
   Set<String> _subscribed = const {};
   List<TvNotificationChannel> _knownChannels = const [];
@@ -37,23 +48,27 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void initState() {
     super.initState();
-    widget.appState.addListener(_reload);
+    _store = ref.read(notificationStoreProvider);
+    // Subscribe directly to the broadcast stream so new notifications trigger
+    // a reload regardless of Riverpod build-cycle timing.
+    _liveNotificationSub = ref
+        .read(tvNotificationsStreamProvider)
+        .listen((_) async => _reload());
     unawaited(_reload());
   }
 
   @override
   void dispose() {
+    unawaited(_liveNotificationSub.cancel());
     _tabController.dispose();
-    widget.appState.removeListener(_reload);
     super.dispose();
   }
 
   Future<void> _reload() async {
-    final store = widget.appState.notificationStore;
     final results = await Future.wait([
-      store.all(),
-      store.subscribedChannels(),
-      store.knownChannels(),
+      _store.all(),
+      _store.subscribedChannels(),
+      _store.knownChannels(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -66,13 +81,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   Future<void> _markRead(StoredTvNotification notification) async {
     if (notification.isRead) return;
-    await widget.appState.markNotificationRead(notification.item.id);
-    await _reload();
+    await widget.onMarkRead(notification.item.id);
+    unawaited(_reload());
   }
 
   Future<void> _markAllRead() async {
-    await widget.appState.markAllNotificationsRead();
-    await _reload();
+    await widget.onMarkAllRead();
+    unawaited(_reload());
   }
 
   Future<void> _toggleChannel(String channel) async {
@@ -82,13 +97,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     } else {
       next.add(channel);
     }
-    await widget.appState.setNotificationChannels(next);
-    await _reload();
+    await widget.onSetChannels(next);
+    unawaited(_reload());
   }
 
   Future<void> _clearChannelFilter() async {
-    await widget.appState.setNotificationChannels({});
-    await _reload();
+    await widget.onSetChannels({});
+    unawaited(_reload());
   }
 
   @override

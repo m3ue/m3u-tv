@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -20,37 +22,27 @@ enum _ViewMode { list, logoGrid, epgGrid }
 /// - Toggle between list and grid view modes
 /// - Long-press context menu for favorites and recording actions
 /// - Lazy EPG loading for visible channels
-class LiveTvScreen extends StatefulWidget {
+class LiveTvScreen extends ConsumerStatefulWidget {
   const LiveTvScreen({
     super.key,
-    required this.channels,
-    required this.categories,
-    required this.isLoading,
-    required this.isConfigured,
     required this.favoritesService,
-    required this.epgService,
     required this.onChannelSelect,
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
     this.onScheduleProgram,
   });
 
-  final List<Channel> channels;
-  final List<Category> categories;
-  final bool isLoading;
-  final bool isConfigured;
   final FavoritesService favoritesService;
-  final EpgService epgService;
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
 
   @override
-  State<LiveTvScreen> createState() => _LiveTvScreenState();
+  ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();
 }
 
-class _LiveTvScreenState extends State<LiveTvScreen> {
+class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
   String _query = '';
@@ -101,14 +93,14 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
     }
   }
 
-  List<Channel> get _filteredChannels {
+  List<Channel> _filteredChannels(List<Channel> channels) {
     final selectedCategory = _selectedCategory;
     final categoryFiltered =
         selectedCategory == null || selectedCategory.isEmpty
-        ? widget.channels
+        ? channels
         : selectedCategory == _favoritesCategoryId
-        ? widget.channels.where((channel) => _favoriteIds.contains(channel.id))
-        : widget.channels.where(
+        ? channels.where((channel) => _favoriteIds.contains(channel.id))
+        : channels.where(
             (channel) => channel.categoryId == selectedCategory,
           );
     final normalizedQuery = _query.trim().toLowerCase();
@@ -122,7 +114,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
         .toList(growable: false);
   }
 
-  List<CategoryTabData> get _categoryTabs {
+  List<CategoryTabData> _categoryTabs(List<Category> categories) {
     return [
       CategoryTabData(
         id: '',
@@ -132,13 +124,13 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
         id: _favoritesCategoryId,
         name: AppLocalizations.of(context).liveTvFavorites,
       ),
-      ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
+      ...categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
   }
 
-  void _loadEpgForChannels(List<Channel> channels) {
+  void _loadEpgForChannels(List<Channel> channels, EpgService epgService) {
     for (final channel in channels) {
-      final result = widget.epgService.lookupForChannel(channel);
+      final result = epgService.lookupForChannel(channel);
       if (result != null) {
         _epgMap[channel.id] = result;
       }
@@ -224,7 +216,18 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.isConfigured) {
+    final isBootstrapping = ref.watch(isBootstrappingProvider);
+    final isConfigured = ref.watch(isConfiguredProvider);
+    final isLoading = ref.watch(isLoadingContentProvider);
+    final channels = ref.watch(liveChannelsProvider);
+    final categories = ref.watch(liveCategoriesProvider);
+    final epgService = ref.watch(epgServiceProvider);
+
+    if (isBootstrapping) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!isConfigured) {
       return Scaffold(
         body: Center(
           child: Text(
@@ -235,18 +238,16 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
       );
     }
 
-    final filtered = _filteredChannels;
-    _loadEpgForChannels(filtered);
+    final filtered = _filteredChannels(channels);
+    _loadEpgForChannels(filtered, epgService);
 
     return Scaffold(
       body: Column(
         children: [
           _buildSearchField(),
-          // Category bar + view mode toggle
-          _buildCategoryBar(),
-          // Content area
+          _buildCategoryBar(categories),
           Expanded(
-            child: widget.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
                 ? Center(
@@ -256,7 +257,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
                     ),
                   )
                 : switch (_viewMode) {
-                    _ViewMode.epgGrid => _buildEpgGrid(filtered),
+                    _ViewMode.epgGrid => _buildEpgGrid(filtered, epgService),
                     _ViewMode.logoGrid => _buildGridView(filtered),
                     _ViewMode.list => _buildListView(filtered),
                   },
@@ -282,9 +283,9 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
     );
   }
 
-  Widget _buildCategoryBar() {
+  Widget _buildCategoryBar(List<Category> categories) {
     return ScrollableCategoryBar(
-      tabs: _categoryTabs,
+      tabs: _categoryTabs(categories),
       selectedId: _selectedCategory ?? '',
       onSelected: (id) => setState(() => _selectedCategory = id),
       leading: IconButton(
@@ -340,7 +341,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
     );
   }
 
-  Widget _buildEpgGrid(List<Channel> channels) {
+  Widget _buildEpgGrid(List<Channel> channels, EpgService epgService) {
     return DpadRegion(
       memoryKey: 'live-tv/epg',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -351,7 +352,7 @@ class _LiveTvScreenState extends State<LiveTvScreen> {
       },
       child: TimelineEpgView(
         channels: channels,
-        epgService: widget.epgService,
+        epgService: epgService,
         onChannelSelect: widget.onChannelSelect,
         onCatchupProgramSelect: widget.onCatchupProgramSelect,
       ),

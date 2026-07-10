@@ -5,6 +5,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
@@ -23,9 +24,11 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -57,7 +60,7 @@ String _routeLabel(BuildContext context, String route) {
 /// Root shell with adaptive scaffold: sidebar for TV/desktop, bottom nav for
 /// phone/tablet. Includes TV focus traversal, D-pad/keyboard shortcuts, back
 /// handling, and focus restoration.
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({
     super.key,
     required this.navigationShell,
@@ -74,13 +77,15 @@ class AppShell extends StatefulWidget {
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
 
   @override
-  State<AppShell> createState() => AppShellState();
+  ConsumerState<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
+  int _unreadCount = 0;
 
   DateTime? _lastBackPress;
   int _lastNavMs = 0;
@@ -117,6 +122,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
+    _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
     if (!_appState.isConfigured) {
@@ -154,18 +160,23 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (!_mainRoutes.contains(route)) {
       widget.navigationShell.goBranch(0, initialLocation: true);
     }
-    setState(() {});
+    final newCount = _appState.unreadNotificationCount;
+    if (_unreadCount != newCount) {
+      setState(() => _unreadCount = newCount);
+    }
   }
 
   void _initSidebarFocusNodes() {
     _syncSidebarFocusNodes();
   }
 
-  void _syncSidebarFocusNodes() {
-    while (_sidebarFocusNodes.length < _mainRoutes.length) {
+  void _syncSidebarFocusNodes([List<String>? routes]) {
+    final r = routes ?? _mainRoutes;
+    if (_sidebarFocusNodes.length == r.length) return;
+    while (_sidebarFocusNodes.length < r.length) {
       _sidebarFocusNodes.add(FocusNode());
     }
-    while (_sidebarFocusNodes.length > _mainRoutes.length) {
+    while (_sidebarFocusNodes.length > r.length) {
       _sidebarFocusNodes.removeLast().dispose();
     }
   }
@@ -544,135 +555,141 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Widget _buildTabScreen(String routeName) {
-    return ListenableBuilder(
-      listenable: _appState,
-      builder: (context, _) {
-        if (_appState.isBootstrapping) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return switch (routeName) {
-          RouteNames.home => _HomeScreen(
-            appState: _appState,
-            onChannelSelect: _openChannel,
-            onVodSelect: _openVod,
-            onSeriesSelect: _openSeries,
-            onProgressSelect: _openProgress,
-            onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
-            onAioStreamsItemSelect: (item, integrationId) => unawaited(
-              _pushDetail(
-                RouteNames.aiostreamsDetailsFor(
-                  integrationId,
-                  item.type,
-                  item.id,
-                ),
-                extra: item,
-              ),
+    return switch (routeName) {
+      RouteNames.home => _HomeScreen(
+        onChannelSelect: _openChannel,
+        onVodSelect: _openVod,
+        onSeriesSelect: _openSeries,
+        onProgressSelect: _openProgress,
+        onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
+        onAioStreamsItemSelect: (item, integrationId) => unawaited(
+          _pushDetail(
+            RouteNames.aiostreamsDetailsFor(
+              integrationId,
+              item.type,
+              item.id,
             ),
-            onSidebarActivate: _activateSidebar,
+            extra: item,
           ),
-          RouteNames.search => SearchScreen(
-            channels: _appState.channels,
-            vodItems: _appState.vodItems,
-            seriesList: _appState.seriesList,
-            isConfigured: _appState.isConfigured,
-            onChannelSelect: _openChannel,
-            onVodSelect: _openVod,
-            onSeriesSelect: _openSeries,
-            onSidebarActivate: _activateSidebar,
-          ),
-          RouteNames.liveTv => LiveTvScreen(
-            channels: _appState.channels,
-            categories: _appState.liveCategories,
-            isLoading: _appState.isLoadingContent,
-            isConfigured: _appState.isConfigured,
-            favoritesService: _appState.favoritesService,
-            epgService: _appState.epgService,
-            onChannelSelect: _openChannel,
-            onCatchupProgramSelect: _openCatchupProgram,
-            onSidebarActivate: _activateSidebar,
-            onScheduleProgram: (channel, program) =>
-                unawaited(_scheduleDvr(context, channel, program)),
-          ),
-          RouteNames.vod => VodScreen(
-            vodItems: _appState.vodItems,
-            categories: _appState.vodCategories,
-            isLoading: _appState.isLoadingContent,
-            isConfigured: _appState.isConfigured,
-            onVodSelect: _openVod,
-            favoritesService: _appState.vodFavoritesService,
-            onSidebarActivate: _activateSidebar,
-          ),
-          RouteNames.series => SeriesScreen(
-            seriesList: _appState.seriesList,
-            categories: _appState.seriesCategories,
-            isLoading: _appState.isLoadingContent,
-            isConfigured: _appState.isConfigured,
-            onSeriesSelect: _openSeries,
-            favoritesService: _appState.seriesFavoritesService,
-            onSidebarActivate: _activateSidebar,
-          ),
-          RouteNames.aiostreams => AIOStreamsHomeScreen(
-            integrations: _appState.aiostreamsIntegrations,
-            apiService: _appState.aiostreamsApiService,
-            onItemSelect: (item, integrationId) => unawaited(
-              _pushDetail(
-                RouteNames.aiostreamsDetailsFor(
-                  integrationId,
-                  item.type,
-                  item.id,
-                ),
-                extra: item,
+        ),
+        onSidebarActivate: _activateSidebar,
+      ),
+      RouteNames.search => SearchScreen(
+        onChannelSelect: _openChannel,
+        onVodSelect: _openVod,
+        onSeriesSelect: _openSeries,
+        onSidebarActivate: _activateSidebar,
+      ),
+      RouteNames.liveTv => LiveTvScreen(
+        favoritesService: _appState.favoritesService,
+        onChannelSelect: _openChannel,
+        onCatchupProgramSelect: _openCatchupProgram,
+        onSidebarActivate: _activateSidebar,
+        onScheduleProgram: (channel, program) =>
+            unawaited(_scheduleDvr(context, channel, program)),
+      ),
+      RouteNames.vod => VodScreen(
+        onVodSelect: _openVod,
+        favoritesService: _appState.vodFavoritesService,
+        onSidebarActivate: _activateSidebar,
+      ),
+      RouteNames.series => SeriesScreen(
+        onSeriesSelect: _openSeries,
+        favoritesService: _appState.seriesFavoritesService,
+        onSidebarActivate: _activateSidebar,
+      ),
+      RouteNames.aiostreams => ListenableBuilder(
+        listenable: _appState,
+        builder: (_, _) => AIOStreamsHomeScreen(
+          integrations: _appState.aiostreamsIntegrations,
+          apiService: _appState.aiostreamsApiService,
+          onItemSelect: (item, integrationId) => unawaited(
+            _pushDetail(
+              RouteNames.aiostreamsDetailsFor(
+                integrationId,
+                item.type,
+                item.id,
               ),
+              extra: item,
             ),
-            onPlay: _openPlayerFromActions,
-            favoritesService: _appState.aioFavoritesService,
-            progressList: _appState.progressList,
-            onSidebarActivate: _activateSidebar,
           ),
-          RouteNames.dvr => DvrRecordingsScreen(
+          onPlay: _openPlayerFromActions,
+          favoritesService: _appState.aioFavoritesService,
+          progressList: _appState.progressList,
+          onSidebarActivate: _activateSidebar,
+        ),
+      ),
+      RouteNames.dvr => ListenableBuilder(
+        listenable: _appState,
+        builder: (_, _) {
+          if (_appState.isBootstrapping) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return DvrRecordingsScreen(
             recordings: _appState.dvrRecordings,
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
             onPlay: _openPlayerDirect,
             onSidebarActivate: _activateSidebar,
-          ),
-          RouteNames.requests => RequestScreen(
+          );
+        },
+      ),
+      RouteNames.requests => ListenableBuilder(
+        listenable: _appState,
+        builder: (_, _) {
+          if (_appState.isBootstrapping) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return RequestScreen(
             isConfigured: _appState.isConfigured,
             onSidebarActivate: _activateSidebar,
-          ),
-          RouteNames.notifications => NotificationsScreen(appState: _appState),
-          RouteNames.settings => SettingsScreen(
-            authNotifier: _appState.authNotifier,
-            activeViewer: _appState.activeViewer,
-            viewers: _appState.viewers,
-            sourceLabel: _appState.sourceLabel,
-            sourceError: _appState.error,
-            isConfiguredOverride: _appState.isConfigured,
-            epgRefreshInterval: _appState.epgRefreshInterval,
-            epgRefreshOptions: AppStateController.epgRefreshOptions,
-            traktService: _appState.traktService,
-            onConnect: _appState.connectXtream,
-            onDisconnect: () => unawaited(_appState.disconnect()),
-            onSwitchViewer: (viewer) =>
-                unawaited(_appState.switchViewer(viewer)),
-            onCreateViewer: _appState.createViewer,
-            onClearCache: () => unawaited(_appState.clearAndRefresh()),
-            onEpgIntervalChanged: (d) =>
-                unawaited(_appState.setEpgRefreshInterval(d)),
-            onConnected: () => _navigateTo(0),
-            locale: _appState.locale,
-            onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
-          ),
-          _ => const PlaceholderScreen(title: 'Home'),
-        };
-      },
-    );
+          );
+        },
+      ),
+      RouteNames.notifications => NotificationsScreen(
+        onMarkRead: _appState.markNotificationRead,
+        onMarkAllRead: _appState.markAllNotificationsRead,
+        onSetChannels: _appState.setNotificationChannels,
+      ),
+      RouteNames.settings => ListenableBuilder(
+        listenable: _appState,
+        builder: (_, _) => SettingsScreen(
+          authNotifier: _appState.authNotifier,
+          activeViewer: _appState.activeViewer,
+          viewers: _appState.viewers,
+          sourceLabel: _appState.sourceLabel,
+          sourceError: _appState.error,
+          isConfiguredOverride: _appState.isConfigured,
+          epgRefreshInterval: _appState.epgRefreshInterval,
+          epgRefreshOptions: AppStateController.epgRefreshOptions,
+          traktService: _appState.traktService,
+          onConnect: _appState.connectXtream,
+          onDisconnect: () => unawaited(_appState.disconnect()),
+          onSwitchViewer: (viewer) => unawaited(_appState.switchViewer(viewer)),
+          onCreateViewer: _appState.createViewer,
+          onClearCache: () => unawaited(_appState.clearAndRefresh()),
+          onEpgIntervalChanged: (d) =>
+              unawaited(_appState.setEpgRefreshInterval(d)),
+          onConnected: () => _navigateTo(0),
+          locale: _appState.locale,
+          onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
+        ),
+      ),
+      _ => const PlaceholderScreen(title: 'Home'),
+    };
   }
 
   @override
   Widget build(BuildContext context) {
+    // isConfigured triggers route recalculation on connect/disconnect.
+    ref.watch(isConfiguredProvider);
+
+    final routes = _mainRoutes;
+    _syncSidebarFocusNodes(routes);
     final useSidebar = shouldUseSidebar(widget.deviceType);
 
     final contentShell = ContentActions(
@@ -716,8 +733,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
             return KeyEventResult.ignored;
           },
           child: useSidebar
-              ? _buildTvLayout(contentShell)
-              : _buildMobileLayout(contentShell),
+              ? _buildTvLayout(contentShell, routes, _unreadCount)
+              : _buildMobileLayout(contentShell, routes, _unreadCount),
         ),
       ),
     );
@@ -869,7 +886,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTvLayout(Widget contentShell) {
+  Widget _buildTvLayout(
+    Widget contentShell,
+    List<String> routes,
+    int unreadCount,
+  ) {
     return MediaQuery.removePadding(
       context: context,
       removeTop: true,
@@ -907,11 +928,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   bottom: 0,
                   child: NavigationSidebar(
                     currentIndex: _currentIndex,
-                    routes: _mainRoutes,
+                    routes: routes,
                     sidebarActive: _sidebarActive,
                     focusNodes: _sidebarFocusNodes,
                     scopeNode: _sidebarScopeNode,
-                    unreadNotificationCount: _appState.unreadNotificationCount,
+                    unreadNotificationCount: unreadCount,
                     onNavigate: _navigateTo,
                     onActivateSidebar: _activateSidebar,
                     onDeactivateSidebar: _deactivateSidebar,
@@ -925,14 +946,18 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMobileLayout(Widget contentShell) {
+  Widget _buildMobileLayout(
+    Widget contentShell,
+    List<String> routes,
+    int unreadCount,
+  ) {
     final primaryCount = RouteNames.mobilePrimaryCount.clamp(
       0,
-      _mainRoutes.length,
+      routes.length,
     );
-    final overflowRoutes = _mainRoutes.skip(primaryCount).toList();
+    final overflowRoutes = routes.skip(primaryCount).toList();
     final overflowUnread = overflowRoutes.contains(RouteNames.notifications)
-        ? _appState.unreadNotificationCount
+        ? unreadCount
         : 0;
     final moreTabIndex = primaryCount;
     final displayedIndex = _currentIndex < primaryCount
@@ -945,12 +970,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         type: BottomNavigationBarType.fixed,
         currentIndex: displayedIndex,
         onTap: (index) => index == moreTabIndex
-            ? _showMoreSheet(overflowRoutes, primaryCount)
+            ? _showMoreSheet(overflowRoutes, primaryCount, unreadCount)
             : _navigateTo(index),
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
         items: [
-          ..._mainRoutes.take(primaryCount).map((route) {
+          ...routes.take(primaryCount).map((route) {
             return BottomNavigationBarItem(
               icon: Icon(_routeIcon(route)),
               label: _routeLabel(context, route),
@@ -973,6 +998,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _showMoreSheet(
     List<String> overflowRoutes,
     int primaryCount,
+    int unreadCount,
   ) async {
     // Return the chosen index and navigate after the sheet is fully dismissed.
     // Calling _navigateTo synchronously inside ListTile.onTap while the sheet
@@ -989,8 +1015,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 leading: Badge(
                   isLabelVisible:
                       overflowRoutes[i] == RouteNames.notifications &&
-                      _appState.unreadNotificationCount > 0,
-                  label: Text('${_appState.unreadNotificationCount}'),
+                      unreadCount > 0,
+                  label: Text('$unreadCount'),
                   child: Icon(_routeIcon(overflowRoutes[i])),
                 ),
                 title: Text(_routeLabel(sheetContext, overflowRoutes[i])),
@@ -1366,9 +1392,8 @@ class _OfflineBanner extends StatelessWidget {
   }
 }
 
-class _HomeScreen extends StatefulWidget {
+class _HomeScreen extends ConsumerStatefulWidget {
   const _HomeScreen({
-    required this.appState,
     required this.onChannelSelect,
     required this.onVodSelect,
     required this.onSeriesSelect,
@@ -1378,7 +1403,6 @@ class _HomeScreen extends StatefulWidget {
     this.onSidebarActivate,
   });
 
-  final AppStateController appState;
   final void Function(Channel) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
@@ -1388,24 +1412,31 @@ class _HomeScreen extends StatefulWidget {
   final VoidCallback? onSidebarActivate;
 
   @override
-  State<_HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<_HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<_HomeScreen> {
+class _HomeScreenState extends ConsumerState<_HomeScreen> {
   Set<int> _favoriteChannelIds = {};
   Set<int> _favoriteVodIds = {};
   Set<int> _favoriteSeriesIds = {};
 
+  late final FavoritesService _liveFavoritesService;
+  late final FavoritesService _vodFavoritesService;
+  late final FavoritesService _seriesFavoritesService;
+
   @override
   void initState() {
     super.initState();
-    widget.appState.favoritesService.addListener(_onChannelFavoritesChanged);
+    _liveFavoritesService = ref.read(liveFavoritesServiceProvider);
+    _vodFavoritesService = ref.read(vodFavoritesServiceProvider);
+    _seriesFavoritesService = ref.read(seriesFavoritesServiceProvider);
+    _liveFavoritesService.addListener(_onChannelFavoritesChanged);
     unawaited(_loadFavorites());
   }
 
   @override
   void dispose() {
-    widget.appState.favoritesService.removeListener(_onChannelFavoritesChanged);
+    _liveFavoritesService.removeListener(_onChannelFavoritesChanged);
     super.dispose();
   }
 
@@ -1414,24 +1445,38 @@ class _HomeScreenState extends State<_HomeScreen> {
   }
 
   Future<void> _loadChannelFavorites() async {
-    final ids = await widget.appState.favoritesService.all();
+    final ids = await _liveFavoritesService.all();
     if (mounted) setState(() => _favoriteChannelIds = ids);
   }
 
   Future<void> _loadFavorites() async {
-    final appState = widget.appState;
-    final channels = await appState.favoritesService.all();
-    if (mounted) setState(() => _favoriteChannelIds = channels);
-    final vod = await appState.vodFavoritesService.all();
+    final live = await _liveFavoritesService.all();
+    if (mounted) setState(() => _favoriteChannelIds = live);
+    final vod = await _vodFavoritesService.all();
     if (mounted) setState(() => _favoriteVodIds = vod);
-    final series = await appState.seriesFavoritesService.all();
+    final series = await _seriesFavoritesService.all();
     if (mounted) setState(() => _favoriteSeriesIds = series);
   }
 
   @override
   Widget build(BuildContext context) {
-    final appState = widget.appState;
-    if (!appState.isConfigured) {
+    final isBootstrapping = ref.watch(isBootstrappingProvider);
+    final isConfigured = ref.watch(isConfiguredProvider);
+    final progressList = ref.watch(progressListProvider);
+    final channels = ref.watch(liveChannelsProvider);
+    final vodItems = ref.watch(vodItemsProvider);
+    final seriesList = ref.watch(seriesListProvider);
+    final epgService = ref.watch(epgServiceProvider);
+    final dvrRecordings = ref.watch(dvrRecordingsProvider);
+    final sourceLabel = ref.watch(sourceLabelProvider);
+    final sourceError = ref.watch(sourceErrorProvider);
+    final hasDvrFeature = ref.watch(hasDvrFeatureProvider);
+
+    if (isBootstrapping) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!isConfigured) {
       return Scaffold(
         body: Center(
           child: Text(AppLocalizations.of(context).appNotConfigured),
@@ -1440,9 +1485,9 @@ class _HomeScreenState extends State<_HomeScreen> {
     }
 
     final l = AppLocalizations.of(context);
-    final continueWatchingItems = appState.progressList
+    final continueWatchingItems = progressList
         .where(_isResumeEligible)
-        .map(_resumePreviewItem)
+        .map((p) => _resumePreviewItem(p, vodItems, seriesList))
         .whereType<MediaPreviewItem>()
         .toList(growable: false);
     final continueWatchingSection = MediaPreviewSection(
@@ -1456,7 +1501,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       title: channel.name,
       imageUrl: channel.logoUrl,
       subtitle:
-          appState.epgService.lookupForChannel(channel)?.current.title ??
+          epgService.lookupForChannel(channel)?.current.title ??
           channel.groupTitle ??
           l.homeLiveChannel,
       fallbackIcon: Icons.live_tv,
@@ -1466,18 +1511,18 @@ class _HomeScreenState extends State<_HomeScreen> {
       isFavorite: _favoriteChannelIds.contains(channel.id),
       onTap: () => widget.onChannelSelect(channel),
       onLongTap: () async {
-        await appState.favoritesService.toggle(channel.id);
+        await _liveFavoritesService.toggle(channel.id);
         await _loadFavorites();
       },
     );
 
-    final favoriteChannels = appState.channels
+    final favoriteChannels = channels
         .where((channel) => _favoriteChannelIds.contains(channel.id))
         .toList(growable: false);
     final liveSection = MediaPreviewSection(
       title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       emptyLabel: l.homeNoLiveTv,
-      items: (favoriteChannels.isEmpty ? appState.channels : favoriteChannels)
+      items: (favoriteChannels.isEmpty ? channels : favoriteChannels)
           .map(liveChannelItem)
           .toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
@@ -1486,7 +1531,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       title: l.navVod,
       emptyLabel: l.homeNoMovies,
       posterStyle: true,
-      items: appState.vodItems
+      items: vodItems
           .map(
             (item) => MediaPreviewItem(
               title: item.name,
@@ -1497,7 +1542,7 @@ class _HomeScreenState extends State<_HomeScreen> {
               isFavorite: _favoriteVodIds.contains(item.id),
               onTap: () => widget.onVodSelect(item),
               onLongTap: () async {
-                await appState.vodFavoritesService.toggle(item.id);
+                await _vodFavoritesService.toggle(item.id);
                 await _loadFavorites();
               },
             ),
@@ -1509,7 +1554,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       title: l.navSeries,
       emptyLabel: l.homeNoSeries,
       posterStyle: true,
-      items: appState.seriesList
+      items: seriesList
           .map(
             (series) => MediaPreviewItem(
               title: series.name,
@@ -1522,7 +1567,7 @@ class _HomeScreenState extends State<_HomeScreen> {
               isFavorite: _favoriteSeriesIds.contains(series.id),
               onTap: () => widget.onSeriesSelect(series),
               onLongTap: () async {
-                await appState.seriesFavoritesService.toggle(series.id);
+                await _seriesFavoritesService.toggle(series.id);
                 await _loadFavorites();
               },
             ),
@@ -1536,9 +1581,9 @@ class _HomeScreenState extends State<_HomeScreen> {
       items: [
         MediaPreviewItem(
           title: 'DVR Recordings',
-          subtitle: appState.dvrRecordings.isEmpty
+          subtitle: dvrRecordings.isEmpty
               ? 'Browse completed and in-progress recordings'
-              : '${appState.dvrRecordings.length} recordings',
+              : '${dvrRecordings.length} recordings',
           fallbackIcon: Icons.video_library,
           onTap: () => widget.onRecordingsSelect(),
         ),
@@ -1554,28 +1599,17 @@ class _HomeScreenState extends State<_HomeScreen> {
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          Text(l.homeConnectedSource(appState.sourceLabel)),
-          if (appState.error != null && appState.error!.isNotEmpty) ...[
+          Text(l.homeConnectedSource(sourceLabel)),
+          if (sourceError != null && sourceError.isNotEmpty) ...[
             const SizedBox(height: MediaBrowsingMetrics.chipGap),
-            _OfflineBanner(message: appState.error!),
+            _OfflineBanner(message: sourceError),
           ],
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
           liveSection,
           moviesSection,
           seriesSection,
-          if (appState.hasAioStreams)
-            for (final integration in appState.aiostreamsIntegrations)
-              for (final catalog in integration.catalogs)
-                AIOStreamsCatalogRow(
-                  catalog: catalog,
-                  integrationId: integration.id,
-                  apiService: appState.aiostreamsApiService,
-                  onItemSelect: (item) =>
-                      widget.onAioStreamsItemSelect(item, integration.id),
-                  onSidebarActivate: widget.onSidebarActivate,
-                ),
-          if (appState.hasDvrFeature) recordingsSection,
+          if (hasDvrFeature) recordingsSection,
         ],
       ),
     );
@@ -1587,7 +1621,11 @@ class _HomeScreenState extends State<_HomeScreen> {
         !progress.completed;
   }
 
-  MediaPreviewItem? _resumePreviewItem(Progress progress) {
+  MediaPreviewItem? _resumePreviewItem(
+    Progress progress,
+    List<VodItem> vodItems,
+    List<Series> seriesList,
+  ) {
     if (progress.contentType == ContentType.vod) {
       if (progress.title != null) {
         final hasBackdrop = progress.backdropUrl != null;
@@ -1603,7 +1641,7 @@ class _HomeScreenState extends State<_HomeScreen> {
             ? (plot.length > 120 ? '${plot.substring(0, 117)}…' : plot)
             : null;
         final vodFallbackLogo = (!hasBackdrop && progress.thumbnailUrl == null)
-            ? widget.appState.vodItems
+            ? vodItems
                   .firstWhereOrNull((v) => v.id == progress.streamId)
                   ?.logoUrl
             : null;
@@ -1625,7 +1663,7 @@ class _HomeScreenState extends State<_HomeScreen> {
           onTap: () => widget.onProgressSelect(progress),
         );
       }
-      final item = widget.appState.vodItems.firstWhereOrNull(
+      final item = vodItems.firstWhereOrNull(
         (item) => item.id == progress.streamId,
       );
       if (item == null) return null;
@@ -1667,7 +1705,7 @@ class _HomeScreenState extends State<_HomeScreen> {
             (progress.seasonNumber != null
                 ? 'Season ${progress.seasonNumber}'
                 : null);
-        final seriesFallback = widget.appState.seriesList.firstWhereOrNull(
+        final seriesFallback = seriesList.firstWhereOrNull(
           (s) => s.id == progress.seriesId,
         );
         return MediaPreviewItem(
@@ -1692,7 +1730,7 @@ class _HomeScreenState extends State<_HomeScreen> {
         );
       }
       if (progress.seriesId != null) {
-        final series = widget.appState.seriesList.firstWhereOrNull(
+        final series = seriesList.firstWhereOrNull(
           (series) => series.id == progress.seriesId,
         );
         if (series == null) return null;

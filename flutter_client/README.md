@@ -208,7 +208,8 @@ lib/
   l10n/           ARB source files + generated AppLocalizations
   navigation/     Router, route names, PlayerArgs
   playback/       Platform playback adapters and orchestrator
-  services/       Domain models, Xtream API, EPG, state controller
+  providers/      Riverpod providers (app_providers.dart — single source of truth)
+  services/       Domain models, Xtream API, EPG, AppStateController
   shared/         Reusable UI widgets
 tvos/             Apple TV (tvOS) Xcode runner
 ios/              iOS Xcode runner
@@ -216,6 +217,20 @@ android/          Android Gradle project
 packages/         Local Flutter packages (flutter_secure_storage_tvos, …)
 test/             Unit and widget tests
 ```
+
+## State architecture
+
+State is managed with **Riverpod 2**. The key split:
+
+| Concern | Who handles it |
+|---|---|
+| Reactive data reads (channels, isConfigured, etc.) | Riverpod providers in `lib/providers/app_providers.dart` |
+| Business logic / mutations (connect, disconnect, etc.) | `AppStateController` — called via callbacks passed from `AppShell` |
+| Service instances (EPG, favorites, etc.) | `AppStateController` owns them; providers expose stable refs via `ref.read` |
+
+**The rule:** feature screens extend `ConsumerStatefulWidget` and read all display data via `ref.watch(someProvider)`. They never hold or accept an `AppStateController` reference. Actions arrive as typed callbacks in the constructor.
+
+See `CLAUDE.md` for the full provider list and the test pattern.
 
 ## Localization
 

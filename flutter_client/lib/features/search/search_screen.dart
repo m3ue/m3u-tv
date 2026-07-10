@@ -1,6 +1,8 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -11,33 +13,25 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 /// - Case-insensitive name.includes(query) filtering
 /// - All / Live TV / Movies / Series tabs
 /// - Real-time filtering as user types
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
     super.key,
-    required this.channels,
-    required this.vodItems,
-    required this.seriesList,
-    required this.isConfigured,
     required this.onChannelSelect,
     required this.onVodSelect,
     required this.onSeriesSelect,
     this.onSidebarActivate,
   });
 
-  final List<Channel> channels;
-  final List<VodItem> vodItems;
-  final List<Series> seriesList;
-  final bool isConfigured;
   final void Function(Channel) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final VoidCallback? onSidebarActivate;
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen>
+class _SearchScreenState extends ConsumerState<SearchScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _query = '';
@@ -55,35 +49,45 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   String get _normalizedQuery => _query.trim().toLowerCase();
-
   bool get _hasQuery => _normalizedQuery.isNotEmpty;
 
-  List<Channel> get _filteredChannels => _hasQuery
-      ? widget.channels
+  List<Channel> _filterChannels(List<Channel> channels) => _hasQuery
+      ? channels
             .where(
-              (channel) =>
-                  channel.name.toLowerCase().contains(_normalizedQuery),
+              (c) => c.name.toLowerCase().contains(_normalizedQuery),
             )
             .toList(growable: false)
       : const [];
 
-  List<VodItem> get _filteredVodItems => _hasQuery
-      ? widget.vodItems
-            .where((item) => item.name.toLowerCase().contains(_normalizedQuery))
+  List<VodItem> _filterVodItems(List<VodItem> vodItems) => _hasQuery
+      ? vodItems
+            .where(
+              (v) => v.name.toLowerCase().contains(_normalizedQuery),
+            )
             .toList(growable: false)
       : const [];
 
-  List<Series> get _filteredSeriesList => _hasQuery
-      ? widget.seriesList
+  List<Series> _filterSeriesList(List<Series> seriesList) => _hasQuery
+      ? seriesList
             .where(
-              (series) => series.name.toLowerCase().contains(_normalizedQuery),
+              (s) => s.name.toLowerCase().contains(_normalizedQuery),
             )
             .toList(growable: false)
       : const [];
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.isConfigured) {
+    final isBootstrapping = ref.watch(isBootstrappingProvider);
+    final isConfigured = ref.watch(isConfiguredProvider);
+    final channels = ref.watch(liveChannelsProvider);
+    final vodItems = ref.watch(vodItemsProvider);
+    final seriesList = ref.watch(seriesListProvider);
+
+    if (isBootstrapping) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!isConfigured) {
       return Scaffold(
         body: Center(
           child: Text(
@@ -93,6 +97,10 @@ class _SearchScreenState extends State<SearchScreen>
         ),
       );
     }
+
+    final filteredChannels = _filterChannels(channels);
+    final filteredVodItems = _filterVodItems(vodItems);
+    final filteredSeries = _filterSeriesList(seriesList);
 
     return Scaffold(
       body: Column(
@@ -114,15 +122,18 @@ class _SearchScreenState extends State<SearchScreen>
               AppLocalizations.of(context).searchSectionSeries,
             ],
           ),
-          // Content
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAllTab(),
-                _buildLiveTvTab(),
-                _buildMoviesTab(),
-                _buildSeriesTab(),
+                _buildAllTab(
+                  filteredChannels,
+                  filteredVodItems,
+                  filteredSeries,
+                ),
+                _buildLiveTvTab(filteredChannels),
+                _buildMoviesTab(filteredVodItems),
+                _buildSeriesTab(filteredSeries),
               ],
             ),
           ),
@@ -131,13 +142,12 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildAllTab() {
+  Widget _buildAllTab(
+    List<Channel> channels,
+    List<VodItem> vodItems,
+    List<Series> seriesList,
+  ) {
     if (!_hasQuery) return _buildPromptState();
-
-    final channels = _filteredChannels;
-    final vodItems = _filteredVodItems;
-    final seriesList = _filteredSeriesList;
-
     if (channels.isEmpty && vodItems.isEmpty && seriesList.isEmpty) {
       return _buildEmptyState('No results found');
     }
@@ -187,13 +197,9 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildLiveTvTab() {
+  Widget _buildLiveTvTab(List<Channel> channels) {
     if (!_hasQuery) return _buildPromptState();
-
-    final channels = _filteredChannels;
-    if (channels.isEmpty) {
-      return _buildEmptyState('No results found');
-    }
+    if (channels.isEmpty) return _buildEmptyState('No results found');
     return DpadRegion(
       memoryKey: 'search/live-tv',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -213,13 +219,9 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildMoviesTab() {
+  Widget _buildMoviesTab(List<VodItem> vodItems) {
     if (!_hasQuery) return _buildPromptState();
-
-    final vodItems = _filteredVodItems;
-    if (vodItems.isEmpty) {
-      return _buildEmptyState('No results found');
-    }
+    if (vodItems.isEmpty) return _buildEmptyState('No results found');
     return DpadRegion(
       memoryKey: 'search/movies',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -239,13 +241,9 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildSeriesTab() {
+  Widget _buildSeriesTab(List<Series> seriesList) {
     if (!_hasQuery) return _buildPromptState();
-
-    final seriesList = _filteredSeriesList;
-    if (seriesList.isEmpty) {
-      return _buildEmptyState('No results found');
-    }
+    if (seriesList.isEmpty) return _buildEmptyState('No results found');
     return DpadRegion(
       memoryKey: 'search/series',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -268,11 +266,8 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildPromptState() =>
       _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
 
-  Widget _buildEmptyState(String label) {
-    return Center(
-      child: Text(label, style: Theme.of(context).textTheme.bodyLarge),
-    );
-  }
+  Widget _buildEmptyState(String label) =>
+      Center(child: Text(label, style: Theme.of(context).textTheme.bodyLarge));
 }
 
 class _SectionHeader extends StatelessWidget {

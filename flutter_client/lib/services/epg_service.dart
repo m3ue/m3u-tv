@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:m3u_tv/services/domain_models.dart';
 
 typedef Clock = DateTime Function();
 
-class EpgService {
+class EpgService extends ChangeNotifier {
   EpgService({Clock? clock, this.cacheTtl = const Duration(minutes: 30)})
     : _clock = clock ?? DateTime.now;
 
@@ -16,6 +17,7 @@ class EpgService {
     _programsByChannel.clear();
     _storePrograms(programs);
     _loadedAt = _clock();
+    notifyListeners();
   }
 
   void mergePrograms(List<EpgProgram> programs) {
@@ -28,6 +30,7 @@ class EpgService {
     }
     _storePrograms(programs);
     _loadedAt = _clock();
+    notifyListeners();
   }
 
   void _storePrograms(List<EpgProgram> programs) {

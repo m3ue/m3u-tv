@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -15,31 +17,23 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 /// - Grid layout with cover thumbnails and ratings
 /// - Category filtering
 /// - Season/episode navigation happens in SeriesDetailsScreen (separate route)
-class SeriesScreen extends StatefulWidget {
+class SeriesScreen extends ConsumerStatefulWidget {
   const SeriesScreen({
     super.key,
-    required this.seriesList,
-    required this.categories,
-    required this.isLoading,
-    required this.isConfigured,
     required this.onSeriesSelect,
     this.favoritesService,
     this.onSidebarActivate,
   });
 
-  final List<Series> seriesList;
-  final List<Category> categories;
-  final bool isLoading;
-  final bool isConfigured;
   final void Function(Series) onSeriesSelect;
   final FavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
-  State<SeriesScreen> createState() => _SeriesScreenState();
+  ConsumerState<SeriesScreen> createState() => _SeriesScreenState();
 }
 
-class _SeriesScreenState extends State<SeriesScreen> {
+class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   static const double _minPosterCardWidth = 120;
   static const double _maxPosterCardWidth = 220;
   static const _kFavoritesCategoryId = '__FAVORITES__';
@@ -61,17 +55,17 @@ class _SeriesScreenState extends State<SeriesScreen> {
     if (mounted) setState(() => _favoriteIds = ids);
   }
 
-  List<Series> get _filteredItems {
+  List<Series> _filteredItems(List<Series> seriesList) {
     final selectedCategory = _selectedCategory;
     final Iterable<Series> categoryFiltered;
     if (selectedCategory == _kFavoritesCategoryId) {
-      categoryFiltered = widget.seriesList.where(
+      categoryFiltered = seriesList.where(
         (item) => _favoriteIds.contains(item.id),
       );
     } else if (selectedCategory == null || selectedCategory.isEmpty) {
-      categoryFiltered = widget.seriesList;
+      categoryFiltered = seriesList;
     } else {
-      categoryFiltered = widget.seriesList.where(
+      categoryFiltered = seriesList.where(
         (item) => item.categoryId == selectedCategory,
       );
     }
@@ -80,13 +74,25 @@ class _SeriesScreenState extends State<SeriesScreen> {
       return categoryFiltered.toList(growable: false);
     }
     return categoryFiltered
-        .where((item) => item.name.toLowerCase().contains(normalizedQuery))
+        .where(
+          (item) => item.name.toLowerCase().contains(normalizedQuery),
+        )
         .toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.isConfigured) {
+    final isBootstrapping = ref.watch(isBootstrappingProvider);
+    final isConfigured = ref.watch(isConfiguredProvider);
+    final isLoading = ref.watch(isLoadingContentProvider);
+    final seriesList = ref.watch(seriesListProvider);
+    final categories = ref.watch(seriesCategoriesProvider);
+
+    if (isBootstrapping) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!isConfigured) {
       return Scaffold(
         body: Center(
           child: Text(
@@ -97,17 +103,15 @@ class _SeriesScreenState extends State<SeriesScreen> {
       );
     }
 
-    final filtered = _filteredItems;
+    final filtered = _filteredItems(seriesList);
 
     return Scaffold(
       body: Column(
         children: [
           _buildSearchField(),
-          // Category bar
-          _buildCategoryBar(),
-          // Content area
+          _buildCategoryBar(categories),
           Expanded(
-            child: widget.isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filtered.isEmpty
                 ? Center(
@@ -139,13 +143,13 @@ class _SeriesScreenState extends State<SeriesScreen> {
     );
   }
 
-  Widget _buildCategoryBar() {
+  Widget _buildCategoryBar(List<Category> categories) {
     final l = AppLocalizations.of(context);
     final tabs = [
       CategoryTabData(id: '', name: l.seriesAllSeries),
       if (_favoriteIds.isNotEmpty)
         CategoryTabData(id: _kFavoritesCategoryId, name: l.liveTvFavorites),
-      ...widget.categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
+      ...categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
     ];
 
     return ScrollableCategoryBar(
@@ -277,10 +281,17 @@ class _SeriesCard extends StatelessWidget {
             Positioned(
               top: 4,
               left: 4,
-              child: Icon(
-                Icons.star,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.star,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
             ),
         ],
