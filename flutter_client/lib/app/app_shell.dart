@@ -5,6 +5,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
@@ -23,6 +24,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -57,7 +59,7 @@ String _routeLabel(BuildContext context, String route) {
 /// Root shell with adaptive scaffold: sidebar for TV/desktop, bottom nav for
 /// phone/tablet. Includes TV focus traversal, D-pad/keyboard shortcuts, back
 /// handling, and focus restoration.
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({
     super.key,
     required this.navigationShell,
@@ -74,10 +76,10 @@ class AppShell extends StatefulWidget {
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
 
   @override
-  State<AppShell> createState() => AppShellState();
+  ConsumerState<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
@@ -154,7 +156,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (!_mainRoutes.contains(route)) {
       widget.navigationShell.goBranch(0, initialLocation: true);
     }
-    setState(() {});
+    // No setState needed — ref.watch(appStateControllerProvider) in build()
+    // schedules the rebuild whenever notifyListeners fires.
   }
 
   void _initSidebarFocusNodes() {
@@ -674,6 +677,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Subscribe to AppStateController so this build re-runs whenever
+    // notifyListeners fires — replaces the setState in _onAppStateChanged.
+    ref.watch(appStateControllerProvider);
+
     final routes = _mainRoutes;
     _syncSidebarFocusNodes(routes);
     final useSidebar = shouldUseSidebar(widget.deviceType);

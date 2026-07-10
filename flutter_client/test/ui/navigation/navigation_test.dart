@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
@@ -13,6 +14,7 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -1252,18 +1254,25 @@ class _TestAppState extends State<_TestApp> {
 
   @override
   void dispose() {
+    // The proxy inside ProviderScope is disposed by Riverpod, but it does NOT
+    // dispose _appState — the caller retains lifecycle ownership. Dispose here
+    // only when _TestAppState itself created the controller (widget.appState
+    // was null); external callers (which use addTearDown) own their own.
     if (widget.appState == null) _appState.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'M3U TV Test',
-      theme: ThemeData.dark(useMaterial3: true),
-      routerConfig: _router,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+    return ProviderScope(
+      overrides: [overrideAppState(_appState)],
+      child: MaterialApp.router(
+        title: 'M3U TV Test',
+        theme: ThemeData.dark(useMaterial3: true),
+        routerConfig: _router,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+      ),
     );
   }
 }
