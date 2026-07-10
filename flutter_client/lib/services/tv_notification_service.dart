@@ -107,14 +107,19 @@ class TvNotificationItem {
   /// 'success' | 'warning' | 'danger' | 'info'
   final String status;
 
-  factory TvNotificationItem.fromJson(Map<String, Object?> json) =>
-      TvNotificationItem(
-        id: '${json['id'] ?? ''}',
-        channel: '${json['channel'] ?? 'general'}',
-        title: '${json['title'] ?? ''}',
-        body: json['body'] as String?,
-        status: '${json['status'] ?? 'info'}',
-      );
+  factory TvNotificationItem.fromJson(Map<String, Object?> json) {
+    final rawId = json['id'];
+    final id = rawId is String && rawId.isNotEmpty
+        ? rawId
+        : 'live-${DateTime.now().microsecondsSinceEpoch}';
+    return TvNotificationItem(
+      id: id,
+      channel: '${json['channel'] ?? 'general'}',
+      title: '${json['title'] ?? ''}',
+      body: json['body'] as String?,
+      status: '${json['status'] ?? 'info'}',
+    );
+  }
 }
 
 /// REST client for the `/api/tv` endpoints.
