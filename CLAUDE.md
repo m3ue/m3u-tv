@@ -58,7 +58,6 @@ class _MyScreenState extends ConsumerState<MyScreen> {
 - Status: `isConfiguredProvider`, `isBootstrappingProvider`, `isLoadingContentProvider`
 - Services (stable, use `ref.read`): `epgServiceProvider`, `liveFavoritesServiceProvider`, `vodFavoritesServiceProvider`, `seriesFavoritesServiceProvider`
 - Home extras: `progressListProvider`, `dvrRecordingsProvider`, `sourceLabelProvider`, `sourceErrorProvider`, `hasDvrFeatureProvider`
-- Shell: `unreadNotificationCountProvider`
 
 **Adding a new provider** — add it to `app_providers.dart` using `ref.watch(appStateControllerProvider)` so it reacts to `AppStateController.notifyListeners()`:
 ```dart

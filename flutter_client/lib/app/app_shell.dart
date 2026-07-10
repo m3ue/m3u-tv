@@ -621,20 +621,34 @@ class AppShellState extends ConsumerState<AppShell>
       ),
       RouteNames.dvr => ListenableBuilder(
         listenable: _appState,
-        builder: (_, _) => DvrRecordingsScreen(
-          recordings: _appState.dvrRecordings,
-          isLoading: _appState.isLoadingContent,
-          isConfigured: _appState.isConfigured,
-          onPlay: _openPlayerDirect,
-          onSidebarActivate: _activateSidebar,
-        ),
+        builder: (_, _) {
+          if (_appState.isBootstrapping) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return DvrRecordingsScreen(
+            recordings: _appState.dvrRecordings,
+            isLoading: _appState.isLoadingContent,
+            isConfigured: _appState.isConfigured,
+            onPlay: _openPlayerDirect,
+            onSidebarActivate: _activateSidebar,
+          );
+        },
       ),
       RouteNames.requests => ListenableBuilder(
         listenable: _appState,
-        builder: (_, _) => RequestScreen(
-          isConfigured: _appState.isConfigured,
-          onSidebarActivate: _activateSidebar,
-        ),
+        builder: (_, _) {
+          if (_appState.isBootstrapping) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return RequestScreen(
+            isConfigured: _appState.isConfigured,
+            onSidebarActivate: _activateSidebar,
+          );
+        },
       ),
       RouteNames.notifications => NotificationsScreen(
         onMarkRead: _appState.markNotificationRead,
