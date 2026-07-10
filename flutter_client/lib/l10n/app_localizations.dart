@@ -302,6 +302,24 @@ abstract class AppLocalizations {
   /// **'Resume'**
   String get playerResume;
 
+  /// No description provided for @playerUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This content is not supported on this device'**
+  String get playerUnsupported;
+
+  /// No description provided for @playerResolverUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream resolution is unavailable. Please try again.'**
+  String get playerResolverUnavailable;
+
+  /// No description provided for @playerResolverRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The stream request was rejected. Check your account and try again.'**
+  String get playerResolverRejected;
+
   /// No description provided for @searchHint.
   ///
   /// In en, this message translates to:

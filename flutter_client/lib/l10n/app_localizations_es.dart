@@ -114,6 +114,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerResume => 'Reanudar';
 
   @override
+  String get playerUnsupported =>
+      'Este contenido no es compatible con este dispositivo';
+
+  @override
+  String get playerResolverUnavailable =>
+      'La resolución de la transmisión no está disponible. Inténtalo de nuevo.';
+
+  @override
+  String get playerResolverRejected =>
+      'La solicitud de transmisión fue rechazada. Comprueba tu cuenta e inténtalo de nuevo.';
+
+  @override
   String get searchHint => 'Buscar Televisión en vivo, cine y series…';
 
   @override

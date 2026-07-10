@@ -29,6 +29,7 @@ import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/stream_resolution_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -317,9 +318,10 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _openPlayerDirect(PlayerArgs args) {
     final oldOrch = _playerOrchestrator;
-    final newOrch =
-        widget.playbackOrchestratorBuilder?.call() ??
-        buildPlaybackOrchestrator();
+    final builder = widget.playbackOrchestratorBuilder;
+    final newOrch = builder != null
+        ? builder()
+        : _buildOrchestratorWithResolution();
     // Save the focused node so we can restore it precisely after the player
     // closes. _contentFocusNode.requestFocus() alone is unreliable: when
     // PlayerScreen disposes _screenFocusNode, Flutter's _willDisposeFocusNode
@@ -338,6 +340,16 @@ class AppShellState extends ConsumerState<AppShell>
         (_) => oldOrch.dispose().ignore(),
       );
     }
+  }
+
+  PlaybackOrchestrator _buildOrchestratorWithResolution() {
+    final credentials = _appState.authNotifier.credentials;
+    return buildPlaybackOrchestrator(
+      resolutionService:
+          credentials == null || _appState.sourceType != AppSourceType.xtream
+          ? null
+          : ProductionStreamResolutionService(credentials: credentials),
+    );
   }
 
   bool _isInContentScope(FocusNode? node) {
@@ -428,6 +440,7 @@ class AppShellState extends ConsumerState<AppShell>
           headers: channel.headers,
           metadata: <String, Object?>{
             'catchup': true,
+            'catchup_format': 'ts',
             'program_title': program.title,
             'program_start': program.start.toIso8601String(),
             'program_end': program.end.toIso8601String(),

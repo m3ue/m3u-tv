@@ -115,6 +115,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerResume => 'Fortsetzen';
 
   @override
+  String get playerUnsupported =>
+      'Dieser Inhalt wird auf diesem Gerät nicht unterstützt';
+
+  @override
+  String get playerResolverUnavailable =>
+      'Die Stream-Auflösung ist nicht verfügbar. Bitte versuche es erneut.';
+
+  @override
+  String get playerResolverRejected =>
+      'Die Stream-Anfrage wurde abgelehnt. Überprüfe dein Konto und versuche es erneut.';
+
+  @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
 
   @override

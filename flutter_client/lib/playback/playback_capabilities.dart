@@ -199,6 +199,78 @@ class PlaybackCapabilities {
     };
   }
 
+  static ClientCapabilities clientCapabilities(PlaybackCapabilities caps) {
+    return switch (caps.backend) {
+      PlaybackBackend.androidMpv ||
+      PlaybackBackend.appleMpvKit ||
+      PlaybackBackend.desktopLibmpv => ClientCapabilities(
+        profile: caps.displayName,
+        platform: caps.platform,
+        backend: caps.backend.name,
+        videoCodecs: const <String>[
+          'h264',
+          'hevc',
+          'av1',
+          'vp9',
+          'mpeg2video',
+        ],
+        audioCodecs: const <String>[
+          'aac',
+          'ac3',
+          'eac3',
+          'mp2',
+          'mp3',
+          'opus',
+        ],
+        containers: const <String>['hls', 'mpegts', 'mp4', 'mkv', 'dash'],
+      ),
+      PlaybackBackend.androidExoPlayer => ClientCapabilities(
+        profile: caps.displayName,
+        platform: caps.platform,
+        backend: caps.backend.name,
+        videoCodecs: const <String>['h264'],
+        audioCodecs: const <String>['aac', 'mp3'],
+        containers: [
+          if (caps.supportsHls) 'hls',
+          if (caps.supportsMpegTs) 'mpegts',
+          if (caps.supportsMp4) 'mp4',
+        ],
+        maxHeight: 1080,
+        maxBitrateKbps: 20000,
+        hdr: false,
+      ),
+      PlaybackBackend.appleAvKit => ClientCapabilities(
+        profile: caps.displayName,
+        platform: caps.platform,
+        backend: caps.backend.name,
+        videoCodecs: const <String>['h264'],
+        audioCodecs: const <String>['aac'],
+        containers: [
+          if (caps.supportsHls) 'hls',
+          if (caps.supportsMpegTs) 'mpegts',
+          if (caps.supportsMp4) 'mp4',
+        ],
+        maxHeight: 1080,
+        maxBitrateKbps: 20000,
+        hdr: false,
+      ),
+      PlaybackBackend.serverTranscode => ClientCapabilities(
+        profile: caps.displayName,
+        platform: caps.platform,
+        backend: caps.backend.name,
+        videoCodecs: const <String>['h264'],
+        audioCodecs: const <String>['aac'],
+        containers: [
+          if (caps.supportsHls) 'hls',
+          if (caps.supportsMpegTs) 'mpegts',
+          if (caps.supportsMp4) 'mp4',
+        ],
+        maxHeight: 1080,
+        hdr: false,
+      ),
+    };
+  }
+
   List<String> get unsupportedFeatures {
     final features = <String>[];
     if (!supportsDirectStreams) features.add('direct-streams');
@@ -220,4 +292,40 @@ class PlaybackCapabilities {
     if (!supportsLiveSeek) features.add('live-seek');
     return List<String>.unmodifiable(features);
   }
+}
+
+class ClientCapabilities {
+  const ClientCapabilities({
+    required this.profile,
+    required this.platform,
+    this.backend,
+    required this.videoCodecs,
+    required this.audioCodecs,
+    required this.containers,
+    this.maxHeight,
+    this.maxBitrateKbps,
+    this.hdr,
+  });
+
+  final String profile;
+  final PlaybackPlatform platform;
+  final String? backend;
+  final List<String> videoCodecs;
+  final List<String> audioCodecs;
+  final List<String> containers;
+  final int? maxHeight;
+  final int? maxBitrateKbps;
+  final bool? hdr;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'profile': profile,
+    'platform': platform.name,
+    if (backend != null) 'backend': backend,
+    'video_codecs': videoCodecs,
+    'audio_codecs': audioCodecs,
+    'containers': containers,
+    if (maxHeight != null) 'max_height': maxHeight,
+    if (maxBitrateKbps != null) 'max_bitrate_kbps': maxBitrateKbps,
+    if (hdr != null) 'hdr': hdr,
+  };
 }

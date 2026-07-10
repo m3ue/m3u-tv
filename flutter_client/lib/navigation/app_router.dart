@@ -10,6 +10,7 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/stream_resolution_service.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 /// Placeholder screen used when a route target cannot be resolved.
@@ -93,6 +94,8 @@ class PlayerArgs {
       metadata: <String, Object?>{
         ...metadata,
         if (epgChannelId != null) 'epg_channel_id': epgChannelId,
+        'type': type,
+        if (streamId != null) 'stream_id': streamId,
       },
     );
   }
@@ -115,7 +118,9 @@ class SeriesDetailsArgs {
   final String seriesName;
 }
 
-PlaybackOrchestrator buildPlaybackOrchestrator() {
+PlaybackOrchestrator buildPlaybackOrchestrator({
+  StreamResolutionService? resolutionService,
+}) {
   final platform = _playbackPlatformForCurrentTarget();
   final adapters = <PlaybackBackend, PlayerAdapter>{};
 
@@ -142,6 +147,7 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     adapters: adapters,
     transcodeGateway: const _UnavailableTranscodeGateway(),
     retryDelay: Duration.zero,
+    resolutionService: resolutionService,
   );
 }
 

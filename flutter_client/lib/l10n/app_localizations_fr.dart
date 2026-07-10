@@ -114,6 +114,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerResume => 'Reprendre';
 
   @override
+  String get playerUnsupported =>
+      'Ce contenu n\'est pas pris en charge sur cet appareil';
+
+  @override
+  String get playerResolverUnavailable =>
+      'La résolution du flux est indisponible. Réessayez.';
+
+  @override
+  String get playerResolverRejected =>
+      'La demande de flux a été refusée. Vérifiez votre compte et réessayez.';
+
+  @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
 
   @override

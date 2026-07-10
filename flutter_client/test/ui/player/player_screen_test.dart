@@ -1322,5 +1322,67 @@ void main() {
       expect(find.text('Launcher'), findsOneWidget);
       expect(find.text('Playback error'), findsNothing);
     });
+
+    testWidgets('localizes capability resolution errors without raw reasons', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.android,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.androidExoPlayer: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'Resolver Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final entry in [
+        (
+          code: 'stream_unsupported',
+          expected: 'This content is not supported on this device',
+        ),
+        (
+          code: 'stream_resolution_unavailable',
+          expected: 'Stream resolution is unavailable. Please try again.',
+        ),
+        (
+          code: 'stream_resolution_rejected',
+          expected:
+              'The stream request was rejected. Check your account and try again.',
+        ),
+      ]) {
+        adapter.emitError(
+          PlaybackError(
+            backend: PlaybackBackend.androidExoPlayer,
+            message: 'raw backend reason https://provider.example/private',
+            code: entry.code,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(entry.expected), findsOneWidget);
+        expect(find.textContaining('raw backend reason'), findsNothing);
+        expect(find.textContaining('provider.example'), findsNothing);
+      }
+    });
   });
 }

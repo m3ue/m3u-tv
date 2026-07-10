@@ -114,6 +114,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerResume => '恢复播放';
 
   @override
+  String get playerUnsupported => '此内容不受此设备支持';
+
+  @override
+  String get playerResolverUnavailable => '流解析当前不可用，请重试。';
+
+  @override
+  String get playerResolverRejected => '流请求被拒绝。请检查您的账户后重试。';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/playback/subtitle_controller_provider.dart';
+import 'package:m3u_tv/services/stream_resolution_service.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
@@ -34,17 +35,20 @@ class PlaybackOrchestrator {
     required PlaybackTranscodeGateway transcodeGateway,
     Duration bufferingTimeout = const Duration(seconds: 15),
     Duration retryDelay = const Duration(milliseconds: 250),
+    StreamResolutionService? resolutionService,
   }) : _platform = platform,
        _adapters = Map<PlaybackBackend, PlayerAdapter>.unmodifiable(adapters),
        _transcodeGateway = transcodeGateway,
        _bufferingTimeout = bufferingTimeout,
-       _retryDelay = retryDelay;
+       _retryDelay = retryDelay,
+       _resolutionService = resolutionService;
 
   final PlaybackPlatform _platform;
   final Map<PlaybackBackend, PlayerAdapter> _adapters;
   final PlaybackTranscodeGateway _transcodeGateway;
   final Duration _bufferingTimeout;
   final Duration _retryDelay;
+  final StreamResolutionService? _resolutionService;
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();
   final StreamController<PlaybackError> _errorController =
@@ -62,7 +66,13 @@ class PlaybackOrchestrator {
   Timer? _bufferingTimer;
   int _activeRecoveryAttempts = 0;
   int _playbackGeneration = 0;
+  int _openGeneration = 0;
+  int? _activeAdapterGeneration;
+  Future<void> _openPipeline = Future<void>.value();
+  int _openOperations = 0;
+  Completer<void>? _openIdle;
   bool _recovering = false;
+  bool _disposing = false;
   bool _disposed = false;
 
   Stream<PlaybackState> get onState => _stateController.stream;
@@ -82,17 +92,60 @@ class PlaybackOrchestrator {
 
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
 
-  Future<void> open(PlaybackSource source) async {
+  Future<void> open(PlaybackSource source) {
+    _openGeneration += 1;
+    final openGeneration = _openGeneration;
     _ensureNotDisposed();
     _playbackGeneration += 1;
-    _cancelBufferingTimer();
     _activeRecoveryAttempts = 0;
     _recovering = false;
+    _cancelBufferingTimer();
+    _openOperations += 1;
+
+    final operation = _openPipeline.then(
+      (_) => _openInternal(source, openGeneration),
+    );
+    _openPipeline = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    unawaited(
+      operation.then<void>(
+        (_) => _finishOpenOperation(),
+        onError: (Object _, StackTrace _) => _finishOpenOperation(),
+      ),
+    );
+    return operation;
+  }
+
+  void _finishOpenOperation() {
+    _openOperations -= 1;
+    if (_openOperations == 0) {
+      _openIdle?.complete();
+      _openIdle = null;
+    }
+  }
+
+  Future<void> _openInternal(
+    PlaybackSource source,
+    int openGeneration,
+  ) async {
+    if (_isOpenStale(openGeneration)) return;
     await _stopActiveAdapter();
+    if (_isOpenStale(openGeneration)) return;
     await _cleanupSessions();
-    _activeAdapter = null;
-    _activeBackend = null;
-    _activeSource = null;
+    if (_isOpenStale(openGeneration)) return;
+
+    final resolver = _resolutionService;
+    if (resolver != null) {
+      final resolved = await _resolvePreflight(
+        source,
+        resolver,
+        openGeneration,
+      );
+      if (resolved == null || _isOpenStale(openGeneration)) return;
+      source = resolved; // ignore: parameter_assignments
+    }
 
     PlaybackException? lastRecoverableFailure;
     PlaybackBackend? previousBackend;
@@ -104,7 +157,9 @@ class PlaybackOrchestrator {
         successDiagnostic: attempt == 0
             ? 'direct:${backend.name}:ready'
             : 'fallback:${backend.name}:preferred ${previousBackend?.name ?? 'none'} unsupported',
+        openGeneration: openGeneration,
       );
+      if (_isOpenStale(openGeneration)) return;
       attempt += 1;
       if (failure == null) return;
       if (_platform == PlaybackPlatform.android &&
@@ -116,7 +171,11 @@ class PlaybackOrchestrator {
       lastRecoverableFailure = failure;
     }
 
-    await _openServerTranscode(source, lastFailure: lastRecoverableFailure);
+    await _openServerTranscode(
+      source,
+      lastFailure: lastRecoverableFailure,
+      openGeneration: openGeneration,
+    );
   }
 
   Future<void> play() => _requireActiveAdapter().play();
@@ -131,6 +190,7 @@ class PlaybackOrchestrator {
       _requireActiveAdapter().setPlaybackSpeed(speed);
 
   Future<void> stop() async {
+    _openGeneration += 1;
     await _stopActiveAdapter();
     await _cleanupSessions();
   }
@@ -138,8 +198,13 @@ class PlaybackOrchestrator {
   Future<void> cancel() => stop();
 
   Future<void> dispose() async {
-    if (_disposed) return;
+    if (_disposed || _disposing) return;
+    _disposing = true;
     await stop();
+    if (_openOperations > 0) {
+      _openIdle ??= Completer<void>();
+      await _openIdle!.future;
+    }
     _disposed = true;
     for (final subscription in _subscriptions) {
       await subscription.cancel();
@@ -170,6 +235,7 @@ class PlaybackOrchestrator {
     required PlaybackBackend backend,
     required PlaybackSource source,
     required String successDiagnostic,
+    required int openGeneration,
   }) async {
     final adapter = _adapters[backend];
     if (adapter == null) return null;
@@ -177,36 +243,295 @@ class PlaybackOrchestrator {
     _activeAdapter = adapter;
     _activeBackend = backend;
     _activeSource = source;
+    _activeAdapterGeneration = openGeneration;
     try {
       await adapter.load(source);
+      if (_isOpenStale(openGeneration)) {
+        if (identical(_activeAdapter, adapter) &&
+            _activeAdapterGeneration == openGeneration) {
+          _clearActiveAdapter();
+          await adapter.stop();
+        }
+        return null;
+      }
       _activeSource = source;
       _diagnostics
         ..add(successDiagnostic)
         ..add('active-backend:${backend.name}:ready');
       return null;
     } on PlaybackException catch (error) {
-      if (identical(_activeAdapter, adapter) && _activeBackend == backend) {
-        _activeAdapter = null;
-        _activeBackend = null;
-        _activeSource = null;
+      if (_isOpenStale(openGeneration)) return error;
+      if (identical(_activeAdapter, adapter) &&
+          _activeBackend == backend &&
+          _activeAdapterGeneration == openGeneration) {
+        _clearActiveAdapter();
       }
-      _diagnostics.add(
-        'load-failed:${backend.name}:${error.code}:${error.message}',
-      );
+      _diagnostics.add('load-failed:${backend.name}:${error.code}');
       if (error.recoverable) {
-        _diagnostics.add('fallback-reason:${error.code}:${error.message}');
+        _diagnostics.add('fallback-reason:${error.code}');
       }
       if (!error.recoverable) {
         _emitError(PlaybackError.fromException(error));
       }
       return error;
+    } on Object {
+      if (_isOpenStale(openGeneration)) return null;
+      if (identical(_activeAdapter, adapter) &&
+          _activeAdapterGeneration == openGeneration) {
+        _clearActiveAdapter();
+      }
+      final error = PlaybackException(
+        message: '',
+        backend: backend,
+        code: 'backend_load_failed',
+      );
+      _diagnostics.add('load-failed:${backend.name}:${error.code}');
+      _emitError(PlaybackError.fromException(error));
+      return error;
     }
+  }
+
+  Future<PlaybackSource?> _resolvePreflight(
+    PlaybackSource source,
+    StreamResolutionService resolver,
+    int openGeneration,
+  ) async {
+    final type = source.metadata['type'] as String?;
+    final streamId = source.metadata['stream_id'] as int?;
+    if (type == null || streamId == null) return source;
+    if (!const {'live', 'vod', 'series', 'catchup'}.contains(type)) {
+      return source;
+    }
+
+    final nativeBackends = _nativeBackends().toList(growable: false);
+    if (nativeBackends.isEmpty) return source;
+    final capabilities = _adapters[nativeBackends.first]!.capabilities;
+
+    DateTime? catchupStart;
+    int? catchupDurationMinutes;
+    if (type == 'catchup') {
+      final startValue = source.metadata['program_start'];
+      final endValue = source.metadata['program_end'];
+      catchupStart = startValue is String
+          ? DateTime.tryParse(startValue)
+          : null;
+      final catchupEnd = endValue is String
+          ? DateTime.tryParse(endValue)
+          : null;
+      catchupDurationMinutes = catchupStart != null && catchupEnd != null
+          ? catchupEnd.difference(catchupStart).inMinutes
+          : null;
+      if (catchupStart == null ||
+          catchupEnd == null ||
+          catchupDurationMinutes == null ||
+          catchupDurationMinutes <= 0) {
+        _emitResolutionUnavailable();
+        return null;
+      }
+    }
+
+    final response = await _resolveSafely(
+      resolver,
+      StreamResolveRequest(
+        type: type,
+        streamId: streamId,
+        clientCapabilities: PlaybackCapabilities.clientCapabilities(
+          capabilities,
+        ),
+        catchupStart: catchupStart,
+        catchupDurationMinutes: catchupDurationMinutes,
+        catchupFormat: type == 'catchup'
+            ? source.metadata['catchup_format'] as String?
+            : null,
+      ),
+    );
+    if (_isOpenStale(openGeneration)) return null;
+
+    if (response == null) {
+      _diagnostics.add('resolve:fallback:direct_play:backend-unavailable');
+      return _safeResolverFallback(source);
+    }
+    if (response.failure == StreamResolveFailure.rejected) {
+      _diagnostics.add('resolve:rejected');
+      _emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.serverTranscode,
+          message: '',
+          code: 'stream_resolution_rejected',
+        ),
+      );
+      return null;
+    }
+
+    switch (response.mode) {
+      case StreamResolveMode.directPlay:
+        final url = response.url;
+        if (url == null) {
+          _diagnostics.add('resolve:fallback:direct_play:no-direct-url');
+          return _safeResolverFallback(source);
+        }
+        if (!_isSafeResolvedPlaybackUrl(url)) {
+          _diagnostics.add('resolve:fallback:direct_play:unsafe-resolved-url');
+          return _safeResolverFallback(source);
+        }
+        _diagnostics.add(_resolutionDiagnostic('direct_play', response.source));
+        return _resolvedSource(
+          source,
+          uri: url,
+          videoCodec: response.source?.videoCodec ?? source.videoCodec,
+          audioCodec: response.source?.audioCodec ?? source.audioCodec,
+        );
+      case StreamResolveMode.transcode:
+        final url = response.url;
+        if (url == null) {
+          _diagnostics.add('resolve:fallback:direct_play:no-transcode-url');
+          return _safeResolverFallback(source);
+        }
+        if (!_isSafeResolvedPlaybackUrl(url)) {
+          _diagnostics.add('resolve:fallback:direct_play:unsafe-resolved-url');
+          return _safeResolverFallback(source);
+        }
+        _diagnostics.add(_resolutionDiagnostic('transcode', response.source));
+        return _resolvedSource(
+          source,
+          uri: url,
+          videoCodec: response.output?.videoCodec,
+          audioCodec: response.output?.audioCodec,
+          metadata: <String, Object?>{
+            ...source.metadata,
+            'resolve_mode': 'transcode',
+            if (response.source?.videoCodec != null)
+              'resolve_video_codec': response.source!.videoCodec,
+            if (response.source?.audioCodec != null)
+              'resolve_audio_codec': response.source!.audioCodec,
+            if (response.source?.container != null)
+              'resolve_container': response.source!.container,
+            if (response.output?.videoCodec != null)
+              'resolve_output_video_codec': response.output!.videoCodec,
+            if (response.output?.audioCodec != null)
+              'resolve_output_audio_codec': response.output!.audioCodec,
+            if (response.output?.container != null)
+              'resolve_output_container': response.output!.container,
+          },
+        );
+      case StreamResolveMode.unsupported:
+        _diagnostics.add(_resolutionDiagnostic('unsupported', response.source));
+        _emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.serverTranscode,
+            message: '',
+            code: 'stream_unsupported',
+          ),
+        );
+        return null;
+    }
+  }
+
+  Future<StreamResolveResponse?> _resolveSafely(
+    StreamResolutionService resolver,
+    StreamResolveRequest request,
+  ) async {
+    try {
+      return await resolver.resolve(request);
+    } on Object {
+      return null;
+    }
+  }
+
+  PlaybackSource _resolvedSource(
+    PlaybackSource source, {
+    required String uri,
+    required String? videoCodec,
+    required String? audioCodec,
+    Map<String, Object?>? metadata,
+  }) {
+    return PlaybackSource(
+      uri: uri,
+      title: source.title,
+      startPosition: source.startPosition,
+      isLive: source.isLive,
+      videoCodec: videoCodec,
+      audioCodec: audioCodec,
+      userAgent: source.userAgent,
+      headers: _withoutAuthorization(source.headers),
+      metadata: metadata ?? source.metadata,
+    );
+  }
+
+  PlaybackSource? _safeResolverFallback(PlaybackSource source) {
+    if (!_isSafeLegacyFallbackUrl(source.uri)) {
+      _emitResolutionUnavailable();
+      return null;
+    }
+    return _resolvedSource(
+      source,
+      uri: source.uri,
+      videoCodec: source.videoCodec,
+      audioCodec: source.audioCodec,
+    );
+  }
+
+  bool _isSafeResolvedPlaybackUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        uri.isAbsolute &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty;
+  }
+
+  bool _isSafeLegacyFallbackUrl(String value) {
+    if (!_isSafeResolvedPlaybackUrl(value)) return false;
+    final uri = Uri.parse(value);
+    if (uri.hasQuery) return false;
+    final segments = uri.pathSegments
+        .expand((segment) => segment.split('/'))
+        .map((segment) => segment.toLowerCase())
+        .toList(growable: false);
+    for (var index = 0; index < segments.length; index += 1) {
+      if (const {'live', 'movie', 'series', 'timeshift'}.contains(
+            segments[index],
+          ) &&
+          index + 2 < segments.length) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Map<String, String> _withoutAuthorization(Map<String, String> headers) {
+    return Map<String, String>.unmodifiable({
+      for (final entry in headers.entries)
+        if (entry.key.toLowerCase() != 'authorization') entry.key: entry.value,
+    });
+  }
+
+  void _emitResolutionUnavailable() {
+    _emitError(
+      const PlaybackError(
+        backend: PlaybackBackend.serverTranscode,
+        message: '',
+        code: 'stream_resolution_unavailable',
+        recoverable: true,
+      ),
+    );
+  }
+
+  String _resolutionDiagnostic(String mode, StreamSourceInfo? source) {
+    final parts = <String>[
+      if (source?.videoCodec != null) 'video=${source!.videoCodec}',
+      if (source?.audioCodec != null) 'audio=${source!.audioCodec}',
+      if (source?.container != null) 'container=${source!.container}',
+    ];
+    return parts.isEmpty ? 'resolve:$mode' : 'resolve:$mode:${parts.join(',')}';
   }
 
   Future<void> _openServerTranscode(
     PlaybackSource source, {
     required PlaybackException? lastFailure,
+    required int openGeneration,
   }) async {
+    if (_isOpenStale(openGeneration)) return;
     final adapter = _adapters[PlaybackBackend.serverTranscode];
     if (adapter == null) {
       if (_platform == PlaybackPlatform.desktop && lastFailure != null) {
@@ -230,6 +555,7 @@ class PlaybackOrchestrator {
         _serverRequestFromSource(source),
       );
     } on TranscodeUnavailableException catch (error) {
+      if (_isOpenStale(openGeneration)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -240,6 +566,7 @@ class PlaybackOrchestrator {
       );
       return;
     } on Object catch (error) {
+      if (_isOpenStale(openGeneration)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -251,10 +578,15 @@ class PlaybackOrchestrator {
       return;
     }
 
+    if (_isOpenStale(openGeneration)) {
+      await _stopServerTranscode(response);
+      return;
+    }
     _activeServerTranscode = response;
     if (response.status == BroadcastStatus.stalled.value ||
         response.status == BroadcastStatus.failed.value) {
       await _cleanupSessions();
+      if (_isOpenStale(openGeneration)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -275,6 +607,7 @@ class PlaybackOrchestrator {
       broadcast = await _startBroadcastIfNeeded(source);
     } on Object catch (error) {
       await _cleanupSessions();
+      if (_isOpenStale(openGeneration)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -283,6 +616,16 @@ class PlaybackOrchestrator {
           recoverable: true,
         ),
       );
+      return;
+    }
+    if (_isOpenStale(openGeneration)) {
+      if (broadcast != null) {
+        await _transcodeGateway.stopBroadcast(broadcast.networkId);
+      }
+      if (identical(_activeServerTranscode, response)) {
+        _activeServerTranscode = null;
+        await _stopServerTranscode(response);
+      }
       return;
     }
     if (broadcast != null) {
@@ -311,18 +654,30 @@ class PlaybackOrchestrator {
     _activeAdapter = adapter;
     _activeBackend = PlaybackBackend.serverTranscode;
     _activeSource = transcodedSource;
+    _activeAdapterGeneration = openGeneration;
     try {
       await adapter.load(transcodedSource);
+      if (_isOpenStale(openGeneration)) {
+        if (identical(_activeAdapter, adapter) &&
+            _activeAdapterGeneration == openGeneration) {
+          _clearActiveAdapter();
+          await adapter.stop();
+        }
+        await _cleanupSessions();
+        return;
+      }
       _diagnostics.add('active-backend:serverTranscode:ready');
     } on PlaybackException catch (error) {
+      if (_isOpenStale(openGeneration)) return;
       if (identical(_activeAdapter, adapter) &&
-          _activeBackend == PlaybackBackend.serverTranscode) {
-        _activeAdapter = null;
-        _activeBackend = null;
-        _activeSource = null;
+          _activeBackend == PlaybackBackend.serverTranscode &&
+          _activeAdapterGeneration == openGeneration) {
+        _clearActiveAdapter();
       }
       await _cleanupSessions();
-      _emitError(PlaybackError.fromException(error));
+      if (!_isOpenStale(openGeneration)) {
+        _emitError(PlaybackError.fromException(error));
+      }
     }
   }
 
@@ -355,21 +710,26 @@ class PlaybackOrchestrator {
     _cancelBufferingTimer();
     final adapter = _activeAdapter;
     if (adapter == null) return;
+    _clearActiveAdapter();
+    await adapter.stop();
+  }
+
+  void _clearActiveAdapter() {
     _activeAdapter = null;
     _activeBackend = null;
     _activeSource = null;
-    await adapter.stop();
+    _activeAdapterGeneration = null;
   }
 
   Future<void> _cleanupSessions() async {
     final broadcast = _activeBroadcast;
     _activeBroadcast = null;
+    final serverTranscode = _activeServerTranscode;
+    _activeServerTranscode = null;
     if (broadcast != null) {
       await _transcodeGateway.stopBroadcast(broadcast.networkId);
       _diagnostics.add('cleanup:broadcast:stopped:${broadcast.networkId}');
     }
-    final serverTranscode = _activeServerTranscode;
-    _activeServerTranscode = null;
     if (serverTranscode != null) {
       await _stopServerTranscode(serverTranscode);
     }
@@ -390,7 +750,11 @@ class PlaybackOrchestrator {
       return;
     }
     _subscriptions
-      ..add(adapter.onState.listen(_handleAdapterState))
+      ..add(
+        adapter.onState.listen((state) {
+          _handleAdapterState(adapter, state);
+        }),
+      )
       ..add(
         adapter.onError.listen((error) {
           unawaited(_handleAdapterError(adapter, error));
@@ -398,8 +762,13 @@ class PlaybackOrchestrator {
       );
   }
 
-  void _handleAdapterState(PlaybackState state) {
-    if (_disposed) return;
+  void _handleAdapterState(PlayerAdapter adapter, PlaybackState state) {
+    if (_disposed ||
+        _disposing ||
+        !identical(adapter, _activeAdapter) ||
+        _activeAdapterGeneration != _openGeneration) {
+      return;
+    }
     _stateController.add(state);
     if (state.status == PlaybackStatus.buffering &&
         state.backend == _activeBackend) {
@@ -434,7 +803,12 @@ class PlaybackOrchestrator {
     PlayerAdapter adapter,
     PlaybackError error,
   ) async {
-    if (_disposed || !identical(adapter, _activeAdapter)) return;
+    if (_disposed ||
+        _disposing ||
+        !identical(adapter, _activeAdapter) ||
+        _activeAdapterGeneration != _openGeneration) {
+      return;
+    }
     if (!error.recoverable) {
       _emitError(error);
       return;
@@ -509,13 +883,48 @@ class PlaybackOrchestrator {
   }
 
   void _emitError(PlaybackError error) {
-    if (_disposed) return;
-    _diagnostics.add('error:${error.code}:${error.message}');
-    _errorController.add(error);
+    if (_disposed || _disposing) return;
+    final sanitized = PlaybackError(
+      backend: error.backend,
+      message: _sanitizeErrorText(error.message),
+      code: error.code,
+      recoverable: error.recoverable,
+    );
+    _diagnostics.add('error:${sanitized.code}');
+    _errorController.add(sanitized);
+  }
+
+  String _sanitizeErrorText(String message) {
+    return message
+        .replaceAll(
+          RegExp(r'''https?://[^\s<>"']+''', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(
+            r'authorization\s*:\s*(?:basic\s+)?\S+',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'basic\s+[a-z0-9+/=]+', caseSensitive: false), '')
+        .replaceAll(
+          RegExp(
+            r'/(?:live|movie|series|timeshift)/[^/\s]+/[^/\s]+',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  bool _isOpenStale(int openGeneration) {
+    return _disposed || _disposing || openGeneration != _openGeneration;
   }
 
   void _ensureNotDisposed() {
-    if (_disposed) {
+    if (_disposed || _disposing) {
       throw StateError('PlaybackOrchestrator is disposed');
     }
   }

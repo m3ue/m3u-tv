@@ -185,7 +185,7 @@ void main() {
         expect(transcode.stoppedServerTranscodes, isEmpty);
         expect(
           orchestrator.diagnostics,
-          contains('error:server_transcode_unavailable:m3u-editor offline'),
+          contains('error:server_transcode_unavailable'),
         );
 
         await sub.cancel();
@@ -229,9 +229,7 @@ void main() {
         expect(transcode.startedServerRequests, isEmpty);
         expect(
           orchestrator.diagnostics,
-          contains(
-            'error:desktop-libmpv-render-context-failed:libmpv render context failed to initialize',
-          ),
+          contains('error:desktop-libmpv-render-context-failed'),
         );
 
         await sub.cancel();
@@ -447,15 +445,215 @@ void main() {
         );
         expect(
           orchestrator.diagnostics,
-          contains(
-            'error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
-          ),
+          contains('error:backend_unavailable'),
         );
 
         await sub.cancel();
         await orchestrator.dispose();
       },
     );
+
+    test('stop during adapter load suppresses stale ready state', () async {
+      final loadGate = Completer<void>();
+      final adapter = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+        loadGate: loadGate,
+      );
+      final orchestrator = _orchestrator(
+        adapters: {PlaybackBackend.androidExoPlayer: adapter},
+        transcodeGateway: _FakeTranscodeGateway(),
+      );
+      final states = <PlaybackState>[];
+      final subscription = orchestrator.onState.listen(states.add);
+
+      final opening = orchestrator.open(_source());
+      await pumpEventQueue();
+      await orchestrator.stop();
+      loadGate.complete();
+      await opening;
+      await pumpEventQueue();
+
+      expect(orchestrator.activeBackend, isNull);
+      expect(states, isEmpty);
+      await subscription.cancel();
+      await orchestrator.dispose();
+    });
+
+    test('replacement open invalidates an adapter load in flight', () async {
+      final loadGate = Completer<void>();
+      final adapter = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+        loadGate: loadGate,
+      );
+      final orchestrator = _orchestrator(
+        adapters: {PlaybackBackend.androidExoPlayer: adapter},
+        transcodeGateway: _FakeTranscodeGateway(),
+      );
+      final states = <PlaybackState>[];
+      final subscription = orchestrator.onState.listen(states.add);
+      const first = PlaybackSource(uri: 'https://safe.example/first.ts');
+      const second = PlaybackSource(uri: 'https://safe.example/second.ts');
+
+      final openingA = orchestrator.open(first);
+      await pumpEventQueue();
+      final openingB = orchestrator.open(second);
+      loadGate.complete();
+      await Future.wait([openingA, openingB]);
+      await pumpEventQueue();
+
+      expect(adapter.loadedSources.map((source) => source.uri), [
+        first.uri,
+        second.uri,
+      ]);
+      expect(states, hasLength(1));
+      expect(states.single.source?.uri, second.uri);
+      await subscription.cancel();
+      await orchestrator.dispose();
+    });
+
+    test('dispose during adapter load suppresses stale work', () async {
+      final loadGate = Completer<void>();
+      final adapter = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+        loadGate: loadGate,
+      );
+      final orchestrator = _orchestrator(
+        adapters: {PlaybackBackend.androidExoPlayer: adapter},
+        transcodeGateway: _FakeTranscodeGateway(),
+      );
+      final states = <PlaybackState>[];
+      final subscription = orchestrator.onState.listen(states.add);
+
+      final opening = orchestrator.open(_source());
+      await pumpEventQueue();
+      final disposing = orchestrator.dispose();
+      await pumpEventQueue();
+      expect(() => orchestrator.open(_source()), throwsStateError);
+      loadGate.complete();
+      await Future.wait([opening, disposing]);
+
+      expect(states, isEmpty);
+      await subscription.cancel();
+    });
+
+    test('stop cleans a server session that completes late', () async {
+      final serverGate = Completer<void>();
+      final direct = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+        unsupportedVideoCodecs: {'hevc'},
+      );
+      final serverPlayer = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.serverTranscode,
+      );
+      final gateway = _FakeTranscodeGateway(
+        serverGate: serverGate,
+        serverResponse: const TranscodeResponse(
+          streamId: 'late-stream',
+          streamUrl: 'https://editor.example/late.m3u8',
+          mode: TranscodeMode.server,
+          status: 'running',
+          sessionId: 'late-session',
+        ),
+      );
+      final orchestrator = _orchestrator(
+        adapters: {
+          PlaybackBackend.androidExoPlayer: direct,
+          PlaybackBackend.serverTranscode: serverPlayer,
+        },
+        transcodeGateway: gateway,
+      );
+
+      final opening = orchestrator.open(_source(videoCodec: 'hevc'));
+      await pumpEventQueue();
+      await orchestrator.stop();
+      serverGate.complete();
+      await opening;
+
+      expect(gateway.stoppedServerTranscodes, ['late-stream:late-session']);
+      expect(serverPlayer.loadedSources, isEmpty);
+      await orchestrator.dispose();
+    });
+
+    test('stop cleans late broadcast and transcode exactly once', () async {
+      final broadcastGate = Completer<void>();
+      final direct = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+        unsupportedVideoCodecs: {'hevc'},
+      );
+      final serverPlayer = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.serverTranscode,
+      );
+      final gateway = _FakeTranscodeGateway(
+        broadcastGate: broadcastGate,
+        serverResponse: const TranscodeResponse(
+          streamId: 'broadcast-stream',
+          streamUrl: 'https://editor.example/server.m3u8',
+          mode: TranscodeMode.server,
+          status: 'running',
+          sessionId: 'broadcast-session',
+        ),
+        broadcastSession: const BroadcastSession(
+          networkId: 'late-network',
+          status: BroadcastStatus.running,
+          playlistUrl: 'https://editor.example/broadcast.m3u8',
+        ),
+      );
+      final orchestrator = _orchestrator(
+        adapters: {
+          PlaybackBackend.androidExoPlayer: direct,
+          PlaybackBackend.serverTranscode: serverPlayer,
+        },
+        transcodeGateway: gateway,
+      );
+
+      final opening = orchestrator.open(
+        _source(
+          videoCodec: 'hevc',
+          metadata: const {'broadcast_network_id': 'late-network'},
+        ),
+      );
+      await pumpEventQueue();
+      await orchestrator.stop();
+      broadcastGate.complete();
+      await opening;
+
+      expect(gateway.stoppedBroadcasts, ['late-network']);
+      expect(gateway.stoppedServerTranscodes, [
+        'broadcast-stream:broadcast-session',
+      ]);
+      expect(serverPlayer.loadedSources, isEmpty);
+      await orchestrator.dispose();
+    });
+
+    test('adapter errors do not expose URLs or authorization', () async {
+      final adapter = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final orchestrator = _orchestrator(
+        adapters: {PlaybackBackend.androidExoPlayer: adapter},
+        transcodeGateway: _FakeTranscodeGateway(),
+      );
+      final errors = <PlaybackError>[];
+      final subscription = orchestrator.onError.listen(errors.add);
+
+      await orchestrator.open(_source());
+      adapter.emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.androidExoPlayer,
+          message:
+              'Failed https://provider.example/live/user/pass/42.ts Authorization: Basic c2VjcmV0',
+          code: 'decoder_failed',
+        ),
+      );
+      await pumpEventQueue();
+
+      final surfaces = '${errors.single.message} ${orchestrator.diagnostics}';
+      expect(surfaces, isNot(contains('provider.example')));
+      expect(surfaces.toLowerCase(), isNot(contains('authorization')));
+      expect(surfaces, isNot(contains('c2VjcmV0')));
+      await subscription.cancel();
+      await orchestrator.dispose();
+    });
   });
 }
 
@@ -494,11 +692,15 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
     this.serverResponse,
     this.serverError,
     this.broadcastSession,
+    this.serverGate,
+    this.broadcastGate,
   });
 
   final TranscodeResponse? serverResponse;
   final Exception? serverError;
   final BroadcastSession? broadcastSession;
+  final Completer<void>? serverGate;
+  final Completer<void>? broadcastGate;
   final List<StreamRequest> startedServerRequests = <StreamRequest>[];
   final List<StreamRequest> startedBroadcastRequests = <StreamRequest>[];
   final List<String> stoppedServerTranscodes = <String>[];
@@ -507,6 +709,7 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
   @override
   Future<TranscodeResponse> startServerTranscode(StreamRequest request) async {
     startedServerRequests.add(request);
+    await serverGate?.future;
     final error = serverError;
     if (error != null) throw error;
     return serverResponse ??
@@ -522,6 +725,7 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
   @override
   Future<BroadcastSession?> startBroadcast(StreamRequest request) async {
     startedBroadcastRequests.add(request);
+    await broadcastGate?.future;
     return broadcastSession;
   }
 
@@ -544,12 +748,14 @@ class _FakePlayerAdapter implements PlayerAdapter {
     required this.capabilities,
     this.loadFailure,
     this.unsupportedVideoCodecs = const <String>{},
+    this.loadGate,
   });
 
   @override
   final PlaybackCapabilities capabilities;
   final PlaybackException? loadFailure;
   final Set<String> unsupportedVideoCodecs;
+  final Completer<void>? loadGate;
   final List<String> commands = <String>[];
   final List<PlaybackSource> loadedSources = <PlaybackSource>[];
   final StreamController<PlaybackState> _stateController =
@@ -567,10 +773,13 @@ class _FakePlayerAdapter implements PlayerAdapter {
   @override
   Stream<PlaybackError> get onError => _errorController.stream;
 
+  void emitError(PlaybackError error) => _errorController.add(error);
+
   @override
   Future<void> load(PlaybackSource source) async {
     commands.add('load:${source.uri}');
     loadedSources.add(source);
+    await loadGate?.future;
     final failure = loadFailure;
     if (failure != null) {
       throw failure;

@@ -148,15 +148,15 @@ void main() {
         );
         expect(
           orchestrator.diagnostics,
-          contains(
-            'load-failed:desktopLibmpv:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
-          ),
+          contains('load-failed:desktopLibmpv:backend_unavailable'),
         );
         expect(
           orchestrator.diagnostics,
-          contains(
-            'error:backend_unavailable:libmpv shared library not found; tried libmpv.so.2',
-          ),
+          contains('error:backend_unavailable'),
+        );
+        expect(
+          orchestrator.diagnostics.join(' '),
+          isNot(contains('libmpv shared library not found')),
         );
       },
     );
@@ -225,9 +225,11 @@ void main() {
         expect(decoderFailure.errors, isEmpty);
         expect(
           decoderFailure.orchestrator.diagnostics,
-          contains(
-            'fallback-reason:decoder_failure:Media3 decoder failed during init',
-          ),
+          contains('fallback-reason:decoder_failure'),
+        );
+        expect(
+          decoderFailure.orchestrator.diagnostics.join(' '),
+          isNot(contains('Media3 decoder failed during init')),
         );
         await decoderFailure.dispose();
 
@@ -244,9 +246,11 @@ void main() {
         expect(deadStream.gateway.startedServerRequests, isEmpty);
         expect(
           deadStream.orchestrator.diagnostics,
-          contains(
-            'load-failed:androidExoPlayer:stream_not_found:Fixture stream not found',
-          ),
+          contains('load-failed:androidExoPlayer:stream_not_found'),
+        );
+        expect(
+          deadStream.orchestrator.diagnostics.join(' '),
+          isNot(contains('Fixture stream not found')),
         );
         await deadStream.dispose();
 

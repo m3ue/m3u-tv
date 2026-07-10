@@ -329,7 +329,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     }
 
-    _setErrorMessage(error.message);
+    final localizations = AppLocalizations.of(context);
+    final message = switch (error.code) {
+      'stream_unsupported' => localizations.playerUnsupported,
+      'stream_resolution_unavailable' =>
+        localizations.playerResolverUnavailable,
+      'stream_resolution_rejected' => localizations.playerResolverRejected,
+      _ => error.message,
+    };
+    _setErrorMessage(message);
   }
 
   void _startProgressReporting() {
