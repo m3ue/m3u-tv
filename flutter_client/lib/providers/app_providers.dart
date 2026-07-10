@@ -4,6 +4,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/tv_notification_store.dart';
 
 // ---------------------------------------------------------------------------
 // Proxy: wraps AppStateController and forwards ChangeNotifier notifications.
@@ -143,4 +144,8 @@ final vodFavoritesServiceProvider = Provider<FavoritesService>((ref) {
 
 final seriesFavoritesServiceProvider = Provider<FavoritesService>((ref) {
   return ref.read(appStateControllerProvider).appState.seriesFavoritesService;
+});
+
+final notificationStoreProvider = Provider<TvNotificationStore>((ref) {
+  return ref.read(appStateControllerProvider).appState.notificationStore;
 });

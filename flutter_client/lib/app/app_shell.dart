@@ -632,7 +632,11 @@ class AppShellState extends ConsumerState<AppShell>
           onSidebarActivate: _activateSidebar,
         ),
       ),
-      RouteNames.notifications => NotificationsScreen(appState: _appState),
+      RouteNames.notifications => NotificationsScreen(
+        onMarkRead: _appState.markNotificationRead,
+        onMarkAllRead: _appState.markAllNotificationsRead,
+        onSetChannels: _appState.setNotificationChannels,
+      ),
       RouteNames.settings => ListenableBuilder(
         listenable: _appState,
         builder: (_, _) => SettingsScreen(
