@@ -1,11 +1,9 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
-import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
-import 'package:m3u_tv/services/xtream_service.dart';
 
 // ---------------------------------------------------------------------------
 // Proxy: wraps AppStateController and forwards ChangeNotifier notifications.
@@ -56,19 +54,6 @@ Override overrideAppState(AppStateController appState) =>
     appStateControllerProvider.overrideWith(
       (ref) => _AppStateProxy(appState),
     );
-
-// ---------------------------------------------------------------------------
-// Service providers — stable references that never change after construction.
-// Use ref.read (not ref.watch) since services don't need rebuild tracking.
-// ---------------------------------------------------------------------------
-
-final cacheServiceProvider = Provider<CacheService>((ref) {
-  return ref.read(appStateControllerProvider).appState.cacheService;
-});
-
-final xtreamServiceProvider = Provider<XtreamService>((ref) {
-  return ref.read(appStateControllerProvider).appState.xtreamService;
-});
 
 // EpgService is its own ChangeNotifier — this provider subscribes directly to
 // EpgService.notifyListeners(), which fires only when EPG data loads.
@@ -159,51 +144,3 @@ final vodFavoritesServiceProvider = Provider<FavoritesService>((ref) {
 final seriesFavoritesServiceProvider = Provider<FavoritesService>((ref) {
   return ref.read(appStateControllerProvider).appState.seriesFavoritesService;
 });
-
-// ---------------------------------------------------------------------------
-// LiveChannelsNotifier: hardened async version that owns the full
-// fetch → cache → serve cycle for live channels.
-//
-// Implements stale-while-revalidate:
-//   Fresh cache  → return immediately, no network call.
-//   Stale cache  → fetch, cache, return fresh data.
-//   No cache     → fetch, cache, return.
-//   Not configured → return cached data or empty list.
-// ---------------------------------------------------------------------------
-
-final liveChannelsNotifierProvider =
-    AsyncNotifierProvider<LiveChannelsNotifier, List<Channel>>(
-      LiveChannelsNotifier.new,
-    );
-
-class LiveChannelsNotifier extends AsyncNotifier<List<Channel>> {
-  @override
-  Future<List<Channel>> build() async {
-    // Keep alive across route changes — channels are global app state.
-    ref.keepAlive();
-
-    final cache = ref.read(cacheServiceProvider);
-    final xtream = ref.read(xtreamServiceProvider);
-
-    if (!xtream.isConfigured) {
-      final entry = await cache.get<List<Channel>>('liveStreams');
-      return entry?.data ?? const <Channel>[];
-    }
-
-    final entry = await cache.get<List<Channel>>('liveStreams');
-    if (entry != null && !entry.isStale) return entry.data;
-
-    final channels = await xtream.getLiveStreams();
-    await cache.set('liveStreams', channels);
-    return channels;
-  }
-
-  /// Forces a fresh fetch. Pass [clearCache] to also wipe persisted entries.
-  Future<void> refresh({bool clearCache = false}) async {
-    if (clearCache) {
-      await ref.read(cacheServiceProvider).clear();
-    }
-    ref.invalidateSelf();
-    await future;
-  }
-}

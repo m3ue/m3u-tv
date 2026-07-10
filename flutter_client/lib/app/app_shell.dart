@@ -168,6 +168,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _syncSidebarFocusNodes([List<String>? routes]) {
     final r = routes ?? _mainRoutes;
+    if (_sidebarFocusNodes.length == r.length) return;
     while (_sidebarFocusNodes.length < r.length) {
       _sidebarFocusNodes.add(FocusNode());
     }
@@ -593,23 +594,26 @@ class AppShellState extends ConsumerState<AppShell>
         favoritesService: _appState.seriesFavoritesService,
         onSidebarActivate: _activateSidebar,
       ),
-      RouteNames.aiostreams => AIOStreamsHomeScreen(
-        integrations: _appState.aiostreamsIntegrations,
-        apiService: _appState.aiostreamsApiService,
-        onItemSelect: (item, integrationId) => unawaited(
-          _pushDetail(
-            RouteNames.aiostreamsDetailsFor(
-              integrationId,
-              item.type,
-              item.id,
+      RouteNames.aiostreams => ListenableBuilder(
+        listenable: _appState,
+        builder: (_, _) => AIOStreamsHomeScreen(
+          integrations: _appState.aiostreamsIntegrations,
+          apiService: _appState.aiostreamsApiService,
+          onItemSelect: (item, integrationId) => unawaited(
+            _pushDetail(
+              RouteNames.aiostreamsDetailsFor(
+                integrationId,
+                item.type,
+                item.id,
+              ),
+              extra: item,
             ),
-            extra: item,
           ),
+          onPlay: _openPlayerFromActions,
+          favoritesService: _appState.aioFavoritesService,
+          progressList: _appState.progressList,
+          onSidebarActivate: _activateSidebar,
         ),
-        onPlay: _openPlayerFromActions,
-        favoritesService: _appState.aioFavoritesService,
-        progressList: _appState.progressList,
-        onSidebarActivate: _activateSidebar,
       ),
       RouteNames.dvr => ListenableBuilder(
         listenable: _appState,

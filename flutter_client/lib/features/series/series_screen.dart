@@ -289,7 +289,7 @@ class _SeriesCard extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.star,
-                  color: Color(0xFFFFFFFF),
+                  color: Colors.white,
                   size: 14,
                 ),
               ),
