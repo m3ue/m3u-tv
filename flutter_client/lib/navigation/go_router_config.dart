@@ -129,8 +129,11 @@ GoRouter createGoRouter({
                       if (item == null) {
                         return NoTransitionPage(
                           child: Scaffold(
-                            body: Center(
-                              child: Text('VOD #$vodId not found'),
+                            body: SafeArea(
+                              bottom: false,
+                              child: Center(
+                                child: Text('VOD #$vodId not found'),
+                              ),
                             ),
                           ),
                         );
@@ -176,8 +179,11 @@ GoRouter createGoRouter({
                       if (series == null) {
                         return NoTransitionPage(
                           child: Scaffold(
-                            body: Center(
-                              child: Text('Series #$seriesId not found'),
+                            body: SafeArea(
+                              bottom: false,
+                              child: Center(
+                                child: Text('Series #$seriesId not found'),
+                              ),
                             ),
                           ),
                         );
