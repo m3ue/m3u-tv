@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -21,7 +22,7 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _configureSystemUi();
+  await SystemUiPolicy().applyBrowsing();
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
   if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
@@ -37,11 +38,6 @@ Future<void> main() async {
       ),
     ),
   );
-}
-
-Future<void> _configureSystemUi() async {
-  if (kIsWeb || !Platform.isAndroid) return;
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 }
 
 Future<AppStateController> _buildAppState() async {

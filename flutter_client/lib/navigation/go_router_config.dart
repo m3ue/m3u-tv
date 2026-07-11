@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show AppShell, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
@@ -52,6 +53,7 @@ GoRouter createGoRouter({
   required bool nativeTelevisionHint,
   PlaybackOrchestrator Function()? playbackOrchestratorBuilder,
   Widget Function(PlayerArgs args)? playerRouteBuilder,
+  SystemUiPolicy? systemUiPolicy,
   DeviceType? deviceTypeOverride,
 }) {
   return GoRouter(
@@ -71,6 +73,7 @@ GoRouter createGoRouter({
             appState: appState,
             playbackOrchestratorBuilder: playbackOrchestratorBuilder,
             playerRouteBuilder: playerRouteBuilder,
+            systemUiPolicy: systemUiPolicy,
           );
         },
         branches: [

@@ -164,13 +164,57 @@ void main() {
     expect(launcherIcon, isNot(contains('android:inset="16%"')));
   });
 
-  test('android fullscreen mode is configured at startup and on resume', () {
+  test('Android launch and normal themes use the same edge-to-edge window', () {
+    for (final path in <String>[
+      'android/app/src/main/res/values/styles.xml',
+      'android/app/src/main/res/values-night/styles.xml',
+      'android/app/src/main/res/values-v31/styles.xml',
+      'android/app/src/main/res/values-night-v31/styles.xml',
+    ]) {
+      final styles = readFile(path);
+
+      expect(
+        '<item name="android:windowDrawsSystemBarBackgrounds">true</item>'
+            .allMatches(styles),
+        hasLength(2),
+        reason: path,
+      );
+      expect(
+        '<item name="android:windowFullscreen">false</item>'.allMatches(styles),
+        hasLength(2),
+        reason: path,
+      );
+      expect(
+        '<item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>'
+            .allMatches(styles),
+        hasLength(2),
+        reason: path,
+      );
+    }
+  });
+
+  test('android system UI policy is route-aware', () {
     final mainDart = readFile('lib/main.dart');
     final appShell = readFile('lib/app/app_shell.dart');
+    final systemUiPolicy = readFile('lib/app/system_ui_policy.dart');
+    final mainActivity = readFile(
+      'android/app/src/main/kotlin/dev/sparkison/tv/MainActivity.kt',
+    );
 
-    expect(mainDart, contains('SystemUiMode.immersiveSticky'));
-    expect(appShell, contains('SystemUiMode.immersiveSticky'));
+    expect(mainDart, contains('applyBrowsing()'));
+    expect(mainDart, isNot(contains('SystemUiMode.immersiveSticky')));
+    expect(appShell, contains('applyPlayer()'));
+    expect(appShell, contains('applyBrowsing()'));
     expect(appShell, contains('AppLifecycleState.resumed'));
+    expect(systemUiPolicy, contains('m3u_tv/system_ui'));
+    expect(mainActivity, contains('WindowCompat.setDecorFitsSystemWindows'));
+    expect(mainActivity, contains('WindowInsetsCompat.Type.systemBars()'));
+    expect(mainActivity, contains('insetsController.show(systemBars)'));
+    expect(mainActivity, contains('insetsController.hide(systemBars)'));
+    expect(
+      mainActivity,
+      contains('BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE'),
+    );
   });
 
   test('release matrix documents signing, store, and license gates', () {

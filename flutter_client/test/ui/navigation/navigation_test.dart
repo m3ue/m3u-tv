@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -483,6 +484,204 @@ void main() {
 
     expect(find.text('Player route: Route News'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('player open and Android back apply route system UI policies', (
+    tester,
+  ) async {
+    final modes = <SystemUiRouteMode>[];
+    final policy = SystemUiPolicy(
+      isAndroid: true,
+      applySystemUiRouteMode: (mode) async => modes.add(mode),
+    );
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        systemUiPolicy: policy,
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+
+    expect(modes, <SystemUiRouteMode>[SystemUiRouteMode.player]);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await _pumpAppFrame(tester);
+
+    expect(modes, <SystemUiRouteMode>[
+      SystemUiRouteMode.player,
+      SystemUiRouteMode.browsing,
+    ]);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(modes.last, SystemUiRouteMode.browsing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('lifecycle resume reapplies browsing route system UI policy', (
+    tester,
+  ) async {
+    final modes = <SystemUiRouteMode>[];
+    final policy = SystemUiPolicy(
+      isAndroid: true,
+      applySystemUiRouteMode: (mode) async => modes.add(mode),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, systemUiPolicy: policy),
+    );
+    await _pumpAppFrame(tester);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(modes, <SystemUiRouteMode>[SystemUiRouteMode.browsing]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('playback failure restores browsing system UI policy', (
+    tester,
+  ) async {
+    final modes = <SystemUiRouteMode>[];
+    final policy = SystemUiPolicy(
+      isAndroid: true,
+      applySystemUiRouteMode: (mode) async => modes.add(mode),
+    );
+    final adapter = _NavigationPlayerAdapter();
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        systemUiPolicy: policy,
+        useProductionPlayer: true,
+        playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+
+    adapter.emitError(
+      const PlaybackError(
+        backend: PlaybackBackend.desktopLibmpv,
+        message: 'Playback failed',
+        code: 'playback_failed',
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Playback error'), findsOneWidget);
+    expect(modes, <SystemUiRouteMode>[
+      SystemUiRouteMode.player,
+      SystemUiRouteMode.browsing,
+    ]);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(modes.last, SystemUiRouteMode.browsing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('lifecycle resume keeps an active player immersive', (
+    tester,
+  ) async {
+    final modes = <SystemUiRouteMode>[];
+    final policy = SystemUiPolicy(
+      isAndroid: true,
+      applySystemUiRouteMode: (mode) async => modes.add(mode),
+    );
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        systemUiPolicy: policy,
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(modes, <SystemUiRouteMode>[
+      SystemUiRouteMode.player,
+      SystemUiRouteMode.player,
+    ]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('route replacement restores browsing system UI policy', (
+    tester,
+  ) async {
+    final modes = <SystemUiRouteMode>[];
+    final policy = SystemUiPolicy(
+      isAndroid: true,
+      applySystemUiRouteMode: (mode) async => modes.add(mode),
+    );
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        systemUiPolicy: policy,
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pump();
+
+    expect(modes, <SystemUiRouteMode>[
+      SystemUiRouteMode.player,
+      SystemUiRouteMode.browsing,
+    ]);
   });
 
   testWidgets('selecting live channel passes name as EPG fallback', (
@@ -1226,12 +1425,16 @@ class _TestApp extends StatefulWidget {
     required this.deviceType,
     this.appState,
     this.playerRouteBuilder,
+    this.systemUiPolicy,
+    this.playbackOrchestratorBuilder,
     this.useProductionPlayer = false,
   });
 
   final DeviceType deviceType;
   final AppStateController? appState;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
+  final SystemUiPolicy? systemUiPolicy;
+  final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final bool useProductionPlayer;
 
   @override
@@ -1246,10 +1449,12 @@ class _TestAppState extends State<_TestApp> {
     appState: _appState,
     nativeTelevisionHint: false,
     deviceTypeOverride: widget.deviceType,
-    playbackOrchestratorBuilder: _testPlaybackOrchestrator,
+    playbackOrchestratorBuilder:
+        widget.playbackOrchestratorBuilder ?? _testPlaybackOrchestrator,
     playerRouteBuilder: widget.useProductionPlayer
         ? null
         : widget.playerRouteBuilder ?? _testPlayerRoute,
+    systemUiPolicy: widget.systemUiPolicy,
   );
 
   @override
@@ -1293,11 +1498,13 @@ Widget _testPlayerRoute(PlayerArgs args) {
   return Scaffold(body: Center(child: Text('Player route: ${args.title}')));
 }
 
-PlaybackOrchestrator _testPlaybackOrchestrator() {
+PlaybackOrchestrator _testPlaybackOrchestrator([
+  _NavigationPlayerAdapter? adapter,
+]) {
   return PlaybackOrchestrator(
     platform: PlaybackPlatform.desktop,
     adapters: <PlaybackBackend, PlayerAdapter>{
-      PlaybackBackend.desktopLibmpv: _NavigationPlayerAdapter(),
+      PlaybackBackend.desktopLibmpv: adapter ?? _NavigationPlayerAdapter(),
     },
     transcodeGateway: _NavigationTranscodeGateway(),
     retryDelay: Duration.zero,
@@ -1330,6 +1537,8 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
       ),
     );
   }
+
+  void emitError(PlaybackError error) => _errorController.add(error);
 
   @override
   Future<void> play() async {}
