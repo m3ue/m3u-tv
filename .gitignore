@@ -34,6 +34,9 @@ flutter_client/android/*.jks
 flutter_client/android/*.keystore
 flutter_client/android/*.pem
 
+# Ignore app store generated screenshots
+flutter_client/screenshots/store
+
 # Dart/Flutter generated
 flutter_client/**/*.g.dart
 flutter_client/**/*.freezed.dart

@@ -51,6 +51,20 @@ done
     exit 1
 }
 
+# Render the SVG logo at a given size and add a soft drop shadow.
+# Shadow: 55% opacity, 18 px blur sigma, 0 px X / 8 px Y offset.
+# Layers are merged on a transparent canvas so the result can be composited
+# onto any background without a baked-in fill colour.
+logo_with_shadow() {
+    local size="$1" dst="$2"
+    local raw="$TMP/logo_raw_${size}.png"
+    rsvg-convert -w "$size" -h "$size" "$SVG" -o "$raw"
+    magick "$raw" \
+        \( +clone -background black -shadow "55x18+0+8" \) \
+        +swap -background none -layers merge +repage \
+        "$dst"
+}
+
 # Diagonal gradient background matching the app's _kGradientBg in go_router_config.dart:
 #   topLeft=#1a1528 → bottomRight=#09090b
 # gradient:vector pins the start/end colours to exact pixel coordinates so
@@ -149,8 +163,7 @@ echo ""
 echo "--- Google Play: Android Feature Graphic ---"
 # Google Play requires a single 1024×500 feature graphic (mandatory).
 # It appears as the hero banner at the top of the store listing.
-# Generated from logo.svg: dark app background with the logo centered.
-# Logo is rendered at 400×400 so it has 50 px breathing room top/bottom.
+# Logo at 260 px gives ~120 px breathing room top/bottom (~24% padding).
 # ---------------------------------------------------------------------------
 FEATURE_DIR="$OUT_DIR/google/android-feature-graphic"
 mkdir -p "$FEATURE_DIR"
@@ -158,29 +171,27 @@ mkdir -p "$FEATURE_DIR"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-rsvg-convert -w 400 -h 400 "$SVG" -o "$TMP/logo_400.png"
-
 echo "  [Android Feature Graphic 1024×500] feature-graphic.png"
+logo_with_shadow 260 "$TMP/logo_feature.png"
 gradient_bg "$TMP/feature_bg.png" 1024 500
 magick "$TMP/feature_bg.png" \
-    "$TMP/logo_400.png" -gravity center -composite \
+    "$TMP/logo_feature.png" -gravity center -composite \
     "$FEATURE_DIR/feature-graphic.png"
 
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Google Play: Android TV Banner ---"
 # Displayed on Android TV home screen. PNG or JPEG, 1280×720 (16:9).
-# Generated from logo.svg: logo centered with 160 px breathing room top/bottom.
+# Logo at 300 px gives ~210 px breathing room top/bottom (~29% padding).
 # ---------------------------------------------------------------------------
 ATV_BANNER_DIR="$OUT_DIR/google/android-tv-banner"
 mkdir -p "$ATV_BANNER_DIR"
 
-rsvg-convert -w 400 -h 400 "$SVG" -o "$TMP/logo_400.png"
-
 echo "  [Android TV Banner 1280×720] tv-banner.png"
+logo_with_shadow 300 "$TMP/logo_banner.png"
 gradient_bg "$TMP/banner_bg.png" 1280 720
 magick "$TMP/banner_bg.png" \
-    "$TMP/logo_400.png" -gravity center -composite \
+    "$TMP/logo_banner.png" -gravity center -composite \
     "$ATV_BANNER_DIR/tv-banner.png"
 
 # ---------------------------------------------------------------------------
