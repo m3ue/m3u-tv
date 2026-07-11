@@ -52,16 +52,14 @@ done
 }
 
 # Diagonal gradient background matching the app's _kGradientBg in go_router_config.dart:
-#   topLeft=#1a1528 → bottomRight=#09090b, transition completes at ~45%.
-# Uses sparse-color Bilinear interpolation so the midpoint (45% along diagonal)
-# is already at the end colour, matching the Flutter stop configuration.
+#   topLeft=#1a1528 → bottomRight=#09090b
+# gradient:vector pins the start/end colours to exact pixel coordinates so
+# ImageMagick never extrapolates outside the specified range.
 gradient_bg() {
     local dst="$1" w="$2" h="$3"
-    local mx=$(echo "$w * 0.45" | bc | cut -d. -f1)
-    local my=$(echo "$h * 0.45" | bc | cut -d. -f1)
-    magick -size "${w}x${h}" xc: \
-        -sparse-color Bilinear \
-        "0,0 ${GRADIENT_START}  ${mx},${my} ${GRADIENT_END}  $((w-1)),$((h-1)) ${GRADIENT_END}" \
+    magick -size "${w}x${h}" \
+        -define "gradient:vector=0,0,$((w-1)),$((h-1))" \
+        gradient:"${GRADIENT_START}-${GRADIENT_END}" \
         "$dst"
 }
 
