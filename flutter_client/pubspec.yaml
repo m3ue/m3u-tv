@@ -8,10 +8,12 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
+  cached_network_image: ^3.4.1
   cupertino_icons: ^1.0.8
   dpad: ^3.0.0
   flutter:
     sdk: flutter
+  flutter_cache_manager: ^3.3.0
   flutter_localizations:
     sdk: flutter
   flutter_riverpod: ^2.6.1
