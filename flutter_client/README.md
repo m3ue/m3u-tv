@@ -153,6 +153,48 @@ After running, rebuild the tvOS target in Xcode to pick up the refreshed icons.
 | App Icon — Small (home shelf) | 400 × 240 px (1x), 800 × 480 px (2x) per layer |
 | Top Shelf Image | 1920 × 720 px |
 
+## Generating store screenshots
+
+Store-ready screenshots and marketing assets are generated from the source images in `screenshots/app-screenshots/` and the SVG logo at `../logo.svg`. Do not hand-edit the output files — run the script instead.
+
+### Prerequisites
+
+```bash
+brew install imagemagick librsvg
+```
+
+### Run the generator
+
+```bash
+bash scripts/generate-screenshots.sh
+```
+
+Output is written to `screenshots/store/` with the following structure:
+
+| Platform | Directory | Notes |
+|---|---|---|
+| Apple tvOS | `apple/tvos/1920x1080/` | Required for all submissions |
+| Apple tvOS 4K | `apple/tvos/3840x2160/` | Optional — copied from source |
+| Apple iPhone 6.7" | `apple/ios/6.7in-1290x2796/` | Required for iPhone 14+/15+ |
+| Apple iPhone 6.5" | `apple/ios/6.5in-1242x2688/` | Required for older iPhones |
+| Apple iPhone 5.5" | `apple/ios/5.5in-1242x2208/` | Optional legacy device class |
+| Apple macOS | `apple/macos/1440x900/` | |
+| Android TV | `google/android-tv/1920x1080/` | Required |
+| Android TV (legacy) | `google/android-tv/1280x720/` | Optional |
+| Android Phone | `google/android-phone/1080x2340/` | |
+| Google Play Feature Graphic | `google/android-feature-graphic/feature-graphic.png` | Required — single 1024 × 500 image |
+| Android TV Banner | `google/android-tv-banner/tv-banner.png` | Required for TV listing — 1280 × 720 |
+
+The feature graphic and TV banner are generated from `../logo.svg` on the app's diagonal gradient background (`#1a1528` → `#09090b`) rather than from screenshots.
+
+### Source image conventions
+
+| Filename pattern | Used for |
+|---|---|
+| `tv*.png` | tvOS + Android TV screenshots (source: 3840 × 2160) |
+| `mobile*.png` | iOS + Android Phone screenshots (source: 1206 × 2622) |
+| `desktop*.png` | macOS screenshots (source: 1707 × 1160) |
+
 ## Trakt setup
 
 Trakt credentials are injected at compile time via `--dart-define` and are never stored in source control.

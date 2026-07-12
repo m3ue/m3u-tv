@@ -194,6 +194,7 @@ GoRouter createGoRouter({
                           builder: (ctx, _) => SeriesDetailsScreen(
                             seriesId: series.id,
                             seriesName: series.name,
+                            coverUrl: series.coverUrl,
                             xtreamService: actions.xtreamService,
                             onPlay: actions.onOpenPlayer,
                             progressList: actions.progressList,
