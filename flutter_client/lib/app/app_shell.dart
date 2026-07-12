@@ -1540,6 +1540,7 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
               fallbackIcon: Icons.movie,
               fallbackTitle: item.name,
               isFavorite: _favoriteVodIds.contains(item.id),
+              heroTag: 'vod_poster_${item.id}',
               onTap: () => widget.onVodSelect(item),
               onLongTap: () async {
                 await _vodFavoritesService.toggle(item.id);
@@ -1565,6 +1566,7 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
               fallbackIcon: Icons.tv,
               fallbackTitle: series.name,
               isFavorite: _favoriteSeriesIds.contains(series.id),
+              heroTag: 'series_poster_${series.id}',
               onTap: () => widget.onSeriesSelect(series),
               onLongTap: () async {
                 await _seriesFavoritesService.toggle(series.id);

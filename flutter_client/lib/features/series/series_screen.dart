@@ -246,10 +246,13 @@ class _SeriesCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: ResilientMediaImage(
-                  imageUrl: item.coverUrl,
-                  fallbackIcon: Icons.tv,
-                  borderRadius: 0,
+                child: Hero(
+                  tag: 'series_poster_${item.id}',
+                  child: ResilientMediaImage(
+                    imageUrl: item.coverUrl,
+                    fallbackIcon: Icons.tv,
+                    borderRadius: 0,
+                  ),
                 ),
               ),
               // Title + rating
