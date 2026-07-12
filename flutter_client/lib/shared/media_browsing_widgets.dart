@@ -1,4 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart'
+    show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -159,16 +160,27 @@ class ResilientMediaImage extends StatelessWidget {
           ),
           child: url == null || url.isEmpty
               ? fallback
-              : CachedNetworkImage(
-                  imageUrl: url,
-                  cacheManager: MediaImageCacheManager(),
+              : Image(
+                  image: CachedNetworkImageProvider(
+                    url,
+                    cacheManager: MediaImageCacheManager(),
+                  ),
                   fit: fit,
                   width: width,
                   height: height,
-                  placeholder: (context, url) => fallback,
-                  errorWidget: (context, url, error) => fallback,
-                  fadeInDuration: const Duration(milliseconds: 200),
-                  fadeOutDuration: const Duration(milliseconds: 100),
+                  gaplessPlayback: true,
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded || frame != null) {
+                          return child;
+                        }
+                        return fallback;
+                      },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return fallback;
+                  },
+                  errorBuilder: (_, _, _) => fallback,
                 ),
         ),
       ),
