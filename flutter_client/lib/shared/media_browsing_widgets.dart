@@ -1,8 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart'
+    show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -157,8 +160,11 @@ class ResilientMediaImage extends StatelessWidget {
           ),
           child: url == null || url.isEmpty
               ? fallback
-              : Image.network(
-                  url,
+              : Image(
+                  image: CachedNetworkImageProvider(
+                    url,
+                    cacheManager: MediaImageCacheManager(),
+                  ),
                   fit: fit,
                   width: width,
                   height: height,
@@ -477,6 +483,7 @@ class MediaPreviewItem {
     this.progressFraction,
     this.overlayBadges = const <String>[],
     this.overlayLabel,
+    this.heroTag,
   });
 
   final String title;
@@ -500,6 +507,10 @@ class MediaPreviewItem {
 
   /// Optional label shown left-aligned opposite the overlay badges.
   final String? overlayLabel;
+
+  /// Optional Hero tag used to animate the poster image when navigating to a
+  /// detail screen. Only applied when [MediaPreviewCard] is in poster style.
+  final Object? heroTag;
 }
 
 class MediaPreviewSection extends StatefulWidget {
@@ -639,9 +650,14 @@ class MediaPreviewCard extends StatefulWidget {
   State<MediaPreviewCard> createState() => _MediaPreviewCardState();
 }
 
-class _MediaPreviewCardState extends State<MediaPreviewCard> {
+class _MediaPreviewCardState extends State<MediaPreviewCard>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final colorScheme = Theme.of(context).colorScheme;
     final item = widget.item;
     final isRating = item.subtitle?.startsWith('★') ?? false;
@@ -857,6 +873,19 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
   ) {
     final item = widget.item;
     final posterStyle = widget.posterStyle;
+    final heroTag = posterStyle ? item.heroTag : null;
+    Widget mediaImage = ResilientMediaImage(
+      imageUrl: item.imageUrl,
+      fallbackIcon: item.fallbackIcon,
+      fit: item.imageFit,
+      aspectRatio: item.imageAspectRatio,
+      fallbackTitle: item.fallbackTitle,
+      backgroundColor: item.imageBackgroundColor,
+      borderRadius: 0,
+    );
+    if (heroTag != null) {
+      mediaImage = Hero(tag: heroTag, child: mediaImage);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -866,15 +895,7 @@ class _MediaPreviewCardState extends State<MediaPreviewCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ResilientMediaImage(
-                  imageUrl: item.imageUrl,
-                  fallbackIcon: item.fallbackIcon,
-                  fit: item.imageFit,
-                  aspectRatio: item.imageAspectRatio,
-                  fallbackTitle: item.fallbackTitle,
-                  backgroundColor: item.imageBackgroundColor,
-                  borderRadius: 0,
-                ),
+                mediaImage,
                 if (item.isFavorite)
                   Positioned(
                     top: 4,

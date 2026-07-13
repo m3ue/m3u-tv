@@ -138,11 +138,14 @@ class _VodDetailsBody extends StatelessWidget {
             width: 220,
             child: AspectRatio(
               aspectRatio: 0.68,
-              child: ResilientMediaImage(
-                imageUrl: details.coverUrl,
-                fallbackIcon: Icons.movie,
-                borderRadius: MediaBrowsingMetrics.cardRadius,
-                fallbackTitle: details.name,
+              child: Hero(
+                tag: 'vod_poster_${item.id}',
+                child: ResilientMediaImage(
+                  imageUrl: details.coverUrl,
+                  fallbackIcon: Icons.movie,
+                  borderRadius: MediaBrowsingMetrics.cardRadius,
+                  fallbackTitle: details.name,
+                ),
               ),
             ),
           ),
@@ -156,11 +159,12 @@ class _VodDetailsBody extends StatelessWidget {
       ),
     );
 
-    if (backdrop == null) return content;
+    // Always use the backdrop Stack layout so the poster stays bottom-aligned
+    // before and after the backdrop URL loads in, preventing a Hero position jump.
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.network(backdrop, fit: BoxFit.cover),
+        if (backdrop != null) Image.network(backdrop, fit: BoxFit.cover),
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -203,15 +207,9 @@ class _VodDetailsBody extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (backdrop != null)
-                Image.network(backdrop, fit: BoxFit.cover)
-              else
-                ResilientMediaImage(
-                  imageUrl: details.coverUrl,
-                  fallbackIcon: Icons.movie,
-                  borderRadius: 0,
-                  fallbackTitle: details.name,
-                ),
+              // Backdrop fills the area when available; otherwise the
+              // gradient alone provides the surface transition.
+              if (backdrop != null) Image.network(backdrop, fit: BoxFit.cover),
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -220,6 +218,26 @@ class _VodDetailsBody extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: [Colors.transparent, theme.colorScheme.surface],
                       stops: const [0.4, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              // Always show the poster thumbnail at the same position so the
+              // Hero destination is stable before and after the backdrop loads.
+              Positioned(
+                left: 16,
+                bottom: 16,
+                child: Hero(
+                  tag: 'vod_poster_${item.id}',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ResilientMediaImage(
+                      imageUrl: details.coverUrl,
+                      fallbackIcon: Icons.movie,
+                      width: 80,
+                      height: 118,
+                      borderRadius: 0,
+                      fallbackTitle: details.name,
                     ),
                   ),
                 ),

@@ -17,12 +17,17 @@ class SeriesDetailsScreen extends StatefulWidget {
     required this.seriesId,
     required this.seriesName,
     required this.xtreamService,
+    this.coverUrl,
     this.onPlay,
     this.progressList = const [],
   });
 
   final int seriesId;
   final String seriesName;
+
+  /// Cover image URL passed immediately on navigation so the Hero animation
+  /// can begin before the series info API call resolves.
+  final String? coverUrl;
   final XtreamService xtreamService;
   final void Function(PlayerArgs)? onPlay;
   final List<Progress> progressList;
@@ -32,6 +37,8 @@ class SeriesDetailsScreen extends StatefulWidget {
 }
 
 class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
+  static const double _wideBreakpoint = 600;
+
   late final Future<SeriesInfo> _future = widget.xtreamService
       .getSeriesInfo(widget.seriesId)
       .then((info) {
@@ -68,7 +75,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            // Show the poster at its final position immediately so the Hero
+            // animation has a destination even before the API call returns.
+            return LayoutBuilder(
+              builder: (context, constraints) =>
+                  constraints.maxWidth >= _wideBreakpoint
+                  ? _buildLoadingWide(context)
+                  : _buildLoadingNarrow(context),
+            );
           }
           if (snapshot.hasError) {
             return Center(
@@ -81,6 +95,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           }
           return _SeriesDetailsBody(
             info: info,
+            seriesId: widget.seriesId,
             selectedSeason: _selectedSeason,
             progressList: widget.progressList,
             onSeasonSelected: (season) =>
@@ -89,6 +104,80 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildLoadingWide(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 220,
+            child: AspectRatio(
+              aspectRatio: 0.68,
+              child: Hero(
+                tag: 'series_poster_${widget.seriesId}',
+                child: ResilientMediaImage(
+                  imageUrl: widget.coverUrl,
+                  fallbackIcon: Icons.tv,
+                  borderRadius: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 32),
+          const Expanded(child: Center(child: CircularProgressIndicator())),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingNarrow(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 200,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, theme.colorScheme.surface],
+                      stops: const [0.4, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                bottom: 16,
+                child: Hero(
+                  tag: 'series_poster_${widget.seriesId}',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ResilientMediaImage(
+                      imageUrl: widget.coverUrl,
+                      fallbackIcon: Icons.tv,
+                      width: 100,
+                      height: 148,
+                      borderRadius: 0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Expanded(child: Center(child: CircularProgressIndicator())),
+      ],
     );
   }
 
@@ -126,6 +215,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 class _SeriesDetailsBody extends StatelessWidget {
   const _SeriesDetailsBody({
     required this.info,
+    required this.seriesId,
     required this.selectedSeason,
     required this.progressList,
     required this.onSeasonSelected,
@@ -133,6 +223,11 @@ class _SeriesDetailsBody extends StatelessWidget {
   });
 
   final SeriesInfo info;
+
+  /// The series ID from the navigation argument — used for Hero tags so they
+  /// remain consistent with the list card regardless of what info.series.id
+  /// the API returns.
+  final int seriesId;
   final int? selectedSeason;
   final List<Progress> progressList;
   final ValueChanged<int> onSeasonSelected;
@@ -177,10 +272,13 @@ class _SeriesDetailsBody extends StatelessWidget {
             width: 220,
             child: AspectRatio(
               aspectRatio: 0.68,
-              child: ResilientMediaImage(
-                imageUrl: info.series.coverUrl,
-                fallbackIcon: Icons.tv,
-                borderRadius: 16,
+              child: Hero(
+                tag: 'series_poster_$seriesId',
+                child: ResilientMediaImage(
+                  imageUrl: info.series.coverUrl,
+                  fallbackIcon: Icons.tv,
+                  borderRadius: 16,
+                ),
               ),
             ),
           ),
@@ -325,14 +423,17 @@ class _SeriesDetailsBody extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: ResilientMediaImage(
-                        imageUrl: cover,
-                        fallbackIcon: Icons.tv,
-                        width: 100,
-                        height: 148,
-                        borderRadius: 12,
+                    Hero(
+                      tag: 'series_poster_$seriesId',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: ResilientMediaImage(
+                          imageUrl: cover,
+                          fallbackIcon: Icons.tv,
+                          width: 100,
+                          height: 148,
+                          borderRadius: 0,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
