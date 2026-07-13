@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -42,6 +43,7 @@ class AppStateController extends ChangeNotifier {
     TvNotificationStore? tvNotificationStore,
     ReverbService? reverbService,
     AIOStreamsFavoritesService? aioFavoritesService,
+    ProxyPlaybackSettings? proxyPlaybackSettings,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -79,6 +81,8 @@ class AppStateController extends ChangeNotifier {
       reverbService: reverbService ?? ReverbService(),
       aioFavoritesService:
           aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
+      proxyPlaybackSettings:
+          proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
     );
   }
 
@@ -99,6 +103,7 @@ class AppStateController extends ChangeNotifier {
     required this.notificationStore,
     required this._reverbService,
     required this.aioFavoritesService,
+    required this.proxyPlaybackSettings,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -120,6 +125,7 @@ class AppStateController extends ChangeNotifier {
   final FavoritesService seriesFavoritesService;
   final ResumeService resumeService;
   final AIOStreamsFavoritesService aioFavoritesService;
+  final ProxyPlaybackSettings proxyPlaybackSettings;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -234,6 +240,7 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
+    unawaited(proxyPlaybackSettings.load());
 
     final savedLocale = await secureStorage.read(_localeKey);
     if (savedLocale != null) _locale = Locale(savedLocale);
