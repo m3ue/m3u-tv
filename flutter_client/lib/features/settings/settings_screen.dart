@@ -6,7 +6,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -40,10 +42,12 @@ class SettingsScreen extends StatefulWidget {
     this.onConnected,
     this.locale,
     this.onLocaleChanged,
+    this.proxyPlaybackSettings,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final ProxyPlaybackSettings? proxyPlaybackSettings;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -143,6 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onEpgIntervalChanged: widget.onEpgIntervalChanged,
         locale: widget.locale,
         onLocaleChanged: widget.onLocaleChanged,
+        proxyPlaybackSettings: widget.proxyPlaybackSettings,
       ),
     );
   }
@@ -329,10 +334,12 @@ class _ConnectedView extends StatefulWidget {
     this.onEpgIntervalChanged,
     this.locale,
     this.onLocaleChanged,
+    this.proxyPlaybackSettings,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final ProxyPlaybackSettings? proxyPlaybackSettings;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -663,6 +670,22 @@ class _ConnectedViewState extends State<_ConnectedView>
           ),
         ),
         const SizedBox(height: 20),
+
+        // ── Proxy playback ───────────────────────────────────────────────────
+        if (auth?.proxy != null && widget.proxyPlaybackSettings != null) ...[
+          _SettingsSection(
+            title: l.settingsProxyPlayback,
+            subtitle: l.settingsProxyPlaybackSubtitle,
+            child: ListenableBuilder(
+              listenable: widget.proxyPlaybackSettings!,
+              builder: (context, _) => _ProxyPlaybackControls(
+                capability: auth!.proxy!,
+                settings: widget.proxyPlaybackSettings!,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
 
         // ── Account ──────────────────────────────────────────────────────────
         _SettingsSection(
@@ -1390,6 +1413,116 @@ class _ViewerRow extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Shared section layout
 // ---------------------------------------------------------------------------
+
+class _ProxyPlaybackControls extends StatelessWidget {
+  const _ProxyPlaybackControls({
+    required this.capability,
+    required this.settings,
+  });
+
+  final ProxyCapability capability;
+  final ProxyPlaybackSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isActive = settings.enabled || capability.forced;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (capability.forced)
+          Text(l.settingsProxyForced, style: theme.textTheme.bodySmall)
+        else
+          Wrap(
+            spacing: 8,
+            children: [
+              _IntervalChip(
+                label: l.settingsProxyUse,
+                isSelected: settings.enabled,
+                onTap: () =>
+                    unawaited(settings.setEnabled(enabled: !settings.enabled)),
+              ),
+            ],
+          ),
+        if (isActive && capability.profiles.isEmpty) ...[
+          const SizedBox(height: 12),
+          Text(l.settingsProxyNoProfiles, style: theme.textTheme.bodySmall),
+        ],
+        if (isActive && capability.profiles.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 12),
+          _ProxyProfilePicker(
+            label: l.settingsProxyLiveProfile,
+            profiles: capability.profiles,
+            selectedId: settings.liveProfileId,
+            onChanged: (id) => unawaited(settings.setLiveProfileId(id)),
+          ),
+          const SizedBox(height: 12),
+          _ProxyProfilePicker(
+            label: l.settingsProxyVodProfile,
+            profiles: capability.profiles,
+            selectedId: settings.vodProfileId,
+            onChanged: (id) => unawaited(settings.setVodProfileId(id)),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProxyProfilePicker extends StatelessWidget {
+  const _ProxyProfilePicker({
+    required this.label,
+    required this.profiles,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  final String label;
+  final List<ProxyStreamProfile> profiles;
+  final int? selectedId;
+  final void Function(int? id) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _IntervalChip(
+              label: l.settingsProxyProfileDefault,
+              isSelected: selectedId == null,
+              onTap: () => onChanged(null),
+            ),
+            _IntervalChip(
+              label: l.settingsProxyProfileDirect,
+              isSelected: selectedId == ProxyPlaybackSettings.directProfileId,
+              onTap: () => onChanged(ProxyPlaybackSettings.directProfileId),
+            ),
+            ...profiles.map(
+              (profile) => _IntervalChip(
+                label: profile.name,
+                isSelected: selectedId == profile.id,
+                onTap: () => onChanged(profile.id),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 class _SettingsSection extends StatelessWidget {
   const _SettingsSection({

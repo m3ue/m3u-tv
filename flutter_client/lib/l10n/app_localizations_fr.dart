@@ -244,6 +244,36 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAccount => 'Compte';
 
   @override
+  String get settingsProxyPlayback => 'Lecture via proxy';
+
+  @override
+  String get settingsProxyPlaybackSubtitle =>
+      'Diffusez via le proxy m3u-editor avec un profil de transcodage optionnel pour cet appareil.';
+
+  @override
+  String get settingsProxyUse => 'Utiliser le proxy';
+
+  @override
+  String get settingsProxyForced =>
+      'Le proxy est activé au niveau de la playlist et ne peut pas être désactivé.';
+
+  @override
+  String get settingsProxyLiveProfile => 'Profil de transcodage en direct';
+
+  @override
+  String get settingsProxyVodProfile => 'Profil de transcodage VOD et séries';
+
+  @override
+  String get settingsProxyProfileDefault => 'Par défaut';
+
+  @override
+  String get settingsProxyProfileDirect => 'Direct (sans transcodage)';
+
+  @override
+  String get settingsProxyNoProfiles =>
+      'Aucun profil de transcodage disponible — les flux utilisent le proxy direct.';
+
+  @override
   String get settingsDisconnectTitle => 'Se déconnecter ?';
 
   @override

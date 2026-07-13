@@ -312,7 +312,25 @@ class AppShellState extends ConsumerState<AppShell>
     _openPlayerDirect(resolvedArgs);
   }
 
-  void _openPlayerDirect(PlayerArgs args) {
+  /// Applies the per-device proxy playback preferences (enable proxy +
+  /// live/VOD transcoding profile) to backend stream URLs. External URLs
+  /// (e.g. AIOStreams sources) pass through unchanged.
+  PlayerArgs _applyProxyPlayback(PlayerArgs args) {
+    final proxy = _appState.authNotifier.authResponse?.proxy;
+    final server = _appState.xtreamService.credentials?.server;
+    if (proxy == null || server == null) return args;
+
+    final updated = _appState.proxyPlaybackSettings.apply(
+      args.streamUrl,
+      type: args.type,
+      forced: proxy.forced,
+      serverBase: server,
+    );
+    return updated == args.streamUrl ? args : args.copyWith(streamUrl: updated);
+  }
+
+  void _openPlayerDirect(PlayerArgs rawArgs) {
+    final args = _applyProxyPlayback(rawArgs);
     final oldOrch = _playerOrchestrator;
     final newOrch =
         widget.playbackOrchestratorBuilder?.call() ??
@@ -674,6 +692,7 @@ class AppShellState extends ConsumerState<AppShell>
           onConnected: () => _navigateTo(0),
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
+          proxyPlaybackSettings: _appState.proxyPlaybackSettings,
         ),
       ),
       _ => const PlaceholderScreen(title: 'Home'),
