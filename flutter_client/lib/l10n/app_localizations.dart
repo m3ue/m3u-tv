@@ -548,6 +548,60 @@ abstract class AppLocalizations {
   /// **'Account'**
   String get settingsAccount;
 
+  /// No description provided for @settingsProxyPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy Playback'**
+  String get settingsProxyPlayback;
+
+  /// No description provided for @settingsProxyPlaybackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream through the m3u-editor proxy with an optional transcoding profile for this device.'**
+  String get settingsProxyPlaybackSubtitle;
+
+  /// No description provided for @settingsProxyUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use proxy'**
+  String get settingsProxyUse;
+
+  /// No description provided for @settingsProxyForced.
+  ///
+  /// In en, this message translates to:
+  /// **'The proxy is enabled at the playlist level and cannot be turned off.'**
+  String get settingsProxyForced;
+
+  /// No description provided for @settingsProxyLiveProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Live transcoding profile'**
+  String get settingsProxyLiveProfile;
+
+  /// No description provided for @settingsProxyVodProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'VOD & Series transcoding profile'**
+  String get settingsProxyVodProfile;
+
+  /// No description provided for @settingsProxyProfileDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get settingsProxyProfileDefault;
+
+  /// No description provided for @settingsProxyProfileDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct (no transcoding)'**
+  String get settingsProxyProfileDirect;
+
+  /// No description provided for @settingsProxyNoProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No transcoding profiles available — streams use the direct proxy.'**
+  String get settingsProxyNoProfiles;
+
   /// No description provided for @settingsDisconnectTitle.
   ///
   /// In en, this message translates to:

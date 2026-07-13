@@ -32,6 +32,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/notification_toast.dart';
 
 /// Device type enum matching the RN useDeviceType hook.
 enum DeviceType { tv, desktop, tablet, phone }
@@ -91,6 +92,7 @@ class AppShellState extends ConsumerState<AppShell>
   int _lastNavMs = 0;
   int _lastNavIndex = -1;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
+  final _toastKey = GlobalKey<NotificationToastOverlayState>();
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
@@ -183,16 +185,11 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _onTvNotification(TvNotificationItem item) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          item.body != null && item.body!.isNotEmpty
-              ? '${item.title}: ${item.body}'
-              : item.title,
-        ),
-        duration: const Duration(seconds: 5),
-      ),
-    );
+    _toastKey.currentState?.enqueue(item);
+  }
+
+  void _onToastTap(TvNotificationItem item) {
+    _navigateToRoute(RouteNames.notifications);
   }
 
   @override
@@ -315,7 +312,25 @@ class AppShellState extends ConsumerState<AppShell>
     _openPlayerDirect(resolvedArgs);
   }
 
-  void _openPlayerDirect(PlayerArgs args) {
+  /// Applies the per-device proxy playback preferences (enable proxy +
+  /// live/VOD transcoding profile) to backend stream URLs. External URLs
+  /// (e.g. AIOStreams sources) pass through unchanged.
+  PlayerArgs _applyProxyPlayback(PlayerArgs args) {
+    final proxy = _appState.authNotifier.authResponse?.proxy;
+    final server = _appState.xtreamService.credentials?.server;
+    if (proxy == null || server == null) return args;
+
+    final updated = _appState.proxyPlaybackSettings.apply(
+      args.streamUrl,
+      type: args.type,
+      forced: proxy.forced,
+      serverBase: server,
+    );
+    return updated == args.streamUrl ? args : args.copyWith(streamUrl: updated);
+  }
+
+  void _openPlayerDirect(PlayerArgs rawArgs) {
+    final args = _applyProxyPlayback(rawArgs);
     final oldOrch = _playerOrchestrator;
     final newOrch =
         widget.playbackOrchestratorBuilder?.call() ??
@@ -677,6 +692,7 @@ class AppShellState extends ConsumerState<AppShell>
           onConnected: () => _navigateTo(0),
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
+          proxyPlaybackSettings: _appState.proxyPlaybackSettings,
         ),
       ),
       _ => const PlaceholderScreen(title: 'Home'),
@@ -741,148 +757,157 @@ class AppShellState extends ConsumerState<AppShell>
 
     final args = _playerArgs;
     final orch = _playerOrchestrator;
-    if (args == null || orch == null) return shell;
+    if (args == null || orch == null) {
+      return NotificationToastOverlay(
+        key: _toastKey,
+        onNotificationTap: _onToastTap,
+        child: shell,
+      );
+    }
 
     final viewerId = _appState.activeViewer?.ulid ?? '';
 
-    return Stack(
-      children: [
-        shell,
-        Positioned.fill(
-          child:
-              widget.playerRouteBuilder?.call(args) ??
-              PlayerScreen(
-                key: ValueKey(args.streamUrl),
-                args: args,
-                orchestrator: orch,
-                epgService: _appState.epgService,
-                xtreamService: _appState.xtreamService,
-                viewerId: viewerId,
-                progressReporter: (progress) {
-                  final aioLookupId = args.metadata['aio_item_id'] as String?;
-                  final existing = _appState.progressList.firstWhereOrNull(
-                    (p) =>
-                        p.contentType == progress.contentType &&
-                        (p.contentType == ContentType.aiostreams
-                            ? p.aioItemId == aioLookupId
-                            : p.streamId == progress.streamId),
-                  );
-                  final toSave = Progress(
-                    viewerId: progress.viewerId,
-                    contentType: progress.contentType,
-                    streamId: progress.streamId,
-                    positionSeconds: progress.positionSeconds,
-                    durationSeconds:
-                        progress.durationSeconds ?? existing?.durationSeconds,
-                    completed: progress.completed,
-                    seriesId: progress.seriesId ?? existing?.seriesId,
-                    seasonNumber:
-                        progress.seasonNumber ??
-                        (args.metadata['season_number'] as int?) ??
-                        existing?.seasonNumber,
-                    episodeNumber:
-                        progress.episodeNumber ??
-                        (args.metadata['episode_number'] as int?) ??
-                        existing?.episodeNumber,
-                    title:
-                        progress.title ??
-                        args.metadata['title'] as String? ??
-                        args.title,
-                    episodeTitle:
-                        progress.episodeTitle ??
-                        args.metadata['episode_title'] as String? ??
-                        existing?.episodeTitle,
-                    seriesName:
-                        progress.seriesName ??
-                        args.metadata['series_name'] as String? ??
-                        existing?.seriesName,
-                    thumbnailUrl:
-                        progress.thumbnailUrl ??
-                        args.metadata['thumbnail_url'] as String? ??
-                        existing?.thumbnailUrl,
-                    backdropUrl:
-                        progress.backdropUrl ??
-                        args.metadata['backdrop_url'] as String? ??
-                        existing?.backdropUrl,
-                    rating:
-                        progress.rating ??
-                        args.metadata['rating'] as String? ??
-                        existing?.rating,
-                    runtime:
-                        progress.runtime ??
-                        args.metadata['duration'] as String? ??
-                        existing?.runtime,
-                    plot:
-                        progress.plot ??
-                        args.metadata['plot'] as String? ??
-                        existing?.plot,
-                    genre: progress.genre ?? existing?.genre,
-                    year:
-                        progress.year ??
-                        args.metadata['year'] as String? ??
-                        existing?.year,
-                  );
-                  final aioItemId = args.metadata['aio_item_id'] as String?;
-                  final aioIntegrationId =
-                      args.metadata['aio_integration_id'] as int?;
-                  final aioToSave = aioItemId != null
-                      ? Progress(
-                          viewerId: toSave.viewerId,
-                          contentType: ContentType.aiostreams,
-                          streamId: 0,
-                          positionSeconds: toSave.positionSeconds,
-                          durationSeconds: toSave.durationSeconds,
-                          completed: toSave.completed,
-                          seasonNumber: toSave.seasonNumber,
-                          episodeNumber: toSave.episodeNumber,
-                          title: toSave.title,
-                          episodeTitle: toSave.episodeTitle,
-                          thumbnailUrl: toSave.thumbnailUrl,
-                          backdropUrl: toSave.backdropUrl,
-                          rating: toSave.rating,
-                          runtime: toSave.runtime,
-                          plot: toSave.plot,
-                          genre: toSave.genre,
-                          year: toSave.year,
-                          aioItemId: aioItemId,
-                          aioIntegrationId: aioIntegrationId,
-                        )
-                      : null;
-                  if (aioToSave != null) {
-                    if (_appState.sourceType == AppSourceType.xtream) {
+    return NotificationToastOverlay(
+      key: _toastKey,
+      child: Stack(
+        children: [
+          shell,
+          Positioned.fill(
+            child:
+                widget.playerRouteBuilder?.call(args) ??
+                PlayerScreen(
+                  key: ValueKey(args.streamUrl),
+                  args: args,
+                  orchestrator: orch,
+                  epgService: _appState.epgService,
+                  xtreamService: _appState.xtreamService,
+                  viewerId: viewerId,
+                  progressReporter: (progress) {
+                    final aioLookupId = args.metadata['aio_item_id'] as String?;
+                    final existing = _appState.progressList.firstWhereOrNull(
+                      (p) =>
+                          p.contentType == progress.contentType &&
+                          (p.contentType == ContentType.aiostreams
+                              ? p.aioItemId == aioLookupId
+                              : p.streamId == progress.streamId),
+                    );
+                    final toSave = Progress(
+                      viewerId: progress.viewerId,
+                      contentType: progress.contentType,
+                      streamId: progress.streamId,
+                      positionSeconds: progress.positionSeconds,
+                      durationSeconds:
+                          progress.durationSeconds ?? existing?.durationSeconds,
+                      completed: progress.completed,
+                      seriesId: progress.seriesId ?? existing?.seriesId,
+                      seasonNumber:
+                          progress.seasonNumber ??
+                          (args.metadata['season_number'] as int?) ??
+                          existing?.seasonNumber,
+                      episodeNumber:
+                          progress.episodeNumber ??
+                          (args.metadata['episode_number'] as int?) ??
+                          existing?.episodeNumber,
+                      title:
+                          progress.title ??
+                          args.metadata['title'] as String? ??
+                          args.title,
+                      episodeTitle:
+                          progress.episodeTitle ??
+                          args.metadata['episode_title'] as String? ??
+                          existing?.episodeTitle,
+                      seriesName:
+                          progress.seriesName ??
+                          args.metadata['series_name'] as String? ??
+                          existing?.seriesName,
+                      thumbnailUrl:
+                          progress.thumbnailUrl ??
+                          args.metadata['thumbnail_url'] as String? ??
+                          existing?.thumbnailUrl,
+                      backdropUrl:
+                          progress.backdropUrl ??
+                          args.metadata['backdrop_url'] as String? ??
+                          existing?.backdropUrl,
+                      rating:
+                          progress.rating ??
+                          args.metadata['rating'] as String? ??
+                          existing?.rating,
+                      runtime:
+                          progress.runtime ??
+                          args.metadata['duration'] as String? ??
+                          existing?.runtime,
+                      plot:
+                          progress.plot ??
+                          args.metadata['plot'] as String? ??
+                          existing?.plot,
+                      genre: progress.genre ?? existing?.genre,
+                      year:
+                          progress.year ??
+                          args.metadata['year'] as String? ??
+                          existing?.year,
+                    );
+                    final aioItemId = args.metadata['aio_item_id'] as String?;
+                    final aioIntegrationId =
+                        args.metadata['aio_integration_id'] as int?;
+                    final aioToSave = aioItemId != null
+                        ? Progress(
+                            viewerId: toSave.viewerId,
+                            contentType: ContentType.aiostreams,
+                            streamId: 0,
+                            positionSeconds: toSave.positionSeconds,
+                            durationSeconds: toSave.durationSeconds,
+                            completed: toSave.completed,
+                            seasonNumber: toSave.seasonNumber,
+                            episodeNumber: toSave.episodeNumber,
+                            title: toSave.title,
+                            episodeTitle: toSave.episodeTitle,
+                            thumbnailUrl: toSave.thumbnailUrl,
+                            backdropUrl: toSave.backdropUrl,
+                            rating: toSave.rating,
+                            runtime: toSave.runtime,
+                            plot: toSave.plot,
+                            genre: toSave.genre,
+                            year: toSave.year,
+                            aioItemId: aioItemId,
+                            aioIntegrationId: aioIntegrationId,
+                          )
+                        : null;
+                    if (aioToSave != null) {
+                      if (_appState.sourceType == AppSourceType.xtream) {
+                        unawaited(
+                          _appState.xtreamService
+                              .updateProgress(aioToSave)
+                              .catchError((_) {}),
+                        );
+                      }
                       unawaited(
-                        _appState.xtreamService
-                            .updateProgress(aioToSave)
-                            .catchError((_) {}),
+                        _appState.resumeService.save(aioToSave).then((_) {
+                          if (mounted) {
+                            _appState.updateProgressEntry(aioToSave);
+                          }
+                        }),
+                      );
+                    } else {
+                      if (_appState.sourceType == AppSourceType.xtream) {
+                        unawaited(
+                          _appState.xtreamService
+                              .updateProgress(toSave)
+                              .catchError((_) {}),
+                        );
+                      }
+                      unawaited(
+                        _appState.resumeService.save(toSave).then((_) {
+                          if (mounted) _appState.updateProgressEntry(toSave);
+                        }),
                       );
                     }
-                    unawaited(
-                      _appState.resumeService.save(aioToSave).then((_) {
-                        if (mounted) {
-                          _appState.updateProgressEntry(aioToSave);
-                        }
-                      }),
-                    );
-                  } else {
-                    if (_appState.sourceType == AppSourceType.xtream) {
-                      unawaited(
-                        _appState.xtreamService
-                            .updateProgress(toSave)
-                            .catchError((_) {}),
-                      );
-                    }
-                    unawaited(
-                      _appState.resumeService.save(toSave).then((_) {
-                        if (mounted) _appState.updateProgressEntry(toSave);
-                      }),
-                    );
-                  }
-                },
-                traktService: _appState.traktService,
-                onClose: _closePlayer,
-              ),
-        ),
-      ],
+                  },
+                  traktService: _appState.traktService,
+                  onClose: _closePlayer,
+                ),
+          ),
+        ],
+      ),
     );
   }
 

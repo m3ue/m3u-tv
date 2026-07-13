@@ -171,6 +171,52 @@ class AIOStreamsIntegration {
   final List<AIOStreamsCatalog> catalogs;
 }
 
+class ProxyStreamProfile {
+  const ProxyStreamProfile({
+    required this.id,
+    required this.name,
+    this.description,
+    this.format,
+  });
+
+  factory ProxyStreamProfile.fromJson(Map<String, dynamic> json) =>
+      ProxyStreamProfile(
+        id: _asInt(json['id']),
+        name: '${json['name'] ?? ''}',
+        description: json['description'] as String?,
+        format: json['format'] as String?,
+      );
+
+  final int id;
+  final String name;
+  final String? description;
+  final String? format;
+}
+
+/// Proxy playback capability advertised by the backend.
+///
+/// [forced] means the playlist already routes every stream through the proxy,
+/// so the proxy cannot be turned off client-side — profile selection still
+/// applies. [profiles] is the set of transcoding profiles this user may apply.
+class ProxyCapability {
+  const ProxyCapability({
+    required this.forced,
+    this.profiles = const <ProxyStreamProfile>[],
+  });
+
+  factory ProxyCapability.fromJson(Map<String, dynamic> json) =>
+      ProxyCapability(
+        forced: json['forced'] == true,
+        profiles: _asList(json['profiles'])
+            .whereType<Map<String, dynamic>>()
+            .map(ProxyStreamProfile.fromJson)
+            .toList(growable: false),
+      );
+
+  final bool forced;
+  final List<ProxyStreamProfile> profiles;
+}
+
 class XtreamAuthResponse {
   const XtreamAuthResponse({
     required this.isAuthenticated,
@@ -178,6 +224,7 @@ class XtreamAuthResponse {
     this.m3uEditorVersion,
     this.features = const <String>[],
     this.aiostreamsIntegrations = const <AIOStreamsIntegration>[],
+    this.proxy,
   });
 
   final bool isAuthenticated;
@@ -185,10 +232,12 @@ class XtreamAuthResponse {
   final String? m3uEditorVersion;
   final List<String> features;
   final List<AIOStreamsIntegration> aiostreamsIntegrations;
+  final ProxyCapability? proxy;
 
   bool hasFeature(String feature) => features.contains(feature);
   bool get hasAioStreams =>
       hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
+  bool get hasProxy => hasFeature('proxy') && proxy != null;
 }
 
 class XtreamService {
@@ -253,12 +302,17 @@ class XtreamService {
         .whereType<Map<String, dynamic>>()
         .map(AIOStreamsIntegration.fromJson)
         .toList(growable: false);
+    final proxyJson = m3uEditor['proxy'];
+    final proxy = proxyJson is Map<String, dynamic>
+        ? ProxyCapability.fromJson(proxyJson)
+        : null;
     return XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
       m3uEditorVersion: '${m3uEditor['version'] ?? ''}',
       features: features,
       aiostreamsIntegrations: aiostreamsIntegrations,
+      proxy: proxy,
     );
   }
 

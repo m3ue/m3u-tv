@@ -60,9 +60,9 @@ class PlayerArgs {
   final Map<String, String> headers;
   final Map<String, Object?> metadata;
 
-  PlayerArgs copyWith({double? startPosition}) {
+  PlayerArgs copyWith({String? streamUrl, double? startPosition}) {
     return PlayerArgs(
-      streamUrl: streamUrl,
+      streamUrl: streamUrl ?? this.streamUrl,
       title: title,
       type: type,
       streamId: streamId,

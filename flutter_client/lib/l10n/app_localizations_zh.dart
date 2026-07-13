@@ -241,6 +241,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAccount => '账户';
 
   @override
+  String get settingsProxyPlayback => '代理播放';
+
+  @override
+  String get settingsProxyPlaybackSubtitle =>
+      '通过 m3u-editor 代理播放，并可为此设备选择转码配置。';
+
+  @override
+  String get settingsProxyUse => '使用代理';
+
+  @override
+  String get settingsProxyForced => '代理已在播放列表级别启用，无法关闭。';
+
+  @override
+  String get settingsProxyLiveProfile => '直播转码配置';
+
+  @override
+  String get settingsProxyVodProfile => '点播和剧集转码配置';
+
+  @override
+  String get settingsProxyProfileDefault => '默认';
+
+  @override
+  String get settingsProxyProfileDirect => '直连（不转码）';
+
+  @override
+  String get settingsProxyNoProfiles => '没有可用的转码配置——将使用直连代理播放。';
+
+  @override
   String get settingsDisconnectTitle => '断开连接？';
 
   @override

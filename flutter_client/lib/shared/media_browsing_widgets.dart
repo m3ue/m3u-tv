@@ -1,8 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart'
+    show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -157,8 +160,11 @@ class ResilientMediaImage extends StatelessWidget {
           ),
           child: url == null || url.isEmpty
               ? fallback
-              : Image.network(
-                  url,
+              : Image(
+                  image: CachedNetworkImageProvider(
+                    url,
+                    cacheManager: MediaImageCacheManager(),
+                  ),
                   fit: fit,
                   width: width,
                   height: height,
@@ -644,9 +650,14 @@ class MediaPreviewCard extends StatefulWidget {
   State<MediaPreviewCard> createState() => _MediaPreviewCardState();
 }
 
-class _MediaPreviewCardState extends State<MediaPreviewCard> {
+class _MediaPreviewCardState extends State<MediaPreviewCard>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final colorScheme = Theme.of(context).colorScheme;
     final item = widget.item;
     final isRating = item.subtitle?.startsWith('★') ?? false;
