@@ -22,7 +22,8 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemUiPolicy().applyBrowsing();
+  final systemUiPolicy = SystemUiPolicy();
+  await systemUiPolicy.applyBrowsing();
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
   if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
@@ -35,6 +36,7 @@ Future<void> main() async {
       child: MyApp(
         nativeTelevisionHint: nativeTelevisionHint,
         appState: appState,
+        systemUiPolicy: systemUiPolicy,
       ),
     ),
   );
@@ -55,10 +57,16 @@ Future<AppStateController> _buildAppState() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.nativeTelevisionHint = false, this.appState});
+  const MyApp({
+    super.key,
+    this.nativeTelevisionHint = false,
+    this.appState,
+    this.systemUiPolicy,
+  });
 
   final bool nativeTelevisionHint;
   final AppStateController? appState;
+  final SystemUiPolicy? systemUiPolicy;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -68,6 +76,7 @@ class _MyAppState extends State<MyApp> {
   late final GoRouter _router = createGoRouter(
     appState: widget.appState ?? AppStateController(),
     nativeTelevisionHint: widget.nativeTelevisionHint,
+    systemUiPolicy: widget.systemUiPolicy,
   );
 
   @override

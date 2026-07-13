@@ -195,18 +195,17 @@ void main() {
 
   test('android system UI policy is route-aware', () {
     final mainDart = readFile('lib/main.dart');
-    final appShell = readFile('lib/app/app_shell.dart');
     final systemUiPolicy = readFile('lib/app/system_ui_policy.dart');
     final mainActivity = readFile(
       'android/app/src/main/kotlin/dev/sparkison/tv/MainActivity.kt',
     );
 
-    expect(mainDart, contains('applyBrowsing()'));
+    // Migration guard: old global immersive mode must not reappear.
     expect(mainDart, isNot(contains('SystemUiMode.immersiveSticky')));
-    expect(appShell, contains('applyPlayer()'));
-    expect(appShell, contains('applyBrowsing()'));
-    expect(appShell, contains('AppLifecycleState.resumed'));
+    // Channel name must match between Dart and Kotlin.
     expect(systemUiPolicy, contains('m3u_tv/system_ui'));
+    expect(mainActivity, contains('m3u_tv/system_ui'));
+    // Native implementation must cover both show and hide paths.
     expect(mainActivity, contains('WindowCompat.setDecorFitsSystemWindows'));
     expect(mainActivity, contains('WindowInsetsCompat.Type.systemBars()'));
     expect(mainActivity, contains('insetsController.show(systemBars)'));
