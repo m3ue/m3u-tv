@@ -910,15 +910,15 @@ class AppShellState extends ConsumerState<AppShell>
                       );
                     }
                   },
-                traktService: _appState.traktService,
-                onPlaybackFailure: () {
-                  _playerHasFailed = true;
-                  unawaited(_systemUiPolicy.applyBrowsing());
-                },
-                onClose: _closePlayer,
-              ),
-        ),
-      ],
+                  traktService: _appState.traktService,
+                  onPlaybackFailure: () {
+                    _playerHasFailed = true;
+                    unawaited(_systemUiPolicy.applyBrowsing());
+                  },
+                  onClose: _closePlayer,
+                ),
+          ),
+        ],
       ),
     );
   }
