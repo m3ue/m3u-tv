@@ -45,28 +45,35 @@ class NotificationToastOverlayState extends State<NotificationToastOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final safePadding = MediaQuery.of(context).padding;
     return Stack(
       children: [
         widget.child,
         Positioned(
-          top: 24,
-          right: 24,
-          width: 360,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: _queue
-                .map(
-                  (entry) => _NotificationToast(
-                    key: entry.key,
-                    item: entry.item,
-                    onDismiss: () => _dismiss(entry),
-                    onTap: widget.onNotificationTap != null
-                        ? () => widget.onNotificationTap!(entry.item)
-                        : null,
-                  ),
-                )
-                .toList(),
+          top: safePadding.top + 8,
+          left: safePadding.left + 16,
+          right: safePadding.right + 16,
+          child: Align(
+            alignment: Alignment.topRight,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: _queue
+                    .map(
+                      (entry) => _NotificationToast(
+                        key: entry.key,
+                        item: entry.item,
+                        onDismiss: () => _dismiss(entry),
+                        onTap: widget.onNotificationTap != null
+                            ? () => widget.onNotificationTap!(entry.item)
+                            : null,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
           ),
         ),
       ],
