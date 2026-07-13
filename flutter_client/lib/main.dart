@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -21,7 +22,8 @@ import 'package:path_provider/path_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _configureSystemUi();
+  final systemUiPolicy = SystemUiPolicy();
+  await systemUiPolicy.applyBrowsing();
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
   if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
@@ -34,14 +36,10 @@ Future<void> main() async {
       child: MyApp(
         nativeTelevisionHint: nativeTelevisionHint,
         appState: appState,
+        systemUiPolicy: systemUiPolicy,
       ),
     ),
   );
-}
-
-Future<void> _configureSystemUi() async {
-  if (kIsWeb || !Platform.isAndroid) return;
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 }
 
 Future<AppStateController> _buildAppState() async {
@@ -59,10 +57,16 @@ Future<AppStateController> _buildAppState() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.nativeTelevisionHint = false, this.appState});
+  const MyApp({
+    super.key,
+    this.nativeTelevisionHint = false,
+    this.appState,
+    this.systemUiPolicy,
+  });
 
   final bool nativeTelevisionHint;
   final AppStateController? appState;
+  final SystemUiPolicy? systemUiPolicy;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -72,6 +76,7 @@ class _MyAppState extends State<MyApp> {
   late final GoRouter _router = createGoRouter(
     appState: widget.appState ?? AppStateController(),
     nativeTelevisionHint: widget.nativeTelevisionHint,
+    systemUiPolicy: widget.systemUiPolicy,
   );
 
   @override

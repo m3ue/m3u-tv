@@ -34,6 +34,7 @@ class PlayerScreen extends StatefulWidget {
     this.traktService,
     this.viewerId = '',
     this.onClose,
+    this.onPlaybackFailure,
     super.key,
   });
 
@@ -45,6 +46,7 @@ class PlayerScreen extends StatefulWidget {
   final TraktService? traktService;
   final String viewerId;
   final VoidCallback? onClose;
+  final VoidCallback? onPlaybackFailure;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -94,6 +96,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   bool _disposed = false;
   bool _traktScrobbleActive = false;
+  bool _failureReported = false;
   double _lastValidProgress = 0;
 
   bool get _isLive => widget.args.type == 'live';
@@ -194,6 +197,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // PlaybackControls is hidden when _errorMessage is set, so without this the
   // escape-to-close Shortcuts would have no focused node to route through.
   void _setErrorMessage(String message) {
+    if (!_failureReported) {
+      _failureReported = true;
+      widget.onPlaybackFailure?.call();
+    }
     setState(() {
       _errorMessage = message;
       _status = PlaybackStatus.idle;

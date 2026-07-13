@@ -4,7 +4,12 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Color
+import android.os.Build
 import android.util.DisplayMetrics
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -12,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var media3Plugin: Media3PlaybackPlugin? = null
     private var deviceInfoChannel: MethodChannel? = null
+    private var systemUiChannel: MethodChannel? = null
 
     override fun attachBaseContext(newBase: Context) {
         val uiModeManager = newBase.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
@@ -52,6 +58,17 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        systemUiChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SYSTEM_UI_CHANNEL).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "browsing", "player" -> {
+                        applySystemUiPolicy(call.method)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -59,7 +76,30 @@ class MainActivity : FlutterActivity() {
         media3Plugin = null
         deviceInfoChannel?.setMethodCallHandler(null)
         deviceInfoChannel = null
+        systemUiChannel?.setMethodCallHandler(null)
+        systemUiChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    private fun applySystemUiPolicy(route: String) {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        val systemBars = WindowInsetsCompat.Type.systemBars()
+        if (route == "player") {
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(systemBars)
+        } else {
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+            insetsController.show(systemBars)
+        }
     }
 
     private fun isTelevisionDevice(): Boolean {
@@ -72,5 +112,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val DEVICE_INFO_CHANNEL = "m3u_tv/device_info"
+        private const val SYSTEM_UI_CHANNEL = "m3u_tv/system_ui"
     }
 }
