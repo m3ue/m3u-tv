@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
@@ -69,6 +68,7 @@ class AppShell extends ConsumerStatefulWidget {
     this.appState,
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
+    this.systemUiPolicy,
   });
 
   final StatefulNavigationShell navigationShell;
@@ -76,6 +76,7 @@ class AppShell extends ConsumerStatefulWidget {
   final AppStateController? appState;
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
+  final SystemUiPolicy? systemUiPolicy;
 
   @override
   ConsumerState<AppShell> createState() => AppShellState();
@@ -86,6 +87,7 @@ class AppShellState extends ConsumerState<AppShell>
   bool _sidebarActive = false;
   late final AppStateController _appState;
   late final bool _ownsAppState;
+  late final SystemUiPolicy _systemUiPolicy;
   int _unreadCount = 0;
 
   DateTime? _lastBackPress;
@@ -96,6 +98,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
+  bool _playerHasFailed = false;
   FocusNode? _focusBeforePlayer;
 
   final List<FocusNode> _sidebarFocusNodes = [];
@@ -124,6 +127,7 @@ class AppShellState extends ConsumerState<AppShell>
     WidgetsBinding.instance.addObserver(this);
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
+    _systemUiPolicy = widget.systemUiPolicy ?? SystemUiPolicy();
     _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
@@ -194,6 +198,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   @override
   void dispose() {
+    unawaited(_systemUiPolicy.applyBrowsing());
     _tvNotificationSub?.cancel().ignore();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
@@ -209,13 +214,12 @@ class AppShellState extends ConsumerState<AppShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // immersiveSticky is reset by the OS on background/foreground transitions;
-    // re-apply it each time the app resumes to keep the layout full-screen.
-    if (state == AppLifecycleState.resumed && !kIsWeb && Platform.isAndroid) {
-      unawaited(
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
-      );
-    }
+    if (state != AppLifecycleState.resumed) return;
+    unawaited(
+      _playerArgs == null || _playerHasFailed
+          ? _systemUiPolicy.applyBrowsing()
+          : _systemUiPolicy.applyPlayer(),
+    );
   }
 
   void _navigateTo(int index) {
@@ -344,9 +348,11 @@ class AppShellState extends ConsumerState<AppShell>
     // gets a chance to run.
     final focus = FocusManager.instance.primaryFocus;
     _focusBeforePlayer = _isInContentScope(focus) ? focus : null;
+    unawaited(_systemUiPolicy.applyPlayer());
     setState(() {
       _playerArgs = args;
       _playerOrchestrator = newOrch;
+      _playerHasFailed = false;
     });
     if (oldOrch != null) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -368,9 +374,11 @@ class AppShellState extends ConsumerState<AppShell>
     final orch = _playerOrchestrator;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
+    unawaited(_systemUiPolicy.applyBrowsing());
     setState(() {
       _playerArgs = null;
       _playerOrchestrator = null;
+      _playerHasFailed = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       orch?.dispose().ignore();
@@ -903,6 +911,10 @@ class AppShellState extends ConsumerState<AppShell>
                     }
                   },
                   traktService: _appState.traktService,
+                  onPlaybackFailure: () {
+                    _playerHasFailed = true;
+                    unawaited(_systemUiPolicy.applyBrowsing());
+                  },
                   onClose: _closePlayer,
                 ),
           ),
