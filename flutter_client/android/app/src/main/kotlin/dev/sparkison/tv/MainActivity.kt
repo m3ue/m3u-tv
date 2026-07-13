@@ -20,9 +20,9 @@ class MainActivity : FlutterActivity() {
     private var systemUiChannel: MethodChannel? = null
 
     override fun attachBaseContext(newBase: Context) {
-        val uiModeManager = newBase.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-        val isTV = uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            newBase.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        // UiModeManager.getCurrentModeType() calls getDisplayId() internally on Android 17+,
+        // which NPEs here because the display isn't attached until after attachBaseContext returns.
+        val isTV = newBase.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
         val override = if (isTV) {
             val res = newBase.resources.configuration
