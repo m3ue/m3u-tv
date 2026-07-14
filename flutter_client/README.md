@@ -151,7 +151,7 @@ After running, rebuild the tvOS target in Xcode to pick up the refreshed icons.
 |---|---|
 | App Icon — Large (focused) | 1280 × 768 px per layer |
 | App Icon — Small (home shelf) | 400 × 240 px (1x), 800 × 480 px (2x) per layer |
-| Top Shelf Image | 1920 × 720 px |
+| Top Shelf Image | 2320 × 720 px (Wide) |
 
 ## Generating store screenshots
 
