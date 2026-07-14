@@ -19,9 +19,11 @@ import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.

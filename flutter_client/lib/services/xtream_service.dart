@@ -6,6 +6,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
     if (dart.library.io) 'xtream_http_transport_io.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 typedef XtreamTransport = Future<Object?> Function(XtreamRequest request);
 
@@ -252,9 +253,14 @@ class XtreamService {
   final XtreamTransport _transport;
   final CacheService? _cache;
   UserCredentials? _credentials;
+  tz.Location _serverLocation = tz.UTC;
   bool _isM3UEditor = false;
 
   bool get isConfigured => _credentials != null;
+
+  /// The IANA timezone name resolved from the server's `server_info.timezone`
+  /// field during the last successful [authenticate] call.
+  String get serverTimezone => _serverLocation.name;
 
   UserCredentials? get credentials => _credentials;
 
@@ -294,6 +300,13 @@ class XtreamService {
 
     _credentials = normalized;
     _isM3UEditor = true;
+    final tzName =
+        _stringOrNull(_asMap(json['server_info'])['timezone']) ?? 'UTC';
+    try {
+      _serverLocation = tz.getLocation(tzName);
+    } on Exception catch (_) {
+      _serverLocation = tz.UTC;
+    }
     final features = _asList(m3uEditor['features'])
         .map((feature) => '$feature')
         .where((feature) => feature.isNotEmpty)
@@ -319,6 +332,7 @@ class XtreamService {
   void clearCredentials() {
     _credentials = null;
     _isM3UEditor = false;
+    _serverLocation = tz.UTC;
   }
 
   Future<List<Category>> getLiveCategories() async =>
@@ -592,7 +606,7 @@ class XtreamService {
     String extension = 'ts',
   }) {
     final c = _requireCredentials();
-    final normalizedStart = start.toUtc();
+    final normalizedStart = tz.TZDateTime.from(start, _serverLocation);
     final startText = _formatTimeshiftStart(normalizedStart);
     final durationMinutes = duration.inMinutes;
     return '${c.server}/timeshift/${c.username}/${c.password}/$durationMinutes/$startText/$streamId.$extension';

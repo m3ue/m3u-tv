@@ -235,6 +235,9 @@ class AppStateController extends ChangeNotifier {
     AppSourceType.none => 'Not connected',
   };
 
+  String? get serverTimezone =>
+      _sourceType == AppSourceType.xtream ? xtreamService.serverTimezone : null;
+
   Future<void> boot() async {
     _isBootstrapping = true;
     _error = null;

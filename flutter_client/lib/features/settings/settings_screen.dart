@@ -29,6 +29,7 @@ class SettingsScreen extends StatefulWidget {
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
+    this.serverTimezone,
     this.sourceError,
     this.isConfiguredOverride,
     this.epgRefreshInterval,
@@ -51,6 +52,7 @@ class SettingsScreen extends StatefulWidget {
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
+  final String? serverTimezone;
   final String? sourceError;
   final bool? isConfiguredOverride;
   final Future<bool> Function(UserCredentials credentials)? onConnect;
@@ -136,6 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         activeViewer: widget.activeViewer,
         viewers: widget.viewers,
         sourceLabel: widget.sourceLabel,
+        serverTimezone: widget.serverTimezone,
         sourceError: widget.sourceError,
         epgRefreshInterval: widget.epgRefreshInterval,
         epgRefreshOptions: widget.epgRefreshOptions,
@@ -324,6 +327,7 @@ class _ConnectedView extends StatefulWidget {
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
+    this.serverTimezone,
     this.sourceError,
     this.epgRefreshInterval,
     this.epgRefreshOptions = const [],
@@ -343,6 +347,7 @@ class _ConnectedView extends StatefulWidget {
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
+  final String? serverTimezone;
   final String? sourceError;
   final Duration? epgRefreshInterval;
   final List<Duration> epgRefreshOptions;
@@ -525,6 +530,13 @@ class _ConnectedViewState extends State<_ConnectedView>
                 _StatusRow(
                   label: l.settingsSourceLabel,
                   value: widget.sourceLabel!,
+                ),
+              ],
+              if (widget.serverTimezone != null) ...[
+                const Divider(),
+                _StatusRow(
+                  label: l.settingsServerTimezone,
+                  value: widget.serverTimezone!,
                 ),
               ],
               if (auth != null) ...[

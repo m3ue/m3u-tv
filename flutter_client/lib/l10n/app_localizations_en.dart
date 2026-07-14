@@ -177,6 +177,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSourceLabel => 'Source';
 
   @override
+  String get settingsServerTimezone => 'Server Timezone';
+
+  @override
   String get settingsLastError => 'Last error';
 
   @override

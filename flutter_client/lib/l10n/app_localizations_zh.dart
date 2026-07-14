@@ -177,6 +177,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSourceLabel => '来源';
 
   @override
+  String get settingsServerTimezone => '服务器时区';
+
+  @override
   String get settingsLastError => '最近错误';
 
   @override

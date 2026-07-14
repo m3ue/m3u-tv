@@ -75,6 +75,7 @@
   "settingsStatusUnavailable": "Indisponible",
   "settingsStatusLabel": "Statut",
   "settingsSourceLabel": "Source",
+  "settingsServerTimezone": "Fuseau horaire du serveur",
   "settingsLastError": "Dernière erreur",
   "settingsRetryConnection": "Réessayer la connexion",
   "settingsEditServer": "Modifier les paramètres du serveur",

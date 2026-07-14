@@ -75,6 +75,7 @@
   "settingsStatusUnavailable": "No disponible",
   "settingsStatusLabel": "Estado",
   "settingsSourceLabel": "Fuente",
+  "settingsServerTimezone": "Zona horaria del servidor",
   "settingsLastError": "Último error",
   "settingsRetryConnection": "Reintentar conexión",
   "settingsEditServer": "Editar configuración del servidor",

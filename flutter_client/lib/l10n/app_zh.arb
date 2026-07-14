@@ -75,6 +75,7 @@
   "settingsStatusUnavailable": "不可用",
   "settingsStatusLabel": "状态",
   "settingsSourceLabel": "来源",
+  "settingsServerTimezone": "服务器时区",
   "settingsLastError": "最近错误",
   "settingsRetryConnection": "重试连接",
   "settingsEditServer": "编辑服务器设置",

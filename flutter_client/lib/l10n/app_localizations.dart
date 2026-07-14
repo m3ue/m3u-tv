@@ -428,6 +428,12 @@ abstract class AppLocalizations {
   /// **'Source'**
   String get settingsSourceLabel;
 
+  /// No description provided for @settingsServerTimezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Server Timezone'**
+  String get settingsServerTimezone;
+
   /// No description provided for @settingsLastError.
   ///
   /// In en, this message translates to:

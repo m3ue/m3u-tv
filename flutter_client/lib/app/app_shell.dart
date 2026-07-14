@@ -685,6 +685,7 @@ class AppShellState extends ConsumerState<AppShell>
           activeViewer: _appState.activeViewer,
           viewers: _appState.viewers,
           sourceLabel: _appState.sourceLabel,
+          serverTimezone: _appState.serverTimezone,
           sourceError: _appState.error,
           isConfiguredOverride: _appState.isConfigured,
           epgRefreshInterval: _appState.epgRefreshInterval,
