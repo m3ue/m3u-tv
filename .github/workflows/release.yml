@@ -245,11 +245,17 @@ jobs:
         # base equivalents when building for physical tvOS hardware, so both must
         # be cleared. Use [^;]* (not [A-Z0-9]*) to avoid zero-length matches that
         # double-quote an already-empty value and corrupt the pbxproj plist.
+        # CODE_SIGN_STYLE must be set to Manual (not just clearing DEVELOPMENT_TEAM)
+        # because Automatic signing contacts Apple servers to generate profiles even
+        # with an empty team, which fails in CI with "no devices" error.
         run: |
           sed -i '' \
+            -e 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' \
             -e 's/DEVELOPMENT_TEAM = [^;]*/DEVELOPMENT_TEAM = ""/g' \
             -e 's/"DEVELOPMENT_TEAM\[sdk=appletvos\*\]" = [^;]*/"DEVELOPMENT_TEAM[sdk=appletvos*]" = ""/g' \
+            -e 's/PROVISIONING_PROFILE_SPECIFIER = [^;]*/PROVISIONING_PROFILE_SPECIFIER = ""/g' \
             -e 's/"PROVISIONING_PROFILE_SPECIFIER\[sdk=appletvos\*\]" = [^;]*/"PROVISIONING_PROFILE_SPECIFIER[sdk=appletvos*]" = ""/g' \
+            -e 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = ""/g' \
             -e 's/"CODE_SIGN_IDENTITY\[sdk=appletvos\*\]" = [^;]*/"CODE_SIGN_IDENTITY[sdk=appletvos*]" = ""/g' \
             tvos/Runner.xcodeproj/project.pbxproj
 
