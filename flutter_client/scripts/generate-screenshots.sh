@@ -8,6 +8,8 @@
 #              → Android TV (1920×1080, 1280×720)
 #   mobile*.png  → Apple iPhone (6.7", 6.5", 5.5")
 #              → Android Phone (1080×2340)
+#   tablet/*.png  → Apple iPad (12.9", 11")
+#                 → Android Tablet (7", 10")
 #   desktop*.png → Apple macOS (1440×900)
 #   logo.svg     → Google Play feature graphic (1024×500, generated)
 #
@@ -141,6 +143,27 @@ done
 
 # ---------------------------------------------------------------------------
 echo ""
+echo "--- Apple iOS (iPad) ---"
+# App Store Connect supports tablet screenshots. These are common portrait
+# targets for iPad Pro classes:
+#   12.9" 2048×2732
+#   11"   1668×2388
+# ---------------------------------------------------------------------------
+IOS_IPAD_129="$OUT_DIR/apple/ipad/12.9in-2048x2732"
+IOS_IPAD_11="$OUT_DIR/apple/ipad/11in-1668x2388"
+mkdir -p "$IOS_IPAD_129" "$IOS_IPAD_11"
+
+for src in "$SRC_DIR"/tablet*.png; do
+    name=$(basename "$src")
+    echo "  [iPad 12.9\"  2048×2732] $name"
+    resize_fill "$src" "$IOS_IPAD_129/$name" 2048 2732
+    echo "  [iPad 11\"  1668×2388] $name"
+    resize_fill "$src" "$IOS_IPAD_11/$name" 1668 2388
+done
+
+
+# ---------------------------------------------------------------------------
+echo ""
 echo "--- Apple macOS ---"
 # Mac App Store screenshot requirements:
 #   Minimum: 1280×800
@@ -227,6 +250,24 @@ for src in "$SRC_DIR"/mobile*.png; do
     name=$(basename "$src")
     echo "  [Android Phone 1080×2340] $name"
     resize_fill "$src" "$ANDROID_DIR/$name" 1080 2340
+done
+
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Google Play: Android Tablet ---"
+# Google Play supports dedicated tablet screenshots for 7" and 10" classes.
+# Using portrait 16:10 targets works well across common Android tablets.
+# ---------------------------------------------------------------------------
+ANDROID_TAB_7_DIR="$OUT_DIR/google/android-tablet/7in-1200x1920"
+ANDROID_TAB_10_DIR="$OUT_DIR/google/android-tablet/10in-1600x2560"
+mkdir -p "$ANDROID_TAB_7_DIR" "$ANDROID_TAB_10_DIR"
+
+for src in "$SRC_DIR"/tablet*.png; do
+    name=$(basename "$src")
+    echo "  [Android Tablet 7\"   1200×1920] $name"
+    resize_fill "$src" "$ANDROID_TAB_7_DIR/$name" 1200 1920
+    echo "  [Android Tablet 10\"  1600×2560] $name"
+    resize_fill "$src" "$ANDROID_TAB_10_DIR/$name" 1600 2560
 done
 
 # ---------------------------------------------------------------------------
