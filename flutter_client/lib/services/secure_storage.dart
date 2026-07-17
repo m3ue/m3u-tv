@@ -33,8 +33,8 @@ class InMemorySecureStorage implements SecureStorage {
   String toString() => 'InMemorySecureStorage(${_store.length} keys)';
 }
 
-/// Secure storage backed by the platform keychain/keystore via flutter_secure_storage.
-/// Use on Android and iOS; not needed on desktop where FileSecureStorage suffices.
+/// Secure storage backed by platform secure storage via flutter_secure_storage.
+/// Use on Android, iOS, tvOS, Linux, and Windows.
 class FlutterSecureStorageAdapter implements SecureStorage {
   FlutterSecureStorageAdapter() : _storage = const FlutterSecureStorage();
 
