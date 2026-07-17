@@ -24,7 +24,10 @@ using MethodResult = flutter::MethodResult<flutter::EncodableValue>;
 
 constexpr char kChannelName[] = "m3u_tv/desktop_libmpv";
 constexpr char kBackendUnavailableCode[] = "backend_unavailable";
-constexpr wchar_t kMpvDll[] = L"mpv-2.dll";
+constexpr const wchar_t* kMpvDllNames[] = {
+    L"libmpv-2.dll",
+    L"mpv-2.dll",
+};
 constexpr uint32_t kTextureWidth = 1280;
 constexpr uint32_t kTextureHeight = 720;
 constexpr int kBytesPerPixel = 4;
@@ -192,32 +195,42 @@ LibmpvApi& Api() {
   if (g_api.library != nullptr || !g_api.error.empty()) return g_api;
 
   const std::wstring runner_dir = RunnerDirectory();
-  std::wstring bundled_path;
-  if (!runner_dir.empty()) bundled_path = runner_dir + L"\\" + kMpvDll;
-
   std::ostringstream attempted;
   DWORD last_error = 0;
-  if (!bundled_path.empty()) {
-    attempted << Narrow(bundled_path) << " ";
-    g_api.library = LoadLibraryExW(
-        bundled_path.c_str(), nullptr,
-        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-    if (g_api.library == nullptr) last_error = GetLastError();
+  if (!runner_dir.empty()) {
+    for (const wchar_t* name : kMpvDllNames) {
+      const std::wstring bundled_path = runner_dir + L"\\" + name;
+      attempted << Narrow(bundled_path) << " ";
+      g_api.library = LoadLibraryExW(
+          bundled_path.c_str(), nullptr,
+          LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+      if (g_api.library != nullptr) {
+        g_api.library_name = Narrow(bundled_path);
+        break;
+      }
+      last_error = GetLastError();
+    }
   }
 
   if (g_api.library == nullptr) {
-    attempted << "Windows DLL search path " << Narrow(kMpvDll);
-    g_api.library = LoadLibraryExW(kMpvDll, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-    if (g_api.library == nullptr) last_error = GetLastError();
+    for (const wchar_t* name : kMpvDllNames) {
+      attempted << "Windows DLL search path " << Narrow(name) << " ";
+      g_api.library =
+          LoadLibraryExW(name, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+      if (g_api.library != nullptr) {
+        g_api.library_name = Narrow(name);
+        break;
+      }
+      last_error = GetLastError();
+    }
   }
 
   if (g_api.library == nullptr) {
-    g_api.error = "mpv-2.dll not found; tried runner directory and Windows DLL search path; " +
+    g_api.error = "libmpv DLL not found; tried " + attempted.str() + "; " +
                   LastErrorMessage(last_error);
     return g_api;
   }
 
-  g_api.library_name = !bundled_path.empty() ? Narrow(bundled_path) : Narrow(kMpvDll);
   g_api.create = reinterpret_cast<mpv_create_fn>(LoadSymbol(g_api.library, "mpv_create"));
   g_api.initialize = reinterpret_cast<mpv_initialize_fn>(LoadSymbol(g_api.library, "mpv_initialize"));
   g_api.command = reinterpret_cast<mpv_command_fn>(LoadSymbol(g_api.library, "mpv_command"));

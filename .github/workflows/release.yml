@@ -511,9 +511,8 @@ jobs:
 
   # ── Windows ───────────────────────────────────────────────────────────────
   #
-  # Note: the Windows target uses a custom libmpv backend (desktop_libmpv_backend.cpp).
-  # The build output will not include libmpv.dll — users may need to install
-  # the mpv runtime or bundle libmpv.dll separately for video playback.
+  # The Windows target uses a custom libmpv backend (desktop_libmpv_backend.cpp)
+  # and loads the libmpv-2.dll bundled by media_kit_libs_windows_video.
   # ─────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows ZIP
@@ -545,6 +544,16 @@ jobs:
           flutter build windows --release `
             --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} `
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+
+      - name: Verify bundled libmpv runtime
+        run: |
+          $MpvDll = "build\windows\x64\runner\Release\libmpv-2.dll"
+          if (-not (Test-Path $MpvDll -PathType Leaf)) {
+            throw "Required bundled playback runtime is missing: $MpvDll"
+          }
+          if ((Get-Item $MpvDll).Length -eq 0) {
+            throw "Bundled playback runtime is empty: $MpvDll"
+          }
 
       - name: Package as ZIP
         run: |
