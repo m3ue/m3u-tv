@@ -41,8 +41,10 @@ The workflow does not run Electron builder commands, Electron scripts, or React 
 ## Android App ID, Signing, and TV Release Metadata
 
 - Application ID: `dev.sparkison.tv`; active Android release configuration must not use `com.example` or other template identifiers.
-- Release signing is intentionally blocked until external signing material exists. `flutter_client/android/app/build.gradle.kts` reads `ANDROID_KEYSTORE_PATH`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` from Gradle properties, environment variables, or the local ignored file `flutter_client/android/signing.properties`.
-- No debug signing is allowed for release builds. Missing signing values or a missing keystore path must fail release tasks honestly instead of producing a debug-signed production artifact.
+- `flutter_client/android/app/build.gradle.kts` reads `ANDROID_KEYSTORE_PATH`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` from Gradle properties, environment variables, or the local ignored file `flutter_client/android/signing.properties`.
+- The publication workflow enables `ANDROID_REQUIRE_RELEASE_SIGNING`. Missing signing values or a missing keystore path therefore fail publication instead of producing a debug-signed artifact. The workflow verifies the APK signer before staging and records its SHA-256 certificate digest in the job summary.
+- Without `ANDROID_REQUIRE_RELEASE_SIGNING`, contributors can create a debug-signed release build for local development only and must not publish it.
+- Users upgrading from a debug-signed version must uninstall the existing debug-signed app once before installing the first stable release-signed build. Uninstalling removes local app data and settings, so users must configure the app again afterward.
 - Android TV launcher metadata must remain present in `flutter_client/android/app/src/main/AndroidManifest.xml`: `android.software.leanback`, optional touchscreen support, application banner, exported main activity, and `LEANBACK_LAUNCHER` category.
 - Play Store and Android TV store distribution remain blocked until signed AAB/APK artifacts, Play Console metadata, data-safety declarations, codec/legal review, physical Android phone/tablet QA, and physical Android TV hardware QA are supplied as release evidence outside git.
 

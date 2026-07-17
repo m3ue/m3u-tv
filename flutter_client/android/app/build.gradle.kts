@@ -21,8 +21,8 @@ val androidSigningProperties = Properties().apply {
 }
 
 fun signingValue(name: String): String? =
-    providers.gradleProperty(name).orNull
-        ?: providers.environmentVariable(name).orNull
+    providers.gradleProperty(name).orNull?.takeIf { it.isNotBlank() }
+        ?: providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
         ?: androidSigningProperties.getProperty(name)?.takeIf { it.isNotBlank() }
 
 val releaseSigningKeys = listOf(
@@ -36,6 +36,16 @@ fun hasReleaseSigningKeys(): Boolean {
     val keystorePath = signingValue("ANDROID_KEYSTORE_PATH") ?: return false
     if (!file(keystorePath).isFile) return false
     return releaseSigningKeys.all { !signingValue(it).isNullOrBlank() }
+}
+
+val releaseSigningRequired =
+    signingValue("ANDROID_REQUIRE_RELEASE_SIGNING")?.toBooleanStrictOrNull() ?: false
+val releaseSigningAvailable = hasReleaseSigningKeys()
+
+if (releaseSigningRequired && !releaseSigningAvailable) {
+    throw GradleException(
+        "ANDROID_REQUIRE_RELEASE_SIGNING is enabled, but Android release signing inputs are incomplete or the keystore file is missing.",
+    )
 }
 
 android {
@@ -72,11 +82,12 @@ android {
 
     buildTypes {
         release {
-            // Use release signing when keys are available, otherwise fall back to
-            // debug signing so contributors can build without credentials.
-            signingConfig = if (hasReleaseSigningKeys()) {
+            // Publication requires release signing. Local contributors without
+            // credentials retain a debug-signed release build for development only.
+            signingConfig = if (releaseSigningAvailable) {
                 signingConfigs.getByName("release")
             } else {
+                logger.warn("Creating a debug-signed release build for local development only. Do not publish it.")
                 signingConfigs.getByName("debug")
             }
         }
