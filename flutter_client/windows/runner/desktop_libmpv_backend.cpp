@@ -55,7 +55,6 @@ constexpr int MPV_FORMAT_DOUBLE = 5;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
-constexpr int MPV_RENDER_PARAM_ADVANCED_CONTROL = 10;
 constexpr int MPV_RENDER_PARAM_SW_SIZE = 17;
 constexpr int MPV_RENDER_PARAM_SW_FORMAT = 18;
 constexpr int MPV_RENDER_PARAM_SW_STRIDE = 19;
@@ -368,10 +367,8 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
   }
 
   char api_type[] = "sw";
-  int advanced_control = 1;
   mpv_render_param create_params[] = {
       {MPV_RENDER_PARAM_API_TYPE, api_type},
-      {MPV_RENDER_PARAM_ADVANCED_CONTROL, &advanced_control},
       {MPV_RENDER_PARAM_INVALID, nullptr},
   };
   mpv_render_context* render_context = nullptr;

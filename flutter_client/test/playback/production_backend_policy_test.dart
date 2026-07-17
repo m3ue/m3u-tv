@@ -216,6 +216,30 @@ void main() {
       expect(windowsBackend, contains('start='));
     });
 
+    test(
+      'Windows software renderer keeps frame callbacks without advanced control',
+      () {
+        final windowsBackend = File(
+          'windows/runner/desktop_libmpv_backend.cpp',
+        ).readAsStringSync();
+
+        expect(
+          windowsBackend,
+          isNot(contains('MPV_RENDER_PARAM_ADVANCED_CONTROL')),
+        );
+        expect(windowsBackend, contains('render_context_set_update_callback'));
+        expect(windowsBackend, contains('RenderUpdate'));
+        expect(
+          windowsBackend,
+          contains('MarkTextureFrameAvailable(player->texture_id)'),
+        );
+        expect(
+          windowsBackend,
+          contains('render_context_render(render_context'),
+        );
+      },
+    );
+
     test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
       final media3Plugin = File(
         'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',
