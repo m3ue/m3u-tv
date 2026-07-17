@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const workflowPath = '../.github/workflows/ci.yml';
+  const releaseWorkflowPath = '../.github/workflows/release.yml';
   const releaseMatrixPath = '../docs/release/platform-release-matrix.md';
   const readmePath = 'README.md';
 
@@ -144,6 +145,70 @@ void main() {
     expect(settingsGradle, contains('org.jetbrains.kotlin.android'));
   });
 
+  test('android publication requires and verifies stable release signing', () {
+    final buildGradle = readFile('android/app/build.gradle.kts');
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+    final releaseMatrix = readFile(releaseMatrixPath);
+
+    expect(buildGradle, contains('ANDROID_REQUIRE_RELEASE_SIGNING'));
+    expect(buildGradle, contains('GradleException'));
+    expect(
+      buildGradle,
+      contains('providers.gradleProperty(name).orNull?.takeIf'),
+    );
+    expect(
+      buildGradle,
+      contains('providers.environmentVariable(name).orNull?.takeIf'),
+    );
+    expect(
+      buildGradle,
+      contains('signingConfigs.getByName("debug")'),
+      reason: 'Local contributor builds keep an explicit debug fallback.',
+    );
+
+    for (final expected in <String>[
+      'set -euo pipefail',
+      r'KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}',
+      r'ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}',
+      r'ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}',
+      r'ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}',
+      'ANDROID_KEYSTORE_PATH: ../../upload-keystore.jks',
+      'ANDROID_REQUIRE_RELEASE_SIGNING: "true"',
+      'APKSIGNER=',
+      'verify --verbose --print-certs',
+      'Signer #1 certificate SHA-256 digest:',
+      'Android Debug',
+      r'$GITHUB_STEP_SUMMARY',
+    ]) {
+      expect(releaseWorkflow, contains(expected));
+    }
+
+    final signingPreflight = releaseWorkflow.indexOf(
+      '- name: Validate and decode keystore',
+    );
+    final buildApk = releaseWorkflow.indexOf('- name: Build APK');
+    final verifySigner = releaseWorkflow.indexOf('- name: Verify APK signer');
+    final stageArtifact = releaseWorkflow.indexOf('- name: Stage artifact');
+    final uploadArtifact = releaseWorkflow.indexOf(
+      '- uses: actions/upload-artifact@v7',
+      verifySigner,
+    );
+    expect(signingPreflight, lessThan(buildApk));
+    expect(buildApk, lessThan(verifySigner));
+    expect(verifySigner, lessThan(stageArtifact));
+    expect(verifySigner, lessThan(uploadArtifact));
+
+    for (final expected in <String>[
+      'local development only',
+      'must not publish it',
+      'uninstall the existing debug-signed app once',
+      'removes local app data and settings',
+      'configure the app again',
+    ]) {
+      expect(releaseMatrix, contains(expected));
+    }
+  });
+
   test('android manifest exposes Android TV launcher metadata', () {
     final manifest = readFile('android/app/src/main/AndroidManifest.xml');
 
@@ -221,9 +286,10 @@ void main() {
 
     for (final expected in <String>[
       'Application ID: `dev.sparkison.tv`',
-      'Release signing is intentionally blocked until external signing material exists',
+      'The publication workflow enables `ANDROID_REQUIRE_RELEASE_SIGNING`',
       '`flutter_client/android/signing.properties`',
-      'No debug signing is allowed for release builds',
+      'fail publication instead of producing a debug-signed artifact',
+      'debug-signed release build for local development only',
       'Android TV launcher metadata',
       'Dependency and License Gates',
       'Media3',
