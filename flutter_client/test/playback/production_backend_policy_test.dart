@@ -161,6 +161,22 @@ void main() {
       },
     );
 
+    test('Windows loader resolves the libmpv DLL bundled by media_kit', () {
+      final windowsBackend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+      final releaseWorkflow = File(
+        '../.github/workflows/release.yml',
+      ).readAsStringSync();
+
+      final bundledNameIndex = windowsBackend.indexOf('L"libmpv-2.dll"');
+      final compatibilityNameIndex = windowsBackend.indexOf('L"mpv-2.dll"');
+      expect(bundledNameIndex, isNonNegative);
+      expect(compatibilityNameIndex, greaterThan(bundledNameIndex));
+      expect(releaseWorkflow, contains(r'Test-Path $MpvDll'));
+      expect(releaseWorkflow, contains('libmpv-2.dll'));
+    });
+
     test(
       'desktop software texture render paths use Flutter RGBA pixel buffers',
       () {
