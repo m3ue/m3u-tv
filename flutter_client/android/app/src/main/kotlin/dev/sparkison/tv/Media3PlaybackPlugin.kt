@@ -10,6 +10,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.MimeTypes
@@ -71,6 +72,10 @@ class Media3PlaybackPlugin(
                 }
                 "setSubtitleTrack" -> {
                     selectTrack(C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
+                    result.success(null)
+                }
+                "setPlaybackSpeed" -> {
+                    requirePlayer().playbackParameters = PlaybackParameters(call.playbackSpeedArgument())
                     result.success(null)
                 }
                 "stop" -> {
@@ -412,6 +417,15 @@ class Media3PlaybackPlugin(
     private fun MethodCall.argumentsMap(): Map<String, Any?> = arguments as? Map<String, Any?> ?: emptyMap()
 
     private fun MethodCall.longArgument(name: String): Long = (argument<Number>(name))?.toLong() ?: 0L
+
+    private fun MethodCall.playbackSpeedArgument(): Float {
+        val speed = argument<Number>("speed")?.toFloat()
+            ?: throw IllegalArgumentException("Missing playback speed")
+        require(speed.isFinite() && speed > 0f) {
+            "Playback speed must be finite and greater than zero"
+        }
+        return speed
+    }
 
     companion object {
         const val METHOD_CHANNEL = "m3u_tv/android_media3"

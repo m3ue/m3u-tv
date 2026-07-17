@@ -229,6 +229,19 @@ void main() {
       );
     });
 
+    test('Android Media3 validates and applies native playback speed', () {
+      final media3Plugin = File(
+        'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',
+      ).readAsStringSync();
+
+      expect(media3Plugin, contains('"setPlaybackSpeed" ->'));
+      expect(
+        media3Plugin,
+        contains('PlaybackParameters(call.playbackSpeedArgument())'),
+      );
+      expect(media3Plugin, contains('speed.isFinite() && speed > 0f'));
+    });
+
     test(
       'failure diagnostics cover decoder failure, dead stream, and stalled transcode',
       () async {
