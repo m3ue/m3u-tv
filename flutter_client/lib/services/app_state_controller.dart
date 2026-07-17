@@ -489,16 +489,40 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<DvrRecording> scheduleDvr(Channel channel, EpgProgram program) async {
-    final recording = await xtreamService.scheduleDvr(
+  /// Schedules a one-shot DVR recording and refreshes the local list.
+  ///
+  /// m3u-editor's `schedule_dvr` creates a DVR rule and (when DVR is enabled
+  /// for the playlist) returns synchronously after the rule's scheduler has
+  /// produced the corresponding `DvrRecording` row. We refresh the local list
+  /// from `get_dvr_recordings` so the UI shows the real entry instead of a
+  /// phantom row synthesised from a stale client-side response.
+  ///
+  /// Returns the matching recording if the refresh surfaced one for this
+  /// channel + start time; otherwise null (the scheduler tick may not have
+  /// produced the row yet on slower servers).
+  Future<DvrRecording?> scheduleDvr(Channel channel, EpgProgram program) async {
+    await xtreamService.scheduleDvr(
       channelId: channel.id,
       title: program.title,
       startTime: program.start,
       endTime: program.end,
     );
-    _dvrRecordings = [recording, ..._dvrRecordings];
+    try {
+      _dvrRecordings = await xtreamService.getDvrRecordings();
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: refresh after schedule failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
     notifyListeners();
-    return recording;
+    for (final recording in _dvrRecordings) {
+      if (recording.channelId != channel.id) continue;
+      final start = recording.scheduledStart;
+      if (start == null) continue;
+      if (program.start.difference(start).abs() <= const Duration(minutes: 1)) {
+        return recording;
+      }
+    }
+    return null;
   }
 
   void updateProgressEntry(Progress updated) {
