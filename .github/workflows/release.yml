@@ -472,7 +472,7 @@ jobs:
 
   # ── Linux ─────────────────────────────────────────────────────────────────
   build-linux:
-    name: Build Linux tarball
+    name: Build Linux ZIP
     runs-on: ubuntu-latest
     needs: validate
     defaults:
@@ -508,15 +508,35 @@ jobs:
             --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 
-      - name: Package as tarball
+      - name: Verify Linux bundle
         run: |
-          tar -czf "m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz" \
-            -C build/linux/x64/release/bundle .
+          BUNDLE="build/linux/x64/release/bundle"
+          test -x "$BUNDLE/m3u_tv"
+          test -s "$BUNDLE/lib/libflutter_linux_gtk.so"
+          test -s "$BUNDLE/lib/libmpv.so.2"
+          test -s "$BUNDLE/data/icudtl.dat"
+          test -d "$BUNDLE/data/flutter_assets"
+          readelf -d "$BUNDLE/m3u_tv"
+          if ldd "$BUNDLE/m3u_tv" | tee /tmp/m3u-tv-ldd.txt | grep -q 'not found'; then
+            cat /tmp/m3u-tv-ldd.txt
+            exit 1
+          fi
+
+      - name: Package as ZIP
+        run: |
+          V="${{ needs.validate.outputs.version }}"
+          ZIP="m3u-tv-v${V}-linux.zip"
+          BUNDLE="build/linux/x64/release/bundle"
+          (cd "$BUNDLE" && python3 -m zipfile -c "$GITHUB_WORKSPACE/flutter_client/$ZIP" .)
+          python3 -m zipfile -t "$ZIP"
+          sha256sum "$ZIP" > "$ZIP.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: linux-tarball
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.tar.gz
+          name: linux-zip
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip.sha256
 
   # ── Windows ───────────────────────────────────────────────────────────────
   #
@@ -554,14 +574,24 @@ jobs:
             --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} `
             --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 
-      - name: Verify bundled libmpv runtime
+      - name: Verify Windows bundle
         run: |
-          $MpvDll = "build\windows\x64\runner\Release\libmpv-2.dll"
-          if (-not (Test-Path $MpvDll -PathType Leaf)) {
-            throw "Required bundled playback runtime is missing: $MpvDll"
-          }
-          if ((Get-Item $MpvDll).Length -eq 0) {
-            throw "Bundled playback runtime is empty: $MpvDll"
+          $Bundle = "build\windows\x64\runner\Release"
+          $Required = @(
+            "m3u_tv.exe",
+            "flutter_windows.dll",
+            "libmpv-2.dll",
+            "data\icudtl.dat",
+            "data\flutter_assets\AssetManifest.bin"
+          )
+          foreach ($RelativePath in $Required) {
+            $Path = Join-Path $Bundle $RelativePath
+            if (-not (Test-Path $Path -PathType Leaf)) {
+              throw "Required Windows bundle file is missing: $Path"
+            }
+            if ((Get-Item $Path).Length -eq 0) {
+              throw "Required Windows bundle file is empty: $Path"
+            }
           }
 
       - name: Package as ZIP
@@ -571,10 +601,27 @@ jobs:
             -Path "build\windows\x64\runner\Release\*" `
             -DestinationPath "m3u-tv-v${V}-windows.zip"
 
+      - name: Verify Windows archive
+        run: |
+          $V = "${{ needs.validate.outputs.version }}"
+          $Zip = "m3u-tv-v${V}-windows.zip"
+          $VerifyDir = Join-Path $env:RUNNER_TEMP "m3u-tv-windows-verify"
+          Expand-Archive -Path $Zip -DestinationPath $VerifyDir
+          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-2.dll", "data\icudtl.dat")) {
+            $Path = Join-Path $VerifyDir $RelativePath
+            if (-not (Test-Path $Path -PathType Leaf)) {
+              throw "Required archived Windows file is missing: $RelativePath"
+            }
+          }
+          $Hash = (Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLowerInvariant()
+          "$Hash  $Zip" | Set-Content "$Zip.sha256"
+
       - uses: actions/upload-artifact@v7
         with:
           name: windows-zip
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip.sha256
 
   # ── GitHub Release ─────────────────────────────────────────────────────────
   release:
@@ -608,7 +655,7 @@ jobs:
 
           ASSETS=$(find artifacts -type f \( \
             -name "*.apk" -o -name "*.ipa" -o \
-            -name "*.dmg" -o -name "*.tar.gz" -o -name "*.zip" \
+            -name "*.dmg" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \
           \))
 
           if gh release view "$TAG" > /dev/null 2>&1; then
@@ -635,5 +682,5 @@ jobs:
           echo "| iOS | \`m3u-tv-${V}-ios.ipa\` |" >> $GITHUB_STEP_SUMMARY
           echo "| tvOS (Apple TV) | \`m3u-tv-${V}-tvos.ipa\` |" >> $GITHUB_STEP_SUMMARY
           echo "| macOS | \`m3u-tv-${V}-macos.dmg\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linux | \`m3u-tv-${V}-linux.tar.gz\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY

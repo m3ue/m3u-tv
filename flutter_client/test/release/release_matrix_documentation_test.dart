@@ -209,6 +209,24 @@ void main() {
     }
   });
 
+  test('desktop release jobs bundle and verify ZIP artifacts', () {
+    final linuxCmake = readFile('linux/CMakeLists.txt');
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    expect(linuxCmake, contains('RENAME "libmpv.so.2"'));
+    expect(releaseWorkflow, contains('name: Build Linux ZIP'));
+    expect(releaseWorkflow, contains('name: Verify Linux bundle'));
+    expect(releaseWorkflow, contains(r'test -s "$BUNDLE/lib/libmpv.so.2"'));
+    expect(releaseWorkflow, contains(r'readelf -d "$BUNDLE/m3u_tv"'));
+    expect(releaseWorkflow, contains('python3 -m zipfile -c'));
+    expect(releaseWorkflow, contains('python3 -m zipfile -t'));
+    expect(releaseWorkflow, contains('sha256sum'));
+    expect(releaseWorkflow, contains('name: Verify Windows bundle'));
+    expect(releaseWorkflow, contains('Expand-Archive'));
+    expect(releaseWorkflow, contains('Get-FileHash -Algorithm SHA256'));
+    expect(releaseWorkflow, contains('*.sha256'));
+  });
+
   test('android manifest exposes Android TV launcher metadata', () {
     final manifest = readFile('android/app/src/main/AndroidManifest.xml');
 

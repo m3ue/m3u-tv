@@ -61,6 +61,7 @@ else()
   message(WARNING "mpv.pc was not found; Linux backend will use runtime dlopen diagnostics and may fall back to server transcode.")
 endif()
 if(LIBMPV_RUNTIME)
+  get_filename_component(LIBMPV_RUNTIME_REALPATH "${LIBMPV_RUNTIME}" REALPATH)
   message(STATUS "libmpv runtime candidate found: ${LIBMPV_RUNTIME}")
 else()
   message(WARNING "libmpv.so runtime was not found by CMake; bundle/provide libmpv.so.2, libmpv.so.1, or libmpv.so for in-process playback.")
@@ -133,6 +134,13 @@ install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}
 
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
+
+if(LIBMPV_RUNTIME_REALPATH)
+  install(FILES "${LIBMPV_RUNTIME_REALPATH}"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    RENAME "libmpv.so.2"
+    COMPONENT Runtime)
+endif()
 
 foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
   install(FILES "${bundled_library}"

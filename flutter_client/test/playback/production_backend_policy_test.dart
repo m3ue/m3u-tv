@@ -173,7 +173,11 @@ void main() {
       final compatibilityNameIndex = windowsBackend.indexOf('L"mpv-2.dll"');
       expect(bundledNameIndex, isNonNegative);
       expect(compatibilityNameIndex, greaterThan(bundledNameIndex));
-      expect(releaseWorkflow, contains(r'Test-Path $MpvDll'));
+      expect(
+        releaseWorkflow,
+        contains(r'foreach ($RelativePath in $Required)'),
+      );
+      expect(releaseWorkflow, contains(r'Test-Path $Path -PathType Leaf'));
       expect(releaseWorkflow, contains('libmpv-2.dll'));
     });
 
