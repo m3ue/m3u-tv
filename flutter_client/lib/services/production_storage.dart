@@ -50,9 +50,12 @@ Future<void> migrateLegacyCredentials({
     final legacyCredentials = await appStateStore.read(credentialsKey);
     if (legacyCredentials is! String) return;
 
-    await credentialStorage.write(credentialsKey, legacyCredentials);
-    await appStateStore.delete(credentialsKey);
+    try {
+      await credentialStorage.write(credentialsKey, legacyCredentials);
+    } finally {
+      await appStateStore.delete(credentialsKey);
+    }
   } on Object {
-    // Keep legacy credentials until encrypted storage can safely accept them.
+    // Credential migration must not block application startup.
   }
 }

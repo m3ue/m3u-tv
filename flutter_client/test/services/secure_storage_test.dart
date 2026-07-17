@@ -67,7 +67,7 @@ void main() {
   );
 
   test(
-    'migration retains plaintext credentials if secure storage rejects them',
+    'migration removes plaintext credentials if secure storage rejects them',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'm3u-tv-storage-',
@@ -75,14 +75,26 @@ void main() {
       final stateFile = File('${directory.path}/app_state.json');
       final store = PersistentJsonStore(file: stateFile);
       addTearDown(() => directory.delete(recursive: true));
-      await store.write(credentialsKey, 'fixture-credential');
+      const usernameSentinel = 'rejected-user-sentinel';
+      const passwordSentinel = 'rejected-password-sentinel';
+      final credentialPayload = jsonEncode(<String, String>{
+        'username': usernameSentinel,
+        'password': passwordSentinel,
+      });
+      await store.write(credentialsKey, credentialPayload);
+      await store.write('m3ue_favorites', <int>[42]);
 
       await migrateLegacyCredentials(
         appStateStore: store,
         credentialStorage: _FailingSecureStorage(),
       );
 
-      expect(await store.read(credentialsKey), 'fixture-credential');
+      expect(await store.read(credentialsKey), isNull);
+      expect(await store.read('m3ue_favorites'), <int>[42]);
+      final appStateJson = await stateFile.readAsString();
+      expect(appStateJson, isNot(contains(credentialsKey)));
+      expect(appStateJson, isNot(contains(usernameSentinel)));
+      expect(appStateJson, isNot(contains(passwordSentinel)));
     },
   );
 }
