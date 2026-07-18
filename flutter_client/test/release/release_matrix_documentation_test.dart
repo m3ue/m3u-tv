@@ -453,10 +453,23 @@ void main() {
     final releaseWorkflow = readFile(releaseWorkflowPath);
 
     expect(linuxCmake, contains('RENAME "libmpv.so.2"'));
+    expect(linuxCmake, contains('if(TARGET media_kit_video_plugin)'));
+    expect(linuxCmake, contains('BUILD_WITH_INSTALL_RPATH TRUE'));
+    expect(linuxCmake, contains(r'INSTALL_RPATH "$ORIGIN"'));
     expect(releaseWorkflow, contains('name: Build Linux ZIP'));
     expect(releaseWorkflow, contains('name: Verify Linux bundle'));
     expect(releaseWorkflow, contains(r'test -s "$BUNDLE/lib/libmpv.so.2"'));
     expect(releaseWorkflow, contains(r'readelf -d "$BUNDLE/m3u_tv"'));
+    expect(
+      releaseWorkflow,
+      contains(
+        r'readelf -d "$BUNDLE/lib/libmedia_kit_video_plugin.so"',
+      ),
+    );
+    expect(
+      releaseWorkflow,
+      contains(r"grep -F 'Library runpath: [$ORIGIN]'"),
+    );
     expect(releaseWorkflow, contains('python3 -m zipfile -c'));
     expect(releaseWorkflow, contains('python3 -m zipfile -t'));
     expect(releaseWorkflow, contains('sha256sum'));

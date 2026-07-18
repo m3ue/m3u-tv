@@ -531,9 +531,14 @@ jobs:
           test -x "$BUNDLE/m3u_tv"
           test -s "$BUNDLE/lib/libflutter_linux_gtk.so"
           test -s "$BUNDLE/lib/libmpv.so.2"
+          test -s "$BUNDLE/lib/libmedia_kit_video_plugin.so"
           test -s "$BUNDLE/data/icudtl.dat"
           test -d "$BUNDLE/data/flutter_assets"
           readelf -d "$BUNDLE/m3u_tv"
+          readelf -d "$BUNDLE/lib/libmedia_kit_video_plugin.so" \
+            > /tmp/m3u-tv-media-kit-video-dynamic.txt
+          grep -F 'Library runpath: [$ORIGIN]' \
+            /tmp/m3u-tv-media-kit-video-dynamic.txt
           if ldd "$BUNDLE/m3u_tv" | tee /tmp/m3u-tv-ldd.txt | grep -q 'not found'; then
             cat /tmp/m3u-tv-ldd.txt
             exit 1

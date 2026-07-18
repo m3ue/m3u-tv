@@ -105,6 +105,14 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+if(TARGET media_kit_video_plugin)
+  set_target_properties(media_kit_video_plugin
+    PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "$ORIGIN"
+  )
+endif()
+
 if(TARGET flutter_secure_storage_linux_plugin)
   target_compile_options(flutter_secure_storage_linux_plugin PRIVATE -Wno-error=deprecated-literal-operator)
 endif()
