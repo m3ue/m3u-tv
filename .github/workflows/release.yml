@@ -101,6 +101,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Test native Android code
+        run: ./android/gradlew -p android :app:testDebugUnitTest
+
       - name: Set version
         run: |
           sed -i "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
@@ -697,6 +700,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           TAG="v${{ needs.validate.outputs.version }}"
           PREV_TAG="${{ needs.validate.outputs.prev_tag }}"
           PREV_FLAG=""
@@ -711,6 +715,18 @@ jobs:
           )
 
           if gh release view "$TAG" > /dev/null 2>&1; then
+            EXISTING_ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+            for blocked_asset in \
+              "m3u-tv-v${V}-linux.zip" \
+              "m3u-tv-v${V}-linux.zip.sha256" \
+              "m3u-tv-v${V}-linux.tar.gz" \
+              "m3u-tv-v${V}-linux.tar.gz.sha256" \
+              "m3u-tv-v${V}-windows.zip" \
+              "m3u-tv-v${V}-windows.zip.sha256"; do
+              if grep -Fxq "$blocked_asset" <<< "$EXISTING_ASSETS"; then
+                gh release delete-asset "$TAG" "$blocked_asset" --yes
+              fi
+            done
             gh release edit "$TAG" --title "$TAG"
             gh release upload "$TAG" --clobber "${ASSETS[@]}"
           else

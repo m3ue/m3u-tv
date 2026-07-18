@@ -10,6 +10,23 @@ void main() {
 
   String readFile(String path) => File(path).readAsStringSync();
 
+  String workflowStep(String workflow, String name) {
+    final lines = workflow.split('\n');
+    final header = '      - name: $name';
+    final starts = <int>[
+      for (var index = 0; index < lines.length; index++)
+        if (lines[index] == header) index,
+    ];
+    expect(starts, hasLength(1));
+    final start = starts.single;
+    final end = lines.indexWhere(
+      (line) => line.startsWith('      - '),
+      start + 1,
+    );
+    expect(end, greaterThan(start));
+    return lines.sublist(start, end).join('\n');
+  }
+
   test('ci workflow is the active Flutter contract', () {
     final workflow = readFile(ciWorkflowPath);
 
@@ -18,6 +35,53 @@ void main() {
     expect(workflow, contains('/tmp/flutter/bin/flutter --version'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter analyze'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter test'));
+  });
+
+  test('CI executes native Android playback speed unit tests', () {
+    final ciWorkflow = readFile(ciWorkflowPath);
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    for (final workflow in [ciWorkflow, releaseWorkflow]) {
+      final step = workflowStep(workflow, 'Test native Android code');
+      final executableLines = step
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty && !line.startsWith('#'));
+
+      expect(
+        executableLines,
+        contains('run: ./android/gradlew -p android :app:testDebugUnitTest'),
+      );
+    }
+  });
+
+  test('Android Gradle wrapper is committed and checksum pinned', () {
+    final androidGitignore = readFile('android/.gitignore');
+    final wrapperProperties = readFile(
+      'android/gradle/wrapper/gradle-wrapper.properties',
+    );
+
+    for (final path in <String>[
+      'android/gradlew',
+      'android/gradlew.bat',
+      'android/gradle/wrapper/gradle-wrapper.jar',
+    ]) {
+      expect(
+        File(path).existsSync(),
+        isTrue,
+        reason: '$path must be committed',
+      );
+    }
+    expect(androidGitignore, isNot(contains('gradle-wrapper.jar')));
+    expect(androidGitignore, isNot(contains('/gradlew\n')));
+    expect(androidGitignore, isNot(contains('/gradlew.bat')));
+    expect(
+      wrapperProperties,
+      contains(
+        'distributionSha256Sum='
+        'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85',
+      ),
+    );
   });
 
   test('release workflow is the active publication contract', () {
@@ -444,6 +508,87 @@ void main() {
       expect(releaseSummary, isNot(contains('| Windows |')));
     },
   );
+
+  test('existing releases remove only version-bound desktop assets', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+    final releaseStep = workflowStep(
+      releaseWorkflow,
+      'Create or update release',
+    );
+    final updateStart = releaseStep.indexOf(
+      r'if gh release view "$TAG" > /dev/null 2>&1; then',
+    );
+    final updateEnd = releaseStep.indexOf('\n          else', updateStart);
+
+    expect(updateStart, greaterThan(-1));
+    expect(updateEnd, greaterThan(updateStart));
+    expect(releaseStep, contains('set -euo pipefail'));
+
+    final updatePath = releaseStep.substring(updateStart, updateEnd);
+    final executableLines = updatePath
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty && !line.startsWith('#'))
+        .toList();
+    final assetListStart = updatePath.indexOf(r'for blocked_asset in \');
+    final assetListEnd = updatePath.indexOf('; do', assetListStart);
+    expect(assetListStart, greaterThan(-1));
+    expect(assetListEnd, greaterThan(assetListStart));
+    const expectedAssets = <String>[
+      r'm3u-tv-v${V}-linux.zip',
+      r'm3u-tv-v${V}-linux.zip.sha256',
+      r'm3u-tv-v${V}-linux.tar.gz',
+      r'm3u-tv-v${V}-linux.tar.gz.sha256',
+      r'm3u-tv-v${V}-windows.zip',
+      r'm3u-tv-v${V}-windows.zip.sha256',
+    ];
+    final assetListLines = updatePath
+        .substring(assetListStart, assetListEnd)
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty && !line.startsWith('#'))
+        .toList();
+    expect(assetListLines, hasLength(expectedAssets.length + 1));
+    expect(assetListLines.first, r'for blocked_asset in \');
+    expect(
+      assetListLines.skip(1),
+      orderedEquals(<String>[
+        for (var index = 0; index < expectedAssets.length; index++)
+          if (index < expectedAssets.length - 1)
+            '"${expectedAssets[index]}" \\'
+          else
+            '"${expectedAssets[index]}"',
+      ]),
+    );
+
+    expect(
+      executableLines,
+      contains(
+        r'if grep -Fxq "$blocked_asset" <<< "$EXISTING_ASSETS"; then',
+      ),
+    );
+    expect(
+      executableLines,
+      contains(r'gh release delete-asset "$TAG" "$blocked_asset" --yes'),
+    );
+    expect(
+      executableLines.indexOf(
+        r'gh release delete-asset "$TAG" "$blocked_asset" --yes',
+      ),
+      lessThan(
+        executableLines.indexOf(
+          r'gh release upload "$TAG" --clobber "${ASSETS[@]}"',
+        ),
+      ),
+    );
+    expect(updatePath, isNot(contains(r'delete-asset "$TAG" "*')));
+    expect(
+      executableLines
+          .where((line) => line.contains('delete-asset'))
+          .every((line) => !line.contains('|| true')),
+      isTrue,
+    );
+  });
 
   test('android gradle flags keep Flutter plugin on compatible DSL path', () {
     final gradleProperties = readFile('android/gradle.properties');

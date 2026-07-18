@@ -20,6 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Provision pinned Flutter SDK path
         run: |
           if [ ! -x /tmp/flutter/bin/flutter ]; then
@@ -29,6 +35,9 @@ jobs:
 
       - name: Get dependencies
         run: /tmp/flutter/bin/flutter pub get
+
+      - name: Test native Android code
+        run: ./android/gradlew -p android :app:testDebugUnitTest
 
       - name: Check formatting
         run: /tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
