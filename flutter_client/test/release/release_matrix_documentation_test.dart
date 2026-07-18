@@ -458,18 +458,63 @@ void main() {
     expect(linuxCmake, contains(r'INSTALL_RPATH "$ORIGIN"'));
     expect(releaseWorkflow, contains('name: Build Linux ZIP'));
     expect(releaseWorkflow, contains('name: Verify Linux bundle'));
-    expect(releaseWorkflow, contains(r'test -s "$BUNDLE/lib/libmpv.so.2"'));
-    expect(releaseWorkflow, contains(r'readelf -d "$BUNDLE/m3u_tv"'));
-    expect(
-      releaseWorkflow,
-      contains(
-        r'readelf -d "$BUNDLE/lib/libmedia_kit_video_plugin.so"',
-      ),
+
+    const verifyLinuxStepName = '      - name: Verify Linux bundle';
+    final verifyLinuxStepIndex = releaseWorkflow.indexOf(verifyLinuxStepName);
+    expect(verifyLinuxStepIndex, greaterThan(-1));
+    final verifyLinuxStepEnd = releaseWorkflow.indexOf(
+      '\n      - ',
+      verifyLinuxStepIndex + verifyLinuxStepName.length,
+    );
+    expect(verifyLinuxStepEnd, greaterThan(verifyLinuxStepIndex));
+    final verifyLinuxStep = releaseWorkflow.substring(
+      verifyLinuxStepIndex,
+      verifyLinuxStepEnd,
+    );
+    const runBlockMarker = '\n        run: |\n';
+    final runBlockIndex = verifyLinuxStep.indexOf(runBlockMarker);
+    expect(runBlockIndex, greaterThan(-1));
+    final verifyLinuxRunBlock = verifyLinuxStep.substring(
+      runBlockIndex + runBlockMarker.length,
+    );
+    final runLines = verifyLinuxRunBlock
+        .split('\n')
+        .map((line) => line.trim())
+        .toList();
+
+    final pluginReadelfIndex = runLines.indexOf(
+      r'readelf -d "$BUNDLE/lib/libmedia_kit_video_plugin.so" '
+      r'\',
     );
     expect(
-      releaseWorkflow,
-      contains(r"grep -F 'Library runpath: [$ORIGIN]'"),
+      pluginReadelfIndex,
+      greaterThan(-1),
+      reason:
+          'The plugin readelf command must be executable in this run block.',
     );
+    expect(
+      runLines[pluginReadelfIndex + 1],
+      '> /tmp/m3u-tv-media-kit-video-dynamic.txt',
+    );
+    final runpathGrepIndex = runLines.indexOf(
+      r"grep -F 'Library runpath: [$ORIGIN]' "
+      r'\',
+    );
+    expect(
+      runpathGrepIndex,
+      greaterThan(pluginReadelfIndex),
+      reason: 'The executable RUNPATH grep must follow the plugin readelf.',
+    );
+    expect(
+      runLines[runpathGrepIndex + 1],
+      '/tmp/m3u-tv-media-kit-video-dynamic.txt',
+    );
+
+    expect(
+      verifyLinuxRunBlock,
+      contains(r'test -s "$BUNDLE/lib/libmpv.so.2"'),
+    );
+    expect(verifyLinuxRunBlock, contains(r'readelf -d "$BUNDLE/m3u_tv"'));
     expect(releaseWorkflow, contains('python3 -m zipfile -c'));
     expect(releaseWorkflow, contains('python3 -m zipfile -t'));
     expect(releaseWorkflow, contains('sha256sum'));
