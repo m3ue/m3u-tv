@@ -4,12 +4,14 @@ This document is the production release source of truth for the Flutter client. 
 
 ## Active CI Baseline
 
-The only active workflow created for this release baseline is `.github/workflows/ci.yml`. It runs these Flutter gates from `flutter_client/` with the pinned Flutter binary:
+The CI gate workflow is `.github/workflows/ci.yml`. It runs these Flutter gates from `flutter_client/` with the pinned Flutter binary:
 
 ```bash
 /tmp/flutter/bin/flutter analyze
 /tmp/flutter/bin/flutter test
 ```
+
+The release publication workflow is `.github/workflows/release.yml`. It builds and publishes artifacts for all platforms (Android, Linux, Windows, iOS, tvOS, macOS) with separate non-Apple and Apple release tracks.
 
 The workflow does not run Electron builder commands, Electron scripts, or React Native/Expo release jobs. The React Native/Expo app has been fully removed; only the Flutter client remains in this repository.
 

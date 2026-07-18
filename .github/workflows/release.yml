@@ -57,7 +57,7 @@ jobs:
           echo "version=$VERSION"           >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "prev_tag=$PREV_TAG"         >> $GITHUB_OUTPUT
-          echo "Building v$VERSION (build $BUILD_NUMBER) — prev: ${PREV_TAG:-none}"
+          echo "Building v$VERSION (build $BUILD_NUMBER) - prev: ${PREV_TAG:-none}"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -169,7 +169,7 @@ jobs:
           name: android-apk
           path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
 
-  # ── iOS (unsigned IPA — sideload via AltStore / TestFlight with Apple certs) ──
+  # ── iOS (unsigned IPA - sideload via AltStore / TestFlight with Apple certs) ──
   #
   # To enable signed distribution add secrets and uncomment the certificate
   # install step (same pattern as the tvOS job below).
@@ -211,7 +211,7 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
           APP="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app"
           if [ ! -d "$APP" ]; then
-            echo "ERROR: Runner.app not found at expected xcarchive path — listing build/ios/:"
+            echo "ERROR: Runner.app not found at expected xcarchive path - listing build/ios/:"
             find build/ios -name "*.app" | head -10
             find build/ios -name "*.xcarchive" | head -5
             exit 1
@@ -233,9 +233,9 @@ jobs:
   #
   # To enable signed/TestFlight distribution uncomment the certificate step
   # below and add these secrets:
-  #   APPLE_CERTIFICATE_BASE64       — p12 (base64)
-  #   APPLE_CERTIFICATE_PASSWORD     — p12 password
-  #   APPLE_PROVISIONING_PROFILE_B64 — .mobileprovision (base64)
+#   APPLE_CERTIFICATE_BASE64       - p12 (base64)
+#   APPLE_CERTIFICATE_PASSWORD     - p12 password
+#   APPLE_PROVISIONING_PROFILE_B64 - .mobileprovision (base64)
   # ─────────────────────────────────────────────────────────────────────────
   build-tvos:
     name: Build tvOS IPA
@@ -319,7 +319,7 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
           APP=$(find build/tvos -name "Runner.app" | head -1)
           if [ -z "$APP" ]; then
-            echo "ERROR: Runner.app not found — listing build/tvos/:"
+            echo "ERROR: Runner.app not found - listing build/tvos/:"
             find build/tvos -name "*.app" -o -name "*.xcarchive" || true
             exit 1
           fi
@@ -431,7 +431,7 @@ jobs:
         run: |
           APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
           if [ -z "$APP" ]; then
-            echo "ERROR: .app not found — listing build/macos/:"
+            echo "ERROR: .app not found - listing build/macos/:"
             find build/macos -name "*.app" | head -10
             exit 1
           fi
@@ -453,7 +453,7 @@ jobs:
           STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
           ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           if [ "$STATUS" != "Accepted" ]; then
-            echo "Notarization status: $STATUS — fetching Apple rejection log:"
+            echo "Notarization status: $STATUS - fetching Apple rejection log:"
             xcrun notarytool log "$ID" \
               --key "$KEY" \
               --key-id ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }} \
@@ -628,7 +628,11 @@ jobs:
     name: Create GitHub Release
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop_artifacts_only != true }}
     runs-on: ubuntu-latest
-    needs: [validate, build-android, build-ios, build-tvos, build-macos, build-linux, build-windows]
+    needs:
+      - validate
+      - build-android
+      - build-linux
+      - build-windows
     permissions:
       contents: write
     steps:
@@ -636,11 +640,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
+      - name: Download Android APK
         uses: actions/download-artifact@v8
         with:
-          path: artifacts/
-          merge-multiple: true
+          name: android-apk
+          path: artifacts/android-apks/
+
+      - name: Download Linux ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-zip
+          path: artifacts/linux-zips/
+
+      - name: Download Windows ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-zip
+          path: artifacts/windows-zips/
 
       - name: Create or update release
         env:
@@ -653,20 +669,25 @@ jobs:
             PREV_FLAG="--notes-start-tag $PREV_TAG"
           fi
 
-          ASSETS=$(find artifacts -type f \( \
-            -name "*.apk" -o -name "*.ipa" -o \
-            -name "*.dmg" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \
-          \))
+          V="${{ needs.validate.outputs.version }}"
+          ASSETS=(
+            "artifacts/android-apks/m3u-tv-v${V}-android.apk"
+            "artifacts/android-apks/m3u-tv-v${V}-android.apk.sha256"
+            "artifacts/linux-zips/m3u-tv-v${V}-linux.zip"
+            "artifacts/linux-zips/m3u-tv-v${V}-linux.zip.sha256"
+            "artifacts/windows-zips/m3u-tv-v${V}-windows.zip"
+            "artifacts/windows-zips/m3u-tv-v${V}-windows.zip.sha256"
+          )
 
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" --title "$TAG"
-            echo "$ASSETS" | xargs gh release upload "$TAG" --clobber
+            gh release upload "$TAG" --clobber "${ASSETS[@]}"
           else
             gh release create "$TAG" \
               --title "$TAG" \
               --generate-notes \
               $PREV_FLAG \
-              $(echo "$ASSETS" | tr '\n' ' ')
+              "${ASSETS[@]}"
           fi
 
       - name: Release summary
@@ -679,8 +700,70 @@ jobs:
           echo "| Platform | Artifact |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| Android + Android TV | \`m3u-tv-${V}-android.apk\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| iOS | \`m3u-tv-${V}-ios.ipa\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| tvOS (Apple TV) | \`m3u-tv-${V}-tvos.ipa\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| macOS | \`m3u-tv-${V}-macos.dmg\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Linux | \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ── Apple Release ─────────────────────────────────────────────────────────
+  release-apple:
+    name: Create GitHub Release (Apple)
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop_artifacts_only != true }}
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+      - release
+      - build-ios
+      - build-tvos
+      - build-macos
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v8
+        with:
+          name: ios-ipa
+          path: artifacts/ios-ipas/
+
+      - name: Download tvOS IPA
+        uses: actions/download-artifact@v8
+        with:
+          name: tvos-ipa
+          path: artifacts/tvos-ipas/
+
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-dmg
+          path: artifacts/macos-dmgs/
+
+      - name: Add Apple assets to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ needs.validate.outputs.version }}"
+          ASSETS=(
+            "artifacts/ios-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa"
+            "artifacts/tvos-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa"
+            "artifacts/macos-dmgs/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+            "artifacts/ios-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa.sha256"
+            "artifacts/tvos-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa.sha256"
+            "artifacts/macos-dmgs/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg.sha256"
+          )
+
+          gh release upload "$TAG" --clobber "${ASSETS[@]}"
+
+      - name: Apple Release summary
+        run: |
+          V="v${{ needs.validate.outputs.version }}"
+          echo "## Apple Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $V | **Build:** ${{ needs.validate.outputs.build_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Artifact |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| iOS | \`m3u-tv-${V}-ios.ipa\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| tvOS | \`m3u-tv-${V}-tvos.ipa\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | \`m3u-tv-${V}-macos.dmg\` |" >> $GITHUB_STEP_SUMMARY

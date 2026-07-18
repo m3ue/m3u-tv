@@ -261,9 +261,15 @@ void main() {
       expect(media3Plugin, contains('"setPlaybackSpeed" ->'));
       expect(
         media3Plugin,
-        contains('PlaybackParameters(call.playbackSpeedArgument())'),
+        contains(
+          'PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)',
+        ),
       );
-      expect(media3Plugin, contains('speed.isFinite() && speed > 0f'));
+
+      final validationClass = File(
+        'android/app/src/main/kotlin/dev/sparkison/tv/PlaybackSpeedValidation.kt',
+      ).readAsStringSync();
+      expect(validationClass, contains('!speed.isFinite() || speed <= 0f'));
     });
 
     test(

@@ -75,7 +75,9 @@ class Media3PlaybackPlugin(
                     result.success(null)
                 }
                 "setPlaybackSpeed" -> {
-                    requirePlayer().playbackParameters = PlaybackParameters(call.playbackSpeedArgument())
+                    val speed = call.argument<Number>("speed")?.toFloat()
+                    val playbackParameters = PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)
+                    requirePlayer().playbackParameters = playbackParameters
                     result.success(null)
                 }
                 "stop" -> {
@@ -417,15 +419,6 @@ class Media3PlaybackPlugin(
     private fun MethodCall.argumentsMap(): Map<String, Any?> = arguments as? Map<String, Any?> ?: emptyMap()
 
     private fun MethodCall.longArgument(name: String): Long = (argument<Number>(name))?.toLong() ?: 0L
-
-    private fun MethodCall.playbackSpeedArgument(): Float {
-        val speed = argument<Number>("speed")?.toFloat()
-            ?: throw IllegalArgumentException("Missing playback speed")
-        require(speed.isFinite() && speed > 0f) {
-            "Playback speed must be finite and greater than zero"
-        }
-        return speed
-    }
 
     companion object {
         const val METHOD_CHANNEL = "m3u_tv/android_media3"

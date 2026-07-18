@@ -3,21 +3,82 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const workflowPath = '../.github/workflows/ci.yml';
+  const ciWorkflowPath = '../.github/workflows/ci.yml';
   const releaseWorkflowPath = '../.github/workflows/release.yml';
   const releaseMatrixPath = '../docs/release/platform-release-matrix.md';
   const readmePath = 'README.md';
 
   String readFile(String path) => File(path).readAsStringSync();
 
-  test('flutter workflow is the active CI contract', () {
-    final workflow = readFile(workflowPath);
+  test('ci workflow is the active Flutter contract', () {
+    final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
     expect(workflow, contains('git clone --depth 1 --branch stable'));
     expect(workflow, contains('/tmp/flutter/bin/flutter --version'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter analyze'));
     expect(workflow, contains('run: /tmp/flutter/bin/flutter test'));
+  });
+
+  test('release workflow is the active publication contract', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    expect(releaseWorkflow, contains('name: Create GitHub Release'));
+    expect(releaseWorkflow, contains('name: Build Android APK'));
+    expect(releaseWorkflow, contains('name: Build iOS IPA'));
+    expect(releaseWorkflow, contains('name: Build tvOS IPA'));
+    expect(releaseWorkflow, contains('name: Build macOS DMG'));
+    expect(releaseWorkflow, contains('name: Build Linux ZIP'));
+    expect(releaseWorkflow, contains('name: Build Windows ZIP'));
+  });
+
+  test('release workflow partitions non-Apple and Apple release tracks', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    // Non-Apple release job depends only on non-Apple builds
+    final nonAppleReleaseIdx = releaseWorkflow.indexOf('release:');
+    expect(nonAppleReleaseIdx, greaterThan(-1));
+    final nonAppleReleaseSection = releaseWorkflow.substring(
+      nonAppleReleaseIdx,
+    );
+    final needsNonAppleReleaseIdx = nonAppleReleaseSection.indexOf('needs:');
+    expect(needsNonAppleReleaseIdx, greaterThan(-1));
+    // Extract the needs section by finding the next key at 4-space indent
+    final afterNeeds = nonAppleReleaseSection.substring(
+      needsNonAppleReleaseIdx,
+    );
+    final needsNonAppleReleaseEnd = afterNeeds.indexOf(RegExp(r'\n    [a-z]'));
+    expect(needsNonAppleReleaseEnd, greaterThan(-1));
+    final needsNonAppleRelease = afterNeeds.substring(
+      0,
+      needsNonAppleReleaseEnd,
+    );
+    expect(needsNonAppleRelease, contains('build-android'));
+    expect(needsNonAppleRelease, contains('build-linux'));
+    expect(needsNonAppleRelease, contains('build-windows'));
+    expect(needsNonAppleRelease, isNot(contains('build-ios')));
+    expect(needsNonAppleRelease, isNot(contains('build-tvos')));
+    expect(needsNonAppleRelease, isNot(contains('build-macos')));
+
+    // Apple release job depends on non-Apple release + Apple builds
+    final appleReleaseIdx = releaseWorkflow.indexOf('release-apple:');
+    expect(appleReleaseIdx, greaterThan(-1));
+    final appleReleaseSection = releaseWorkflow.substring(appleReleaseIdx);
+    final needsAppleReleaseIdx = appleReleaseSection.indexOf('needs:');
+    expect(needsAppleReleaseIdx, greaterThan(-1));
+    final afterAppleNeeds = appleReleaseSection.substring(needsAppleReleaseIdx);
+    final needsAppleReleaseEnd = afterAppleNeeds.indexOf(
+      RegExp(r'\n    [a-z]'),
+    );
+    expect(needsAppleReleaseEnd, greaterThan(-1));
+    final needsAppleRelease = afterAppleNeeds.substring(
+      0,
+      needsAppleReleaseEnd,
+    );
+    expect(needsAppleRelease, contains('release'));
+    expect(needsAppleRelease, contains('build-ios'));
+    expect(needsAppleRelease, contains('build-tvos'));
+    expect(needsAppleRelease, contains('build-macos'));
   });
 
   test('release matrix documents required toolchains and blockers', () {
@@ -224,7 +285,8 @@ void main() {
     expect(releaseWorkflow, contains('name: Verify Windows bundle'));
     expect(releaseWorkflow, contains('Expand-Archive'));
     expect(releaseWorkflow, contains('Get-FileHash -Algorithm SHA256'));
-    expect(releaseWorkflow, contains('*.sha256'));
+    expect(releaseWorkflow, contains('.zip.sha256'));
+    expect(releaseWorkflow, contains('.apk.sha256'));
   });
 
   test('android manifest exposes Android TV launcher metadata', () {
