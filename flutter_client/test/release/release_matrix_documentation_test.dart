@@ -81,6 +81,184 @@ void main() {
     expect(needsAppleRelease, contains('build-macos'));
   });
 
+  test('release workflow publishes generated checksum sidecars', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    String jobSection(String start, String end) {
+      final startIndex = releaseWorkflow.indexOf(start);
+      final endIndex = releaseWorkflow.indexOf(end, startIndex + start.length);
+      expect(startIndex, greaterThan(-1), reason: start);
+      expect(endIndex, greaterThan(startIndex), reason: end);
+      return releaseWorkflow.substring(startIndex, endIndex);
+    }
+
+    for (final contract
+        in <
+          ({
+            String start,
+            String end,
+            List<String> checksumCommands,
+            String uploadedAsset,
+          })
+        >[
+          (
+            start: '  build-android:',
+            end: '  build-ios:',
+            checksumCommands: const [r'sha256sum "$APK" > "$APK.sha256"'],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk',
+          ),
+          (
+            start: '  build-ios:',
+            end: '  build-tvos:',
+            checksumCommands: const [
+              r'shasum -a 256 "$IPA" > "$IPA.sha256"',
+            ],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa',
+          ),
+          (
+            start: '  build-tvos:',
+            end: '  build-macos:',
+            checksumCommands: const [
+              r'shasum -a 256 "$IPA" > "$IPA.sha256"',
+            ],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa',
+          ),
+          (
+            start: '  build-macos:',
+            end: '  build-linux:',
+            checksumCommands: const [
+              r'shasum -a 256 "$DMG" > "$DMG.sha256"',
+            ],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg',
+          ),
+          (
+            start: '  build-linux:',
+            end: '  build-windows:',
+            checksumCommands: const [r'sha256sum "$ZIP" > "$ZIP.sha256"'],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip',
+          ),
+          (
+            start: '  build-windows:',
+            end: '  release:',
+            checksumCommands: const [
+              r'$Hash = (Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLowerInvariant()',
+              r'"$Hash  $Zip" | Set-Content "$Zip.sha256"',
+            ],
+            uploadedAsset:
+                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows.zip',
+          ),
+        ]) {
+      final section = jobSection(contract.start, contract.end);
+      for (final checksumCommand in contract.checksumCommands) {
+        expect(section, contains(checksumCommand), reason: contract.start);
+      }
+      expect(section, contains(contract.uploadedAsset), reason: contract.start);
+      expect(
+        section,
+        contains('${contract.uploadedAsset}.sha256'),
+        reason: contract.start,
+      );
+    }
+
+    void expectReleaseContract({
+      required String section,
+      required String verifyStep,
+      required String releaseStep,
+      required List<String> releaseCommands,
+      required List<({String verified, String uploaded})> assets,
+    }) {
+      final verifyIndex = section.indexOf('name: $verifyStep');
+      final releaseStepIndex = section.indexOf('name: $releaseStep');
+      expect(verifyIndex, greaterThan(-1), reason: verifyStep);
+      expect(releaseStepIndex, greaterThan(verifyIndex), reason: releaseStep);
+
+      final verifier = section.substring(verifyIndex, releaseStepIndex);
+      expect(verifier, contains('set -euo pipefail'));
+      expect(verifier, contains(r'test -s "$asset"'));
+      expect(verifier, contains(r'test -s "$asset.sha256"'));
+      expect(verifier, contains('sha256sum -c'));
+
+      final releaseBody = section.substring(releaseStepIndex);
+      final assetsStart = releaseBody.indexOf('ASSETS=(');
+      final assetsEnd = releaseBody.indexOf('\n          )', assetsStart);
+      expect(assetsStart, greaterThan(-1), reason: releaseStep);
+      expect(assetsEnd, greaterThan(assetsStart), reason: releaseStep);
+      final assetArray = releaseBody.substring(assetsStart, assetsEnd);
+
+      for (final asset in assets) {
+        expect(verifier, contains('"${asset.verified}"'), reason: verifyStep);
+        expect(
+          assetArray,
+          contains('"${asset.uploaded}"'),
+          reason: releaseStep,
+        );
+        expect(
+          assetArray,
+          contains('"${asset.uploaded}.sha256"'),
+          reason: releaseStep,
+        );
+      }
+      for (final releaseCommand in releaseCommands) {
+        final commandIndex = releaseBody.indexOf(releaseCommand);
+        expect(commandIndex, greaterThan(assetsEnd), reason: releaseCommand);
+      }
+    }
+
+    final nonAppleRelease = jobSection('  release:', '  release-apple:');
+    expectReleaseContract(
+      section: nonAppleRelease,
+      verifyStep: 'Verify non-Apple assets',
+      releaseStep: 'Create or update release',
+      releaseCommands: const ['gh release upload', 'gh release create'],
+      assets: const [
+        (
+          verified: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
+          uploaded: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
+        ),
+        (
+          verified: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
+          uploaded: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
+        ),
+        (
+          verified: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
+          uploaded: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
+        ),
+      ],
+    );
+
+    final appleRelease = releaseWorkflow.substring(
+      releaseWorkflow.indexOf('  release-apple:'),
+    );
+    expectReleaseContract(
+      section: appleRelease,
+      verifyStep: 'Verify Apple assets',
+      releaseStep: 'Add Apple assets to release',
+      releaseCommands: const ['gh release upload'],
+      assets: const [
+        (
+          verified: r'artifacts/ios-ipas/m3u-tv-v${V}-ios.ipa',
+          uploaded:
+              r'artifacts/ios-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa',
+        ),
+        (
+          verified: r'artifacts/tvos-ipas/m3u-tv-v${V}-tvos.ipa',
+          uploaded:
+              r'artifacts/tvos-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa',
+        ),
+        (
+          verified: r'artifacts/macos-dmgs/m3u-tv-v${V}-macos.dmg',
+          uploaded:
+              r'artifacts/macos-dmgs/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg',
+        ),
+      ],
+    );
+  });
+
   test('release matrix documents required toolchains and blockers', () {
     final releaseMatrix = readFile(releaseMatrixPath);
 

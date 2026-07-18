@@ -162,12 +162,17 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Stage artifact
-        run: cp build/app/outputs/flutter-apk/app-release.apk m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
+        run: |
+          APK="m3u-tv-v${{ needs.validate.outputs.version }}-android.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$APK"
+          sha256sum "$APK" > "$APK.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
           name: android-apk
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-android.apk.sha256
 
   # ── iOS (unsigned IPA - sideload via AltStore / TestFlight with Apple certs) ──
   #
@@ -219,11 +224,15 @@ jobs:
           mkdir -p build/ios/Payload
           cp -r "$APP" build/ios/Payload/Runner.app
           (cd build/ios && zip -qr "../../m3u-tv-v${VERSION}-ios.ipa" Payload/)
+          IPA="m3u-tv-v${VERSION}-ios.ipa"
+          shasum -a 256 "$IPA" > "$IPA.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
           name: ios-ipa
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa.sha256
 
   # ── Apple TV / tvOS ───────────────────────────────────────────────────────
   #
@@ -325,13 +334,17 @@ jobs:
           fi
           mkdir -p build/tvos/Payload
           cp -r "$APP" build/tvos/Payload/Runner.app
-          cd build/tvos && zip -qr \
-            "../../m3u-tv-v${VERSION}-tvos.ipa" Payload/
+          (cd build/tvos && zip -qr \
+            "../../m3u-tv-v${VERSION}-tvos.ipa" Payload/)
+          IPA="m3u-tv-v${VERSION}-tvos.ipa"
+          shasum -a 256 "$IPA" > "$IPA.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
           name: tvos-ipa
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa.sha256
 
   # ── macOS ─────────────────────────────────────────────────────────────────
   build-macos:
@@ -463,12 +476,16 @@ jobs:
 
       - name: Staple notarization ticket
         run: |
-          xcrun stapler staple "m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+          DMG="m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg"
+          xcrun stapler staple "$DMG"
+          shasum -a 256 "$DMG" > "$DMG.sha256"
 
       - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
-          path: flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg.sha256
 
   # ── Linux ─────────────────────────────────────────────────────────────────
   build-linux:
@@ -658,6 +675,19 @@ jobs:
           name: windows-zip
           path: artifacts/windows-zips/
 
+      - name: Verify non-Apple assets
+        run: |
+          set -euo pipefail
+          V="${{ needs.validate.outputs.version }}"
+          for asset in \
+            "artifacts/android-apks/m3u-tv-v${V}-android.apk" \
+            "artifacts/linux-zips/m3u-tv-v${V}-linux.zip" \
+            "artifacts/windows-zips/m3u-tv-v${V}-windows.zip"; do
+            test -s "$asset"
+            test -s "$asset.sha256"
+            (cd "$(dirname "$asset")" && sha256sum -c "$(basename "$asset").sha256")
+          done
+
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -738,6 +768,19 @@ jobs:
         with:
           name: macos-dmg
           path: artifacts/macos-dmgs/
+
+      - name: Verify Apple assets
+        run: |
+          set -euo pipefail
+          V="${{ needs.validate.outputs.version }}"
+          for asset in \
+            "artifacts/ios-ipas/m3u-tv-v${V}-ios.ipa" \
+            "artifacts/tvos-ipas/m3u-tv-v${V}-tvos.ipa" \
+            "artifacts/macos-dmgs/m3u-tv-v${V}-macos.dmg"; do
+            test -s "$asset"
+            test -s "$asset.sha256"
+            (cd "$(dirname "$asset")" && sha256sum -c "$(basename "$asset").sha256")
+          done
 
       - name: Add Apple assets to release
         env:
