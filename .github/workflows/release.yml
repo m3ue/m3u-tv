@@ -708,10 +708,6 @@ jobs:
           ASSETS=(
             "artifacts/android-apks/m3u-tv-v${V}-android.apk"
             "artifacts/android-apks/m3u-tv-v${V}-android.apk.sha256"
-            "artifacts/linux-zips/m3u-tv-v${V}-linux.zip"
-            "artifacts/linux-zips/m3u-tv-v${V}-linux.zip.sha256"
-            "artifacts/windows-zips/m3u-tv-v${V}-windows.zip"
-            "artifacts/windows-zips/m3u-tv-v${V}-windows.zip.sha256"
           )
 
           if gh release view "$TAG" > /dev/null 2>&1; then
@@ -735,8 +731,6 @@ jobs:
           echo "| Platform | Artifact |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| Android + Android TV | \`m3u-tv-${V}-android.apk\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linux | \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Windows | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY
 
   # ── Apple Release ─────────────────────────────────────────────────────────
   release-apple:

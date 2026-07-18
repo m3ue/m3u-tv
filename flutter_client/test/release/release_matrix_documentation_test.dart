@@ -170,7 +170,8 @@ void main() {
       required String verifyStep,
       required String releaseStep,
       required List<String> releaseCommands,
-      required List<({String verified, String uploaded})> assets,
+      required List<({String verified, String uploaded, bool published})>
+      assets,
     }) {
       final verifyIndex = section.indexOf('name: $verifyStep');
       final releaseStepIndex = section.indexOf('name: $releaseStep');
@@ -192,14 +193,16 @@ void main() {
 
       for (final asset in assets) {
         expect(verifier, contains('"${asset.verified}"'), reason: verifyStep);
+        final artifact = '"${asset.uploaded}"';
+        final sidecar = '"${asset.uploaded}.sha256"';
         expect(
           assetArray,
-          contains('"${asset.uploaded}"'),
+          asset.published ? contains(artifact) : isNot(contains(artifact)),
           reason: releaseStep,
         );
         expect(
           assetArray,
-          contains('"${asset.uploaded}.sha256"'),
+          asset.published ? contains(sidecar) : isNot(contains(sidecar)),
           reason: releaseStep,
         );
       }
@@ -219,14 +222,17 @@ void main() {
         (
           verified: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
           uploaded: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
+          published: true,
         ),
         (
           verified: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
           uploaded: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
+          published: false,
         ),
         (
           verified: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
           uploaded: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
+          published: false,
         ),
       ],
     );
@@ -244,16 +250,19 @@ void main() {
           verified: r'artifacts/ios-ipas/m3u-tv-v${V}-ios.ipa',
           uploaded:
               r'artifacts/ios-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-ios.ipa',
+          published: true,
         ),
         (
           verified: r'artifacts/tvos-ipas/m3u-tv-v${V}-tvos.ipa',
           uploaded:
               r'artifacts/tvos-ipas/m3u-tv-v${{ needs.validate.outputs.version }}-tvos.ipa',
+          published: true,
         ),
         (
           verified: r'artifacts/macos-dmgs/m3u-tv-v${V}-macos.dmg',
           uploaded:
               r'artifacts/macos-dmgs/m3u-tv-v${{ needs.validate.outputs.version }}-macos.dmg',
+          published: true,
         ),
       ],
     );
@@ -369,6 +378,70 @@ void main() {
       ]) {
         expect(gitignore, contains(ignored));
       }
+    },
+  );
+
+  test(
+    'release workflow blocks desktop ZIPs from public assets while keeping them as workflow artifacts',
+    () {
+      final releaseWorkflow = readFile('../.github/workflows/release.yml');
+
+      final releaseStepStart = releaseWorkflow.indexOf('  release:');
+      final releaseStepEnd = releaseWorkflow.indexOf(
+        '  release-apple:',
+        releaseStepStart,
+      );
+      final releaseSection = releaseWorkflow.substring(
+        releaseStepStart,
+        releaseStepEnd,
+      );
+
+      expect(releaseSection, contains('name: Verify non-Apple assets'));
+      expect(releaseSection, contains('artifacts/linux-zips/m3u-tv-v'));
+      expect(releaseSection, contains('artifacts/windows-zips/m3u-tv-v'));
+
+      final verifyIndex = releaseSection.indexOf(
+        'name: Verify non-Apple assets',
+      );
+      final releaseStepIndex = releaseSection.indexOf(
+        'name: Create or update release',
+      );
+      final verifierSection = releaseSection.substring(
+        verifyIndex,
+        releaseStepIndex,
+      );
+
+      expect(verifierSection, contains('artifacts/linux-zips/m3u-tv-v'));
+      expect(verifierSection, contains('artifacts/windows-zips/m3u-tv-v'));
+
+      final releaseBody = releaseSection.substring(releaseStepIndex);
+      final assetsStart = releaseBody.indexOf('ASSETS=(');
+      final assetsEnd = releaseBody.indexOf('\n          )', assetsStart);
+      final assetArray = releaseBody.substring(assetsStart, assetsEnd);
+
+      expect(
+        assetArray,
+        isNot(contains('linux-zip')),
+        reason: 'Linux ZIP must NOT be in public release assets',
+      );
+      expect(
+        assetArray,
+        isNot(contains('windows-zip')),
+        reason: 'Windows ZIP must NOT be in public release assets',
+      );
+
+      expect(
+        assetArray,
+        contains('android-apk'),
+        reason: 'Android APK must remain in public release',
+      );
+
+      final releaseSummary = releaseSection.substring(
+        releaseSection.indexOf('name: Release summary'),
+      );
+      expect(releaseSummary, contains('Android + Android TV'));
+      expect(releaseSummary, isNot(contains('| Linux |')));
+      expect(releaseSummary, isNot(contains('| Windows |')));
     },
   );
 
