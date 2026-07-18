@@ -91,6 +91,7 @@ class AppShellState extends ConsumerState<AppShell>
   int _unreadCount = 0;
 
   DateTime? _lastBackPress;
+  Timer? _backExitTimer;
   int _lastNavMs = 0;
   int _lastNavIndex = -1;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
@@ -137,8 +138,7 @@ class AppShellState extends ConsumerState<AppShell>
     _initSidebarFocusNodes();
   }
 
-  @override
-  Future<bool> didPopRoute() async {
+  Future<bool> _handleSystemBack() async {
     if (_handleBackPress()) return true;
 
     // Double-back to exit: require two back presses within 2 seconds.
@@ -147,8 +147,12 @@ class AppShellState extends ConsumerState<AppShell>
     if (last != null && now.difference(last) < const Duration(seconds: 2)) {
       return false;
     }
-    _lastBackPress = now;
+    _backExitTimer?.cancel();
+    _backExitTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _lastBackPress = null);
+    });
     if (mounted) {
+      setState(() => _lastBackPress = now);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context).appBackToExit),
@@ -156,6 +160,14 @@ class AppShellState extends ConsumerState<AppShell>
         ),
       );
     }
+    return true;
+  }
+
+  bool get _canSystemExit => _playerArgs == null && _lastBackPress != null;
+
+  bool _handleNavigationNotification(NavigationNotification notification) {
+    if (_canSystemExit || notification.canHandlePop) return false;
+    const NavigationNotification(canHandlePop: true).dispatch(context);
     return true;
   }
 
@@ -199,6 +211,7 @@ class AppShellState extends ConsumerState<AppShell>
   @override
   void dispose() {
     unawaited(_systemUiPolicy.applyBrowsing());
+    _backExitTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
@@ -763,6 +776,16 @@ class AppShellState extends ConsumerState<AppShell>
         ),
       ),
     );
+    final backAwareShell = NotificationListener<NavigationNotification>(
+      onNotification: _handleNavigationNotification,
+      child: PopScope<Object?>(
+        canPop: _canSystemExit,
+        child: BackButtonListener(
+          onBackButtonPressed: _handleSystemBack,
+          child: shell,
+        ),
+      ),
+    );
 
     final args = _playerArgs;
     final orch = _playerOrchestrator;
@@ -770,7 +793,7 @@ class AppShellState extends ConsumerState<AppShell>
       return NotificationToastOverlay(
         key: _toastKey,
         onNotificationTap: _onToastTap,
-        child: shell,
+        child: backAwareShell,
       );
     }
 
@@ -780,7 +803,7 @@ class AppShellState extends ConsumerState<AppShell>
       key: _toastKey,
       child: Stack(
         children: [
-          shell,
+          backAwareShell,
           Positioned.fill(
             child:
                 widget.playerRouteBuilder?.call(args) ??
