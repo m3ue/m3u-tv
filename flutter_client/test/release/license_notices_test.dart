@@ -167,28 +167,30 @@ void main() {
       );
       expect(androidBuildGradle, isNot(contains('com.example')));
 
-      // Non-Android platforms are future-gated; they may still have template IDs,
-      // but we record them so they are not forgotten when those platforms activate.
+      // Linux and Windows are active release targets and must not ship Flutter
+      // template identities.
       final linuxCmake = readFile('linux/CMakeLists.txt');
+      final linuxRunner = readFile('linux/my_application.cc');
       final windowsRc = readFile('windows/runner/Runner.rc');
       final macosConfig = readFile('macos/Runner/Configs/AppInfo.xcconfig');
 
-      // These are known template IDs in non-Android platforms; they are not
-      // release blockers today but must be updated before those platforms ship.
-      if (linuxCmake.contains('com.example')) {
-        expect(
-          linuxCmake,
-          contains('com.example.m3u_tv'),
-          reason: 'Linux template ID must be the known template value',
-        );
-      }
-      if (windowsRc.contains('com.example')) {
-        expect(
-          windowsRc,
-          contains('com.example'),
-          reason: 'Windows template ID must be the known template value',
-        );
-      }
+      expect(
+        linuxCmake,
+        contains('set(APPLICATION_ID "dev.sparkison.tv")'),
+      );
+      expect(linuxCmake, isNot(contains('com.example')));
+      expect(
+        linuxRunner,
+        contains('gtk_header_bar_set_title(header_bar, "M3U TV")'),
+      );
+      expect(linuxRunner, contains('gtk_window_set_title(window, "M3U TV")'));
+      expect(windowsRc, isNot(contains('com.example')));
+      expect(windowsRc, contains('VALUE "CompanyName", "M3U TV"'));
+      expect(windowsRc, contains('VALUE "FileDescription", "M3U TV"'));
+      expect(windowsRc, contains('VALUE "ProductName", "M3U TV"'));
+
+      // macOS remains future-gated and keeps its known template value until its
+      // release gate is activated.
       if (macosConfig.contains('com.example')) {
         expect(
           macosConfig,

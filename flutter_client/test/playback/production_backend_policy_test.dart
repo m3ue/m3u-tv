@@ -161,6 +161,26 @@ void main() {
       },
     );
 
+    test('Windows loader resolves the libmpv DLL bundled by media_kit', () {
+      final windowsBackend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+      final releaseWorkflow = File(
+        '../.github/workflows/release.yml',
+      ).readAsStringSync();
+
+      final bundledNameIndex = windowsBackend.indexOf('L"libmpv-2.dll"');
+      final compatibilityNameIndex = windowsBackend.indexOf('L"mpv-2.dll"');
+      expect(bundledNameIndex, isNonNegative);
+      expect(compatibilityNameIndex, greaterThan(bundledNameIndex));
+      expect(
+        releaseWorkflow,
+        contains(r'foreach ($RelativePath in $Required)'),
+      );
+      expect(releaseWorkflow, contains(r'Test-Path $Path -PathType Leaf'));
+      expect(releaseWorkflow, contains('libmpv-2.dll'));
+    });
+
     test(
       'desktop software texture render paths use Flutter RGBA pixel buffers',
       () {
@@ -196,6 +216,30 @@ void main() {
       expect(windowsBackend, contains('start='));
     });
 
+    test(
+      'Windows software renderer keeps frame callbacks without advanced control',
+      () {
+        final windowsBackend = File(
+          'windows/runner/desktop_libmpv_backend.cpp',
+        ).readAsStringSync();
+
+        expect(
+          windowsBackend,
+          isNot(contains('MPV_RENDER_PARAM_ADVANCED_CONTROL')),
+        );
+        expect(windowsBackend, contains('render_context_set_update_callback'));
+        expect(windowsBackend, contains('RenderUpdate'));
+        expect(
+          windowsBackend,
+          contains('MarkTextureFrameAvailable(player->texture_id)'),
+        );
+        expect(
+          windowsBackend,
+          contains('render_context_render(render_context'),
+        );
+      },
+    );
+
     test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
       final media3Plugin = File(
         'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',
@@ -207,6 +251,25 @@ void main() {
         media3Plugin,
         contains('Input does not start with the #EXTM3U header'),
       );
+    });
+
+    test('Android Media3 validates and applies native playback speed', () {
+      final media3Plugin = File(
+        'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',
+      ).readAsStringSync();
+
+      expect(media3Plugin, contains('"setPlaybackSpeed" ->'));
+      expect(
+        media3Plugin,
+        contains(
+          'PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)',
+        ),
+      );
+
+      final validationClass = File(
+        'android/app/src/main/kotlin/dev/sparkison/tv/PlaybackSpeedValidation.kt',
+      ).readAsStringSync();
+      expect(validationClass, contains('!speed.isFinite() || speed <= 0f'));
     });
 
     test(
