@@ -155,6 +155,50 @@ struct EventSnapshot {
   bool recoverable = false;
 };
 
+struct TextureDispatchState {
+  TextureDispatchState(FlTextureRegistrar* texture_registrar, FlTexture* texture)
+      : texture_registrar(texture_registrar), texture(texture) {}
+
+  void Retain() { references.fetch_add(1, std::memory_order_relaxed); }
+
+  void Release() {
+    if (references.fetch_sub(1, std::memory_order_acq_rel) == 1) delete this;
+  }
+
+  void QueueFrame() {
+    if (!active.load(std::memory_order_acquire)) return;
+    bool expected = false;
+    if (!frame_pending.compare_exchange_strong(expected, true,
+                                               std::memory_order_acq_rel)) {
+      return;
+    }
+    Retain();
+    g_main_context_invoke(nullptr, MarkTextureFrameAvailableOnGtkThread, this);
+  }
+
+  void Deactivate() { active.store(false, std::memory_order_release); }
+
+  static gboolean MarkTextureFrameAvailableOnGtkThread(gpointer user_data) {
+    auto* state = static_cast<TextureDispatchState*>(user_data);
+    if (state->active.load(std::memory_order_acquire) &&
+        state->texture_registrar != nullptr && state->texture != nullptr) {
+      fl_texture_registrar_mark_texture_frame_available(state->texture_registrar,
+                                                        state->texture);
+    }
+    state->frame_pending.store(false, std::memory_order_release);
+    state->Release();
+    return G_SOURCE_REMOVE;
+  }
+
+  std::atomic<bool> active{true};
+
+ private:
+  std::atomic<int> references{1};
+  std::atomic<bool> frame_pending{false};
+  FlTextureRegistrar* texture_registrar = nullptr;
+  FlTexture* texture = nullptr;
+};
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, FlTextureRegistrar* texture_registrar,
                  FlEventChannel* event_channel,
@@ -168,11 +212,17 @@ struct PlayerInstance {
         texture(texture),
         texture_id(texture_id),
         id(id),
+        texture_state(new TextureDispatchState(texture_registrar,
+                                               FL_TEXTURE(texture))),
         pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0) {}
 
   ~PlayerInstance() {
     disposing.store(true);
-    if (api != nullptr && api->wakeup != nullptr) {
+    if (render_context != nullptr && api != nullptr &&
+        api->render_context_set_update_callback != nullptr) {
+      api->render_context_set_update_callback(render_context, nullptr, nullptr);
+    }
+    if (api != nullptr && api->wakeup != nullptr && handle != nullptr) {
       api->wakeup(handle);
     }
     if (event_thread.joinable()) {
@@ -181,14 +231,24 @@ struct PlayerInstance {
     if (api != nullptr && api->unobserve_property != nullptr && handle != nullptr) {
       api->unobserve_property(handle, 0);
     }
+    if (texture_state != nullptr) {
+      texture_state->Deactivate();
+    }
     if (texture_registrar != nullptr && texture != nullptr) {
       fl_texture_registrar_unregister_texture(texture_registrar,
                                               FL_TEXTURE(texture));
     }
-    if (texture != nullptr) g_object_unref(texture);
+    if (texture != nullptr) {
+      texture->player = nullptr;
+      g_object_unref(texture);
+    }
     if (render_context != nullptr && api != nullptr &&
         api->render_context_free != nullptr) {
       api->render_context_free(render_context);
+    }
+    if (texture_state != nullptr) {
+      texture_state->Release();
+      texture_state = nullptr;
     }
     if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) {
       api->terminate_destroy(handle);
@@ -211,6 +271,7 @@ struct PlayerInstance {
   std::thread event_thread;
   std::atomic<bool> disposing{false};
   std::atomic<int> sequence{0};
+  TextureDispatchState* texture_state = nullptr;
 };
 
 LibmpvApi g_api;
@@ -495,13 +556,8 @@ FlValue* VideoAspectRatioResult(PlayerInstance* player) {
 }
 
 void RenderUpdate(void* data) {
-  PlayerInstance* player = static_cast<PlayerInstance*>(data);
-  if (player == nullptr || player->texture_registrar == nullptr ||
-      player->texture == nullptr) {
-    return;
-  }
-  fl_texture_registrar_mark_texture_frame_available(player->texture_registrar,
-                                                    FL_TEXTURE(player->texture));
+  auto* texture_state = static_cast<TextureDispatchState*>(data);
+  if (texture_state != nullptr) texture_state->QueueFrame();
 }
 
 static void SendEventOnGtkThread(gpointer user_data) {
@@ -759,7 +815,8 @@ FlMethodResponse* Load(FlValue* args) {
   auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, g_event_channel,
                                                  handle, render_context, texture, texture_id, id);
   texture->player = player.get();
-  api.render_context_set_update_callback(render_context, RenderUpdate, player.get());
+  api.render_context_set_update_callback(render_context, RenderUpdate,
+                                         player->texture_state);
   player->StartEventThread();
 
   std::string uri = StringArg(args, "uri");

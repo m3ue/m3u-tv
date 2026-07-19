@@ -315,6 +315,133 @@ void main() {
       },
     );
 
+    test(
+      'Linux texture updates dispatch on GTK main before lifecycle-safe teardown',
+      () {
+        final linuxBackend = File(
+          'linux/desktop_libmpv_backend.cc',
+        ).readAsStringSync();
+
+        final textureStateStart = linuxBackend.indexOf(
+          'struct TextureDispatchState',
+        );
+        final textureStateEnd = linuxBackend.indexOf(
+          'struct PlayerInstance {',
+          textureStateStart,
+        );
+        expect(textureStateStart, isNonNegative);
+        expect(textureStateEnd, greaterThan(textureStateStart));
+        final textureState = linuxBackend.substring(
+          textureStateStart,
+          textureStateEnd,
+        );
+        expect(textureState, contains('std::atomic<bool> active{true}'));
+        expect(
+          textureState,
+          contains('if (state->active.load(std::memory_order_acquire) &&'),
+        );
+        expect(textureState, contains('void Retain()'));
+        expect(textureState, contains('void Release()'));
+        expect(textureState, contains('void QueueFrame()'));
+        expect(textureState, contains('void Deactivate()'));
+        expect(
+          textureState,
+          contains(
+            'g_main_context_invoke(nullptr, MarkTextureFrameAvailableOnGtkThread, this)',
+          ),
+        );
+        expect(
+          textureState,
+          contains('fl_texture_registrar_mark_texture_frame_available'),
+        );
+        expect(
+          textureState.indexOf('g_main_context_invoke('),
+          lessThan(
+            textureState.indexOf(
+              'fl_texture_registrar_mark_texture_frame_available',
+            ),
+          ),
+        );
+
+        final renderUpdateStart = linuxBackend.indexOf('void RenderUpdate');
+        final renderUpdateEnd = linuxBackend.indexOf(
+          'static void SendEventOnGtkThread',
+          renderUpdateStart,
+        );
+        expect(renderUpdateStart, isNonNegative);
+        expect(renderUpdateEnd, greaterThan(renderUpdateStart));
+        final renderUpdate = linuxBackend.substring(
+          renderUpdateStart,
+          renderUpdateEnd,
+        );
+        expect(renderUpdate, contains('texture_state->QueueFrame()'));
+        expect(
+          renderUpdate,
+          isNot(contains('fl_texture_registrar_mark_texture_frame_available')),
+        );
+
+        final loadStart = linuxBackend.indexOf('FlMethodResponse* Load');
+        final loadEnd = linuxBackend.indexOf(
+          'FlMethodResponse* Control',
+          loadStart,
+        );
+        expect(loadStart, isNonNegative);
+        expect(loadEnd, greaterThan(loadStart));
+        final load = linuxBackend.substring(loadStart, loadEnd);
+        expect(
+          load,
+          contains('player->texture_state'),
+        );
+        expect(
+          load,
+          isNot(contains('RenderUpdate, player.get()')),
+        );
+
+        final playerStart = linuxBackend.indexOf('struct PlayerInstance {');
+        final playerEnd = linuxBackend.indexOf('LibmpvApi g_api', playerStart);
+        expect(playerStart, isNonNegative);
+        expect(playerEnd, greaterThan(playerStart));
+        final playerInstance = linuxBackend.substring(playerStart, playerEnd);
+        final disposingIndex = playerInstance.indexOf('disposing.store(true)');
+        final detachIndex = playerInstance.indexOf(
+          'api->render_context_set_update_callback(render_context, nullptr, nullptr)',
+        );
+        final wakeupIndex = playerInstance.indexOf('api->wakeup(handle)');
+        final joinIndex = playerInstance.indexOf('event_thread.join()');
+        final deactivateIndex = playerInstance.indexOf(
+          'texture_state->Deactivate()',
+        );
+        final unregisterIndex = playerInstance.indexOf(
+          'fl_texture_registrar_unregister_texture',
+        );
+        final renderFreeIndex = playerInstance.indexOf(
+          'api->render_context_free(render_context)',
+        );
+        final destroyIndex = playerInstance.indexOf(
+          'api->terminate_destroy(handle)',
+        );
+        for (final index in <int>[
+          disposingIndex,
+          detachIndex,
+          wakeupIndex,
+          joinIndex,
+          deactivateIndex,
+          unregisterIndex,
+          renderFreeIndex,
+          destroyIndex,
+        ]) {
+          expect(index, isNonNegative);
+        }
+        expect(detachIndex, greaterThan(disposingIndex));
+        expect(wakeupIndex, greaterThan(detachIndex));
+        expect(joinIndex, greaterThan(wakeupIndex));
+        expect(deactivateIndex, greaterThan(joinIndex));
+        expect(unregisterIndex, greaterThan(deactivateIndex));
+        expect(renderFreeIndex, greaterThan(unregisterIndex));
+        expect(destroyIndex, greaterThan(renderFreeIndex));
+      },
+    );
+
     test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
       final media3Plugin = File(
         'android/app/src/main/kotlin/dev/sparkison/tv/Media3PlaybackPlugin.kt',
