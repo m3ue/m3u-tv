@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -61,6 +62,17 @@ struct mpv_event {
   uint64_t reply_userdata;
   void* data;
 };
+
+struct mpv_event_end_file {
+  int reason;
+  int error;
+  int64_t playlist_entry_id;
+  int64_t playlist_insert_id;
+  int playlist_insert_num_entries;
+};
+
+constexpr int MPV_END_FILE_REASON_ERROR = 4;
+constexpr int MPV_EVENT_END_FILE = 7;
 
 constexpr int MPV_FORMAT_DOUBLE = 5;
 constexpr int MPV_FORMAT_FLAG = 3;
@@ -155,6 +167,47 @@ struct EventSnapshot {
   bool recoverable = false;
 };
 
+struct EventDispatchState {
+  explicit EventDispatchState(FlEventChannel* channel)
+      : event_channel(FL_EVENT_CHANNEL(g_object_ref(channel))) {}
+
+  ~EventDispatchState() {
+    if (event_channel != nullptr) g_object_unref(event_channel);
+  }
+
+  void Deactivate() { active.store(false, std::memory_order_release); }
+
+  std::atomic<bool> active{true};
+  FlEventChannel* event_channel = nullptr;
+};
+
+struct EventDispatch {
+  std::shared_ptr<EventDispatchState> state;
+  EventSnapshot snapshot;
+};
+
+struct EventChannelState {
+  explicit EventChannelState(FlEventChannel* channel)
+      : event_channel(FL_EVENT_CHANNEL(g_object_ref(channel))) {}
+
+  ~EventChannelState() {
+    if (event_channel != nullptr) g_object_unref(event_channel);
+  }
+
+  std::shared_ptr<EventDispatchState> CreateDispatchState() const {
+    if (!active.load(std::memory_order_acquire) || event_channel == nullptr) {
+      return nullptr;
+    }
+    return std::make_shared<EventDispatchState>(event_channel);
+  }
+
+  void Deactivate() { active.store(false, std::memory_order_release); }
+
+ private:
+  std::atomic<bool> active{true};
+  FlEventChannel* event_channel = nullptr;
+};
+
 struct TextureDispatchState {
   TextureDispatchState(FlTextureRegistrar* texture_registrar, FlTexture* texture)
       : texture_registrar(texture_registrar), texture(texture) {}
@@ -201,12 +254,12 @@ struct TextureDispatchState {
 
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, FlTextureRegistrar* texture_registrar,
-                 FlEventChannel* event_channel,
+                 std::shared_ptr<EventDispatchState> event_dispatch_state,
                  mpv_handle* handle, mpv_render_context* render_context,
                  MpvTexture* texture, int64_t texture_id, int64_t id)
       : api(api),
         texture_registrar(texture_registrar),
-        event_channel(event_channel),
+        event_dispatch_state(std::move(event_dispatch_state)),
         handle(handle),
         render_context(render_context),
         texture(texture),
@@ -227,6 +280,9 @@ struct PlayerInstance {
     }
     if (event_thread.joinable()) {
       event_thread.join();
+    }
+    if (event_dispatch_state != nullptr) {
+      event_dispatch_state->Deactivate();
     }
     if (api != nullptr && api->unobserve_property != nullptr && handle != nullptr) {
       api->unobserve_property(handle, 0);
@@ -256,12 +312,12 @@ struct PlayerInstance {
   }
 
   void StartEventThread();
-  void BuildAndSendEvent(const EventSnapshot& snapshot);
+  void QueueEvent(EventSnapshot snapshot);
   void ReadSnapshotProperties(EventSnapshot* snapshot);
 
   LibmpvApi* api = nullptr;
   FlTextureRegistrar* texture_registrar = nullptr;
-  FlEventChannel* event_channel = nullptr;
+  std::shared_ptr<EventDispatchState> event_dispatch_state;
   mpv_handle* handle = nullptr;
   mpv_render_context* render_context = nullptr;
   MpvTexture* texture = nullptr;
@@ -276,7 +332,7 @@ struct PlayerInstance {
 
 LibmpvApi g_api;
 FlTextureRegistrar* g_texture_registrar = nullptr;
-FlEventChannel* g_event_channel = nullptr;
+std::shared_ptr<EventChannelState> g_event_channel_state;
 int64_t g_next_handle = 1;
 std::map<int64_t, std::unique_ptr<PlayerInstance>> g_players;
 
@@ -560,19 +616,7 @@ void RenderUpdate(void* data) {
   if (texture_state != nullptr) texture_state->QueueFrame();
 }
 
-static void SendEventOnGtkThread(gpointer user_data) {
-  FlValue* event = static_cast<FlValue*>(user_data);
-  if (g_event_channel != nullptr) {
-    g_autoptr(GError) error = nullptr;
-    fl_event_channel_send(g_event_channel, event, nullptr, &error);
-    if (error != nullptr) {
-      g_warning("Failed to send event: %s", error->message);
-    }
-  }
-  fl_value_unref(event);
-}
-
-void PlayerInstance::BuildAndSendEvent(const EventSnapshot& snapshot) {
+FlValue* BuildEventValue(const EventSnapshot& snapshot) {
   g_autoptr(FlValue) event = fl_value_new_map();
   fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(1));
   fl_value_set_string_take(event, "handle", fl_value_new_int(snapshot.handle));
@@ -606,10 +650,34 @@ void PlayerInstance::BuildAndSendEvent(const EventSnapshot& snapshot) {
     fl_value_set_string_take(event, "code", fl_value_new_string(snapshot.code.c_str()));
   }
   fl_value_set_string_take(event, "recoverable", fl_value_new_bool(snapshot.recoverable));
+  return fl_value_ref(event);
+}
 
-  // Pass to GTK main thread for actual send.
-  fl_value_ref(event);
-  g_main_context_invoke(nullptr, SendEventOnGtkThread, event);
+static gboolean SendEventSnapshotOnGtkThread(gpointer user_data) {
+  std::unique_ptr<EventDispatch> dispatch(static_cast<EventDispatch*>(user_data));
+  const std::shared_ptr<EventDispatchState>& state = dispatch->state;
+  if (!state->active.load(std::memory_order_acquire) ||
+      state->event_channel == nullptr) {
+    return G_SOURCE_REMOVE;
+  }
+
+  g_autoptr(FlValue) event = BuildEventValue(dispatch->snapshot);
+  g_autoptr(GError) error = nullptr;
+  fl_event_channel_send(state->event_channel, event, nullptr, &error);
+  if (error != nullptr) {
+    g_warning("Failed to send event: %s", error->message);
+  }
+  return G_SOURCE_REMOVE;
+}
+
+void PlayerInstance::QueueEvent(EventSnapshot snapshot) {
+  if (disposing.load(std::memory_order_acquire) ||
+      event_dispatch_state == nullptr ||
+      !event_dispatch_state->active.load(std::memory_order_acquire)) {
+    return;
+  }
+  auto* dispatch = new EventDispatch{event_dispatch_state, std::move(snapshot)};
+  g_main_context_invoke(nullptr, SendEventSnapshotOnGtkThread, dispatch);
 }
 
 void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
@@ -685,7 +753,7 @@ void PlayerInstance::StartEventThread() {
         snapshot.message = "mpv event queue overflow";
         snapshot.code = "event-queue-overflow";
         snapshot.recoverable = true;
-        BuildAndSendEvent(snapshot);
+        QueueEvent(snapshot);
         continue;
       }
 
@@ -694,7 +762,7 @@ void PlayerInstance::StartEventThread() {
         snapshot.sequence = sequence.fetch_add(1);
         snapshot.kind = "PLAYBACK_RESTART";
         ReadSnapshotProperties(&snapshot);
-        BuildAndSendEvent(snapshot);
+        QueueEvent(snapshot);
         continue;
       }
 
@@ -704,37 +772,48 @@ void PlayerInstance::StartEventThread() {
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "START_FILE";
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           break;
         case 8:   // MPV_EVENT_FILE_LOADED
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "FILE_LOADED";
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           break;
         case 21:  // MPV_EVENT_PLAYBACK_RESTART
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "PLAYBACK_RESTART";
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           break;
         case 17:  // MPV_EVENT_VIDEO_RECONFIG
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "VIDEO_RECONFIG";
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           break;
-        case 7:   // MPV_EVENT_END_FILE
+        case MPV_EVENT_END_FILE: {
           snapshot.sequence = sequence.fetch_add(1);
-          snapshot.kind = "END_FILE";
+          const auto* end_file = static_cast<const mpv_event_end_file*>(ev->data);
+          if (end_file != nullptr &&
+              end_file->reason == MPV_END_FILE_REASON_ERROR) {
+            snapshot.kind = "ERROR";
+            snapshot.message = "libmpv end-file error " +
+                               std::to_string(end_file->error);
+            snapshot.code = "mpv-end-file-error";
+            snapshot.recoverable = true;
+          } else {
+            snapshot.kind = "END_FILE";
+          }
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           break;
+        }
         case 1:   // MPV_EVENT_SHUTDOWN
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "SHUTDOWN";
           ReadSnapshotProperties(&snapshot);
-          BuildAndSendEvent(snapshot);
+          QueueEvent(snapshot);
           disposing.store(true);
           break;
         default:
@@ -752,6 +831,13 @@ FlMethodResponse* Load(FlValue* args) {
   }
   if (g_texture_registrar == nullptr) {
     return LoadFailure(kBackendUnavailableCode, "Flutter texture registrar unavailable");
+  }
+  const std::shared_ptr<EventDispatchState> event_dispatch_state =
+      g_event_channel_state == nullptr
+          ? nullptr
+          : g_event_channel_state->CreateDispatchState();
+  if (event_dispatch_state == nullptr) {
+    return LoadFailure(kBackendUnavailableCode, "Flutter event channel unavailable");
   }
 
   setlocale(LC_NUMERIC, "C");
@@ -812,8 +898,10 @@ FlMethodResponse* Load(FlValue* args) {
   const int64_t texture_id = fl_texture_get_id(FL_TEXTURE(texture));
 
   const int64_t id = g_next_handle++;
-  auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, g_event_channel,
-                                                 handle, render_context, texture, texture_id, id);
+  auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar,
+                                                 event_dispatch_state, handle,
+                                                 render_context, texture,
+                                                 texture_id, id);
   texture->player = player.get();
   api.render_context_set_update_callback(render_context, RenderUpdate,
                                          player->texture_state);
@@ -867,7 +955,7 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     snapshot.sequence = player->sequence.fetch_add(1);
     snapshot.kind = "STOP";
     player->ReadSnapshotProperties(&snapshot);
-    player->BuildAndSendEvent(snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "quit") == 0) {
     const char* command[] = {"quit", nullptr};
     player->api->command(player->handle, command);
@@ -876,7 +964,7 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     snapshot.sequence = player->sequence.fetch_add(1);
     snapshot.kind = "QUIT";
     player->ReadSnapshotProperties(&snapshot);
-    player->BuildAndSendEvent(snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "setAudioTrack") == 0) {
     const std::string track = StringArg(args, "trackId");
     const char* command[] = {"set", "aid", track.empty() ? "no" : track.c_str(), nullptr};
@@ -941,6 +1029,15 @@ static FlMethodErrorResponse* EventChannelCancel(FlEventChannel* channel,
 
 }  // namespace
 
+void desktop_libmpv_backend_shutdown() {
+  if (g_event_channel_state != nullptr) {
+    g_event_channel_state->Deactivate();
+  }
+  g_players.clear();
+  g_event_channel_state.reset();
+  g_texture_registrar = nullptr;
+}
+
 void desktop_libmpv_backend_register(FlPluginRegistry* registry) {
   FlPluginRegistrar* registrar = fl_plugin_registry_get_registrar_for_plugin(
       registry, "DesktopLibmpvBackend");
@@ -954,9 +1051,10 @@ void desktop_libmpv_backend_register(FlPluginRegistry* registry) {
   fl_method_channel_set_method_call_handler(channel, MethodCallHandler, nullptr,
                                             nullptr);
 
-  g_event_channel = fl_event_channel_new(
+  g_autoptr(FlEventChannel) event_channel = fl_event_channel_new(
       fl_plugin_registrar_get_messenger(registrar), kEventChannelName,
       FL_METHOD_CODEC(codec));
-  fl_event_channel_set_stream_handlers(g_event_channel, EventChannelListen,
+  g_event_channel_state = std::make_shared<EventChannelState>(event_channel);
+  fl_event_channel_set_stream_handlers(event_channel, EventChannelListen,
                                        EventChannelCancel, nullptr, nullptr);
 }

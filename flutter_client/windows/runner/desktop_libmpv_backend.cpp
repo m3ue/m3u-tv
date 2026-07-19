@@ -68,6 +68,14 @@ struct mpv_event {
   void* data;
 };
 
+struct mpv_event_end_file {
+  int reason;
+  int error;
+  int64_t playlist_entry_id;
+  int64_t playlist_insert_id;
+  int playlist_insert_num_entries;
+};
+
 constexpr int MPV_FORMAT_DOUBLE = 5;
 constexpr int MPV_FORMAT_FLAG = 3;
 constexpr int MPV_FORMAT_STRING = 1;
@@ -81,6 +89,7 @@ constexpr int MPV_EVENT_VIDEO_RECONFIG = 17;
 constexpr int MPV_EVENT_PLAYBACK_RESTART = 21;
 constexpr int MPV_EVENT_PROPERTY_CHANGE = 22;
 constexpr int MPV_EVENT_QUEUE_OVERFLOW = 24;
+constexpr int MPV_END_FILE_REASON_ERROR = 4;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
@@ -691,7 +700,18 @@ void PlayerInstance::StartEventThread() {
       } else if (event->event_id == MPV_EVENT_VIDEO_RECONFIG) {
         snapshot.kind = "VIDEO_RECONFIG";
       } else if (event->event_id == MPV_EVENT_END_FILE) {
-        snapshot.kind = "END_FILE";
+        const auto* end_file =
+            static_cast<const mpv_event_end_file*>(event->data);
+        if (end_file != nullptr &&
+            end_file->reason == MPV_END_FILE_REASON_ERROR) {
+          snapshot.kind = "ERROR";
+          snapshot.message = "libmpv end-file error " +
+                             std::to_string(end_file->error);
+          snapshot.code = "mpv-end-file-error";
+          snapshot.recoverable = true;
+        } else {
+          snapshot.kind = "END_FILE";
+        }
       } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
         snapshot.kind = "SHUTDOWN";
       } else if (event->error < 0) {

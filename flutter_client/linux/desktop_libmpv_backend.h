@@ -6,6 +6,7 @@
 G_BEGIN_DECLS
 
 void desktop_libmpv_backend_register(FlPluginRegistry* registry);
+void desktop_libmpv_backend_shutdown();
 
 G_END_DECLS
 

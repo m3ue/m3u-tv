@@ -338,5 +338,53 @@ void main() {
       });
       await events.close();
     });
+
+    test(
+      'dispose during a pending load releases the returned handle without publishing after close',
+      () async {
+        final events = setupMockEvents();
+        final loadResponse = Completer<Map<String, Object?>>();
+        final calls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              calls.add(call);
+              if (call.method == 'load') return loadResponse.future;
+              return null;
+            });
+
+        final backend = DesktopLibmpvBackend();
+        final states = <PlaybackState>[];
+        final errors = <PlaybackError>[];
+        final stateSub = backend.onState.listen(states.add);
+        final errorSub = backend.onError.listen(errors.add);
+        final load = backend.load(
+          const PlaybackSource(uri: 'https://example.test/pending.m3u8'),
+        );
+
+        await pumpEventQueue();
+        await backend.dispose();
+        loadResponse.complete(<String, Object?>{
+          'ok': true,
+          'handle': 77,
+          'textureId': 7700,
+        });
+
+        await expectLater(load, completes);
+        await pumpEventQueue();
+
+        final disposeCalls = calls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(1));
+        expect(disposeCalls.single.arguments, <String, Object?>{'handle': 77});
+        expect(backend.textureId, isNull);
+        expect(states, isEmpty);
+        expect(errors, isEmpty);
+
+        await stateSub.cancel();
+        await errorSub.cancel();
+        await events.close();
+      },
+    );
   });
 }

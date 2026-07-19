@@ -216,6 +216,195 @@ void main() {
       expect(windowsBackend, contains('start='));
     });
 
+    test('desktop native event transport shares the libmpv channel ABI', () {
+      final linuxBackend = File(
+        'linux/desktop_libmpv_backend.cc',
+      ).readAsStringSync();
+      final windowsBackend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+
+      for (final backend in <String>[linuxBackend, windowsBackend]) {
+        expect(
+          backend,
+          contains('constexpr char kChannelName[] = "m3u_tv/desktop_libmpv";'),
+        );
+        expect(
+          backend,
+          contains(
+            'constexpr char kEventChannelName[] = "m3u_tv/desktop_libmpv/events";',
+          ),
+        );
+        expect(backend, contains('"schemaVersion"'));
+        expect(backend, contains('"handle"'));
+        expect(backend, contains('"sequence"'));
+        expect(backend, contains('struct mpv_event_end_file'));
+        expect(backend, contains('MPV_END_FILE_REASON_ERROR'));
+        expect(backend, contains('snapshot.kind = "ERROR"'));
+        expect(backend, contains('snapshot.code = "mpv-end-file-error"'));
+        expect(backend, contains('end_file->error'));
+      }
+
+      final abiBlocks = <String>[
+        linuxBackend.substring(
+          linuxBackend.indexOf('struct mpv_event_end_file'),
+          linuxBackend.indexOf('constexpr int MPV_FORMAT_DOUBLE'),
+        ),
+        windowsBackend.substring(
+          windowsBackend.indexOf('struct mpv_event_end_file'),
+          windowsBackend.indexOf('constexpr int MPV_RENDER_PARAM_INVALID'),
+        ),
+      ];
+      for (final abiBlock in abiBlocks) {
+        expect(abiBlock, contains('struct mpv_event_end_file'));
+        expect(abiBlock, contains('int reason;'));
+        expect(abiBlock, contains('int error;'));
+        expect(abiBlock, contains('int64_t playlist_entry_id;'));
+        expect(abiBlock, contains('int64_t playlist_insert_id;'));
+        expect(abiBlock, contains('int playlist_insert_num_entries;'));
+        expect(abiBlock, contains('constexpr int MPV_EVENT_END_FILE = 7;'));
+        expect(abiBlock, contains('MPV_END_FILE_REASON_ERROR = 4'));
+      }
+
+      final linuxChannelContract = linuxBackend.substring(
+        0,
+        linuxBackend.indexOf('using mpv_handle'),
+      );
+      final windowsChannelContract = windowsBackend.substring(
+        0,
+        windowsBackend.indexOf('using mpv_handle'),
+      );
+      for (final channelContract in <String>[
+        linuxChannelContract,
+        windowsChannelContract,
+      ]) {
+        expect(
+          channelContract,
+          contains('constexpr char kChannelName[] = "m3u_tv/desktop_libmpv";'),
+        );
+        expect(
+          channelContract,
+          contains(
+            'constexpr char kEventChannelName[] = "m3u_tv/desktop_libmpv/events";',
+          ),
+        );
+      }
+
+      final linuxEventValueStart = linuxBackend.indexOf(
+        'FlValue* BuildEventValue',
+      );
+      final linuxEventValueEnd = linuxBackend.indexOf(
+        'static gboolean SendEventSnapshotOnGtkThread',
+        linuxEventValueStart,
+      );
+      expect(linuxEventValueStart, isNonNegative);
+      expect(linuxEventValueEnd, greaterThan(linuxEventValueStart));
+      final linuxEventValue = linuxBackend.substring(
+        linuxEventValueStart,
+        linuxEventValueEnd,
+      );
+      final windowsEventValueStart = windowsBackend.indexOf(
+        'class EventSinkState',
+      );
+      final windowsEventValueEnd = windowsBackend.indexOf(
+        'struct PlayerInstance',
+        windowsEventValueStart,
+      );
+      expect(windowsEventValueStart, isNonNegative);
+      expect(windowsEventValueEnd, greaterThan(windowsEventValueStart));
+      final windowsEventValue = windowsBackend.substring(
+        windowsEventValueStart,
+        windowsEventValueEnd,
+      );
+      expect(
+        linuxEventValue,
+        contains(
+          'fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(1));',
+        ),
+      );
+      expect(
+        linuxEventValue,
+        contains(
+          'fl_value_set_string_take(event, "handle", fl_value_new_int(snapshot.handle));',
+        ),
+      );
+      expect(
+        linuxEventValue,
+        contains(
+          'fl_value_set_string_take(event, "sequence", fl_value_new_int(snapshot.sequence));',
+        ),
+      );
+      expect(
+        windowsEventValue,
+        contains(
+          '{flutter::EncodableValue("schemaVersion"), flutter::EncodableValue(1)}',
+        ),
+      );
+      expect(
+        windowsEventValue,
+        contains(
+          '{flutter::EncodableValue("handle"), flutter::EncodableValue(snapshot.handle)}',
+        ),
+      );
+      expect(
+        windowsEventValue,
+        contains(
+          '{flutter::EncodableValue("sequence"), flutter::EncodableValue(snapshot.sequence)}',
+        ),
+      );
+
+      final linuxEndFileStart = linuxBackend.indexOf(
+        'case MPV_EVENT_END_FILE:',
+      );
+      final linuxEndFileEnd = linuxBackend.indexOf(
+        'case 1:',
+        linuxEndFileStart,
+      );
+      final windowsEndFileStart = windowsBackend.indexOf(
+        'event->event_id == MPV_EVENT_END_FILE',
+      );
+      final windowsEndFileEnd = windowsBackend.indexOf(
+        'event->event_id == MPV_EVENT_SHUTDOWN',
+        windowsEndFileStart,
+      );
+      expect(linuxEndFileStart, isNonNegative);
+      expect(linuxEndFileEnd, greaterThan(linuxEndFileStart));
+      expect(windowsEndFileStart, isNonNegative);
+      expect(windowsEndFileEnd, greaterThan(windowsEndFileStart));
+      for (final endFileMapping in <String>[
+        linuxBackend.substring(linuxEndFileStart, linuxEndFileEnd),
+        windowsBackend.substring(windowsEndFileStart, windowsEndFileEnd),
+      ]) {
+        expect(endFileMapping, contains('MPV_END_FILE_REASON_ERROR'));
+        expect(endFileMapping, contains('snapshot.kind = "ERROR"'));
+        expect(
+          endFileMapping,
+          contains('snapshot.code = "mpv-end-file-error"'),
+        );
+        expect(endFileMapping, contains('end_file->error'));
+      }
+
+      final eventThreadStart = linuxBackend.indexOf(
+        'void PlayerInstance::StartEventThread()',
+      );
+      final eventThreadEnd = linuxBackend.indexOf(
+        'FlMethodResponse* Load',
+        eventThreadStart,
+      );
+      expect(eventThreadStart, isNonNegative);
+      expect(eventThreadEnd, greaterThan(eventThreadStart));
+      final eventThread = linuxBackend.substring(
+        eventThreadStart,
+        eventThreadEnd,
+      );
+      expect(eventThread, isNot(contains('fl_value_')));
+      expect(eventThread, isNot(contains('fl_event_channel_')));
+      expect(linuxBackend, contains('struct EventDispatchState'));
+      expect(linuxBackend, contains('void QueueEvent(EventSnapshot snapshot)'));
+      expect(linuxBackend, contains('EventSnapshot snapshot;'));
+      expect(linuxBackend, contains('event_dispatch_state->Deactivate()'));
+    });
+
     test(
       'Windows software renderer keeps frame callbacks without advanced control',
       () {
@@ -365,7 +554,7 @@ void main() {
 
         final renderUpdateStart = linuxBackend.indexOf('void RenderUpdate');
         final renderUpdateEnd = linuxBackend.indexOf(
-          'static void SendEventOnGtkThread',
+          'static gboolean SendEventSnapshotOnGtkThread',
           renderUpdateStart,
         );
         expect(renderUpdateStart, isNonNegative);

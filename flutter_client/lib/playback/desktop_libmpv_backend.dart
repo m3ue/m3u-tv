@@ -31,9 +31,11 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   int? _handle;
   int? _textureId;
   int _lastSequence = -1;
+  int _loadGeneration = 0;
   bool _errorEmitted = false;
   bool _disposed = false;
   Completer<void>? _readyCompleter;
+  PlaybackException? _readyFailure;
   PlaybackSource? _pendingSource;
   StreamSubscription<Object?>? _eventSubscription;
   final List<DesktopLibmpvEvent> _pendingEvents = <DesktopLibmpvEvent>[];
@@ -58,6 +60,11 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   @override
   Future<void> load(PlaybackSource source) async {
     _ensureNotDisposed();
+    final generation = ++_loadGeneration;
+    final previousReady = _readyCompleter;
+    if (previousReady != null && !previousReady.isCompleted) {
+      previousReady.complete();
+    }
 
     // Dispose previous handle before creating a new one.
     if (_handle != null) {
@@ -67,9 +74,12 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
         'handle': oldHandle,
       });
     }
+    if (!_isActiveLoad(generation)) return;
 
+    final ready = Completer<void>();
     _pendingSource = source;
-    _readyCompleter = Completer<void>();
+    _readyCompleter = ready;
+    _readyFailure = null;
     _pendingEvents.clear();
 
     try {
@@ -85,6 +95,10 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       final handle = response?['handle'] as int?;
       final textureId = response?['textureId'] as int?;
       final ok = response?['ok'] == true;
+      if (!_isActiveLoad(generation)) {
+        if (handle != null) await _disposeNativeHandle(handle);
+        return;
+      }
       if (!ok || handle == null || textureId == null) {
         final message = response?['error'] as String? ?? 'libmpv load failed';
         final code =
@@ -98,8 +112,7 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
                 recoverable: true,
               );
         _errorController.add(PlaybackError.fromException(error));
-        _readyCompleter = null;
-        _pendingSource = null;
+        _clearLoading(ready);
         throw error;
       }
 
@@ -116,15 +129,17 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       }
       _pendingEvents.clear();
 
-      await _readyCompleter!.future;
-      _pendingSource = null;
+      await ready.future;
+      if (!_isActiveLoad(generation)) return;
+      final failure = _readyFailure;
+      _clearLoading(ready);
+      if (failure != null) throw failure;
     } on PlaybackException {
-      _readyCompleter = null;
-      _pendingSource = null;
+      _clearLoading(ready);
       rethrow;
     } on Object catch (e) {
-      _readyCompleter = null;
-      _pendingSource = null;
+      if (!_isActiveLoad(generation)) return;
+      _clearLoading(ready);
       throw PlaybackException(
         message: e.toString(),
         backend: capabilities.backend,
@@ -179,17 +194,16 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    ++_loadGeneration;
 
-    if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
-      _readyCompleter!.completeError(
-        PlaybackException(
-          message: 'Adapter disposed while loading',
-          backend: capabilities.backend,
-          code: 'disposed',
-        ),
-      );
+    final ready = _readyCompleter;
+    if (ready != null && !ready.isCompleted) {
+      ready.complete();
     }
     _readyCompleter = null;
+    _readyFailure = null;
+    _pendingSource = null;
+    _pendingEvents.clear();
 
     await _eventSubscription?.cancel();
 
@@ -251,11 +265,22 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
         code: event.code ?? 'desktop-libmpv-error',
         recoverable: event.recoverable,
       );
-      if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
-        _readyCompleter!.completeError(error);
-        _readyCompleter = null;
-        _pendingSource = null;
-      }
+      _failReady(error);
+      _errorController.add(PlaybackError.fromException(error));
+      return;
+    }
+
+    if (event.kind == DesktopLibmpvEventKind.endFile &&
+        _readyCompleter != null &&
+        !_readyCompleter!.isCompleted) {
+      _errorEmitted = true;
+      final error = PlaybackException(
+        message: 'desktop libmpv ended before FILE_LOADED',
+        backend: capabilities.backend,
+        code: 'desktop-libmpv-ended-before-ready',
+        recoverable: true,
+      );
+      _failReady(error);
       _errorController.add(PlaybackError.fromException(error));
       return;
     }
@@ -291,25 +316,51 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       code: 'event-stream-error',
       recoverable: true,
     );
+    final failure = PlaybackException(
+      message: playbackError.message,
+      backend: playbackError.backend,
+      code: playbackError.code,
+      recoverable: playbackError.recoverable,
+    );
     if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
-      _readyCompleter!.completeError(
-        PlaybackException(
-          message: playbackError.message,
-          backend: playbackError.backend,
-          code: playbackError.code,
-          recoverable: playbackError.recoverable,
-        ),
-      );
-      _readyCompleter = null;
-      _pendingSource = null;
+      _failReady(failure);
     } else {
       _errorController.add(playbackError);
     }
   }
 
   void _emit(PlaybackState state) {
+    if (_disposed || _stateController.isClosed) return;
     _state = state;
     _stateController.add(state);
+  }
+
+  void _failReady(PlaybackException error) {
+    final ready = _readyCompleter;
+    if (ready == null || ready.isCompleted) return;
+    _readyFailure = error;
+    ready.complete();
+    _readyCompleter = null;
+    _pendingSource = null;
+  }
+
+  void _clearLoading(Completer<void> ready) {
+    if (_readyCompleter == ready) _readyCompleter = null;
+    _pendingSource = null;
+    _readyFailure = null;
+  }
+
+  bool _isActiveLoad(int generation) =>
+      !_disposed && generation == _loadGeneration;
+
+  Future<void> _disposeNativeHandle(int handle) async {
+    try {
+      await _channel.invokeMethod<void>('dispose', <String, Object?>{
+        'handle': handle,
+      });
+    } on Object {
+      // A stale native handle must not turn cancellation into an unhandled load error.
+    }
   }
 
   void _resetHandleState() {

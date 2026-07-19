@@ -691,6 +691,136 @@ void main() {
       await events.close();
     });
 
+    test('ERROR before FILE_LOADED fails load once without hanging', () async {
+      final events = StreamController<Map<String, Object?>>.broadcast();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            if (call.method == 'load') {
+              scheduleMicrotask(() {
+                events.add(<String, Object?>{
+                  'schemaVersion': 1,
+                  'handle': 51,
+                  'sequence': 0,
+                  'kind': 'ERROR',
+                  'message': 'demuxer failed',
+                  'code': 'mpv-end-file-error',
+                  'recoverable': true,
+                });
+                events.add(<String, Object?>{
+                  'schemaVersion': 1,
+                  'handle': 51,
+                  'sequence': 1,
+                  'kind': 'END_FILE',
+                });
+              });
+              return <String, Object?>{
+                'ok': true,
+                'handle': 51,
+                'textureId': 5100,
+              };
+            }
+            return null;
+          });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+            eventChannel,
+            MockStreamHandler.inline(
+              onListen: (arguments, eventSink) {
+                events.stream.listen(eventSink.success);
+              },
+            ),
+          );
+
+      final backend = DesktopLibmpvBackend();
+      final errors = <PlaybackError>[];
+      final states = <PlaybackState>[];
+      final errorSub = backend.onError.listen(errors.add);
+      final stateSub = backend.onState.listen(states.add);
+
+      await expectLater(
+        backend
+            .load(const PlaybackSource(uri: 'https://example.test/error.m3u8'))
+            .timeout(const Duration(seconds: 1)),
+        throwsA(
+          isA<PlaybackException>().having(
+            (error) => error.code,
+            'code',
+            'mpv-end-file-error',
+          ),
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(errors, hasLength(1));
+      expect(errors.single.code, 'mpv-end-file-error');
+      expect(states, isEmpty);
+
+      await errorSub.cancel();
+      await stateSub.cancel();
+      await backend.dispose();
+      await events.close();
+    });
+
+    test(
+      'END_FILE before FILE_LOADED fails load once without hanging',
+      () async {
+        final events = StreamController<Map<String, Object?>>.broadcast();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              if (call.method == 'load') {
+                scheduleMicrotask(() {
+                  events.add(<String, Object?>{
+                    'schemaVersion': 1,
+                    'handle': 52,
+                    'sequence': 0,
+                    'kind': 'END_FILE',
+                  });
+                });
+                return <String, Object?>{
+                  'ok': true,
+                  'handle': 52,
+                  'textureId': 5200,
+                };
+              }
+              return null;
+            });
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockStreamHandler(
+              eventChannel,
+              MockStreamHandler.inline(
+                onListen: (arguments, eventSink) {
+                  events.stream.listen(eventSink.success);
+                },
+              ),
+            );
+
+        final backend = DesktopLibmpvBackend();
+        final errors = <PlaybackError>[];
+        final errorSub = backend.onError.listen(errors.add);
+
+        await expectLater(
+          backend
+              .load(const PlaybackSource(uri: 'https://example.test/end.m3u8'))
+              .timeout(const Duration(seconds: 1)),
+          throwsA(
+            isA<PlaybackException>().having(
+              (error) => error.code,
+              'code',
+              'desktop-libmpv-ended-before-ready',
+            ),
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(errors, hasLength(1));
+        expect(errors.single.code, 'desktop-libmpv-ended-before-ready');
+
+        await errorSub.cancel();
+        await backend.dispose();
+        await events.close();
+      },
+    );
+
     test('buffering event maps to buffering status', () async {
       final events = StreamController<Map<String, Object?>>.broadcast();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
