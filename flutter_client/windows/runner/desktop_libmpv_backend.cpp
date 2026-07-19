@@ -1,18 +1,22 @@
 #include "desktop_libmpv_backend.h"
 
 #include <flutter/encodable_value.h>
+#include <flutter/event_channel.h>
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 #include <flutter/texture_registrar.h>
 
 #include <windows.h>
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -23,6 +27,7 @@ using MethodCall = flutter::MethodCall<flutter::EncodableValue>;
 using MethodResult = flutter::MethodResult<flutter::EncodableValue>;
 
 constexpr char kChannelName[] = "m3u_tv/desktop_libmpv";
+constexpr char kEventChannelName[] = "m3u_tv/desktop_libmpv/events";
 constexpr char kBackendUnavailableCode[] = "backend_unavailable";
 constexpr const wchar_t* kMpvDllNames[] = {
     L"libmpv-2.dll",
@@ -38,7 +43,12 @@ using mpv_initialize_fn = int (*)(mpv_handle*);
 using mpv_command_fn = int (*)(mpv_handle*, const char**);
 using mpv_set_option_string_fn = int (*)(mpv_handle*, const char*, const char*);
 using mpv_get_property_fn = int (*)(mpv_handle*, const char*, int, void*);
+using mpv_free_fn = void (*)(void*);
 using mpv_terminate_destroy_fn = void (*)(mpv_handle*);
+using mpv_observe_property_fn = int (*)(mpv_handle*, uint64_t, const char*, int);
+using mpv_unobserve_property_fn = int (*)(mpv_handle*, uint64_t);
+using mpv_wakeup_fn = void (*)(mpv_handle*);
+using mpv_wait_event_fn = struct mpv_event* (*)(mpv_handle*, double);
 using mpv_render_update_fn = void (*)(void*);
 using mpv_render_context = struct mpv_render_context;
 using mpv_render_context_create_fn = int (*)(mpv_render_context**, mpv_handle*, void*);
@@ -51,7 +61,26 @@ struct mpv_render_param {
   void* data;
 };
 
+struct mpv_event {
+  int event_id;
+  int error;
+  uint64_t reply_userdata;
+  void* data;
+};
+
 constexpr int MPV_FORMAT_DOUBLE = 5;
+constexpr int MPV_FORMAT_FLAG = 3;
+constexpr int MPV_FORMAT_STRING = 1;
+
+constexpr int MPV_EVENT_NONE = 0;
+constexpr int MPV_EVENT_SHUTDOWN = 1;
+constexpr int MPV_EVENT_START_FILE = 6;
+constexpr int MPV_EVENT_END_FILE = 7;
+constexpr int MPV_EVENT_FILE_LOADED = 8;
+constexpr int MPV_EVENT_VIDEO_RECONFIG = 17;
+constexpr int MPV_EVENT_PLAYBACK_RESTART = 21;
+constexpr int MPV_EVENT_PROPERTY_CHANGE = 22;
+constexpr int MPV_EVENT_QUEUE_OVERFLOW = 24;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
@@ -102,7 +131,12 @@ struct LibmpvApi {
   mpv_command_fn command = nullptr;
   mpv_set_option_string_fn set_option_string = nullptr;
   mpv_get_property_fn get_property = nullptr;
+  mpv_free_fn free = nullptr;
   mpv_terminate_destroy_fn terminate_destroy = nullptr;
+  mpv_observe_property_fn observe_property = nullptr;
+  mpv_unobserve_property_fn unobserve_property = nullptr;
+  mpv_wakeup_fn wakeup = nullptr;
+  mpv_wait_event_fn wait_event = nullptr;
   mpv_render_context_create_fn render_context_create = nullptr;
   mpv_render_context_set_update_callback_fn render_context_set_update_callback = nullptr;
   mpv_render_context_render_fn render_context_render = nullptr;
@@ -113,7 +147,9 @@ struct LibmpvApi {
   bool client_available() const {
     return library != nullptr && create != nullptr && initialize != nullptr &&
            command != nullptr && set_option_string != nullptr &&
-           get_property != nullptr && terminate_destroy != nullptr;
+           get_property != nullptr && free != nullptr && terminate_destroy != nullptr &&
+           observe_property != nullptr && unobserve_property != nullptr &&
+           wakeup != nullptr && wait_event != nullptr;
   }
 
   bool render_api_available() const {
@@ -125,68 +161,218 @@ struct LibmpvApi {
   bool available() const { return client_available() && render_api_available(); }
 };
 
+struct EventSnapshot {
+  int64_t handle = 0;
+  int64_t sequence = 0;
+  std::string kind;
+  double position = 0.0;
+  double duration = 0.0;
+  bool paused = false;
+  bool buffering = false;
+  bool eof = false;
+  double video_aspect_ratio = 0.0;
+  double speed = 0.0;
+  std::string aid;
+  std::string sid;
+  std::string message;
+  std::string code;
+  bool recoverable = false;
+};
+
+class PlatformDispatcher {
+ public:
+  explicit PlatformDispatcher(HWND hwnd) : hwnd_(hwnd) {}
+
+  bool Post(std::function<void()> callback) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!active_ || hwnd_ == nullptr) return false;
+    const UINT_PTR id = next_id_++;
+    pending_.emplace(id, std::move(callback));
+    if (PostMessageW(hwnd_, kDesktopLibmpvPlatformDispatchMessage, id, 0)) return true;
+    pending_.erase(id);
+    return false;
+  }
+
+  bool Dispatch(UINT_PTR id) {
+    std::function<void()> callback;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      auto it = pending_.find(id);
+      if (it == pending_.end()) return false;
+      callback = std::move(it->second);
+      pending_.erase(it);
+      if (!active_) return true;
+    }
+    callback();
+    return true;
+  }
+
+  void Deactivate() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    active_ = false;
+    pending_.clear();
+  }
+
+ private:
+  HWND hwnd_ = nullptr;
+  std::mutex mutex_;
+  bool active_ = true;
+  UINT_PTR next_id_ = 1;
+  std::map<UINT_PTR, std::function<void()>> pending_;
+};
+
+class EventSinkState {
+ public:
+  void Listen(std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> sink) {
+    sink_ = std::move(sink);
+  }
+
+  void Cancel() { sink_.reset(); }
+
+  void Send(const EventSnapshot& snapshot) {
+    if (!sink_) return;
+    flutter::EncodableMap event{
+        {flutter::EncodableValue("schemaVersion"), flutter::EncodableValue(1)},
+        {flutter::EncodableValue("handle"), flutter::EncodableValue(snapshot.handle)},
+        {flutter::EncodableValue("sequence"), flutter::EncodableValue(snapshot.sequence)},
+        {flutter::EncodableValue("kind"), flutter::EncodableValue(snapshot.kind)},
+        {flutter::EncodableValue("positionMs"), flutter::EncodableValue(static_cast<int64_t>(snapshot.position * 1000.0))},
+        {flutter::EncodableValue("durationMs"), flutter::EncodableValue(static_cast<int64_t>(snapshot.duration * 1000.0))},
+        {flutter::EncodableValue("paused"), flutter::EncodableValue(snapshot.paused)},
+        {flutter::EncodableValue("buffering"), flutter::EncodableValue(snapshot.buffering)},
+        {flutter::EncodableValue("eof"), flutter::EncodableValue(snapshot.eof)},
+        {flutter::EncodableValue("videoAspectRatio"), flutter::EncodableValue(snapshot.video_aspect_ratio)},
+        {flutter::EncodableValue("speed"), flutter::EncodableValue(snapshot.speed)},
+        {flutter::EncodableValue("aid"), flutter::EncodableValue(snapshot.aid)},
+        {flutter::EncodableValue("sid"), flutter::EncodableValue(snapshot.sid)},
+        {flutter::EncodableValue("recoverable"), flutter::EncodableValue(snapshot.recoverable)},
+    };
+    if (!snapshot.message.empty()) event[flutter::EncodableValue("message")] = flutter::EncodableValue(snapshot.message);
+    if (!snapshot.code.empty()) event[flutter::EncodableValue("code")] = flutter::EncodableValue(snapshot.code);
+    sink_->Success(flutter::EncodableValue(event));
+  }
+
+ private:
+  std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> sink_;
+};
+
+class EventStreamHandler final : public flutter::StreamHandler<flutter::EncodableValue> {
+ public:
+  explicit EventStreamHandler(std::shared_ptr<EventSinkState> state) : state_(std::move(state)) {}
+
+ protected:
+  std::unique_ptr<flutter::StreamHandlerError<flutter::EncodableValue>> OnListenInternal(
+      const flutter::EncodableValue* arguments,
+      std::unique_ptr<flutter::EventSink<flutter::EncodableValue>>&& sink) override {
+    (void)arguments;
+    state_->Listen(std::move(sink));
+    return nullptr;
+  }
+
+  std::unique_ptr<flutter::StreamHandlerError<flutter::EncodableValue>> OnCancelInternal(
+      const flutter::EncodableValue* arguments) override {
+    (void)arguments;
+    state_->Cancel();
+    return nullptr;
+  }
+
+ private:
+  std::shared_ptr<EventSinkState> state_;
+};
+
+struct TextureState : public std::enable_shared_from_this<TextureState> {
+  flutter::TextureRegistrar* registrar = nullptr;
+  int64_t texture_id = 0;
+  std::weak_ptr<PlatformDispatcher> dispatcher;
+  std::atomic<bool> active{true};
+
+  void QueueFrame() {
+    if (!active.load()) return;
+    auto platform_dispatcher = dispatcher.lock();
+    if (!platform_dispatcher) return;
+    std::weak_ptr<TextureState> weak = shared_from_this();
+    platform_dispatcher->Post([weak]() {
+      auto state = weak.lock();
+      if (state && state->active.load() && state->registrar != nullptr && state->texture_id != 0) {
+        state->registrar->MarkTextureFrameAvailable(state->texture_id);
+      }
+    });
+  }
+};
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, flutter::TextureRegistrar* texture_registrar,
-                 mpv_handle* handle, mpv_render_context* render_context)
-      : api(api),
-        texture_registrar(texture_registrar),
-        handle(handle),
-        render_context(render_context),
-        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0) {
+                 std::shared_ptr<PlatformDispatcher> dispatcher,
+                 std::shared_ptr<EventSinkState> event_sink_state,
+                 mpv_handle* handle, mpv_render_context* render_context, int64_t id)
+      : api(api), texture_registrar(texture_registrar), dispatcher(std::move(dispatcher)),
+        event_sink_state(std::move(event_sink_state)), handle(handle), render_context(render_context), id(id),
+        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0), texture_state(std::make_shared<TextureState>()) {
     pixel_buffer.buffer = pixels.data();
     pixel_buffer.width = kTextureWidth;
     pixel_buffer.height = kTextureHeight;
+    texture_state->registrar = texture_registrar;
+    texture_state->dispatcher = this->dispatcher;
   }
 
   ~PlayerInstance() {
-    if (texture_registrar != nullptr && texture_id != 0) {
-      texture_registrar->UnregisterTexture(texture_id);
+    disposing.store(true);
+    if (api != nullptr && api->wakeup != nullptr && handle != nullptr) api->wakeup(handle);
+    if (event_thread.joinable()) event_thread.join();
+    if (api != nullptr && api->unobserve_property != nullptr && handle != nullptr) {
+      api->unobserve_property(handle, 0);
     }
-    if (render_context != nullptr && api != nullptr && api->render_context_free != nullptr) {
-      api->render_context_free(render_context);
+    if (render_context != nullptr && api != nullptr && api->render_context_set_update_callback != nullptr) {
+      api->render_context_set_update_callback(render_context, nullptr, nullptr);
     }
-    if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) {
-      api->terminate_destroy(handle);
-    }
+    texture_state->active.store(false);
+    if (texture_registrar != nullptr && texture_id != 0) texture_registrar->UnregisterTexture(texture_id);
+    if (render_context != nullptr && api != nullptr && api->render_context_free != nullptr) api->render_context_free(render_context);
+    if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) api->terminate_destroy(handle);
   }
 
   const FlutterDesktopPixelBuffer* CopyPixels(size_t width, size_t height) {
     (void)width;
     (void)height;
     std::lock_guard<std::mutex> lock(mutex);
-    if (render_context == nullptr || api == nullptr || api->render_context_render == nullptr) {
-      return &pixel_buffer;
-    }
+    if (render_context == nullptr || api == nullptr || api->render_context_render == nullptr) return &pixel_buffer;
     int size[] = {static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight)};
     int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
     char format[] = "rgba";
     void* buffer = pixels.data();
-    mpv_render_param params[] = {
-        {MPV_RENDER_PARAM_SW_SIZE, size},
-        {MPV_RENDER_PARAM_SW_FORMAT, format},
-        {MPV_RENDER_PARAM_SW_STRIDE, &stride},
-        {MPV_RENDER_PARAM_SW_POINTER, buffer},
-        {MPV_RENDER_PARAM_INVALID, nullptr},
-    };
+    mpv_render_param params[] = {{MPV_RENDER_PARAM_SW_SIZE, size}, {MPV_RENDER_PARAM_SW_FORMAT, format}, {MPV_RENDER_PARAM_SW_STRIDE, &stride}, {MPV_RENDER_PARAM_SW_POINTER, buffer}, {MPV_RENDER_PARAM_INVALID, nullptr}};
     api->render_context_render(render_context, params);
     return &pixel_buffer;
   }
 
+  void StartEventThread();
+  void QueueEvent(EventSnapshot snapshot);
+  void ReadSnapshotProperties(EventSnapshot* snapshot);
+
   LibmpvApi* api = nullptr;
   flutter::TextureRegistrar* texture_registrar = nullptr;
+  std::shared_ptr<PlatformDispatcher> dispatcher;
+  std::shared_ptr<EventSinkState> event_sink_state;
   mpv_handle* handle = nullptr;
   mpv_render_context* render_context = nullptr;
+  int64_t id = 0;
   int64_t texture_id = 0;
   std::vector<uint8_t> pixels;
   FlutterDesktopPixelBuffer pixel_buffer = {};
   std::unique_ptr<flutter::TextureVariant> texture;
+  std::shared_ptr<TextureState> texture_state;
   std::mutex mutex;
+  std::thread event_thread;
+  std::atomic<bool> disposing{false};
+  std::atomic<int64_t> sequence{0};
 };
 
 LibmpvApi g_api;
 flutter::TextureRegistrar* g_texture_registrar = nullptr;
 int64_t g_next_handle = 1;
 std::map<int64_t, std::unique_ptr<PlayerInstance>> g_players;
+std::mutex g_dispatcher_mutex;
+std::weak_ptr<PlatformDispatcher> g_platform_dispatcher;
 
 FARPROC LoadSymbol(HMODULE library, const char* name) { return GetProcAddress(library, name); }
 
@@ -235,7 +421,12 @@ LibmpvApi& Api() {
   g_api.command = reinterpret_cast<mpv_command_fn>(LoadSymbol(g_api.library, "mpv_command"));
   g_api.set_option_string = reinterpret_cast<mpv_set_option_string_fn>(LoadSymbol(g_api.library, "mpv_set_option_string"));
   g_api.get_property = reinterpret_cast<mpv_get_property_fn>(LoadSymbol(g_api.library, "mpv_get_property"));
+  g_api.free = reinterpret_cast<mpv_free_fn>(LoadSymbol(g_api.library, "mpv_free"));
   g_api.terminate_destroy = reinterpret_cast<mpv_terminate_destroy_fn>(LoadSymbol(g_api.library, "mpv_terminate_destroy"));
+  g_api.observe_property = reinterpret_cast<mpv_observe_property_fn>(LoadSymbol(g_api.library, "mpv_observe_property"));
+  g_api.unobserve_property = reinterpret_cast<mpv_unobserve_property_fn>(LoadSymbol(g_api.library, "mpv_unobserve_property"));
+  g_api.wakeup = reinterpret_cast<mpv_wakeup_fn>(LoadSymbol(g_api.library, "mpv_wakeup"));
+  g_api.wait_event = reinterpret_cast<mpv_wait_event_fn>(LoadSymbol(g_api.library, "mpv_wait_event"));
   g_api.render_context_create = reinterpret_cast<mpv_render_context_create_fn>(LoadSymbol(g_api.library, "mpv_render_context_create"));
   g_api.render_context_set_update_callback = reinterpret_cast<mpv_render_context_set_update_callback_fn>(LoadSymbol(g_api.library, "mpv_render_context_set_update_callback"));
   g_api.render_context_render = reinterpret_cast<mpv_render_context_render_fn>(LoadSymbol(g_api.library, "mpv_render_context_render"));
@@ -334,12 +525,13 @@ ProbeMap LoadFailure(const char* code, const std::string& error) {
 }
 
 void RenderUpdate(void* data) {
-  PlayerInstance* player = static_cast<PlayerInstance*>(data);
-  if (player == nullptr || player->texture_registrar == nullptr || player->texture_id == 0) return;
-  player->texture_registrar->MarkTextureFrameAvailable(player->texture_id);
+  TextureState* texture_state = static_cast<TextureState*>(data);
+  if (texture_state != nullptr) texture_state->QueueFrame();
 }
 
-ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
+ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
+              const std::shared_ptr<PlatformDispatcher>& dispatcher,
+              const std::shared_ptr<EventSinkState>& event_sink_state) {
   LibmpvApi& api = Api();
   if (!api.available()) return LoadFailure(kBackendUnavailableCode, api.error);
   if (g_texture_registrar == nullptr) {
@@ -378,7 +570,9 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
     return LoadFailure("desktop-libmpv-load-failed", "mpv_render_context_create failed");
   }
 
-  auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, handle, render_context);
+  const int64_t id = g_next_handle++;
+  auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, dispatcher,
+                                                 event_sink_state, handle, render_context, id);
   auto texture = std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture(
       [raw_player = player.get()](size_t width, size_t height) {
         return raw_player->CopyPixels(width, height);
@@ -389,7 +583,9 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
   }
   player->texture = std::move(texture);
   player->texture_id = texture_id;
-  api.render_context_set_update_callback(render_context, RenderUpdate, player.get());
+  player->texture_state->texture_id = texture_id;
+  api.render_context_set_update_callback(render_context, RenderUpdate, player->texture_state.get());
+  player->StartEventThread();
 
   const std::string uri = StringArg(args, "uri");
   const int64_t start_position_ms = IntArg(args, "startPositionMs");
@@ -404,7 +600,6 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
   rc = api.command(handle, load_args);
   if (rc < 0) return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
 
-  const int64_t id = g_next_handle++;
   g_players[id] = std::move(player);
   return ProbeMap{
       {flutter::EncodableValue("ok"), flutter::EncodableValue(true)},
@@ -416,16 +611,102 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd) {
 
 
 bool DoubleProperty(PlayerInstance* player, const char* name, double* value) {
-  if (player == nullptr || player->api == nullptr ||
-      player->api->get_property == nullptr) {
-    return false;
-  }
+  if (player == nullptr || player->api == nullptr || player->api->get_property == nullptr) return false;
   double current = 0.0;
-  const int rc = player->api->get_property(
-      player->handle, name, MPV_FORMAT_DOUBLE, &current);
-  if (rc < 0 || current <= 0.0) return false;
+  if (player->api->get_property(player->handle, name, MPV_FORMAT_DOUBLE, &current) < 0) return false;
   *value = current;
   return true;
+}
+
+bool FlagProperty(PlayerInstance* player, const char* name, bool* value) {
+  int current = 0;
+  if (player == nullptr || player->api == nullptr || player->api->get_property == nullptr ||
+      player->api->get_property(player->handle, name, MPV_FORMAT_FLAG, &current) < 0) return false;
+  *value = current != 0;
+  return true;
+}
+
+std::string StringProperty(PlayerInstance* player, const char* name) {
+  char* current = nullptr;
+  if (player == nullptr || player->api == nullptr || player->api->get_property == nullptr ||
+      player->api->free == nullptr || player->api->get_property(player->handle, name, MPV_FORMAT_STRING, &current) < 0 || current == nullptr) return "";
+  std::string value(current);
+  player->api->free(current);
+  return value;
+}
+
+void PlayerInstance::QueueEvent(EventSnapshot snapshot) {
+  if (disposing.load() || dispatcher == nullptr) return;
+  snapshot.handle = id;
+  snapshot.sequence = sequence.fetch_add(1);
+  std::weak_ptr<EventSinkState> sink = event_sink_state;
+  dispatcher->Post([sink, snapshot]() {
+    if (auto state = sink.lock()) state->Send(snapshot);
+  });
+}
+
+void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
+  DoubleProperty(this, "time-pos", &snapshot->position);
+  DoubleProperty(this, "duration", &snapshot->duration);
+  FlagProperty(this, "pause", &snapshot->paused);
+  bool paused_for_cache = false;
+  double cache_buffering_state = 0.0;
+  FlagProperty(this, "paused-for-cache", &paused_for_cache);
+  DoubleProperty(this, "cache-buffering-state", &cache_buffering_state);
+  snapshot->buffering = paused_for_cache || cache_buffering_state > 0.0;
+  FlagProperty(this, "eof-reached", &snapshot->eof);
+  DoubleProperty(this, "speed", &snapshot->speed);
+  if (!DoubleProperty(this, "video-params/aspect", &snapshot->video_aspect_ratio) || snapshot->video_aspect_ratio <= 0.0) {
+    double width = 0.0;
+    double height = 0.0;
+    if (DoubleProperty(this, "dwidth", &width) && DoubleProperty(this, "dheight", &height) && height > 0.0) snapshot->video_aspect_ratio = width / height;
+  }
+  snapshot->aid = StringProperty(this, "aid");
+  snapshot->sid = StringProperty(this, "sid");
+}
+
+void PlayerInstance::StartEventThread() {
+  event_thread = std::thread([this]() {
+    const char* doubles[] = {"time-pos", "duration", "speed", "cache-buffering-state", "video-params/aspect", "dwidth", "dheight"};
+    const char* flags[] = {"pause", "paused-for-cache", "eof-reached"};
+    const char* strings[] = {"aid", "sid"};
+    for (const char* name : doubles) api->observe_property(handle, 0, name, MPV_FORMAT_DOUBLE);
+    for (const char* name : flags) api->observe_property(handle, 0, name, MPV_FORMAT_FLAG);
+    for (const char* name : strings) api->observe_property(handle, 0, name, MPV_FORMAT_STRING);
+    while (!disposing.load()) {
+      mpv_event* event = api->wait_event(handle, 0.1);
+      if (event == nullptr || event->event_id == MPV_EVENT_NONE) continue;
+      EventSnapshot snapshot;
+      if (event->event_id == MPV_EVENT_QUEUE_OVERFLOW) {
+        snapshot.kind = "ERROR";
+        snapshot.message = "mpv event queue overflow";
+        snapshot.code = "event-queue-overflow";
+        snapshot.recoverable = true;
+      } else if (event->event_id == MPV_EVENT_START_FILE) {
+        snapshot.kind = "START_FILE";
+      } else if (event->event_id == MPV_EVENT_FILE_LOADED) {
+        snapshot.kind = "FILE_LOADED";
+      } else if (event->event_id == MPV_EVENT_PLAYBACK_RESTART || event->event_id == MPV_EVENT_PROPERTY_CHANGE) {
+        snapshot.kind = "PLAYBACK_RESTART";
+      } else if (event->event_id == MPV_EVENT_VIDEO_RECONFIG) {
+        snapshot.kind = "VIDEO_RECONFIG";
+      } else if (event->event_id == MPV_EVENT_END_FILE) {
+        snapshot.kind = "END_FILE";
+      } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
+        snapshot.kind = "SHUTDOWN";
+      } else if (event->error < 0) {
+        snapshot.kind = "ERROR";
+        snapshot.message = "libmpv event failed";
+        snapshot.code = "libmpv-event-error";
+        snapshot.recoverable = true;
+      } else {
+        continue;
+      }
+      ReadSnapshotProperties(&snapshot);
+      QueueEvent(std::move(snapshot));
+      if (event->event_id == MPV_EVENT_SHUTDOWN) disposing.store(true);
+    }
+  });
 }
 
 ProbeMap VideoAspectRatioResult(PlayerInstance* player) {
@@ -442,7 +723,7 @@ ProbeMap VideoAspectRatioResult(PlayerInstance* player) {
   double width = 0.0;
   double height = 0.0;
   if (DoubleProperty(player, "dwidth", &width) &&
-      DoubleProperty(player, "dheight", &height)) {
+      DoubleProperty(player, "dheight", &height) && height > 0.0) {
     result[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(width);
     result[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(height);
     if (aspect <= 0.0) {
@@ -481,6 +762,17 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
   } else if (method == "stop") {
     const char* command[] = {"stop", nullptr};
     player->api->command(player->handle, command);
+    EventSnapshot snapshot;
+    snapshot.kind = "STOP";
+    player->ReadSnapshotProperties(&snapshot);
+    player->QueueEvent(std::move(snapshot));
+  } else if (method == "quit") {
+    const char* command[] = {"quit", nullptr};
+    player->api->command(player->handle, command);
+    EventSnapshot snapshot;
+    snapshot.kind = "QUIT";
+    player->ReadSnapshotProperties(&snapshot);
+    player->QueueEvent(std::move(snapshot));
   } else if (method == "setAudioTrack") {
     const std::string track = StringArg(args, "trackId");
     const char* command[] = {"set", "aid", track.empty() ? "no" : track.c_str(), nullptr};
@@ -501,16 +793,32 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
 class DesktopLibmpvBackendPlugin : public flutter::Plugin {
  public:
   DesktopLibmpvBackendPlugin(flutter::PluginRegistrarWindows* registrar, HWND hwnd)
-      : texture_registrar_(registrar->texture_registrar()), hwnd_(hwnd) {
+      : texture_registrar_(registrar->texture_registrar()), hwnd_(hwnd),
+        dispatcher_(std::make_shared<PlatformDispatcher>(hwnd)),
+        event_sink_state_(std::make_shared<EventSinkState>()) {
     g_texture_registrar = texture_registrar_;
+    {
+      std::lock_guard<std::mutex> lock(g_dispatcher_mutex);
+      g_platform_dispatcher = dispatcher_;
+    }
     channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), kChannelName, &flutter::StandardMethodCodec::GetInstance());
     channel_->SetMethodCallHandler([this](const MethodCall& call, std::unique_ptr<MethodResult> result) {
       HandleCall(call, std::move(result));
     });
+    event_channel_ = std::make_unique<flutter::EventChannel<flutter::EncodableValue>>(
+        registrar->messenger(), kEventChannelName, &flutter::StandardMethodCodec::GetInstance());
+    event_channel_->SetStreamHandler(std::make_unique<EventStreamHandler>(event_sink_state_));
   }
 
   ~DesktopLibmpvBackendPlugin() override {
+    if (event_channel_) event_channel_->SetStreamHandler(nullptr);
+    event_sink_state_->Cancel();
+    dispatcher_->Deactivate();
+    {
+      std::lock_guard<std::mutex> lock(g_dispatcher_mutex);
+      g_platform_dispatcher.reset();
+    }
     g_players.clear();
     if (g_texture_registrar == texture_registrar_) g_texture_registrar = nullptr;
   }
@@ -527,7 +835,7 @@ class DesktopLibmpvBackendPlugin : public flutter::Plugin {
       return;
     }
     if (method == "load") {
-      result->Success(flutter::EncodableValue(Load(args, hwnd_)));
+      result->Success(flutter::EncodableValue(Load(args, hwnd_, dispatcher_, event_sink_state_)));
       return;
     }
     if (method == "getVideoAspectRatio") {
@@ -540,9 +848,21 @@ class DesktopLibmpvBackendPlugin : public flutter::Plugin {
 
   flutter::TextureRegistrar* texture_registrar_ = nullptr;
   HWND hwnd_ = nullptr;
+  std::shared_ptr<PlatformDispatcher> dispatcher_;
+  std::shared_ptr<EventSinkState> event_sink_state_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
+  std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> event_channel_;
 };
 
+}  // namespace
+
+bool DispatchDesktopLibmpvPlatformMessage(WPARAM task_id) {
+  std::shared_ptr<PlatformDispatcher> dispatcher;
+  {
+    std::lock_guard<std::mutex> lock(g_dispatcher_mutex);
+    dispatcher = g_platform_dispatcher.lock();
+  }
+  return dispatcher != nullptr && dispatcher->Dispatch(static_cast<UINT_PTR>(task_id));
 }
 
 void RegisterDesktopLibmpvBackend(flutter::PluginRegistrarWindows* registrar, HWND hwnd) {

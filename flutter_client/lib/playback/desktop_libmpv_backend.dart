@@ -6,12 +6,20 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
 class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
-  DesktopLibmpvBackend({MethodChannel? channel})
-    : _channel = channel ?? const MethodChannel(_channelName);
+  DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
+    : _channel = channel ?? const MethodChannel(_methodChannelName),
+      _eventChannel = eventChannel ?? const EventChannel(_eventChannelName) {
+    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
+      _handleRawEvent,
+      onError: _handleEventStreamError,
+    );
+  }
 
-  static const String _channelName = 'm3u_tv/desktop_libmpv';
+  static const String _methodChannelName = 'm3u_tv/desktop_libmpv';
+  static const String _eventChannelName = 'm3u_tv/desktop_libmpv/events';
 
   final MethodChannel _channel;
+  final EventChannel _eventChannel;
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();
   final StreamController<PlaybackError> _errorController =
@@ -22,6 +30,13 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   );
   int? _handle;
   int? _textureId;
+  int _lastSequence = -1;
+  bool _errorEmitted = false;
+  bool _disposed = false;
+  Completer<void>? _readyCompleter;
+  PlaybackSource? _pendingSource;
+  StreamSubscription<Object?>? _eventSubscription;
+  final List<DesktopLibmpvEvent> _pendingEvents = <DesktopLibmpvEvent>[];
 
   @override
   int? get textureId => _textureId;
@@ -42,69 +57,91 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> load(PlaybackSource source) async {
-    _emit(
-      _state.copyWith(
-        status: PlaybackStatus.loading,
-        source: source,
-        position: source.startPosition,
-      ),
-    );
-    final response = await _channel.invokeMapMethod<String, Object?>('load', {
-      'uri': source.uri,
-      'title': source.title,
-      'startPositionMs': source.startPosition.inMilliseconds,
-      'isLive': source.isLive,
-      'userAgent': source.userAgent,
-      'headers': source.headers,
-    });
-    _handle = response?['handle'] as int?;
-    _textureId = response?['textureId'] as int?;
-    final ok = response?['ok'] == true;
-    if (!ok || _handle == null || _textureId == null) {
-      final message = response?['error'] as String? ?? 'libmpv load failed';
-      final code = response?['code'] as String? ?? 'desktop-libmpv-load-failed';
-      final error = code == BackendUnavailableException.unavailableCode
-          ? BackendUnavailableException(message)
-          : PlaybackException(
-              message: message,
-              backend: capabilities.backend,
-              code: code,
-              recoverable: true,
-            );
-      _errorController.add(PlaybackError.fromException(error));
-      throw error;
+    _ensureNotDisposed();
+
+    // Dispose previous handle before creating a new one.
+    if (_handle != null) {
+      final oldHandle = _handle;
+      _resetHandleState();
+      await _channel.invokeMethod<void>('dispose', <String, Object?>{
+        'handle': oldHandle,
+      });
     }
-    final initialAspectRatio = playbackAspectRatioFromValues(
-      aspectRatio:
-          response?['videoAspectRatio'] ??
-          response?['displayAspectRatio'] ??
-          response?['aspectRatio'],
-      width: response?['videoWidth'] ?? response?['width'],
-      height: response?['videoHeight'] ?? response?['height'],
-    );
-    _emit(
-      _state.copyWith(
-        status: PlaybackStatus.ready,
-        source: source,
-        position: source.startPosition,
-        videoAspectRatio: initialAspectRatio,
-      ),
-    );
-    if (initialAspectRatio == null) {
-      unawaited(_refreshVideoAspectRatio());
+
+    _pendingSource = source;
+    _readyCompleter = Completer<void>();
+    _pendingEvents.clear();
+
+    try {
+      final response = await _channel.invokeMapMethod<String, Object?>('load', {
+        'uri': source.uri,
+        'title': source.title,
+        'startPositionMs': source.startPosition.inMilliseconds,
+        'isLive': source.isLive,
+        'userAgent': source.userAgent,
+        'headers': source.headers,
+      });
+
+      final handle = response?['handle'] as int?;
+      final textureId = response?['textureId'] as int?;
+      final ok = response?['ok'] == true;
+      if (!ok || handle == null || textureId == null) {
+        final message = response?['error'] as String? ?? 'libmpv load failed';
+        final code =
+            response?['code'] as String? ?? 'desktop-libmpv-load-failed';
+        final error = code == BackendUnavailableException.unavailableCode
+            ? BackendUnavailableException(message)
+            : PlaybackException(
+                message: message,
+                backend: capabilities.backend,
+                code: code,
+                recoverable: true,
+              );
+        _errorController.add(PlaybackError.fromException(error));
+        _readyCompleter = null;
+        _pendingSource = null;
+        throw error;
+      }
+
+      _handle = handle;
+      _textureId = textureId;
+      _lastSequence = -1;
+      _errorEmitted = false;
+
+      // Drain buffered events that belong to this handle.
+      for (final event in _pendingEvents) {
+        if (event.handle == _handle) {
+          _applyEvent(event);
+        }
+      }
+      _pendingEvents.clear();
+
+      await _readyCompleter!.future;
+      _pendingSource = null;
+    } on PlaybackException {
+      _readyCompleter = null;
+      _pendingSource = null;
+      rethrow;
+    } on Object catch (e) {
+      _readyCompleter = null;
+      _pendingSource = null;
+      throw PlaybackException(
+        message: e.toString(),
+        backend: capabilities.backend,
+        code: 'desktop-libmpv-load-failed',
+        recoverable: true,
+      );
     }
   }
 
   @override
   Future<void> play() async {
     await _invokeControl('play');
-    _emit(_state.copyWith(status: PlaybackStatus.playing));
   }
 
   @override
   Future<void> pause() async {
     await _invokeControl('pause');
-    _emit(_state.copyWith(status: PlaybackStatus.paused));
   }
 
   @override
@@ -112,13 +149,11 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
     await _invokeControl('seek', <String, Object?>{
       'positionMs': position.inMilliseconds,
     });
-    _emit(_state.copyWith(position: position));
   }
 
   @override
   Future<void> stop() async {
     await _invokeControl('stop');
-    _emit(_state.copyWith(status: PlaybackStatus.stopped));
   }
 
   @override
@@ -126,7 +161,6 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
     await _invokeControl('setAudioTrack', <String, Object?>{
       'trackId': trackId,
     });
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
   }
 
   @override
@@ -134,57 +168,41 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
     await _invokeControl('setSubtitleTrack', <String, Object?>{
       'trackId': trackId,
     });
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
   }
 
   @override
   Future<void> setPlaybackSpeed(double speed) async {
     await _invokeControl('setPlaybackSpeed', <String, Object?>{'speed': speed});
-    _emit(_state.copyWith(playbackSpeed: speed));
   }
 
   @override
   Future<void> dispose() async {
-    if (_handle != null) {
-      await _invokeControl('dispose');
-      _handle = null;
-      _textureId = null;
+    if (_disposed) return;
+    _disposed = true;
+
+    if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+      _readyCompleter!.completeError(
+        PlaybackException(
+          message: 'Adapter disposed while loading',
+          backend: capabilities.backend,
+          code: 'disposed',
+        ),
+      );
     }
+    _readyCompleter = null;
+
+    await _eventSubscription?.cancel();
+
+    final handle = _handle;
+    if (handle != null) {
+      await _channel.invokeMethod<void>('dispose', <String, Object?>{
+        'handle': handle,
+      });
+    }
+    _resetHandleState();
+
     await _stateController.close();
     await _errorController.close();
-  }
-
-  Future<void> _refreshVideoAspectRatio() async {
-    final handle = _handle;
-    if (handle == null) return;
-
-    for (final delay in <Duration>[
-      Duration.zero,
-      const Duration(milliseconds: 100),
-      const Duration(milliseconds: 250),
-      const Duration(milliseconds: 500),
-      const Duration(seconds: 1),
-    ]) {
-      if (delay > Duration.zero) await Future<void>.delayed(delay);
-      if (_handle != handle) return;
-
-      final response = await _channel.invokeMapMethod<String, Object?>(
-        'getVideoAspectRatio',
-        <String, Object?>{'handle': handle},
-      );
-      final aspectRatio = playbackAspectRatioFromValues(
-        aspectRatio:
-            response?['videoAspectRatio'] ??
-            response?['displayAspectRatio'] ??
-            response?['aspectRatio'],
-        width: response?['videoWidth'] ?? response?['width'],
-        height: response?['videoHeight'] ?? response?['height'],
-      );
-      if (aspectRatio != null) {
-        _emit(_state.copyWith(videoAspectRatio: aspectRatio));
-        return;
-      }
-    }
   }
 
   Future<void> _invokeControl(
@@ -193,14 +211,119 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   ]) async {
     final handle = _handle;
     await _channel.invokeMethod<void>(method, <String, Object?>{
-      'handle': ?handle,
+      'handle': handle,
       ...arguments,
     });
+  }
+
+  void _handleRawEvent(dynamic raw) {
+    if (_disposed) return;
+
+    final map = Map<String, Object?>.from(raw as Map<Object?, Object?>);
+    final event = DesktopLibmpvEvent.fromMap(map);
+
+    if (event.kind == DesktopLibmpvEventKind.unknown) {
+      return;
+    }
+
+    // Buffer events while we do not yet know the active handle.
+    if (_handle == null) {
+      _pendingEvents.add(event);
+      return;
+    }
+
+    _applyEvent(event);
+  }
+
+  void _applyEvent(DesktopLibmpvEvent event) {
+    // Ignore stale handles and out-of-order sequences.
+    if (event.handle != _handle) return;
+    if (event.sequence <= _lastSequence) return;
+    _lastSequence = event.sequence;
+
+    if (_errorEmitted) return;
+
+    if (event.kind == DesktopLibmpvEventKind.error) {
+      _errorEmitted = true;
+      final error = PlaybackException(
+        message: event.message ?? 'desktop libmpv error',
+        backend: capabilities.backend,
+        code: event.code ?? 'desktop-libmpv-error',
+        recoverable: event.recoverable,
+      );
+      if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+        _readyCompleter!.completeError(error);
+        _readyCompleter = null;
+        _pendingSource = null;
+      }
+      _errorController.add(PlaybackError.fromException(error));
+      return;
+    }
+
+    final effectiveSource = _state.source ?? _pendingSource;
+    if (effectiveSource == null &&
+        event.kind != DesktopLibmpvEventKind.shutdown) {
+      return;
+    }
+
+    final nextState = DesktopLibmpvEventReducer.reduce(
+      _state,
+      event,
+      effectiveSource ?? const PlaybackSource(uri: ''),
+    );
+
+    if (_readyCompleter != null &&
+        !_readyCompleter!.isCompleted &&
+        event.kind == DesktopLibmpvEventKind.fileLoaded) {
+      _readyCompleter!.complete();
+      _readyCompleter = null;
+      _pendingSource = null;
+    }
+
+    _emit(nextState);
+  }
+
+  void _handleEventStreamError(Object error) {
+    if (_disposed) return;
+    final playbackError = PlaybackError(
+      backend: capabilities.backend,
+      message: error.toString(),
+      code: 'event-stream-error',
+      recoverable: true,
+    );
+    if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+      _readyCompleter!.completeError(
+        PlaybackException(
+          message: playbackError.message,
+          backend: playbackError.backend,
+          code: playbackError.code,
+          recoverable: playbackError.recoverable,
+        ),
+      );
+      _readyCompleter = null;
+      _pendingSource = null;
+    } else {
+      _errorController.add(playbackError);
+    }
   }
 
   void _emit(PlaybackState state) {
     _state = state;
     _stateController.add(state);
+  }
+
+  void _resetHandleState() {
+    _handle = null;
+    _textureId = null;
+    _lastSequence = -1;
+    _errorEmitted = false;
+    _pendingEvents.clear();
+  }
+
+  void _ensureNotDisposed() {
+    if (_disposed) {
+      throw StateError('DesktopLibmpvBackend is disposed');
+    }
   }
 }
 
@@ -254,5 +377,184 @@ class DesktopLibmpvProbe {
       fallbackDecision: map['fallbackDecision'] as String? ?? 'unreported',
       details: map['details'] as String? ?? '',
     );
+  }
+}
+
+enum DesktopLibmpvEventKind {
+  startFile,
+  fileLoaded,
+  playbackRestart,
+  videoReconfig,
+  endFile,
+  stop,
+  quit,
+  error,
+  shutdown,
+  unknown,
+}
+
+class DesktopLibmpvEvent {
+  const DesktopLibmpvEvent({
+    required this.schemaVersion,
+    required this.handle,
+    required this.sequence,
+    required this.kind,
+    this.position,
+    this.duration,
+    this.paused = false,
+    this.buffering = false,
+    this.eof = false,
+    this.videoAspectRatio,
+    this.speed,
+    this.aid,
+    this.sid,
+    this.message,
+    this.code,
+    this.recoverable = false,
+  });
+
+  factory DesktopLibmpvEvent.fromMap(Map<String, Object?> map) {
+    return DesktopLibmpvEvent(
+      schemaVersion: (map['schemaVersion'] as num?)?.toInt() ?? 0,
+      handle: (map['handle'] as num?)?.toInt() ?? 0,
+      sequence: (map['sequence'] as num?)?.toInt() ?? 0,
+      kind: _kindFromString(map['kind'] as String?),
+      position: map['positionMs'] is num
+          ? Duration(milliseconds: (map['positionMs']! as num).round())
+          : Duration.zero,
+      duration: map['durationMs'] is num
+          ? Duration(milliseconds: (map['durationMs']! as num).round())
+          : null,
+      paused: map['paused'] == true,
+      buffering: map['buffering'] == true,
+      eof: map['eof'] == true,
+      videoAspectRatio: playbackAspectRatioFromValues(
+        aspectRatio:
+            map['videoAspectRatio'] ??
+            map['displayAspectRatio'] ??
+            map['aspectRatio'],
+        width: map['videoWidth'] ?? map['width'],
+        height: map['videoHeight'] ?? map['height'],
+      ),
+      speed: _asPositiveDouble(map['speed']),
+      aid: map['aid'] as String?,
+      sid: map['sid'] as String?,
+      message: map['message'] as String?,
+      code: map['code'] as String?,
+      recoverable: map['recoverable'] == true,
+    );
+  }
+
+  final int schemaVersion;
+  final int handle;
+  final int sequence;
+  final DesktopLibmpvEventKind kind;
+  final Duration? position;
+  final Duration? duration;
+  final bool paused;
+  final bool buffering;
+  final bool eof;
+  final double? videoAspectRatio;
+  final double? speed;
+  final String? aid;
+  final String? sid;
+  final String? message;
+  final String? code;
+  final bool recoverable;
+
+  static DesktopLibmpvEventKind _kindFromString(String? value) {
+    return switch (value) {
+      'START_FILE' => DesktopLibmpvEventKind.startFile,
+      'FILE_LOADED' => DesktopLibmpvEventKind.fileLoaded,
+      'PLAYBACK_RESTART' => DesktopLibmpvEventKind.playbackRestart,
+      'VIDEO_RECONFIG' => DesktopLibmpvEventKind.videoReconfig,
+      'END_FILE' => DesktopLibmpvEventKind.endFile,
+      'STOP' => DesktopLibmpvEventKind.stop,
+      'QUIT' => DesktopLibmpvEventKind.quit,
+      'ERROR' => DesktopLibmpvEventKind.error,
+      'SHUTDOWN' => DesktopLibmpvEventKind.shutdown,
+      _ => DesktopLibmpvEventKind.unknown,
+    };
+  }
+
+  static double? _asPositiveDouble(Object? value) {
+    if (value is num && value > 0) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value.trim());
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    return null;
+  }
+}
+
+class DesktopLibmpvEventReducer {
+  const DesktopLibmpvEventReducer._();
+
+  static PlaybackState reduce(
+    PlaybackState current,
+    DesktopLibmpvEvent event,
+    PlaybackSource source,
+  ) {
+    const backend = PlaybackBackend.desktopLibmpv;
+
+    switch (event.kind) {
+      case DesktopLibmpvEventKind.startFile:
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.loading,
+          source: source,
+          position: source.startPosition,
+        );
+      case DesktopLibmpvEventKind.fileLoaded:
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.ready,
+          source: source,
+          position: event.position ?? source.startPosition,
+          duration: event.duration,
+          videoAspectRatio: event.videoAspectRatio,
+          playbackSpeed: event.speed,
+          selectedAudioTrackId: event.aid,
+          selectedSubtitleTrackId: event.sid,
+        );
+      case DesktopLibmpvEventKind.playbackRestart:
+        final status = event.paused
+            ? PlaybackStatus.paused
+            : event.buffering
+            ? PlaybackStatus.buffering
+            : PlaybackStatus.playing;
+        return current.copyWith(
+          backend: backend,
+          status: status,
+          position: event.position ?? current.position,
+          duration: event.duration ?? current.duration,
+          videoAspectRatio: event.videoAspectRatio ?? current.videoAspectRatio,
+          playbackSpeed: event.speed ?? current.playbackSpeed,
+          selectedAudioTrackId: event.aid ?? current.selectedAudioTrackId,
+          selectedSubtitleTrackId: event.sid ?? current.selectedSubtitleTrackId,
+        );
+      case DesktopLibmpvEventKind.videoReconfig:
+        return current.copyWith(
+          backend: backend,
+          videoAspectRatio: event.videoAspectRatio ?? current.videoAspectRatio,
+        );
+      case DesktopLibmpvEventKind.endFile:
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.completed,
+        );
+      case DesktopLibmpvEventKind.stop:
+      case DesktopLibmpvEventKind.quit:
+      case DesktopLibmpvEventKind.shutdown:
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.stopped,
+        );
+      case DesktopLibmpvEventKind.error:
+        // Errors are emitted as PlaybackError; state is left unchanged.
+        return current;
+      case DesktopLibmpvEventKind.unknown:
+        return current;
+    }
   }
 }

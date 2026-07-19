@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -51,10 +53,25 @@ void main() {
     });
 
     test('normal playback stays on the method-channel texture path', () async {
-      const channel = MethodChannel('m3u_tv/desktop_libmpv');
+      const methodChannel = MethodChannel('m3u_tv/desktop_libmpv');
+      const eventChannel = EventChannel('m3u_tv/desktop_libmpv/events');
+      final events = StreamController<Map<String, Object?>>.broadcast();
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+            eventChannel,
+            MockStreamHandler.inline(
+              onListen: (arguments, eventSink) {
+                events.stream.listen((event) {
+                  eventSink.success(event);
+                });
+              },
+            ),
+          );
+
       final calls = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
+          .setMockMethodCallHandler(methodChannel, (call) async {
             calls.add(call.method);
             switch (call.method) {
               case 'probe':
@@ -70,6 +87,15 @@ void main() {
                   'details': 'mock libmpv render context ready',
                 };
               case 'load':
+                scheduleMicrotask(() {
+                  events.add(<String, Object?>{
+                    'schemaVersion': 1,
+                    'handle': 1,
+                    'sequence': 0,
+                    'kind': 'FILE_LOADED',
+                    'videoAspectRatio': 1.78,
+                  });
+                });
                 return <String, Object?>{
                   'ok': true,
                   'handle': 1,
@@ -81,7 +107,11 @@ void main() {
           });
       addTearDown(
         () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null),
+            .setMockMethodCallHandler(methodChannel, null),
+      );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockStreamHandler(eventChannel, null),
       );
 
       final backend = DesktopLibmpvBackend();
@@ -93,6 +123,7 @@ void main() {
       await backend.stop();
 
       expect(calls, <String>['probe', 'load', 'play', 'stop']);
+      await events.close();
     });
   });
 }
