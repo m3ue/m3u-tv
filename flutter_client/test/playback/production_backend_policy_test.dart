@@ -227,16 +227,91 @@ void main() {
           windowsBackend,
           isNot(contains('MPV_RENDER_PARAM_ADVANCED_CONTROL')),
         );
-        expect(windowsBackend, contains('render_context_set_update_callback'));
-        expect(windowsBackend, contains('RenderUpdate'));
         expect(
           windowsBackend,
-          contains('MarkTextureFrameAvailable(player->texture_id)'),
+          contains(
+            'api.render_context_set_update_callback(render_context, RenderUpdate, player->texture_state.get())',
+          ),
         );
         expect(
           windowsBackend,
           contains('render_context_render(render_context'),
         );
+
+        final platformDispatcherStart = windowsBackend.indexOf(
+          'class PlatformDispatcher',
+        );
+        final platformDispatcherEnd = windowsBackend.indexOf(
+          'class EventSinkState',
+          platformDispatcherStart,
+        );
+        expect(platformDispatcherStart, isNonNegative);
+        expect(platformDispatcherEnd, greaterThan(platformDispatcherStart));
+        final platformDispatcher = windowsBackend.substring(
+          platformDispatcherStart,
+          platformDispatcherEnd,
+        );
+        expect(
+          platformDispatcher,
+          contains('bool Post(std::function<void()> callback)'),
+        );
+        expect(
+          platformDispatcher,
+          contains('PostMessageW(hwnd_, kDesktopLibmpvPlatformDispatchMessage'),
+        );
+
+        final textureStateStart = windowsBackend.indexOf('struct TextureState');
+        final textureStateEnd = windowsBackend.indexOf(
+          'struct PlayerInstance',
+          textureStateStart,
+        );
+        expect(textureStateStart, isNonNegative);
+        expect(textureStateEnd, greaterThan(textureStateStart));
+        final textureState = windowsBackend.substring(
+          textureStateStart,
+          textureStateEnd,
+        );
+        expect(textureState, contains('void QueueFrame()'));
+        expect(
+          textureState,
+          contains('std::weak_ptr<PlatformDispatcher> dispatcher'),
+        );
+        expect(
+          textureState,
+          contains('std::weak_ptr<TextureState> weak = shared_from_this()'),
+        );
+        expect(
+          textureState,
+          contains('platform_dispatcher->Post([weak]()'),
+        );
+        expect(textureState, contains('auto state = weak.lock()'));
+        expect(
+          textureState,
+          contains(
+            'state->registrar->MarkTextureFrameAvailable(state->texture_id)',
+          ),
+        );
+        expect(
+          textureState.indexOf('platform_dispatcher->Post([weak]()'),
+          lessThan(
+            textureState.indexOf(
+              'state->registrar->MarkTextureFrameAvailable(state->texture_id)',
+            ),
+          ),
+        );
+
+        final renderUpdateStart = windowsBackend.indexOf('void RenderUpdate');
+        final renderUpdateEnd = windowsBackend.indexOf(
+          'ProbeMap Load',
+          renderUpdateStart,
+        );
+        expect(renderUpdateStart, isNonNegative);
+        expect(renderUpdateEnd, greaterThan(renderUpdateStart));
+        final renderUpdate = windowsBackend.substring(
+          renderUpdateStart,
+          renderUpdateEnd,
+        );
+        expect(renderUpdate, contains('texture_state->QueueFrame()'));
       },
     );
 
