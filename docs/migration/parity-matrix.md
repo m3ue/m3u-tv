@@ -30,8 +30,8 @@ Legend: **Done** = implemented in Flutter, **Partial** = partially implemented o
 | tvOS | Blocked/Gated. No official `flutter build tvos` command. Custom embedder, plugin audit, Siri Remote input bridge, and AVKit playback proof required. | AVKit/AVPlayer once embedder exists. | Does not block Android release track. |
 | iOS | Non-blocking/Gated. Flutter iOS project generation works; App Store readiness not claimed. | AVKit/AVPlayer safe default. MPVKit gated by GPL/licensing review. | Does not block Android release track. |
 | macOS | Non-blocking/Gated. Flutter macOS project generation works; signing and notarization not proven. | AVKit/AVPlayer safe default. libmpv gated. | Does not block Android release track. |
-| Linux desktop | Blocked. GTK pkg-config, clang++, and libmpv runtime packaging not proven. | libmpv/MPV in-process; server transcode fallback. | Blocked until Linux SDK dependencies and `flutter build linux` pass. |
-| Windows desktop | Blocked. Requires Windows runner, Visual Studio Build Tools, and bundled mpv/FFmpeg DLLs. | libmpv/MPV in-process; server transcode fallback. | Blocked until Windows runner and signing are proven. |
+| Linux desktop | Active (custom backend). `flutter build linux` passes, in-process C++ libmpv path is wired in the orchestrator (see `desktop-libmpv-feasibility.md`). | In-process libmpv via `DesktopLibmpvBackend`; server transcode fallback. | Loads `libmpv.so.2` from the system package at runtime; not yet bundled for portable AppImage/snap/flatpak. Subtitle overlay is not exposed by the custom backend. See `desktop-libmpv-feasibility.md` for current status and known issues. |
+| Windows desktop | Active (custom backend). In-process libmpv path is wired in the orchestrator (mirrors Linux). | In-process libmpv via `DesktopLibmpvBackend`; server transcode fallback. | Requires a Windows runner to build and sign; codec/legal review for distributed mpv/FFmpeg DLLs is still outstanding. |
 
 ## Playback backend status
 
