@@ -25,7 +25,7 @@ class MediaKitDesktopAdapter
       StreamController<PlaybackError>.broadcast();
 
   PlaybackState _state = const PlaybackState.idle(
-    backend: PlaybackBackend.desktopLibmpv,
+    backend: PlaybackBackend.desktopMediaKit,
   );
 
   @override
@@ -35,7 +35,7 @@ class MediaKitDesktopAdapter
   mkv.VideoController get subtitleController => _controller;
 
   @override
-  PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
+  PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopMediaKit;
 
   @override
   Stream<PlaybackState> get onState => _stateController.stream;
@@ -126,7 +126,7 @@ class MediaKitDesktopAdapter
           if (error.isNotEmpty) {
             _errorController.add(
               PlaybackError(
-                backend: PlaybackBackend.desktopLibmpv,
+                backend: PlaybackBackend.desktopMediaKit,
                 message: error,
                 code: 'media_kit_error',
               ),

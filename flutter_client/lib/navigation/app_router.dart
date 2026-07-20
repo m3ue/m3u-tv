@@ -131,24 +131,25 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     );
   } else if (platform == PlaybackPlatform.apple) {
     if (!kIsWeb && Platform.operatingSystem != 'tvos') {
-      adapters[PlaybackBackend.appleMpvKit] = MediaKitIosAdapter();
+      adapters[PlaybackBackend.appleMediaKit] = MediaKitIosAdapter();
     }
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
     // Use the in-process C++ libmpv backend (`linux/desktop_libmpv_backend.cc`,
     // `windows/runner/desktop_libmpv_backend.cpp`) rather than `media_kit_video`
-    // on platforms where a native desktop-libmpv backend is wired up. The
-    // `media_kit_video` plugin's H/W render path requires a current EGL context
-    // on the platform thread; starting with Flutter 3.38 the EGL context lives
-    // exclusively on the raster thread, so `eglGetCurrentDisplay()` returns
-    // `EGL_NO_DISPLAY` and playback falls back to software texture upload
-    // (media-kit/media-kit#1404). The in-process libmpv backend uses
-    // `MPV_RENDER_API_TYPE_SW` with `FlPixelBufferTexture` and `hwdec=auto-safe`,
-    // sidestepping the EGL dependency entirely while keeping hardware video
-    // decode. macOS has no in-process backend yet, so it stays on
-    // `MediaKitDesktopAdapter` until a Metal/CALayer equivalent lands.
+    // on Linux/Windows. The `media_kit_video` plugin's H/W render path requires
+    // a current EGL context on the platform thread; starting with Flutter 3.38
+    // the EGL context lives exclusively on the raster thread, so
+    // `eglGetCurrentDisplay()` returns `EGL_NO_DISPLAY` and playback falls back
+    // to software texture upload (media-kit/media-kit#1404). The in-process
+    // libmpv backend uses `MPV_RENDER_API_TYPE_SW` with `FlPixelBufferTexture`
+    // and `hwdec=auto-safe`, sidestepping the EGL dependency entirely while
+    // keeping hardware video decode. macOS renders through Metal, not EGL, so
+    // it never hits #1404 and stays on `MediaKitDesktopAdapter` (media_kit) —
+    // a native libmpv backend was prototyped there and reverted since
+    // media_kit already worked correctly; it is not planned for macOS.
     if (Platform.isMacOS) {
-      adapters[PlaybackBackend.desktopLibmpv] = MediaKitDesktopAdapter();
+      adapters[PlaybackBackend.desktopMediaKit] = MediaKitDesktopAdapter();
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
     }

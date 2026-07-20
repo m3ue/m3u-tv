@@ -47,18 +47,18 @@ This document records the third-party dependency license notices that must be in
 - **Status**: Desktop-only, bundled with libmpv.
 - **Gate**: Verify libass and its dependency notices are present.
 
-## Apple Playback Dependencies (Future-Gated)
+## Apple Playback Dependencies
 
 ### AVKit / AVPlayer
-- **Scope**: iOS, iPadOS, macOS, and tvOS playback fallback.
+- **Scope**: iOS, iPadOS, and tvOS playback (permanent primary backend, not a fallback pending MPVKit approval). macOS uses media_kit instead — see the Desktop Playback Dependencies section.
 - **License**: Apple proprietary framework; no additional third-party notice required beyond Apple standard terms.
-- **Status**: Safe fallback path for Apple platforms.
+- **Status**: Safe, permanent path for iOS/iPadOS/tvOS.
 - **Gate**: No additional license gate beyond standard Apple distribution terms.
 
-### MPVKit (Blocked)
-- **Scope**: Broad-codec Apple playback via MPVKit framework.
+### MPVKit (Not planned, iOS/tvOS)
+- **Scope**: Broad-codec playback via MPVKit framework. Not planned for iOS/tvOS — GPL-3.0 is incompatible with App Store distribution for this app, a firm decision rather than a pending review gate. Not planned for macOS either — macOS stays on media_kit/AVKit; a native libmpv backend was prototyped and reverted there.
 - **License**: GPL/LGPL (same as mpv/libmpv).
-- **Status**: Blocked until GPL/LGPL/FFmpeg, signing, and crash-review gates pass.
+- **Status**: Not planned. This section is kept only as reference in case the decision is ever revisited.
 - **Gate**: Do not ship MPVKit in a store artifact without explicit GPL acceptance and license review evidence.
 
 ## GPL Policy Gate

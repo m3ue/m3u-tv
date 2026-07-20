@@ -122,9 +122,10 @@ void main() {
         containsAll(<PlaybackBackend>[
           PlaybackBackend.androidExoPlayer,
           PlaybackBackend.androidMpv,
-          PlaybackBackend.appleMpvKit,
+          PlaybackBackend.appleMediaKit,
           PlaybackBackend.appleAvKit,
           PlaybackBackend.desktopLibmpv,
+          PlaybackBackend.desktopMediaKit,
           PlaybackBackend.serverTranscode,
         ]),
       );
@@ -138,7 +139,7 @@ void main() {
       expect(
         PlaybackCapabilities.forPlatform(PlaybackPlatform.apple),
         <PlaybackCapabilities>[
-          PlaybackCapabilities.appleMpvKit,
+          PlaybackCapabilities.appleMediaKit,
           PlaybackCapabilities.appleAvKit,
           PlaybackCapabilities.serverTranscode,
         ],
@@ -147,6 +148,7 @@ void main() {
         PlaybackCapabilities.forPlatform(PlaybackPlatform.desktop),
         <PlaybackCapabilities>[
           PlaybackCapabilities.desktopLibmpv,
+          PlaybackCapabilities.desktopMediaKit,
           PlaybackCapabilities.serverTranscode,
         ],
       );

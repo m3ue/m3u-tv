@@ -71,7 +71,7 @@ void main() {
         AppleBackendFeasibility.forPlatform(
           AppleTargetPlatform.macos,
         ).backendOrder.first.backend,
-        PlaybackBackend.desktopLibmpv,
+        PlaybackBackend.desktopMediaKit,
       );
     });
 
@@ -138,7 +138,7 @@ void main() {
         expect(
           text,
           contains(
-            '| macOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | AVKit/AVPlayer-safe default for HLS/MP4, then server transcode.',
+            '| macOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | media_kit (AVFoundation-backed), then server transcode.',
           ),
         );
         expect(text, contains('| tvOS | FAIL | BLOCKED/GATED |'));

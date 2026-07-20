@@ -902,9 +902,10 @@ class _PlaybackDiagnosticsSnapshot {
     return switch (parts[1]) {
       'androidExoPlayer' => PlaybackBackend.androidExoPlayer,
       'androidMpv' => PlaybackBackend.androidMpv,
-      'appleMpvKit' => PlaybackBackend.appleMpvKit,
+      'appleMediaKit' => PlaybackBackend.appleMediaKit,
       'appleAvKit' => PlaybackBackend.appleAvKit,
       'desktopLibmpv' => PlaybackBackend.desktopLibmpv,
+      'desktopMediaKit' => PlaybackBackend.desktopMediaKit,
       'serverTranscode' => PlaybackBackend.serverTranscode,
       _ => null,
     };
@@ -914,9 +915,10 @@ class _PlaybackDiagnosticsSnapshot {
     return switch (backend) {
       PlaybackBackend.androidExoPlayer => 'Android ExoPlayer',
       PlaybackBackend.androidMpv => 'Android mpv/libmpv disabled',
-      PlaybackBackend.appleMpvKit => 'Apple MPVKit',
+      PlaybackBackend.appleMediaKit => 'Apple Media Kit',
       PlaybackBackend.appleAvKit => 'Apple AVKit fallback',
       PlaybackBackend.desktopLibmpv => 'Desktop libmpv',
+      PlaybackBackend.desktopMediaKit => 'Desktop Media Kit',
       PlaybackBackend.serverTranscode => 'Server transcode fallback',
       null => 'Selecting backend',
     };

@@ -49,7 +49,7 @@ void main() {
       'falls back to the native platform backend before transcoding',
       () async {
         final direct = _FakePlayerAdapter(
-          capabilities: PlaybackCapabilities.appleMpvKit,
+          capabilities: PlaybackCapabilities.appleMediaKit,
           unsupportedVideoCodecs: <String>{'hevc'},
         );
         final fallback = _FakePlayerAdapter(
@@ -59,7 +59,7 @@ void main() {
         final orchestrator = PlaybackOrchestrator(
           platform: PlaybackPlatform.apple,
           adapters: <PlaybackBackend, PlayerAdapter>{
-            PlaybackBackend.appleMpvKit: direct,
+            PlaybackBackend.appleMediaKit: direct,
             PlaybackBackend.appleAvKit: fallback,
           },
           transcodeGateway: transcode,
@@ -79,7 +79,7 @@ void main() {
         expect(orchestrator.activeBackend, PlaybackBackend.appleAvKit);
         expect(
           orchestrator.diagnostics,
-          contains('fallback:appleAvKit:preferred appleMpvKit unsupported'),
+          contains('fallback:appleAvKit:preferred appleMediaKit unsupported'),
         );
 
         await orchestrator.dispose();
@@ -354,7 +354,7 @@ void main() {
         unsupportedVideoCodecs: <String>{'hevc'},
       );
       final fallback = _FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.appleMpvKit,
+        capabilities: PlaybackCapabilities.appleMediaKit,
         unsupportedVideoCodecs: <String>{'hevc'},
       );
       final serverPlayer = _FakePlayerAdapter(
@@ -374,7 +374,7 @@ void main() {
         platform: PlaybackPlatform.apple,
         adapters: <PlaybackBackend, PlayerAdapter>{
           PlaybackBackend.appleAvKit: direct,
-          PlaybackBackend.appleMpvKit: fallback,
+          PlaybackBackend.appleMediaKit: fallback,
           PlaybackBackend.serverTranscode: serverPlayer,
         },
         transcodeGateway: transcode,

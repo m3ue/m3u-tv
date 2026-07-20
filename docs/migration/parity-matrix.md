@@ -27,9 +27,9 @@ Legend: **Done** = implemented in Flutter, **Partial** = partially implemented o
 | --- | --- | --- | --- |
 | Android TV | Active primary target. D-pad navigation, back handling, leanback launcher metadata all implemented. | ExoPlayer first, server transcode fallback. MPV future-gated. | Physical Android TV hardware QA and signed release artifact required before production release. |
 | Android phone/tablet | Supported. | Same as Android TV. | Play Store distribution gated on signed AAB, Play Console metadata, and physical device QA. |
-| tvOS | Blocked/Gated. No official `flutter build tvos` command. Custom embedder, plugin audit, Siri Remote input bridge, and AVKit playback proof required. | AVKit/AVPlayer once embedder exists. | Does not block Android release track. |
-| iOS | Non-blocking/Gated. Flutter iOS project generation works; App Store readiness not claimed. | AVKit/AVPlayer safe default. MPVKit gated by GPL/licensing review. | Does not block Android release track. |
-| macOS | Non-blocking/Gated. Flutter macOS project generation works; signing and notarization not proven. | AVKit/AVPlayer safe default. libmpv gated. | Does not block Android release track. |
+| tvOS | Blocked/Gated. No official `flutter build tvos` command. Custom embedder, plugin audit, Siri Remote input bridge, and AVKit playback proof required. | AVKit/AVPlayer once embedder exists. MPVKit not planned — GPL-3.0 is incompatible with App Store distribution for this app. | Does not block Android release track. |
+| iOS | Non-blocking/Gated. Flutter iOS project generation works; App Store readiness not claimed. | AVKit/AVPlayer safe default, permanently. MPVKit not planned — GPL-3.0 is incompatible with App Store distribution for this app, not a review gate pending approval. | Does not block Android release track. |
+| macOS | Non-blocking/Gated. Flutter macOS project generation works; signing and notarization not proven. | media_kit (AVFoundation-backed). A native libmpv backend was prototyped and reverted — media_kit already covers macOS well; libmpv is not planned for this platform. | Does not block Android release track. |
 | Linux desktop | Active (custom backend). `flutter build linux` passes, in-process C++ libmpv path is wired in the orchestrator (see `desktop-libmpv-feasibility.md`). | In-process libmpv via `DesktopLibmpvBackend`; server transcode fallback. | Loads `libmpv.so.2` from the system package at runtime; not yet bundled for portable AppImage/snap/flatpak. Subtitle overlay is not exposed by the custom backend. See `desktop-libmpv-feasibility.md` for current status and known issues. |
 | Windows desktop | Active (custom backend). In-process libmpv path is wired in the orchestrator (mirrors Linux). | In-process libmpv via `DesktopLibmpvBackend`; server transcode fallback. | Requires a Windows runner to build and sign; codec/legal review for distributed mpv/FFmpeg DLLs is still outstanding. |
 
@@ -39,9 +39,9 @@ Legend: **Done** = implemented in Flutter, **Partial** = partially implemented o
 | --- | --- | --- |
 | ExoPlayer (Media3) | Active default for Android/Android TV. Handles H.264, H.265, AV1, AC3 (passthrough), HLS, MPEG-TS, MP4. | Android, Android TV. |
 | MPV/libmpv Android | Future-gated fallback for unsupported codecs, advanced subtitles, and MediaCodec failures. | Android, Android TV. |
-| AVKit/AVPlayer | Safe default for all Apple platforms. Required for App Store compliance. | iOS, iPadOS, macOS, tvOS (once embedder exists). |
-| MPVKit/libmpv Apple | Gated by GPL/LGPL licensing, App Store policy, crash/runtime review, and native dependency review. | macOS, iOS (future). tvOS too risky until embedder is proven. |
-| libmpv desktop | Gated by Linux/Windows SDK and runtime packaging work. | Linux, Windows. |
+| AVKit/AVPlayer | Safe default for all Apple platforms, and the permanent playback strategy for iOS/iPadOS/tvOS. Required for App Store compliance. | iOS, iPadOS, macOS, tvOS (once embedder exists). |
+| MPVKit/libmpv Apple | Not planned for iOS/iPadOS/tvOS — GPL-3.0 is incompatible with App Store distribution for this app (a firm decision, not a review gate awaiting approval). Not planned for macOS either — media_kit already covers it. | None. |
+| libmpv desktop | Active for Linux/Windows only; gated on release-packaging work (signing, bundled runtime licensing). Not used on macOS, which stays on media_kit. | Linux, Windows. |
 | Server transcode | Final fallback for all platforms when direct playback fails. Contract defined in `m3u-editor-transcoding-contract.md`. | All platforms. |
 
 ## Direct M3U requirements (pending)

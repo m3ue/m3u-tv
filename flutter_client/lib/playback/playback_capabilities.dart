@@ -3,9 +3,10 @@ enum PlaybackPlatform { android, apple, desktop, server }
 enum PlaybackBackend {
   androidExoPlayer,
   androidMpv,
-  appleMpvKit,
+  appleMediaKit,
   appleAvKit,
   desktopLibmpv,
+  desktopMediaKit,
   serverTranscode,
 }
 
@@ -90,10 +91,10 @@ class PlaybackCapabilities {
     supportsLiveSeek: false,
   );
 
-  static const PlaybackCapabilities appleMpvKit = PlaybackCapabilities(
+  static const PlaybackCapabilities appleMediaKit = PlaybackCapabilities(
     platform: PlaybackPlatform.apple,
-    backend: PlaybackBackend.appleMpvKit,
-    displayName: 'Apple MPVKit',
+    backend: PlaybackBackend.appleMediaKit,
+    displayName: 'Apple Media Kit',
     supportsDirectStreams: true,
     supportsServerTranscodeFallback: true,
     supportsHls: true,
@@ -150,6 +151,26 @@ class PlaybackCapabilities {
     supportsLiveSeek: false,
   );
 
+  static const PlaybackCapabilities desktopMediaKit = PlaybackCapabilities(
+    platform: PlaybackPlatform.desktop,
+    backend: PlaybackBackend.desktopMediaKit,
+    displayName: 'Desktop Media Kit',
+    supportsDirectStreams: true,
+    supportsServerTranscodeFallback: true,
+    supportsHls: true,
+    supportsMpegTs: true,
+    supportsMp4: true,
+    supportsAdvancedCodecs: true,
+    supportsAudioTrackSelection: true,
+    supportsSubtitleTrackSelection: true,
+    supportsEmbeddedSubtitles: true,
+    supportsExternalSubtitles: true,
+    supportsAdvancedSubtitleFormats: true,
+    supportsPlaybackSpeed: true,
+    supportsSeek: true,
+    supportsLiveSeek: false,
+  );
+
   static const PlaybackCapabilities serverTranscode = PlaybackCapabilities(
     platform: PlaybackPlatform.server,
     backend: PlaybackBackend.serverTranscode,
@@ -174,9 +195,10 @@ class PlaybackCapabilities {
   static const List<PlaybackCapabilities> matrix = <PlaybackCapabilities>[
     androidExoPlayer,
     androidMpv,
-    appleMpvKit,
+    appleMediaKit,
     appleAvKit,
     desktopLibmpv,
+    desktopMediaKit,
     serverTranscode,
   ];
 
@@ -187,12 +209,13 @@ class PlaybackCapabilities {
         serverTranscode,
       ],
       PlaybackPlatform.apple => const <PlaybackCapabilities>[
-        appleMpvKit,
+        appleMediaKit,
         appleAvKit,
         serverTranscode,
       ],
       PlaybackPlatform.desktop => const <PlaybackCapabilities>[
         desktopLibmpv,
+        desktopMediaKit,
         serverTranscode,
       ],
       PlaybackPlatform.server => const <PlaybackCapabilities>[serverTranscode],

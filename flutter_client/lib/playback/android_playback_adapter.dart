@@ -88,9 +88,10 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
       PlaybackBackend.androidExoPlayer => PlaybackCapabilities.androidExoPlayer,
       PlaybackBackend.androidMpv => PlaybackCapabilities.androidMpv,
       PlaybackBackend.serverTranscode => PlaybackCapabilities.serverTranscode,
-      PlaybackBackend.appleMpvKit ||
+      PlaybackBackend.appleMediaKit ||
       PlaybackBackend.appleAvKit ||
-      PlaybackBackend.desktopLibmpv => PlaybackCapabilities.androidExoPlayer,
+      PlaybackBackend.desktopLibmpv ||
+      PlaybackBackend.desktopMediaKit => PlaybackCapabilities.androidExoPlayer,
     };
   }
 
