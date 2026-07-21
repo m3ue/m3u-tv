@@ -202,6 +202,10 @@ class AppStateController extends ChangeNotifier {
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
+  final Set<int> _pendingEpgChannelIds = <int>{};
+  Timer? _epgFetchDebounce;
+  static const _epgPrimeCount = 60;
+  static const _epgFetchDebounceDelay = Duration(milliseconds: 250);
 
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
@@ -577,7 +581,11 @@ class AppStateController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      await _loadXtreamEpg(channels);
+      // Prime EPG for the first screen's worth of channels only; the rest is
+      // fetched lazily as screens request it via [ensureEpgForChannels] (e.g.
+      // as the channel list scrolls into view). Fetching all channels' EPG
+      // upfront was the main bottleneck on large playlists.
+      unawaited(_loadXtreamEpg(channels.take(_epgPrimeCount).toList()));
 
       if (clearCache) {
         await cacheService.clear();
@@ -751,6 +759,52 @@ class AppStateController extends ChangeNotifier {
     return result;
   }
 
+  /// Queues [channels] for a lazy, debounced EPG fetch — only channels
+  /// without fresh cached data are requested. Call this from a screen's
+  /// `itemBuilder` (list/grid) so only currently visible channels get fetched
+  /// as the user scrolls, instead of fetching the whole channel list upfront.
+  void ensureEpgForChannels(List<Channel> channels) {
+    if (_sourceType != AppSourceType.xtream) return;
+    var added = false;
+    for (final channel in channels) {
+      if (epgService.hasFreshDataForChannel(channel)) continue;
+      if (_pendingEpgChannelIds.add(channel.id)) added = true;
+    }
+    if (!added) return;
+    _epgFetchDebounce?.cancel();
+    _epgFetchDebounce = Timer(_epgFetchDebounceDelay, _flushPendingEpgFetch);
+  }
+
+  Future<void> _flushPendingEpgFetch() async {
+    if (_pendingEpgChannelIds.isEmpty) return;
+    final ids = _pendingEpgChannelIds.toSet();
+    _pendingEpgChannelIds.clear();
+    final channels = _channels
+        .where((channel) => ids.contains(channel.id))
+        .toList(growable: false);
+    if (channels.isEmpty) return;
+    final channelIds = channels.map(
+      (channel) => channel.epgChannelId ?? channel.tvgName ?? channel.name,
+    );
+    try {
+      final programs = await xtreamService.getEpgBatch(channels);
+      epgService
+        ..mergePrograms(programs)
+        ..markFetched(channelIds);
+      if (kDebugMode) {
+        debugPrint(
+          '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
+        );
+      }
+    } on Object catch (e) {
+      // Mark as fetched even on failure so a persistently erroring channel
+      // doesn't get re-queued (and reschedule the debounce timer) on every
+      // rebuild — it'll be retried once cacheTtl expires.
+      epgService.markFetched(channelIds);
+      if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
+    }
+  }
+
   Future<void> _loadXtreamEpg(List<Channel> channels) async {
     try {
       final programs = await xtreamService.getEpgBatch(channels);
@@ -806,5 +860,11 @@ class AppStateController extends ChangeNotifier {
       redacted = redacted.replaceAll(credentials.username, '[redacted]');
     }
     return redacted;
+  }
+
+  @override
+  void dispose() {
+    _epgFetchDebounce?.cancel();
+    super.dispose();
   }
 }

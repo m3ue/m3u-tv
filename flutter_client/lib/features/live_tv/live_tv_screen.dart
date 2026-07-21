@@ -30,6 +30,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
     this.onScheduleProgram,
+    this.onEnsureEpg,
   });
 
   final FavoritesService favoritesService;
@@ -37,6 +38,11 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
+
+  /// Requests EPG data for the given channels be fetched (lazily, debounced)
+  /// if not already fresh. Called per-item as the visible list/grid builds,
+  /// so only channels actually scrolled into view get fetched.
+  final void Function(List<Channel>)? onEnsureEpg;
 
   @override
   ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();
@@ -325,6 +331,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         itemCount: channels.length,
         itemBuilder: (context, index) {
           final channel = channels[index];
+          widget.onEnsureEpg?.call([channel]);
           final epg = _epgMap[channel.id];
           final isFav = _favoriteIds.contains(channel.id);
           return _ChannelRow(
@@ -355,6 +362,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         epgService: epgService,
         onChannelSelect: widget.onChannelSelect,
         onCatchupProgramSelect: widget.onCatchupProgramSelect,
+        onEnsureEpg: widget.onEnsureEpg,
       ),
     );
   }
@@ -378,6 +386,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         itemCount: channels.length,
         itemBuilder: (context, index) {
           final channel = channels[index];
+          widget.onEnsureEpg?.call([channel]);
           final epg = _epgMap[channel.id];
           final isFav = _favoriteIds.contains(channel.id);
           return _ChannelGridItem(

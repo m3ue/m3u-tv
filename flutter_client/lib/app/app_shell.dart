@@ -610,6 +610,7 @@ class AppShellState extends ConsumerState<AppShell>
         onSidebarActivate: _activateSidebar,
         onScheduleProgram: (channel, program) =>
             unawaited(_scheduleDvr(context, channel, program)),
+        onEnsureEpg: _appState.ensureEpgForChannels,
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,

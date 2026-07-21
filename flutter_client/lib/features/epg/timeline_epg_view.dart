@@ -26,6 +26,7 @@ class TimelineEpgView extends StatefulWidget {
     required this.epgService,
     required this.onChannelSelect,
     this.onCatchupProgramSelect,
+    this.onEnsureEpg,
     this.windowHours = 6,
   });
 
@@ -33,6 +34,10 @@ class TimelineEpgView extends StatefulWidget {
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
+
+  /// Requests EPG data for a channel be fetched (lazily, debounced) if not
+  /// already fresh. Called per-row as the visible timeline builds.
+  final void Function(List<Channel>)? onEnsureEpg;
 
   /// How many hours the visible window spans (default 6).
   final int windowHours;
@@ -245,6 +250,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                       itemExtent: _kRowH,
                       itemBuilder: (_, i) {
                         final channel = widget.channels[i];
+                        widget.onEnsureEpg?.call([channel]);
                         final programs = widget.epgService.programsForChannel(
                           channel,
                         );
