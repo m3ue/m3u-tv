@@ -238,6 +238,7 @@
   "requestsNoResults": "Keine Ergebnisse gefunden",
   "requestsAlreadyAvailable": "Bereits verfügbar",
   "requestsAlreadyRequested": "Bereits angefragt",
+  "requestsRequestButton": "Anfragen",
   "requestsSubmitted": "\"{title}\" wurde angefragt",
   "@requestsSubmitted": {
     "placeholders": {

@@ -518,6 +518,29 @@ MediaRequestStatus mediaRequestStatusFromWire(String value) {
   };
 }
 
+/// Structured rating forwarded by `request_search`
+/// (`ContentRequestService::search()`'s `rating` field — sourced from
+/// Sonarr/Radarr's `ratings.imdb`/`ratings.tmdb`).
+class ContentRequestRating {
+  const ContentRequestRating({required this.value, this.votes, this.source});
+
+  final double value;
+  final int? votes;
+  final String? source;
+
+  static ContentRequestRating? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final map = json.cast<String, Object?>();
+    final value = _asDoubleOrNull(map['value']);
+    if (value == null) return null;
+    return ContentRequestRating(
+      value: value,
+      votes: _asIntOrNull(map['votes']),
+      source: _asNullableString(map['source']),
+    );
+  }
+}
+
 /// A single search result from `request_search`, combining a title's Arr
 /// metadata with the guest-enabled ArrIntegration that can fulfil it.
 class ContentRequestSearchResult {
@@ -533,6 +556,8 @@ class ContentRequestSearchResult {
     this.fanart,
     this.genres = const <String>[],
     this.rating,
+    this.runtimeMinutes,
+    this.certification,
     this.seasons = const <int>[],
     this.alreadyAvailable = false,
   });
@@ -547,7 +572,9 @@ class ContentRequestSearchResult {
   final String? poster;
   final String? fanart;
   final List<String> genres;
-  final String? rating;
+  final ContentRequestRating? rating;
+  final int? runtimeMinutes;
+  final String? certification;
   final List<int> seasons;
   final bool alreadyAvailable;
 
@@ -565,7 +592,9 @@ class ContentRequestSearchResult {
         genres: _asList(
           json['genres'],
         ).map((genre) => '$genre').toList(growable: false),
-        rating: _asNullableString(json['rating']),
+        rating: ContentRequestRating.fromJson(json['rating']),
+        runtimeMinutes: _asIntOrNull(json['runtime']),
+        certification: _asNullableString(json['certification']),
         seasons: _asList(json['seasons']).map(_asInt).toList(growable: false),
         alreadyAvailable: json['already_available'] == true,
       );

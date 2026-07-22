@@ -238,6 +238,7 @@
   "requestsNoResults": "未找到结果",
   "requestsAlreadyAvailable": "已可观看",
   "requestsAlreadyRequested": "已请求",
+  "requestsRequestButton": "请求",
   "requestsSubmitted": "已请求“{title}”",
   "@requestsSubmitted": {
     "placeholders": {

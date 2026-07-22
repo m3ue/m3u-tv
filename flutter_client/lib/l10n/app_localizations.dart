@@ -1028,6 +1028,12 @@ abstract class AppLocalizations {
   /// **'Already requested'**
   String get requestsAlreadyRequested;
 
+  /// No description provided for @requestsRequestButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Request'**
+  String get requestsRequestButton;
+
   /// No description provided for @requestsSubmitted.
   ///
   /// In en, this message translates to:

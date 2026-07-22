@@ -510,6 +510,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get requestsAlreadyRequested => 'Déjà demandé';
 
   @override
+  String get requestsRequestButton => 'Demander';
+
+  @override
   String requestsSubmitted(String title) {
     return '« $title » a été demandé';
   }

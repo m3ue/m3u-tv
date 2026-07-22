@@ -238,6 +238,7 @@
   "requestsNoResults": "No se encontraron resultados",
   "requestsAlreadyAvailable": "Ya disponible",
   "requestsAlreadyRequested": "Ya solicitado",
+  "requestsRequestButton": "Solicitar",
   "requestsSubmitted": "\"{title}\" fue solicitado",
   "@requestsSubmitted": {
     "placeholders": {

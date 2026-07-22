@@ -23,7 +23,7 @@ class RequestScreen extends ConsumerStatefulWidget {
     super.key,
     required this.isConfigured,
     required this.onSearch,
-    required this.onSubmit,
+    required this.onResultSelect,
     required this.onDismiss,
     required this.onRefreshRequests,
     this.onSidebarActivate,
@@ -35,12 +35,7 @@ class RequestScreen extends ConsumerStatefulWidget {
     String? type,
   })
   onSearch;
-  final Future<MediaRequestSummary> Function({
-    required String type,
-    required int integrationId,
-    required String externalId,
-  })
-  onSubmit;
+  final void Function(ContentRequestSearchResult result) onResultSelect;
   final Future<void> Function(int requestId) onDismiss;
   final Future<void> Function() onRefreshRequests;
   final VoidCallback? onSidebarActivate;
@@ -61,7 +56,6 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   bool _isSearching = false;
   String? _searchError;
   List<ContentRequestSearchResult> _results = const [];
-  final Set<String> _submittingKeys = <String>{};
   final Set<int> _dismissingIds = <int>{};
 
   @override
@@ -129,37 +123,6 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         (request.status == MediaRequestStatus.pendingApproval ||
             request.status == MediaRequestStatus.approved),
   );
-
-  Future<void> _submit(ContentRequestSearchResult result) async {
-    final l = AppLocalizations.of(context);
-    final key = '${result.type}:${result.externalId}';
-    setState(() => _submittingKeys.add(key));
-    try {
-      final request = await widget.onSubmit(
-        type: result.type,
-        integrationId: result.integrationId,
-        externalId: result.externalId,
-      );
-      if (!mounted) return;
-      final message = request.status == MediaRequestStatus.pendingApproval
-          ? l.requestsSubmittedPendingApproval(result.title)
-          : l.requestsSubmitted(result.title);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } on Object catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l.requestsSubmitFailed(result.title, _errorMessage(error)),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _submittingKeys.remove(key));
-    }
-  }
 
   Future<void> _dismiss(MediaRequestSummary request) async {
     final l = AppLocalizations.of(context);
@@ -283,28 +246,47 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         ),
       );
     }
-    return GridView.builder(
-      padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 160,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 2 / 3,
-      ),
-      itemCount: _results.length,
-      itemBuilder: (context, index) {
-        final result = _results[index];
-        final key = '${result.type}:${result.externalId}';
-        return _SearchResultCard(
-          result: result,
-          l: l,
-          autofocus: index == 0,
-          isSubmitting: _submittingKeys.contains(key),
-          isAlreadyRequested: _isAlreadyRequested(result, myRequests),
-          onRequest: () => unawaited(_submit(result)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth =
+            constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
+        final columnCount = _posterColumnCount(availableWidth);
+        return ScrollbarGridView(
+          padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columnCount,
+            childAspectRatio: 0.6,
+            mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+            crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+          ),
+          itemCount: _results.length,
+          itemBuilder: (context, index) {
+            final result = _results[index];
+            return _RequestResultCard(
+              result: result,
+              autofocus: index == 0,
+              isAlreadyRequested: _isAlreadyRequested(result, myRequests),
+              onTap: () => widget.onResultSelect(result),
+            );
+          },
         );
       },
     );
+  }
+
+  static const double _minPosterCardWidth = 120;
+  static const double _maxPosterCardWidth = 220;
+
+  int _posterColumnCount(double availableWidth) {
+    final minimumColumns =
+        ((availableWidth + MediaBrowsingMetrics.itemGap) /
+                (_maxPosterCardWidth + MediaBrowsingMetrics.itemGap))
+            .ceil();
+    final maximumColumns =
+        ((availableWidth + MediaBrowsingMetrics.itemGap) /
+                (_minPosterCardWidth + MediaBrowsingMetrics.itemGap))
+            .floor();
+    return minimumColumns.clamp(1, maximumColumns.clamp(1, 100));
   }
 
   Widget _buildMyRequestsTab(
@@ -340,104 +322,93 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   }
 }
 
-class _SearchResultCard extends StatelessWidget {
-  const _SearchResultCard({
+/// Mirrors _VodCard in vod_screen.dart: same Hero tag convention, same
+/// image/title/rating layout, same corner-badge position — just swapping
+/// the favorite star for an already-requested/already-available indicator.
+class _RequestResultCard extends StatelessWidget {
+  const _RequestResultCard({
     required this.result,
-    required this.l,
-    required this.onRequest,
+    required this.onTap,
     this.autofocus = false,
-    this.isSubmitting = false,
     this.isAlreadyRequested = false,
   });
 
   final ContentRequestSearchResult result;
-  final AppLocalizations l;
-  final VoidCallback onRequest;
+  final VoidCallback onTap;
   final bool autofocus;
-  final bool isSubmitting;
   final bool isAlreadyRequested;
-
-  bool get _actionable =>
-      !result.alreadyAvailable && !isAlreadyRequested && !isSubmitting;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final flagged = result.alreadyAvailable || isAlreadyRequested;
     return DpadInkWell(
       autofocus: autofocus,
-      borderRadius: const BorderRadius.all(Radius.circular(8)),
-      onTap: _actionable ? onRequest : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: Stack(
         children: [
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ResilientMediaImage(
-                  imageUrl: result.poster,
-                  fallbackIcon: result.type == 'series'
-                      ? Icons.tv
-                      : Icons.movie,
-                ),
-                if (isSubmitting)
-                  ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else if (result.alreadyAvailable || isAlreadyRequested)
-                  Positioned(
-                    left: 4,
-                    right: 4,
-                    bottom: 4,
-                    child: _StatusPill(
-                      label: result.alreadyAvailable
-                          ? l.requestsAlreadyAvailable
-                          : l.requestsAlreadyRequested,
-                    ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Hero(
+                  tag: 'request_poster_${result.type}_${result.externalId}',
+                  child: ResilientMediaImage(
+                    imageUrl: result.poster,
+                    fallbackIcon: result.type == 'series'
+                        ? Icons.tv
+                        : Icons.movie,
+                    borderRadius: 0,
                   ),
-              ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.title,
+                      style: theme.textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (result.rating != null)
+                      Text(
+                        '★ ${result.rating!.value.toStringAsFixed(1)}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFFFFCC00),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (flagged)
+            Positioned(
+              top: 4,
+              left: 4,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  result.alreadyAvailable
+                      ? Icons.check_circle_outline
+                      : Icons.hourglass_top,
+                  color: Colors.white,
+                  size: 14,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            result.title,
-            style: theme.textTheme.bodySmall,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(50),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
       ),
     );
   }

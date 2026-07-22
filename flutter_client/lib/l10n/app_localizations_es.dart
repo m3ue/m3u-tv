@@ -510,6 +510,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get requestsAlreadyRequested => 'Ya solicitado';
 
   @override
+  String get requestsRequestButton => 'Solicitar';
+
+  @override
   String requestsSubmitted(String title) {
     return '\"$title\" fue solicitado';
   }

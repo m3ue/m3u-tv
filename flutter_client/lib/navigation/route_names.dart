@@ -51,6 +51,8 @@ class RouteNames {
   static const String aiostreamsDetailsPath =
       '/aiostreams/details/:integrationId/:type/:id';
   static const String aiostreamsSearchPath = '/aiostreams/search';
+  static const String requestsDetailsPath =
+      '/requests/details/:integrationId/:type/:externalId';
 
   /// Builds a path to a VOD details screen for deep linking.
   static String vodDetailsFor(int vodId) => '/vod/details/$vodId';
@@ -64,6 +66,13 @@ class RouteNames {
     String type,
     String id,
   ) => '/aiostreams/details/$integrationId/$type/$id';
+
+  /// Builds a path to a content-request search result's detail screen.
+  static String requestsDetailsFor(
+    int integrationId,
+    String type,
+    String externalId,
+  ) => '/requests/details/$integrationId/$type/$externalId';
 
   /// Human-readable labels for main routes.
   static const Map<String, String> routeLabels = {

@@ -497,6 +497,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get requestsAlreadyRequested => '已请求';
 
   @override
+  String get requestsRequestButton => '请求';
+
+  @override
   String requestsSubmitted(String title) {
     return '已请求“$title”';
   }
