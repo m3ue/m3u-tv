@@ -39,6 +39,7 @@
   "liveTvNoProgram": "暂无节目信息",
   "liveTvNext": "下一个",
   "liveTvRecord": "录制",
+  "liveTvRecording": "录制中",
   "liveTvFavorite": "收藏",
   "liveTvRemoveFavorite": "取消收藏",
   "playerGoBack": "返回",

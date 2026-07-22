@@ -88,6 +88,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvRecord => '录制';
 
   @override
+  String get liveTvRecording => '录制中';
+
+  @override
   String get liveTvFavorite => '收藏';
 
   @override

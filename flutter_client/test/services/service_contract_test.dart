@@ -462,6 +462,34 @@ void main() {
     );
 
     test(
+      'requests a status-filtered, limited DVR recordings list for the live badge poll',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_dvr_recordings': [recordingDvrRecording()],
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        final recordings = await service.getDvrRecordings(
+          status: DvrRecordingStatus.recording,
+          limit: 200,
+        );
+
+        expect(recordings, hasLength(1));
+        expect(recordings.single.status, DvrRecordingStatus.recording);
+        expect(transport.requests.last.params['status'], 'recording');
+        expect(transport.requests.last.params['limit'], '200');
+      },
+    );
+
+    test(
       'expired credentials return typed auth error without cache corruption',
       () async {
         final cache = CacheService(memory: <String, Object?>{});

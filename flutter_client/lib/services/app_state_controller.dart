@@ -199,6 +199,7 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> _vodItems = const <VodItem>[];
   List<Series> _seriesList = const <Series>[];
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
+  Set<int> _recordingChannelIds = const <int>{};
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -218,6 +219,7 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> get vodItems => _vodItems;
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
+  Set<int> get recordingChannelIds => _recordingChannelIds;
   List<Progress> get progressList => _progressList;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
@@ -342,6 +344,7 @@ class AppStateController extends ChangeNotifier {
       _vodItems = const <VodItem>[];
       _seriesList = const <Series>[];
       _dvrRecordings = const <DvrRecording>[];
+      _recordingChannelIds = const <int>{};
       _activeViewer = const Viewer(
         id: 0,
         ulid: 'local-m3u',
@@ -422,6 +425,7 @@ class AppStateController extends ChangeNotifier {
     _vodItems = const <VodItem>[];
     _seriesList = const <Series>[];
     _dvrRecordings = const <DvrRecording>[];
+    _recordingChannelIds = const <int>{};
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -509,6 +513,7 @@ class AppStateController extends ChangeNotifier {
     );
     try {
       _dvrRecordings = await xtreamService.getDvrRecordings();
+      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
     } on Object catch (error, stackTrace) {
       debugPrint('DVR: refresh after schedule failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -523,6 +528,35 @@ class AppStateController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  static Set<int> _extractRecordingChannelIds(List<DvrRecording> recordings) {
+    return recordings
+        .where((recording) => recording.isInProgress)
+        .map((recording) => recording.channelId)
+        .whereType<int>()
+        .toSet();
+  }
+
+  /// Lightweight poll for which channels are currently recording, used to
+  /// mark Live TV tiles without waiting for a full app refresh. Callers
+  /// (e.g. LiveTvScreen) are expected to invoke this on a short timer only
+  /// while the screen is visible — `status=recording` keeps the request
+  /// small regardless of total recording history.
+  Future<void> refreshActiveDvrRecordings() async {
+    if (!hasDvrFeature) return;
+    try {
+      final active = await xtreamService.getDvrRecordings(
+        status: DvrRecordingStatus.recording,
+        limit: 200,
+      );
+      final ids = _extractRecordingChannelIds(active);
+      if (setEquals(_recordingChannelIds, ids)) return;
+      _recordingChannelIds = ids;
+      notifyListeners();
+    } on Object catch (error) {
+      debugPrint('DVR: refresh active recordings failed: $error');
+    }
   }
 
   void updateProgressEntry(Progress updated) {
@@ -595,6 +629,7 @@ class AppStateController extends ChangeNotifier {
       _vodItems = vodItems;
       _seriesList = seriesList;
       _dvrRecordings = dvrRecordings;
+      _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
       _viewers = viewers;
       _activeViewer = activeViewer;
       _progressList = progress;
@@ -668,6 +703,7 @@ class AppStateController extends ChangeNotifier {
     _vodItems = vodItems;
     _seriesList = seriesList;
     _dvrRecordings = const <DvrRecording>[];
+    _recordingChannelIds = const <int>{};
     _viewers = viewers;
     _activeViewer = await viewerService.resolveActiveViewer(viewers);
     final activeViewer = _activeViewer;

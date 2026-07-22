@@ -404,8 +404,14 @@ class XtreamService {
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
   }
 
-  Future<List<DvrRecording>> getDvrRecordings() async {
-    final response = await _request('get_dvr_recordings');
+  Future<List<DvrRecording>> getDvrRecordings({
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async {
+    final response = await _request(
+      'get_dvr_recordings',
+      params: {'status': ?status?.name, 'limit': ?limit?.toString()},
+    );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);

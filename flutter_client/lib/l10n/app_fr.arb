@@ -39,6 +39,7 @@
   "liveTvNoProgram": "Aucune info programme",
   "liveTvNext": "SUIVANT",
   "liveTvRecord": "Enregistrer",
+  "liveTvRecording": "Enregistrement en cours",
   "liveTvFavorite": "Favori",
   "liveTvRemoveFavorite": "Retirer des favoris",
   "playerGoBack": "Retour",

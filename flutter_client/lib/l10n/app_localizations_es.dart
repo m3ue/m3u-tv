@@ -88,6 +88,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get liveTvRecord => 'Grabar';
 
   @override
+  String get liveTvRecording => 'Grabando';
+
+  @override
   String get liveTvFavorite => 'Favorito';
 
   @override
