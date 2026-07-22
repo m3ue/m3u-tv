@@ -200,6 +200,7 @@ class AppStateController extends ChangeNotifier {
   List<Series> _seriesList = const <Series>[];
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
   Set<int> _recordingChannelIds = const <int>{};
+  List<MediaRequestSummary> _mediaRequests = const <MediaRequestSummary>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -225,10 +226,13 @@ class AppStateController extends ChangeNotifier {
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
   Set<int> get recordingChannelIds => _recordingChannelIds;
   List<Progress> get progressList => _progressList;
+  List<MediaRequestSummary> get mediaRequests => _mediaRequests;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
   bool get hasRequestsFeature =>
       authNotifier.authResponse?.hasFeature('requests') ?? false;
+  RequestsCapability? get requestsCapability =>
+      authNotifier.authResponse?.requests;
   bool get hasAioStreams => authNotifier.authResponse?.hasAioStreams ?? false;
   List<AIOStreamsIntegration> get aiostreamsIntegrations =>
       authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
@@ -349,6 +353,7 @@ class AppStateController extends ChangeNotifier {
       _seriesList = const <Series>[];
       _dvrRecordings = const <DvrRecording>[];
       _recordingChannelIds = const <int>{};
+      _mediaRequests = const <MediaRequestSummary>[];
       _activeViewer = const Viewer(
         id: 0,
         ulid: 'local-m3u',
@@ -395,6 +400,7 @@ class AppStateController extends ChangeNotifier {
         credentials: credentials,
         onNotification: _onPushNotification,
         onDvrStatus: _onDvrStatusPush,
+        onRequestStatus: _onRequestStatusPush,
         // Reconciles any status pushes missed while disconnected (app
         // suspended, network drop) — cheap, status-filtered fetch, not a poll.
         onConnected: () => unawaited(refreshActiveDvrRecordings()),
@@ -467,6 +473,22 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
+  /// Mirrors [_onDvrStatusPush]: updates the local requests list in place
+  /// from the lightweight `request.status` push (approved/rejected/completed
+  /// by MediaRequestStatusEvent on the server) instead of re-polling
+  /// request_history.
+  void _onRequestStatusPush(MediaRequestSummary request) {
+    final next = [..._mediaRequests];
+    final index = next.indexWhere((r) => r.id == request.id);
+    if (index >= 0) {
+      next[index] = request;
+    } else {
+      next.insert(0, request);
+    }
+    _mediaRequests = next;
+    notifyListeners();
+  }
+
   Future<void> _storeAndNotify(TvNotificationItem item) async {
     await notificationStore.add(item);
     await _refreshUnreadNotificationCount();
@@ -493,6 +515,7 @@ class AppStateController extends ChangeNotifier {
     _seriesList = const <Series>[];
     _dvrRecordings = const <DvrRecording>[];
     _recordingChannelIds = const <int>{};
+    _mediaRequests = const <MediaRequestSummary>[];
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -626,6 +649,53 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
+  /// Searches guest-enabled Arr integrations via `request_search`. Thin
+  /// pass-through — the Requests screen owns its own search-in-flight/error
+  /// state since results aren't part of the app's persistent state.
+  Future<List<ContentRequestSearchResult>> searchContentRequests(
+    String query, {
+    String? type,
+  }) => xtreamService.searchContentRequests(query, type: type);
+
+  /// Submits a content request and adds it to the local requests list so it
+  /// shows up immediately, without waiting for a `request.status` push.
+  Future<MediaRequestSummary> submitContentRequest({
+    required String type,
+    required int integrationId,
+    required String externalId,
+  }) async {
+    final request = await xtreamService.submitContentRequest(
+      type: type,
+      integrationId: integrationId,
+      externalId: externalId,
+    );
+    _mediaRequests = [request, ..._mediaRequests];
+    notifyListeners();
+    return request;
+  }
+
+  /// Dismisses a completed or rejected request and removes it locally.
+  Future<void> dismissMediaRequest(int requestId) async {
+    await xtreamService.dismissMediaRequest(requestId);
+    _mediaRequests = _mediaRequests
+        .where((request) => request.id != requestId)
+        .toList(growable: false);
+    notifyListeners();
+  }
+
+  /// Refreshes the requesting guest's request history from the server. Used
+  /// when the Requests screen becomes visible, since a push can be missed
+  /// while the app is backgrounded and no other screen holds this list warm.
+  Future<void> refreshMediaRequests() async {
+    if (!hasRequestsFeature) return;
+    try {
+      _mediaRequests = await xtreamService.getMediaRequests();
+      notifyListeners();
+    } on Object catch (error) {
+      debugPrint('Requests: refresh failed: $error');
+    }
+  }
+
   void updateProgressEntry(Progress updated) {
     final idx = _progressList.indexWhere((p) {
       if (p.contentType != updated.contentType) return false;
@@ -657,6 +727,13 @@ class AppStateController extends ChangeNotifier {
               (Object _) => const <DvrRecording>[],
             )
           : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
+      final mediaRequestsFuture = hasRequestsFeature
+          ? xtreamService.getMediaRequests().catchError(
+              (Object _) => const <MediaRequestSummary>[],
+            )
+          : Future<List<MediaRequestSummary>>.value(
+              const <MediaRequestSummary>[],
+            );
       final viewersFuture = xtreamService.getViewers();
 
       final results = await Future.wait<Object>(<Future<Object>>[
@@ -668,6 +745,7 @@ class AppStateController extends ChangeNotifier {
         seriesFuture,
         recordingsFuture,
         viewersFuture,
+        mediaRequestsFuture,
       ]);
 
       final viewers = results[7] as List<Viewer>;
@@ -678,6 +756,7 @@ class AppStateController extends ChangeNotifier {
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
       final dvrRecordings = results[6] as List<DvrRecording>;
+      final mediaRequests = results[8] as List<MediaRequestSummary>;
 
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
       final fetched = activeViewer == null
@@ -697,6 +776,7 @@ class AppStateController extends ChangeNotifier {
       _seriesList = seriesList;
       _dvrRecordings = dvrRecordings;
       _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
+      _mediaRequests = mediaRequests;
       _viewers = viewers;
       _activeViewer = activeViewer;
       _progressList = progress;
@@ -775,6 +855,7 @@ class AppStateController extends ChangeNotifier {
     _seriesList = seriesList;
     _dvrRecordings = const <DvrRecording>[];
     _recordingChannelIds = const <int>{};
+    _mediaRequests = const <MediaRequestSummary>[];
     _viewers = viewers;
     _activeViewer = await viewerService.resolveActiveViewer(viewers);
     final activeViewer = _activeViewer;

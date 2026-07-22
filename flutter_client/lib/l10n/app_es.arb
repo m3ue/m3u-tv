@@ -231,5 +231,53 @@
   "aiostreamsSearch": "Buscar en AIOStreams",
   "aiostreamsSearchResults": "Resultados de búsqueda",
   "aiostreamsNoResults": "No se encontraron resultados",
-  "aiostreamsSearchAll": "Todo"
+  "aiostreamsSearchAll": "Todo",
+  "requestsTabSearch": "Buscar",
+  "requestsTabMyRequests": "Mis Solicitudes",
+  "requestsSearchHint": "Buscar películas y series…",
+  "requestsNoResults": "No se encontraron resultados",
+  "requestsAlreadyAvailable": "Ya disponible",
+  "requestsAlreadyRequested": "Ya solicitado",
+  "requestsSubmitted": "\"{title}\" fue solicitado",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "\"{title}\" fue enviado para aprobación",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "No se pudo solicitar \"{title}\": {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "Todavía no has solicitado nada",
+  "requestsDismiss": "Descartar",
+  "requestsDismissFailed": "No se pudo descartar la solicitud: {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "Pendiente de Aprobación",
+  "requestsStatusApproved": "Aprobado",
+  "requestsStatusRejected": "Rechazado",
+  "requestsStatusCompleted": "Completado",
+  "requestsStatusUnknown": "Desconocido"
 }

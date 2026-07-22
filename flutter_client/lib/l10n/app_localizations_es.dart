@@ -490,4 +490,63 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => 'Todo';
+
+  @override
+  String get requestsTabSearch => 'Buscar';
+
+  @override
+  String get requestsTabMyRequests => 'Mis Solicitudes';
+
+  @override
+  String get requestsSearchHint => 'Buscar películas y series…';
+
+  @override
+  String get requestsNoResults => 'No se encontraron resultados';
+
+  @override
+  String get requestsAlreadyAvailable => 'Ya disponible';
+
+  @override
+  String get requestsAlreadyRequested => 'Ya solicitado';
+
+  @override
+  String requestsSubmitted(String title) {
+    return '\"$title\" fue solicitado';
+  }
+
+  @override
+  String requestsSubmittedPendingApproval(String title) {
+    return '\"$title\" fue enviado para aprobación';
+  }
+
+  @override
+  String requestsSubmitFailed(String title, String error) {
+    return 'No se pudo solicitar \"$title\": $error';
+  }
+
+  @override
+  String get requestsMyRequestsEmpty => 'Todavía no has solicitado nada';
+
+  @override
+  String get requestsDismiss => 'Descartar';
+
+  @override
+  String requestsDismissFailed(String error) {
+    return 'No se pudo descartar la solicitud: $error';
+  }
+
+  @override
+  String get requestsStatusPendingApproval => 'Pendiente de Aprobación';
+
+  @override
+  String get requestsStatusApproved => 'Aprobado';
+
+  @override
+  String get requestsStatusRejected => 'Rechazado';
+
+  @override
+  String get requestsStatusCompleted => 'Completado';
+
+  @override
+  String get requestsStatusUnknown => 'Desconocido';
 }

@@ -670,6 +670,10 @@ class AppShellState extends ConsumerState<AppShell>
           }
           return RequestScreen(
             isConfigured: _appState.isConfigured,
+            onSearch: _appState.searchContentRequests,
+            onSubmit: _appState.submitContentRequest,
+            onDismiss: _appState.dismissMediaRequest,
+            onRefreshRequests: _appState.refreshMediaRequests,
             onSidebarActivate: _activateSidebar,
           );
         },

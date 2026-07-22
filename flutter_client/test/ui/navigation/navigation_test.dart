@@ -378,8 +378,9 @@ void main() {
       await tester.tap(_sidebarText('Requests'));
       await _pumpAppFrame(tester);
 
-      expect(find.text('Request Content'), findsOneWidget);
-      expect(find.text('Full request workflow coming soon.'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('My Requests'), findsOneWidget);
+      expect(find.text('Search movies & shows…'), findsOneWidget);
     });
 
     testWidgets('sidebar labels remain visible after selecting a route', (

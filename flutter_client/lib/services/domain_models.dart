@@ -493,6 +493,142 @@ class DvrRecording {
   }
 }
 
+enum MediaRequestStatus {
+  pendingApproval,
+  approved,
+  rejected,
+  completed,
+  unknown,
+}
+
+MediaRequestStatus mediaRequestStatusFromWire(String value) {
+  return switch (value.trim().toLowerCase()) {
+    'pending_approval' || 'pending' => MediaRequestStatus.pendingApproval,
+    'rejected' => MediaRequestStatus.rejected,
+    'completed' || 'imported' => MediaRequestStatus.completed,
+    'approved' ||
+    'monitored' ||
+    'grabbing' ||
+    'downloading' ||
+    'import_pending' ||
+    'importing' ||
+    'queued' ||
+    'paused' => MediaRequestStatus.approved,
+    _ => MediaRequestStatus.unknown,
+  };
+}
+
+/// A single search result from `request_search`, combining a title's Arr
+/// metadata with the guest-enabled ArrIntegration that can fulfil it.
+class ContentRequestSearchResult {
+  const ContentRequestSearchResult({
+    required this.type,
+    required this.externalId,
+    required this.integrationId,
+    required this.integrationName,
+    required this.title,
+    this.year,
+    this.overview,
+    this.poster,
+    this.fanart,
+    this.genres = const <String>[],
+    this.rating,
+    this.seasons = const <int>[],
+    this.alreadyAvailable = false,
+  });
+
+  final String type;
+  final String externalId;
+  final int integrationId;
+  final String integrationName;
+  final String title;
+  final String? year;
+  final String? overview;
+  final String? poster;
+  final String? fanart;
+  final List<String> genres;
+  final String? rating;
+  final List<int> seasons;
+  final bool alreadyAvailable;
+
+  factory ContentRequestSearchResult.fromJson(Map<String, Object?> json) =>
+      ContentRequestSearchResult(
+        type: '${json['type'] ?? ''}',
+        externalId: '${json['external_id'] ?? ''}',
+        integrationId: _asInt(json['integration_id']),
+        integrationName: '${json['integration_name'] ?? ''}',
+        title: '${json['title'] ?? ''}',
+        year: _asNullableString(json['year']),
+        overview: _asNullableString(json['overview']),
+        poster: _asNullableString(json['poster']),
+        fanart: _asNullableString(json['fanart']),
+        genres: _asList(
+          json['genres'],
+        ).map((genre) => '$genre').toList(growable: false),
+        rating: _asNullableString(json['rating']),
+        seasons: _asList(json['seasons']).map(_asInt).toList(growable: false),
+        alreadyAvailable: json['already_available'] == true,
+      );
+}
+
+/// A guest's content request, mirroring m3u-editor's
+/// `ContentRequestService::formatRequest()` wire shape. Also the shape of the
+/// `request.status` Reverb push (see MediaRequestStatusEvent on the server).
+class MediaRequestSummary {
+  const MediaRequestSummary({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.status,
+    this.externalId,
+    this.integrationId,
+    this.integrationName,
+    this.seasonNumber,
+    this.episodeNumber,
+    this.requestedAt,
+    this.canDismiss = false,
+    this.progress,
+    this.quality,
+    this.sizeBytes,
+    this.timeLeft,
+  });
+
+  final int id;
+  final String type;
+  final String title;
+  final MediaRequestStatus status;
+  final String? externalId;
+  final int? integrationId;
+  final String? integrationName;
+  final int? seasonNumber;
+  final int? episodeNumber;
+  final DateTime? requestedAt;
+  final bool canDismiss;
+  final int? progress;
+  final String? quality;
+  final int? sizeBytes;
+  final String? timeLeft;
+
+  factory MediaRequestSummary.fromJson(Map<String, Object?> json) =>
+      MediaRequestSummary(
+        id: _asInt(json['id']),
+        type: '${json['type'] ?? ''}',
+        title: '${json['title'] ?? ''}',
+        status: mediaRequestStatusFromWire('${json['status'] ?? ''}'),
+        externalId: _asNullableString(json['external_id']),
+        integrationId: _asIntOrNull(json['integration_id']),
+        integrationName: _asNullableString(json['integration_name']),
+        seasonNumber: _asIntOrNull(json['season_number']),
+        episodeNumber: _asIntOrNull(json['episode_number']),
+        requestedAt: _asDateTimeOrNull(json['requested_at']),
+        canDismiss: json['can_dismiss'] == true,
+        progress: _asIntOrNull(json['progress']),
+        quality: _asNullableString(json['quality']),
+        sizeBytes: _asIntOrNull(json['size']),
+        timeLeft: _asNullableString(json['time_left']),
+      );
+}
+
 class EpgProgram {
   const EpgProgram({
     required this.channelId,
@@ -716,6 +852,9 @@ ContentType contentTypeFromWire(String value) => switch (value) {
   'aiostreams' => ContentType.aiostreams,
   _ => ContentType.vod,
 };
+
+List<Object?> _asList(Object? value) =>
+    value is List ? value.cast<Object?>() : const <Object?>[];
 
 int _asInt(Object? value) {
   if (value is int) return value;

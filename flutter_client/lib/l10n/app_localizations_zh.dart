@@ -477,4 +477,63 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => '全部';
+
+  @override
+  String get requestsTabSearch => '搜索';
+
+  @override
+  String get requestsTabMyRequests => '我的请求';
+
+  @override
+  String get requestsSearchHint => '搜索电影和剧集…';
+
+  @override
+  String get requestsNoResults => '未找到结果';
+
+  @override
+  String get requestsAlreadyAvailable => '已可观看';
+
+  @override
+  String get requestsAlreadyRequested => '已请求';
+
+  @override
+  String requestsSubmitted(String title) {
+    return '已请求“$title”';
+  }
+
+  @override
+  String requestsSubmittedPendingApproval(String title) {
+    return '“$title”已提交等待批准';
+  }
+
+  @override
+  String requestsSubmitFailed(String title, String error) {
+    return '无法请求“$title”：$error';
+  }
+
+  @override
+  String get requestsMyRequestsEmpty => '您还没有请求过任何内容';
+
+  @override
+  String get requestsDismiss => '移除';
+
+  @override
+  String requestsDismissFailed(String error) {
+    return '无法移除请求：$error';
+  }
+
+  @override
+  String get requestsStatusPendingApproval => '待批准';
+
+  @override
+  String get requestsStatusApproved => '已批准';
+
+  @override
+  String get requestsStatusRejected => '已拒绝';
+
+  @override
+  String get requestsStatusCompleted => '已完成';
+
+  @override
+  String get requestsStatusUnknown => '未知';
 }

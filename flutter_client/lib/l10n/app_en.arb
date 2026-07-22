@@ -231,5 +231,53 @@
   "aiostreamsSearch": "Search AIOStreams",
   "aiostreamsSearchResults": "Search Results",
   "aiostreamsNoResults": "No results found",
-  "aiostreamsSearchAll": "All"
+  "aiostreamsSearchAll": "All",
+  "requestsTabSearch": "Search",
+  "requestsTabMyRequests": "My Requests",
+  "requestsSearchHint": "Search movies & shows…",
+  "requestsNoResults": "No results found",
+  "requestsAlreadyAvailable": "Already available",
+  "requestsAlreadyRequested": "Already requested",
+  "requestsSubmitted": "\"{title}\" was requested",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "\"{title}\" was sent for approval",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "Could not request \"{title}\": {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "You haven't requested anything yet",
+  "requestsDismiss": "Dismiss",
+  "requestsDismissFailed": "Could not dismiss request: {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "Pending Approval",
+  "requestsStatusApproved": "Approved",
+  "requestsStatusRejected": "Rejected",
+  "requestsStatusCompleted": "Completed",
+  "requestsStatusUnknown": "Unknown"
 }
