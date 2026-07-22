@@ -19,6 +19,50 @@ const _kStadiumEffect = [
   GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
 ];
 
+/// A [DpadFocusable] that also moves real D-pad/keyboard focus on mouse
+/// hover, so this button's gradient border follows the mouse the same way
+/// it follows the D-pad — plain [DpadFocusable] only reacts to actual
+/// focus, so a mouse hovering a sibling button never lit it up and an
+/// autofocused button kept its border until the next arrow-key press.
+class _HoverFocusButton extends StatefulWidget {
+  const _HoverFocusButton({
+    required this.child,
+    this.onSelect,
+    this.autofocus = false,
+  });
+
+  final Widget child;
+  final VoidCallback? onSelect;
+  final bool autofocus;
+
+  @override
+  State<_HoverFocusButton> createState() => _HoverFocusButtonState();
+}
+
+class _HoverFocusButtonState extends State<_HoverFocusButton> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _focusNode.requestFocus(),
+      child: DpadFocusable(
+        focusNode: _focusNode,
+        autofocus: widget.autofocus,
+        onSelect: widget.onSelect,
+        effects: _kStadiumEffect,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// Detail screen for a single `request_search` result — mirrors
 /// VodDetailsScreen/AIOStreamsDetailScreen's backdrop layout (same metadata
 /// chip row, same wide/narrow breakpoint), since all the metadata needed is
@@ -412,17 +456,15 @@ class _Body extends StatelessWidget {
           : button;
     }
 
-    final selectAll = DpadFocusable(
+    final selectAll = _HoverFocusButton(
       onSelect: onSelectAllSeasons,
-      effects: _kStadiumEffect,
       child: FilledButton.tonal(
         onPressed: onSelectAllSeasons,
         child: Text(l.requestsSelectAllSeasons),
       ),
     );
-    final clear = DpadFocusable(
+    final clear = _HoverFocusButton(
       onSelect: onClearAllSeasons,
-      effects: _kStadiumEffect,
       child: FilledButton.tonal(
         onPressed: onClearAllSeasons,
         child: Text(l.requestsClearSeasons),
@@ -478,10 +520,9 @@ class _Body extends StatelessWidget {
     }
     final noSeasonsSelected = _showSeasonPicker && selectedSeasons.isEmpty;
     final onPressed = isSubmitting || noSeasonsSelected ? null : onSubmit;
-    return DpadFocusable(
+    return _HoverFocusButton(
       autofocus: true,
       onSelect: onPressed,
-      effects: _kStadiumEffect,
       child: FilledButton.icon(
         onPressed: onPressed,
         icon: isSubmitting
