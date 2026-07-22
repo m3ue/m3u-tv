@@ -802,7 +802,7 @@ void main() {
     );
     final launcherIconConfig = readFile('flutter_launcher_icons.yaml');
 
-    expect(manifest, contains('android:banner="@mipmap/ic_launcher"'));
+    expect(manifest, contains('android:banner="@drawable/tv_banner"'));
     expect(manifest, contains('android:label="M3U TV"'));
     expect(manifest, contains('android.intent.category.LEANBACK_LAUNCHER'));
     expect(manifest, contains('android:enableOnBackInvokedCallback="true"'));
@@ -810,6 +810,16 @@ void main() {
     expect(launcherIconConfig, contains('adaptive_icon_foreground_inset: 0'));
     expect(launcherIcon, contains('android:inset="0%"'));
     expect(launcherIcon, isNot(contains('android:inset="16%"')));
+
+    for (final density in ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']) {
+      expect(
+        File(
+          'android/app/src/main/res/drawable-$density/tv_banner.png',
+        ).existsSync(),
+        isTrue,
+        reason: 'TV banner must be committed for drawable-$density',
+      );
+    }
   });
 
   test('Android launch and normal themes use the same edge-to-edge window', () {
