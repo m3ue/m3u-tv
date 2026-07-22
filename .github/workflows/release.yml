@@ -547,6 +547,54 @@ jobs:
             exit 1
           fi
 
+          # Explicit allowlist of intentional system dependencies. Libraries
+          # resolved from inside the bundle (media_kit, libmpv, the Flutter
+          # engine) are already covered by the checks above and are exempt.
+          # Anything else must be a known, reviewed system dependency of the
+          # GTK/X11/glibc stack this app links against - add new entries here
+          # deliberately, not to silence a failure.
+          ALLOWED_SYSTEM_LIBS=(
+            'linux-vdso.so.1' 'ld-linux-x86-64.so.2'
+            'libc.so.6' 'libm.so.6' 'libpthread.so.0' 'libdl.so.2' 'librt.so.1'
+            'libgcc_s.so.1' 'libstdc++.so.6'
+            'libgtk-3.so.0' 'libgdk-3.so.0' 'libgio-2.0.so.0' 'libglib-2.0.so.0'
+            'libgobject-2.0.so.0' 'libgmodule-2.0.so.0'
+            'libpango-1.0.so.0' 'libpangocairo-1.0.so.0'
+            'libcairo.so.2' 'libcairo-gobject.so.2' 'libgdk_pixbuf-2.0.so.0'
+            'libatk-1.0.so.0' 'libatk-bridge-2.0.so.0' 'libepoxy.so.0'
+            'libX11.so.6' 'libXext.so.6' 'libXi.so.6' 'libXcursor.so.1'
+            'libXdamage.so.1' 'libXfixes.so.3' 'libXcomposite.so.1'
+            'libXrandr.so.2' 'libXrender.so.1' 'libXinerama.so.1' 'libXtst.so.6'
+            'libsecret-1.so.0' 'libjsoncpp.so.26' 'liblzma.so.5'
+            'libselinux.so.1' 'libmount.so.1' 'libblkid.so.1' 'libpcre2-8.so.0'
+            'libffi.so.8' 'libz.so.1' 'libbz2.so.1.0' 'libexpat.so.1'
+            'libuuid.so.1' 'libgpg-error.so.0' 'libp11-kit.so.0'
+          )
+          UNEXPECTED=()
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            if printf '%s' "$line" | grep -q '/bundle/lib/'; then
+              continue
+            fi
+            LIBNAME=$(printf '%s' "$line" | sed -n 's/^[[:space:]]*\([^[:space:]]*\).*/\1/p')
+            [ -z "$LIBNAME" ] && continue
+            MATCH=0
+            for allowed in "${ALLOWED_SYSTEM_LIBS[@]}"; do
+              if [ "$LIBNAME" = "$allowed" ]; then
+                MATCH=1
+                break
+              fi
+            done
+            if [ "$MATCH" -eq 0 ]; then
+              UNEXPECTED+=("$LIBNAME")
+            fi
+          done < /tmp/m3u-tv-ldd.txt
+          if [ "${#UNEXPECTED[@]}" -gt 0 ]; then
+            echo "ERROR: Unexpected system dependency not in ALLOWED_SYSTEM_LIBS: ${UNEXPECTED[*]}"
+            echo "If this is an intentional new dependency, add it to the allowlist in this step."
+            exit 1
+          fi
+
       - name: Package as ZIP
         run: |
           V="${{ needs.validate.outputs.version }}"

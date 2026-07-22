@@ -741,6 +741,54 @@ void main() {
     expect(releaseWorkflow, contains('Get-FileHash -Algorithm SHA256'));
     expect(releaseWorkflow, contains('.zip.sha256'));
     expect(releaseWorkflow, contains('.apk.sha256'));
+
+    expect(verifyLinuxRunBlock, contains('ALLOWED_SYSTEM_LIBS='));
+    expect(
+      verifyLinuxRunBlock,
+      contains('ERROR: Unexpected system dependency not in ALLOWED_SYSTEM_LIBS'),
+    );
+    expect(verifyLinuxRunBlock, contains("'libgtk-3.so.0'"));
+    expect(verifyLinuxRunBlock, contains("'libc.so.6'"));
+  });
+
+  test('pull request CI compiles native Linux and Windows runners', () {
+    final ciWorkflow = readFile(ciWorkflowPath);
+
+    expect(ciWorkflow, contains('workflow_dispatch'));
+    expect(ciWorkflow, contains('name: Detect desktop-affecting changes'));
+    expect(ciWorkflow, contains('uses: dorny/paths-filter@v3'));
+    expect(
+      ciWorkflow,
+      contains(
+        r"desktop: ${{ github.event_name == 'workflow_dispatch' || "
+            "steps.filter.outputs.desktop == 'true' }}",
+      ),
+    );
+    expect(ciWorkflow, contains("- 'flutter_client/linux/**'"));
+    expect(ciWorkflow, contains("- 'flutter_client/windows/**'"));
+    expect(ciWorkflow, contains("- 'flutter_client/pubspec.yaml'"));
+    expect(ciWorkflow, contains("- 'flutter_client/pubspec.lock'"));
+
+    expect(ciWorkflow, contains('name: Build Linux runner (verify only)'));
+    expect(ciWorkflow, contains('name: Build Windows runner (verify only)'));
+    expect(
+      ciWorkflow,
+      contains("if: needs.changes.outputs.desktop == 'true'"),
+    );
+
+    final linuxJobIdx = ciWorkflow.indexOf('build-linux-native:');
+    final windowsJobIdx = ciWorkflow.indexOf('build-windows-native:');
+    expect(linuxJobIdx, greaterThan(-1));
+    expect(windowsJobIdx, greaterThan(linuxJobIdx));
+    final linuxJob = ciWorkflow.substring(linuxJobIdx, windowsJobIdx);
+    final windowsJob = ciWorkflow.substring(windowsJobIdx);
+
+    expect(linuxJob, contains('runs-on: ubuntu-latest'));
+    expect(linuxJob, contains('flutter build linux --release'));
+    expect(linuxJob, isNot(contains('upload-artifact')));
+    expect(windowsJob, contains('runs-on: windows-latest'));
+    expect(windowsJob, contains('flutter build windows --release'));
+    expect(windowsJob, isNot(contains('upload-artifact')));
   });
 
   test('android manifest exposes Android TV launcher metadata', () {

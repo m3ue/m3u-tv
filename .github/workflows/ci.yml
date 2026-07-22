@@ -5,12 +5,34 @@ on:
     branches: [main, master, dev, flutter]
   push:
     branches: [main, master, dev, flutter]
+  workflow_dispatch: {}
 
 concurrency:
   group: flutter-client-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect desktop-affecting changes
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            desktop:
+              - 'flutter_client/linux/**'
+              - 'flutter_client/windows/**'
+              - 'flutter_client/lib/**'
+              - 'flutter_client/pubspec.yaml'
+              - 'flutter_client/pubspec.lock'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+
   flutter-gates:
     name: Flutter analyze and test
     runs-on: ubuntu-latest
@@ -47,3 +69,91 @@ jobs:
 
       - name: Test Flutter client
         run: /tmp/flutter/bin/flutter test
+
+  build-linux-native:
+    name: Build Linux runner (verify only)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libmpv-dev \
+            libsecret-1-dev libjsoncpp-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Linux app
+        run: flutter build linux --release
+
+      - name: Verify Linux runner and runtime files
+        run: |
+          BUNDLE="build/linux/x64/release/bundle"
+          test -x "$BUNDLE/m3u_tv"
+          test -s "$BUNDLE/lib/libflutter_linux_gtk.so"
+          test -s "$BUNDLE/lib/libmpv.so.2"
+          test -s "$BUNDLE/lib/libmedia_kit_video_plugin.so"
+          test -s "$BUNDLE/data/icudtl.dat"
+          test -d "$BUNDLE/data/flutter_assets"
+          if ldd "$BUNDLE/m3u_tv" | tee /tmp/m3u-tv-ldd.txt | grep -q 'not found'; then
+            cat /tmp/m3u-tv-ldd.txt
+            exit 1
+          fi
+
+  build-windows-native:
+    name: Build Windows runner (verify only)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Verify Windows runner and runtime files
+        run: |
+          $Bundle = "build\windows\x64\runner\Release"
+          $Required = @(
+            "m3u_tv.exe",
+            "flutter_windows.dll",
+            "libmpv-2.dll",
+            "data\icudtl.dat",
+            "data\flutter_assets\AssetManifest.bin"
+          )
+          foreach ($RelativePath in $Required) {
+            $Path = Join-Path $Bundle $RelativePath
+            if (-not (Test-Path $Path -PathType Leaf)) {
+              throw "Required Windows bundle file is missing: $Path"
+            }
+            if ((Get-Item $Path).Length -eq 0) {
+              throw "Required Windows bundle file is empty: $Path"
+            }
+          }
