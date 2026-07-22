@@ -390,6 +390,10 @@ class AppStateController extends ChangeNotifier {
         session: session,
         credentials: credentials,
         onNotification: _onPushNotification,
+        onDvrStatus: _onDvrStatusPush,
+        // Reconciles any status pushes missed while disconnected (app
+        // suspended, network drop) — cheap, status-filtered fetch, not a poll.
+        onConnected: () => unawaited(refreshActiveDvrRecordings()),
       );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
@@ -398,6 +402,59 @@ class AppStateController extends ChangeNotifier {
 
   void _onPushNotification(TvNotificationItem item) {
     unawaited(_storeAndNotify(item));
+  }
+
+  void _onDvrStatusPush(DvrRecording recording) {
+    final channelId = recording.channelId;
+    if (channelId != null) {
+      final updated = Set<int>.of(_recordingChannelIds);
+      if (recording.isInProgress) {
+        updated.add(channelId);
+      } else {
+        updated.remove(channelId);
+      }
+      if (!setEquals(_recordingChannelIds, updated)) {
+        _recordingChannelIds = updated;
+        notifyListeners();
+      }
+    }
+
+    if (recording.status == DvrRecordingStatus.deleted) {
+      // The server is the source of truth: a deleted recording has no
+      // get_dvr_recording row left to fetch, so drop it locally instead of
+      // refreshing its detail.
+      final next = _dvrRecordings
+          .where((r) => r.uuid != recording.uuid)
+          .toList(growable: false);
+      if (next.length != _dvrRecordings.length) {
+        _dvrRecordings = next;
+        notifyListeners();
+      }
+      return;
+    }
+
+    // The push payload is a lightweight status ping (no stream_url/live_url —
+    // those need this viewer's Xtream credentials to build). Fetch the full
+    // record so the DVR Recordings screen updates its status label and gets
+    // a playable URL as soon as a recording starts, not just on next reload.
+    unawaited(_refreshDvrRecordingDetail(recording.uuid));
+  }
+
+  Future<void> _refreshDvrRecordingDetail(String uuid) async {
+    try {
+      final detail = await xtreamService.getDvrRecording(uuid);
+      final next = [..._dvrRecordings];
+      final index = next.indexWhere((r) => r.uuid == uuid);
+      if (index >= 0) {
+        next[index] = detail;
+      } else {
+        next.insert(0, detail);
+      }
+      _dvrRecordings = next;
+      notifyListeners();
+    } on Object catch (error) {
+      debugPrint('DVR: refresh recording detail after push failed: $error');
+    }
   }
 
   Future<void> _storeAndNotify(TvNotificationItem item) async {

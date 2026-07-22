@@ -258,6 +258,9 @@ class _StatusIcon extends StatelessWidget {
       DvrRecordingStatus.scheduled => Icons.schedule,
       DvrRecordingStatus.failed => Icons.error,
       DvrRecordingStatus.cancelled => Icons.cancel,
+      // Never actually rendered — deleted recordings are removed from the
+      // list before they reach this widget. See _onDvrStatusPush.
+      DvrRecordingStatus.deleted => Icons.delete,
       DvrRecordingStatus.unknown => Icons.radio_button_unchecked,
     };
     final color = switch (recording.status) {
@@ -266,6 +269,7 @@ class _StatusIcon extends StatelessWidget {
       DvrRecordingStatus.scheduled => colorScheme.secondary,
       DvrRecordingStatus.failed => colorScheme.error,
       DvrRecordingStatus.cancelled => colorScheme.onSurfaceVariant,
+      DvrRecordingStatus.deleted => colorScheme.onSurfaceVariant,
       DvrRecordingStatus.unknown => colorScheme.onSurfaceVariant,
     };
     return Container(

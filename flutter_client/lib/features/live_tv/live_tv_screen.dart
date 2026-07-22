@@ -30,7 +30,6 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
     this.onScheduleProgram,
-    this.onPollActiveRecordings,
   });
 
   final FavoritesService favoritesService;
@@ -38,7 +37,6 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
-  final Future<void> Function()? onPollActiveRecordings;
 
   @override
   ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();
@@ -46,30 +44,22 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   static const _favoritesCategoryId = '__FAVORITES__';
-  static const _recordingPollInterval = Duration(seconds: 15);
   String? _selectedCategory;
   String _query = '';
   Set<int> _favoriteIds = {};
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
-  Timer? _recordingPollTimer;
 
   @override
   void initState() {
     super.initState();
     widget.favoritesService.addListener(_onFavoritesChanged);
     unawaited(_initCategory());
-    unawaited(widget.onPollActiveRecordings?.call());
-    _recordingPollTimer = Timer.periodic(
-      _recordingPollInterval,
-      (_) => unawaited(widget.onPollActiveRecordings?.call()),
-    );
   }
 
   @override
   void dispose() {
     widget.favoritesService.removeListener(_onFavoritesChanged);
-    _recordingPollTimer?.cancel();
     super.dispose();
   }
 

@@ -457,7 +457,9 @@ void main() {
         final detail = await service.getDvrRecording('rec-completed');
         expect(detail.metadata, {'tmdb_id': 12345});
         expect(detail.errorMessage, 'transient probe warning');
-        expect(transport.requests.last.params['uuid'], 'rec-completed');
+        // Backend reads `recording_id`, not `uuid` — see
+        // XtreamApiController::getDvrRecording().
+        expect(transport.requests.last.params['recording_id'], 'rec-completed');
       },
     );
 

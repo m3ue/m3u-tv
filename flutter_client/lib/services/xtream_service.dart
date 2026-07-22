@@ -420,7 +420,9 @@ class XtreamService {
   Future<DvrRecording> getDvrRecording(String uuid) async {
     final response = await _request(
       'get_dvr_recording',
-      params: {'uuid': uuid},
+      // m3u-editor's XtreamApiController::getDvrRecording() reads
+      // `recording_id`, not `uuid`.
+      params: {'recording_id': uuid},
     );
     return DvrRecording.fromXtream(_asMap(response));
   }
