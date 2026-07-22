@@ -22,6 +22,11 @@ TVOS_ASSETS="$FLUTTER_DIR/tvos/Runner/Assets.xcassets/AppIcon.brandassets"
 APP_BG="#0a0a0f"    # App surface colour (used for icon.png, splash, android)
 TVOS_BG="#1c1c1e"   # tvOS system dark (used for tvOS icon layers + top shelf)
 
+# Diagonal gradient matching the app's _kGradientBg in go_router_config.dart
+# (topLeft → bottomRight), also used by generate-screenshots.sh.
+GRADIENT_START="#1a1528"
+GRADIENT_END="#09090b"
+
 # Prerequisites
 for cmd in rsvg-convert magick; do
     command -v "$cmd" &>/dev/null || {
@@ -52,6 +57,17 @@ composite_square() {
     magick -size "${size}x${size}" xc:"$bg" \
         "$logo" -gravity center -composite \
         -depth 8 "PNG32:$output"
+}
+
+# Diagonal gradient background at exact pixel dimensions.
+# gradient:vector pins the start/end colours to the corners so ImageMagick
+# never extrapolates outside the specified range.
+gradient_bg() {
+    local w=$1 h=$2 output=$3
+    magick -size "${w}x${h}" \
+        -define "gradient:vector=0,0,$((w-1)),$((h-1))" \
+        gradient:"${GRADIENT_START}-${GRADIENT_END}" \
+        "$output"
 }
 
 # ---------------------------------------------------------------------------
@@ -148,6 +164,34 @@ magick -size 2320x720 xc:"$TVOS_BG" "$LOGO_580" -gravity center -composite \
     -depth 8 "$SHELF/top_shelf.png"
 
 echo "  tvOS layered icons and Top Shelf image written to $TVOS_ASSETS"
+
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== Step 6: Generate Android TV banner ==="
+# ---------------------------------------------------------------------------
+# The Leanback launcher's row/grid view uses android:banner (a landscape
+# 320x180dp image), not the square launcher icon. Without it Android TV
+# falls back to a default icon in that view. Density buckets scale from the
+# 320x180 xhdpi baseline (0.55x mdpi, 0.825x hdpi, 1.5x xxhdpi).
+ANDROID_RES="$FLUTTER_DIR/android/app/src/main/res"
+
+declare -A BANNER_SIZES=(
+    [mdpi]="176x100"
+    [hdpi]="264x150"
+    [xhdpi]="320x180"
+    [xxhdpi]="480x270"
+)
+for density in "${!BANNER_SIZES[@]}"; do
+    size="${BANNER_SIZES[$density]}"
+    width="${size%x*}" height="${size#*x}"
+    logo=$(render_logo "$((height * 80 / 100))")
+    bg="$TMP/banner_bg_${density}.png"
+    gradient_bg "$width" "$height" "$bg"
+    magick "$bg" "$logo" -gravity center -composite \
+        -depth 8 "PNG32:$ANDROID_RES/drawable-${density}/tv_banner.png"
+done
+
+echo "  tv_banner.png written to $ANDROID_RES/drawable-{mdpi,hdpi,xhdpi,xxhdpi}"
 
 # ---------------------------------------------------------------------------
 echo ""

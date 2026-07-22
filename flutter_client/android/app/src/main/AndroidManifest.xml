@@ -13,7 +13,7 @@
     <application
         android:label="M3U TV"
         android:name="${applicationName}"
-        android:banner="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
         android:isGame="false"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">
