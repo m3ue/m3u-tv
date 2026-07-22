@@ -47,28 +47,28 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
-      - name: Provision pinned Flutter SDK path
-        run: |
-          if [ ! -x /tmp/flutter/bin/flutter ]; then
-            git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /tmp/flutter
-          fi
-          /tmp/flutter/bin/flutter --version
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          cache: true
 
       - name: Get dependencies
-        run: /tmp/flutter/bin/flutter pub get
+        run: flutter pub get
 
       - name: Test native Android code
         run: ./android/gradlew -p android :app:testDebugUnitTest
 
       - name: Check formatting
-        run: /tmp/flutter/bin/dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze Flutter client
-        run: /tmp/flutter/bin/flutter analyze
+        run: flutter analyze
 
       - name: Test Flutter client
-        run: /tmp/flutter/bin/flutter test
+        run: flutter test
 
   build-linux-native:
     name: Build Linux runner (verify only)

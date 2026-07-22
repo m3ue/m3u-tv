@@ -31,10 +31,9 @@ void main() {
     final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
-    expect(workflow, contains('git clone --depth 1 --branch stable'));
-    expect(workflow, contains('/tmp/flutter/bin/flutter --version'));
-    expect(workflow, contains('run: /tmp/flutter/bin/flutter analyze'));
-    expect(workflow, contains('run: /tmp/flutter/bin/flutter test'));
+    expect(workflow, contains("flutter-version: '3.44.2'"));
+    expect(workflow, contains('run: flutter analyze'));
+    expect(workflow, contains('run: flutter test'));
   });
 
   test('CI executes native Android playback speed unit tests', () {
@@ -745,7 +744,9 @@ void main() {
     expect(verifyLinuxRunBlock, contains('ALLOWED_SYSTEM_LIBS='));
     expect(
       verifyLinuxRunBlock,
-      contains('ERROR: Unexpected system dependency not in ALLOWED_SYSTEM_LIBS'),
+      contains(
+        'ERROR: Unexpected system dependency not in ALLOWED_SYSTEM_LIBS',
+      ),
     );
     expect(verifyLinuxRunBlock, contains("'libgtk-3.so.0'"));
     expect(verifyLinuxRunBlock, contains("'libc.so.6'"));
@@ -761,7 +762,7 @@ void main() {
       ciWorkflow,
       contains(
         r"desktop: ${{ github.event_name == 'workflow_dispatch' || "
-            "steps.filter.outputs.desktop == 'true' }}",
+        "steps.filter.outputs.desktop == 'true' }}",
       ),
     );
     expect(ciWorkflow, contains("- 'flutter_client/linux/**'"));
