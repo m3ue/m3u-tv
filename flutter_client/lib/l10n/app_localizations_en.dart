@@ -512,6 +512,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestsRequestButton => 'Request';
 
   @override
+  String get requestsSeasonsHeading => 'Seasons';
+
+  @override
+  String get requestsSelectAllSeasons => 'Select All';
+
+  @override
+  String get requestsClearSeasons => 'Clear';
+
+  @override
   String requestsSubmitted(String title) {
     return '\"$title\" was requested';
   }

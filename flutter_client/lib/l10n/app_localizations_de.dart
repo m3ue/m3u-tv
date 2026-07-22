@@ -513,6 +513,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get requestsRequestButton => 'Anfragen';
 
   @override
+  String get requestsSeasonsHeading => 'Staffeln';
+
+  @override
+  String get requestsSelectAllSeasons => 'Alle auswählen';
+
+  @override
+  String get requestsClearSeasons => 'Zurücksetzen';
+
+  @override
   String requestsSubmitted(String title) {
     return '\"$title\" wurde angefragt';
   }

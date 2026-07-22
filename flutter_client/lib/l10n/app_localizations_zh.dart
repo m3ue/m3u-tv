@@ -500,6 +500,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get requestsRequestButton => '请求';
 
   @override
+  String get requestsSeasonsHeading => '季';
+
+  @override
+  String get requestsSelectAllSeasons => '全选';
+
+  @override
+  String get requestsClearSeasons => '清除';
+
+  @override
   String requestsSubmitted(String title) {
     return '已请求“$title”';
   }

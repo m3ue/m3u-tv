@@ -239,6 +239,9 @@
   "requestsAlreadyAvailable": "Already available",
   "requestsAlreadyRequested": "Already requested",
   "requestsRequestButton": "Request",
+  "requestsSeasonsHeading": "Seasons",
+  "requestsSelectAllSeasons": "Select All",
+  "requestsClearSeasons": "Clear",
   "requestsSubmitted": "\"{title}\" was requested",
   "@requestsSubmitted": {
     "placeholders": {

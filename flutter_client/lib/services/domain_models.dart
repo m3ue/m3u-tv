@@ -541,6 +541,32 @@ class ContentRequestRating {
   }
 }
 
+/// A single season of a series search result, mirroring
+/// `ContentRequestService::search()`'s per-season shape — enough to let the
+/// TV app pre-select missing seasons and show which ones the library already
+/// has (`has_file`), without exposing Sonarr's full monitored/statistics shape.
+class ContentRequestSeason {
+  const ContentRequestSeason({
+    required this.seasonNumber,
+    this.episodeCount,
+    this.episodeFileCount,
+    this.hasFile = false,
+  });
+
+  final int seasonNumber;
+  final int? episodeCount;
+  final int? episodeFileCount;
+  final bool hasFile;
+
+  factory ContentRequestSeason.fromJson(Map<String, Object?> json) =>
+      ContentRequestSeason(
+        seasonNumber: _asInt(json['season_number']),
+        episodeCount: _asIntOrNull(json['episode_count']),
+        episodeFileCount: _asIntOrNull(json['episode_file_count']),
+        hasFile: json['has_file'] == true,
+      );
+}
+
 /// A single search result from `request_search`, combining a title's Arr
 /// metadata with the guest-enabled ArrIntegration that can fulfil it.
 class ContentRequestSearchResult {
@@ -558,7 +584,7 @@ class ContentRequestSearchResult {
     this.rating,
     this.runtimeMinutes,
     this.certification,
-    this.seasons = const <int>[],
+    this.seasons = const <ContentRequestSeason>[],
     this.alreadyAvailable = false,
   });
 
@@ -575,7 +601,7 @@ class ContentRequestSearchResult {
   final ContentRequestRating? rating;
   final int? runtimeMinutes;
   final String? certification;
-  final List<int> seasons;
+  final List<ContentRequestSeason> seasons;
   final bool alreadyAvailable;
 
   factory ContentRequestSearchResult.fromJson(Map<String, Object?> json) =>
@@ -595,7 +621,10 @@ class ContentRequestSearchResult {
         rating: ContentRequestRating.fromJson(json['rating']),
         runtimeMinutes: _asIntOrNull(json['runtime']),
         certification: _asNullableString(json['certification']),
-        seasons: _asList(json['seasons']).map(_asInt).toList(growable: false),
+        seasons: _asList(json['seasons'])
+            .whereType<Map<String, dynamic>>()
+            .map((season) => ContentRequestSeason.fromJson(_asMap(season)))
+            .toList(growable: false),
         alreadyAvailable: json['already_available'] == true,
       );
 }

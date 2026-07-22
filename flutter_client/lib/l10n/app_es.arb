@@ -239,6 +239,9 @@
   "requestsAlreadyAvailable": "Ya disponible",
   "requestsAlreadyRequested": "Ya solicitado",
   "requestsRequestButton": "Solicitar",
+  "requestsSeasonsHeading": "Temporadas",
+  "requestsSelectAllSeasons": "Seleccionar todo",
+  "requestsClearSeasons": "Borrar",
   "requestsSubmitted": "\"{title}\" fue solicitado",
   "@requestsSubmitted": {
     "placeholders": {

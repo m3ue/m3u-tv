@@ -663,11 +663,13 @@ class AppStateController extends ChangeNotifier {
     required String type,
     required int integrationId,
     required String externalId,
+    List<int>? seasons,
   }) async {
     final request = await xtreamService.submitContentRequest(
       type: type,
       integrationId: integrationId,
       externalId: externalId,
+      seasons: seasons,
     );
     _mediaRequests = [request, ..._mediaRequests];
     notifyListeners();

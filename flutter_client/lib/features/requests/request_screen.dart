@@ -53,6 +53,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   Timer? _debounce;
 
   String _query = '';
+  String _typeFilter = '';
   bool _isSearching = false;
   String? _searchError;
   List<ContentRequestSearchResult> _results = const [];
@@ -95,7 +96,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       _searchError = null;
     });
     try {
-      final results = await widget.onSearch(query.trim());
+      final results = await widget.onSearch(
+        query.trim(),
+        type: _typeFilter.isEmpty ? null : _typeFilter,
+      );
       if (!mounted || _query != query) return;
       setState(() {
         _results = results;
@@ -112,6 +116,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
 
   String _errorMessage(Object error) =>
       error is XtreamRequestException ? error.message : error.toString();
+
+  void _onTypeFilterChanged(String type) {
+    if (type == _typeFilter) return;
+    setState(() => _typeFilter = type);
+    if (_query.trim().length >= 2) unawaited(_search(_query));
+  }
 
   bool _isAlreadyRequested(
     ContentRequestSearchResult result,
@@ -191,16 +201,35 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     AppLocalizations l,
     List<MediaRequestSummary> myRequests,
   ) {
+    final contentTypes =
+        ref.watch(requestsCapabilityProvider)?.contentTypes ?? const [];
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
+          padding: const EdgeInsets.fromLTRB(
+            MediaBrowsingMetrics.contentPadding,
+            MediaBrowsingMetrics.contentPadding,
+            MediaBrowsingMetrics.contentPadding,
+            0,
+          ),
           child: InlineMediaSearchField(
             query: _query,
             hintText: l.requestsSearchHint,
             onChanged: _onQueryChanged,
           ),
         ),
+        if (contentTypes.length > 1)
+          ScrollableCategoryBar(
+            tabs: [
+              CategoryTabData(id: '', name: l.aiostreamsSearchAll),
+              if (contentTypes.contains('movie'))
+                CategoryTabData(id: 'movie', name: l.searchSectionMovies),
+              if (contentTypes.contains('series'))
+                CategoryTabData(id: 'series', name: l.searchSectionSeries),
+            ],
+            selectedId: _typeFilter,
+            onSelected: _onTypeFilterChanged,
+          ),
         Expanded(child: _buildSearchResults(l, myRequests)),
       ],
     );

@@ -239,6 +239,9 @@
   "requestsAlreadyAvailable": "Bereits verfügbar",
   "requestsAlreadyRequested": "Bereits angefragt",
   "requestsRequestButton": "Anfragen",
+  "requestsSeasonsHeading": "Staffeln",
+  "requestsSelectAllSeasons": "Alle auswählen",
+  "requestsClearSeasons": "Zurücksetzen",
   "requestsSubmitted": "\"{title}\" wurde angefragt",
   "@requestsSubmitted": {
     "placeholders": {

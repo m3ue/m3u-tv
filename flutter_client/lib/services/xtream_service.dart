@@ -143,7 +143,7 @@ class XtreamRequest {
   final UserCredentials credentials;
   final String? action;
   final Map<String, String> params;
-  final Map<String, String> body;
+  final Map<String, Object?> body;
   final Map<String, String> headers;
   final String method;
 
@@ -552,6 +552,7 @@ class XtreamService {
     required String type,
     required int integrationId,
     required String externalId,
+    List<int>? seasons,
   }) async {
     final response = await _request(
       'request_submit',
@@ -560,6 +561,7 @@ class XtreamService {
         'type': type,
         'integration_id': '$integrationId',
         'external_id': externalId,
+        'seasons': ?seasons,
       },
     );
     final data = _asMap(_unwrapRequestEnvelope(response)['data']);
@@ -831,7 +833,7 @@ class XtreamService {
   Future<Object?> _request(
     String action, {
     Map<String, String> params = const {},
-    Map<String, String> body = const {},
+    Map<String, Object?> body = const {},
     String method = 'GET',
   }) {
     return _requestWithCredentials(
@@ -847,7 +849,7 @@ class XtreamService {
     UserCredentials credentials,
     String? action, {
     Map<String, String> params = const {},
-    Map<String, String> body = const {},
+    Map<String, Object?> body = const {},
     Map<String, String> headers = const {},
     String method = 'GET',
   }) {

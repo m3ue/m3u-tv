@@ -239,6 +239,9 @@
   "requestsAlreadyAvailable": "已可观看",
   "requestsAlreadyRequested": "已请求",
   "requestsRequestButton": "请求",
+  "requestsSeasonsHeading": "季",
+  "requestsSelectAllSeasons": "全选",
+  "requestsClearSeasons": "清除",
   "requestsSubmitted": "已请求“{title}”",
   "@requestsSubmitted": {
     "placeholders": {

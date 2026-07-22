@@ -1034,6 +1034,24 @@ abstract class AppLocalizations {
   /// **'Request'**
   String get requestsRequestButton;
 
+  /// No description provided for @requestsSeasonsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get requestsSeasonsHeading;
+
+  /// No description provided for @requestsSelectAllSeasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get requestsSelectAllSeasons;
+
+  /// No description provided for @requestsClearSeasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get requestsClearSeasons;
+
   /// No description provided for @requestsSubmitted.
   ///
   /// In en, this message translates to:

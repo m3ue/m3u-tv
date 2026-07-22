@@ -513,6 +513,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get requestsRequestButton => 'Demander';
 
   @override
+  String get requestsSeasonsHeading => 'Saisons';
+
+  @override
+  String get requestsSelectAllSeasons => 'Tout sélectionner';
+
+  @override
+  String get requestsClearSeasons => 'Effacer';
+
+  @override
   String requestsSubmitted(String title) {
     return '« $title » a été demandé';
   }

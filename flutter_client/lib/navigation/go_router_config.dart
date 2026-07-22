@@ -300,8 +300,7 @@ GoRouter createGoRouter({
                   GoRoute(
                     path: 'details/:integrationId/:type/:externalId',
                     pageBuilder: (context, state) {
-                      final result =
-                          state.extra! as ContentRequestSearchResult;
+                      final result = state.extra! as ContentRequestSearchResult;
                       final actions = ContentActions.of(context);
                       return _slidePage(
                         ListenableBuilder(
