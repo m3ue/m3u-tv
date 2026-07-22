@@ -254,6 +254,7 @@ class _StatusIcon extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final icon = switch (recording.status) {
       DvrRecordingStatus.recording => Icons.fiber_manual_record,
+      DvrRecordingStatus.postProcessing => Icons.sync,
       DvrRecordingStatus.completed => Icons.check_circle,
       DvrRecordingStatus.scheduled => Icons.schedule,
       DvrRecordingStatus.failed => Icons.error,
@@ -265,6 +266,7 @@ class _StatusIcon extends StatelessWidget {
     };
     final color = switch (recording.status) {
       DvrRecordingStatus.recording => Colors.redAccent,
+      DvrRecordingStatus.postProcessing => colorScheme.secondary,
       DvrRecordingStatus.completed => colorScheme.primary,
       DvrRecordingStatus.scheduled => colorScheme.secondary,
       DvrRecordingStatus.failed => colorScheme.error,

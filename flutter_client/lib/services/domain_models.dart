@@ -345,6 +345,7 @@ class SeriesInfo {
 enum DvrRecordingStatus {
   scheduled,
   recording,
+  postProcessing,
   completed,
   failed,
   cancelled,
@@ -359,6 +360,7 @@ extension DvrRecordingStatusDisplay on DvrRecordingStatus {
   String get label => switch (this) {
     DvrRecordingStatus.scheduled => 'Scheduled',
     DvrRecordingStatus.recording => 'Recording',
+    DvrRecordingStatus.postProcessing => 'Post Processing',
     DvrRecordingStatus.completed => 'Completed',
     DvrRecordingStatus.failed => 'Failed',
     DvrRecordingStatus.cancelled => 'Cancelled',
@@ -373,6 +375,9 @@ DvrRecordingStatus dvrRecordingStatusFromWire(String value) {
     'recording' ||
     'in_progress' ||
     'in-progress' => DvrRecordingStatus.recording,
+    'post_processing' ||
+    'post-processing' ||
+    'postprocessing' => DvrRecordingStatus.postProcessing,
     'completed' || 'complete' => DvrRecordingStatus.completed,
     'failed' || 'error' => DvrRecordingStatus.failed,
     'cancelled' || 'canceled' => DvrRecordingStatus.cancelled,

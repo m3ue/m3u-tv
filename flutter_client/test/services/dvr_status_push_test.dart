@@ -15,6 +15,20 @@ void main() {
     },
   );
 
+  test(
+    'dvrRecordingStatusFromWire maps "post_processing" to DvrRecordingStatus.postProcessing',
+    () {
+      expect(
+        dvrRecordingStatusFromWire('post_processing'),
+        DvrRecordingStatus.postProcessing,
+      );
+      expect(
+        dvrRecordingStatusFromWire('post-processing'),
+        DvrRecordingStatus.postProcessing,
+      );
+    },
+  );
+
   test('DvrRecording.fromXtream parses a deletion push payload', () {
     final recording = DvrRecording.fromXtream({
       'uuid': 'rec-1',

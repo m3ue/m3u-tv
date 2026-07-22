@@ -437,6 +437,12 @@ class AppStateController extends ChangeNotifier {
     // those need this viewer's Xtream credentials to build). Fetch the full
     // record so the DVR Recordings screen updates its status label and gets
     // a playable URL as soon as a recording starts, not just on next reload.
+    //
+    // Toasts for user-facing transitions (started/completed/failed/cancelled)
+    // are no longer sent from here — the server dispatches a persisted
+    // TvNotification on the 'dvr' channel at those points instead, which
+    // arrives through the same _onPushNotification path as every other
+    // notification (unread badge, history, subscription filter all for free).
     unawaited(_refreshDvrRecordingDetail(recording.uuid));
   }
 
