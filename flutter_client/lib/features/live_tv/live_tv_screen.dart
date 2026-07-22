@@ -228,6 +228,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final channels = ref.watch(liveChannelsProvider);
     final categories = ref.watch(liveCategoriesProvider);
     final epgService = ref.watch(epgServiceProvider);
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -264,8 +265,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
                   )
                 : switch (_viewMode) {
                     _ViewMode.epgGrid => _buildEpgGrid(filtered, epgService),
-                    _ViewMode.logoGrid => _buildGridView(filtered),
-                    _ViewMode.list => _buildListView(filtered),
+                    _ViewMode.logoGrid => _buildGridView(
+                      filtered,
+                      recordingChannelIds,
+                    ),
+                    _ViewMode.list => _buildListView(
+                      filtered,
+                      recordingChannelIds,
+                    ),
                   },
           ),
         ],
@@ -318,7 +325,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     );
   }
 
-  Widget _buildListView(List<Channel> channels) {
+  Widget _buildListView(List<Channel> channels, Set<int> recordingChannelIds) {
     return DpadRegion(
       memoryKey: 'live-tv/list',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -338,6 +345,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             channel: channel,
             epg: epg,
             isFavorite: isFav,
+            isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
             onLongPress: () =>
@@ -367,7 +375,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     );
   }
 
-  Widget _buildGridView(List<Channel> channels) {
+  Widget _buildGridView(List<Channel> channels, Set<int> recordingChannelIds) {
     return DpadRegion(
       memoryKey: 'live-tv/grid',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -392,6 +400,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           return _ChannelGridItem(
             channel: channel,
             isFavorite: isFav,
+            isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () => widget.onChannelSelect(channel),
             onLongPress: () =>
@@ -459,6 +468,7 @@ class _ChannelRow extends StatelessWidget {
     required this.channel,
     this.epg,
     required this.isFavorite,
+    required this.isRecording,
     required this.autofocus,
     required this.onTap,
     required this.onLongPress,
@@ -467,6 +477,7 @@ class _ChannelRow extends StatelessWidget {
   final Channel channel;
   final EpgCurrentNext? epg;
   final bool isFavorite;
+  final bool isRecording;
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -504,11 +515,21 @@ class _ChannelRow extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        channel.name,
-                        style: Theme.of(context).textTheme.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          if (isRecording) ...[
+                            _RecordingDot(color: colorScheme.error),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: Text(
+                              channel.name,
+                              style: Theme.of(context).textTheme.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                       if (epg != null) ...[
                         const SizedBox(height: 2),
@@ -586,6 +607,7 @@ class _ChannelGridItem extends StatelessWidget {
   const _ChannelGridItem({
     required this.channel,
     required this.isFavorite,
+    required this.isRecording,
     required this.autofocus,
     required this.onTap,
     required this.onLongPress,
@@ -593,6 +615,7 @@ class _ChannelGridItem extends StatelessWidget {
 
   final Channel channel;
   final bool isFavorite;
+  final bool isRecording;
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -618,16 +641,49 @@ class _ChannelGridItem extends StatelessWidget {
             fit: BoxFit.contain,
           ),
           const SizedBox(height: 4),
-          Text(
-            channel.name,
-            style: Theme.of(context).textTheme.bodySmall,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isRecording) ...[
+                _RecordingDot(color: colorScheme.error),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  channel.name,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
           if (isFavorite)
             Icon(Icons.star, color: colorScheme.tertiary, size: 16),
         ],
+      ),
+    );
+  }
+}
+
+/// Small themed dot marking a channel as currently recording. Deliberately
+/// compact (no text label) so it holds up on narrow mobile widths; the
+/// full description is exposed to screen readers via [Semantics].
+class _RecordingDot extends StatelessWidget {
+  const _RecordingDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: AppLocalizations.of(context).liveTvRecording,
+      child: Container(
+        key: const Key('recording-dot'),
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

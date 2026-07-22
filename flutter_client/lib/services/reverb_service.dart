@@ -9,7 +9,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 ///
 /// Connects to the private TV playlist channel, authenticates via the custom
 /// `/api/tv/broadcasting/auth` endpoint (no user session required), and
-/// forwards incoming `tv.notification` events to the supplied callback.
+/// forwards incoming `tv.notification` and `dvr.status` events to the
+/// supplied callbacks.
 ///
 /// Call `connect` after a successful Xtream login. Call `disconnect` on logout
 /// or app suspend. Reconnects automatically with exponential backoff.
@@ -27,6 +28,8 @@ class ReverbService {
   late TvPlaylistSession _session;
   Set<String> _subscribedChannels = const {};
   void Function(TvNotificationItem)? _onNotification;
+  void Function(DvrRecording)? _onDvrStatus;
+  void Function()? _onConnected;
 
   WebSocketChannel? _ws;
   StreamSubscription<dynamic>? _sub;
@@ -45,11 +48,15 @@ class ReverbService {
     required UserCredentials credentials,
     Set<String> subscribedChannels = const {},
     required void Function(TvNotificationItem) onNotification,
+    void Function(DvrRecording)? onDvrStatus,
+    void Function()? onConnected,
   }) async {
     _session = session;
     _credentials = credentials;
     _subscribedChannels = subscribedChannels;
     _onNotification = onNotification;
+    _onDvrStatus = onDvrStatus;
+    _onConnected = onConnected;
     _disposed = false;
     _retryDelay = 2;
     await _connectOnce();
@@ -101,6 +108,7 @@ class ReverbService {
       case 'pusher_internal:subscription_succeeded':
         _connected = true;
         _retryDelay = 2;
+        _onConnected?.call();
 
       case 'tv.notification':
         if (!_connected) return;
@@ -110,6 +118,11 @@ class ReverbService {
             _subscribedChannels.contains(item.channel)) {
           _onNotification?.call(item);
         }
+
+      case 'dvr.status':
+        if (!_connected) return;
+        final payload = _parseData(msg['data']);
+        _onDvrStatus?.call(DvrRecording.fromXtream(payload));
     }
   }
 

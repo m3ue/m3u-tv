@@ -345,9 +345,14 @@ class SeriesInfo {
 enum DvrRecordingStatus {
   scheduled,
   recording,
+  postProcessing,
   completed,
   failed,
   cancelled,
+  // Not a real server-side recording status — only ever seen on a `dvr.status`
+  // push signalling the recording was deleted. See _onDvrStatusPush, which
+  // removes the recording locally instead of rendering this state.
+  deleted,
   unknown,
 }
 
@@ -355,9 +360,11 @@ extension DvrRecordingStatusDisplay on DvrRecordingStatus {
   String get label => switch (this) {
     DvrRecordingStatus.scheduled => 'Scheduled',
     DvrRecordingStatus.recording => 'Recording',
+    DvrRecordingStatus.postProcessing => 'Post Processing',
     DvrRecordingStatus.completed => 'Completed',
     DvrRecordingStatus.failed => 'Failed',
     DvrRecordingStatus.cancelled => 'Cancelled',
+    DvrRecordingStatus.deleted => 'Deleted',
     DvrRecordingStatus.unknown => 'Unknown',
   };
 }
@@ -368,9 +375,13 @@ DvrRecordingStatus dvrRecordingStatusFromWire(String value) {
     'recording' ||
     'in_progress' ||
     'in-progress' => DvrRecordingStatus.recording,
+    'post_processing' ||
+    'post-processing' ||
+    'postprocessing' => DvrRecordingStatus.postProcessing,
     'completed' || 'complete' => DvrRecordingStatus.completed,
     'failed' || 'error' => DvrRecordingStatus.failed,
     'cancelled' || 'canceled' => DvrRecordingStatus.cancelled,
+    'deleted' => DvrRecordingStatus.deleted,
     _ => DvrRecordingStatus.unknown,
   };
 }

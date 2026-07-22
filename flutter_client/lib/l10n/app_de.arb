@@ -39,6 +39,7 @@
   "liveTvNoProgram": "Keine Programminfo",
   "liveTvNext": "NÄCHSTES",
   "liveTvRecord": "Aufnehmen",
+  "liveTvRecording": "Aufnahme läuft",
   "liveTvFavorite": "Favorit",
   "liveTvRemoveFavorite": "Aus Favoriten entfernen",
   "playerGoBack": "Zurück",
@@ -215,8 +216,7 @@
   },
   "searchTypeToSearch": "Zum Suchen tippen",
   "vodPlayMovie": "Film abspielen",
-  "vodContinueMovie": "Film fortsetzen"
-,
+  "vodContinueMovie": "Film fortsetzen",
   "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "Streams laden",
   "aiostreamsLoadingStreams": "Streams werden geladen…",

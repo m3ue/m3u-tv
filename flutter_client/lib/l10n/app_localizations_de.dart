@@ -89,6 +89,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveTvRecord => 'Aufnehmen';
 
   @override
+  String get liveTvRecording => 'Aufnahme läuft';
+
+  @override
   String get liveTvFavorite => 'Favorit';
 
   @override

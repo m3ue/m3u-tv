@@ -254,6 +254,12 @@ abstract class AppLocalizations {
   /// **'Record'**
   String get liveTvRecord;
 
+  /// No description provided for @liveTvRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get liveTvRecording;
+
   /// No description provided for @liveTvFavorite.
   ///
   /// In en, this message translates to:

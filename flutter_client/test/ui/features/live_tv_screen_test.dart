@@ -292,6 +292,29 @@ void main() {
         expect(scheduledProgram?.title, 'Late Show');
       },
     );
+
+    testWidgets(
+      'shows a recording indicator for a channel with an in-progress recording',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            dvrRecordings: const [
+              DvrRecording(
+                uuid: 'rec-1',
+                title: 'Late Show',
+                status: DvrRecordingStatus.recording,
+                channelId: 1,
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('recording-dot')), findsOneWidget);
+      },
+    );
   });
 }
 
@@ -305,6 +328,7 @@ class _TestApp extends StatelessWidget {
     this.epgService,
     this.onChannelSelect,
     this.onScheduleProgram,
+    this.dvrRecordings = const [],
   });
 
   final List<Channel> channels;
@@ -315,6 +339,7 @@ class _TestApp extends StatelessWidget {
   final EpgService? epgService;
   final void Function(Channel)? onChannelSelect;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
+  final List<DvrRecording> dvrRecordings;
 
   @override
   Widget build(BuildContext context) {
@@ -327,6 +352,14 @@ class _TestApp extends StatelessWidget {
         liveChannelsProvider.overrideWith((_) => channels),
         liveCategoriesProvider.overrideWith((_) => categories),
         epgServiceProvider.overrideWith((_) => epg),
+        dvrRecordingsProvider.overrideWith((_) => dvrRecordings),
+        recordingChannelIdsProvider.overrideWith(
+          (_) => dvrRecordings
+              .where((recording) => recording.isInProgress)
+              .map((recording) => recording.channelId)
+              .whereType<int>()
+              .toSet(),
+        ),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,

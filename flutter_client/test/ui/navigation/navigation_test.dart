@@ -1709,7 +1709,10 @@ class _NavigationXtreamService extends XtreamService {
   ];
 
   @override
-  Future<List<DvrRecording>> getDvrRecordings() async => dvrRecordings;
+  Future<List<DvrRecording>> getDvrRecordings({
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async => dvrRecordings;
 
   @override
   Future<List<Progress>> getRecentlyWatched(

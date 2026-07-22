@@ -199,6 +199,7 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> _vodItems = const <VodItem>[];
   List<Series> _seriesList = const <Series>[];
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
+  Set<int> _recordingChannelIds = const <int>{};
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -222,6 +223,7 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> get vodItems => _vodItems;
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
+  Set<int> get recordingChannelIds => _recordingChannelIds;
   List<Progress> get progressList => _progressList;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
@@ -346,6 +348,7 @@ class AppStateController extends ChangeNotifier {
       _vodItems = const <VodItem>[];
       _seriesList = const <Series>[];
       _dvrRecordings = const <DvrRecording>[];
+      _recordingChannelIds = const <int>{};
       _activeViewer = const Viewer(
         id: 0,
         ulid: 'local-m3u',
@@ -391,6 +394,10 @@ class AppStateController extends ChangeNotifier {
         session: session,
         credentials: credentials,
         onNotification: _onPushNotification,
+        onDvrStatus: _onDvrStatusPush,
+        // Reconciles any status pushes missed while disconnected (app
+        // suspended, network drop) — cheap, status-filtered fetch, not a poll.
+        onConnected: () => unawaited(refreshActiveDvrRecordings()),
       );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
@@ -399,6 +406,65 @@ class AppStateController extends ChangeNotifier {
 
   void _onPushNotification(TvNotificationItem item) {
     unawaited(_storeAndNotify(item));
+  }
+
+  void _onDvrStatusPush(DvrRecording recording) {
+    final channelId = recording.channelId;
+    if (channelId != null) {
+      final updated = Set<int>.of(_recordingChannelIds);
+      if (recording.isInProgress) {
+        updated.add(channelId);
+      } else {
+        updated.remove(channelId);
+      }
+      if (!setEquals(_recordingChannelIds, updated)) {
+        _recordingChannelIds = updated;
+        notifyListeners();
+      }
+    }
+
+    if (recording.status == DvrRecordingStatus.deleted) {
+      // The server is the source of truth: a deleted recording has no
+      // get_dvr_recording row left to fetch, so drop it locally instead of
+      // refreshing its detail.
+      final next = _dvrRecordings
+          .where((r) => r.uuid != recording.uuid)
+          .toList(growable: false);
+      if (next.length != _dvrRecordings.length) {
+        _dvrRecordings = next;
+        notifyListeners();
+      }
+      return;
+    }
+
+    // The push payload is a lightweight status ping (no stream_url/live_url —
+    // those need this viewer's Xtream credentials to build). Fetch the full
+    // record so the DVR Recordings screen updates its status label and gets
+    // a playable URL as soon as a recording starts, not just on next reload.
+    //
+    // Toasts for user-facing transitions (started/completed/failed/cancelled)
+    // are no longer sent from here — the server dispatches a persisted
+    // TvNotification on the 'dvr' channel at those points instead, which
+    // arrives through the same _onPushNotification path as every other
+    // notification (unread badge, history, subscription filter all for free).
+    unawaited(_refreshDvrRecordingDetail(recording.uuid));
+  }
+
+  Future<void> _refreshDvrRecordingDetail(String uuid) async {
+    try {
+      final detail = await xtreamService.getDvrRecording(uuid);
+      final next = [..._dvrRecordings];
+      final index = next.indexWhere((r) => r.uuid == uuid);
+      if (index >= 0) {
+        next[index] = detail;
+      } else {
+        next.insert(0, detail);
+      }
+      _dvrRecordings = next;
+      notifyListeners();
+    } on Object catch (error) {
+      debugPrint('DVR: refresh recording detail after push failed: $error');
+    }
   }
 
   Future<void> _storeAndNotify(TvNotificationItem item) async {
@@ -426,6 +492,7 @@ class AppStateController extends ChangeNotifier {
     _vodItems = const <VodItem>[];
     _seriesList = const <Series>[];
     _dvrRecordings = const <DvrRecording>[];
+    _recordingChannelIds = const <int>{};
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -493,16 +560,70 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<DvrRecording> scheduleDvr(Channel channel, EpgProgram program) async {
-    final recording = await xtreamService.scheduleDvr(
+  /// Schedules a one-shot DVR recording and refreshes the local list.
+  ///
+  /// m3u-editor's `schedule_dvr` creates a DVR rule and (when DVR is enabled
+  /// for the playlist) returns synchronously after the rule's scheduler has
+  /// produced the corresponding `DvrRecording` row. We refresh the local list
+  /// from `get_dvr_recordings` so the UI shows the real entry instead of a
+  /// phantom row synthesised from a stale client-side response.
+  ///
+  /// Returns the matching recording if the refresh surfaced one for this
+  /// channel + start time; otherwise null (the scheduler tick may not have
+  /// produced the row yet on slower servers).
+  Future<DvrRecording?> scheduleDvr(Channel channel, EpgProgram program) async {
+    await xtreamService.scheduleDvr(
       channelId: channel.id,
       title: program.title,
       startTime: program.start,
       endTime: program.end,
     );
-    _dvrRecordings = [recording, ..._dvrRecordings];
+    try {
+      _dvrRecordings = await xtreamService.getDvrRecordings();
+      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: refresh after schedule failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
     notifyListeners();
-    return recording;
+    for (final recording in _dvrRecordings) {
+      if (recording.channelId != channel.id) continue;
+      final start = recording.scheduledStart;
+      if (start == null) continue;
+      if (program.start.difference(start).abs() <= const Duration(minutes: 1)) {
+        return recording;
+      }
+    }
+    return null;
+  }
+
+  static Set<int> _extractRecordingChannelIds(List<DvrRecording> recordings) {
+    return recordings
+        .where((recording) => recording.isInProgress)
+        .map((recording) => recording.channelId)
+        .whereType<int>()
+        .toSet();
+  }
+
+  /// Lightweight poll for which channels are currently recording, used to
+  /// mark Live TV tiles without waiting for a full app refresh. Callers
+  /// (e.g. LiveTvScreen) are expected to invoke this on a short timer only
+  /// while the screen is visible — `status=recording` keeps the request
+  /// small regardless of total recording history.
+  Future<void> refreshActiveDvrRecordings() async {
+    if (!hasDvrFeature) return;
+    try {
+      final active = await xtreamService.getDvrRecordings(
+        status: DvrRecordingStatus.recording,
+        limit: 200,
+      );
+      final ids = _extractRecordingChannelIds(active);
+      if (setEquals(_recordingChannelIds, ids)) return;
+      _recordingChannelIds = ids;
+      notifyListeners();
+    } on Object catch (error) {
+      debugPrint('DVR: refresh active recordings failed: $error');
+    }
   }
 
   void updateProgressEntry(Progress updated) {
@@ -575,6 +696,7 @@ class AppStateController extends ChangeNotifier {
       _vodItems = vodItems;
       _seriesList = seriesList;
       _dvrRecordings = dvrRecordings;
+      _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
       _viewers = viewers;
       _activeViewer = activeViewer;
       _progressList = progress;
@@ -652,6 +774,7 @@ class AppStateController extends ChangeNotifier {
     _vodItems = vodItems;
     _seriesList = seriesList;
     _dvrRecordings = const <DvrRecording>[];
+    _recordingChannelIds = const <int>{};
     _viewers = viewers;
     _activeViewer = await viewerService.resolveActiveViewer(viewers);
     final activeViewer = _activeViewer;

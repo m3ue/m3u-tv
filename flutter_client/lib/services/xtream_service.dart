@@ -99,6 +99,21 @@ class XtreamResponseException implements Exception {
   }
 }
 
+/// Thrown when the m3u-editor `schedule_dvr` endpoint reports a scheduling
+/// failure (DVR disabled, channel not found, invalid window, etc.) or returns
+/// a response shape that does not match the documented envelope.
+///
+/// Surfaced via `toString()` so the UI can render the server's message
+/// directly through `appRecordingFailed(error.toString())`.
+class XtreamDvrScheduleException implements Exception {
+  const XtreamDvrScheduleException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class XtreamRequest {
   const XtreamRequest({
     required this.credentials,
@@ -389,8 +404,14 @@ class XtreamService {
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
   }
 
-  Future<List<DvrRecording>> getDvrRecordings() async {
-    final response = await _request('get_dvr_recordings');
+  Future<List<DvrRecording>> getDvrRecordings({
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async {
+    final response = await _request(
+      'get_dvr_recordings',
+      params: {'status': ?status?.name, 'limit': ?limit?.toString()},
+    );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
@@ -399,12 +420,23 @@ class XtreamService {
   Future<DvrRecording> getDvrRecording(String uuid) async {
     final response = await _request(
       'get_dvr_recording',
-      params: {'uuid': uuid},
+      // m3u-editor's XtreamApiController::getDvrRecording() reads
+      // `recording_id`, not `uuid`.
+      params: {'recording_id': uuid},
     );
     return DvrRecording.fromXtream(_asMap(response));
   }
 
-  Future<DvrRecording> scheduleDvr({
+  /// Schedules a one-shot DVR recording on m3u-editor's `schedule_dvr` action.
+  ///
+  /// The m3u-editor endpoint responds with an envelope:
+  /// - Success: `{ success: true, rule_id: int, message: string }`
+  /// - Failure: `{ error: string }` with HTTP 4xx
+  ///
+  /// Returns the created rule's id on success. Throws [XtreamDvrScheduleException]
+  /// on failure so callers can surface the server's error message to the user
+  /// instead of silently treating the failure as a successful schedule.
+  Future<int> scheduleDvr({
     required int channelId,
     required String title,
     required DateTime startTime,
@@ -420,7 +452,18 @@ class XtreamService {
         'end_time': endTime.toUtc().toIso8601String(),
       },
     );
-    return DvrRecording.fromXtream(_asMap(response));
+    final map = _asMap(response);
+    final errorMessage = map['error'];
+    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+      throw XtreamDvrScheduleException('$errorMessage');
+    }
+    final ruleId = int.tryParse('${map['rule_id'] ?? ''}');
+    if (ruleId != null && ruleId > 0) {
+      return ruleId;
+    }
+    throw const XtreamDvrScheduleException(
+      'm3u-editor returned an unexpected response for schedule_dvr.',
+    );
   }
 
   Future<SeriesInfo> getSeriesInfo(int seriesId) async {

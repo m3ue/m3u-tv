@@ -265,12 +265,9 @@ void main() {
       final transport = FakeXtreamTransport({
         'auth': xtreamAuth(auth: 1),
         'schedule_dvr': <String, Object?>{
-          'uuid': 'rec-scheduled',
-          'title': 'Late Show',
-          'status': 'scheduled',
-          'channel_id': 101,
-          'scheduled_start': '2026-06-25T21:30:00Z',
-          'scheduled_end': '2026-06-25T22:15:00Z',
+          'success': true,
+          'rule_id': 42,
+          'message': 'Recording scheduled: Late Show',
         },
       });
       final service = XtreamService(transport: transport.call);
@@ -282,7 +279,7 @@ void main() {
         ),
       );
 
-      final recording = await service.scheduleDvr(
+      final ruleId = await service.scheduleDvr(
         channelId: 101,
         title: 'Late Show',
         startTime: DateTime.utc(2026, 6, 25, 21, 30),
@@ -298,9 +295,72 @@ void main() {
         'start_time': '2026-06-25T21:30:00.000Z',
         'end_time': '2026-06-25T22:15:00.000Z',
       });
-      expect(recording.uuid, 'rec-scheduled');
-      expect(recording.status, DvrRecordingStatus.scheduled);
+      expect(ruleId, 42);
     });
+
+    test(
+      'schedule DVR surfaces server error message when response carries one',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'schedule_dvr': <String, Object?>{
+            'error': 'DVR is not enabled for this playlist',
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await expectLater(
+          service.scheduleDvr(
+            channelId: 101,
+            title: 'Late Show',
+            startTime: DateTime.utc(2026, 6, 25, 21, 30),
+            endTime: DateTime.utc(2026, 6, 25, 22, 15),
+          ),
+          throwsA(
+            isA<XtreamDvrScheduleException>().having(
+              (e) => e.message,
+              'message',
+              'DVR is not enabled for this playlist',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'schedule DVR throws when response shape is unrecognised',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'schedule_dvr': <String, Object?>{'unexpected': 'value'},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await expectLater(
+          service.scheduleDvr(
+            channelId: 101,
+            title: 'Late Show',
+            startTime: DateTime.utc(2026, 6, 25, 21, 30),
+            endTime: DateTime.utc(2026, 6, 25, 22, 15),
+          ),
+          throwsA(isA<XtreamDvrScheduleException>()),
+        );
+      },
+    );
 
     test(
       'schedule DVR normalizes offset EPG dates to UTC request dates',
@@ -308,9 +368,9 @@ void main() {
         final transport = FakeXtreamTransport({
           'auth': xtreamAuth(auth: 1),
           'schedule_dvr': <String, Object?>{
-            'uuid': 'rec-timezone',
-            'title': 'Offset News',
-            'status': 'scheduled',
+            'success': true,
+            'rule_id': 7,
+            'message': 'Recording scheduled: Offset News',
           },
         });
         final service = XtreamService(transport: transport.call);
@@ -397,7 +457,37 @@ void main() {
         final detail = await service.getDvrRecording('rec-completed');
         expect(detail.metadata, {'tmdb_id': 12345});
         expect(detail.errorMessage, 'transient probe warning');
-        expect(transport.requests.last.params['uuid'], 'rec-completed');
+        // Backend reads `recording_id`, not `uuid` — see
+        // XtreamApiController::getDvrRecording().
+        expect(transport.requests.last.params['recording_id'], 'rec-completed');
+      },
+    );
+
+    test(
+      'requests a status-filtered, limited DVR recordings list for the live badge poll',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_dvr_recordings': [recordingDvrRecording()],
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        final recordings = await service.getDvrRecordings(
+          status: DvrRecordingStatus.recording,
+          limit: 200,
+        );
+
+        expect(recordings, hasLength(1));
+        expect(recordings.single.status, DvrRecordingStatus.recording);
+        expect(transport.requests.last.params['status'], 'recording');
+        expect(transport.requests.last.params['limit'], '200');
       },
     );
 
