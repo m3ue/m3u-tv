@@ -55,6 +55,19 @@ flutter:
   uses-material-design: true
   generate: true
 
+  # Flutter hardcodes the auto-generated FlutterGeneratedPluginSwiftPackage
+  # wrapper's minimum iOS version to 13.0 regardless of the project's real
+  # IPHONEOS_DEPLOYMENT_TARGET (15.0), which conflicts with firebase_core /
+  # firebase_messaging's own SPM manifests (15.0 minimum). Disabling SPM here
+  # routes all plugins through CocoaPods instead (still fully supported via
+  # their published podspecs), honoring the Podfile's real platform version.
+  # This project-manifest setting is read on every flutter invocation (clean,
+  # pub get, build, and Xcode's Run Script build phase alike) - unlike a shell
+  # env var or the Xcode-project build setting alone, it can't be bypassed by
+  # running flutter commands outside of Xcode.
+  config:
+    enable-swift-package-manager: false
+
   assets:
     - assets/icons/
     - pubspec.yaml
