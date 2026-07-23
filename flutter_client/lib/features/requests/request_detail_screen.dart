@@ -423,6 +423,15 @@ class _Body extends StatelessWidget {
                 .map((genre) => _MetadataChip(label: genre)),
           ],
         ),
+        if (result.overview != null && result.overview!.isNotEmpty) ...[
+          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
+          Text(
+            result.overview!,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
         if (_showSeasonPicker) ...[
           const SizedBox(height: MediaBrowsingMetrics.contentPadding),
           _SeasonsSection(
@@ -433,14 +442,6 @@ class _Body extends StatelessWidget {
         ],
         const SizedBox(height: MediaBrowsingMetrics.contentPadding),
         _actionRow(l, button, fullWidthButton: fullWidthButton),
-        const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-        if (result.overview != null && result.overview!.isNotEmpty)
-          Text(
-            result.overview!,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
       ],
     );
   }
