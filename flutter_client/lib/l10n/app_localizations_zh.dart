@@ -284,6 +284,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDisconnectConfirm => '断开连接';
 
   @override
+  String get settingsApp => '应用';
+
+  @override
+  String get settingsAppVersion => '版本';
+
+  @override
+  String get settingsAppUpdateStatus => '更新';
+
+  @override
+  String get settingsAppVersionChecking => '正在检查更新…';
+
+  @override
+  String get settingsAppUpToDate => '已是最新版本';
+
+  @override
+  String settingsAppUpdateAvailable(String version) {
+    return '有可用更新：$version';
+  }
+
+  @override
+  String get settingsAppViewRelease => '查看版本';
+
+  @override
   String get homeContinueWatching => '继续观看';
 
   @override

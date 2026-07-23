@@ -123,6 +123,20 @@
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",
+  "settingsApp": "App",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Update",
+  "settingsAppVersionChecking": "Checking for updates…",
+  "settingsAppUpToDate": "Up to date",
+  "settingsAppUpdateAvailable": "Update available: {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "View release",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
   "homeNoLiveTv": "No Live TV available",

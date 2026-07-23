@@ -98,6 +98,20 @@
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",
+  "settingsApp": "应用",
+  "settingsAppVersion": "版本",
+  "settingsAppUpdateStatus": "更新",
+  "settingsAppVersionChecking": "正在检查更新…",
+  "settingsAppUpToDate": "已是最新版本",
+  "settingsAppUpdateAvailable": "有可用更新：{version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "查看版本",
   "settingsContentCache": "内容缓存",
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",
   "settingsEpgRefreshInterval": "EPG 刷新间隔",

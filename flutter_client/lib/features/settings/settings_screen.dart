@@ -4,6 +4,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
@@ -509,6 +510,13 @@ class _ConnectedViewState extends State<_ConnectedView>
         ),
         const SizedBox(height: 20),
 
+        // ── App ─────────────────────────────────────────────────────────────
+        _SettingsSection(
+          title: l.settingsApp,
+          child: const _AppVersionCard(),
+        ),
+        const SizedBox(height: 20),
+
         // ── Connection ──────────────────────────────────────────────────────
         _SettingsSection(
           title: l.settingsConnection,
@@ -736,6 +744,92 @@ class _ConnectedViewState extends State<_ConnectedView>
                 _TraktCard(traktService: widget.traktService),
           ),
         ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// App version card
+// ---------------------------------------------------------------------------
+
+class _AppVersionCard extends StatefulWidget {
+  const _AppVersionCard();
+
+  @override
+  State<_AppVersionCard> createState() => _AppVersionCardState();
+}
+
+class _AppVersionCardState extends State<_AppVersionCard> {
+  final _service = AppVersionService();
+  AppVersionCheck? _check;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_runCheck());
+  }
+
+  Future<void> _runCheck() async {
+    final check = await _service.check();
+    if (!mounted) return;
+    setState(() => _check = check);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final check = _check;
+
+    final String statusValue;
+    Color? statusColor;
+    if (check == null) {
+      statusValue = l.settingsAppVersionChecking;
+    } else if (check.latestVersion == null || !check.updateAvailable) {
+      statusValue = l.settingsAppUpToDate;
+      statusColor = Colors.green;
+    } else {
+      statusValue = l.settingsAppUpdateAvailable(check.latestVersion!);
+      statusColor = Colors.orange;
+    }
+
+    return Column(
+      children: [
+        _StatusRow(
+          label: l.settingsAppVersion,
+          value: (check?.currentVersion.isNotEmpty ?? false)
+              ? check!.currentVersion
+              : l.unknown,
+        ),
+        const Divider(),
+        _StatusRow(
+          label: l.settingsAppUpdateStatus,
+          value: statusValue,
+          valueColor: statusColor,
+        ),
+        if (check != null &&
+            check.latestVersion != null &&
+            check.updateAvailable) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: DpadFocusable(
+              onSelect: () => launchUrl(
+                Uri.parse('https://github.com/m3ue/m3u-tv/releases/latest'),
+                mode: LaunchMode.externalApplication,
+              ),
+              effects: _kStadiumEffect,
+              child: FilledButton.tonalIcon(
+                onPressed: () => launchUrl(
+                  Uri.parse('https://github.com/m3ue/m3u-tv/releases/latest'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                icon: const Icon(Icons.open_in_new),
+                label: Text(l.settingsAppViewRelease),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

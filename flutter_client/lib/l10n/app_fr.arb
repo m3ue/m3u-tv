@@ -98,6 +98,20 @@
   "settingsDisconnectTitle": "Se déconnecter ?",
   "settingsDisconnectBody": "Vous serez déconnecté et devrez saisir à nouveau vos identifiants pour vous reconnecter.",
   "settingsDisconnectConfirm": "Déconnecter",
+  "settingsApp": "Application",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Mise à jour",
+  "settingsAppVersionChecking": "Recherche de mises à jour…",
+  "settingsAppUpToDate": "À jour",
+  "settingsAppUpdateAvailable": "Mise à jour disponible : {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "Voir la version",
   "settingsContentCache": "Cache de contenu",
   "settingsCacheSubtitle": "Le contenu en cache se charge instantanément. Les données se rafraîchissent automatiquement en arrière-plan.",
   "settingsEpgRefreshInterval": "Intervalle de rafraîchissement EPG",

@@ -56,4 +56,5 @@ flutter:
 
   assets:
     - assets/icons/
+    - pubspec.yaml
 

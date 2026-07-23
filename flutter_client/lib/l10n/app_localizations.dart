@@ -632,6 +632,48 @@ abstract class AppLocalizations {
   /// **'Disconnect'**
   String get settingsDisconnectConfirm;
 
+  /// No description provided for @settingsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsApp;
+
+  /// No description provided for @settingsAppVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsAppVersion;
+
+  /// No description provided for @settingsAppUpdateStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get settingsAppUpdateStatus;
+
+  /// No description provided for @settingsAppVersionChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates…'**
+  String get settingsAppVersionChecking;
+
+  /// No description provided for @settingsAppUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get settingsAppUpToDate;
+
+  /// No description provided for @settingsAppUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: {version}'**
+  String settingsAppUpdateAvailable(String version);
+
+  /// No description provided for @settingsAppViewRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'View release'**
+  String get settingsAppViewRelease;
+
   /// No description provided for @homeContinueWatching.
   ///
   /// In en, this message translates to:

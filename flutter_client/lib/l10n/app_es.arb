@@ -98,6 +98,20 @@
   "settingsDisconnectTitle": "¿Desconectar?",
   "settingsDisconnectBody": "Se cerrará tu sesión y deberás volver a introducir tus credenciales para reconectarte.",
   "settingsDisconnectConfirm": "Desconectar",
+  "settingsApp": "Aplicación",
+  "settingsAppVersion": "Versión",
+  "settingsAppUpdateStatus": "Actualización",
+  "settingsAppVersionChecking": "Buscando actualizaciones…",
+  "settingsAppUpToDate": "Actualizado",
+  "settingsAppUpdateAvailable": "Actualización disponible: {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "Ver versión",
   "settingsContentCache": "Caché de contenido",
   "settingsCacheSubtitle": "El contenido en caché carga al instante. Los datos se actualizan automáticamente en segundo plano.",
   "settingsEpgRefreshInterval": "Intervalo de actualización de EPG",

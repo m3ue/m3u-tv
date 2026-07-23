@@ -291,6 +291,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDisconnectConfirm => 'Trennen';
 
   @override
+  String get settingsApp => 'App';
+
+  @override
+  String get settingsAppVersion => 'Version';
+
+  @override
+  String get settingsAppUpdateStatus => 'Update';
+
+  @override
+  String get settingsAppVersionChecking => 'Suche nach Updates…';
+
+  @override
+  String get settingsAppUpToDate => 'Aktuell';
+
+  @override
+  String settingsAppUpdateAvailable(String version) {
+    return 'Update verfügbar: $version';
+  }
+
+  @override
+  String get settingsAppViewRelease => 'Release ansehen';
+
+  @override
   String get homeContinueWatching => 'Weiterschauen';
 
   @override

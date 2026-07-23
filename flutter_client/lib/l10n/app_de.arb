@@ -98,6 +98,20 @@
   "settingsDisconnectTitle": "Trennen?",
   "settingsDisconnectBody": "Du wirst abgemeldet und musst deine Anmeldedaten erneut eingeben, um dich wieder zu verbinden.",
   "settingsDisconnectConfirm": "Trennen",
+  "settingsApp": "App",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Update",
+  "settingsAppVersionChecking": "Suche nach Updates…",
+  "settingsAppUpToDate": "Aktuell",
+  "settingsAppUpdateAvailable": "Update verfügbar: {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "Release ansehen",
   "settingsContentCache": "Inhaltscache",
   "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",
   "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",
