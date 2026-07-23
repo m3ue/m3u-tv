@@ -102,6 +102,25 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Decode Firebase config
+        # google-services.json is gitignored (not published), so CI checkouts
+        # need it written from a repo secret before the build - otherwise
+        # Firebase.initializeApp() fails in release builds built from source.
+        # Must run before any gradlew invocation: the Google Services Gradle
+        # plugin's processDebugGoogleServices task now runs as a dependency of
+        # testDebugUnitTest (not just assembleRelease), so it needs this file
+        # in place before "Test native Android code" below.
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_SERVICES_JSON_B64:-}" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON_BASE64 secret is missing or empty."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json
+          test -s android/app/google-services.json
+
       - name: Test native Android code
         run: ./android/gradlew -p android :app:testDebugUnitTest
 
@@ -125,21 +144,6 @@ jobs:
           done
           printf '%s' "$KEYSTORE_B64" | base64 --decode > upload-keystore.jks
           test -s upload-keystore.jks
-
-      - name: Decode Firebase config
-        # google-services.json is gitignored (not published), so CI checkouts
-        # need it written from a repo secret before the build - otherwise
-        # Firebase.initializeApp() fails in release builds built from source.
-        env:
-          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [ -z "${GOOGLE_SERVICES_JSON_B64:-}" ]; then
-            echo "ERROR: GOOGLE_SERVICES_JSON_BASE64 secret is missing or empty."
-            exit 1
-          fi
-          printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json
-          test -s android/app/google-services.json
 
       - name: Build APK
         run: |
@@ -595,8 +599,14 @@ jobs:
           # Anything else must be a known, reviewed system dependency of the
           # GTK/X11/glibc stack this app links against - add new entries here
           # deliberately, not to silence a failure.
+          #
+          # The second block below is libmpv 0.37's own transitive closure
+          # (ffmpeg codecs/demuxers, hardware accel, audio backends, network
+          # protocols, text shaping). This check never ran against a real
+          # release build until v1.0.6, so it was reviewed and added here in
+          # one pass rather than discovered as a "new" dependency per release.
           ALLOWED_SYSTEM_LIBS=(
-            'linux-vdso.so.1' 'ld-linux-x86-64.so.2'
+            'linux-vdso.so.1' 'ld-linux-x86-64.so.2' '/lib64/ld-linux-x86-64.so.2'
             'libc.so.6' 'libm.so.6' 'libpthread.so.0' 'libdl.so.2' 'librt.so.1'
             'libgcc_s.so.1' 'libstdc++.so.6'
             'libgtk-3.so.0' 'libgdk-3.so.0' 'libgio-2.0.so.0' 'libglib-2.0.so.0'
@@ -611,6 +621,88 @@ jobs:
             'libselinux.so.1' 'libmount.so.1' 'libblkid.so.1' 'libpcre2-8.so.0'
             'libffi.so.8' 'libz.so.1' 'libbz2.so.1.0' 'libexpat.so.1'
             'libuuid.so.1' 'libgpg-error.so.0' 'libp11-kit.so.0'
+
+            # libmpv/ffmpeg codec, demuxer, and container libraries
+            'libavcodec.so.60' 'libavdevice.so.60' 'libavfilter.so.9'
+            'libavformat.so.60' 'libavutil.so.58' 'libpostproc.so.57'
+            'libswresample.so.4' 'libswscale.so.7' 'libass.so.9'
+            'libplacebo.so.338' 'libaom.so.3' 'libdav1d.so.7' 'librav1e.so.0'
+            'libSvtAv1Enc.so.1' 'libvpx.so.9' 'libx264.so.164' 'libx265.so.199'
+            'libxvidcore.so.4' 'libtheoraenc.so.1' 'libtheoradec.so.1'
+            'libvidstab.so.1.1' 'libwebp.so.7' 'libwebpmux.so.3'
+            'libsharpyuv.so.0' 'libjxl.so.0.7' 'libjxl_threads.so.0.7'
+            'libopenjp2.so.7' 'libjpeg.so.8' 'libpng16.so.16' 'liblcms2.so.2'
+            'libzimg.so.2' 'libhwy.so.1' 'librsvg-2.so.2' 'libgme.so.0'
+            'libbluray.so.2' 'libdvdnav.so.4' 'libdvdread.so.8'
+            'libcdio.so.19' 'libcdio_cdda.so.2' 'libcdio_paranoia.so.2'
+            'libudfread.so.0' 'libarchive.so.13' 'libmujs.so.3' 'liblua5.2.so.0'
+            'libcodec2.so.1.2' 'libgsm.so.1' 'libmp3lame.so.0' 'libshine.so.3'
+            'libtwolame.so.0' 'libvorbis.so.0' 'libvorbisenc.so.2'
+            'libvorbisfile.so.3' 'libogg.so.0' 'libopus.so.0' 'libspeex.so.1'
+            'libFLAC.so.12' 'libmpg123.so.0' 'libopenmpt.so.0'
+            'libchromaprint.so.1' 'libsoxr.so.0' 'libsamplerate.so.0'
+            'librubberband.so.2' 'libfftw3.so.3' 'libsnappy.so.1'
+            'libzvbi.so.0' 'libuchardet.so.0' 'libxml2.so.2'
+            'libpocketsphinx.so.3' 'libsphinxbase.so.3'
+            'libflite.so.1' 'libflite_usenglish.so.1' 'libflite_cmulex.so.1'
+            'libflite_cmu_us_awb.so.1' 'libflite_cmu_us_kal.so.1'
+            'libflite_cmu_us_kal16.so.1' 'libflite_cmu_us_rms.so.1'
+            'libflite_cmu_us_slt.so.1' 'liblilv-0.so.0' 'libserd-0.so.0'
+            'libsord-0.so.0' 'libsratom-0.so.0' 'libzix-0.so.0'
+            'libmysofa.so.1' 'libbs2b.so.0'
+
+            # Audio backends
+            'libasound.so.2' 'libpulse.so.0' 'libpulsecommon-16.1.so'
+            'libpipewire-0.3.so.0' 'libjack.so.0' 'libsndio.so.7'
+            'libsndfile.so.1' 'libasyncns.so.0' 'libopenal.so.1'
+            'libSDL2-2.0.so.0'
+
+            # GL/Vulkan/hardware accel + display protocols
+            'libGL.so.1' 'libGLX.so.0' 'libGLdispatch.so.0' 'libEGL.so.1'
+            'libvulkan.so.1' 'libdrm.so.2' 'libgbm.so.1' 'libva.so.2'
+            'libva-drm.so.2' 'libva-wayland.so.2' 'libva-x11.so.2'
+            'libvdpau.so.1' 'libvpl.so.2' 'libOpenCL.so.1' 'libwayland-client.so.0'
+            'libwayland-cursor.so.0' 'libwayland-egl.so.1' 'libdecor-0.so.0'
+            'libxkbcommon.so.0' 'libcaca.so.0' 'libsixel.so.1'
+            'libXss.so.1' 'libXpresent.so.1' 'libXv.so.1' 'libatspi.so.0'
+            'libxcb.so.1' 'libxcb-render.so.0' 'libxcb-shm.so.0'
+            'libxcb-shape.so.0' 'libxcb-xfixes.so.0' 'libxcb-dri3.so.0'
+            'libX11-xcb.so.1' 'libXau.so.6' 'libXdmcp.so.6'
+
+            # Text shaping / fonts
+            'libharfbuzz.so.0' 'libfontconfig.so.1' 'libfreetype.so.6'
+            'libfribidi.so.0' 'libthai.so.0' 'libdatrie.so.1'
+            'libgraphite2.so.3' 'libpangoft2-1.0.so.0' 'libunibreak.so.5'
+            'libpixman-1.so.0'
+
+            # Network protocols (RTMP/RIST/SRT/SSH etc. demuxer support)
+            'librist.so.4' 'libsrt-gnutls.so.1.5' 'libssh-gcrypt.so.4'
+            'librabbitmq.so.4' 'libzmq.so.5' 'libpgm-5.3.so.0' 'libnorm.so.1'
+            'libsodium.so.23' 'libresolv.so.2'
+
+            # TLS/crypto/auth
+            'libgnutls.so.30' 'libgcrypt.so.20' 'libnettle.so.8'
+            'libhogweed.so.6' 'libgmp.so.10' 'libssl.so.3' 'libcrypto.so.3'
+            'libmbedcrypto.so.7' 'libcjson.so.1' 'libidn2.so.0'
+            'libunistring.so.5' 'libtasn1.so.6' 'libp11-kit.so.0'
+            'libgssapi_krb5.so.2' 'libkrb5.so.3' 'libk5crypto.so.3'
+            'libkrb5support.so.0' 'libcom_err.so.2' 'libkeyutils.so.1'
+
+            # 1394/IEEE camera capture, USB, misc system
+            'libraw1394.so.11' 'libavc1394.so.0' 'librom1394.so.0'
+            'libiec61883.so.0' 'libdc1394.so.25' 'libusb-1.0.so.0'
+            'libudev.so.1' 'libsystemd.so.0' 'libdbus-1.so.3' 'libacl.so.1'
+            'libapparmor.so.1' 'libcap.so.2' 'libbsd.so.0' 'libmd.so.0'
+            'libnuma.so.1' 'libslang.so.2' 'libncursesw.so.6' 'libtinfo.so.6'
+            'libdb-5.3.so'
+
+            # Compression
+            'libzstd.so.1' 'liblz4.so.1' 'libbrotlicommon.so.1'
+            'libbrotlidec.so.1' 'libbrotlienc.so.1'
+
+            # Misc numeric/runtime libs pulled in by ffmpeg's optional deps
+            'libblas.so.3' 'liblapack.so.3' 'libgfortran.so.5' 'libgomp.so.1'
+            'libicudata.so.74' 'libicuuc.so.74'
           )
           UNEXPECTED=()
           while IFS= read -r line; do
