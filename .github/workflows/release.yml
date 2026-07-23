@@ -126,6 +126,21 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > upload-keystore.jks
           test -s upload-keystore.jks
 
+      - name: Decode Firebase config
+        # google-services.json is gitignored (not published), so CI checkouts
+        # need it written from a repo secret before the build - otherwise
+        # Firebase.initializeApp() fails in release builds built from source.
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_SERVICES_JSON_B64:-}" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON_BASE64 secret is missing or empty."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > android/app/google-services.json
+          test -s android/app/google-services.json
+
       - name: Build APK
         run: |
           flutter build apk --release \
@@ -206,6 +221,21 @@ jobs:
       - name: Set version
         run: |
           sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
+
+      - name: Decode Firebase config
+        # GoogleService-Info.plist is gitignored (not published), so CI checkouts
+        # need it written from a repo secret before the build - otherwise
+        # Firebase.initializeApp() fails in release builds built from source.
+        env:
+          GOOGLESERVICE_INFO_PLIST_B64: ${{ secrets.GOOGLESERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLESERVICE_INFO_PLIST_B64:-}" ]; then
+            echo "ERROR: GOOGLESERVICE_INFO_PLIST_BASE64 secret is missing or empty."
+            exit 1
+          fi
+          printf '%s' "$GOOGLESERVICE_INFO_PLIST_B64" | base64 --decode > ios/GoogleService-Info.plist
+          test -s ios/GoogleService-Info.plist
 
       - name: Build iOS IPA (unsigned)
         run: |
