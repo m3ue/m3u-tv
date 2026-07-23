@@ -58,14 +58,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Provide stub Firebase config for CI
+        # google-services.json is gitignored (real one only exists on release
+        # builds via a repo secret, see release.yml) - the Google Services
+        # Gradle plugin still needs *a* validly-shaped file to parse to run
+        # native unit tests at all, so use a checked-in dummy here.
+        run: cp ci/google-services.stub.json android/app/google-services.json
+
       - name: Test native Android code
         run: ./android/gradlew -p android :app:testDebugUnitTest
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze Flutter client
-        run: flutter analyze
+        run: flutter analyze lib test
 
       - name: Test Flutter client
         run: flutter test

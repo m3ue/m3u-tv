@@ -15,10 +15,12 @@ flutter run
 Run these from `flutter_client/` before every PR:
 
 ```bash
-dart format .
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
+
+Scope `format`/`analyze` to `lib test` rather than `.` — if you've run an iOS/macOS build locally, `ios/build/` and `macos/build/` contain vendored SPM checkouts (e.g. `firebase_messaging`) with their own `pubspec.yaml`, which the analyzer treats as separate projects to fully lint/type-check. `analyzer.exclude` globs can't suppress this once a directory has its own `pubspec.yaml`, so directory scoping is the only reliable fix.
 
 ## Platform commands
 

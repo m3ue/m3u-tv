@@ -4,6 +4,9 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android Gradle plugin.
     id("dev.flutter.flutter-gradle-plugin")
+    // Requires android/app/google-services.json to be present (gitignored,
+    // downloaded from Firebase Console) — build fails without it.
+    id("com.google.gms.google-services")
 }
 
 val media3Version = "1.10.1"

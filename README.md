@@ -63,10 +63,12 @@ Quality gates:
 
 ```bash
 cd flutter_client
-dart format .
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
+
+Scope `format`/`analyze` to `lib test`, not `.` — see [flutter_client/README.md](flutter_client/README.md#quality-gates) for why.
 
 ## Configuration
 
@@ -139,8 +141,8 @@ To use with M3U Editor, use your M3U Editor server URL and credentials from a Pl
 
 ```bash
 cd flutter_client
-dart format ./
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
 
