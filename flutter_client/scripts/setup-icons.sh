@@ -195,6 +195,31 @@ echo "  tv_banner.png written to $ANDROID_RES/drawable-{mdpi,hdpi,xhdpi,xxhdpi}"
 
 # ---------------------------------------------------------------------------
 echo ""
+echo "=== Step 7: Generate Android notification icon ==="
+# ---------------------------------------------------------------------------
+# The status bar / heads-up notification icon must be a flat white silhouette
+# on a transparent background — Android ignores colour and alpha gradients
+# and renders anything else as a solid white blob. Without one configured,
+# FCM notifications fall back to a plain white dot. Referenced from
+# AndroidManifest.xml via com.google.firebase.messaging.default_notification_icon.
+declare -A NOTIF_SIZES=(
+    [mdpi]=24
+    [hdpi]=36
+    [xhdpi]=48
+    [xxhdpi]=72
+    [xxxhdpi]=96
+)
+for density in "${!NOTIF_SIZES[@]}"; do
+    size="${NOTIF_SIZES[$density]}"
+    logo=$(render_logo "$size")
+    magick "$logo" -fill white -colorize 100 \
+        -depth 8 "PNG32:$ANDROID_RES/drawable-${density}/ic_notification.png"
+done
+
+echo "  ic_notification.png written to $ANDROID_RES/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}"
+
+# ---------------------------------------------------------------------------
+echo ""
 echo "=== Done ==="
 echo "All icons and splash screens are up to date."
 echo "Rebuild the tvOS target in Xcode to pick up the refreshed icons."

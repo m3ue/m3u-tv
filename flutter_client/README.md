@@ -38,6 +38,14 @@ flutter run                       # debug on simulator or device
 flutter build ios --no-codesign   # CI smoke build
 ```
 
+If you hit `Package product 'firebase-core' requires minimum platform version 15.0 ... but this target supports 13.0`, set this for every iOS command (`flutter clean`, `flutter pub get`, `flutter run`, `flutter build ios`, `pod install`):
+
+```bash
+export FLUTTER_SWIFT_PACKAGE_MANAGER=false
+```
+
+This is a Flutter SDK limitation, not a project misconfig: Flutter hardcodes the auto-generated `FlutterGeneratedPluginSwiftPackage` wrapper's minimum iOS version to 13.0 regardless of `IPHONEOS_DEPLOYMENT_TARGET` (which is correctly 15.0 here), and `firebase_core`/`firebase_messaging` require 15.0. It regenerates on every `flutter clean`/`pub get`, so the error resurfaces even if you haven't touched anything. Disabling SPM routes all plugins — Firebase included, via its still-published podspec — through CocoaPods instead, which honors the Podfile's real `platform :ios, '15.0'`. CI (`release.yml`) sets this env var for the `build-ios` job already.
+
 ### macOS / Linux / Windows
 
 ```bash
