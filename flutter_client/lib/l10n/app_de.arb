@@ -112,6 +112,7 @@
     }
   },
   "settingsAppViewRelease": "Release ansehen",
+  "settingsAppScanQr": "Scannen, um auf deinem Handy zu öffnen",
   "settingsContentCache": "Inhaltscache",
   "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",
   "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",

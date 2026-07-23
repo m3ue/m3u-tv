@@ -137,6 +137,7 @@
     }
   },
   "settingsAppViewRelease": "View release",
+  "settingsAppScanQr": "Scan to open on your phone",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
   "homeNoLiveTv": "No Live TV available",

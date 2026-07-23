@@ -674,6 +674,12 @@ abstract class AppLocalizations {
   /// **'View release'**
   String get settingsAppViewRelease;
 
+  /// No description provided for @settingsAppScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to open on your phone'**
+  String get settingsAppScanQr;
+
   /// No description provided for @homeContinueWatching.
   ///
   /// In en, this message translates to:

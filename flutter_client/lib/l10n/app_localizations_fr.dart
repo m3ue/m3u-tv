@@ -313,6 +313,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAppViewRelease => 'Voir la version';
 
   @override
+  String get settingsAppScanQr => 'Scanner pour ouvrir sur votre téléphone';
+
+  @override
   String get homeContinueWatching => 'Reprendre';
 
   @override

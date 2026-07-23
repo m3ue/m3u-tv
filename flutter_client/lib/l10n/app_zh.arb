@@ -112,6 +112,7 @@
     }
   },
   "settingsAppViewRelease": "查看版本",
+  "settingsAppScanQr": "扫描以在手机上打开",
   "settingsContentCache": "内容缓存",
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",
   "settingsEpgRefreshInterval": "EPG 刷新间隔",

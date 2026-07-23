@@ -307,6 +307,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAppViewRelease => '查看版本';
 
   @override
+  String get settingsAppScanQr => '扫描以在手机上打开';
+
+  @override
   String get homeContinueWatching => '继续观看';
 
   @override

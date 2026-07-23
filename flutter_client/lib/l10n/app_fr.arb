@@ -112,6 +112,7 @@
     }
   },
   "settingsAppViewRelease": "Voir la version",
+  "settingsAppScanQr": "Scanner pour ouvrir sur votre téléphone",
   "settingsContentCache": "Cache de contenu",
   "settingsCacheSubtitle": "Le contenu en cache se charge instantanément. Les données se rafraîchissent automatiquement en arrière-plan.",
   "settingsEpgRefreshInterval": "Intervalle de rafraîchissement EPG",

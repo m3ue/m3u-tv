@@ -313,6 +313,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppViewRelease => 'View release';
 
   @override
+  String get settingsAppScanQr => 'Scan to open on your phone';
+
+  @override
   String get homeContinueWatching => 'Continue Watching';
 
   @override

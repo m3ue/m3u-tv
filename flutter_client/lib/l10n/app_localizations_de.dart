@@ -314,6 +314,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAppViewRelease => 'Release ansehen';
 
   @override
+  String get settingsAppScanQr => 'Scannen, um auf deinem Handy zu öffnen';
+
+  @override
   String get homeContinueWatching => 'Weiterschauen';
 
   @override

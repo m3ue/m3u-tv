@@ -811,26 +811,70 @@ class _AppVersionCardState extends State<_AppVersionCard> {
             check.latestVersion != null &&
             check.updateAvailable) ...[
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: DpadFocusable(
-              onSelect: () => launchUrl(
-                Uri.parse('https://github.com/m3ue/m3u-tv/releases/latest'),
-                mode: LaunchMode.externalApplication,
-              ),
-              effects: _kStadiumEffect,
-              child: FilledButton.tonalIcon(
-                onPressed: () => launchUrl(
-                  Uri.parse('https://github.com/m3ue/m3u-tv/releases/latest'),
-                  mode: LaunchMode.externalApplication,
-                ),
-                icon: const Icon(Icons.open_in_new),
-                label: Text(l.settingsAppViewRelease),
-              ),
-            ),
-          ),
+          const _AppReleaseLink(),
         ],
       ],
+    );
+  }
+}
+
+/// TV screens can't scan a QR code shown on themselves, and tvOS has no
+/// in-app browser for url_launcher to hand off to — so this shows a QR
+/// code (scan on your phone) on wide/TV layouts, and an "Open" button
+/// (which works via url_launcher) only on narrow/mobile layouts. Mirrors
+/// the same wide/narrow split _TraktPending already uses.
+class _AppReleaseLink extends StatelessWidget {
+  const _AppReleaseLink();
+
+  static const _releaseUrl = 'https://github.com/m3ue/m3u-tv/releases/latest';
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: QrImageView(
+                  data: _releaseUrl,
+                  size: 140,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l.settingsAppScanQr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          );
+        }
+        return SizedBox(
+          width: double.infinity,
+          child: DpadFocusable(
+            onSelect: () => launchUrl(
+              Uri.parse(_releaseUrl),
+              mode: LaunchMode.externalApplication,
+            ),
+            effects: _kStadiumEffect,
+            child: FilledButton.tonalIcon(
+              onPressed: () => launchUrl(
+                Uri.parse(_releaseUrl),
+                mode: LaunchMode.externalApplication,
+              ),
+              icon: const Icon(Icons.open_in_new),
+              label: Text(l.settingsAppViewRelease),
+            ),
+          ),
+        );
+      },
     );
   }
 }
