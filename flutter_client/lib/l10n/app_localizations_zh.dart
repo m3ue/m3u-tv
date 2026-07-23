@@ -529,6 +529,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get requestsSeasonsHeading => '季';
 
   @override
+  String get requestsSeasonSpecials => '特别篇';
+
+  @override
   String get requestsSelectAllSeasons => '全选';
 
   @override

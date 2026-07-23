@@ -255,6 +255,7 @@
   "requestsAlreadyRequested": "Ya solicitado",
   "requestsRequestButton": "Solicitar",
   "requestsSeasonsHeading": "Temporadas",
+  "requestsSeasonSpecials": "Especiales",
   "requestsSelectAllSeasons": "Seleccionar todo",
   "requestsClearSeasons": "Borrar",
   "requestsSubmitted": "\"{title}\" fue solicitado",

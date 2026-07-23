@@ -1088,6 +1088,12 @@ abstract class AppLocalizations {
   /// **'Seasons'**
   String get requestsSeasonsHeading;
 
+  /// No description provided for @requestsSeasonSpecials.
+  ///
+  /// In en, this message translates to:
+  /// **'Specials'**
+  String get requestsSeasonSpecials;
+
   /// No description provided for @requestsSelectAllSeasons.
   ///
   /// In en, this message translates to:

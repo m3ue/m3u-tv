@@ -255,6 +255,7 @@
   "requestsAlreadyRequested": "Déjà demandé",
   "requestsRequestButton": "Demander",
   "requestsSeasonsHeading": "Saisons",
+  "requestsSeasonSpecials": "Épisodes spéciaux",
   "requestsSelectAllSeasons": "Tout sélectionner",
   "requestsClearSeasons": "Effacer",
   "requestsSubmitted": "« {title} » a été demandé",

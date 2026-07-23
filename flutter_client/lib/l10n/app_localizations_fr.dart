@@ -542,6 +542,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get requestsSeasonsHeading => 'Saisons';
 
   @override
+  String get requestsSeasonSpecials => 'Épisodes spéciaux';
+
+  @override
   String get requestsSelectAllSeasons => 'Tout sélectionner';
 
   @override

@@ -542,6 +542,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get requestsSeasonsHeading => 'Staffeln';
 
   @override
+  String get requestsSeasonSpecials => 'Specials';
+
+  @override
   String get requestsSelectAllSeasons => 'Alle auswählen';
 
   @override

@@ -542,6 +542,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get requestsSeasonsHeading => 'Temporadas';
 
   @override
+  String get requestsSeasonSpecials => 'Especiales';
+
+  @override
   String get requestsSelectAllSeasons => 'Seleccionar todo';
 
   @override

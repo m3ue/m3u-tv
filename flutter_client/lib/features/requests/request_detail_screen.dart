@@ -94,8 +94,11 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
   /// Seasons the guest wants to request, initialized to every season the
   /// library doesn't already have a file for — matching Sonarr's own
   /// "monitor missing" default so a plain tap of Request just fills gaps.
+  /// Season 0 ("Specials") is excluded from that default, same as the
+  /// m3u-editor web UI (ArrSearch::openDetail) — guests can still opt in
+  /// via its chip.
   late final Set<int> _selectedSeasons = widget.result.seasons
-      .where((season) => !season.hasFile)
+      .where((season) => !season.hasFile && season.seasonNumber != 0)
       .map((season) => season.seasonNumber)
       .toSet();
 
@@ -586,7 +589,9 @@ class _SeasonsSection extends StatelessWidget {
           children: [
             for (final season in seasons)
               _SeasonToggle(
-                label: l.homeSeason(season.seasonNumber),
+                label: season.seasonNumber == 0
+                    ? l.requestsSeasonSpecials
+                    : l.homeSeason(season.seasonNumber),
                 isSelected: selectedSeasons.contains(season.seasonNumber),
                 hasFile: season.hasFile,
                 onTap: () => onToggleSeason(season.seasonNumber),

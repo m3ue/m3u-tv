@@ -255,6 +255,7 @@
   "requestsAlreadyRequested": "Already requested",
   "requestsRequestButton": "Request",
   "requestsSeasonsHeading": "Seasons",
+  "requestsSeasonSpecials": "Specials",
   "requestsSelectAllSeasons": "Select All",
   "requestsClearSeasons": "Clear",
   "requestsSubmitted": "\"{title}\" was requested",
