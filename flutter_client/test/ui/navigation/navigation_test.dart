@@ -518,7 +518,12 @@ void main() {
 
     expect(modes, <SystemUiRouteMode>[SystemUiRouteMode.player]);
 
-    expect(await tester.binding.handlePopRoute(), isTrue);
+    expect(
+      await tester
+          .state<_TestAppState>(find.byType(_TestApp))
+          .dispatchRouterBack(),
+      isTrue,
+    );
     await _pumpAppFrame(tester);
 
     expect(modes, <SystemUiRouteMode>[
@@ -872,7 +877,7 @@ void main() {
     },
   );
 
-  testWidgets('Android system back closes live player through didPopRoute', (
+  testWidgets('Router back dispatch closes active live player', (
     tester,
   ) async {
     final appState = _testAppState(xtreamService: _NavigationXtreamService());
@@ -896,8 +901,10 @@ void main() {
 
     expect(find.text('Player route: Route News'), findsOneWidget);
 
-    final handled = await tester.binding.handlePopRoute();
-    await _pumpAppFrame(tester);
+    final handled = await tester
+        .state<_TestAppState>(find.byType(_TestApp))
+        .dispatchRouterBack();
+    await tester.pumpAndSettle();
 
     expect(handled, isTrue);
     expect(find.text('Player route: Route News'), findsNothing);
@@ -905,6 +912,217 @@ void main() {
     expect(find.text('Press back again to exit'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('Router back dispatch closes failed player', (tester) async {
+    final adapter = _NavigationPlayerAdapter();
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.phone,
+        appState: appState,
+        useProductionPlayer: true,
+        playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+
+    adapter.emitError(
+      const PlaybackError(
+        backend: PlaybackBackend.desktopLibmpv,
+        message: 'Playback failed',
+        code: 'playback_failed',
+      ),
+    );
+    await _pumpAppFrame(tester);
+    expect(find.text('Playback error'), findsOneWidget);
+
+    final handled = await tester
+        .state<_TestAppState>(find.byType(_TestApp))
+        .dispatchRouterBack();
+    await tester.pumpAndSettle();
+
+    expect(handled, isTrue);
+    expect(find.byType(PlayerScreen), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    expect(find.text('Press back again to exit'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Router back dispatch pops nested movie details', (tester) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('Movies'),
+      ),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route Movie').last);
+    await _pumpAppFrame(tester);
+    expect(find.text('Play movie'), findsOneWidget);
+
+    final handled = await tester
+        .state<_TestAppState>(find.byType(_TestApp))
+        .dispatchRouterBack();
+    await tester.pumpAndSettle();
+
+    expect(handled, isTrue);
+    expect(find.text('Play movie'), findsNothing);
+    expect(find.text('Route Movie'), findsWidgets);
+  });
+
+  testWidgets('Router back dispatch preserves root double-back exit', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
+    await _pumpAppFrame(tester);
+    final app = tester.state<_TestAppState>(find.byType(_TestApp));
+
+    expect(await app.dispatchRouterBack(), isTrue);
+    await tester.pump();
+    expect(find.text('Press back again to exit'), findsOneWidget);
+
+    expect(await app.dispatchRouterBack(), isFalse);
+  });
+
+  testWidgets('legacy Android platform back closes active player', (
+    tester,
+  ) async {
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(deviceType: DeviceType.phone, appState: appState),
+    );
+    await _pumpAppFrame(tester);
+    await tester.tap(find.text('Route News').last);
+    await _pumpAppFrame(tester);
+    expect(find.text('Player route: Route News'), findsOneWidget);
+
+    await _sendPlatformNavigationMethod(tester, const MethodCall('popRoute'));
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Player route: Route News'), findsNothing);
+    expect(find.text('Route News'), findsWidgets);
+    expect(find.text('Press back again to exit'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'predictive back stays handled until the root exit window is armed',
+    (tester) async {
+      final frameworkHandlesBack = <bool>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'SystemNavigator.setFrameworkHandlesBack') {
+            frameworkHandlesBack.add(methodCall.arguments as bool);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
+      await _pumpAppFrame(tester);
+
+      expect(frameworkHandlesBack, isNotEmpty);
+      expect(frameworkHandlesBack.last, isTrue);
+
+      final app = tester.state<_TestAppState>(find.byType(_TestApp));
+      expect(await app.dispatchRouterBack(), isTrue);
+      await tester.pump();
+
+      expect(find.text('Press back again to exit'), findsOneWidget);
+      expect(frameworkHandlesBack.last, isFalse);
+
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+
+      expect(frameworkHandlesBack.last, isTrue);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    'predictive Android back commit closes active player',
+    (tester) async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.phone, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route News').last);
+      await _pumpAppFrame(tester);
+      expect(find.text('Player route: Route News'), findsOneWidget);
+
+      await _sendPlatformBackGestureMethod(
+        tester,
+        const MethodCall('startBackGesture', <String, Object>{
+          'touchOffset': <double>[5, 300],
+          'progress': 0.0,
+          'swipeEdge': 0,
+        }),
+      );
+      await _sendPlatformBackGestureMethod(
+        tester,
+        const MethodCall('commitBackGesture'),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.text('Player route: Route News'), findsNothing);
+      expect(find.text('Route News'), findsWidgets);
+      expect(find.text('Press back again to exit'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets('TV back dismisses player controls before closing player', (
     tester,
@@ -1411,6 +1629,30 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
 }
 
+Future<void> _sendPlatformNavigationMethod(
+  WidgetTester tester,
+  MethodCall methodCall,
+) async {
+  final message = const JSONMethodCodec().encodeMethodCall(methodCall);
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    'flutter/navigation',
+    message,
+    (_) {},
+  );
+}
+
+Future<void> _sendPlatformBackGestureMethod(
+  WidgetTester tester,
+  MethodCall methodCall,
+) async {
+  final message = const StandardMethodCodec().encodeMethodCall(methodCall);
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    'flutter/backgesture',
+    message,
+    (_) {},
+  );
+}
+
 Future<void> _waitForText(WidgetTester tester, String text) async {
   final finder = find.text(text);
   for (var i = 0; i < 60; i += 1) {
@@ -1458,10 +1700,13 @@ class _TestAppState extends State<_TestApp> {
     systemUiPolicy: widget.systemUiPolicy,
   );
 
+  Future<bool> dispatchRouterBack() =>
+      _router.backButtonDispatcher.invokeCallback(Future<bool>.value(false));
+
   @override
   void dispose() {
     // The proxy inside ProviderScope is disposed by Riverpod, but it does NOT
-    // dispose _appState — the caller retains lifecycle ownership. Dispose here
+    // dispose _appState - the caller retains lifecycle ownership. Dispose here
     // only when _TestAppState itself created the controller (widget.appState
     // was null); external callers (which use addTearDown) own their own.
     if (widget.appState == null) _appState.dispose();
