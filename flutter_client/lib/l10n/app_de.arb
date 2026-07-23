@@ -231,5 +231,57 @@
   "aiostreamsSearch": "AIOStreams durchsuchen",
   "aiostreamsSearchResults": "Suchergebnisse",
   "aiostreamsNoResults": "Keine Ergebnisse gefunden",
-  "aiostreamsSearchAll": "Alle"
+  "aiostreamsSearchAll": "Alle",
+  "requestsTabSearch": "Suche",
+  "requestsTabMyRequests": "Meine Anfragen",
+  "requestsSearchHint": "Filme & Serien suchen…",
+  "requestsNoResults": "Keine Ergebnisse gefunden",
+  "requestsAlreadyAvailable": "Bereits verfügbar",
+  "requestsAlreadyRequested": "Bereits angefragt",
+  "requestsRequestButton": "Anfragen",
+  "requestsSeasonsHeading": "Staffeln",
+  "requestsSelectAllSeasons": "Alle auswählen",
+  "requestsClearSeasons": "Zurücksetzen",
+  "requestsSubmitted": "\"{title}\" wurde angefragt",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "\"{title}\" wurde zur Genehmigung gesendet",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "\"{title}\" konnte nicht angefragt werden: {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "Du hast noch nichts angefragt",
+  "requestsDismiss": "Verwerfen",
+  "requestsDismissFailed": "Anfrage konnte nicht verworfen werden: {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "Ausstehende Genehmigung",
+  "requestsStatusApproved": "Genehmigt",
+  "requestsStatusRejected": "Abgelehnt",
+  "requestsStatusCompleted": "Abgeschlossen",
+  "requestsStatusUnknown": "Unbekannt"
 }

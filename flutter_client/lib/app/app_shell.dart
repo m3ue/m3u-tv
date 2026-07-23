@@ -505,6 +505,19 @@ class AppShellState extends ConsumerState<AppShell>
     unawaited(_pushDetail(RouteNames.vodDetailsFor(item.id), extra: item));
   }
 
+  void _openRequestResult(ContentRequestSearchResult result) {
+    unawaited(
+      _pushDetail(
+        RouteNames.requestsDetailsFor(
+          result.integrationId,
+          result.type,
+          result.externalId,
+        ),
+        extra: result,
+      ),
+    );
+  }
+
   void _openSeries(Series series) {
     unawaited(
       _pushDetail(RouteNames.seriesDetailsFor(series.id), extra: series),
@@ -670,6 +683,10 @@ class AppShellState extends ConsumerState<AppShell>
           }
           return RequestScreen(
             isConfigured: _appState.isConfigured,
+            onSearch: _appState.searchContentRequests,
+            onResultSelect: _openRequestResult,
+            onDismiss: _appState.dismissMediaRequest,
+            onRefreshRequests: _appState.refreshMediaRequests,
             onSidebarActivate: _activateSidebar,
           );
         },

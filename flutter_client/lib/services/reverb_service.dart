@@ -29,6 +29,7 @@ class ReverbService {
   Set<String> _subscribedChannels = const {};
   void Function(TvNotificationItem)? _onNotification;
   void Function(DvrRecording)? _onDvrStatus;
+  void Function(MediaRequestSummary)? _onRequestStatus;
   void Function()? _onConnected;
 
   WebSocketChannel? _ws;
@@ -49,6 +50,7 @@ class ReverbService {
     Set<String> subscribedChannels = const {},
     required void Function(TvNotificationItem) onNotification,
     void Function(DvrRecording)? onDvrStatus,
+    void Function(MediaRequestSummary)? onRequestStatus,
     void Function()? onConnected,
   }) async {
     _session = session;
@@ -56,6 +58,7 @@ class ReverbService {
     _subscribedChannels = subscribedChannels;
     _onNotification = onNotification;
     _onDvrStatus = onDvrStatus;
+    _onRequestStatus = onRequestStatus;
     _onConnected = onConnected;
     _disposed = false;
     _retryDelay = 2;
@@ -123,6 +126,11 @@ class ReverbService {
         if (!_connected) return;
         final payload = _parseData(msg['data']);
         _onDvrStatus?.call(DvrRecording.fromXtream(payload));
+
+      case 'request.status':
+        if (!_connected) return;
+        final payload = _parseData(msg['data']);
+        _onRequestStatus?.call(MediaRequestSummary.fromJson(payload));
     }
   }
 

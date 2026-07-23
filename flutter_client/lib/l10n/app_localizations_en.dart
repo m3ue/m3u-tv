@@ -489,4 +489,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => 'All';
+
+  @override
+  String get requestsTabSearch => 'Search';
+
+  @override
+  String get requestsTabMyRequests => 'My Requests';
+
+  @override
+  String get requestsSearchHint => 'Search movies & shows…';
+
+  @override
+  String get requestsNoResults => 'No results found';
+
+  @override
+  String get requestsAlreadyAvailable => 'Already available';
+
+  @override
+  String get requestsAlreadyRequested => 'Already requested';
+
+  @override
+  String get requestsRequestButton => 'Request';
+
+  @override
+  String get requestsSeasonsHeading => 'Seasons';
+
+  @override
+  String get requestsSelectAllSeasons => 'Select All';
+
+  @override
+  String get requestsClearSeasons => 'Clear';
+
+  @override
+  String requestsSubmitted(String title) {
+    return '\"$title\" was requested';
+  }
+
+  @override
+  String requestsSubmittedPendingApproval(String title) {
+    return '\"$title\" was sent for approval';
+  }
+
+  @override
+  String requestsSubmitFailed(String title, String error) {
+    return 'Could not request \"$title\": $error';
+  }
+
+  @override
+  String get requestsMyRequestsEmpty => 'You haven\'t requested anything yet';
+
+  @override
+  String get requestsDismiss => 'Dismiss';
+
+  @override
+  String requestsDismissFailed(String error) {
+    return 'Could not dismiss request: $error';
+  }
+
+  @override
+  String get requestsStatusPendingApproval => 'Pending Approval';
+
+  @override
+  String get requestsStatusApproved => 'Approved';
+
+  @override
+  String get requestsStatusRejected => 'Rejected';
+
+  @override
+  String get requestsStatusCompleted => 'Completed';
+
+  @override
+  String get requestsStatusUnknown => 'Unknown';
 }

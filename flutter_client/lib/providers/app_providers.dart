@@ -7,6 +7,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart'
     show TvNotificationItem;
 import 'package:m3u_tv/services/tv_notification_store.dart';
+import 'package:m3u_tv/services/xtream_service.dart' show RequestsCapability;
 
 // ---------------------------------------------------------------------------
 // Proxy: wraps AppStateController and forwards ChangeNotifier notifications.
@@ -130,6 +131,18 @@ final sourceErrorProvider = Provider<String?>((ref) {
 
 final hasDvrFeatureProvider = Provider<bool>((ref) {
   return ref.watch(appStateControllerProvider).appState.hasDvrFeature;
+});
+
+final hasRequestsFeatureProvider = Provider<bool>((ref) {
+  return ref.watch(appStateControllerProvider).appState.hasRequestsFeature;
+});
+
+final requestsCapabilityProvider = Provider<RequestsCapability?>((ref) {
+  return ref.watch(appStateControllerProvider).appState.requestsCapability;
+});
+
+final mediaRequestsProvider = Provider<List<MediaRequestSummary>>((ref) {
+  return ref.watch(appStateControllerProvider).appState.mediaRequests;
 });
 
 // Favorites services are stable ChangeNotifier instances — they notify on

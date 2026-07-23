@@ -231,5 +231,57 @@
   "aiostreamsSearch": "Rechercher dans AIOStreams",
   "aiostreamsSearchResults": "Résultats de recherche",
   "aiostreamsNoResults": "Aucun résultat trouvé",
-  "aiostreamsSearchAll": "Tout"
+  "aiostreamsSearchAll": "Tout",
+  "requestsTabSearch": "Recherche",
+  "requestsTabMyRequests": "Mes Demandes",
+  "requestsSearchHint": "Rechercher des films et séries…",
+  "requestsNoResults": "Aucun résultat trouvé",
+  "requestsAlreadyAvailable": "Déjà disponible",
+  "requestsAlreadyRequested": "Déjà demandé",
+  "requestsRequestButton": "Demander",
+  "requestsSeasonsHeading": "Saisons",
+  "requestsSelectAllSeasons": "Tout sélectionner",
+  "requestsClearSeasons": "Effacer",
+  "requestsSubmitted": "« {title} » a été demandé",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "« {title} » a été envoyé pour approbation",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "Impossible de demander « {title} » : {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "Vous n'avez encore rien demandé",
+  "requestsDismiss": "Ignorer",
+  "requestsDismissFailed": "Impossible d'ignorer la demande : {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "En attente d'approbation",
+  "requestsStatusApproved": "Approuvé",
+  "requestsStatusRejected": "Rejeté",
+  "requestsStatusCompleted": "Terminé",
+  "requestsStatusUnknown": "Inconnu"
 }
