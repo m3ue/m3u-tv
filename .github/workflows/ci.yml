@@ -69,10 +69,10 @@ jobs:
         run: ./android/gradlew -p android :app:testDebugUnitTest
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze Flutter client
-        run: flutter analyze
+        run: flutter analyze lib test
 
       - name: Test Flutter client
         run: flutter test
