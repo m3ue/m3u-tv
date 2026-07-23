@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
@@ -14,6 +15,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
+import 'package:m3u_tv/services/push_notification_service.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -44,6 +46,7 @@ class AppStateController extends ChangeNotifier {
     ReverbService? reverbService,
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
+    PushNotificationService? pushNotificationService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -83,6 +86,8 @@ class AppStateController extends ChangeNotifier {
           aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
+      pushNotificationService:
+          pushNotificationService ?? PushNotificationService(),
     );
   }
 
@@ -104,6 +109,7 @@ class AppStateController extends ChangeNotifier {
     required this._reverbService,
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
+    required this._pushNotificationService,
   });
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -129,6 +135,8 @@ class AppStateController extends ChangeNotifier {
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
+  final PushNotificationService _pushNotificationService;
+  String? _pushToken;
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
   int _unreadNotificationCount = 0;
@@ -278,11 +286,13 @@ class AppStateController extends ChangeNotifier {
           unawaited(_refreshRecentlyWatchedForActiveViewer());
           unawaited(_replaceWithXtreamContent(clearCache: false));
           unawaited(_connectTvNotifications(credentials));
+          unawaited(_registerPushToken(credentials));
           return;
         }
         final loaded = await _replaceWithXtreamContent(clearCache: false);
         if (loaded) {
           unawaited(_connectTvNotifications(credentials));
+          unawaited(_registerPushToken(credentials));
         }
       } else if (savedSource == AppSourceType.xtream &&
           authNotifier.error != null) {
@@ -318,6 +328,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     if (loaded) {
       unawaited(_connectTvNotifications(credentials));
+      unawaited(_registerPushToken(credentials));
     }
     return loaded;
   }
@@ -407,6 +418,32 @@ class AppStateController extends ChangeNotifier {
       );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
+    }
+  }
+
+  /// Called by `main.dart` once Firebase hands back an FCM registration
+  /// token (mobile only — TV builds never call this). Registers immediately
+  /// if credentials are already connected; otherwise the token is held and
+  /// registered the next time [_connectTvNotifications] runs.
+  void setPushToken(String token) {
+    _pushToken = token;
+    final credentials = authNotifier.credentials;
+    if (credentials != null) {
+      unawaited(_registerPushToken(credentials));
+    }
+  }
+
+  Future<void> _registerPushToken(UserCredentials credentials) async {
+    final token = _pushToken;
+    if (token == null) return;
+    try {
+      await _pushNotificationService.registerToken(
+        credentials,
+        token: token,
+        platform: Platform.isIOS ? 'ios' : 'android',
+      );
+    } on Object catch (_) {
+      // Push registration is best-effort, same as TV notifications above.
     }
   }
 

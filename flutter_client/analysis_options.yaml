@@ -12,6 +12,9 @@ analyzer:
   exclude:
     - '**/*.g.dart'
     - '**/*.freezed.dart'
+    # macOS SPM checkouts (e.g. firebase_messaging) vendor their own pubspec.yaml,
+    # which makes the analyzer treat them as a nested project to lint.
+    - 'build/**'
 
 linter:
   rules:

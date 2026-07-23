@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config — not secret, but no reason to publish this project's
+# specific Firebase identity. Placed manually per m3u-push-relay/README.md.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

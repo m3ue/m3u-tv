@@ -16,6 +16,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
+import 'package:m3u_tv/services/push_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -32,6 +33,9 @@ Future<void> main() async {
   }
   final appState = await _buildAppState();
   final nativeTelevisionHint = await resolveNativeTelevisionHint();
+  if (_isMobilePushCapable(nativeTelevisionHint)) {
+    unawaited(_initPushNotifications(appState));
+  }
   runApp(
     ProviderScope(
       overrides: [overrideAppState(appState)],
@@ -42,6 +46,26 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+/// Push is mobile-only: TV builds (Android TV, tvOS) rely on the existing
+/// Reverb pipeline instead. tvOS reports `Platform.operatingSystem == 'tvos'`
+/// (not 'ios'), so `Platform.isIOS` alone already excludes it.
+bool _isMobilePushCapable(bool nativeTelevisionHint) =>
+    (Platform.isAndroid && !nativeTelevisionHint) || Platform.isIOS;
+
+Future<void> _initPushNotifications(AppStateController appState) async {
+  try {
+    final service = PushNotificationService();
+    final token = await service.init();
+    if (token != null) {
+      appState.setPushToken(token);
+    }
+    service.onTokenRefresh.listen(appState.setPushToken);
+  } on Object catch (error) {
+    // Best-effort: e.g. Firebase config not yet installed on this build.
+    debugPrint('Push notification init failed: $error');
+  }
 }
 
 Future<AppStateController> _buildAppState() async {

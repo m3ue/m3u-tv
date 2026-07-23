@@ -11,6 +11,8 @@ dependencies:
   cached_network_image: ^3.4.1
   cupertino_icons: ^1.0.8
   dpad: ^3.0.0
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
   flutter:
     sdk: flutter
   flutter_cache_manager: ^3.4.2
