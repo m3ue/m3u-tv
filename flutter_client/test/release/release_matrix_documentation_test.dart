@@ -632,7 +632,7 @@ void main() {
       'ANDROID_REQUIRE_RELEASE_SIGNING: "true"',
       'APKSIGNER=',
       'verify --verbose --print-certs',
-      'Signer #1 certificate SHA-256 digest:',
+      '(Signer #[0-9]+|V[0-9.]+ Signer:) certificate SHA-256 digest: ',
       'Android Debug',
       r'$GITHUB_STEP_SUMMARY',
     ]) {
