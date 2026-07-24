@@ -421,6 +421,14 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
+  /// Suspends the TV notification WebSocket while the app is backgrounded.
+  /// Call [resumeNotifications] when the app returns to the foreground.
+  Future<void> suspendNotifications() => _reverbService.pause();
+
+  /// Reconnects the TV notification WebSocket after the app returns to the
+  /// foreground. No-op if it was never connected or the app has logged out.
+  Future<void> resumeNotifications() => _reverbService.resume();
+
   /// Called by `main.dart` once Firebase hands back an FCM registration
   /// token (mobile only — TV builds never call this). Registers immediately
   /// if credentials are already connected; otherwise the token is held and

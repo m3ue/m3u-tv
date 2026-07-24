@@ -12,8 +12,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// forwards incoming `tv.notification` and `dvr.status` events to the
 /// supplied callbacks.
 ///
-/// Call `connect` after a successful Xtream login. Call `disconnect` on logout
-/// or app suspend. Reconnects automatically with exponential backoff.
+/// Call `connect` after a successful Xtream login. Call `pause`/`resume`
+/// around app background/foreground transitions, and `disconnect` on logout.
+/// Reconnects automatically with exponential backoff.
 class ReverbService {
   ReverbService({
     TvNotificationService? notificationApi,
@@ -34,7 +35,9 @@ class ReverbService {
 
   WebSocketChannel? _ws;
   StreamSubscription<dynamic>? _sub;
+  Timer? _reconnectTimer;
   bool _disposed = false;
+  bool _paused = false;
   bool _connected = false;
   int _retryDelay = 2;
 
@@ -61,6 +64,7 @@ class ReverbService {
     _onRequestStatus = onRequestStatus;
     _onConnected = onConnected;
     _disposed = false;
+    _paused = false;
     _retryDelay = 2;
     await _connectOnce();
   }
@@ -166,19 +170,46 @@ class ReverbService {
     _sub = null;
     _ws = null;
     _connected = false;
+    if (_disposed || _paused) return;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: _retryDelay), () {
+      if (_disposed || _paused) return;
+      _retryDelay = (_retryDelay * 2).clamp(2, _maxRetryDelay);
+      unawaited(_connectOnce());
+    });
+  }
+
+  /// Suspends the connection while the app is backgrounded, without
+  /// discarding session/credentials. Call [resume] to reconnect. Unlike
+  /// [disconnect], this is not terminal — reconnect attempts resume on
+  /// [resume] rather than being permanently disabled.
+  Future<void> pause() async {
     if (_disposed) return;
-    unawaited(
-      Future.delayed(Duration(seconds: _retryDelay), () {
-        if (_disposed) return;
-        _retryDelay = (_retryDelay * 2).clamp(2, _maxRetryDelay);
-        unawaited(_connectOnce());
-      }),
-    );
+    _paused = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _connected = false;
+    await _sub?.cancel();
+    _sub = null;
+    await _ws?.sink.close();
+    _ws = null;
+  }
+
+  /// Reconnects a connection previously suspended by [pause]. No-op if not
+  /// currently paused (e.g. never connected, or already [disconnect]ed).
+  Future<void> resume() async {
+    if (_disposed || !_paused) return;
+    _paused = false;
+    _retryDelay = 2;
+    await _connectOnce();
   }
 
   /// Disconnects and prevents any further reconnect attempts.
   Future<void> disconnect() async {
     _disposed = true;
+    _paused = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _connected = false;
     await _sub?.cancel();
     _sub = null;

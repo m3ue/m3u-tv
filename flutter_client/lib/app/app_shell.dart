@@ -214,7 +214,12 @@ class AppShellState extends ConsumerState<AppShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      unawaited(_appState.suspendNotifications());
+      return;
+    }
     if (state != AppLifecycleState.resumed) return;
+    unawaited(_appState.resumeNotifications());
     unawaited(
       _playerArgs == null || _playerHasFailed
           ? _systemUiPolicy.applyBrowsing()
