@@ -39,6 +39,7 @@ class ReverbService {
   bool _disposed = false;
   bool _paused = false;
   bool _connected = false;
+  bool _hasConnectedBefore = false;
   int _retryDelay = 2;
 
   static const int _maxRetryDelay = 60;
@@ -65,6 +66,7 @@ class ReverbService {
     _onConnected = onConnected;
     _disposed = false;
     _paused = false;
+    _hasConnectedBefore = true;
     _retryDelay = 2;
     await _connectOnce();
   }
@@ -195,11 +197,14 @@ class ReverbService {
     _ws = null;
   }
 
-  /// Reconnects a connection previously suspended by [pause]. No-op if not
-  /// currently paused (e.g. never connected, or already [disconnect]ed).
+  /// Reconnects after [pause], or after the socket otherwise dropped without
+  /// an explicit [pause] (e.g. the OS silently killed it while backgrounded).
+  /// No-op if [connect] was never called, already connected, or [disconnect]ed.
   Future<void> resume() async {
-    if (_disposed || !_paused) return;
+    if (_disposed || !_hasConnectedBefore || _connected) return;
     _paused = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _retryDelay = 2;
     await _connectOnce();
   }

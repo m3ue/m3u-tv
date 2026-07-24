@@ -385,27 +385,10 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> _connectTvNotifications(UserCredentials credentials) async {
     try {
-      final (session, unread) = await _tvNotificationService.fetchUnread(
-        credentials,
-      );
-      if (session.availableChannels.isNotEmpty) {
-        await notificationStore.setServerChannels(session.availableChannels);
-      }
-      // Sync local store with the server's authoritative unread list: stale
-      // local unreads are marked read, new server items are added. Only
-      // genuinely new items (not seen before) are surfaced as toasts — boot
-      // should not replay banners for notifications the user already received.
-      final newItems = await notificationStore.syncUnreadWithServer(unread);
-      await _refreshUnreadNotificationCount();
-      final subscribed = await notificationStore.subscribedChannels();
-      for (final item in newItems) {
-        if (subscribed.isEmpty || subscribed.contains(item.channel)) {
-          _tvNotificationController.add(item);
-        }
-      }
+      final session = await _reconcileUnreadNotifications(credentials);
       // Older server versions don't return Reverb config — skip WebSocket setup
       // rather than hammering a connection that can never succeed.
-      if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) return;
+      if (session == null) return;
       await _reverbService.connect(
         session: session,
         credentials: credentials,
@@ -421,13 +404,55 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
+  /// Fetches the server's authoritative unread list, syncs it into the local
+  /// store (surfacing genuinely new items as toasts), and returns the
+  /// playlist session — or `null` if the server has no Reverb config to
+  /// connect a WebSocket to.
+  Future<TvPlaylistSession?> _reconcileUnreadNotifications(
+    UserCredentials credentials,
+  ) async {
+    final (session, unread) = await _tvNotificationService.fetchUnread(
+      credentials,
+    );
+    if (session.availableChannels.isNotEmpty) {
+      await notificationStore.setServerChannels(session.availableChannels);
+    }
+    // Sync local store with the server's authoritative unread list: stale
+    // local unreads are marked read, new server items are added. Only
+    // genuinely new items (not seen before) are surfaced as toasts — this
+    // should not replay banners for notifications the user already received.
+    final newItems = await notificationStore.syncUnreadWithServer(unread);
+    await _refreshUnreadNotificationCount();
+    final subscribed = await notificationStore.subscribedChannels();
+    for (final item in newItems) {
+      if (subscribed.isEmpty || subscribed.contains(item.channel)) {
+        _tvNotificationController.add(item);
+      }
+    }
+    if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) {
+      return null;
+    }
+    return session;
+  }
+
   /// Suspends the TV notification WebSocket while the app is backgrounded.
   /// Call [resumeNotifications] when the app returns to the foreground.
   Future<void> suspendNotifications() => _reverbService.pause();
 
   /// Reconnects the TV notification WebSocket after the app returns to the
-  /// foreground. No-op if it was never connected or the app has logged out.
-  Future<void> resumeNotifications() => _reverbService.resume();
+  /// foreground, and reconciles any notifications (e.g. a push received
+  /// while backgrounded) the server delivered while the socket was down.
+  /// No-op if there are no stored credentials.
+  Future<void> resumeNotifications() async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    try {
+      await _reconcileUnreadNotifications(credentials);
+    } on Object catch (_) {
+      // TV notifications are best-effort; a failure here must not crash the app.
+    }
+    await _reverbService.resume();
+  }
 
   /// Called by `main.dart` once Firebase hands back an FCM registration
   /// token (mobile only — TV builds never call this). Registers immediately
