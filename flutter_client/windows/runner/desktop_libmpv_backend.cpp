@@ -89,7 +89,11 @@ constexpr int MPV_EVENT_VIDEO_RECONFIG = 17;
 constexpr int MPV_EVENT_PLAYBACK_RESTART = 21;
 constexpr int MPV_EVENT_PROPERTY_CHANGE = 22;
 constexpr int MPV_EVENT_QUEUE_OVERFLOW = 24;
+constexpr int MPV_END_FILE_REASON_EOF = 0;
+constexpr int MPV_END_FILE_REASON_STOP = 2;
+constexpr int MPV_END_FILE_REASON_QUIT = 3;
 constexpr int MPV_END_FILE_REASON_ERROR = 4;
+constexpr int MPV_END_FILE_REASON_REDIRECT = 5;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
@@ -317,6 +321,43 @@ struct CopyPixelsContext {
   FlutterDesktopPixelBuffer pixel_buffer = {};
 };
 
+struct TextureReleaseContext {
+  TextureReleaseContext(LibmpvApi* api, mpv_handle* handle,
+                        mpv_render_context* render_context,
+                        std::unique_ptr<flutter::TextureVariant> texture,
+                        std::shared_ptr<CopyPixelsContext> copy_context)
+      : api(api), handle(handle), render_context(render_context),
+        texture(std::move(texture)), copy_context(std::move(copy_context)) {}
+
+  ~TextureReleaseContext() { Release(); }
+
+  void Release() {
+    std::lock_guard<std::mutex> lock(copy_context->mutex);
+    if (released) return;
+    released = true;
+    copy_context->render_context = nullptr;
+    copy_context->api = nullptr;
+    texture.reset();
+    if (render_context != nullptr && api != nullptr &&
+        api->render_context_free != nullptr) {
+      api->render_context_free(render_context);
+      render_context = nullptr;
+    }
+    if (handle != nullptr && api != nullptr &&
+        api->terminate_destroy != nullptr) {
+      api->terminate_destroy(handle);
+      handle = nullptr;
+    }
+  }
+
+  LibmpvApi* api;
+  mpv_handle* handle;
+  mpv_render_context* render_context;
+  std::unique_ptr<flutter::TextureVariant> texture;
+  std::shared_ptr<CopyPixelsContext> copy_context;
+  bool released = false;
+};
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, flutter::TextureRegistrar* texture_registrar,
                  std::shared_ptr<PlatformDispatcher> dispatcher,
@@ -346,13 +387,17 @@ struct PlayerInstance {
       api->render_context_set_update_callback(render_context, nullptr, nullptr);
     }
     texture_state->active.store(false);
-    if (texture_registrar != nullptr && texture_id != 0) texture_registrar->UnregisterTexture(texture_id);
-    {
-      std::lock_guard<std::mutex> lock(copy_context->mutex);
-      copy_context->render_context = nullptr;
+    auto release_context = std::make_shared<TextureReleaseContext>(
+        api, handle, render_context, std::move(texture), copy_context);
+    handle = nullptr;
+    render_context = nullptr;
+    if (texture_registrar != nullptr && texture_id != 0) {
+      texture_registrar->UnregisterTexture(texture_id, [release_context]() {
+        release_context->Release();
+      });
+    } else {
+      release_context->Release();
     }
-    if (render_context != nullptr && api != nullptr && api->render_context_free != nullptr) api->render_context_free(render_context);
-    if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) api->terminate_destroy(handle);
   }
 
   const FlutterDesktopPixelBuffer* CopyPixels(size_t width, size_t height) {
@@ -682,10 +727,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
   DoubleProperty(this, "duration", &snapshot->duration);
   FlagProperty(this, "pause", &snapshot->paused);
   bool paused_for_cache = false;
-  double cache_buffering_state = 0.0;
   FlagProperty(this, "paused-for-cache", &paused_for_cache);
-  DoubleProperty(this, "cache-buffering-state", &cache_buffering_state);
-  snapshot->buffering = paused_for_cache || cache_buffering_state > 0.0;
+  snapshot->buffering = paused_for_cache;
   FlagProperty(this, "eof-reached", &snapshot->eof);
   DoubleProperty(this, "speed", &snapshot->speed);
   if (!DoubleProperty(this, "video-params/aspect", &snapshot->video_aspect_ratio) || snapshot->video_aspect_ratio <= 0.0) {
@@ -699,7 +742,7 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
 
 void PlayerInstance::StartEventThread() {
   event_thread = std::thread([this]() {
-    const char* doubles[] = {"time-pos", "duration", "speed", "cache-buffering-state", "video-params/aspect", "dwidth", "dheight"};
+    const char* doubles[] = {"time-pos", "duration", "speed", "video-params/aspect", "dwidth", "dheight"};
     const char* flags[] = {"pause", "paused-for-cache", "eof-reached"};
     const char* strings[] = {"aid", "sid"};
     for (const char* name : doubles) api->observe_property(handle, 0, name, MPV_FORMAT_DOUBLE);
@@ -725,15 +768,33 @@ void PlayerInstance::StartEventThread() {
       } else if (event->event_id == MPV_EVENT_END_FILE) {
         const auto* end_file =
             static_cast<const mpv_event_end_file*>(event->data);
-        if (end_file != nullptr &&
-            end_file->reason == MPV_END_FILE_REASON_ERROR) {
-          snapshot.kind = "ERROR";
-          snapshot.message = "libmpv end-file error " +
-                             std::to_string(end_file->error);
-          snapshot.code = "mpv-end-file-error";
-          snapshot.recoverable = true;
-        } else {
-          snapshot.kind = "END_FILE";
+        const int end_file_reason = end_file == nullptr ? -1 : end_file->reason;
+        switch (end_file_reason) {
+          case MPV_END_FILE_REASON_EOF:
+            snapshot.kind = "END_FILE";
+            break;
+          case MPV_END_FILE_REASON_STOP:
+            snapshot.kind = "STOP";
+            break;
+          case MPV_END_FILE_REASON_QUIT:
+            snapshot.kind = "QUIT";
+            break;
+          case MPV_END_FILE_REASON_ERROR:
+            snapshot.kind = "ERROR";
+            snapshot.message = "libmpv end-file error " +
+                               std::to_string(end_file->error);
+            snapshot.code = "mpv-end-file-error";
+            snapshot.recoverable = true;
+            break;
+          case MPV_END_FILE_REASON_REDIRECT:
+            continue;
+          default:
+            snapshot.kind = "ERROR";
+            snapshot.message = "unknown libmpv end-file reason " +
+                               std::to_string(end_file_reason);
+            snapshot.code = "mpv-end-file-unknown-reason";
+            snapshot.recoverable = true;
+            break;
         }
       } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
         snapshot.kind = "SHUTDOWN";

@@ -64,6 +64,20 @@ void main() {
       expect(event.sid, isNull);
     });
 
+    test('normalizes empty native track IDs to no selected track', () {
+      final event = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 1,
+        'handle': 1,
+        'sequence': 0,
+        'kind': 'FILE_LOADED',
+        'aid': '',
+        'sid': '',
+      });
+
+      expect(event.aid, isNull);
+      expect(event.sid, isNull);
+    });
+
     test('parses ERROR kind with message and code', () {
       final event = DesktopLibmpvEvent.fromMap(<String, Object?>{
         'schemaVersion': 1,
@@ -558,7 +572,7 @@ void main() {
       await events.close();
     });
 
-    test('emits exactly one error and ignores further events', () async {
+    test('terminal error during load is delivered only by load', () async {
       final events = StreamController<Map<String, Object?>>.broadcast();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(methodChannel, (call) async {
@@ -621,9 +635,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(errors, hasLength(1));
-      expect(errors.single.code, 'network_unavailable');
-      expect(errors.single.recoverable, isTrue);
+      expect(errors, isEmpty);
       expect(
         states.map((s) => s.status),
         isNot(contains(PlaybackStatus.playing)),
@@ -691,7 +703,7 @@ void main() {
       await events.close();
     });
 
-    test('ERROR before FILE_LOADED fails load once without hanging', () async {
+    test('ERROR before FILE_LOADED fails only load without hanging', () async {
       final events = StreamController<Map<String, Object?>>.broadcast();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(methodChannel, (call) async {
@@ -751,8 +763,7 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(errors, hasLength(1));
-      expect(errors.single.code, 'mpv-end-file-error');
+      expect(errors, isEmpty);
       expect(states, isEmpty);
 
       await errorSub.cancel();
@@ -762,7 +773,7 @@ void main() {
     });
 
     test(
-      'END_FILE before FILE_LOADED fails load once without hanging',
+      'END_FILE before FILE_LOADED fails only load without hanging',
       () async {
         final events = StreamController<Map<String, Object?>>.broadcast();
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -812,8 +823,7 @@ void main() {
         );
         await pumpEventQueue();
 
-        expect(errors, hasLength(1));
-        expect(errors.single.code, 'desktop-libmpv-ended-before-ready');
+        expect(errors, isEmpty);
 
         await errorSub.cancel();
         await backend.dispose();

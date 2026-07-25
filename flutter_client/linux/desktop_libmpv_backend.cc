@@ -71,8 +71,12 @@ struct mpv_event_end_file {
   int playlist_insert_num_entries;
 };
 
-constexpr int MPV_END_FILE_REASON_ERROR = 4;
 constexpr int MPV_EVENT_END_FILE = 7;
+constexpr int MPV_END_FILE_REASON_EOF = 0;
+constexpr int MPV_END_FILE_REASON_STOP = 2;
+constexpr int MPV_END_FILE_REASON_QUIT = 3;
+constexpr int MPV_END_FILE_REASON_ERROR = 4;
+constexpr int MPV_END_FILE_REASON_REDIRECT = 5;
 
 constexpr int MPV_FORMAT_DOUBLE = 5;
 constexpr int MPV_FORMAT_FLAG = 3;
@@ -711,10 +715,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
   DoubleProperty(this, "duration", &snapshot->duration);
   FlagProperty(this, "pause", &snapshot->paused);
   bool paused_for_cache = false;
-  double cache_buffering_state = 0.0;
   FlagProperty(this, "paused-for-cache", &paused_for_cache);
-  DoubleProperty(this, "cache-buffering-state", &cache_buffering_state);
-  snapshot->buffering = paused_for_cache || cache_buffering_state > 0.0;
+  snapshot->buffering = paused_for_cache;
   FlagProperty(this, "eof-reached", &snapshot->eof);
   DoubleProperty(this, "speed", &snapshot->speed);
 
@@ -742,7 +744,6 @@ void PlayerInstance::StartEventThread() {
     api->observe_property(handle, 0, "duration", MPV_FORMAT_DOUBLE);
     api->observe_property(handle, 0, "pause", MPV_FORMAT_FLAG);
     api->observe_property(handle, 0, "paused-for-cache", MPV_FORMAT_FLAG);
-    api->observe_property(handle, 0, "cache-buffering-state", MPV_FORMAT_DOUBLE);
     api->observe_property(handle, 0, "eof-reached", MPV_FORMAT_FLAG);
     api->observe_property(handle, 0, "speed", MPV_FORMAT_DOUBLE);
     api->observe_property(handle, 0, "video-params/aspect", MPV_FORMAT_DOUBLE);
@@ -811,15 +812,34 @@ void PlayerInstance::StartEventThread() {
         case MPV_EVENT_END_FILE: {
           snapshot.sequence = sequence.fetch_add(1);
           const auto* end_file = static_cast<const mpv_event_end_file*>(ev->data);
-          if (end_file != nullptr &&
-              end_file->reason == MPV_END_FILE_REASON_ERROR) {
-            snapshot.kind = "ERROR";
-            snapshot.message = "libmpv end-file error " +
-                               std::to_string(end_file->error);
-            snapshot.code = "mpv-end-file-error";
-            snapshot.recoverable = true;
-          } else {
-            snapshot.kind = "END_FILE";
+          const int end_file_reason =
+              end_file == nullptr ? -1 : end_file->reason;
+          switch (end_file_reason) {
+            case MPV_END_FILE_REASON_EOF:
+              snapshot.kind = "END_FILE";
+              break;
+            case MPV_END_FILE_REASON_STOP:
+              snapshot.kind = "STOP";
+              break;
+            case MPV_END_FILE_REASON_QUIT:
+              snapshot.kind = "QUIT";
+              break;
+            case MPV_END_FILE_REASON_ERROR:
+              snapshot.kind = "ERROR";
+              snapshot.message = "libmpv end-file error " +
+                                 std::to_string(end_file->error);
+              snapshot.code = "mpv-end-file-error";
+              snapshot.recoverable = true;
+              break;
+            case MPV_END_FILE_REASON_REDIRECT:
+              continue;
+            default:
+              snapshot.kind = "ERROR";
+              snapshot.message = "unknown libmpv end-file reason " +
+                                 std::to_string(end_file_reason);
+              snapshot.code = "mpv-end-file-unknown-reason";
+              snapshot.recoverable = true;
+              break;
           }
           ReadSnapshotProperties(&snapshot);
           QueueEvent(snapshot);

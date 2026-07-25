@@ -265,8 +265,11 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
         code: event.code ?? 'desktop-libmpv-error',
         recoverable: event.recoverable,
       );
-      _failReady(error);
-      _errorController.add(PlaybackError.fromException(error));
+      if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+        _failReady(error);
+      } else {
+        _errorController.add(PlaybackError.fromException(error));
+      }
       return;
     }
 
@@ -281,7 +284,6 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
         recoverable: true,
       );
       _failReady(error);
-      _errorController.add(PlaybackError.fromException(error));
       return;
     }
 
@@ -488,8 +490,8 @@ class DesktopLibmpvEvent {
         height: map['videoHeight'] ?? map['height'],
       ),
       speed: _asPositiveDouble(map['speed']),
-      aid: map['aid'] as String?,
-      sid: map['sid'] as String?,
+      aid: _nonEmptyString(map['aid']),
+      sid: _nonEmptyString(map['sid']),
       message: map['message'] as String?,
       code: map['code'] as String?,
       recoverable: map['recoverable'] == true,
@@ -535,6 +537,10 @@ class DesktopLibmpvEvent {
       if (parsed != null && parsed > 0) return parsed;
     }
     return null;
+  }
+
+  static String? _nonEmptyString(Object? value) {
+    return value is String && value.isNotEmpty ? value : null;
   }
 }
 

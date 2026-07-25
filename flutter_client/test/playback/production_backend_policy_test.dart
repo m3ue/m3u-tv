@@ -693,7 +693,7 @@ void main() {
     );
 
     test(
-      'Windows CopyPixels uses shared ownership and waits for raster completion',
+      'Windows retains raster resources until async unregister completion',
       () {
         final windowsBackend = File(
           'windows/runner/desktop_libmpv_backend.cpp',
@@ -712,6 +712,7 @@ void main() {
           windowsBackend,
           contains('[ctx = player->copy_context]'),
         );
+        expect(windowsBackend, contains('struct TextureReleaseContext'));
 
         final destructorStart = windowsBackend.indexOf('~PlayerInstance()');
         final destructorEnd = windowsBackend.indexOf(
@@ -727,12 +728,47 @@ void main() {
         final unregisterIndex = destructor.indexOf(
           'texture_registrar->UnregisterTexture',
         );
-        final mutexWaitIndex = destructor.indexOf(
-          'copy_context->mutex',
+        final releaseContextIndex = destructor.indexOf(
+          'std::make_shared<TextureReleaseContext>',
         );
         expect(unregisterIndex, isNonNegative);
-        expect(mutexWaitIndex, isNonNegative);
-        expect(mutexWaitIndex, greaterThan(unregisterIndex));
+        expect(releaseContextIndex, isNonNegative);
+        expect(unregisterIndex, greaterThan(releaseContextIndex));
+        expect(
+          destructor,
+          contains('UnregisterTexture(texture_id, [release_context]()'),
+        );
+        expect(
+          destructor,
+          isNot(contains('UnregisterTexture(texture_id);')),
+        );
+        expect(destructor, isNot(contains('api->render_context_free')));
+        expect(destructor, isNot(contains('api->terminate_destroy')));
+
+        final releaseContextStart = windowsBackend.indexOf(
+          'struct TextureReleaseContext',
+        );
+        final releaseContextEnd = windowsBackend.indexOf(
+          'struct PlayerInstance',
+          releaseContextStart,
+        );
+        expect(releaseContextStart, isNonNegative);
+        expect(releaseContextEnd, greaterThan(releaseContextStart));
+        final releaseContext = windowsBackend.substring(
+          releaseContextStart,
+          releaseContextEnd,
+        );
+        expect(
+          releaseContext,
+          contains('std::unique_ptr<flutter::TextureVariant>'),
+        );
+        expect(releaseContext, contains('std::shared_ptr<CopyPixelsContext>'));
+        expect(releaseContext, contains('copy_context->mutex'));
+        expect(
+          releaseContext,
+          contains('api->render_context_free(render_context)'),
+        );
+        expect(releaseContext, contains('api->terminate_destroy(handle)'));
 
         final pixelBufferStart = windowsBackend.indexOf(
           'flutter::PixelBufferTexture(',
@@ -751,6 +787,75 @@ void main() {
         expect(lambdaSnippet, isNot(contains('raw_player')));
       },
     );
+
+    test('desktop buffering follows paused-for-cache only', () {
+      final backends = <String>[
+        File('linux/desktop_libmpv_backend.cc').readAsStringSync(),
+        File('windows/runner/desktop_libmpv_backend.cpp').readAsStringSync(),
+      ];
+
+      for (final backend in backends) {
+        final snapshotStart = backend.indexOf(
+          'void PlayerInstance::ReadSnapshotProperties',
+        );
+        final snapshotEnd = backend.indexOf(
+          'void PlayerInstance::StartEventThread',
+          snapshotStart,
+        );
+        expect(snapshotStart, isNonNegative);
+        expect(snapshotEnd, greaterThan(snapshotStart));
+        final snapshot = backend.substring(snapshotStart, snapshotEnd);
+        expect(snapshot, contains('snapshot->buffering = paused_for_cache;'));
+        expect(snapshot, isNot(contains('cache_buffering_state >')));
+      }
+    });
+
+    test('desktop END_FILE reasons have explicit native mappings', () {
+      final backends = <String>[
+        File('linux/desktop_libmpv_backend.cc').readAsStringSync(),
+        File('windows/runner/desktop_libmpv_backend.cpp').readAsStringSync(),
+      ];
+
+      for (final backend in backends) {
+        expect(backend, contains('MPV_END_FILE_REASON_EOF = 0'));
+        expect(backend, contains('MPV_END_FILE_REASON_STOP = 2'));
+        expect(backend, contains('MPV_END_FILE_REASON_QUIT = 3'));
+        expect(backend, contains('MPV_END_FILE_REASON_ERROR = 4'));
+        expect(backend, contains('MPV_END_FILE_REASON_REDIRECT = 5'));
+
+        final mappingStart = backend.indexOf('switch (end_file_reason)');
+        expect(mappingStart, isNonNegative);
+        final mappingEnd = backend.indexOf(
+          'ReadSnapshotProperties',
+          mappingStart,
+        );
+        expect(mappingEnd, greaterThan(mappingStart));
+        final mapping = backend.substring(mappingStart, mappingEnd);
+        expect(mapping, contains('case MPV_END_FILE_REASON_EOF:'));
+        expect(mapping, contains('snapshot.kind = "END_FILE"'));
+        expect(mapping, contains('case MPV_END_FILE_REASON_STOP:'));
+        expect(mapping, contains('snapshot.kind = "STOP"'));
+        expect(mapping, contains('case MPV_END_FILE_REASON_QUIT:'));
+        expect(mapping, contains('snapshot.kind = "QUIT"'));
+        expect(mapping, contains('case MPV_END_FILE_REASON_ERROR:'));
+        expect(mapping, contains('snapshot.code = "mpv-end-file-error"'));
+        expect(mapping, contains('case MPV_END_FILE_REASON_REDIRECT:'));
+        expect(
+          mapping,
+          contains(
+            RegExp(r'case MPV_END_FILE_REASON_REDIRECT:\s+continue;'),
+          ),
+        );
+        expect(
+          mapping,
+          contains('snapshot.code = "mpv-end-file-unknown-reason"'),
+        );
+        expect(
+          mapping,
+          isNot(contains('} else {\n            snapshot.kind = "END_FILE"')),
+        );
+      }
+    });
 
     test('Android Media3 retries mislabeled HLS streams as MPEG-TS', () {
       final media3Plugin = File(
