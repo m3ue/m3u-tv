@@ -121,6 +121,84 @@ void main() {
       expect(find.byIcon(Icons.forward_10), findsNothing);
     });
 
+    testWidgets('hides channel controls for live content by default', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsNothing);
+      expect(find.byIcon(Icons.skip_next), findsNothing);
+    });
+
+    testWidgets('hides channel controls for non-live content', (
+      tester,
+    ) async {
+      var nextPressed = false;
+      var previousPressed = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: Duration.zero,
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onNextChannel: () => nextPressed = true,
+            onPreviousChannel: () => previousPressed = true,
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsNothing);
+      expect(find.byIcon(Icons.skip_next), findsNothing);
+      expect(nextPressed, isFalse);
+      expect(previousPressed, isFalse);
+    });
+
+    testWidgets('shows and calls next/previous channel controls for live '
+        'content', (tester) async {
+      var nextPressed = false;
+      var previousPressed = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onNextChannel: () => nextPressed = true,
+            onPreviousChannel: () => previousPressed = true,
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.skip_next));
+      expect(nextPressed, isTrue);
+
+      await tester.tap(find.byIcon(Icons.skip_previous));
+      expect(previousPressed, isTrue);
+    });
+
     testWidgets('shows seek controls for VOD content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

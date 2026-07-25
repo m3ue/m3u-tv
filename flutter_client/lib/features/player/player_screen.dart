@@ -35,6 +35,8 @@ class PlayerScreen extends StatefulWidget {
     this.viewerId = '',
     this.onClose,
     this.onPlaybackFailure,
+    this.onNextChannel,
+    this.onPreviousChannel,
     super.key,
   });
 
@@ -47,6 +49,8 @@ class PlayerScreen extends StatefulWidget {
   final String viewerId;
   final VoidCallback? onClose;
   final VoidCallback? onPlaybackFailure;
+  final VoidCallback? onNextChannel;
+  final VoidCallback? onPreviousChannel;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -648,6 +652,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ? _fallbackReason
                         : null,
                     playPauseFocusNode: _controlsFocusNode,
+                    onNextChannel: widget.onNextChannel,
+                    onPreviousChannel: widget.onPreviousChannel,
                   ),
 
                 if (_showPlaybackDiagnostics &&

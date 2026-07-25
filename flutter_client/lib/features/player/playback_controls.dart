@@ -31,6 +31,8 @@ class PlaybackControls extends StatelessWidget {
     this.onSubtitleTrackSelected,
     this.fallbackReason,
     this.playPauseFocusNode,
+    this.onNextChannel,
+    this.onPreviousChannel,
     super.key,
   });
 
@@ -50,6 +52,8 @@ class PlaybackControls extends StatelessWidget {
   final ValueChanged<String?>? onSubtitleTrackSelected;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
+  final VoidCallback? onNextChannel;
+  final VoidCallback? onPreviousChannel;
 
   static const Duration seekStep = Duration(seconds: 10);
 
@@ -163,6 +167,9 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
+  bool get _hasChannelControls =>
+      isLive && (onPreviousChannel != null || onNextChannel != null);
+
   Widget _buildControlRow(ColorScheme colorScheme) {
     final transportControls = Row(
       mainAxisSize: MainAxisSize.min,
@@ -182,6 +189,12 @@ class PlaybackControls extends StatelessWidget {
             },
             colorScheme: colorScheme,
           ),
+        if (isLive && onPreviousChannel != null)
+          _ControlButton(
+            icon: Icons.skip_previous,
+            onTap: onPreviousChannel!,
+            colorScheme: colorScheme,
+          ),
         _ControlButton(
           icon: isPlaying ? Icons.pause : Icons.play_arrow,
           onTap: onPlayPause,
@@ -189,6 +202,12 @@ class PlaybackControls extends StatelessWidget {
           autofocus: playPauseFocusNode == null,
           focusNode: playPauseFocusNode,
         ),
+        if (isLive && onNextChannel != null)
+          _ControlButton(
+            icon: Icons.skip_next,
+            onTap: onNextChannel!,
+            colorScheme: colorScheme,
+          ),
         if (!isLive)
           _ControlButton(
             icon: Icons.forward_10,
@@ -212,7 +231,9 @@ class PlaybackControls extends StatelessWidget {
         final trackControlsWidth = _hasTrackControls
             ? TrackSelector.controlsWidth
             : 0.0;
-        final transportWidth = isLive ? 56.0 : 168.0;
+        final transportWidth = isLive
+            ? (_hasChannelControls ? 168.0 : 56.0)
+            : 168.0;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >= transportWidth + (trackControlsWidth * 2);
 

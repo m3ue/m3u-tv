@@ -432,6 +432,24 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
+  // channel-up/channel-down without PlayerScreen needing to know about
+  // liveChannelsProvider itself.
+  void _openNextChannel() => _switchChannel(1);
+  void _openPreviousChannel() => _switchChannel(-1);
+
+  void _switchChannel(int direction) {
+    final args = _playerArgs;
+    if (args == null || args.type != 'live') return;
+    final channels = ref.read(liveChannelsProvider);
+    if (channels.isEmpty) return;
+    final currentIndex = channels.indexWhere((c) => c.id == args.streamId);
+    if (currentIndex == -1) return;
+    final nextIndex =
+        (currentIndex + direction + channels.length) % channels.length;
+    _openChannel(channels[nextIndex]);
+  }
+
   void _openCatchupProgram(Channel channel, EpgProgram program) {
     if (_appState.sourceType != AppSourceType.xtream) {
       _openChannel(channel);
@@ -814,6 +832,10 @@ class AppShellState extends ConsumerState<AppShell>
                   epgService: _appState.epgService,
                   xtreamService: _appState.xtreamService,
                   viewerId: viewerId,
+                  onNextChannel: args.type == 'live' ? _openNextChannel : null,
+                  onPreviousChannel: args.type == 'live'
+                      ? _openPreviousChannel
+                      : null,
                   progressReporter: (progress) {
                     final aioLookupId = args.metadata['aio_item_id'] as String?;
                     final existing = _appState.progressList.firstWhereOrNull(
