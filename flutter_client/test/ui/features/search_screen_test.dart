@@ -262,6 +262,31 @@ void main() {
       expect(selectedSeries?.id, 20);
     });
 
+    testWidgets(
+      'tapping a channel reports the current search results as context',
+      (tester) async {
+        List<Channel>? reportedContext;
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            vodItems: testVodItems,
+            seriesList: testSeriesList,
+            onChannelContextChanged: (channels) => reportedContext = channels,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byType(TextField), 'bbc');
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('BBC News'));
+        await tester.pumpAndSettle();
+
+        expect(reportedContext, isNotNull);
+        expect(reportedContext!.map((c) => c.id), [1]);
+      },
+    );
+
     testWidgets('shows empty state when no results match', (tester) async {
       await tester.pumpWidget(
         _TestApp(
@@ -306,6 +331,7 @@ class _TestApp extends StatelessWidget {
     required this.seriesList,
     this.isConfigured = true,
     this.onChannelSelect,
+    this.onChannelContextChanged,
     this.onVodSelect,
     this.onSeriesSelect,
   });
@@ -315,6 +341,7 @@ class _TestApp extends StatelessWidget {
   final List<Series> seriesList;
   final bool isConfigured;
   final void Function(Channel)? onChannelSelect;
+  final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(VodItem)? onVodSelect;
   final void Function(Series)? onSeriesSelect;
 
@@ -333,6 +360,7 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         home: SearchScreen(
           onChannelSelect: onChannelSelect ?? (_) {},
+          onChannelContextChanged: onChannelContextChanged,
           onVodSelect: onVodSelect ?? (_) {},
           onSeriesSelect: onSeriesSelect ?? (_) {},
         ),

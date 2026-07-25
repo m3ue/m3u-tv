@@ -27,6 +27,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     super.key,
     required this.favoritesService,
     required this.onChannelSelect,
+    this.onChannelContextChanged,
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
     this.onScheduleProgram,
@@ -35,6 +36,11 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 
   final FavoritesService favoritesService;
   final void Function(Channel) onChannelSelect;
+
+  /// Called with the filtered channel list (category/favorites/search) right
+  /// before [onChannelSelect], so the player's skip-previous/skip-next stays
+  /// within this view instead of the full unfiltered channel list.
+  final void Function(List<Channel>)? onChannelContextChanged;
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
@@ -347,7 +353,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             isFavorite: isFav,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
-            onTap: () => widget.onChannelSelect(channel),
+            onTap: () {
+              widget.onChannelContextChanged?.call(channels);
+              widget.onChannelSelect(channel);
+            },
             onLongPress: () =>
                 unawaited(_openChannelContextMenu(context, channel, epg)),
           );
@@ -368,7 +377,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
       child: TimelineEpgView(
         channels: channels,
         epgService: epgService,
-        onChannelSelect: widget.onChannelSelect,
+        onChannelSelect: (channel) {
+          widget.onChannelContextChanged?.call(channels);
+          widget.onChannelSelect(channel);
+        },
         onCatchupProgramSelect: widget.onCatchupProgramSelect,
         onEnsureEpg: widget.onEnsureEpg,
       ),
@@ -402,7 +414,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             isFavorite: isFav,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
-            onTap: () => widget.onChannelSelect(channel),
+            onTap: () {
+              widget.onChannelContextChanged?.call(channels);
+              widget.onChannelSelect(channel);
+            },
             onLongPress: () =>
                 unawaited(_openChannelContextMenu(context, channel, epg)),
           );

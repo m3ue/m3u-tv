@@ -17,12 +17,18 @@ class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
     super.key,
     required this.onChannelSelect,
+    this.onChannelContextChanged,
     required this.onVodSelect,
     required this.onSeriesSelect,
     this.onSidebarActivate,
   });
 
   final void Function(Channel) onChannelSelect;
+
+  /// Called with the current search-result channel list right before
+  /// [onChannelSelect], so the player's skip-previous/skip-next stays within
+  /// these search results instead of the full unfiltered channel list.
+  final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final VoidCallback? onSidebarActivate;
@@ -169,7 +175,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ...channels.map(
               (c) => _ChannelListTile(
                 channel: c,
-                onTap: () => widget.onChannelSelect(c),
+                onTap: () {
+                  widget.onChannelContextChanged?.call(channels);
+                  widget.onChannelSelect(c);
+                },
               ),
             ),
           ],
@@ -213,7 +222,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         itemBuilder: (context, index) => _ChannelListTile(
           channel: channels[index],
           autofocus: index == 0,
-          onTap: () => widget.onChannelSelect(channels[index]),
+          onTap: () {
+            widget.onChannelContextChanged?.call(channels);
+            widget.onChannelSelect(channels[index]);
+          },
         ),
       ),
     );

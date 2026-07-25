@@ -117,6 +117,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerResume => 'Resume';
 
   @override
+  String get playerSkipPreviousTooltip => 'Previous channel';
+
+  @override
+  String get playerSkipNextTooltip => 'Next channel';
+
+  @override
   String get searchHint => 'Search live TV, movies, and series...';
 
   @override
@@ -515,6 +521,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => 'All';
+
+  @override
+  String get requestsTitle => 'Requests';
 
   @override
   String get requestsTabSearch => 'Search';

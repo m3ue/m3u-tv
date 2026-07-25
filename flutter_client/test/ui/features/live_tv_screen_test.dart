@@ -250,6 +250,33 @@ void main() {
     });
 
     testWidgets(
+      'tapping a channel reports the current filtered list as context',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.add(1);
+        List<Channel>? reportedContext;
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            favoritesService: favoritesService,
+            onChannelContextChanged: (channels) => reportedContext = channels,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('★ Favorites'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('BBC One'));
+        await tester.pumpAndSettle();
+
+        expect(reportedContext, isNotNull);
+        expect(reportedContext!.map((c) => c.id), [1]);
+      },
+    );
+
+    testWidgets(
       'shows EPG schedule action and calls back with program context',
       (
         tester,
@@ -327,6 +354,7 @@ class _TestApp extends StatelessWidget {
     this.favoritesService,
     this.epgService,
     this.onChannelSelect,
+    this.onChannelContextChanged,
     this.onScheduleProgram,
     this.dvrRecordings = const [],
   });
@@ -338,6 +366,7 @@ class _TestApp extends StatelessWidget {
   final FavoritesService? favoritesService;
   final EpgService? epgService;
   final void Function(Channel)? onChannelSelect;
+  final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
   final List<DvrRecording> dvrRecordings;
 
@@ -367,6 +396,7 @@ class _TestApp extends StatelessWidget {
         home: LiveTvScreen(
           favoritesService: favoritesService ?? FavoritesService(),
           onChannelSelect: onChannelSelect ?? (_) {},
+          onChannelContextChanged: onChannelContextChanged,
           onScheduleProgram: onScheduleProgram,
         ),
       ),

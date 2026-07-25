@@ -175,6 +175,8 @@ void main() {
       var previousPressed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: true,
@@ -198,6 +200,33 @@ void main() {
       await tester.tap(find.byIcon(Icons.skip_previous));
       expect(previousPressed, isTrue);
     });
+
+    testWidgets(
+      'exposes previous/next channel tooltips for accessibility',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlaybackControls(
+              isPlaying: true,
+              isLive: true,
+              canSeek: false,
+              currentPosition: Duration.zero,
+              duration: Duration.zero,
+              onPlayPause: () {},
+              onSeek: (_) {},
+              onBack: () {},
+              onNextChannel: () {},
+              onPreviousChannel: () {},
+            ),
+          ),
+        );
+
+        expect(find.bySemanticsLabel('Previous channel'), findsOneWidget);
+        expect(find.bySemanticsLabel('Next channel'), findsOneWidget);
+      },
+    );
 
     testWidgets('shows seek controls for VOD content', (tester) async {
       await tester.pumpWidget(

@@ -102,6 +102,13 @@ class AppShellState extends ConsumerState<AppShell>
   bool _playerHasFailed = false;
   FocusNode? _focusBeforePlayer;
 
+  // Channels the user was browsing when the live player opened (filtered
+  // category/favorites/search list), so skip-previous/skip-next in
+  // PlaybackControls stays within that view instead of always cycling the
+  // full unfiltered live channel list. Set by feature screens right before
+  // they invoke onChannelSelect.
+  List<Channel> _playerChannelContext = const <Channel>[];
+
   final List<FocusNode> _sidebarFocusNodes = [];
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
@@ -451,10 +458,19 @@ class AppShellState extends ConsumerState<AppShell>
   void _openNextChannel() => _switchChannel(1);
   void _openPreviousChannel() => _switchChannel(-1);
 
+  // Set by feature screens right before they call onChannelSelect, so
+  // skip-previous/skip-next in the player can stay within the filtered view
+  // (category, favorites, search) the user was browsing.
+  void _setChannelContext(List<Channel> channels) {
+    _playerChannelContext = channels;
+  }
+
   void _switchChannel(int direction) {
     final args = _playerArgs;
     if (args == null || args.type != 'live') return;
-    final channels = ref.read(liveChannelsProvider);
+    final channels = _playerChannelContext.isNotEmpty
+        ? _playerChannelContext
+        : ref.read(liveChannelsProvider);
     if (channels.isEmpty) return;
     final currentIndex = channels.indexWhere((c) => c.id == args.streamId);
     if (currentIndex == -1) return;
@@ -630,6 +646,7 @@ class AppShellState extends ConsumerState<AppShell>
     return switch (routeName) {
       RouteNames.home => _HomeScreen(
         onChannelSelect: _openChannel,
+        onChannelContextChanged: _setChannelContext,
         onVodSelect: _openVod,
         onSeriesSelect: _openSeries,
         onProgressSelect: _openProgress,
@@ -648,6 +665,7 @@ class AppShellState extends ConsumerState<AppShell>
       ),
       RouteNames.search => SearchScreen(
         onChannelSelect: _openChannel,
+        onChannelContextChanged: _setChannelContext,
         onVodSelect: _openVod,
         onSeriesSelect: _openSeries,
         onSidebarActivate: _activateSidebar,
@@ -655,6 +673,7 @@ class AppShellState extends ConsumerState<AppShell>
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
         onChannelSelect: _openChannel,
+        onChannelContextChanged: _setChannelContext,
         onCatchupProgramSelect: _openCatchupProgram,
         onSidebarActivate: _activateSidebar,
         onScheduleProgram: (channel, program) =>
@@ -1501,6 +1520,7 @@ class _OfflineBanner extends StatelessWidget {
 class _HomeScreen extends ConsumerStatefulWidget {
   const _HomeScreen({
     required this.onChannelSelect,
+    this.onChannelContextChanged,
     required this.onVodSelect,
     required this.onSeriesSelect,
     required this.onProgressSelect,
@@ -1510,6 +1530,7 @@ class _HomeScreen extends ConsumerStatefulWidget {
   });
 
   final void Function(Channel) onChannelSelect;
+  final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
@@ -1603,6 +1624,12 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       landscapeStyle: true,
       onSidebarActivate: widget.onSidebarActivate,
     );
+    final favoriteChannels = channels
+        .where((channel) => _favoriteChannelIds.contains(channel.id))
+        .toList(growable: false);
+    final liveSectionChannels = favoriteChannels.isEmpty
+        ? channels
+        : favoriteChannels;
     MediaPreviewItem liveChannelItem(Channel channel) => MediaPreviewItem(
       title: channel.name,
       imageUrl: channel.logoUrl,
@@ -1615,22 +1642,20 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       imagePadding: const EdgeInsets.all(10),
       imageBackgroundColor: Colors.transparent,
       isFavorite: _favoriteChannelIds.contains(channel.id),
-      onTap: () => widget.onChannelSelect(channel),
+      onTap: () {
+        widget.onChannelContextChanged?.call(liveSectionChannels);
+        widget.onChannelSelect(channel);
+      },
       onLongTap: () async {
         await _liveFavoritesService.toggle(channel.id);
         await _loadFavorites();
       },
     );
 
-    final favoriteChannels = channels
-        .where((channel) => _favoriteChannelIds.contains(channel.id))
-        .toList(growable: false);
     final liveSection = MediaPreviewSection(
       title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       emptyLabel: l.homeNoLiveTv,
-      items: (favoriteChannels.isEmpty ? channels : favoriteChannels)
-          .map(liveChannelItem)
-          .toList(growable: false),
+      items: liveSectionChannels.map(liveChannelItem).toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );
     final moviesSection = MediaPreviewSection(

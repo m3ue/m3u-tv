@@ -117,6 +117,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerResume => '恢复播放';
 
   @override
+  String get playerSkipPreviousTooltip => '上一个频道';
+
+  @override
+  String get playerSkipNextTooltip => '下一个频道';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override
@@ -503,6 +509,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => '全部';
+
+  @override
+  String get requestsTitle => '请求';
 
   @override
   String get requestsTabSearch => '搜索';
