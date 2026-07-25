@@ -21,7 +21,7 @@ class EpgScreen extends StatefulWidget {
 
   final List<Channel> channels;
   final EpgService epgService;
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
 
   /// Pre-populated EPG map from a parent widget. When provided, the screen
   /// uses this data directly instead of performing its own service lookups.
@@ -97,7 +97,7 @@ class _EpgScreenState extends State<EpgScreen> {
         final channel = widget.channels[index];
         final epg = epgMap[channel.id];
         return InkWell(
-          onTap: () => widget.onChannelSelect(channel),
+          onTap: () => widget.onChannelSelect(channel, widget.channels),
           child: Container(
             height: 80,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -215,7 +215,7 @@ class _EpgScreenState extends State<EpgScreen> {
             final channel = widget.channels[index];
             final epg = epgMap[channel.id];
             return InkWell(
-              onTap: () => widget.onChannelSelect(channel),
+              onTap: () => widget.onChannelSelect(channel, widget.channels),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(

@@ -22,7 +22,7 @@ class SearchScreen extends ConsumerStatefulWidget {
     this.onSidebarActivate,
   });
 
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final VoidCallback? onSidebarActivate;
@@ -169,7 +169,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ...channels.map(
               (c) => _ChannelListTile(
                 channel: c,
-                onTap: () => widget.onChannelSelect(c),
+                onTap: () => widget.onChannelSelect(c, channels),
               ),
             ),
           ],
@@ -213,7 +213,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         itemBuilder: (context, index) => _ChannelListTile(
           channel: channels[index],
           autofocus: index == 0,
-          onTap: () => widget.onChannelSelect(channels[index]),
+          onTap: () => widget.onChannelSelect(channels[index], channels),
         ),
       ),
     );

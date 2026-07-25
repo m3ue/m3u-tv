@@ -38,7 +38,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: LiveTvScreen(
             favoritesService: favorites,
-            onChannelSelect: (_) {},
+            onChannelSelect: (_, _) {},
           ),
         ),
       ),
@@ -101,7 +101,7 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: LiveTvScreen(
               favoritesService: favorites,
-              onChannelSelect: (_) {},
+              onChannelSelect: (_, _) {},
               onScheduleProgram: (channel, program) {
                 recordedChannel = channel;
                 recordedProgram = program;

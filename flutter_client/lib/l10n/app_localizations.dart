@@ -308,6 +308,30 @@ abstract class AppLocalizations {
   /// **'Resume'**
   String get playerResume;
 
+  /// No description provided for @playerSkipPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Channel'**
+  String get playerSkipPrevious;
+
+  /// No description provided for @playerSkipPreviousTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous channel'**
+  String get playerSkipPreviousTooltip;
+
+  /// No description provided for @playerSkipNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Channel'**
+  String get playerSkipNext;
+
+  /// No description provided for @playerSkipNextTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Next channel'**
+  String get playerSkipNextTooltip;
+
   /// No description provided for @searchHint.
   ///
   /// In en, this message translates to:

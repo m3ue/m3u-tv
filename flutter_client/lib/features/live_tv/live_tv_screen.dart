@@ -34,7 +34,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   });
 
   final FavoritesService favoritesService;
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
@@ -347,7 +347,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             isFavorite: isFav,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
-            onTap: () => widget.onChannelSelect(channel),
+            onTap: () => widget.onChannelSelect(channel, channels),
             onLongPress: () =>
                 unawaited(_openChannelContextMenu(context, channel, epg)),
           );
@@ -402,7 +402,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             isFavorite: isFav,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
-            onTap: () => widget.onChannelSelect(channel),
+            onTap: () => widget.onChannelSelect(channel, channels),
             onLongPress: () =>
                 unawaited(_openChannelContextMenu(context, channel, epg)),
           );

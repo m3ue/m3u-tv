@@ -121,6 +121,157 @@ void main() {
       expect(find.byIcon(Icons.forward_10), findsNothing);
     });
 
+    testWidgets('shows channel skip controls for live content', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onPreviousChannel: () {},
+            onNextChannel: () {},
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+    });
+
+    testWidgets('hides channel skip controls when callbacks are null', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsNothing);
+      expect(find.byIcon(Icons.skip_next), findsNothing);
+    });
+
+    testWidgets('hides channel skip controls for VOD content', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: const Duration(minutes: 5),
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onPreviousChannel: () {},
+            onNextChannel: () {},
+          ),
+        ),
+      );
+      expect(find.byIcon(Icons.skip_previous), findsNothing);
+      expect(find.byIcon(Icons.skip_next), findsNothing);
+    });
+
+    testWidgets('fires onPreviousChannel when skip-previous tapped', (
+      tester,
+    ) async {
+      var prevTapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onPreviousChannel: () => prevTapped = true,
+            onNextChannel: () {},
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.skip_previous));
+      expect(prevTapped, isTrue);
+    });
+
+    testWidgets('fires onNextChannel when skip-next tapped', (tester) async {
+      var nextTapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onPreviousChannel: () {},
+            onNextChannel: () => nextTapped = true,
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.skip_next));
+      expect(nextTapped, isTrue);
+    });
+
+    testWidgets('orders live channel skip controls around play pause', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: true,
+            canSeek: false,
+            currentPosition: Duration.zero,
+            duration: Duration.zero,
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+            onPreviousChannel: () {},
+            onNextChannel: () {},
+          ),
+        ),
+      );
+
+      final skipPrev = tester.getCenter(find.byIcon(Icons.skip_previous));
+      final playPause = tester.getCenter(find.byIcon(Icons.pause));
+      final skipNext = tester.getCenter(find.byIcon(Icons.skip_next));
+
+      expect(skipPrev.dx, lessThan(playPause.dx));
+      expect(playPause.dx, lessThan(skipNext.dx));
+    });
+
     testWidgets('shows seek controls for VOD content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

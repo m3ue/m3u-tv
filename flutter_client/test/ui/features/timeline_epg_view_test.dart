@@ -36,7 +36,7 @@ void main() {
                   ),
                 ],
                 epgService: epgService,
-                onChannelSelect: (_) {},
+                onChannelSelect: (_, _) {},
               ),
             ),
           ),
@@ -80,7 +80,7 @@ void main() {
               child: TimelineEpgView(
                 channels: const [channel],
                 epgService: epgService,
-                onChannelSelect: (_) {},
+                onChannelSelect: (_, _) {},
                 onCatchupProgramSelect: (channel, program) {
                   selectedChannel = channel;
                   selectedProgram = program;
@@ -136,7 +136,7 @@ void main() {
                 child: TimelineEpgView(
                   channels: const [channel],
                   epgService: epgService,
-                  onChannelSelect: (_) {},
+                  onChannelSelect: (_, _) {},
                 ),
               ),
             ),

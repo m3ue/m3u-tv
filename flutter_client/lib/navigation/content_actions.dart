@@ -31,7 +31,7 @@ class ContentActions extends InheritedWidget {
   /// Navigates to VOD details route (pushes `/vod/details/:id`).
   final void Function(VodItem) onVodSelect;
 
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final void Function(Channel, EpgProgram) onCatchupSelect;
 
   /// Navigates to series details route (pushes `/series/details/:id`).

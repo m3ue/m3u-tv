@@ -154,7 +154,7 @@ void main() {
         _TestApp(
           channels: testChannels,
           epgService: epgService,
-          onChannelSelect: (channel) => selectedChannel = channel,
+          onChannelSelect: (channel, _) => selectedChannel = channel,
         ),
       );
       await tester.pumpAndSettle();
@@ -177,7 +177,7 @@ class _TestApp extends StatelessWidget {
 
   final List<Channel> channels;
   final EpgService epgService;
-  final void Function(Channel)? onChannelSelect;
+  final void Function(Channel, List<Channel>)? onChannelSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +187,7 @@ class _TestApp extends StatelessWidget {
         body: EpgScreen(
           channels: channels,
           epgService: epgService,
-          onChannelSelect: onChannelSelect ?? (_) {},
+          onChannelSelect: onChannelSelect ?? (_, _) {},
         ),
       ),
     );

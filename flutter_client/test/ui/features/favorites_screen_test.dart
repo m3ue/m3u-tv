@@ -179,7 +179,7 @@ class _TestApp extends StatelessWidget {
             vodFavoritesService ?? FavoritesService(namespace: 'vod'),
         seriesFavoritesService:
             seriesFavoritesService ?? FavoritesService(namespace: 'series'),
-        onChannelSelect: (_) {},
+        onChannelSelect: (_, _) {},
         onVodSelect: (_) {},
         onSeriesSelect: (_) {},
       ),

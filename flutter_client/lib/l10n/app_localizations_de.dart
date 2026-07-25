@@ -118,6 +118,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerResume => 'Fortsetzen';
 
   @override
+  String get playerSkipPrevious => 'Vorheriger Sender';
+
+  @override
+  String get playerSkipPreviousTooltip => 'Vorheriger Sender';
+
+  @override
+  String get playerSkipNext => 'Nächster Sender';
+
+  @override
+  String get playerSkipNextTooltip => 'Nächster Sender';
+
+  @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
 
   @override

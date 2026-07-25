@@ -32,7 +32,7 @@ class TimelineEpgView extends StatefulWidget {
 
   final List<Channel> channels;
   final EpgService epgService;
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
 
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
@@ -283,7 +283,10 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                   );
                                   return;
                                 }
-                                widget.onChannelSelect(channel);
+                                widget.onChannelSelect(
+                                  channel,
+                                  widget.channels,
+                                );
                               },
                             ),
                           ),

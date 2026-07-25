@@ -30,7 +30,7 @@ class FavoritesScreen extends StatefulWidget {
   final FavoritesService channelFavoritesService;
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
 
@@ -148,7 +148,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       itemBuilder: (context, index) {
         final channel = favorites[index];
         return DpadInkWell(
-          onTap: () => widget.onChannelSelect(channel),
+          onTap: () => widget.onChannelSelect(channel, favorites),
           onLongTap: () async {
             await widget.channelFavoritesService.toggle(channel.id);
             await _loadFavorites();

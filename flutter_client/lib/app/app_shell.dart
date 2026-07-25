@@ -101,6 +101,11 @@ class AppShellState extends ConsumerState<AppShell>
   bool _playerHasFailed = false;
   FocusNode? _focusBeforePlayer;
 
+  // Channels the user was browsing when the live player opened (e.g. the
+  // filtered list in LiveTvScreen or the favorites list). Used to compute
+  // prev/next channel navigation so flipping stays in the user's current view.
+  List<Channel> _playerChannelContext = const <Channel>[];
+
   final List<FocusNode> _sidebarFocusNodes = [];
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
@@ -416,7 +421,8 @@ class AppShellState extends ConsumerState<AppShell>
     return false;
   }
 
-  void _openChannel(Channel channel) {
+  void _openChannel(Channel channel, List<Channel> contextChannels) {
+    setState(() => _playerChannelContext = contextChannels);
     unawaited(
       _openPlayer(
         context,
@@ -432,9 +438,57 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  // Player-channel helpers — resolve prev/next within the user's current view
+  // and rebuild PlayerArgs so the screen tears down and recreates on the new
+  // channel (ValueKey on streamUrl handles the rebuild).
+  Channel? _playerCurrentChannel() {
+    final args = _playerArgs;
+    if (args == null || args.type != 'live') return null;
+    final list = _playerChannelContext;
+    if (list.isEmpty) return null;
+    final id = args.streamId;
+    for (final c in list) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
+  Channel? _resolveAdjacentChannel(int delta) {
+    final list = _playerChannelContext;
+    if (list.isEmpty) return null;
+    final current = _playerCurrentChannel();
+    final index = current == null
+        ? (delta > 0 ? -1 : list.length)
+        : list.indexOf(current);
+    if (index < 0) return null;
+    final next = (index + delta + list.length) % list.length;
+    return list[next];
+  }
+
+  void _openAdjacentChannel(int delta) {
+    final next = _resolveAdjacentChannel(delta);
+    if (next == null) return;
+    unawaited(
+      _openPlayer(
+        context,
+        PlayerArgs(
+          streamUrl: next.streamUrl,
+          title: next.name,
+          type: 'live',
+          streamId: next.id,
+          epgChannelId: next.epgChannelId ?? next.tvgName ?? next.name,
+          headers: next.headers,
+        ),
+      ),
+    );
+  }
+
+  void _openPreviousChannel() => _openAdjacentChannel(-1);
+  void _openNextChannel() => _openAdjacentChannel(1);
+
   void _openCatchupProgram(Channel channel, EpgProgram program) {
     if (_appState.sourceType != AppSourceType.xtream) {
-      _openChannel(channel);
+      _openChannel(channel, _appState.channels);
       return;
     }
     final duration = program.end.difference(program.start);
@@ -814,6 +868,10 @@ class AppShellState extends ConsumerState<AppShell>
                   epgService: _appState.epgService,
                   xtreamService: _appState.xtreamService,
                   viewerId: viewerId,
+                  onPreviousChannel:
+                      args.type == 'live' ? _openPreviousChannel : null,
+                  onNextChannel:
+                      args.type == 'live' ? _openNextChannel : null,
                   progressReporter: (progress) {
                     final aioLookupId = args.metadata['aio_item_id'] as String?;
                     final existing = _appState.progressList.firstWhereOrNull(
@@ -1464,7 +1522,7 @@ class _HomeScreen extends ConsumerStatefulWidget {
     this.onSidebarActivate,
   });
 
-  final void Function(Channel) onChannelSelect;
+  final void Function(Channel, List<Channel>) onChannelSelect;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
@@ -1558,6 +1616,11 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       landscapeStyle: true,
       onSidebarActivate: widget.onSidebarActivate,
     );
+    final favoriteChannels = channels
+        .where((channel) => _favoriteChannelIds.contains(channel.id))
+        .toList(growable: false);
+    final liveSectionChannels =
+        favoriteChannels.isEmpty ? channels : favoriteChannels;
     MediaPreviewItem liveChannelItem(Channel channel) => MediaPreviewItem(
       title: channel.name,
       imageUrl: channel.logoUrl,
@@ -1570,22 +1633,16 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       imagePadding: const EdgeInsets.all(10),
       imageBackgroundColor: Colors.transparent,
       isFavorite: _favoriteChannelIds.contains(channel.id),
-      onTap: () => widget.onChannelSelect(channel),
+      onTap: () => widget.onChannelSelect(channel, liveSectionChannels),
       onLongTap: () async {
         await _liveFavoritesService.toggle(channel.id);
         await _loadFavorites();
       },
     );
-
-    final favoriteChannels = channels
-        .where((channel) => _favoriteChannelIds.contains(channel.id))
-        .toList(growable: false);
     final liveSection = MediaPreviewSection(
       title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       emptyLabel: l.homeNoLiveTv,
-      items: (favoriteChannels.isEmpty ? channels : favoriteChannels)
-          .map(liveChannelItem)
-          .toList(growable: false),
+      items: liveSectionChannels.map(liveChannelItem).toList(growable: false),
       onSidebarActivate: widget.onSidebarActivate,
     );
     final moviesSection = MediaPreviewSection(

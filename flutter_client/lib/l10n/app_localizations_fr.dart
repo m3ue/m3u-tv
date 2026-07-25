@@ -117,6 +117,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerResume => 'Reprendre';
 
   @override
+  String get playerSkipPrevious => 'Chaîne précédente';
+
+  @override
+  String get playerSkipPreviousTooltip => 'Chaîne précédente';
+
+  @override
+  String get playerSkipNext => 'Chaîne suivante';
+
+  @override
+  String get playerSkipNextTooltip => 'Chaîne suivante';
+
+  @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
 
   @override

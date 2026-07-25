@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
@@ -23,6 +24,8 @@ class PlaybackControls extends StatelessWidget {
     required this.onPlayPause,
     required this.onSeek,
     required this.onBack,
+    this.onPreviousChannel,
+    this.onNextChannel,
     this.audioTracks = const <PlaybackTrack>[],
     this.subtitleTracks = const <PlaybackTrack>[],
     this.selectedAudioTrackId,
@@ -42,6 +45,8 @@ class PlaybackControls extends StatelessWidget {
   final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onBack;
+  final VoidCallback? onPreviousChannel;
+  final VoidCallback? onNextChannel;
   final List<PlaybackTrack> audioTracks;
   final List<PlaybackTrack> subtitleTracks;
   final String? selectedAudioTrackId;
@@ -68,7 +73,7 @@ class PlaybackControls extends StatelessWidget {
           children: [
             _buildHeader(colorScheme),
             const Spacer(),
-            _buildControlsBar(colorScheme),
+            _buildControlsBar(context, colorScheme),
           ],
         ),
       ),
@@ -122,7 +127,7 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
-  Widget _buildControlsBar(ColorScheme colorScheme) {
+  Widget _buildControlsBar(BuildContext context, ColorScheme colorScheme) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -135,7 +140,7 @@ class PlaybackControls extends StatelessWidget {
         children: [
           if (canSeek) _buildProgressBar(colorScheme),
           if (canSeek) const SizedBox(height: 12),
-          _buildControlRow(colorScheme),
+          _buildControlRow(context, colorScheme),
         ],
       ),
     );
@@ -163,10 +168,17 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
-  Widget _buildControlRow(ColorScheme colorScheme) {
+  Widget _buildControlRow(BuildContext context, ColorScheme colorScheme) {
     final transportControls = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (isLive && onPreviousChannel != null)
+          _ControlButton(
+            icon: Icons.skip_previous,
+            tooltip: AppLocalizations.of(context).playerSkipPreviousTooltip,
+            onTap: onPreviousChannel!,
+            colorScheme: colorScheme,
+          ),
         if (!isLive)
           _ControlButton(
             icon: Icons.replay_10,
@@ -204,6 +216,13 @@ class PlaybackControls extends StatelessWidget {
             },
             colorScheme: colorScheme,
           ),
+        if (isLive && onNextChannel != null)
+          _ControlButton(
+            icon: Icons.skip_next,
+            tooltip: AppLocalizations.of(context).playerSkipNextTooltip,
+            onTap: onNextChannel!,
+            colorScheme: colorScheme,
+          ),
       ],
     );
 
@@ -212,7 +231,7 @@ class PlaybackControls extends StatelessWidget {
         final trackControlsWidth = _hasTrackControls
             ? TrackSelector.controlsWidth
             : 0.0;
-        final transportWidth = isLive ? 56.0 : 168.0;
+        const transportWidth = 168.0;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >= transportWidth + (trackControlsWidth * 2);
 
@@ -253,6 +272,7 @@ class _ControlButton extends StatelessWidget {
     required this.colorScheme,
     this.autofocus = false,
     this.focusNode,
+    this.tooltip,
   });
 
   final IconData icon;
@@ -260,6 +280,7 @@ class _ControlButton extends StatelessWidget {
   final ColorScheme colorScheme;
   final bool autofocus;
   final FocusNode? focusNode;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -274,14 +295,18 @@ class _ControlButton extends StatelessWidget {
       ],
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: Colors.white10,
-            borderRadius: BorderRadius.circular(8),
+        child: Semantics(
+          label: tooltip,
+          button: true,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 22, color: colorScheme.onSurface),
           ),
-          child: Icon(icon, size: 22, color: colorScheme.onSurface),
         ),
       ),
     );

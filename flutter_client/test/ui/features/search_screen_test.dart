@@ -235,7 +235,7 @@ void main() {
           channels: testChannels,
           vodItems: testVodItems,
           seriesList: testSeriesList,
-          onChannelSelect: (channel) => selectedChannel = channel,
+          onChannelSelect: (channel, _) => selectedChannel = channel,
           onVodSelect: (item) => selectedVod = item,
           onSeriesSelect: (series) => selectedSeries = series,
         ),
@@ -314,7 +314,7 @@ class _TestApp extends StatelessWidget {
   final List<VodItem> vodItems;
   final List<Series> seriesList;
   final bool isConfigured;
-  final void Function(Channel)? onChannelSelect;
+  final void Function(Channel, List<Channel>)? onChannelSelect;
   final void Function(VodItem)? onVodSelect;
   final void Function(Series)? onSeriesSelect;
 
@@ -332,7 +332,7 @@ class _TestApp extends StatelessWidget {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: ThemeData.dark(useMaterial3: true),
         home: SearchScreen(
-          onChannelSelect: onChannelSelect ?? (_) {},
+          onChannelSelect: onChannelSelect ?? (_, _) {},
           onVodSelect: onVodSelect ?? (_) {},
           onSeriesSelect: onSeriesSelect ?? (_) {},
         ),

@@ -237,7 +237,7 @@ void main() {
         _TestApp(
           channels: testChannels,
           categories: testCategories,
-          onChannelSelect: (channel) => selectedChannel = channel,
+          onChannelSelect: (channel, _) => selectedChannel = channel,
         ),
       );
       await tester.pumpAndSettle();
@@ -337,7 +337,7 @@ class _TestApp extends StatelessWidget {
   final bool isConfigured;
   final FavoritesService? favoritesService;
   final EpgService? epgService;
-  final void Function(Channel)? onChannelSelect;
+  final void Function(Channel, List<Channel>)? onChannelSelect;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
   final List<DvrRecording> dvrRecordings;
 
@@ -366,7 +366,7 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         home: LiveTvScreen(
           favoritesService: favoritesService ?? FavoritesService(),
-          onChannelSelect: onChannelSelect ?? (_) {},
+          onChannelSelect: onChannelSelect ?? (_, _) {},
           onScheduleProgram: onScheduleProgram,
         ),
       ),
