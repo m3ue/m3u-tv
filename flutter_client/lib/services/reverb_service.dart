@@ -122,7 +122,8 @@ class ReverbService {
       case 'tv.notification':
         if (!_connected) return;
         final payload = _parseData(msg['data']);
-        final item = TvNotificationItem.fromJson(payload);
+        final item = TvNotificationItem.tryFromJson(payload);
+        if (item == null) return;
         if (_subscribedChannels.isEmpty ||
             _subscribedChannels.contains(item.channel)) {
           _onNotification?.call(item);

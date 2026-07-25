@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:async';
+
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 
@@ -34,6 +36,7 @@ class StoredTvNotification {
     'title': item.title,
     'body': item.body,
     'status': item.status,
+    'admin_only': item.adminOnly,
     'received_at': receivedAt.toIso8601String(),
     'is_read': isRead,
     'read_at': readAt?.toIso8601String(),
@@ -51,6 +54,7 @@ class StoredTvNotification {
         title: '${map['title'] ?? ''}',
         body: map['body'] as String?,
         status: '${map['status'] ?? 'info'}',
+        adminOnly: map['admin_only'] == true,
       ),
       receivedAt: receivedAt,
       isRead: map['is_read'] == true,
@@ -85,6 +89,7 @@ class TvNotificationStore {
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? _store;
+  Future<void> _mutationQueue = Future<void>.value();
 
   // In-memory cache so callers don't need to await for a hot-path check.
   Set<String>? _subscribedChannelsCache;
@@ -186,7 +191,7 @@ class TvNotificationStore {
   /// only the newly added items so callers can decide whether to toast them.
   Future<List<TvNotificationItem>> syncUnreadWithServer(
     List<TvNotificationItem> serverUnread,
-  ) async {
+  ) => _mutate(() async {
     final serverUnreadIds = {for (final n in serverUnread) n.id};
     final existing = await all();
     final existingIds = {for (final n in existing) n.item.id};
@@ -212,13 +217,13 @@ class TvNotificationStore {
       [...newItems, ...kept].take(_maxStored).toList(growable: false),
     );
     return newItems.map((n) => n.item).toList(growable: false);
-  }
+  });
 
   /// Adds a newly received notification as unread. No-op if its id is
   /// already stored (e.g. delivered via both the unread-fetch and Reverb push).
-  Future<void> add(TvNotificationItem item) async {
+  Future<bool> add(TvNotificationItem item) => _mutate(() async {
     final existing = await all();
-    if (existing.any((n) => n.item.id == item.id)) return;
+    if (existing.any((n) => n.item.id == item.id)) return false;
     final updated = [
       StoredTvNotification(
         item: item,
@@ -228,7 +233,8 @@ class TvNotificationStore {
       ...existing,
     ];
     await _write(updated.take(_maxStored).toList(growable: false));
-  }
+    return true;
+  });
 
   Future<void> markRead(String id) async {
     final existing = await all();
@@ -262,5 +268,14 @@ class TvNotificationStore {
     final encoded = notifications.map((n) => n.toJson()).toList();
     _memory[_key] = encoded;
     await _store?.write(_key, encoded);
+  }
+
+  Future<T> _mutate<T>(Future<T> Function() operation) {
+    final result = _mutationQueue.then((_) => operation());
+    _mutationQueue = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
   }
 }

@@ -137,8 +137,20 @@ class AppStateController extends ChangeNotifier {
   final ReverbService _reverbService;
   final PushNotificationService _pushNotificationService;
   String? _pushToken;
+  UserCredentials? _registeredPushCredentials;
+  String? _registeredPushToken;
+  Future<void> _pushLifecycle = Future<void>.value();
+  Future<void>? _pushInitialization;
+  StreamSubscription<String>? _pushTokenSubscription;
+  final Map<String, PushMessage> _pendingPushActivations =
+      <String, PushMessage>{};
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
+  final StreamController<TvNotificationDestination>
+  _notificationActivationController =
+      StreamController<TvNotificationDestination>.broadcast();
+  final Set<String> _activatedNotificationIds = <String>{};
+  int _notificationSessionGeneration = 0;
   int _unreadNotificationCount = 0;
 
   /// Stream of incoming TV push notifications (from Reverb WebSocket or
@@ -146,6 +158,9 @@ class AppStateController extends ChangeNotifier {
   /// show snackbars or banners.
   Stream<TvNotificationItem> get tvNotifications =>
       _tvNotificationController.stream;
+
+  Stream<TvNotificationDestination> get notificationActivations =>
+      _notificationActivationController.stream;
 
   int get unreadNotificationCount => _unreadNotificationCount;
 
@@ -280,18 +295,23 @@ class AppStateController extends ChangeNotifier {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
         final credentials = authNotifier.credentials!;
+        final notificationGeneration = ++_notificationSessionGeneration;
         if (await _hydrateCachedXtreamContent()) {
           _isBootstrapping = false;
           notifyListeners();
           unawaited(_refreshRecentlyWatchedForActiveViewer());
           unawaited(_replaceWithXtreamContent(clearCache: false));
-          unawaited(_connectTvNotifications(credentials));
+          unawaited(
+            _connectTvNotifications(credentials, notificationGeneration),
+          );
           unawaited(_registerPushToken(credentials));
           return;
         }
         final loaded = await _replaceWithXtreamContent(clearCache: false);
         if (loaded) {
-          unawaited(_connectTvNotifications(credentials));
+          unawaited(
+            _connectTvNotifications(credentials, notificationGeneration),
+          );
           unawaited(_registerPushToken(credentials));
         }
       } else if (savedSource == AppSourceType.xtream &&
@@ -308,9 +328,17 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<bool> connectXtream(UserCredentials credentials) async {
+    final notificationGeneration = ++_notificationSessionGeneration;
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
+
+    final previousCredentials = authNotifier.credentials;
+    if (previousCredentials != null &&
+        !_sameCredentials(previousCredentials, credentials)) {
+      await _reverbService.disconnect();
+      await _unregisterPushToken();
+    }
 
     final connected = await authNotifier.connect(credentials);
     if (!connected) {
@@ -327,8 +355,8 @@ class AppStateController extends ChangeNotifier {
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
-      unawaited(_connectTvNotifications(credentials));
-      unawaited(_registerPushToken(credentials));
+      unawaited(_connectTvNotifications(credentials, notificationGeneration));
+      await _registerPushToken(credentials);
     }
     return loaded;
   }
@@ -343,6 +371,10 @@ class AppStateController extends ChangeNotifier {
 
     try {
       final playlist = m3uParser.parse(playlistText);
+      _notificationSessionGeneration += 1;
+      await _unregisterPushToken();
+      await _reverbService.disconnect();
+      await authNotifier.disconnect();
       await cacheService.clear();
       await cacheService.set('sourceType', 'm3u');
       await cacheService.set('liveCategories', playlist.categories);
@@ -383,9 +415,22 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  Future<void> _connectTvNotifications(UserCredentials credentials) async {
+  Future<void> _connectTvNotifications(
+    UserCredentials credentials,
+    int notificationGeneration,
+  ) async {
     try {
-      final session = await _reconcileUnreadNotifications(credentials);
+      final session = await _reconcileUnreadNotifications(
+        credentials,
+        present: _pendingPushActivations.isEmpty,
+        notificationGeneration: notificationGeneration,
+      );
+      if (notificationGeneration != _notificationSessionGeneration) return;
+      await _drainPendingPushActivations();
+      if (notificationGeneration != _notificationSessionGeneration ||
+          !_sameCredentials(authNotifier.credentials, credentials)) {
+        return;
+      }
       // Older server versions don't return Reverb config — skip WebSocket setup
       // rather than hammering a connection that can never succeed.
       if (session == null) return;
@@ -409,11 +454,19 @@ class AppStateController extends ChangeNotifier {
   /// playlist session — or `null` if the server has no Reverb config to
   /// connect a WebSocket to.
   Future<TvPlaylistSession?> _reconcileUnreadNotifications(
-    UserCredentials credentials,
-  ) async {
+    UserCredentials credentials, {
+    String? presentOnlyId,
+    bool present = true,
+    int? notificationGeneration,
+  }) async {
     final (session, unread) = await _tvNotificationService.fetchUnread(
       credentials,
     );
+    if ((notificationGeneration != null &&
+            notificationGeneration != _notificationSessionGeneration) ||
+        !_sameCredentials(authNotifier.credentials, credentials)) {
+      return null;
+    }
     if (session.availableChannels.isNotEmpty) {
       await notificationStore.setServerChannels(session.availableChannels);
     }
@@ -421,18 +474,32 @@ class AppStateController extends ChangeNotifier {
     // local unreads are marked read, new server items are added. Only
     // genuinely new items (not seen before) are surfaced as toasts — this
     // should not replay banners for notifications the user already received.
-    final newItems = await notificationStore.syncUnreadWithServer(unread);
+    final authorizedUnread = session.isAdmin
+        ? unread
+        : unread.where((item) => !item.adminOnly).toList(growable: false);
+    final newItems = await notificationStore.syncUnreadWithServer(
+      authorizedUnread,
+    );
     await _refreshUnreadNotificationCount();
-    final subscribed = await notificationStore.subscribedChannels();
-    for (final item in newItems) {
-      if (subscribed.isEmpty || subscribed.contains(item.channel)) {
-        _tvNotificationController.add(item);
+    if (present) {
+      final subscribed = await notificationStore.subscribedChannels();
+      for (final item in newItems) {
+        if ((presentOnlyId == null || item.id == presentOnlyId) &&
+            (subscribed.isEmpty || subscribed.contains(item.channel))) {
+          _tvNotificationController.add(item);
+        }
       }
     }
     if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) {
       return null;
     }
     return session;
+  }
+
+  Future<void> reconcileNotifications() async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    await _reconcileUnreadNotifications(credentials);
   }
 
   /// Suspends the TV notification WebSocket while the app is backgrounded.
@@ -446,11 +513,17 @@ class AppStateController extends ChangeNotifier {
   Future<void> resumeNotifications() async {
     final credentials = authNotifier.credentials;
     if (credentials == null) return;
+    final notificationGeneration = _notificationSessionGeneration;
     try {
-      await _reconcileUnreadNotifications(credentials);
+      await _reconcileUnreadNotifications(
+        credentials,
+        present: _pendingPushActivations.isEmpty,
+        notificationGeneration: notificationGeneration,
+      );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
     }
+    await _drainPendingPushActivations();
     await _reverbService.resume();
   }
 
@@ -458,30 +531,148 @@ class AppStateController extends ChangeNotifier {
   /// token (mobile only — TV builds never call this). Registers immediately
   /// if credentials are already connected; otherwise the token is held and
   /// registered the next time [_connectTvNotifications] runs.
-  void setPushToken(String token) {
-    _pushToken = token;
-    final credentials = authNotifier.credentials;
-    if (credentials != null) {
-      unawaited(_registerPushToken(credentials));
-    }
+  Future<void> initPushNotifications() =>
+      _pushInitialization ??= _initializePushNotifications();
+
+  Future<void> _initializePushNotifications() async {
+    final token = await _pushNotificationService.init(
+      onForegroundMessage: handleForegroundPush,
+      onMessageOpenedApp: handlePushActivation,
+    );
+    if (token != null) await setPushToken(token);
+    _pushTokenSubscription = _pushNotificationService.onTokenRefresh.listen(
+      (replacement) => unawaited(setPushToken(replacement)),
+    );
   }
 
-  Future<void> _registerPushToken(UserCredentials credentials) async {
+  Future<void> setPushToken(String token) => _queuePushLifecycle(() async {
+    if (_pushToken == token && _registeredPushToken == token) return;
+    _pushToken = token;
+    await _unregisterPushTokenNow();
+    final credentials = authNotifier.credentials;
+    if (credentials != null) {
+      await _registerPushTokenNow(credentials);
+    }
+  });
+
+  Future<void> _queuePushLifecycle(Future<void> Function() operation) {
+    final next = _pushLifecycle.then((_) => operation());
+    _pushLifecycle = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _registerPushToken(UserCredentials credentials) =>
+      _queuePushLifecycle(() => _registerPushTokenNow(credentials));
+
+  Future<void> _registerPushTokenNow(UserCredentials credentials) async {
     final token = _pushToken;
     if (token == null) return;
+    if (_registeredPushToken == token &&
+        _sameCredentials(_registeredPushCredentials, credentials)) {
+      return;
+    }
+    await _unregisterPushTokenNow();
     try {
       await _pushNotificationService.registerToken(
         credentials,
         token: token,
         platform: Platform.isIOS ? 'ios' : 'android',
       );
+      _registeredPushCredentials = credentials;
+      _registeredPushToken = token;
     } on Object catch (_) {
       // Push registration is best-effort, same as TV notifications above.
     }
   }
 
+  Future<void> _unregisterPushToken() =>
+      _queuePushLifecycle(_unregisterPushTokenNow);
+
+  Future<void> _unregisterPushTokenNow() async {
+    final credentials = _registeredPushCredentials;
+    final token = _registeredPushToken;
+    _registeredPushCredentials = null;
+    _registeredPushToken = null;
+    if (credentials == null || token == null) return;
+    try {
+      await _pushNotificationService.unregisterToken(
+        credentials,
+        token: token,
+      );
+    } on Object catch (_) {
+      // Best-effort cleanup; do not retain a stale local association on failure.
+    }
+  }
+
   void _onPushNotification(TvNotificationItem item) {
-    unawaited(_storeAndNotify(item));
+    unawaited(receiveTvNotification(item));
+  }
+
+  Future<void> handleForegroundPush(PushMessage message) async {
+    final id = message.notificationId;
+    final credentials = authNotifier.credentials;
+    if (id == null || credentials == null) return;
+    final notificationGeneration = _notificationSessionGeneration;
+    try {
+      await _reconcileUnreadNotifications(
+        credentials,
+        presentOnlyId: id,
+        notificationGeneration: notificationGeneration,
+      );
+    } on Object catch (_) {
+      // Push reconciliation is best-effort and never trusts payload content.
+    }
+  }
+
+  Future<void> handlePushActivation(PushMessage message) async {
+    final id = message.notificationId;
+    if (id == null) return;
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      _pendingPushActivations[id] = message;
+      return;
+    }
+    final notificationGeneration = _notificationSessionGeneration;
+
+    try {
+      final (session, unread) = await _tvNotificationService.fetchUnread(
+        credentials,
+      );
+      if (notificationGeneration != _notificationSessionGeneration ||
+          !_sameCredentials(authNotifier.credentials, credentials)) {
+        return;
+      }
+      if (session.availableChannels.isNotEmpty) {
+        await notificationStore.setServerChannels(session.availableChannels);
+      }
+      final authorizedUnread = session.isAdmin
+          ? unread
+          : unread.where((item) => !item.adminOnly).toList(growable: false);
+      await notificationStore.syncUnreadWithServer(authorizedUnread);
+      await _refreshUnreadNotificationCount();
+      if (notificationGeneration != _notificationSessionGeneration ||
+          !_sameCredentials(authNotifier.credentials, credentials)) {
+        return;
+      }
+      final matching = authorizedUnread.where((item) => item.id == id);
+      if (matching.isEmpty || !_activatedNotificationIds.add(id)) return;
+      _notificationActivationController.add(
+        notificationDestinationFor(matching.first.channel),
+      );
+    } on Object catch (_) {
+      // A tap without an authorized REST record is a safe no-op.
+    }
+  }
+
+  Future<void> _drainPendingPushActivations() async {
+    if (authNotifier.credentials == null || _pendingPushActivations.isEmpty) {
+      return;
+    }
+    final pending = _pendingPushActivations.values.toList(growable: false);
+    _pendingPushActivations.clear();
+    for (final message in pending) {
+      await handlePushActivation(message);
+    }
   }
 
   void _onDvrStatusPush(DvrRecording recording) {
@@ -559,8 +750,9 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _storeAndNotify(TvNotificationItem item) async {
-    await notificationStore.add(item);
+  Future<void> receiveTvNotification(TvNotificationItem item) async {
+    final inserted = await notificationStore.add(item);
+    if (!inserted) return;
     await _refreshUnreadNotificationCount();
     // Only surface the notification in the stream (banners/toasts) if the
     // channel passes the user's subscription filter.
@@ -571,6 +763,8 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _notificationSessionGeneration += 1;
+    await _unregisterPushToken();
     await _reverbService.disconnect();
     await authNotifier.disconnect();
     await secureStorage.delete(_sourceKey);
@@ -1138,9 +1332,20 @@ class AppStateController extends ChangeNotifier {
     return redacted;
   }
 
+  bool _sameCredentials(UserCredentials? first, UserCredentials? second) =>
+      first != null &&
+      second != null &&
+      first.server == second.server &&
+      first.username == second.username &&
+      first.password == second.password;
+
   @override
   void dispose() {
     _epgFetchDebounce?.cancel();
+    _pushTokenSubscription?.cancel().ignore();
+    unawaited(_tvNotificationController.close());
+    unawaited(_notificationActivationController.close());
+    unawaited(_pushNotificationService.dispose());
     super.dispose();
   }
 }

@@ -40,6 +40,17 @@ enum DeviceType { tv, desktop, tablet, phone }
 bool shouldUseSidebar(DeviceType deviceType) =>
     deviceType == DeviceType.tv || deviceType == DeviceType.desktop;
 
+String notificationRouteFor(
+  TvNotificationDestination destination, {
+  bool hasDvrFeature = false,
+  bool hasRequestsFeature = false,
+}) => switch (destination) {
+  TvNotificationDestination.dvr when hasDvrFeature => RouteNames.dvr,
+  TvNotificationDestination.requests when hasRequestsFeature =>
+    RouteNames.requests,
+  _ => RouteNames.notifications,
+};
+
 String _routeLabel(BuildContext context, String route) {
   final l = AppLocalizations.of(context);
   return switch (route) {
@@ -95,6 +106,7 @@ class AppShellState extends ConsumerState<AppShell>
   int _lastNavMs = 0;
   int _lastNavIndex = -1;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
+  StreamSubscription<TvNotificationDestination>? _notificationActivationSub;
   final _toastKey = GlobalKey<NotificationToastOverlayState>();
 
   PlayerArgs? _playerArgs;
@@ -139,6 +151,9 @@ class AppShellState extends ConsumerState<AppShell>
     _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
+    _notificationActivationSub = _appState.notificationActivations.listen(
+      _onNotificationActivation,
+    );
     if (!_appState.isConfigured) {
       unawaited(_appState.boot());
     }
@@ -215,11 +230,22 @@ class AppShellState extends ConsumerState<AppShell>
     _navigateToRoute(RouteNames.notifications);
   }
 
+  void _onNotificationActivation(TvNotificationDestination destination) {
+    _navigateToRoute(
+      notificationRouteFor(
+        destination,
+        hasDvrFeature: _appState.hasDvrFeature,
+        hasRequestsFeature: _appState.hasRequestsFeature,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     unawaited(_systemUiPolicy.applyBrowsing());
     _backExitTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
+    _notificationActivationSub?.cancel().ignore();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {

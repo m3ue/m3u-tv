@@ -5,6 +5,15 @@ import 'dart:io';
 
 import 'package:m3u_tv/services/domain_models.dart';
 
+enum TvNotificationDestination { notifications, dvr, requests }
+
+TvNotificationDestination notificationDestinationFor(String channel) =>
+    switch (channel) {
+      'dvr' => TvNotificationDestination.dvr,
+      'requests' => TvNotificationDestination.requests,
+      _ => TvNotificationDestination.notifications,
+    };
+
 /// Reverb connection config returned by the notifications endpoint.
 class ReverbConfig {
   const ReverbConfig({
@@ -95,6 +104,7 @@ class TvNotificationItem {
     required this.title,
     this.body,
     required this.status,
+    this.adminOnly = false,
   });
 
   final String id;
@@ -106,21 +116,32 @@ class TvNotificationItem {
 
   /// 'success' | 'warning' | 'danger' | 'info'
   final String status;
+  final bool adminOnly;
 
-  factory TvNotificationItem.fromJson(Map<String, Object?> json) {
-    final rawId = json['id'];
-    final id = rawId is String && rawId.isNotEmpty
-        ? rawId
-        : 'live-${DateTime.now().microsecondsSinceEpoch}';
+  static TvNotificationItem? tryFromJson(Map<String, Object?> json) {
+    final id = canonicalNotificationId(json['id']);
+    if (id == null) return null;
     return TvNotificationItem(
       id: id,
       channel: '${json['channel'] ?? 'general'}',
       title: '${json['title'] ?? ''}',
       body: json['body'] as String?,
       status: '${json['status'] ?? 'info'}',
+      adminOnly: json['admin_only'] == true,
     );
   }
 }
+
+String? canonicalNotificationId(Object? value) {
+  if (value is! String) return null;
+  final normalized = value.toLowerCase();
+  if (!_uuidPattern.hasMatch(normalized)) return null;
+  return normalized;
+}
+
+final RegExp _uuidPattern = RegExp(
+  r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+);
 
 /// REST client for the `/api/tv` endpoints.
 ///
@@ -176,7 +197,8 @@ class TvNotificationService {
     final rawList = json['notifications'] as List? ?? const [];
     final notifications = rawList
         .whereType<Map<String, Object?>>()
-        .map(TvNotificationItem.fromJson)
+        .map(TvNotificationItem.tryFromJson)
+        .whereType<TvNotificationItem>()
         .toList(growable: false);
 
     return (session, notifications);
@@ -274,7 +296,7 @@ class TvApiException implements Exception {
   final Uri uri;
 
   @override
-  String toString() => 'TvApiException($statusCode) ${uri.path}: $body';
+  String toString() => 'TvApiException($statusCode)';
 }
 
 int _asInt(Object? value, [int fallback = 0]) {
