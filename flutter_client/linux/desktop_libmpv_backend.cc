@@ -151,6 +151,15 @@ G_DEFINE_TYPE(MpvTexture, mpv_texture, fl_pixel_buffer_texture_get_type())
 
 GMainContext* g_gtk_main_context = nullptr;
 
+bool DispatchOnGtkMain(GSourceFunc callback, gpointer user_data) {
+  if (g_gtk_main_context == nullptr) return false;
+  GSource* source = g_idle_source_new();
+  g_source_set_callback(source, callback, user_data, nullptr);
+  const guint source_id = g_source_attach(source, g_gtk_main_context);
+  g_source_unref(source);
+  return source_id != 0;
+}
+
 struct EventSnapshot {
   int64_t handle;
   int sequence;
@@ -228,7 +237,10 @@ struct TextureDispatchState {
       return;
     }
     Retain();
-    g_main_context_invoke(g_gtk_main_context, MarkTextureFrameAvailableOnGtkThread, this);
+    if (!DispatchOnGtkMain(MarkTextureFrameAvailableOnGtkThread, this)) {
+      frame_pending.store(false, std::memory_order_release);
+      Release();
+    }
   }
 
   void Deactivate() { active.store(false, std::memory_order_release); }
@@ -335,7 +347,6 @@ struct PlayerInstance {
 LibmpvApi g_api;
 FlTextureRegistrar* g_texture_registrar = nullptr;
 std::shared_ptr<EventChannelState> g_event_channel_state;
-GMainContext* g_gtk_main_context = nullptr;
 int64_t g_next_handle = 1;
 std::map<int64_t, std::unique_ptr<PlayerInstance>> g_players;
 
@@ -680,7 +691,9 @@ void PlayerInstance::QueueEvent(EventSnapshot snapshot) {
     return;
   }
   auto* dispatch = new EventDispatch{event_dispatch_state, std::move(snapshot)};
-  g_main_context_invoke(g_gtk_main_context, SendEventSnapshotOnGtkThread, dispatch);
+  if (!DispatchOnGtkMain(SendEventSnapshotOnGtkThread, dispatch)) {
+    delete dispatch;
+  }
 }
 
 void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {

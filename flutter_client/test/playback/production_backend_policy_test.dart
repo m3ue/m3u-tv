@@ -499,7 +499,7 @@ void main() {
     );
 
     test(
-      'Linux retains explicit GTK main context and never dispatches via default context',
+      'Linux attaches non-inline dispatch to a retained GTK main context',
       () {
         final linuxBackend = File(
           'linux/desktop_libmpv_backend.cc',
@@ -511,7 +511,47 @@ void main() {
         );
         expect(
           linuxBackend,
-          isNot(contains('g_main_context_invoke(nullptr,')),
+          isNot(contains('g_main_context_invoke')),
+        );
+        expect(
+          linuxBackend,
+          contains('g_main_context_ref(g_gtk_main_context)'),
+        );
+        expect(
+          linuxBackend,
+          contains('g_main_context_unref(g_gtk_main_context)'),
+        );
+
+        final dispatchStart = linuxBackend.indexOf(
+          'bool DispatchOnGtkMain',
+        );
+        final dispatchEnd = linuxBackend.indexOf(
+          'struct EventSnapshot',
+          dispatchStart,
+        );
+        expect(dispatchStart, isNonNegative);
+        expect(dispatchEnd, greaterThan(dispatchStart));
+        final dispatch = linuxBackend.substring(dispatchStart, dispatchEnd);
+        final idleSourceIndex = dispatch.indexOf('g_idle_source_new()');
+        final callbackIndex = dispatch.indexOf('g_source_set_callback(');
+        final attachIndex = dispatch.indexOf(
+          'g_source_attach(source, g_gtk_main_context)',
+        );
+        final unrefIndex = dispatch.indexOf('g_source_unref(source)');
+        for (final index in <int>[
+          idleSourceIndex,
+          callbackIndex,
+          attachIndex,
+          unrefIndex,
+        ]) {
+          expect(index, isNonNegative);
+        }
+        expect(callbackIndex, greaterThan(idleSourceIndex));
+        expect(attachIndex, greaterThan(callbackIndex));
+        expect(unrefIndex, greaterThan(attachIndex));
+        expect(
+          dispatch,
+          isNot(contains('g_main_context_invoke')),
         );
 
         final textureStateStart = linuxBackend.indexOf(
@@ -538,18 +578,18 @@ void main() {
         expect(textureState, contains('void Deactivate()'));
         expect(
           textureState,
-          isNot(contains('g_main_context_invoke(nullptr,')),
+          isNot(contains('g_main_context_invoke')),
         );
         expect(
           textureState,
-          contains('g_main_context_invoke('),
+          contains('DispatchOnGtkMain('),
         );
         expect(
           textureState,
           contains('fl_texture_registrar_mark_texture_frame_available'),
         );
         expect(
-          textureState.indexOf('g_main_context_invoke('),
+          textureState.indexOf('DispatchOnGtkMain('),
           lessThan(
             textureState.indexOf(
               'fl_texture_registrar_mark_texture_frame_available',
@@ -572,11 +612,11 @@ void main() {
         );
         expect(
           eventDispatch,
-          isNot(contains('g_main_context_invoke(nullptr,')),
+          isNot(contains('g_main_context_invoke')),
         );
         expect(
           eventDispatch,
-          contains('g_main_context_invoke('),
+          contains('DispatchOnGtkMain('),
         );
 
         final renderUpdateStart = linuxBackend.indexOf('void RenderUpdate');
@@ -667,6 +707,10 @@ void main() {
         expect(
           windowsBackend,
           contains('std::shared_ptr<CopyPixelsContext>'),
+        );
+        expect(
+          windowsBackend,
+          contains('[ctx = player->copy_context]'),
         );
 
         final destructorStart = windowsBackend.indexOf('~PlayerInstance()');
