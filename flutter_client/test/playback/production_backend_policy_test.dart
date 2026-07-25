@@ -91,10 +91,7 @@ void main() {
         expect(find.text('Backend'), findsNothing);
         expect(find.text('Server transcode fallback'), findsNothing);
         expect(find.text('Fallback'), findsNothing);
-        expect(
-          find.textContaining('Unsupported codec hevc/aac'),
-          findsNothing,
-        );
+        expect(find.textContaining('Unsupported codec hevc/aac'), findsNothing);
         expect(find.text('Transcode'), findsNothing);
         expect(find.textContaining('unsupported-session'), findsNothing);
         expect(find.text('Android mpv/libmpv'), findsNothing);
@@ -469,10 +466,7 @@ void main() {
           textureState,
           contains('std::weak_ptr<TextureState> weak = shared_from_this()'),
         );
-        expect(
-          textureState,
-          contains('platform_dispatcher->Post([weak]()'),
-        );
+        expect(textureState, contains('platform_dispatcher->Post([weak]()'));
         expect(textureState, contains('auto state = weak.lock()'));
         expect(
           textureState,
@@ -577,14 +571,8 @@ void main() {
         expect(loadStart, isNonNegative);
         expect(loadEnd, greaterThan(loadStart));
         final load = linuxBackend.substring(loadStart, loadEnd);
-        expect(
-          load,
-          contains('player->texture_state'),
-        );
-        expect(
-          load,
-          isNot(contains('RenderUpdate, player.get()')),
-        );
+        expect(load, contains('player->texture_state'));
+        expect(load, isNot(contains('RenderUpdate, player.get()')));
 
         final playerStart = linuxBackend.indexOf('struct PlayerInstance {');
         final playerEnd = linuxBackend.indexOf('LibmpvApi g_api', playerStart);
