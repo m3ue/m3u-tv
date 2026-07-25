@@ -265,9 +265,9 @@ struct PlayerInstance {
         texture(texture),
         texture_id(texture_id),
         id(id),
+        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0),
         texture_state(new TextureDispatchState(texture_registrar,
-                                               FL_TEXTURE(texture))),
-        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0) {}
+                                               FL_TEXTURE(texture))) {}
 
   ~PlayerInstance() {
     disposing.store(true);
