@@ -383,5 +383,50 @@ void main() {
         await events.close();
       },
     );
+
+    test(
+      'stop during a pending load settles it and disposes the late handle once',
+      () async {
+        final events = setupMockEvents();
+        final loadResponse = Completer<Map<String, Object?>>();
+        final calls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              calls.add(call);
+              if (call.method == 'load') return loadResponse.future;
+              return null;
+            });
+
+        final backend = DesktopLibmpvBackend();
+        final load = backend.load(
+          const PlaybackSource(uri: 'https://example.test/pending-stop.m3u8'),
+        );
+
+        await pumpEventQueue();
+        await backend.stop().timeout(const Duration(seconds: 1));
+        loadResponse.complete(<String, Object?>{
+          'ok': true,
+          'handle': 78,
+          'textureId': 7800,
+        });
+
+        await expectLater(
+          load.timeout(const Duration(seconds: 1)),
+          completes,
+        );
+        await pumpEventQueue();
+
+        final disposeCalls = calls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(1));
+        expect(disposeCalls.single.arguments, <String, Object?>{'handle': 78});
+        expect(calls.where((call) => call.method == 'stop'), isEmpty);
+        expect(backend.textureId, isNull);
+
+        await backend.dispose();
+        await events.close();
+      },
+    );
   });
 }

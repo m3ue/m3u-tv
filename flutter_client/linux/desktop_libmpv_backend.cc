@@ -16,6 +16,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -129,6 +130,72 @@ struct LibmpvApi {
   bool available() const { return client_available() && render_api_available(); }
 };
 
+struct CopyPixelsContext {
+  CopyPixelsContext(LibmpvApi* api, mpv_handle* handle,
+                    mpv_render_context* render_context)
+      : api(api),
+        handle(handle),
+        render_context(render_context),
+        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0) {}
+
+  void Retain() { references.fetch_add(1, std::memory_order_relaxed); }
+
+  void Release() {
+    if (references.fetch_sub(1, std::memory_order_acq_rel) == 1) delete this;
+  }
+
+  gboolean CopyPixels(const uint8_t** buffer, uint32_t* width,
+                      uint32_t* height) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (released || api == nullptr || render_context == nullptr ||
+        api->render_context_render == nullptr) {
+      return FALSE;
+    }
+    int size[] = {static_cast<int>(kTextureWidth),
+                  static_cast<int>(kTextureHeight)};
+    int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
+    char format[] = "rgba";
+    void* pixel_buffer = pixels.data();
+    mpv_render_param params[] = {
+        {MPV_RENDER_PARAM_SW_SIZE, size},
+        {MPV_RENDER_PARAM_SW_FORMAT, format},
+        {MPV_RENDER_PARAM_SW_STRIDE, &stride},
+        {MPV_RENDER_PARAM_SW_POINTER, pixel_buffer},
+        {MPV_RENDER_PARAM_INVALID, nullptr},
+    };
+    api->render_context_render(render_context, params);
+    *buffer = pixels.data();
+    *width = kTextureWidth;
+    *height = kTextureHeight;
+    return TRUE;
+  }
+
+  void ReleaseResources() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (released) return;
+    released = true;
+    if (render_context != nullptr && api != nullptr &&
+        api->render_context_free != nullptr) {
+      api->render_context_free(render_context);
+      render_context = nullptr;
+    }
+    if (handle != nullptr && api != nullptr &&
+        api->terminate_destroy != nullptr) {
+      api->terminate_destroy(handle);
+      handle = nullptr;
+    }
+    api = nullptr;
+  }
+
+  std::mutex mutex;
+  LibmpvApi* api = nullptr;
+  mpv_handle* handle = nullptr;
+  mpv_render_context* render_context = nullptr;
+  std::vector<uint8_t> pixels;
+  std::atomic<int> references{1};
+  bool released = false;
+};
+
 struct DisplayInfo {
   std::string window_system = "headless";
   std::string video_api = "software libmpv render API";
@@ -137,13 +204,12 @@ struct DisplayInfo {
   bool has_hardware_display = false;
 };
 
-struct PlayerInstance;
 typedef struct _MpvTexture MpvTexture;
 typedef struct _MpvTextureClass MpvTextureClass;
 
 struct _MpvTexture {
   FlPixelBufferTexture parent_instance;
-  PlayerInstance* player;
+  CopyPixelsContext* copy_context;
 };
 
 struct _MpvTextureClass {
@@ -282,9 +348,12 @@ struct PlayerInstance {
         texture(texture),
         texture_id(texture_id),
         id(id),
-        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0),
+        copy_context(new CopyPixelsContext(api, handle, render_context)),
         texture_state(new TextureDispatchState(texture_registrar,
-                                               FL_TEXTURE(texture))) {}
+                                               FL_TEXTURE(texture))) {
+    texture->copy_context = copy_context;
+    copy_context->Retain();
+  }
 
   ~PlayerInstance() {
     disposing.store(true);
@@ -311,20 +380,21 @@ struct PlayerInstance {
       fl_texture_registrar_unregister_texture(texture_registrar,
                                               FL_TEXTURE(texture));
     }
-    if (texture != nullptr) {
-      texture->player = nullptr;
-      g_object_unref(texture);
+    if (copy_context != nullptr) {
+      copy_context->ReleaseResources();
+      handle = nullptr;
+      render_context = nullptr;
     }
-    if (render_context != nullptr && api != nullptr &&
-        api->render_context_free != nullptr) {
-      api->render_context_free(render_context);
+    if (texture != nullptr) {
+      g_object_unref(texture);
     }
     if (texture_state != nullptr) {
       texture_state->Release();
       texture_state = nullptr;
     }
-    if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) {
-      api->terminate_destroy(handle);
+    if (copy_context != nullptr) {
+      copy_context->Release();
+      copy_context = nullptr;
     }
   }
 
@@ -340,10 +410,10 @@ struct PlayerInstance {
   MpvTexture* texture = nullptr;
   int64_t texture_id = 0;
   int64_t id = 0;
-  std::vector<uint8_t> pixels;
   std::thread event_thread;
   std::atomic<bool> disposing{false};
   std::atomic<int> sequence{0};
+  CopyPixelsContext* copy_context = nullptr;
   TextureDispatchState* texture_state = nullptr;
 };
 
@@ -528,41 +598,34 @@ FlMethodResponse* LoadFailure(const char* code, const std::string& error) {
   return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
 }
 
-void RenderTexture(PlayerInstance* player) {
-  if (player == nullptr || player->render_context == nullptr) return;
-  int size[] = {static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight)};
-  int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
-  char format[] = "rgba";
-  void* buffer = player->pixels.data();
-  mpv_render_param params[] = {
-      {MPV_RENDER_PARAM_SW_SIZE, size},
-      {MPV_RENDER_PARAM_SW_FORMAT, format},
-      {MPV_RENDER_PARAM_SW_STRIDE, &stride},
-      {MPV_RENDER_PARAM_SW_POINTER, buffer},
-      {MPV_RENDER_PARAM_INVALID, nullptr},
-  };
-  player->api->render_context_render(player->render_context, params);
-}
-
 gboolean MpvTextureCopyPixels(FlPixelBufferTexture* texture,
                                const uint8_t** buffer, uint32_t* width,
                                uint32_t* height, GError** error) {
   (void)error;
   MpvTexture* self = reinterpret_cast<MpvTexture*>(texture);
-  PlayerInstance* player = self->player;
-  if (player == nullptr) return FALSE;
-  RenderTexture(player);
-  *buffer = player->pixels.data();
-  *width = kTextureWidth;
-  *height = kTextureHeight;
-  return TRUE;
+  CopyPixelsContext* context = self->copy_context;
+  if (context == nullptr) return FALSE;
+  context->Retain();
+  const gboolean copied = context->CopyPixels(buffer, width, height);
+  context->Release();
+  return copied;
+}
+
+void mpv_texture_finalize(GObject* object) {
+  MpvTexture* self = reinterpret_cast<MpvTexture*>(object);
+  if (self->copy_context != nullptr) {
+    self->copy_context->Release();
+    self->copy_context = nullptr;
+  }
+  G_OBJECT_CLASS(mpv_texture_parent_class)->finalize(object);
 }
 
 void mpv_texture_class_init(MpvTextureClass* klass) {
   FL_PIXEL_BUFFER_TEXTURE_CLASS(klass)->copy_pixels = MpvTextureCopyPixels;
+  G_OBJECT_CLASS(klass)->finalize = mpv_texture_finalize;
 }
 
-void mpv_texture_init(MpvTexture* self) { self->player = nullptr; }
+void mpv_texture_init(MpvTexture* self) { self->copy_context = nullptr; }
 
 bool DoubleProperty(PlayerInstance* player, const char* name, double* value) {
   if (player == nullptr || player->api == nullptr ||
@@ -935,7 +998,6 @@ FlMethodResponse* Load(FlValue* args) {
                                                  event_dispatch_state, handle,
                                                  render_context, texture,
                                                  texture_id, id);
-  texture->player = player.get();
   api.render_context_set_update_callback(render_context, RenderUpdate,
                                          player->texture_state);
   player->StartEventThread();

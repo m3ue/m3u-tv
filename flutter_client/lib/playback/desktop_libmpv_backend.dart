@@ -100,6 +100,13 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
         if (handle != null) await _disposeNativeHandle(handle);
         return;
       }
+      final preResponseFailure = _readyFailure;
+      if (preResponseFailure != null) {
+        if (handle != null) await _disposeNativeHandle(handle);
+        if (!_isActiveLoad(generation)) return;
+        _clearLoading(ready);
+        throw preResponseFailure;
+      }
       if (!ok || handle == null || textureId == null) {
         final message = response?['error'] as String? ?? 'libmpv load failed';
         final code =
@@ -177,6 +184,18 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> stop() async {
+    final ready = _readyCompleter;
+    if (ready != null && !ready.isCompleted) {
+      ++_loadGeneration;
+      ready.complete();
+      if (identical(_readyCompleter, ready)) {
+        _readyCompleter = null;
+        _readyFailure = null;
+        _pendingSource = null;
+        _pendingEvents.clear();
+      }
+    }
+
     final handle = _handle;
     if (handle == null) return;
     try {

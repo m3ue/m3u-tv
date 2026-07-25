@@ -800,6 +800,72 @@ void main() {
     });
 
     test(
+      'event channel error before load response disposes the late handle once',
+      () async {
+        final loadResponse = Completer<Map<String, Object?>>();
+        final methodCalls = <MethodCall>[];
+        late MockStreamHandlerEventSink nativeEvents;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              methodCalls.add(call);
+              if (call.method == 'load') return loadResponse.future;
+              return null;
+            });
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockStreamHandler(
+              eventChannel,
+              MockStreamHandler.inline(
+                onListen: (arguments, eventSink) {
+                  nativeEvents = eventSink;
+                },
+              ),
+            );
+
+        final backend = DesktopLibmpvBackend();
+        final errors = <PlaybackError>[];
+        final errorSub = backend.onError.listen(errors.add);
+        final load = backend.load(
+          const PlaybackSource(uri: 'https://example.test/delayed.m3u8'),
+        );
+
+        await pumpEventQueue();
+        nativeEvents.error(
+          code: 'native-event-channel-failed',
+          message: 'event transport failed',
+        );
+        await pumpEventQueue();
+        loadResponse.complete(<String, Object?>{
+          'ok': true,
+          'handle': 53,
+          'textureId': 5300,
+        });
+
+        await expectLater(
+          load.timeout(const Duration(seconds: 1)),
+          throwsA(
+            isA<PlaybackException>().having(
+              (error) => error.code,
+              'code',
+              'event-stream-error',
+            ),
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(errors, isEmpty);
+        expect(backend.textureId, isNull);
+        final disposeCalls = methodCalls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(1));
+        expect(disposeCalls.single.arguments, <String, Object?>{'handle': 53});
+
+        await errorSub.cancel();
+        await backend.dispose();
+      },
+    );
+
+    test(
       'END_FILE before FILE_LOADED fails only load without hanging',
       () async {
         final events = StreamController<Map<String, Object?>>.broadcast();

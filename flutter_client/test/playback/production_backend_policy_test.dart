@@ -683,11 +683,11 @@ void main() {
         final unregisterIndex = playerInstance.indexOf(
           'fl_texture_registrar_unregister_texture',
         );
-        final renderFreeIndex = playerInstance.indexOf(
-          'api->render_context_free(render_context)',
+        final releaseResourcesIndex = playerInstance.indexOf(
+          'copy_context->ReleaseResources()',
         );
-        final destroyIndex = playerInstance.indexOf(
-          'api->terminate_destroy(handle)',
+        final textureUnrefIndex = playerInstance.indexOf(
+          'g_object_unref(texture)',
         );
         for (final index in <int>[
           disposingIndex,
@@ -696,8 +696,8 @@ void main() {
           joinIndex,
           deactivateIndex,
           unregisterIndex,
-          renderFreeIndex,
-          destroyIndex,
+          releaseResourcesIndex,
+          textureUnrefIndex,
         ]) {
           expect(index, isNonNegative);
         }
@@ -706,8 +706,10 @@ void main() {
         expect(joinIndex, greaterThan(wakeupIndex));
         expect(deactivateIndex, greaterThan(joinIndex));
         expect(unregisterIndex, greaterThan(deactivateIndex));
-        expect(renderFreeIndex, greaterThan(unregisterIndex));
-        expect(destroyIndex, greaterThan(renderFreeIndex));
+        expect(releaseResourcesIndex, greaterThan(unregisterIndex));
+        expect(textureUnrefIndex, greaterThan(releaseResourcesIndex));
+        expect(playerInstance, isNot(contains('api->render_context_free')));
+        expect(playerInstance, isNot(contains('api->terminate_destroy')));
       },
     );
 
@@ -806,6 +808,91 @@ void main() {
         expect(lambdaSnippet, isNot(contains('raw_player')));
       },
     );
+
+    test('Linux serializes raster callbacks with native teardown', () {
+      final linuxBackend = File(
+        'linux/desktop_libmpv_backend.cc',
+      ).readAsStringSync();
+
+      final contextStart = linuxBackend.indexOf('struct CopyPixelsContext {');
+      expect(contextStart, isNonNegative);
+      final contextEnd = linuxBackend.indexOf(
+        'struct DisplayInfo',
+        contextStart,
+      );
+      expect(contextEnd, greaterThan(contextStart));
+      final context = linuxBackend.substring(contextStart, contextEnd);
+      expect(context, contains('std::mutex mutex;'));
+      expect(context, contains('void Retain()'));
+      expect(context, contains('void Release()'));
+
+      final copyStart = context.indexOf('gboolean CopyPixels(');
+      final copyEnd = context.indexOf('void ReleaseResources()', copyStart);
+      expect(copyStart, isNonNegative);
+      expect(copyEnd, greaterThan(copyStart));
+      final copy = context.substring(copyStart, copyEnd);
+      expect(copy, contains('std::lock_guard<std::mutex> lock(mutex)'));
+      expect(copy, contains('render_context_render(render_context, params)'));
+
+      final releaseStart = context.indexOf('void ReleaseResources()');
+      expect(releaseStart, isNonNegative);
+      final release = context.substring(releaseStart);
+      expect(release, contains('std::lock_guard<std::mutex> lock(mutex)'));
+      expect(release, contains('render_context_free(render_context)'));
+      expect(release, contains('terminate_destroy(handle)'));
+
+      final textureStart = linuxBackend.indexOf('struct _MpvTexture {');
+      final textureEnd = linuxBackend.indexOf(
+        'struct _MpvTextureClass',
+        textureStart,
+      );
+      expect(textureStart, isNonNegative);
+      expect(textureEnd, greaterThan(textureStart));
+      final texture = linuxBackend.substring(textureStart, textureEnd);
+      expect(texture, contains('CopyPixelsContext* copy_context;'));
+      expect(texture, isNot(contains('PlayerInstance*')));
+
+      final callbackStart = linuxBackend.indexOf(
+        'gboolean MpvTextureCopyPixels',
+      );
+      final callbackEnd = linuxBackend.indexOf(
+        'void mpv_texture_class_init',
+        callbackStart,
+      );
+      expect(callbackStart, isNonNegative);
+      expect(callbackEnd, greaterThan(callbackStart));
+      final callback = linuxBackend.substring(callbackStart, callbackEnd);
+      expect(callback, contains('context->Retain()'));
+      expect(callback, contains('context->CopyPixels('));
+      expect(callback, contains('context->Release()'));
+      expect(callback, isNot(contains('PlayerInstance')));
+      expect(
+        linuxBackend,
+        contains('texture->copy_context = copy_context;'),
+      );
+      expect(
+        linuxBackend,
+        contains('G_OBJECT_CLASS(klass)->finalize = mpv_texture_finalize;'),
+      );
+
+      final playerStart = linuxBackend.indexOf('struct PlayerInstance {');
+      final playerEnd = linuxBackend.indexOf('LibmpvApi g_api', playerStart);
+      expect(playerStart, isNonNegative);
+      expect(playerEnd, greaterThan(playerStart));
+      final player = linuxBackend.substring(playerStart, playerEnd);
+      final unregisterIndex = player.indexOf(
+        'fl_texture_registrar_unregister_texture',
+      );
+      final releaseResourcesIndex = player.indexOf(
+        'copy_context->ReleaseResources()',
+      );
+      expect(unregisterIndex, isNonNegative);
+      expect(releaseResourcesIndex, greaterThan(unregisterIndex));
+      expect(player, contains('copy_context->Retain()'));
+      expect(player, contains('copy_context->Release()'));
+      expect(player, isNot(contains('api->render_context_free')));
+      expect(player, isNot(contains('api->terminate_destroy')));
+    });
 
     test('desktop buffering follows paused-for-cache only', () {
       final backends = <String>[
