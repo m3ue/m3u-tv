@@ -309,6 +309,14 @@ struct TextureState : public std::enable_shared_from_this<TextureState> {
   }
 };
 
+struct CopyPixelsContext {
+  std::mutex mutex;
+  LibmpvApi* api = nullptr;
+  mpv_render_context* render_context = nullptr;
+  std::vector<uint8_t> pixels;
+  FlutterDesktopPixelBuffer pixel_buffer = {};
+};
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, flutter::TextureRegistrar* texture_registrar,
                  std::shared_ptr<PlatformDispatcher> dispatcher,
@@ -316,10 +324,13 @@ struct PlayerInstance {
                  mpv_handle* handle, mpv_render_context* render_context, int64_t id)
       : api(api), texture_registrar(texture_registrar), dispatcher(std::move(dispatcher)),
         event_sink_state(std::move(event_sink_state)), handle(handle), render_context(render_context), id(id),
-        pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0), texture_state(std::make_shared<TextureState>()) {
-    pixel_buffer.buffer = pixels.data();
-    pixel_buffer.width = kTextureWidth;
-    pixel_buffer.height = kTextureHeight;
+        copy_context(std::make_shared<CopyPixelsContext>()), texture_state(std::make_shared<TextureState>()) {
+    copy_context->api = api;
+    copy_context->render_context = render_context;
+    copy_context->pixels.resize(kTextureWidth * kTextureHeight * kBytesPerPixel, 0);
+    copy_context->pixel_buffer.buffer = copy_context->pixels.data();
+    copy_context->pixel_buffer.width = kTextureWidth;
+    copy_context->pixel_buffer.height = kTextureHeight;
     texture_state->registrar = texture_registrar;
     texture_state->dispatcher = this->dispatcher;
   }
@@ -336,6 +347,10 @@ struct PlayerInstance {
     }
     texture_state->active.store(false);
     if (texture_registrar != nullptr && texture_id != 0) texture_registrar->UnregisterTexture(texture_id);
+    {
+      std::lock_guard<std::mutex> lock(copy_context->mutex);
+      copy_context->render_context = nullptr;
+    }
     if (render_context != nullptr && api != nullptr && api->render_context_free != nullptr) api->render_context_free(render_context);
     if (handle != nullptr && api != nullptr && api->terminate_destroy != nullptr) api->terminate_destroy(handle);
   }
@@ -343,15 +358,15 @@ struct PlayerInstance {
   const FlutterDesktopPixelBuffer* CopyPixels(size_t width, size_t height) {
     (void)width;
     (void)height;
-    std::lock_guard<std::mutex> lock(mutex);
-    if (render_context == nullptr || api == nullptr || api->render_context_render == nullptr) return &pixel_buffer;
+    std::lock_guard<std::mutex> lock(copy_context->mutex);
+    if (copy_context->render_context == nullptr || copy_context->api == nullptr || copy_context->api->render_context_render == nullptr) return &copy_context->pixel_buffer;
     int size[] = {static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight)};
     int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
     char format[] = "rgba";
-    void* buffer = pixels.data();
+    void* buffer = copy_context->pixels.data();
     mpv_render_param params[] = {{MPV_RENDER_PARAM_SW_SIZE, size}, {MPV_RENDER_PARAM_SW_FORMAT, format}, {MPV_RENDER_PARAM_SW_STRIDE, &stride}, {MPV_RENDER_PARAM_SW_POINTER, buffer}, {MPV_RENDER_PARAM_INVALID, nullptr}};
-    api->render_context_render(render_context, params);
-    return &pixel_buffer;
+    copy_context->api->render_context_render(copy_context->render_context, params);
+    return &copy_context->pixel_buffer;
   }
 
   void StartEventThread();
@@ -366,11 +381,9 @@ struct PlayerInstance {
   mpv_render_context* render_context = nullptr;
   int64_t id = 0;
   int64_t texture_id = 0;
-  std::vector<uint8_t> pixels;
-  FlutterDesktopPixelBuffer pixel_buffer = {};
+  std::shared_ptr<CopyPixelsContext> copy_context;
   std::unique_ptr<flutter::TextureVariant> texture;
   std::shared_ptr<TextureState> texture_state;
-  std::mutex mutex;
   std::thread event_thread;
   std::atomic<bool> disposing{false};
   std::atomic<int64_t> sequence{0};
@@ -583,8 +596,18 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, dispatcher,
                                                  event_sink_state, handle, render_context, id);
   auto texture = std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture(
-      [raw_player = player.get()](size_t width, size_t height) {
-        return raw_player->CopyPixels(width, height);
+      [ctx = player->copy_context](size_t width, size_t height) {
+        std::lock_guard<std::mutex> lock(ctx->mutex);
+        if (ctx->render_context == nullptr || ctx->api == nullptr || ctx->api->render_context_render == nullptr) {
+          return &ctx->pixel_buffer;
+        }
+        int size[] = {static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight)};
+        int stride = static_cast<int>(kTextureWidth * kBytesPerPixel);
+        char format[] = "rgba";
+        void* buffer = ctx->pixels.data();
+        mpv_render_param params[] = {{MPV_RENDER_PARAM_SW_SIZE, size}, {MPV_RENDER_PARAM_SW_FORMAT, format}, {MPV_RENDER_PARAM_SW_STRIDE, &stride}, {MPV_RENDER_PARAM_SW_POINTER, buffer}, {MPV_RENDER_PARAM_INVALID, nullptr}};
+        ctx->api->render_context_render(ctx->render_context, params);
+        return &ctx->pixel_buffer;
       }));
   const int64_t texture_id = g_texture_registrar->RegisterTexture(texture.get());
   if (texture_id < 0) {

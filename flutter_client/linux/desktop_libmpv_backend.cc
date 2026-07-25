@@ -149,6 +149,8 @@ struct _MpvTextureClass {
 
 G_DEFINE_TYPE(MpvTexture, mpv_texture, fl_pixel_buffer_texture_get_type())
 
+GMainContext* g_gtk_main_context = nullptr;
+
 struct EventSnapshot {
   int64_t handle;
   int sequence;
@@ -226,7 +228,7 @@ struct TextureDispatchState {
       return;
     }
     Retain();
-    g_main_context_invoke(nullptr, MarkTextureFrameAvailableOnGtkThread, this);
+    g_main_context_invoke(g_gtk_main_context, MarkTextureFrameAvailableOnGtkThread, this);
   }
 
   void Deactivate() { active.store(false, std::memory_order_release); }
@@ -677,7 +679,7 @@ void PlayerInstance::QueueEvent(EventSnapshot snapshot) {
     return;
   }
   auto* dispatch = new EventDispatch{event_dispatch_state, std::move(snapshot)};
-  g_main_context_invoke(nullptr, SendEventSnapshotOnGtkThread, dispatch);
+  g_main_context_invoke(g_gtk_main_context, SendEventSnapshotOnGtkThread, dispatch);
 }
 
 void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
@@ -1036,12 +1038,23 @@ void desktop_libmpv_backend_shutdown() {
   g_players.clear();
   g_event_channel_state.reset();
   g_texture_registrar = nullptr;
+  if (g_gtk_main_context != nullptr) {
+    g_main_context_unref(g_gtk_main_context);
+    g_gtk_main_context = nullptr;
+  }
 }
 
 void desktop_libmpv_backend_register(FlPluginRegistry* registry) {
   FlPluginRegistrar* registrar = fl_plugin_registry_get_registrar_for_plugin(
       registry, "DesktopLibmpvBackend");
   g_texture_registrar = fl_plugin_registrar_get_texture_registrar(registrar);
+
+  if (g_gtk_main_context == nullptr) {
+    g_gtk_main_context = g_main_context_default();
+    if (g_gtk_main_context != nullptr) {
+      g_main_context_ref(g_gtk_main_context);
+    }
+  }
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
 
