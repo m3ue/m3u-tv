@@ -421,7 +421,7 @@ void main() {
         );
         expect(
           windowsBackend,
-          contains('render_context_render(render_context'),
+          contains('render_context_render('),
         );
 
         final platformDispatcherStart = windowsBackend.indexOf(
@@ -499,11 +499,20 @@ void main() {
     );
 
     test(
-      'Linux texture updates dispatch on GTK main before lifecycle-safe teardown',
+      'Linux retains explicit GTK main context and never dispatches via default context',
       () {
         final linuxBackend = File(
           'linux/desktop_libmpv_backend.cc',
         ).readAsStringSync();
+
+        expect(
+          linuxBackend,
+          contains('g_main_context_default()'),
+        );
+        expect(
+          linuxBackend,
+          isNot(contains('g_main_context_invoke(nullptr,')),
+        );
 
         final textureStateStart = linuxBackend.indexOf(
           'struct TextureDispatchState',
@@ -529,9 +538,11 @@ void main() {
         expect(textureState, contains('void Deactivate()'));
         expect(
           textureState,
-          contains(
-            'g_main_context_invoke(nullptr, MarkTextureFrameAvailableOnGtkThread, this)',
-          ),
+          isNot(contains('g_main_context_invoke(nullptr,')),
+        );
+        expect(
+          textureState,
+          contains('g_main_context_invoke('),
         );
         expect(
           textureState,
@@ -544,6 +555,28 @@ void main() {
               'fl_texture_registrar_mark_texture_frame_available',
             ),
           ),
+        );
+
+        final eventDispatchStart = linuxBackend.indexOf(
+          'void PlayerInstance::QueueEvent',
+        );
+        final eventDispatchEnd = linuxBackend.indexOf(
+          'void PlayerInstance::ReadSnapshotProperties',
+          eventDispatchStart,
+        );
+        expect(eventDispatchStart, isNonNegative);
+        expect(eventDispatchEnd, greaterThan(eventDispatchStart));
+        final eventDispatch = linuxBackend.substring(
+          eventDispatchStart,
+          eventDispatchEnd,
+        );
+        expect(
+          eventDispatch,
+          isNot(contains('g_main_context_invoke(nullptr,')),
+        );
+        expect(
+          eventDispatch,
+          contains('g_main_context_invoke('),
         );
 
         final renderUpdateStart = linuxBackend.indexOf('void RenderUpdate');
@@ -616,6 +649,62 @@ void main() {
         expect(unregisterIndex, greaterThan(deactivateIndex));
         expect(renderFreeIndex, greaterThan(unregisterIndex));
         expect(destroyIndex, greaterThan(renderFreeIndex));
+      },
+    );
+
+    test(
+      'Windows CopyPixels uses shared ownership and waits for raster completion',
+      () {
+        final windowsBackend = File(
+          'windows/runner/desktop_libmpv_backend.cpp',
+        ).readAsStringSync();
+
+        expect(
+          windowsBackend,
+          isNot(contains('raw_player = player.get()')),
+        );
+
+        expect(
+          windowsBackend,
+          contains('std::shared_ptr<CopyPixelsContext>'),
+        );
+
+        final destructorStart = windowsBackend.indexOf('~PlayerInstance()');
+        final destructorEnd = windowsBackend.indexOf(
+          'void PlayerInstance::StartEventThread',
+          destructorStart,
+        );
+        expect(destructorStart, isNonNegative);
+        expect(destructorEnd, greaterThan(destructorStart));
+        final destructor = windowsBackend.substring(
+          destructorStart,
+          destructorEnd,
+        );
+        final unregisterIndex = destructor.indexOf(
+          'texture_registrar->UnregisterTexture',
+        );
+        final mutexWaitIndex = destructor.indexOf(
+          'copy_context->mutex',
+        );
+        expect(unregisterIndex, isNonNegative);
+        expect(mutexWaitIndex, isNonNegative);
+        expect(mutexWaitIndex, greaterThan(unregisterIndex));
+
+        final pixelBufferStart = windowsBackend.indexOf(
+          'flutter::PixelBufferTexture(',
+        );
+        expect(pixelBufferStart, isNonNegative);
+        final lambdaEnd = windowsBackend.indexOf(
+          'return &ctx->pixel_buffer;',
+          pixelBufferStart,
+        );
+        expect(lambdaEnd, isNonNegative);
+        final lambdaSnippet = windowsBackend.substring(
+          pixelBufferStart,
+          lambdaEnd + 'return &ctx->pixel_buffer;'.length,
+        );
+        expect(lambdaSnippet, contains('ctx'));
+        expect(lambdaSnippet, isNot(contains('raw_player')));
       },
     );
 
