@@ -335,6 +335,7 @@ struct PlayerInstance {
 LibmpvApi g_api;
 FlTextureRegistrar* g_texture_registrar = nullptr;
 std::shared_ptr<EventChannelState> g_event_channel_state;
+GMainContext* g_gtk_main_context = nullptr;
 int64_t g_next_handle = 1;
 std::map<int64_t, std::unique_ptr<PlayerInstance>> g_players;
 
