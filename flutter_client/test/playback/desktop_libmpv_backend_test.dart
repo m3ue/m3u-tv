@@ -36,7 +36,7 @@ void main() {
     }
 
     test(
-      'maps missing libmpv load response to typed BackendUnavailable',
+      'maps missing libmpv response only to the load Future',
       () async {
         final events = setupMockEvents();
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -61,11 +61,7 @@ void main() {
         );
 
         await pumpEventQueue();
-        expect(errors, hasLength(1));
-        expect(errors.single.code, BackendUnavailableException.unavailableCode);
-        expect(errors.single.message, contains('library=libmpv.so.2'));
-        expect(errors.single.message, contains('LC_NUMERIC=C'));
-        expect(errors.single.recoverable, isTrue);
+        expect(errors, isEmpty);
         expect(backend.textureId, isNull);
 
         await subscription.cancel();
@@ -168,7 +164,7 @@ void main() {
       await backend.stop();
 
       expect(probe.passed, isTrue);
-      expect(backend.textureId, 99);
+      expect(backend.textureId, isNull);
       expect(calls, <String>[
         'probe',
         'load',
@@ -179,6 +175,7 @@ void main() {
         'setSubtitleTrack',
         'setPlaybackSpeed',
         'stop',
+        'dispose',
       ]);
 
       await backend.dispose();

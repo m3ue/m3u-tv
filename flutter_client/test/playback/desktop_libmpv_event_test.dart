@@ -64,6 +64,25 @@ void main() {
       expect(event.sid, isNull);
     });
 
+    test('normalizes omitted and zero native durations as unknown', () {
+      final linuxEvent = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 1,
+        'handle': 1,
+        'sequence': 0,
+        'kind': 'FILE_LOADED',
+      });
+      final windowsEvent = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 1,
+        'handle': 1,
+        'sequence': 0,
+        'kind': 'FILE_LOADED',
+        'durationMs': 0,
+      });
+
+      expect(linuxEvent.duration, isNull);
+      expect(windowsEvent.duration, isNull);
+    });
+
     test('normalizes empty native track IDs to no selected track', () {
       final event = DesktopLibmpvEvent.fromMap(<String, Object?>{
         'schemaVersion': 1,
@@ -705,8 +724,10 @@ void main() {
 
     test('ERROR before FILE_LOADED fails only load without hanging', () async {
       final events = StreamController<Map<String, Object?>>.broadcast();
+      final methodCalls = <MethodCall>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(methodChannel, (call) async {
+            methodCalls.add(call);
             if (call.method == 'load') {
               scheduleMicrotask(() {
                 events.add(<String, Object?>{
@@ -765,6 +786,12 @@ void main() {
 
       expect(errors, isEmpty);
       expect(states, isEmpty);
+      expect(backend.textureId, isNull);
+      final disposeCalls = methodCalls
+          .where((call) => call.method == 'dispose')
+          .toList();
+      expect(disposeCalls, hasLength(1));
+      expect(disposeCalls.single.arguments, <String, Object?>{'handle': 51});
 
       await errorSub.cancel();
       await stateSub.cancel();
@@ -776,8 +803,10 @@ void main() {
       'END_FILE before FILE_LOADED fails only load without hanging',
       () async {
         final events = StreamController<Map<String, Object?>>.broadcast();
+        final methodCalls = <MethodCall>[];
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(methodChannel, (call) async {
+              methodCalls.add(call);
               if (call.method == 'load') {
                 scheduleMicrotask(() {
                   events.add(<String, Object?>{
@@ -824,6 +853,12 @@ void main() {
         await pumpEventQueue();
 
         expect(errors, isEmpty);
+        expect(backend.textureId, isNull);
+        final disposeCalls = methodCalls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(1));
+        expect(disposeCalls.single.arguments, <String, Object?>{'handle': 52});
 
         await errorSub.cancel();
         await backend.dispose();

@@ -178,6 +178,15 @@ void main() {
       expect(releaseWorkflow, contains('libmpv-2.dll'));
     });
 
+    test('desktop smoke requires the packaged libmpv runtime', () {
+      final smokeTest = File(
+        'integration_test/desktop_playback_smoke_test.dart',
+      ).readAsStringSync();
+
+      expect(smokeTest, contains('Packaged libmpv unavailable:'));
+      expect(smokeTest, isNot(contains('return;')));
+    });
+
     test(
       'desktop software texture render paths use Flutter RGBA pixel buffers',
       () {
@@ -313,6 +322,13 @@ void main() {
         windowsEventValueStart,
         windowsEventValueEnd,
       );
+      for (final eventValue in <String>[
+        linuxEventValue,
+        windowsEventValue,
+      ]) {
+        expect(eventValue, contains('if (snapshot.duration > 0.0)'));
+        expect(eventValue, contains('"durationMs"'));
+      }
       expect(
         linuxEventValue,
         contains(
@@ -403,27 +419,30 @@ void main() {
     });
 
     test(
-      'Windows software renderer keeps frame callbacks without advanced control',
+      'desktop software renderers keep frame callbacks without advanced control',
       () {
+        final linuxBackend = File(
+          'linux/desktop_libmpv_backend.cc',
+        ).readAsStringSync();
         final windowsBackend = File(
           'windows/runner/desktop_libmpv_backend.cpp',
         ).readAsStringSync();
 
-        expect(
-          windowsBackend,
-          isNot(contains('MPV_RENDER_PARAM_ADVANCED_CONTROL')),
-        );
+        for (final backend in <String>[linuxBackend, windowsBackend]) {
+          expect(
+            backend,
+            isNot(contains('MPV_RENDER_PARAM_ADVANCED_CONTROL')),
+          );
+          expect(backend, isNot(contains('advanced_control')));
+          expect(backend, contains('render_context_set_update_callback'));
+          expect(backend, contains('render_context_render('));
+        }
         expect(
           windowsBackend,
           contains(
             'api.render_context_set_update_callback(render_context, RenderUpdate, player->texture_state.get())',
           ),
         );
-        expect(
-          windowsBackend,
-          contains('render_context_render('),
-        );
-
         final platformDispatcherStart = windowsBackend.indexOf(
           'class PlatformDispatcher',
         );

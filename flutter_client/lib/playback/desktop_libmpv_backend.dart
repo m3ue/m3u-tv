@@ -36,6 +36,7 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   bool _disposed = false;
   Completer<void>? _readyCompleter;
   PlaybackException? _readyFailure;
+  Future<void>? _terminalCleanup;
   PlaybackSource? _pendingSource;
   StreamSubscription<Object?>? _eventSubscription;
   final List<DesktopLibmpvEvent> _pendingEvents = <DesktopLibmpvEvent>[];
@@ -111,7 +112,6 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
                 code: code,
                 recoverable: true,
               );
-        _errorController.add(PlaybackError.fromException(error));
         _clearLoading(ready);
         throw error;
       }
@@ -122,16 +122,25 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
       _errorEmitted = false;
 
       // Drain buffered events that belong to this handle.
-      for (final event in _pendingEvents) {
+      final pendingEvents = List<DesktopLibmpvEvent>.of(_pendingEvents);
+      _pendingEvents.clear();
+      for (final event in pendingEvents) {
         if (event.handle == _handle) {
           _applyEvent(event);
         }
       }
-      _pendingEvents.clear();
 
       await ready.future;
       if (!_isActiveLoad(generation)) return;
       final failure = _readyFailure;
+      final terminalCleanup = _terminalCleanup;
+      if (terminalCleanup != null) {
+        await terminalCleanup;
+        if (identical(_terminalCleanup, terminalCleanup)) {
+          _terminalCleanup = null;
+        }
+      }
+      if (!_isActiveLoad(generation)) return;
       _clearLoading(ready);
       if (failure != null) throw failure;
     } on PlaybackException {
@@ -168,7 +177,21 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> stop() async {
-    await _invokeControl('stop');
+    final handle = _handle;
+    if (handle == null) return;
+    try {
+      await _channel.invokeMethod<void>('stop', <String, Object?>{
+        'handle': handle,
+      });
+    } finally {
+      if (_handle == handle) {
+        _resetHandleState();
+        if (_state.status != PlaybackStatus.stopped) {
+          _emit(_state.copyWith(status: PlaybackStatus.stopped));
+        }
+        await _disposeNativeHandle(handle);
+      }
+    }
   }
 
   @override
@@ -207,6 +230,10 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
     await _eventSubscription?.cancel();
 
+    final terminalCleanup = _terminalCleanup;
+    _terminalCleanup = null;
+    if (terminalCleanup != null) await terminalCleanup;
+
     final handle = _handle;
     if (handle != null) {
       await _channel.invokeMethod<void>('dispose', <String, Object?>{
@@ -242,7 +269,10 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
 
     // Buffer events while we do not yet know the active handle.
     if (_handle == null) {
-      _pendingEvents.add(event);
+      final ready = _readyCompleter;
+      if (ready != null && !ready.isCompleted) {
+        _pendingEvents.add(event);
+      }
       return;
     }
 
@@ -340,6 +370,11 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   void _failReady(PlaybackException error) {
     final ready = _readyCompleter;
     if (ready == null || ready.isCompleted) return;
+    final handle = _handle;
+    if (handle != null) {
+      _resetHandleState();
+      _terminalCleanup = _disposeNativeHandle(handle);
+    }
     _readyFailure = error;
     ready.complete();
     _readyCompleter = null;
@@ -475,9 +510,7 @@ class DesktopLibmpvEvent {
       position: map['positionMs'] is num
           ? Duration(milliseconds: (map['positionMs']! as num).round())
           : Duration.zero,
-      duration: map['durationMs'] is num
-          ? Duration(milliseconds: (map['durationMs']! as num).round())
-          : null,
+      duration: _asPositiveDuration(map['durationMs']),
       paused: map['paused'] == true,
       buffering: map['buffering'] == true,
       eof: map['eof'] == true,
@@ -537,6 +570,11 @@ class DesktopLibmpvEvent {
       if (parsed != null && parsed > 0) return parsed;
     }
     return null;
+  }
+
+  static Duration? _asPositiveDuration(Object? value) {
+    if (value is! num || value <= 0) return null;
+    return Duration(milliseconds: value.round());
   }
 
   static String? _nonEmptyString(Object? value) {

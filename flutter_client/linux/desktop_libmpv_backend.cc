@@ -86,7 +86,6 @@ constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
 constexpr int MPV_RENDER_PARAM_X11_DISPLAY = 8;
 constexpr int MPV_RENDER_PARAM_WL_DISPLAY = 9;
-constexpr int MPV_RENDER_PARAM_ADVANCED_CONTROL = 10;
 constexpr int MPV_RENDER_PARAM_SW_SIZE = 17;
 constexpr int MPV_RENDER_PARAM_SW_FORMAT = 18;
 constexpr int MPV_RENDER_PARAM_SW_STRIDE = 19;
@@ -899,11 +898,9 @@ FlMethodResponse* Load(FlValue* args) {
   }
 
   const char* api_type = "sw";
-  int advanced_control = 1;
   const DisplayInfo display = GetDisplayInfo();
   std::vector<mpv_render_param> create_params;
   create_params.push_back({MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(api_type)});
-  create_params.push_back({MPV_RENDER_PARAM_ADVANCED_CONTROL, &advanced_control});
   if (display.wayland_display != nullptr) {
     create_params.push_back({MPV_RENDER_PARAM_WL_DISPLAY, display.wayland_display});
   }

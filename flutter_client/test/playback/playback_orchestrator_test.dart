@@ -1,13 +1,27 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('PlaybackOrchestrator', () {
+    const methodChannel = MethodChannel('m3u_tv/desktop_libmpv');
+    const eventChannel = EventChannel('m3u_tv/desktop_libmpv/events');
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(eventChannel, null);
+    });
+
     test(
       'plays directly when the preferred backend can load the stream',
       () async {
@@ -456,7 +470,240 @@ void main() {
         await orchestrator.dispose();
       },
     );
+
+    test(
+      'deterministic desktop dead URL emits one final load error',
+      () async {
+        final events = _setUpDesktopEvents(eventChannel);
+        const sourceUri = 'http://127.0.0.1:9/fixture/dead-stream/master.m3u8';
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              if (call.method != 'load') return null;
+              final arguments = Map<String, Object?>.from(
+                call.arguments as Map<Object?, Object?>,
+              );
+              expect(arguments['uri'], sourceUri);
+              return <String, Object?>{
+                'ok': false,
+                'code': 'stream_not_found',
+                'error': 'Fixture stream is intentionally unavailable',
+              };
+            });
+
+        final desktop = DesktopLibmpvBackend();
+        final adapterErrors = <PlaybackError>[];
+        final adapterSubscription = desktop.onError.listen(adapterErrors.add);
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: desktop,
+          },
+          transcodeGateway: transcode,
+        );
+        final errors = <PlaybackError>[];
+        final subscription = orchestrator.onError.listen(errors.add);
+
+        await orchestrator
+            .open(const PlaybackSource(uri: sourceUri, isLive: true))
+            .timeout(const Duration(seconds: 1));
+        await pumpEventQueue();
+
+        expect(adapterErrors, isEmpty);
+        expect(errors, hasLength(1));
+        expect(errors.single.code, 'stream_not_found');
+        expect(orchestrator.activeBackend, isNull);
+        expect(desktop.textureId, isNull);
+        expect(transcode.startedServerRequests, isEmpty);
+
+        await adapterSubscription.cancel();
+        await subscription.cancel();
+        await orchestrator.dispose();
+        await events.close();
+      },
+      timeout: const Timeout(Duration(seconds: 3)),
+    );
+
+    test(
+      'pre-ready desktop terminal cleanup completes before server fallback',
+      () async {
+        final events = _setUpDesktopEvents(eventChannel);
+        final methodCalls = <MethodCall>[];
+        var nativeDisposed = false;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              methodCalls.add(call);
+              if (call.method == 'dispose') {
+                await Future<void>.delayed(const Duration(milliseconds: 20));
+                nativeDisposed = true;
+                return null;
+              }
+              if (call.method != 'load') return null;
+              scheduleMicrotask(() {
+                events.add(<String, Object?>{
+                  'schemaVersion': 1,
+                  'handle': 61,
+                  'sequence': 0,
+                  'kind': 'ERROR',
+                  'message': 'desktop demuxer rejected fixture',
+                  'code': 'mpv-end-file-error',
+                  'recoverable': true,
+                });
+              });
+              return <String, Object?>{
+                'ok': true,
+                'handle': 61,
+                'textureId': 6100,
+              };
+            });
+
+        final desktop = DesktopLibmpvBackend();
+        final serverPlayer = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.serverTranscode,
+        );
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: desktop,
+            PlaybackBackend.serverTranscode: serverPlayer,
+          },
+          transcodeGateway: transcode,
+        );
+
+        await orchestrator
+            .open(
+              const PlaybackSource(
+                uri: 'https://provider.example/live/fallback.ts',
+                isLive: true,
+              ),
+            )
+            .timeout(const Duration(seconds: 1));
+
+        expect(nativeDisposed, isTrue);
+        expect(desktop.textureId, isNull);
+        expect(orchestrator.activeBackend, PlaybackBackend.serverTranscode);
+        expect(transcode.startedServerRequests, hasLength(1));
+        final disposeCalls = methodCalls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(1));
+        expect(disposeCalls.single.arguments, <String, Object?>{'handle': 61});
+
+        await orchestrator.dispose();
+        await events.close();
+      },
+      timeout: const Timeout(Duration(seconds: 3)),
+    );
+
+    test(
+      'post-ready desktop failure retries once then releases final handle',
+      () async {
+        final events = _setUpDesktopEvents(eventChannel);
+        final methodCalls = <MethodCall>[];
+        var loadCount = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              methodCalls.add(call);
+              if (call.method != 'load') return null;
+              loadCount += 1;
+              final handle = 70 + loadCount;
+              scheduleMicrotask(() {
+                events.add(<String, Object?>{
+                  'schemaVersion': 1,
+                  'handle': handle,
+                  'sequence': 0,
+                  'kind': 'FILE_LOADED',
+                });
+              });
+              return <String, Object?>{
+                'ok': true,
+                'handle': handle,
+                'textureId': handle * 100,
+              };
+            });
+
+        final desktop = DesktopLibmpvBackend();
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: desktop,
+          },
+          transcodeGateway: transcode,
+          retryDelay: Duration.zero,
+        );
+        final errors = <PlaybackError>[];
+        final subscription = orchestrator.onError.listen(errors.add);
+
+        await orchestrator
+            .open(
+              const PlaybackSource(
+                uri: 'https://provider.example/live/runtime.ts',
+                isLive: true,
+              ),
+            )
+            .timeout(const Duration(seconds: 1));
+        events.add(<String, Object?>{
+          'schemaVersion': 1,
+          'handle': 71,
+          'sequence': 1,
+          'kind': 'ERROR',
+          'message': 'desktop stream failed after ready',
+          'code': 'network_unavailable',
+          'recoverable': true,
+        });
+        await pumpEventQueue();
+
+        expect(loadCount, 2);
+        expect(desktop.textureId, 7200);
+
+        events.add(<String, Object?>{
+          'schemaVersion': 1,
+          'handle': 72,
+          'sequence': 1,
+          'kind': 'ERROR',
+          'message': 'desktop stream failed after retry',
+          'code': 'network_unavailable',
+          'recoverable': true,
+        });
+        await pumpEventQueue();
+
+        expect(errors, hasLength(1));
+        expect(errors.single.code, 'network_unavailable');
+        expect(orchestrator.activeBackend, isNull);
+        expect(desktop.textureId, isNull);
+        final disposeCalls = methodCalls
+            .where((call) => call.method == 'dispose')
+            .toList();
+        expect(disposeCalls, hasLength(2));
+        expect(disposeCalls[0].arguments, <String, Object?>{'handle': 71});
+        expect(disposeCalls[1].arguments, <String, Object?>{'handle': 72});
+        expect(transcode.startedServerRequests, isEmpty);
+
+        await subscription.cancel();
+        await orchestrator.dispose();
+        await events.close();
+      },
+      timeout: const Timeout(Duration(seconds: 3)),
+    );
   });
+}
+
+StreamController<Map<String, Object?>> _setUpDesktopEvents(
+  EventChannel eventChannel,
+) {
+  final events = StreamController<Map<String, Object?>>.broadcast();
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockStreamHandler(
+        eventChannel,
+        MockStreamHandler.inline(
+          onListen: (arguments, eventSink) {
+            events.stream.listen(eventSink.success);
+          },
+        ),
+      );
+  return events;
 }
 
 PlaybackOrchestrator _orchestrator({

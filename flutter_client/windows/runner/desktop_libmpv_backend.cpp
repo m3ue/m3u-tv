@@ -250,7 +250,6 @@ class EventSinkState {
         {flutter::EncodableValue("sequence"), flutter::EncodableValue(snapshot.sequence)},
         {flutter::EncodableValue("kind"), flutter::EncodableValue(snapshot.kind)},
         {flutter::EncodableValue("positionMs"), flutter::EncodableValue(static_cast<int64_t>(snapshot.position * 1000.0))},
-        {flutter::EncodableValue("durationMs"), flutter::EncodableValue(static_cast<int64_t>(snapshot.duration * 1000.0))},
         {flutter::EncodableValue("paused"), flutter::EncodableValue(snapshot.paused)},
         {flutter::EncodableValue("buffering"), flutter::EncodableValue(snapshot.buffering)},
         {flutter::EncodableValue("eof"), flutter::EncodableValue(snapshot.eof)},
@@ -260,6 +259,7 @@ class EventSinkState {
         {flutter::EncodableValue("sid"), flutter::EncodableValue(snapshot.sid)},
         {flutter::EncodableValue("recoverable"), flutter::EncodableValue(snapshot.recoverable)},
     };
+    if (snapshot.duration > 0.0) event[flutter::EncodableValue("durationMs")] = flutter::EncodableValue(static_cast<int64_t>(snapshot.duration * 1000.0));
     if (!snapshot.message.empty()) event[flutter::EncodableValue("message")] = flutter::EncodableValue(snapshot.message);
     if (!snapshot.code.empty()) event[flutter::EncodableValue("code")] = flutter::EncodableValue(snapshot.code);
     sink_->Success(flutter::EncodableValue(event));
