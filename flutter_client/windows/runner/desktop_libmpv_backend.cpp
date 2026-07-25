@@ -314,6 +314,16 @@ struct TextureState : public std::enable_shared_from_this<TextureState> {
 };
 
 struct CopyPixelsContext {
+  void SetUpdateCallback(mpv_render_update_fn callback, void* callback_context) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (api == nullptr || render_context == nullptr ||
+        api->render_context_set_update_callback == nullptr) {
+      return;
+    }
+    api->render_context_set_update_callback(render_context, callback,
+                                            callback_context);
+  }
+
   std::mutex mutex;
   LibmpvApi* api = nullptr;
   mpv_render_context* render_context = nullptr;
@@ -383,9 +393,7 @@ struct PlayerInstance {
     if (api != nullptr && api->unobserve_property != nullptr && handle != nullptr) {
       api->unobserve_property(handle, 0);
     }
-    if (render_context != nullptr && api != nullptr && api->render_context_set_update_callback != nullptr) {
-      api->render_context_set_update_callback(render_context, nullptr, nullptr);
-    }
+    copy_context->SetUpdateCallback(nullptr, nullptr);
     texture_state->active.store(false);
     auto release_context = std::make_shared<TextureReleaseContext>(
         api, handle, render_context, std::move(texture), copy_context);
@@ -661,7 +669,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   player->texture = std::move(texture);
   player->texture_id = texture_id;
   player->texture_state->texture_id = texture_id;
-  api.render_context_set_update_callback(render_context, RenderUpdate, player->texture_state.get());
+  player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state.get());
   player->StartEventThread();
 
   const std::string uri = StringArg(args, "uri");

@@ -138,6 +138,16 @@ struct CopyPixelsContext {
         render_context(render_context),
         pixels(kTextureWidth * kTextureHeight * kBytesPerPixel, 0) {}
 
+  void SetUpdateCallback(mpv_render_update_fn callback, void* callback_context) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (released || api == nullptr || render_context == nullptr ||
+        api->render_context_set_update_callback == nullptr) {
+      return;
+    }
+    api->render_context_set_update_callback(render_context, callback,
+                                            callback_context);
+  }
+
   void Retain() { references.fetch_add(1, std::memory_order_relaxed); }
 
   void Release() {
@@ -357,9 +367,8 @@ struct PlayerInstance {
 
   ~PlayerInstance() {
     disposing.store(true);
-    if (render_context != nullptr && api != nullptr &&
-        api->render_context_set_update_callback != nullptr) {
-      api->render_context_set_update_callback(render_context, nullptr, nullptr);
+    if (copy_context != nullptr) {
+      copy_context->SetUpdateCallback(nullptr, nullptr);
     }
     if (api != nullptr && api->wakeup != nullptr && handle != nullptr) {
       api->wakeup(handle);
@@ -998,8 +1007,7 @@ FlMethodResponse* Load(FlValue* args) {
                                                  event_dispatch_state, handle,
                                                  render_context, texture,
                                                  texture_id, id);
-  api.render_context_set_update_callback(render_context, RenderUpdate,
-                                         player->texture_state);
+  player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state);
   player->StartEventThread();
 
   std::string uri = StringArg(args, "uri");

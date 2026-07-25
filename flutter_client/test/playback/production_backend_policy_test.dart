@@ -440,7 +440,7 @@ void main() {
         expect(
           windowsBackend,
           contains(
-            'api.render_context_set_update_callback(render_context, RenderUpdate, player->texture_state.get())',
+            'player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state.get())',
           ),
         );
         final platformDispatcherStart = windowsBackend.indexOf(
@@ -673,7 +673,7 @@ void main() {
         final playerInstance = linuxBackend.substring(playerStart, playerEnd);
         final disposingIndex = playerInstance.indexOf('disposing.store(true)');
         final detachIndex = playerInstance.indexOf(
-          'api->render_context_set_update_callback(render_context, nullptr, nullptr)',
+          'copy_context->SetUpdateCallback(nullptr, nullptr)',
         );
         final wakeupIndex = playerInstance.indexOf('api->wakeup(handle)');
         final joinIndex = playerInstance.indexOf('event_thread.join()');
@@ -806,6 +806,250 @@ void main() {
         );
         expect(lambdaSnippet, contains('ctx'));
         expect(lambdaSnippet, isNot(contains('raw_player')));
+      },
+    );
+
+    test(
+      'desktop render callback changes share the retained render-state lock',
+      () {
+        final linuxBackend = File(
+          'linux/desktop_libmpv_backend.cc',
+        ).readAsStringSync();
+        final windowsBackend = File(
+          'windows/runner/desktop_libmpv_backend.cpp',
+        ).readAsStringSync();
+
+        final linuxContextStart = linuxBackend.indexOf(
+          'struct CopyPixelsContext {',
+        );
+        final linuxContextEnd = linuxBackend.indexOf(
+          'struct DisplayInfo',
+          linuxContextStart,
+        );
+        expect(linuxContextStart, isNonNegative);
+        expect(linuxContextEnd, greaterThan(linuxContextStart));
+        final linuxContext = linuxBackend.substring(
+          linuxContextStart,
+          linuxContextEnd,
+        );
+        final linuxSetterStart = linuxContext.indexOf(
+          'void SetUpdateCallback(',
+        );
+        expect(linuxSetterStart, isNonNegative);
+        final linuxSetterEnd = linuxContext.indexOf(
+          'void Retain()',
+          linuxSetterStart,
+        );
+        expect(linuxSetterEnd, greaterThan(linuxSetterStart));
+        final linuxSetter = linuxContext.substring(
+          linuxSetterStart,
+          linuxSetterEnd,
+        );
+        final linuxSetterLock = linuxSetter.indexOf(
+          'std::lock_guard<std::mutex> lock(mutex)',
+        );
+        final linuxSetterCall = linuxSetter.indexOf(
+          'api->render_context_set_update_callback(',
+        );
+        expect(linuxSetterLock, isNonNegative);
+        expect(linuxSetterCall, greaterThan(linuxSetterLock));
+
+        final linuxCopyStart = linuxContext.indexOf('gboolean CopyPixels(');
+        final linuxCopyEnd = linuxContext.indexOf(
+          'void ReleaseResources()',
+          linuxCopyStart,
+        );
+        expect(linuxCopyStart, isNonNegative);
+        expect(linuxCopyEnd, greaterThan(linuxCopyStart));
+        final linuxCopy = linuxContext.substring(linuxCopyStart, linuxCopyEnd);
+        final linuxCopyLock = linuxCopy.indexOf(
+          'std::lock_guard<std::mutex> lock(mutex)',
+        );
+        final linuxRender = linuxCopy.indexOf(
+          'render_context_render(render_context, params)',
+        );
+        expect(linuxCopyLock, isNonNegative);
+        expect(linuxRender, greaterThan(linuxCopyLock));
+
+        final linuxRelease = linuxContext.substring(
+          linuxContext.indexOf('void ReleaseResources()'),
+        );
+        final linuxReleaseLock = linuxRelease.indexOf(
+          'std::lock_guard<std::mutex> lock(mutex)',
+        );
+        final linuxFree = linuxRelease.indexOf(
+          'render_context_free(render_context)',
+        );
+        expect(linuxReleaseLock, isNonNegative);
+        expect(linuxFree, greaterThan(linuxReleaseLock));
+
+        final linuxPlayerStart = linuxBackend.indexOf(
+          'struct PlayerInstance {',
+        );
+        final linuxPlayerEnd = linuxBackend.indexOf(
+          'LibmpvApi g_api',
+          linuxPlayerStart,
+        );
+        final linuxPlayer = linuxBackend.substring(
+          linuxPlayerStart,
+          linuxPlayerEnd,
+        );
+        final linuxDetach = linuxPlayer.indexOf(
+          'copy_context->SetUpdateCallback(nullptr, nullptr)',
+        );
+        final linuxWake = linuxPlayer.indexOf('api->wakeup(handle)');
+        final linuxReleaseResources = linuxPlayer.indexOf(
+          'copy_context->ReleaseResources()',
+        );
+        expect(linuxDetach, isNonNegative);
+        expect(linuxWake, greaterThan(linuxDetach));
+        expect(linuxReleaseResources, greaterThan(linuxWake));
+        expect(
+          linuxPlayer,
+          isNot(contains('api->render_context_set_update_callback(')),
+        );
+
+        final linuxLoadStart = linuxBackend.indexOf('FlMethodResponse* Load');
+        final linuxLoadEnd = linuxBackend.indexOf(
+          'FlMethodResponse* Control',
+          linuxLoadStart,
+        );
+        final linuxLoad = linuxBackend.substring(linuxLoadStart, linuxLoadEnd);
+        expect(
+          linuxLoad,
+          contains(
+            'player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state)',
+          ),
+        );
+        expect(
+          linuxLoad,
+          isNot(contains('api.render_context_set_update_callback(')),
+        );
+
+        final windowsContextStart = windowsBackend.indexOf(
+          'struct CopyPixelsContext {',
+        );
+        final windowsContextEnd = windowsBackend.indexOf(
+          'struct TextureReleaseContext',
+          windowsContextStart,
+        );
+        expect(windowsContextStart, isNonNegative);
+        expect(windowsContextEnd, greaterThan(windowsContextStart));
+        final windowsContext = windowsBackend.substring(
+          windowsContextStart,
+          windowsContextEnd,
+        );
+        final windowsSetterStart = windowsContext.indexOf(
+          'void SetUpdateCallback(',
+        );
+        expect(windowsSetterStart, isNonNegative);
+        final windowsSetterEnd = windowsContext.indexOf(
+          'std::mutex mutex;',
+          windowsSetterStart,
+        );
+        expect(windowsSetterEnd, greaterThan(windowsSetterStart));
+        final windowsSetter = windowsContext.substring(
+          windowsSetterStart,
+          windowsSetterEnd,
+        );
+        final windowsSetterLock = windowsSetter.indexOf(
+          'std::lock_guard<std::mutex> lock(mutex)',
+        );
+        final windowsSetterCall = windowsSetter.indexOf(
+          'api->render_context_set_update_callback(',
+        );
+        expect(windowsSetterLock, isNonNegative);
+        expect(windowsSetterCall, greaterThan(windowsSetterLock));
+
+        final windowsPixelStart = windowsBackend.indexOf(
+          'flutter::PixelBufferTexture(',
+        );
+        final windowsPixelEnd = windowsBackend.indexOf(
+          'const int64_t texture_id',
+          windowsPixelStart,
+        );
+        expect(windowsPixelStart, isNonNegative);
+        expect(windowsPixelEnd, greaterThan(windowsPixelStart));
+        final windowsPixel = windowsBackend.substring(
+          windowsPixelStart,
+          windowsPixelEnd,
+        );
+        final windowsPixelLock = windowsPixel.indexOf(
+          'std::lock_guard<std::mutex> lock(ctx->mutex)',
+        );
+        final windowsRender = windowsPixel.indexOf(
+          'ctx->api->render_context_render(ctx->render_context, params)',
+        );
+        expect(windowsPixelLock, isNonNegative);
+        expect(windowsRender, greaterThan(windowsPixelLock));
+
+        final windowsReleaseStart = windowsBackend.indexOf(
+          'struct TextureReleaseContext',
+        );
+        final windowsReleaseEnd = windowsBackend.indexOf(
+          'struct PlayerInstance',
+          windowsReleaseStart,
+        );
+        final windowsRelease = windowsBackend.substring(
+          windowsReleaseStart,
+          windowsReleaseEnd,
+        );
+        final windowsReleaseLock = windowsRelease.indexOf(
+          'std::lock_guard<std::mutex> lock(copy_context->mutex)',
+        );
+        final windowsFree = windowsRelease.indexOf(
+          'api->render_context_free(render_context)',
+        );
+        expect(windowsReleaseLock, isNonNegative);
+        expect(windowsFree, greaterThan(windowsReleaseLock));
+
+        final windowsPlayerStart = windowsBackend.indexOf(
+          'struct PlayerInstance {',
+        );
+        final windowsPlayerEnd = windowsBackend.indexOf(
+          'LibmpvApi g_api',
+          windowsPlayerStart,
+        );
+        final windowsPlayer = windowsBackend.substring(
+          windowsPlayerStart,
+          windowsPlayerEnd,
+        );
+        final windowsDetach = windowsPlayer.indexOf(
+          'copy_context->SetUpdateCallback(nullptr, nullptr)',
+        );
+        final windowsReleaseContext = windowsPlayer.indexOf(
+          'std::make_shared<TextureReleaseContext>',
+        );
+        final windowsUnregister = windowsPlayer.indexOf(
+          'texture_registrar->UnregisterTexture',
+        );
+        expect(windowsDetach, isNonNegative);
+        expect(windowsReleaseContext, greaterThan(windowsDetach));
+        expect(windowsUnregister, greaterThan(windowsReleaseContext));
+        expect(
+          windowsPlayer,
+          isNot(contains('api->render_context_set_update_callback(')),
+        );
+
+        final windowsLoadStart = windowsBackend.indexOf('ProbeMap Load(');
+        final windowsLoadEnd = windowsBackend.indexOf(
+          'bool DoubleProperty',
+          windowsLoadStart,
+        );
+        final windowsLoad = windowsBackend.substring(
+          windowsLoadStart,
+          windowsLoadEnd,
+        );
+        expect(
+          windowsLoad,
+          contains(
+            'player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state.get())',
+          ),
+        );
+        expect(
+          windowsLoad,
+          isNot(contains('api.render_context_set_update_callback(')),
+        );
       },
     );
 
