@@ -39,6 +39,7 @@
   "liveTvNoProgram": "No program info",
   "liveTvNext": "NEXT",
   "liveTvRecord": "Record",
+  "liveTvRecording": "Recording",
   "liveTvFavorite": "Favorite",
   "liveTvRemoveFavorite": "Remove favorite",
   "playerGoBack": "Go back",
@@ -122,6 +123,21 @@
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",
+  "settingsApp": "App",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Update",
+  "settingsAppVersionChecking": "Checking for updates…",
+  "settingsAppUpToDate": "Up to date",
+  "settingsAppUpdateAvailable": "Update available: {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "View release",
+  "settingsAppScanQr": "Scan to open on your phone",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
   "homeNoLiveTv": "No Live TV available",
@@ -230,5 +246,58 @@
   "aiostreamsSearch": "Search AIOStreams",
   "aiostreamsSearchResults": "Search Results",
   "aiostreamsNoResults": "No results found",
-  "aiostreamsSearchAll": "All"
+  "aiostreamsSearchAll": "All",
+  "requestsTabSearch": "Search",
+  "requestsTabMyRequests": "My Requests",
+  "requestsSearchHint": "Search movies & shows…",
+  "requestsNoResults": "No results found",
+  "requestsAlreadyAvailable": "Already available",
+  "requestsAlreadyRequested": "Already requested",
+  "requestsRequestButton": "Request",
+  "requestsSeasonsHeading": "Seasons",
+  "requestsSeasonSpecials": "Specials",
+  "requestsSelectAllSeasons": "Select All",
+  "requestsClearSeasons": "Clear",
+  "requestsSubmitted": "\"{title}\" was requested",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "\"{title}\" was sent for approval",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "Could not request \"{title}\": {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "You haven't requested anything yet",
+  "requestsDismiss": "Dismiss",
+  "requestsDismissFailed": "Could not dismiss request: {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "Pending Approval",
+  "requestsStatusApproved": "Approved",
+  "requestsStatusRejected": "Rejected",
+  "requestsStatusCompleted": "Completed",
+  "requestsStatusUnknown": "Unknown"
 }

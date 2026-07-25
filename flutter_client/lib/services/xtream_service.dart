@@ -99,6 +99,37 @@ class XtreamResponseException implements Exception {
   }
 }
 
+/// Thrown when the m3u-editor `schedule_dvr` endpoint reports a scheduling
+/// failure (DVR disabled, channel not found, invalid window, etc.) or returns
+/// a response shape that does not match the documented envelope.
+///
+/// Surfaced via `toString()` so the UI can render the server's message
+/// directly through `appRecordingFailed(error.toString())`.
+class XtreamDvrScheduleException implements Exception {
+  const XtreamDvrScheduleException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Thrown when an m3u-editor `request_*` action returns its documented error
+/// envelope (`{ error: { code, message } }`) or a response shape that doesn't
+/// match the expected envelope. [code] is one of the values advertised in
+/// `m3u_editor.requests.error_codes` (e.g. `already_requested`,
+/// `providers_unavailable`, `rate_limited`), letting callers branch on it
+/// without string-matching [message].
+class XtreamRequestException implements Exception {
+  const XtreamRequestException(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class XtreamRequest {
   const XtreamRequest({
     required this.credentials,
@@ -112,7 +143,7 @@ class XtreamRequest {
   final UserCredentials credentials;
   final String? action;
   final Map<String, String> params;
-  final Map<String, String> body;
+  final Map<String, Object?> body;
   final Map<String, String> headers;
   final String method;
 
@@ -218,6 +249,31 @@ class ProxyCapability {
   final List<ProxyStreamProfile> profiles;
 }
 
+/// Content request capability advertised by the backend when guest content
+/// requests (Sonarr/Radarr via ArrIntegration) are enabled for this playlist
+/// auth. [contentTypes] is which of `movie`/`series` have an enabled,
+/// guest-enabled integration behind them; [autoApproval] mirrors whether this
+/// guest's requests are sent to Arr immediately or held for admin approval.
+class RequestsCapability {
+  const RequestsCapability({
+    this.contentTypes = const <String>[],
+    this.autoApproval = false,
+  });
+
+  factory RequestsCapability.fromJson(Map<String, dynamic> json) =>
+      RequestsCapability(
+        contentTypes: _asList(
+          json['content_types'],
+        ).map((type) => '$type').toList(growable: false),
+        autoApproval: '${json['approval_behavior'] ?? ''}' == 'auto_approval',
+      );
+
+  final List<String> contentTypes;
+  final bool autoApproval;
+
+  bool supports(String type) => contentTypes.contains(type);
+}
+
 class XtreamAuthResponse {
   const XtreamAuthResponse({
     required this.isAuthenticated,
@@ -226,6 +282,7 @@ class XtreamAuthResponse {
     this.features = const <String>[],
     this.aiostreamsIntegrations = const <AIOStreamsIntegration>[],
     this.proxy,
+    this.requests,
   });
 
   final bool isAuthenticated;
@@ -234,11 +291,13 @@ class XtreamAuthResponse {
   final List<String> features;
   final List<AIOStreamsIntegration> aiostreamsIntegrations;
   final ProxyCapability? proxy;
+  final RequestsCapability? requests;
 
   bool hasFeature(String feature) => features.contains(feature);
   bool get hasAioStreams =>
       hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
   bool get hasProxy => hasFeature('proxy') && proxy != null;
+  bool get hasRequests => hasFeature('requests') && requests != null;
 }
 
 class XtreamService {
@@ -319,6 +378,10 @@ class XtreamService {
     final proxy = proxyJson is Map<String, dynamic>
         ? ProxyCapability.fromJson(proxyJson)
         : null;
+    final requestsJson = m3uEditor['requests'];
+    final requests = requestsJson is Map<String, dynamic>
+        ? RequestsCapability.fromJson(requestsJson)
+        : null;
     return XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
@@ -326,6 +389,7 @@ class XtreamService {
       features: features,
       aiostreamsIntegrations: aiostreamsIntegrations,
       proxy: proxy,
+      requests: requests,
     );
   }
 
@@ -389,8 +453,14 @@ class XtreamService {
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
   }
 
-  Future<List<DvrRecording>> getDvrRecordings() async {
-    final response = await _request('get_dvr_recordings');
+  Future<List<DvrRecording>> getDvrRecordings({
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async {
+    final response = await _request(
+      'get_dvr_recordings',
+      params: {'status': ?status?.name, 'limit': ?limit?.toString()},
+    );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
@@ -399,12 +469,23 @@ class XtreamService {
   Future<DvrRecording> getDvrRecording(String uuid) async {
     final response = await _request(
       'get_dvr_recording',
-      params: {'uuid': uuid},
+      // m3u-editor's XtreamApiController::getDvrRecording() reads
+      // `recording_id`, not `uuid`.
+      params: {'recording_id': uuid},
     );
     return DvrRecording.fromXtream(_asMap(response));
   }
 
-  Future<DvrRecording> scheduleDvr({
+  /// Schedules a one-shot DVR recording on m3u-editor's `schedule_dvr` action.
+  ///
+  /// The m3u-editor endpoint responds with an envelope:
+  /// - Success: `{ success: true, rule_id: int, message: string }`
+  /// - Failure: `{ error: string }` with HTTP 4xx
+  ///
+  /// Returns the created rule's id on success. Throws [XtreamDvrScheduleException]
+  /// on failure so callers can surface the server's error message to the user
+  /// instead of silently treating the failure as a successful schedule.
+  Future<int> scheduleDvr({
     required int channelId,
     required String title,
     required DateTime startTime,
@@ -420,7 +501,123 @@ class XtreamService {
         'end_time': endTime.toUtc().toIso8601String(),
       },
     );
-    return DvrRecording.fromXtream(_asMap(response));
+    final map = _asMap(response);
+    final errorMessage = map['error'];
+    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+      throw XtreamDvrScheduleException('$errorMessage');
+    }
+    final ruleId = int.tryParse('${map['rule_id'] ?? ''}');
+    if (ruleId != null && ruleId > 0) {
+      return ruleId;
+    }
+    throw const XtreamDvrScheduleException(
+      'm3u-editor returned an unexpected response for schedule_dvr.',
+    );
+  }
+
+  /// Searches every guest-enabled Arr integration for [query] via
+  /// `request_search`. [type] restricts to `movie` or `series`; omit to
+  /// search both. Throws [XtreamRequestException] on the documented error
+  /// envelope (e.g. `providers_unavailable` when every provider failed).
+  Future<List<ContentRequestSearchResult>> searchContentRequests(
+    String query, {
+    String? type,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final response = await _request(
+      'request_search',
+      params: {
+        'query': query,
+        'type': ?type,
+        'page': '$page',
+        'per_page': '$perPage',
+      },
+    );
+    final data = _asMap(_unwrapRequestEnvelope(response)['data']);
+    return _asList(data['results'])
+        .map((item) => ContentRequestSearchResult.fromJson(_asMap(item)))
+        .toList(growable: false);
+  }
+
+  /// Submits a content request via `request_submit`. Requests the whole
+  /// series for `type: 'series'` — m3u-editor monitors every season when no
+  /// `seasons` selection is sent, so there's no per-season picker to wire up.
+  ///
+  /// Returns the created [MediaRequestSummary], whose `status` is either
+  /// `pendingApproval` or `approved` depending on the guest's
+  /// `auto_approve_requests` setting. Throws [XtreamRequestException] on
+  /// failure (e.g. `already_requested`, `already_available`).
+  Future<MediaRequestSummary> submitContentRequest({
+    required String type,
+    required int integrationId,
+    required String externalId,
+    List<int>? seasons,
+  }) async {
+    final response = await _request(
+      'request_submit',
+      method: 'POST',
+      body: {
+        'type': type,
+        'integration_id': '$integrationId',
+        'external_id': externalId,
+        'seasons': ?seasons,
+      },
+    );
+    final data = _asMap(_unwrapRequestEnvelope(response)['data']);
+    return MediaRequestSummary.fromJson(_asMap(data['request']));
+  }
+
+  /// The requesting guest's own request history via `request_history`.
+  Future<List<MediaRequestSummary>> getMediaRequests({
+    int page = 1,
+    int perPage = 50,
+  }) async {
+    final response = await _request(
+      'request_history',
+      params: {'page': '$page', 'per_page': '$perPage'},
+    );
+    final data = _asMap(_unwrapRequestEnvelope(response)['data']);
+    return _asList(data['requests'])
+        .map((item) => MediaRequestSummary.fromJson(_asMap(item)))
+        .toList(growable: false);
+  }
+
+  /// Refreshes a single request's status via `request_status`, including
+  /// live download progress once approved.
+  Future<MediaRequestSummary> getMediaRequestStatus(int requestId) async {
+    final response = await _request(
+      'request_status',
+      params: {'request_id': '$requestId'},
+    );
+    final data = _asMap(_unwrapRequestEnvelope(response)['data']);
+    return MediaRequestSummary.fromJson(_asMap(data['request']));
+  }
+
+  /// Dismisses a completed or rejected request via `request_dismiss`.
+  Future<void> dismissMediaRequest(int requestId) async {
+    final response = await _request(
+      'request_dismiss',
+      method: 'POST',
+      body: {'request_id': '$requestId'},
+    );
+    _unwrapRequestEnvelope(response);
+  }
+
+  /// Unwraps the shared `request_*` action envelope
+  /// (`{ api_version, data, meta? }` / `{ api_version, error: { code, message } }`),
+  /// throwing [XtreamRequestException] on the error shape.
+  Map<String, Object?> _unwrapRequestEnvelope(Object? response) {
+    final envelope = _asMap(response);
+    final error = envelope['error'];
+    if (error != null) {
+      final errorMap = _asMap(error);
+      throw XtreamRequestException(
+        '${errorMap['code'] ?? 'unknown'}',
+        '${errorMap['message'] ?? 'The request could not be completed.'}',
+      );
+    }
+    return envelope;
   }
 
   Future<SeriesInfo> getSeriesInfo(int seriesId) async {
@@ -636,7 +833,7 @@ class XtreamService {
   Future<Object?> _request(
     String action, {
     Map<String, String> params = const {},
-    Map<String, String> body = const {},
+    Map<String, Object?> body = const {},
     String method = 'GET',
   }) {
     return _requestWithCredentials(
@@ -652,7 +849,7 @@ class XtreamService {
     UserCredentials credentials,
     String? action, {
     Map<String, String> params = const {},
-    Map<String, String> body = const {},
+    Map<String, Object?> body = const {},
     Map<String, String> headers = const {},
     String method = 'GET',
   }) {

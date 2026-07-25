@@ -31,6 +31,8 @@ void main() {
           liveChannelsProvider.overrideWith((_) => channels),
           liveCategoriesProvider.overrideWith((_) => const []),
           epgServiceProvider.overrideWith((_) => epg),
+          dvrRecordingsProvider.overrideWith((_) => const []),
+          recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -91,6 +93,8 @@ void main() {
             liveChannelsProvider.overrideWith((_) => channels),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
+            dvrRecordingsProvider.overrideWith((_) => const []),
+            recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
           ],
           child: MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,

@@ -88,6 +88,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvRecord => '录制';
 
   @override
+  String get liveTvRecording => '录制中';
+
+  @override
   String get liveTvFavorite => '收藏';
 
   @override
@@ -279,6 +282,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDisconnectConfirm => '断开连接';
+
+  @override
+  String get settingsApp => '应用';
+
+  @override
+  String get settingsAppVersion => '版本';
+
+  @override
+  String get settingsAppUpdateStatus => '更新';
+
+  @override
+  String get settingsAppVersionChecking => '正在检查更新…';
+
+  @override
+  String get settingsAppUpToDate => '已是最新版本';
+
+  @override
+  String settingsAppUpdateAvailable(String version) {
+    return '有可用更新：$version';
+  }
+
+  @override
+  String get settingsAppViewRelease => '查看版本';
+
+  @override
+  String get settingsAppScanQr => '扫描以在手机上打开';
 
   @override
   String get homeContinueWatching => '继续观看';
@@ -474,4 +503,78 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => '全部';
+
+  @override
+  String get requestsTabSearch => '搜索';
+
+  @override
+  String get requestsTabMyRequests => '我的请求';
+
+  @override
+  String get requestsSearchHint => '搜索电影和剧集…';
+
+  @override
+  String get requestsNoResults => '未找到结果';
+
+  @override
+  String get requestsAlreadyAvailable => '已可观看';
+
+  @override
+  String get requestsAlreadyRequested => '已请求';
+
+  @override
+  String get requestsRequestButton => '请求';
+
+  @override
+  String get requestsSeasonsHeading => '季';
+
+  @override
+  String get requestsSeasonSpecials => '特别篇';
+
+  @override
+  String get requestsSelectAllSeasons => '全选';
+
+  @override
+  String get requestsClearSeasons => '清除';
+
+  @override
+  String requestsSubmitted(String title) {
+    return '已请求“$title”';
+  }
+
+  @override
+  String requestsSubmittedPendingApproval(String title) {
+    return '“$title”已提交等待批准';
+  }
+
+  @override
+  String requestsSubmitFailed(String title, String error) {
+    return '无法请求“$title”：$error';
+  }
+
+  @override
+  String get requestsMyRequestsEmpty => '您还没有请求过任何内容';
+
+  @override
+  String get requestsDismiss => '移除';
+
+  @override
+  String requestsDismissFailed(String error) {
+    return '无法移除请求：$error';
+  }
+
+  @override
+  String get requestsStatusPendingApproval => '待批准';
+
+  @override
+  String get requestsStatusApproved => '已批准';
+
+  @override
+  String get requestsStatusRejected => '已拒绝';
+
+  @override
+  String get requestsStatusCompleted => '已完成';
+
+  @override
+  String get requestsStatusUnknown => '未知';
 }

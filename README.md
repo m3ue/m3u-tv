@@ -23,7 +23,8 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 | Android TV | Supported — ExoPlayer via Media3 |
 | Android / iOS / iPadOS | Supported |
 | Apple TV (tvOS) | Supported — AVKit backend via [flutter-tvos](https://github.com/fluttertv/flutter-tvos) |
-| Desktop (macOS / Linux / Windows) | Supported — libmpv via media_kit |
+| Desktop (Linux / Windows) | Supported — custom in-process libmpv backend |
+| Desktop (macOS) | Supported — media_kit (AVFoundation-backed); libmpv is not planned for this platform |
 
 ## Tech Stack
 
@@ -62,10 +63,12 @@ Quality gates:
 
 ```bash
 cd flutter_client
-dart format .
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
+
+Scope `format`/`analyze` to `lib test`, not `.` — see [flutter_client/README.md](flutter_client/README.md#quality-gates) for why.
 
 ## Configuration
 
@@ -138,8 +141,8 @@ To use with M3U Editor, use your M3U Editor server URL and credentials from a Pl
 
 ```bash
 cd flutter_client
-dart format ./
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
 

@@ -122,7 +122,7 @@ class AppleBackendFeasibility {
             'Prefer AVPlayer for HLS/MP4 and invoke MPVKit only when licensing and crash gates pass.',
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.appleMpvKit,
+        PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],
@@ -164,7 +164,7 @@ class AppleBackendFeasibility {
             'Exercise AVPlayer full-screen, PiP eligibility, and track controls on iPad hardware.',
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.appleMpvKit,
+        PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],
@@ -195,19 +195,19 @@ class AppleBackendFeasibility {
         evidence:
             'Pinned Flutter create help lists macOS project generation; release builds require a macOS/Xcode host.',
         nextStep:
-            'Create a macOS plugin that loads a bundled libmpv build and falls back to AVPlayerView.',
+            'Verify sandbox-safe media_kit framework embedding and notarized/Mac App Store packaging.',
       ),
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'Desktop libmpv-style playback is feasible; AVKit/AVPlayer remains the App Store fallback.',
+            'media_kit (AVFoundation-backed) playback works correctly; a native in-process libmpv backend was prototyped and reverted because media_kit already covers macOS well. libmpv is not planned for this platform.',
         evidence:
-            'The existing playback contract has a Desktop libmpv row and Apple AVKit fallback row.',
+            'The existing playback contract has a Desktop Media Kit row and Apple AVKit fallback row.',
         nextStep:
             'Verify sandbox-safe framework embedding and notarized/Mac App Store packaging.',
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.desktopLibmpv,
+        PlaybackCapabilities.desktopMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],
@@ -219,7 +219,7 @@ class AppleBackendFeasibility {
             'Route GCController events through the same playback action dispatcher used by TV remotes.',
       ),
       signingRequirements: <String>[
-        'Embed libmpv and dependent dylibs or xcframeworks inside the .app bundle.',
+        'Embed media_kit dependent dylibs/frameworks inside the .app bundle (no libmpv/MPVKit — not planned for macOS).',
         'Meet Mac App Store sandbox, hardened runtime, and notarization requirements for the chosen channel.',
       ],
       publicApiConstraints: <String>[
@@ -250,7 +250,7 @@ class AppleBackendFeasibility {
             'Stand up a tvOS runner, then start with AVKit/AVPlayer fallback before enabling MPVKit.',
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.appleMpvKit,
+        PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],

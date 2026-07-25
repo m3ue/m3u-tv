@@ -39,6 +39,7 @@
   "liveTvNoProgram": "暂无节目信息",
   "liveTvNext": "下一个",
   "liveTvRecord": "录制",
+  "liveTvRecording": "录制中",
   "liveTvFavorite": "收藏",
   "liveTvRemoveFavorite": "取消收藏",
   "playerGoBack": "返回",
@@ -97,6 +98,21 @@
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",
+  "settingsApp": "应用",
+  "settingsAppVersion": "版本",
+  "settingsAppUpdateStatus": "更新",
+  "settingsAppVersionChecking": "正在检查更新…",
+  "settingsAppUpToDate": "已是最新版本",
+  "settingsAppUpdateAvailable": "有可用更新：{version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "查看版本",
+  "settingsAppScanQr": "扫描以在手机上打开",
   "settingsContentCache": "内容缓存",
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",
   "settingsEpgRefreshInterval": "EPG 刷新间隔",
@@ -215,8 +231,7 @@
   },
   "searchTypeToSearch": "输入以搜索",
   "vodPlayMovie": "播放电影",
-  "vodContinueMovie": "继续播放"
-,
+  "vodContinueMovie": "继续播放",
   "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "获取播放源",
   "aiostreamsLoadingStreams": "正在加载播放源…",
@@ -231,5 +246,58 @@
   "aiostreamsSearch": "搜索 AIOStreams",
   "aiostreamsSearchResults": "搜索结果",
   "aiostreamsNoResults": "未找到结果",
-  "aiostreamsSearchAll": "全部"
+  "aiostreamsSearchAll": "全部",
+  "requestsTabSearch": "搜索",
+  "requestsTabMyRequests": "我的请求",
+  "requestsSearchHint": "搜索电影和剧集…",
+  "requestsNoResults": "未找到结果",
+  "requestsAlreadyAvailable": "已可观看",
+  "requestsAlreadyRequested": "已请求",
+  "requestsRequestButton": "请求",
+  "requestsSeasonsHeading": "季",
+  "requestsSeasonSpecials": "特别篇",
+  "requestsSelectAllSeasons": "全选",
+  "requestsClearSeasons": "清除",
+  "requestsSubmitted": "已请求“{title}”",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "“{title}”已提交等待批准",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "无法请求“{title}”：{error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "您还没有请求过任何内容",
+  "requestsDismiss": "移除",
+  "requestsDismissFailed": "无法移除请求：{error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "待批准",
+  "requestsStatusApproved": "已批准",
+  "requestsStatusRejected": "已拒绝",
+  "requestsStatusCompleted": "已完成",
+  "requestsStatusUnknown": "未知"
 }

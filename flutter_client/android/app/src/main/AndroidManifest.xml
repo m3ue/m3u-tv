@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required on Android 13+ to show FCM notifications; requested at
+         runtime via FirebaseMessaging.instance.requestPermission(), mobile
+         only (see PushNotificationService). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
 
@@ -13,7 +17,7 @@
     <application
         android:label="M3U TV"
         android:name="${applicationName}"
-        android:banner="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
         android:isGame="false"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">
@@ -47,6 +51,12 @@
                 <data android:scheme="m3utv"/>
             </intent-filter>
         </activity>
+        <!-- Notification icon shown in the status bar for FCM pushes (see
+             PushNotificationService). Must be a flat white silhouette on a
+             transparent background - regenerated via scripts/setup-icons.sh. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -15,7 +15,8 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
-import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/production_storage.dart';
+import 'package:m3u_tv/services/push_notification_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -32,6 +33,9 @@ Future<void> main() async {
   }
   final appState = await _buildAppState();
   final nativeTelevisionHint = await resolveNativeTelevisionHint();
+  if (_isMobilePushCapable(nativeTelevisionHint)) {
+    unawaited(_initPushNotifications(appState));
+  }
   runApp(
     ProviderScope(
       overrides: [overrideAppState(appState)],
@@ -44,18 +48,55 @@ Future<void> main() async {
   );
 }
 
+/// Push is mobile-only: TV builds (Android TV, tvOS) rely on the existing
+/// Reverb pipeline instead. tvOS reports `Platform.operatingSystem == 'tvos'`
+/// (not 'ios'), so `Platform.isIOS` alone already excludes it.
+bool _isMobilePushCapable(bool nativeTelevisionHint) =>
+    (Platform.isAndroid && !nativeTelevisionHint) || Platform.isIOS;
+
+Future<void> _initPushNotifications(AppStateController appState) async {
+  try {
+    final service = PushNotificationService();
+    final token = await service.init();
+    if (token != null) {
+      appState.setPushToken(token);
+    }
+    service.onTokenRefresh.listen(appState.setPushToken);
+  } on Object catch (error) {
+    // Best-effort: e.g. Firebase config not yet installed on this build.
+    debugPrint('Push notification init failed: $error');
+  }
+}
+
 Future<AppStateController> _buildAppState() async {
-  if (Platform.isAndroid ||
-      Platform.isIOS ||
-      Platform.operatingSystem == 'tvos') {
-    final dir = await getApplicationDocumentsDirectory();
-    final store = PersistentJsonStore(file: File('${dir.path}/app_state.json'));
-    return AppStateController(
-      persistentStore: store,
-      secureStorage: FlutterSecureStorageAdapter(),
+  final operatingSystem = Platform.operatingSystem;
+  final store = await _createAppStateStore(operatingSystem);
+  final storage = createProductionStorage(
+    operatingSystem: operatingSystem,
+    persistentStore: store,
+  );
+  if (shouldMigrateLegacyCredentials(operatingSystem)) {
+    await migrateLegacyCredentials(
+      appStateStore: storage.appStateStore,
+      credentialStorage: storage.credentialStorage,
     );
   }
-  return AppStateController();
+  return AppStateController(
+    persistentStore: storage.appStateStore,
+    secureStorage: storage.credentialStorage,
+  );
+}
+
+Future<PersistentJsonStore> _createAppStateStore(
+  String operatingSystem,
+) async {
+  if (operatingSystem == 'android' ||
+      operatingSystem == 'ios' ||
+      operatingSystem == 'tvos') {
+    final dir = await getApplicationDocumentsDirectory();
+    return PersistentJsonStore(file: File('${dir.path}/app_state.json'));
+  }
+  return PersistentJsonStore();
 }
 
 class MyApp extends StatefulWidget {
@@ -145,7 +186,7 @@ class _MyAppState extends State<MyApp> {
           // requestFocus(lastFocused), and DpadScroll.ensureVisible kills the
           // fling mid-scroll with an animateTo() counter-animation.
           restoreFocus: isTvOrDesktop,
-          // Click sound is D-pad navigation feedback — not wanted on touch.
+          // Click sound is D-pad navigation feedback, not wanted on touch.
           onFocusChange: isTvOrDesktop
               ? (node) {
                   if (node != null) {

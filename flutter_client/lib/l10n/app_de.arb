@@ -39,6 +39,7 @@
   "liveTvNoProgram": "Keine Programminfo",
   "liveTvNext": "NÄCHSTES",
   "liveTvRecord": "Aufnehmen",
+  "liveTvRecording": "Aufnahme läuft",
   "liveTvFavorite": "Favorit",
   "liveTvRemoveFavorite": "Aus Favoriten entfernen",
   "playerGoBack": "Zurück",
@@ -97,6 +98,21 @@
   "settingsDisconnectTitle": "Trennen?",
   "settingsDisconnectBody": "Du wirst abgemeldet und musst deine Anmeldedaten erneut eingeben, um dich wieder zu verbinden.",
   "settingsDisconnectConfirm": "Trennen",
+  "settingsApp": "App",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Update",
+  "settingsAppVersionChecking": "Suche nach Updates…",
+  "settingsAppUpToDate": "Aktuell",
+  "settingsAppUpdateAvailable": "Update verfügbar: {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "Release ansehen",
+  "settingsAppScanQr": "Scannen, um auf deinem Handy zu öffnen",
   "settingsContentCache": "Inhaltscache",
   "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",
   "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",
@@ -215,8 +231,7 @@
   },
   "searchTypeToSearch": "Zum Suchen tippen",
   "vodPlayMovie": "Film abspielen",
-  "vodContinueMovie": "Film fortsetzen"
-,
+  "vodContinueMovie": "Film fortsetzen",
   "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "Streams laden",
   "aiostreamsLoadingStreams": "Streams werden geladen…",
@@ -231,5 +246,58 @@
   "aiostreamsSearch": "AIOStreams durchsuchen",
   "aiostreamsSearchResults": "Suchergebnisse",
   "aiostreamsNoResults": "Keine Ergebnisse gefunden",
-  "aiostreamsSearchAll": "Alle"
+  "aiostreamsSearchAll": "Alle",
+  "requestsTabSearch": "Suche",
+  "requestsTabMyRequests": "Meine Anfragen",
+  "requestsSearchHint": "Filme & Serien suchen…",
+  "requestsNoResults": "Keine Ergebnisse gefunden",
+  "requestsAlreadyAvailable": "Bereits verfügbar",
+  "requestsAlreadyRequested": "Bereits angefragt",
+  "requestsRequestButton": "Anfragen",
+  "requestsSeasonsHeading": "Staffeln",
+  "requestsSeasonSpecials": "Specials",
+  "requestsSelectAllSeasons": "Alle auswählen",
+  "requestsClearSeasons": "Zurücksetzen",
+  "requestsSubmitted": "\"{title}\" wurde angefragt",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "\"{title}\" wurde zur Genehmigung gesendet",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "\"{title}\" konnte nicht angefragt werden: {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "Du hast noch nichts angefragt",
+  "requestsDismiss": "Verwerfen",
+  "requestsDismissFailed": "Anfrage konnte nicht verworfen werden: {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "Ausstehende Genehmigung",
+  "requestsStatusApproved": "Genehmigt",
+  "requestsStatusRejected": "Abgelehnt",
+  "requestsStatusCompleted": "Abgeschlossen",
+  "requestsStatusUnknown": "Unbekannt"
 }

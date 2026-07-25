@@ -26,7 +26,7 @@ class MediaKitIosAdapter
       StreamController<PlaybackError>.broadcast();
 
   PlaybackState _state = const PlaybackState.idle(
-    backend: PlaybackBackend.appleMpvKit,
+    backend: PlaybackBackend.appleMediaKit,
   );
 
   @override
@@ -36,7 +36,7 @@ class MediaKitIosAdapter
   mkv.VideoController get subtitleController => _controller;
 
   @override
-  PlaybackCapabilities get capabilities => PlaybackCapabilities.appleMpvKit;
+  PlaybackCapabilities get capabilities => PlaybackCapabilities.appleMediaKit;
 
   @override
   Stream<PlaybackState> get onState => _stateController.stream;
@@ -129,7 +129,7 @@ class MediaKitIosAdapter
           if (error.isNotEmpty && !_isNonFatalMpvWarning(error)) {
             _errorController.add(
               PlaybackError(
-                backend: PlaybackBackend.appleMpvKit,
+                backend: PlaybackBackend.appleMediaKit,
                 message: error,
                 code: 'media_kit_error',
               ),

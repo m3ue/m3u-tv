@@ -84,6 +84,6 @@ ProviderScope(
 - Match existing file conventions. No new comments unless the WHY is non-obvious.
 
 ### Commands
-- **Analyze**: `cd flutter_client && flutter analyze`
+- **Analyze**: `cd flutter_client && flutter analyze lib test` (scoped to avoid the analyzer treating vendored SPM checkouts under `ios/build/`/`macos/build/` — e.g. `firebase_messaging`'s own `pubspec.yaml` — as a nested project to lint; `analyzer.exclude` globs don't suppress this once a directory has its own `pubspec.yaml`)
 - **Test**: `cd flutter_client && flutter test`
 - **Run (Android TV)**: `cd flutter_client && flutter run -d <device-id>`

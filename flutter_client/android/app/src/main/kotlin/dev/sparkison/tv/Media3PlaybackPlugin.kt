@@ -10,6 +10,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.MimeTypes
@@ -71,6 +72,12 @@ class Media3PlaybackPlugin(
                 }
                 "setSubtitleTrack" -> {
                     selectTrack(C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
+                    result.success(null)
+                }
+                "setPlaybackSpeed" -> {
+                    val speed = call.argument<Number>("speed")?.toFloat()
+                    val playbackParameters = PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)
+                    requirePlayer().playbackParameters = playbackParameters
                     result.success(null)
                 }
                 "stop" -> {

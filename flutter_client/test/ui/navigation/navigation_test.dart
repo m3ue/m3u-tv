@@ -378,8 +378,9 @@ void main() {
       await tester.tap(_sidebarText('Requests'));
       await _pumpAppFrame(tester);
 
-      expect(find.text('Request Content'), findsOneWidget);
-      expect(find.text('Full request workflow coming soon.'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('My Requests'), findsOneWidget);
+      expect(find.text('Search movies & shows…'), findsOneWidget);
     });
 
     testWidgets('sidebar labels remain visible after selecting a route', (
@@ -1954,7 +1955,10 @@ class _NavigationXtreamService extends XtreamService {
   ];
 
   @override
-  Future<List<DvrRecording>> getDvrRecordings() async => dvrRecordings;
+  Future<List<DvrRecording>> getDvrRecordings({
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async => dvrRecordings;
 
   @override
   Future<List<Progress>> getRecentlyWatched(

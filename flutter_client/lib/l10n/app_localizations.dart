@@ -254,6 +254,12 @@ abstract class AppLocalizations {
   /// **'Record'**
   String get liveTvRecord;
 
+  /// No description provided for @liveTvRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get liveTvRecording;
+
   /// No description provided for @liveTvFavorite.
   ///
   /// In en, this message translates to:
@@ -626,6 +632,54 @@ abstract class AppLocalizations {
   /// **'Disconnect'**
   String get settingsDisconnectConfirm;
 
+  /// No description provided for @settingsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsApp;
+
+  /// No description provided for @settingsAppVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsAppVersion;
+
+  /// No description provided for @settingsAppUpdateStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get settingsAppUpdateStatus;
+
+  /// No description provided for @settingsAppVersionChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates…'**
+  String get settingsAppVersionChecking;
+
+  /// No description provided for @settingsAppUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get settingsAppUpToDate;
+
+  /// No description provided for @settingsAppUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: {version}'**
+  String settingsAppUpdateAvailable(String version);
+
+  /// No description provided for @settingsAppViewRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'View release'**
+  String get settingsAppViewRelease;
+
+  /// No description provided for @settingsAppScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to open on your phone'**
+  String get settingsAppScanQr;
+
   /// No description provided for @homeContinueWatching.
   ///
   /// In en, this message translates to:
@@ -985,6 +1039,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All'**
   String get aiostreamsSearchAll;
+
+  /// No description provided for @requestsTabSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get requestsTabSearch;
+
+  /// No description provided for @requestsTabMyRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'My Requests'**
+  String get requestsTabMyRequests;
+
+  /// No description provided for @requestsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search movies & shows…'**
+  String get requestsSearchHint;
+
+  /// No description provided for @requestsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get requestsNoResults;
+
+  /// No description provided for @requestsAlreadyAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Already available'**
+  String get requestsAlreadyAvailable;
+
+  /// No description provided for @requestsAlreadyRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Already requested'**
+  String get requestsAlreadyRequested;
+
+  /// No description provided for @requestsRequestButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Request'**
+  String get requestsRequestButton;
+
+  /// No description provided for @requestsSeasonsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get requestsSeasonsHeading;
+
+  /// No description provided for @requestsSeasonSpecials.
+  ///
+  /// In en, this message translates to:
+  /// **'Specials'**
+  String get requestsSeasonSpecials;
+
+  /// No description provided for @requestsSelectAllSeasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get requestsSelectAllSeasons;
+
+  /// No description provided for @requestsClearSeasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get requestsClearSeasons;
+
+  /// No description provided for @requestsSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{title}\" was requested'**
+  String requestsSubmitted(String title);
+
+  /// No description provided for @requestsSubmittedPendingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{title}\" was sent for approval'**
+  String requestsSubmittedPendingApproval(String title);
+
+  /// No description provided for @requestsSubmitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not request \"{title}\": {error}'**
+  String requestsSubmitFailed(String title, String error);
+
+  /// No description provided for @requestsMyRequestsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t requested anything yet'**
+  String get requestsMyRequestsEmpty;
+
+  /// No description provided for @requestsDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get requestsDismiss;
+
+  /// No description provided for @requestsDismissFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not dismiss request: {error}'**
+  String requestsDismissFailed(String error);
+
+  /// No description provided for @requestsStatusPendingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Approval'**
+  String get requestsStatusPendingApproval;
+
+  /// No description provided for @requestsStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get requestsStatusApproved;
+
+  /// No description provided for @requestsStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get requestsStatusRejected;
+
+  /// No description provided for @requestsStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get requestsStatusCompleted;
+
+  /// No description provided for @requestsStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get requestsStatusUnknown;
 }
 
 class _AppLocalizationsDelegate

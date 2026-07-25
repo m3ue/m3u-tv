@@ -2,8 +2,12 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android Gradle plugin.
+    id("org.jetbrains.kotlin.android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Requires android/app/google-services.json to be present (gitignored,
+    // downloaded from Firebase Console) — build fails without it.
+    id("com.google.gms.google-services")
 }
 
 val media3Version = "1.10.1"
@@ -21,8 +25,8 @@ val androidSigningProperties = Properties().apply {
 }
 
 fun signingValue(name: String): String? =
-    providers.gradleProperty(name).orNull
-        ?: providers.environmentVariable(name).orNull
+    providers.gradleProperty(name).orNull?.takeIf { it.isNotBlank() }
+        ?: providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
         ?: androidSigningProperties.getProperty(name)?.takeIf { it.isNotBlank() }
 
 val releaseSigningKeys = listOf(
@@ -36,6 +40,16 @@ fun hasReleaseSigningKeys(): Boolean {
     val keystorePath = signingValue("ANDROID_KEYSTORE_PATH") ?: return false
     if (!file(keystorePath).isFile) return false
     return releaseSigningKeys.all { !signingValue(it).isNullOrBlank() }
+}
+
+val releaseSigningRequired =
+    signingValue("ANDROID_REQUIRE_RELEASE_SIGNING")?.toBooleanStrictOrNull() ?: false
+val releaseSigningAvailable = hasReleaseSigningKeys()
+
+if (releaseSigningRequired && !releaseSigningAvailable) {
+    throw GradleException(
+        "ANDROID_REQUIRE_RELEASE_SIGNING is enabled, but Android release signing inputs are incomplete or the keystore file is missing.",
+    )
 }
 
 android {
@@ -72,11 +86,12 @@ android {
 
     buildTypes {
         release {
-            // Use release signing when keys are available, otherwise fall back to
-            // debug signing so contributors can build without credentials.
-            signingConfig = if (hasReleaseSigningKeys()) {
+            // Publication requires release signing. Local contributors without
+            // credentials retain a debug-signed release build for development only.
+            signingConfig = if (releaseSigningAvailable) {
                 signingConfigs.getByName("release")
             } else {
+                logger.warn("Creating a debug-signed release build for local development only. Do not publish it.")
                 signingConfigs.getByName("debug")
             }
         }
@@ -90,6 +105,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
+    testImplementation("junit:junit:4.13.2")
 }
 
 flutter {

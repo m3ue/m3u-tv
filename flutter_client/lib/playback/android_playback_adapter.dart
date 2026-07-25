@@ -88,9 +88,10 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
       PlaybackBackend.androidExoPlayer => PlaybackCapabilities.androidExoPlayer,
       PlaybackBackend.androidMpv => PlaybackCapabilities.androidMpv,
       PlaybackBackend.serverTranscode => PlaybackCapabilities.serverTranscode,
-      PlaybackBackend.appleMpvKit ||
+      PlaybackBackend.appleMediaKit ||
       PlaybackBackend.appleAvKit ||
-      PlaybackBackend.desktopLibmpv => PlaybackCapabilities.androidExoPlayer,
+      PlaybackBackend.desktopLibmpv ||
+      PlaybackBackend.desktopMediaKit => PlaybackCapabilities.androidExoPlayer,
     };
   }
 
@@ -211,6 +212,16 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   Future<void> setPlaybackSpeed(double speed) async {
+    if (!speed.isFinite || speed <= 0) {
+      throw ArgumentError.value(
+        speed,
+        'speed',
+        'Playback speed must be finite and greater than zero',
+      );
+    }
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setPlaybackSpeed(speed);
+    }
     _emit(_state.copyWith(playbackSpeed: speed));
   }
 
@@ -340,6 +351,7 @@ abstract class AndroidMedia3Host {
   Future<void> stop();
   Future<void> setAudioTrack(String? trackId);
   Future<void> setSubtitleTrack(String? trackId);
+  Future<void> setPlaybackSpeed(double speed);
   Future<void> dispose();
 }
 
@@ -413,6 +425,12 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'setSubtitleTrack',
         <String, Object?>{'trackId': trackId},
       );
+
+  @override
+  Future<void> setPlaybackSpeed(double speed) =>
+      _methodChannel.invokeMethod<void>('setPlaybackSpeed', <String, Object?>{
+        'speed': speed,
+      });
 
   @override
   Future<void> dispose() async {

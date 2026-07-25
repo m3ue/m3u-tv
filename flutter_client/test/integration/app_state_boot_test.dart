@@ -474,7 +474,7 @@ void main() {
         final directory = await io.Directory.systemTemp.createTemp(
           'm3u-tv-state-',
         );
-        addTearDown(() => directory.delete(recursive: true));
+        addTearDown(() => _deleteDirectoryRetrying(directory));
         final stateFile = io.File('${directory.path}/state.json');
         final store = PersistentJsonStore(file: stateFile);
 
@@ -569,6 +569,26 @@ AppStateController _controller({
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),
   );
+}
+
+// PersistentJsonStore serializes writes onto its own internal queue rather
+// than requiring every caller to await them (several services share one
+// store and fire-and-forget on construction, e.g. ProxyPlaybackSettings.load
+// in AppStateController). One of those can still be mid-write (temp file ->
+// delete -> rename) when this teardown runs, so a plain recursive delete can
+// hit ENOTEMPTY if a file reappears between listing and removal. Retry a few
+// times rather than making every service await its store writes just for
+// test cleanup.
+Future<void> _deleteDirectoryRetrying(io.Directory directory) async {
+  for (var attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on io.FileSystemException {
+      if (attempt == 4) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+  }
 }
 
 String _visibleText(WidgetTester tester) {

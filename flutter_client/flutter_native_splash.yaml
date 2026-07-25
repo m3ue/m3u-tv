@@ -15,6 +15,13 @@ flutter_native_splash:
     color_dark: "#0a0a0f"
     image_dark: assets/icons/splash-icon.png
 
+  # windowDrawsSystemBarBackgrounds is tied directly to this flag by the
+  # flutter_native_splash package (android.dart) - it hardcodes that value to
+  # whatever `fullscreen` is set to. The app relies on it being true for its
+  # transparent/edge-to-edge system bars, independent of the splash screen
+  # itself, so this must be explicit or every regeneration silently reverts it.
+  fullscreen: true
+
   ios: true
   android: true
   web: false

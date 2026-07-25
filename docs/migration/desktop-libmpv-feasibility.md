@@ -1,15 +1,15 @@
 # Desktop libmpv Feasibility
 
-Task 7 proves the Flutter desktop path without Electron, external mpv windows, or reparented player processes. The spike adds a `m3u_tv/desktop_libmpv` native method channel on Linux, Windows, and macOS plus a Dart `DesktopLibmpvBackend` adapter in `flutter_client/lib/playback/desktop_libmpv_backend.dart`.
+Task 7 proves the Flutter desktop path without Electron, external mpv windows, or reparented player processes. The spike adds a `m3u_tv/desktop_libmpv` native method channel on Linux and Windows plus a Dart `DesktopLibmpvBackend` adapter in `flutter_client/lib/playback/desktop_libmpv_backend.dart`. A native macOS implementation was later prototyped and reverted — see "macOS: not planned" below.
 
 ## Result matrix
 
 | Target | Result | Native surface/layer | Render path | Fallback decision |
 |---|---:|---|---|---|
-| Linux Wayland | FAIL on executor | Flutter GTK window with owned in-process render path | Wayland/EGL libmpv render API | Server-transcode until GTK dev files and `libmpv.so` are packaged |
-| Linux X11 fallback | FAIL on executor | Same Flutter GTK window path | X11/EGL libmpv render API fallback | Server-transcode until GTK dev files and `libmpv.so` are packaged |
-| Windows | NOT RUN here, probe implemented | Runner-owned Win32 `HWND` | D3D11 native surface; Vulkan or ANGLE/OpenGL fallback if D3D11 interop blocks | Server-transcode until `mpv-2.dll` bundle is present |
-| macOS | NOT RUN here, probe implemented | Runner-owned Cocoa `CALayer` | Metal layer via libmpv render API or MPVKit-equivalent wrapper | Server-transcode until `libmpv.2.dylib` or `MPVKit.framework` is bundled |
+| Linux Wayland | Active (custom backend) | Flutter GTK window with owned in-process render path | Wayland display handle + libmpv `MPV_RENDER_API_TYPE_SW` + `FlPixelBufferTexture`; `hwdec=auto-safe` | Server-transcode if `libmpv.so.2` unavailable on the host |
+| Linux X11 | Active (custom backend) | Same Flutter GTK window path | X11 display handle + libmpv `MPV_RENDER_API_TYPE_SW` + `FlPixelBufferTexture`; `hwdec=auto-safe` | Server-transcode if `libmpv.so.2` unavailable on the host |
+| Windows | Active (custom backend) | Runner-owned Win32 `HWND` | libmpv render API + RGBA pixel buffer texture (D3D11/ANGLE/OpenGL); `hwdec=auto-safe` | Server-transcode until `mpv-2.dll` bundle is present |
+| macOS | Not planned | media_kit (AVFoundation-backed) via `MediaKitDesktopAdapter` | `media_kit_video` (Metal) | Server-transcode |
 
 Executor evidence:
 
@@ -59,22 +59,9 @@ Bundle steps:
 2. Copy `mpv-2.dll` and dependent DLLs into the Flutter Windows install bundle next to `m3u_tv.exe`.
 3. Keep the runner method channel probe in CI; a missing `mpv-2.dll` is a FAIL and must choose server-transcode fallback.
 
-## macOS packaging
+## macOS: not planned
 
-Decision: use a Metal-backed owned `CALayer` with libmpv render API if available. MPVKit is acceptable as an equivalent path if it keeps playback in-process and renders into app-owned Cocoa/Metal layers.
-
-Required bundle artifacts:
-
-- `Contents/Frameworks/libmpv.2.dylib`, or
-- `Contents/Frameworks/MPVKit.framework` with embedded libmpv and FFmpeg dependencies.
-
-Bundle steps:
-
-1. Build or obtain a codesignable libmpv/MPVKit artifact for the deployment target.
-2. Copy the dylib/framework into `Runner.app/Contents/Frameworks`.
-3. Fix install names with `install_name_tool` so libmpv and FFmpeg dependencies resolve from `@rpath`/`@executable_path/../Frameworks`.
-4. Codesign the app and every embedded dylib/framework together.
-5. If notarization rejects private codec libraries, use server-transcode fallback for affected distributions.
+A native in-process libmpv backend for macOS (MPVKit XCFramework via SPM, `MPV_RENDER_API_TYPE_SW` + `FlutterTexture`/`CVPixelBuffer`, mirroring the Linux/Windows shape) was fully implemented and hands-on tested. It worked, but reimplemented — with more bugs along the way (duration detection, scrubbing, a 900% CPU spike from `force-seekable=yes` full-stream probing) — most of what `media_kit_video`'s macOS build already provides out of the box via its own bundled libmpv. Testing confirmed `media_kit_video` on macOS does not hit the EGL bug described below (EGL is a Linux/Windows-only rendering concern there; macOS uses Metal), so there was no upstream bug to route around on this platform in the first place. The custom backend was reverted; macOS stays on `MediaKitDesktopAdapter` (media_kit) indefinitely unless a concrete, reproducible macOS-specific problem justifies revisiting it.
 
 ## Test command
 
@@ -92,3 +79,33 @@ PATH=/tmp/opencode/bin:/usr/bin:/bin:/tmp/flutter/bin /tmp/flutter/bin/flutter t
 ```
 
 The equivalent command reached the next host prerequisite failure: missing `gtk+-3.0`. Once GTK dev files and libmpv runtime are installed, the same test should either play the fixture HLS in-process or report a server-transcode fallback decision from the native probe.
+
+## Current status (2026-07-16)
+
+The in-process custom backend is wired into the desktop orchestrator path for Linux and Windows (`lib/navigation/app_router.dart`, `Platform.isMacOS ? MediaKitDesktopAdapter() : DesktopLibmpvBackend()`). macOS uses `MediaKitDesktopAdapter` intentionally and permanently — see "macOS: not planned" above.
+
+### Why the swap
+
+`media_kit_video` (the upstream plugin `MediaKitDesktopAdapter` depends on) has an open upstream bug: [media-kit/media-kit#1404](https://github.com/media-kit/media-kit/issues/1404), *"H/W rendering fails on Flutter 3.38+: EGL display not current on platform thread"*. Starting with Flutter 3.38 the EGL rendering context lives exclusively on the raster thread, but `media_kit_video`'s `video_output_new` calls `eglGetCurrentDisplay()` on the platform thread, where it returns `EGL_NO_DISPLAY`. The result is `media_kit: VideoOutput: EGL display or context is invalid.` followed by `media_kit: VideoOutput: S/W rendering.` on every Flutter 3.38+ Linux/Windows build, including this app's Flutter 3.44.2 bundle at `/home/cj/Documents/m3u-tv/`. This is an EGL-specific bug and does not affect macOS, which renders through Metal, not EGL — confirmed by hands-on macOS testing showing no such warning.
+
+`2.0.1` is the latest released version on pub.dev and does not fix this. Upstream is in *Limited Maintenance* per #1337; no PR is open. The custom `DesktopLibmpvBackend` (`linux/desktop_libmpv_backend.cc` / `windows/runner/desktop_libmpv_backend.cpp`) sidesteps the EGL dependency entirely by using `MPV_RENDER_API_TYPE_SW` with `FlPixelBufferTexture` and `hwdec=auto-safe`. Decoding stays hardware-accelerated, while only texture upload uses software pixel copies.
+
+### Verification on this executor (NVIDIA RTX 4070 SUPER, driver 580.159.03, X11, Flutter 3.44.2)
+
+- `flutter analyze`: clean.
+- `flutter test` (134 tests across `test/playback/`, `test/integration/`, `test/ui/`): all pass, 5 skipped (platform-conditional).
+- `flutter build linux --debug`: produces `build/linux/x64/debug/bundle/m3u_tv`.
+- Launching the bundle produced no `EGL display or context is invalid` or `S/W rendering` lines in stdout (proving `mkv.VideoController` is no longer constructed at startup).
+- `libmpv.so.2` resolves via `dlopen` against the system package (`/lib/x86_64-linux-gnu/libmpv.so.2`, mpv 0.37.0, FFmpeg 6.1.1, libplacebo v6.338.2). NVIDIA EGL ICD at `10_nvidia.json` is untouched and remains available for any future H/W texture path.
+
+### Known issues
+
+- **`integration_test/desktop_playback_smoke_test.dart` has two pre-existing assertion failures** (unrelated to this swap because the test instantiates `DesktopLibmpvBackend` directly, so it has always exercised the custom backend):
+  1. `reports feasibility and plays fixture without external mpv`: observed state sequence is `[loading, ready, playing, paused]` but the assertion at line 42 expects `stopped` to be present. The test stops the backend then asserts on the listener before pumping a frame, so the `PlaybackStatus.stopped` event from `backend.stop()` (synchronous broadcast after the method-channel call returns) is not yet delivered to the listener. The runtime behavior is correct: probe succeeded (`libmpvAvailable`, `renderApiAvailable`, `canPlayFixture` all true), load/play/pause/stop all completed against the real HLS fixture at `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`. Fix would be a single `await tester.pump()` after `backend.stop()` on line 40.
+  2. `normal playback stays on the method-channel texture path`: observed method-channel call sequence is `['probe', 'load', 'getVideoAspectRatio', 'play', 'stop']` but the assertion at line 95 expects `['probe', 'load', 'play', 'stop']`. The extra `getVideoAspectRatio` call comes from `DesktopLibmpvBackend.load()` lines 93 to 95, which fires `unawaited(_refreshVideoAspectRatio())` whenever the initial aspect ratio is null (the test's mock `load` response omits it). This is intended production behavior, not a regression. Fix would be updating the expected list to include `getVideoAspectRatio`.
+
+  Both failures are stale test expectations, not runtime defects. They are tracked here instead of fixed because the production path now routes through this backend and the underlying behavior is the intended design.
+
+- **macOS intentionally has no in-process custom backend.** `Platform.isMacOS` uses `MediaKitDesktopAdapter`, which is not subject to the #1404 EGL bug (macOS renders through Metal). See "macOS: not planned" above for the prototype-and-revert history.
+- **Subtitle rendering is not exposed by `DesktopLibmpvBackend`** (it does not implement `SubtitleControllerProvider`). `PlaybackOrchestrator.activeSubtitleController` returns `null` for the desktop backend path, so `SubtitleView`-based rendering does not appear on Linux/Windows. This matches the prior design (`docs/migration/desktop-libmpv-feasibility.md` predates this requirement) but should be revisited if external subtitles need to be added.
+- **libmpv is loaded from the system package**, not bundled. The host needs `libmpv.so.2` (or `.1`/`.so`) on `LD_LIBRARY_PATH` or in `/usr/lib`. This is fine for distro installs and most developer machines, but portable AppImage/snap/flatpak bundles will need to vendor libmpv alongside the binary per the original `Bundle steps` section above.

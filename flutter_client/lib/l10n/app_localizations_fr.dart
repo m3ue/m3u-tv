@@ -88,6 +88,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveTvRecord => 'Enregistrer';
 
   @override
+  String get liveTvRecording => 'Enregistrement en cours';
+
+  @override
   String get liveTvFavorite => 'Favori';
 
   @override
@@ -285,6 +288,32 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsDisconnectConfirm => 'Déconnecter';
+
+  @override
+  String get settingsApp => 'Application';
+
+  @override
+  String get settingsAppVersion => 'Version';
+
+  @override
+  String get settingsAppUpdateStatus => 'Mise à jour';
+
+  @override
+  String get settingsAppVersionChecking => 'Recherche de mises à jour…';
+
+  @override
+  String get settingsAppUpToDate => 'À jour';
+
+  @override
+  String settingsAppUpdateAvailable(String version) {
+    return 'Mise à jour disponible : $version';
+  }
+
+  @override
+  String get settingsAppViewRelease => 'Voir la version';
+
+  @override
+  String get settingsAppScanQr => 'Scanner pour ouvrir sur votre téléphone';
 
   @override
   String get homeContinueWatching => 'Reprendre';
@@ -487,4 +516,78 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aiostreamsSearchAll => 'Tout';
+
+  @override
+  String get requestsTabSearch => 'Recherche';
+
+  @override
+  String get requestsTabMyRequests => 'Mes Demandes';
+
+  @override
+  String get requestsSearchHint => 'Rechercher des films et séries…';
+
+  @override
+  String get requestsNoResults => 'Aucun résultat trouvé';
+
+  @override
+  String get requestsAlreadyAvailable => 'Déjà disponible';
+
+  @override
+  String get requestsAlreadyRequested => 'Déjà demandé';
+
+  @override
+  String get requestsRequestButton => 'Demander';
+
+  @override
+  String get requestsSeasonsHeading => 'Saisons';
+
+  @override
+  String get requestsSeasonSpecials => 'Épisodes spéciaux';
+
+  @override
+  String get requestsSelectAllSeasons => 'Tout sélectionner';
+
+  @override
+  String get requestsClearSeasons => 'Effacer';
+
+  @override
+  String requestsSubmitted(String title) {
+    return '« $title » a été demandé';
+  }
+
+  @override
+  String requestsSubmittedPendingApproval(String title) {
+    return '« $title » a été envoyé pour approbation';
+  }
+
+  @override
+  String requestsSubmitFailed(String title, String error) {
+    return 'Impossible de demander « $title » : $error';
+  }
+
+  @override
+  String get requestsMyRequestsEmpty => 'Vous n\'avez encore rien demandé';
+
+  @override
+  String get requestsDismiss => 'Ignorer';
+
+  @override
+  String requestsDismissFailed(String error) {
+    return 'Impossible d\'ignorer la demande : $error';
+  }
+
+  @override
+  String get requestsStatusPendingApproval => 'En attente d\'approbation';
+
+  @override
+  String get requestsStatusApproved => 'Approuvé';
+
+  @override
+  String get requestsStatusRejected => 'Rejeté';
+
+  @override
+  String get requestsStatusCompleted => 'Terminé';
+
+  @override
+  String get requestsStatusUnknown => 'Inconnu';
 }

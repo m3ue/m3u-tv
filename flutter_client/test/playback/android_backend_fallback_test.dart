@@ -9,6 +9,30 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
 void main() {
+  group('MethodChannelAndroidMedia3Host', () {
+    const channel = MethodChannel('m3u_tv/android_media3_test');
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    test('sends playback speed through the native Media3 channel', () async {
+      MethodCall? receivedCall;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            receivedCall = call;
+            return null;
+          });
+      const host = MethodChannelAndroidMedia3Host(methodChannel: channel);
+
+      await host.setPlaybackSpeed(1.25);
+
+      expect(receivedCall?.method, 'setPlaybackSpeed');
+      expect(receivedCall?.arguments, <String, Object?>{'speed': 1.25});
+    });
+  });
+
   group('AndroidPlaybackAdapter', () {
     test('reports codec, track, and subtitle backend capabilities', () {
       final adapter = AndroidPlaybackAdapter(
@@ -306,6 +330,41 @@ void main() {
     );
 
     test(
+      'forwards finite positive playback speed to Media3 without updating invalid state',
+      () async {
+        final host = _FakeAndroidMedia3Host();
+        final adapter = AndroidPlaybackAdapter(
+          probe: const AndroidPlaybackProbe(
+            hardwareCodecs: <VideoCodec>{VideoCodec.h264},
+            passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
+            mpvAvailable: false,
+            serverTranscodeAvailable: false,
+          ),
+          media3Host: host,
+        );
+        final states = <PlaybackState>[];
+        final subscription = adapter.onState.listen(states.add);
+
+        await adapter.setPlaybackSpeed(1.25);
+        await pumpEventQueue();
+
+        expect(host.commands, <String>['setPlaybackSpeed:1.25']);
+        expect(states.single.playbackSpeed, 1.25);
+
+        await expectLater(
+          adapter.setPlaybackSpeed(double.nan),
+          throwsArgumentError,
+        );
+        expect(host.commands, <String>['setPlaybackSpeed:1.25']);
+        expect(states, hasLength(1));
+        expect(states.single.playbackSpeed, 1.25);
+
+        await subscription.cancel();
+        await adapter.dispose();
+      },
+    );
+
+    test(
       'maps ExoPlayer commands and typed native events through Media3 host',
       () async {
         final host = _FakeAndroidMedia3Host();
@@ -482,6 +541,10 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
   @override
   Future<void> setSubtitleTrack(String? trackId) async =>
       commands.add('setSubtitleTrack:$trackId');
+
+  @override
+  Future<void> setPlaybackSpeed(double speed) async =>
+      commands.add('setPlaybackSpeed:$speed');
 
   @override
   Future<void> dispose() async {

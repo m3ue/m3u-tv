@@ -15,10 +15,12 @@ flutter run
 Run these from `flutter_client/` before every PR:
 
 ```bash
-dart format .
-flutter analyze
+dart format lib test
+flutter analyze lib test
 flutter test
 ```
+
+Scope `format`/`analyze` to `lib test` rather than `.` — if you've run an iOS/macOS build locally, `ios/build/` and `macos/build/` contain vendored SPM checkouts (e.g. `firebase_messaging`) with their own `pubspec.yaml`, which the analyzer treats as separate projects to fully lint/type-check. `analyzer.exclude` globs can't suppress this once a directory has its own `pubspec.yaml`, so directory scoping is the only reliable fix.
 
 ## Platform commands
 
@@ -35,6 +37,14 @@ flutter build apk --debug         # debug APK for sideload QA
 flutter run                       # debug on simulator or device
 flutter build ios --no-codesign   # CI smoke build
 ```
+
+If you hit `Package product 'firebase-core' requires minimum platform version 15.0 ... but this target supports 13.0`, set this for every iOS command (`flutter clean`, `flutter pub get`, `flutter run`, `flutter build ios`, `pod install`):
+
+```bash
+export FLUTTER_SWIFT_PACKAGE_MANAGER=false
+```
+
+This is a Flutter SDK limitation, not a project misconfig: Flutter hardcodes the auto-generated `FlutterGeneratedPluginSwiftPackage` wrapper's minimum iOS version to 13.0 regardless of `IPHONEOS_DEPLOYMENT_TARGET` (which is correctly 15.0 here), and `firebase_core`/`firebase_messaging` require 15.0. It regenerates on every `flutter clean`/`pub get`, so the error resurfaces even if you haven't touched anything. Disabling SPM routes all plugins — Firebase included, via its still-published podspec — through CocoaPods instead, which honors the Podfile's real `platform :ios, '15.0'`. CI (`release.yml`) sets this env var for the `build-ios` job already.
 
 ### macOS / Linux / Windows
 
@@ -75,17 +85,32 @@ flutter build apk --release \
   --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
 ```
 
-### iOS (release archive for App Store)
+`release.yml` builds iOS and tvOS on every tag push too, but only as **unsigned** sideload artifacts attached to the GitHub Release (see `build-ios`/`build-tvos` jobs) — it does not submit to App Store Connect. Actual App Store/TestFlight submission for iOS and tvOS is a manual step you run locally, below.
+
+### iOS (manual App Store submission)
+
+`--dart-define` values are baked into `ios/Flutter/Generated.xcconfig` only as a side effect of a CLI `flutter build`/`flutter run` — if you skip straight to Xcode's **Archive** action without running one first, the archive silently ships without the Trakt credentials (whatever was last written to that file, possibly nothing).
+
+Build, archive, and export in one step from the CLI:
 
 ```bash
 flutter build ipa --release \
   --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET \
+  --export-options-plist=ios/ExportOptions.plist
 ```
 
-Open `build/ios/archive/Runner.xcarchive` in Xcode to distribute via App Store Connect.
+This produces `build/ios/ipa/Runner.ipa` — upload it with [Transporter](https://apps.apple.com/app/transporter/id1450874784) or `xcrun altool --upload-app`.
 
-### Apple TV / tvOS (release archive for App Store)
+Prefer Xcode's Organizer instead? Run the `flutter build ipa` command above first (so the defines are baked in and the archive already exists at `build/ios/archive/Runner.xcarchive`), then open it in Xcode and **Distribute App → App Store Connect**. Do not archive directly from a bare Xcode session that skipped the CLI step.
+
+`ios/ExportOptions.plist` (method `app-store-connect`, your Team ID) is checked into the repo. Use `app-store-connect`, not the older `app-store` value — Xcode 26 treats it as deprecated and `flutter build ipa`'s IPA-export step fails silently on it (`xcodebuild -exportArchive` alone still works either way, but the wrapper doesn't).
+
+### Apple TV / tvOS (manual App Store submission)
+
+This project signs the tvOS target **Manually**, pinned to the `M3U TV (tvOS)` distribution profile (Signing & Capabilities in Xcode) — that's the config that has actually produced working App Store submissions. `flutter-tvos build tvos --release`, however, always forces `CODE_SIGN_STYLE=Automatic` on the `xcodebuild` invocation it runs internally, with no way to opt out — so running it end-to-end **will fail** with `Runner has conflicting provisioning settings`, unrelated to whether your Apple ID is signed into Xcode.
+
+Run it anyway, for one reason only: the Dart AOT compile step (where `--dart-define` values get baked in) completes and writes `tvos/Flutter/App.framework` to disk *before* that incompatible `xcodebuild` call runs, so the framework comes out correct even though the command as a whole reports failure:
 
 ```bash
 flutter-tvos build tvos --release \
@@ -93,9 +118,38 @@ flutter-tvos build tvos --release \
   --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
 ```
 
-Open the resulting `.xcarchive` in Xcode to distribute via App Store Connect.
+Ignore the failure output — a fresh `tvos/Flutter/App.framework` with the Trakt credentials compiled in is what you need, and it's already there. Then open `tvos/Runner.xcworkspace` in Xcode and **Product → Archive → Distribute App**, exactly as before; the project's own "Embed App.framework" build phase picks up the file that's already on disk and doesn't re-run flutter-tvos itself, so the Manual-signing Archive path is untouched by any of this.
 
-### macOS (release archive for Mac App Store)
+If you'd rather not rely on flutter-tvos's `build tvos` reporting a "failure" that isn't one, the fully-CLI archive/export path also works once you're archiving (not just building):
+
+```bash
+xcodebuild archive \
+  -workspace tvos/Runner.xcworkspace -scheme Runner \
+  -sdk appletvos -configuration Release \
+  -archivePath build/Runner.xcarchive \
+  -allowProvisioningUpdates
+
+xcodebuild -exportArchive \
+  -archivePath build/Runner.xcarchive \
+  -exportOptionsPlist tvos/ExportOptions.plist \
+  -exportPath build/export
+```
+
+Upload `build/export/Runner.ipa` the same way as iOS. `tvos/ExportOptions.plist` is checked into the repo alongside the iOS one.
+
+If a plain `xcodebuild archive`/`-allowProvisioningUpdates` run (not `flutter-tvos build`) ever reports `Communication with Apple failed: Your team has no devices...`, that's not really about registering a device — `flutter-tvos` (and a bare `xcodebuild` invocation with no `DEVELOPMENT_TEAM` build setting) resolves the team from whichever certificate your local keychain happens to surface first, which can be a different team than this project's. Pass the right one explicitly and it goes away:
+
+```bash
+export DEVELOPMENT_TEAM=5AMT94T836   # this project's team ID
+```
+
+> **Run `flutter-tvos run -d <simulator-id>` at least once before opening Xcode for simulator debugging.** `flutter-tvos` swaps the entire `Flutter.xcframework` per build mode/environment (debug/release × device/simulator); a stale one left over from a prior release build breaks simulator runs in Xcode with a "no library for this platform" error. `flutter-tvos build tvos --release` (used above to bake in dart-defines) doesn't fix this itself — its own `xcodebuild` step always fails against this project's Manual-signing config, so it never gets to regenerate the simulator slice. If you need to go back to simulator debugging afterward, run `flutter-tvos run -d <simulator-id>` again to restore it. See the [tvOS setup section in the root README](../README.md#apple-tv-tvos) for one-time install instructions. Likewise, never run `pod install` by hand in `tvos/` — it reads the plugin list from `.flutter-plugins-dependencies`, which is only populated correctly as a side effect of `flutter-tvos build`/`run`; running `pod install` standalone (before that list is populated) silently strips tvOS-only pods like `sqflite_tvos` from `Podfile.lock`. If pods look wrong, re-run `flutter-tvos build tvos`/`run` — don't call `pod install` directly.
+
+### macOS (via GitHub Actions — not the Mac App Store)
+
+Unlike iOS/tvOS/Android, macOS release builds are never submitted to an app store by hand. Every `v*.*.*` tag push runs the `build-macos` job in `.github/workflows/release.yml` end-to-end: release build, code-sign with the Developer ID Application certificate, notarize via `notarytool`, staple the ticket, and publish the DMG straight to the GitHub Release — the same all-desktop-via-CI path Linux and Windows use below. There is no separate manual macOS release step.
+
+To build a local macOS release for testing only (not signed or notarized, so not distributable):
 
 ```bash
 flutter build macos --release \

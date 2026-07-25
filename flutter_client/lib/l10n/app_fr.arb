@@ -39,6 +39,7 @@
   "liveTvNoProgram": "Aucune info programme",
   "liveTvNext": "SUIVANT",
   "liveTvRecord": "Enregistrer",
+  "liveTvRecording": "Enregistrement en cours",
   "liveTvFavorite": "Favori",
   "liveTvRemoveFavorite": "Retirer des favoris",
   "playerGoBack": "Retour",
@@ -97,6 +98,21 @@
   "settingsDisconnectTitle": "Se déconnecter ?",
   "settingsDisconnectBody": "Vous serez déconnecté et devrez saisir à nouveau vos identifiants pour vous reconnecter.",
   "settingsDisconnectConfirm": "Déconnecter",
+  "settingsApp": "Application",
+  "settingsAppVersion": "Version",
+  "settingsAppUpdateStatus": "Mise à jour",
+  "settingsAppVersionChecking": "Recherche de mises à jour…",
+  "settingsAppUpToDate": "À jour",
+  "settingsAppUpdateAvailable": "Mise à jour disponible : {version}",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppViewRelease": "Voir la version",
+  "settingsAppScanQr": "Scanner pour ouvrir sur votre téléphone",
   "settingsContentCache": "Cache de contenu",
   "settingsCacheSubtitle": "Le contenu en cache se charge instantanément. Les données se rafraîchissent automatiquement en arrière-plan.",
   "settingsEpgRefreshInterval": "Intervalle de rafraîchissement EPG",
@@ -215,8 +231,7 @@
   },
   "searchTypeToSearch": "Saisir pour rechercher",
   "vodPlayMovie": "Lire le film",
-  "vodContinueMovie": "Continuer le film"
-,
+  "vodContinueMovie": "Continuer le film",
   "navAioStreams": "AIOStreams",
   "aiostreamsGetStreams": "Obtenir les sources",
   "aiostreamsLoadingStreams": "Chargement des sources…",
@@ -231,5 +246,58 @@
   "aiostreamsSearch": "Rechercher dans AIOStreams",
   "aiostreamsSearchResults": "Résultats de recherche",
   "aiostreamsNoResults": "Aucun résultat trouvé",
-  "aiostreamsSearchAll": "Tout"
+  "aiostreamsSearchAll": "Tout",
+  "requestsTabSearch": "Recherche",
+  "requestsTabMyRequests": "Mes Demandes",
+  "requestsSearchHint": "Rechercher des films et séries…",
+  "requestsNoResults": "Aucun résultat trouvé",
+  "requestsAlreadyAvailable": "Déjà disponible",
+  "requestsAlreadyRequested": "Déjà demandé",
+  "requestsRequestButton": "Demander",
+  "requestsSeasonsHeading": "Saisons",
+  "requestsSeasonSpecials": "Épisodes spéciaux",
+  "requestsSelectAllSeasons": "Tout sélectionner",
+  "requestsClearSeasons": "Effacer",
+  "requestsSubmitted": "« {title} » a été demandé",
+  "@requestsSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmittedPendingApproval": "« {title} » a été envoyé pour approbation",
+  "@requestsSubmittedPendingApproval": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsSubmitFailed": "Impossible de demander « {title} » : {error}",
+  "@requestsSubmitFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsMyRequestsEmpty": "Vous n'avez encore rien demandé",
+  "requestsDismiss": "Ignorer",
+  "requestsDismissFailed": "Impossible d'ignorer la demande : {error}",
+  "@requestsDismissFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "requestsStatusPendingApproval": "En attente d'approbation",
+  "requestsStatusApproved": "Approuvé",
+  "requestsStatusRejected": "Rejeté",
+  "requestsStatusCompleted": "Terminé",
+  "requestsStatusUnknown": "Inconnu"
 }

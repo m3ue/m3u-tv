@@ -5,6 +5,7 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
+import 'package:m3u_tv/features/requests/request_detail_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -285,7 +286,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Requests
+          // Branch 7: Requests with nested result details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -295,6 +296,24 @@ GoRouter createGoRouter({
                     _tabScreen(context, RouteNames.requests),
                   ),
                 ),
+                routes: [
+                  GoRoute(
+                    path: 'details/:integrationId/:type/:externalId',
+                    pageBuilder: (context, state) {
+                      final result = state.extra! as ContentRequestSearchResult;
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        ListenableBuilder(
+                          listenable: actions.appState,
+                          builder: (ctx, _) => RequestDetailScreen(
+                            result: result,
+                            onSubmit: actions.appState.submitContentRequest,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
