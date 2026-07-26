@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
 
@@ -110,7 +111,11 @@ class AppStateController extends ChangeNotifier {
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
     required this._pushNotificationService,
-  });
+  }) {
+    favoritesService.clearNamespace();
+    vodFavoritesService.clearNamespace();
+    seriesFavoritesService.clearNamespace();
+  }
 
   static const _sourceKey = 'm3ue_tv_source';
   static const _epgIntervalKey = 'm3ue_tv_epg_interval_minutes';
@@ -210,6 +215,7 @@ class AppStateController extends ChangeNotifier {
   Set<int> _recordingChannelIds = const <int>{};
   List<MediaRequestSummary> _mediaRequests = const <MediaRequestSummary>[];
   List<Progress> _progressList = const <Progress>[];
+  String? _favoritesSourceIdentity;
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
   final Set<int> _pendingEpgChannelIds = <int>{};
@@ -323,6 +329,8 @@ class AppStateController extends ChangeNotifier {
       return false;
     }
 
+    _favoritesSourceIdentity = _xtreamFavoritesIdentity(credentials);
+    _clearFavoritesNamespace();
     final loaded = await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -371,6 +379,8 @@ class AppStateController extends ChangeNotifier {
         name: 'Local M3U',
         isAdmin: true,
       );
+      _favoritesSourceIdentity = _m3uFavoritesIdentity(playlistText);
+      await _selectFavoritesNamespace(_activeViewer!);
       _progressList = await resumeService.all(_activeViewer!.ulid);
       _isLoadingContent = false;
       notifyListeners();
@@ -587,6 +597,8 @@ class AppStateController extends ChangeNotifier {
     _recordingChannelIds = const <int>{};
     _mediaRequests = const <MediaRequestSummary>[];
     _progressList = const <Progress>[];
+    _favoritesSourceIdentity = null;
+    _clearFavoritesNamespace();
     _error = null;
     notifyListeners();
   }
@@ -630,6 +642,7 @@ class AppStateController extends ChangeNotifier {
   Future<void> switchViewer(Viewer viewer) async {
     await viewerService.setActiveViewer(viewer);
     _activeViewer = viewer;
+    await _selectFavoritesNamespace(viewer);
     _progressList = await _loadRecentlyWatched(viewer.ulid);
     notifyListeners();
   }
@@ -831,6 +844,18 @@ class AppStateController extends ChangeNotifier {
       final mediaRequests = results[8] as List<MediaRequestSummary>;
 
       final activeViewer = await viewerService.resolveActiveViewer(viewers);
+      final credentials = authNotifier.credentials;
+      if (credentials == null) {
+        _favoritesSourceIdentity = null;
+        _clearFavoritesNamespace();
+      } else {
+        _favoritesSourceIdentity = _xtreamFavoritesIdentity(credentials);
+        if (activeViewer == null) {
+          _clearFavoritesNamespace();
+        } else {
+          await _selectFavoritesNamespace(activeViewer);
+        }
+      }
       final fetched = activeViewer == null
           ? const <Progress>[]
           : await _loadRecentlyWatchedDeduped(activeViewer.ulid);
@@ -930,6 +955,19 @@ class AppStateController extends ChangeNotifier {
     _mediaRequests = const <MediaRequestSummary>[];
     _viewers = viewers;
     _activeViewer = await viewerService.resolveActiveViewer(viewers);
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      _favoritesSourceIdentity = null;
+      _clearFavoritesNamespace();
+    } else {
+      _favoritesSourceIdentity = _xtreamFavoritesIdentity(credentials);
+      final activeViewer = _activeViewer;
+      if (activeViewer == null) {
+        _clearFavoritesNamespace();
+      } else {
+        await _selectFavoritesNamespace(activeViewer);
+      }
+    }
     final activeViewer = _activeViewer;
     _progressList = activeViewer == null
         ? const <Progress>[]
@@ -1125,6 +1163,45 @@ class AppStateController extends ChangeNotifier {
       return AppSourceType.none;
     }
   }
+
+  void _clearFavoritesNamespace() {
+    favoritesService.clearNamespace();
+    vodFavoritesService.clearNamespace();
+    seriesFavoritesService.clearNamespace();
+  }
+
+  Future<void> _selectFavoritesNamespace(Viewer viewer) async {
+    final sourceIdentity = _favoritesSourceIdentity;
+    if (sourceIdentity == null) {
+      _clearFavoritesNamespace();
+      return;
+    }
+    final namespace = _digest('$sourceIdentity\u0000${viewer.ulid}');
+    await Future.wait(<Future<void>>[
+      favoritesService.selectNamespace(namespace),
+      vodFavoritesService.selectNamespace(namespace),
+      seriesFavoritesService.selectNamespace(namespace),
+    ]);
+  }
+
+  static String _xtreamFavoritesIdentity(UserCredentials credentials) {
+    final server = Uri.parse(credentials.server.trim());
+    final origin = server.hasScheme && server.host.isNotEmpty
+        ? server.origin
+        : credentials.server
+              .trim()
+              .replaceFirst(RegExp(r'/+$'), '')
+              .toLowerCase();
+    return _digest(
+      'xtream\u0000$origin\u0000${credentials.username}\u0000${credentials.password}',
+    );
+  }
+
+  static String _m3uFavoritesIdentity(String playlistText) =>
+      _digest('m3u\u0000$playlistText');
+
+  static String _digest(String value) =>
+      sha256.convert(utf8.encode(value)).toString();
 
   String _redact(String message, UserCredentials? credentials) {
     if (credentials == null) return message;

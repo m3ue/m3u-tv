@@ -1735,6 +1735,11 @@ AppStateController _testAppState({required XtreamService xtreamService}) {
     secureStorage: InMemorySecureStorage(),
     cacheService: CacheService(memory: <String, Object?>{}),
     favoritesService: FavoritesService(memory: memory),
+    vodFavoritesService: FavoritesService(memory: memory, namespace: 'vod'),
+    seriesFavoritesService: FavoritesService(
+      memory: memory,
+      namespace: 'series',
+    ),
     resumeService: ResumeService(memory: memory),
     viewerService: ViewerService(memory: memory),
   );

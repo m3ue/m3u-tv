@@ -548,8 +548,304 @@ void main() {
         );
       },
     );
+
+    test(
+      'Xtream favorites normalize origins and isolate servers and credentials',
+      () async {
+        final storage = InMemorySecureStorage();
+        final localMemory = <String, Object?>{};
+        final controller = _controller(
+          storage: storage,
+          localMemory: localMemory,
+          transport: _FakeXtreamTransport.success().call,
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'HTTPS://FIXTURE.EXAMPLE:443/',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        await controller.favoritesService.add(101);
+        await controller.vodFavoritesService.add(101);
+        await controller.seriesFavoritesService.add(101);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(await controller.favoritesService.all(), <int>{101});
+        expect(await controller.vodFavoritesService.all(), <int>{101});
+        expect(await controller.seriesFavoritesService.all(), <int>{101});
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://other.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(await controller.favoritesService.all(), isEmpty);
+        expect(await controller.vodFavoritesService.all(), isEmpty);
+        expect(await controller.seriesFavoritesService.all(), isEmpty);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'replacement-user',
+              password: 'replacement-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(await controller.favoritesService.all(), isEmpty);
+        expect(await controller.vodFavoritesService.all(), isEmpty);
+        expect(await controller.seriesFavoritesService.all(), isEmpty);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example/',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(await controller.favoritesService.all(), <int>{101});
+        expect(await controller.vodFavoritesService.all(), <int>{101});
+        expect(await controller.seriesFavoritesService.all(), <int>{101});
+      },
+    );
+
+    test('favorites switch with the active viewer', () async {
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: _FakeXtreamTransport.success().withResponse(
+          'get_viewers',
+          <Map<String, Object?>>[
+            <String, Object?>{
+              'id': 1,
+              'ulid': 'viewer-admin',
+              'name': 'Admin',
+              'is_admin': true,
+            },
+            <String, Object?>{
+              'id': 2,
+              'ulid': 'viewer-child',
+              'name': 'Child',
+              'is_admin': false,
+            },
+          ],
+        ).call,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await controller.favoritesService.add(101);
+      await controller.vodFavoritesService.add(201);
+      await controller.seriesFavoritesService.add(301);
+
+      await controller.switchViewer(controller.viewers[1]);
+      expect(await controller.favoritesService.all(), isEmpty);
+      expect(await controller.vodFavoritesService.all(), isEmpty);
+      expect(await controller.seriesFavoritesService.all(), isEmpty);
+      await controller.favoritesService.add(101);
+
+      await controller.switchViewer(controller.viewers[0]);
+      expect(await controller.favoritesService.all(), <int>{101});
+      expect(await controller.vodFavoritesService.all(), <int>{201});
+      expect(await controller.seriesFavoritesService.all(), <int>{301});
+    });
+
+    test('M3U favorites isolate playlists and restore after restart', () async {
+      final storage = InMemorySecureStorage();
+      final localMemory = <String, Object?>{};
+      final first = _controller(
+        storage: storage,
+        localMemory: localMemory,
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(first.dispose);
+
+      expect(
+        await first.switchToM3u(playlistText: _fixturePlaylist),
+        isTrue,
+      );
+      await first.favoritesService.add(101);
+      expect(
+        await first.switchToM3u(playlistText: _otherFixturePlaylist),
+        isTrue,
+      );
+      expect(await first.favoritesService.all(), isEmpty);
+      expect(
+        await first.switchToM3u(playlistText: _fixturePlaylist),
+        isTrue,
+      );
+      expect(await first.favoritesService.all(), <int>{101});
+
+      final restarted = _controller(
+        storage: storage,
+        localMemory: localMemory,
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(restarted.dispose);
+      await restarted.boot();
+      expect(restarted.sourceType, AppSourceType.m3u);
+      expect(await restarted.favoritesService.all(), <int>{101});
+      expect(
+        localMemory.keys.where((key) => key.contains('m3ue_favorites')),
+        everyElement(
+          allOf(
+            isNot(contains('playlist-secret')),
+            isNot(contains(_fixturePlaylist)),
+          ),
+        ),
+      );
+    });
+
+    test('logout hides favorites without deleting their namespace', () async {
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(controller.dispose);
+      const credentials = UserCredentials(
+        server: 'https://fixture.example',
+        username: 'fixture-user',
+        password: 'fixture-password',
+      );
+      expect(await controller.connectXtream(credentials), isTrue);
+      await controller.favoritesService.add(101);
+      await controller.vodFavoritesService.add(201);
+      await controller.seriesFavoritesService.add(301);
+
+      await controller.disconnect();
+      expect(await controller.favoritesService.all(), isEmpty);
+      expect(await controller.vodFavoritesService.all(), isEmpty);
+      expect(await controller.seriesFavoritesService.all(), isEmpty);
+
+      expect(await controller.connectXtream(credentials), isTrue);
+      expect(await controller.favoritesService.all(), <int>{101});
+      expect(await controller.vodFavoritesService.all(), <int>{201});
+      expect(await controller.seriesFavoritesService.all(), <int>{301});
+    });
+
+    test('boot restores the saved Xtream favorite namespace', () async {
+      final storage = InMemorySecureStorage();
+      final localMemory = <String, Object?>{};
+      const credentials = UserCredentials(
+        server: 'https://fixture.example',
+        username: 'fixture-user',
+        password: 'fixture-password',
+      );
+      final first = _controller(
+        storage: storage,
+        localMemory: localMemory,
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(first.dispose);
+      expect(await first.connectXtream(credentials), isTrue);
+      await first.favoritesService.add(101);
+      await first.vodFavoritesService.add(201);
+      await first.seriesFavoritesService.add(301);
+
+      final restarted = _controller(
+        storage: storage,
+        localMemory: localMemory,
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(restarted.dispose);
+      await restarted.boot();
+
+      expect(await restarted.favoritesService.all(), <int>{101});
+      expect(await restarted.vodFavoritesService.all(), <int>{201});
+      expect(await restarted.seriesFavoritesService.all(), <int>{301});
+    });
+
+    test(
+      'legacy favorites migrate once without deleting legacy values',
+      () async {
+        final localMemory = <String, Object?>{
+          'm3ue_favorites': <int>[101],
+          'm3ue_favorites_vod': <int>[201],
+          'm3ue_favorites_series': <int>[301],
+        };
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          localMemory: localMemory,
+          transport: _FakeXtreamTransport.success().call,
+        );
+        addTearDown(controller.dispose);
+        const originalCredentials = UserCredentials(
+          server: 'https://fixture.example',
+          username: 'fixture-user',
+          password: 'fixture-password',
+        );
+
+        expect(await controller.connectXtream(originalCredentials), isTrue);
+        expect(await controller.favoritesService.all(), <int>{101});
+        expect(await controller.vodFavoritesService.all(), <int>{201});
+        expect(await controller.seriesFavoritesService.all(), <int>{301});
+        expect(localMemory['m3ue_favorites'], <int>[101]);
+        expect(localMemory['m3ue_favorites_vod'], <int>[201]);
+        expect(localMemory['m3ue_favorites_series'], <int>[301]);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://unrelated.example',
+              username: 'unrelated-user',
+              password: 'unrelated-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(await controller.favoritesService.all(), isEmpty);
+        expect(await controller.vodFavoritesService.all(), isEmpty);
+        expect(await controller.seriesFavoritesService.all(), isEmpty);
+
+        expect(await controller.connectXtream(originalCredentials), isTrue);
+        expect(await controller.favoritesService.all(), <int>{101});
+        expect(await controller.vodFavoritesService.all(), <int>{201});
+        expect(await controller.seriesFavoritesService.all(), <int>{301});
+      },
+    );
   });
 }
+
+const _fixturePlaylist = '''
+#EXTM3U
+#EXTINF:-1 group-title="News",Fixture News
+https://playlist-secret.example/live/news.m3u8''';
+
+const _otherFixturePlaylist = '''
+#EXTM3U
+#EXTINF:-1 group-title="Sports",Fixture Sports
+https://other.example/live/sports.m3u8''';
 
 AppStateController _controller({
   required InMemorySecureStorage storage,
@@ -566,6 +862,14 @@ AppStateController _controller({
     secureStorage: storage,
     cacheService: CacheService(memory: cacheMemory ?? <String, Object?>{}),
     favoritesService: FavoritesService(memory: sharedLocalMemory),
+    vodFavoritesService: FavoritesService(
+      memory: sharedLocalMemory,
+      namespace: 'vod',
+    ),
+    seriesFavoritesService: FavoritesService(
+      memory: sharedLocalMemory,
+      namespace: 'series',
+    ),
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),
   );
