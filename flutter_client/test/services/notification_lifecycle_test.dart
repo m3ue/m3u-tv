@@ -149,7 +149,7 @@ void main() {
       );
     }
 
-    test('unknown category fails closed to generic notifications', () async {
+    test('unknown category and arbitrary routes fail closed', () async {
       final api = _FakeTvNotificationService(<TvNotificationItem>[
         _item(id: _notificationId, channel: 'untrusted-category'),
       ]);
@@ -163,14 +163,16 @@ void main() {
 
       await controller.handlePushActivation(
         const PushMessage(
-          data: <String, String>{'notification_id': _notificationId},
+          data: <String, String>{
+            'notification_id': _notificationId,
+            'route': '/arbitrary-route',
+            'url': 'https://attacker.invalid/private',
+          },
         ),
       );
       await Future<void>.delayed(Duration.zero);
 
-      expect(destinations, <TvNotificationDestination>[
-        TvNotificationDestination.notifications,
-      ]);
+      expect(destinations, isEmpty);
     });
 
     test(

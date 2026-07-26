@@ -45,6 +45,60 @@ void main() {
       expect(fixture.auth.credentials, isNull);
     });
 
+    test(
+      'logout rejects a direct token replacement queued behind unsubscribe',
+      () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await fixture.controller.setPushToken('old-token');
+        fixture.push.events.clear();
+        final unregisterStarted = fixture.push.delayNextUnregister();
+
+        final disconnect = fixture.controller.disconnect();
+        await unregisterStarted;
+        final replacement = fixture.controller.setPushToken('new-token');
+        fixture.push.releaseUnregister();
+        await Future.wait<void>(<Future<void>>[disconnect, replacement]);
+
+        expect(fixture.push.events, <String>[
+          'unsubscribe:first:old-token:true',
+        ]);
+        expect(fixture.auth.credentials, isNull);
+      },
+    );
+
+    test(
+      'logout rejects a token refresh queued behind unsubscribe',
+      () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await fixture.controller.initPushNotifications();
+        await fixture.controller.setPushToken('old-token');
+        fixture.push.events.clear();
+        final unregisterStarted = fixture.push.delayNextUnregister();
+
+        final disconnect = fixture.controller.disconnect();
+        await unregisterStarted;
+        fixture.push.emitTokenRefresh('new-token');
+        fixture.push.releaseUnregister();
+        await disconnect;
+        await fixture.controller.setPushToken('after-logout-token');
+
+        expect(fixture.push.events, <String>[
+          'unsubscribe:first:old-token:true',
+        ]);
+        expect(fixture.auth.credentials, isNull);
+      },
+    );
+
     test('credential replacement unsubscribes prior requester first', () async {
       final fixture = _Fixture();
       addTearDown(fixture.controller.dispose);
@@ -162,6 +216,29 @@ class _FakePushNotificationService extends PushNotificationService {
 
   final bool Function(UserCredentials credentials) credentialsArePresent;
   final List<String> events = <String>[];
+  final StreamController<String> _tokenRefreshes =
+      StreamController<String>.broadcast(sync: true);
+  Completer<void>? _unregisterStarted;
+  Completer<void>? _releaseUnregister;
+
+  Future<void> delayNextUnregister() {
+    _unregisterStarted = Completer<void>();
+    _releaseUnregister = Completer<void>();
+    return _unregisterStarted!.future;
+  }
+
+  void releaseUnregister() => _releaseUnregister!.complete();
+
+  void emitTokenRefresh(String token) => _tokenRefreshes.add(token);
+
+  @override
+  Stream<String> get onTokenRefresh => _tokenRefreshes.stream;
+
+  @override
+  Future<String?> init({
+    required PushMessageHandler onForegroundMessage,
+    required PushMessageHandler onMessageOpenedApp,
+  }) async => null;
 
   @override
   Future<void> registerToken(
@@ -180,6 +257,20 @@ class _FakePushNotificationService extends PushNotificationService {
     events.add(
       'unsubscribe:${creds.username}:$token:${credentialsArePresent(creds)}',
     );
+    final unregisterStarted = _unregisterStarted;
+    final releaseUnregister = _releaseUnregister;
+    if (unregisterStarted != null && releaseUnregister != null) {
+      unregisterStarted.complete();
+      await releaseUnregister.future;
+      _unregisterStarted = null;
+      _releaseUnregister = null;
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _tokenRefreshes.close();
+    await super.dispose();
   }
 }
 

@@ -7,11 +7,12 @@ import 'package:m3u_tv/services/domain_models.dart';
 
 enum TvNotificationDestination { notifications, dvr, requests }
 
-TvNotificationDestination notificationDestinationFor(String channel) =>
+TvNotificationDestination? notificationDestinationFor(String channel) =>
     switch (channel) {
+      'general' => TvNotificationDestination.notifications,
       'dvr' => TvNotificationDestination.dvr,
       'requests' => TvNotificationDestination.requests,
-      _ => TvNotificationDestination.notifications,
+      _ => null,
     };
 
 /// Reverb connection config returned by the notifications endpoint.

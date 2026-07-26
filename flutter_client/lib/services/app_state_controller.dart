@@ -137,9 +137,11 @@ class AppStateController extends ChangeNotifier {
   final ReverbService _reverbService;
   final PushNotificationService _pushNotificationService;
   String? _pushToken;
+  bool _pushRegistrationSuspended = false;
   UserCredentials? _registeredPushCredentials;
   String? _registeredPushToken;
   Future<void> _pushLifecycle = Future<void>.value();
+  int _pushLifecycleGeneration = 0;
   Future<void>? _pushInitialization;
   StreamSubscription<String>? _pushTokenSubscription;
   final Map<String, PushMessage> _pendingPushActivations =
@@ -301,6 +303,7 @@ class AppStateController extends ChangeNotifier {
           notifyListeners();
           unawaited(_refreshRecentlyWatchedForActiveViewer());
           unawaited(_replaceWithXtreamContent(clearCache: false));
+          _pushRegistrationSuspended = false;
           unawaited(
             _connectTvNotifications(credentials, notificationGeneration),
           );
@@ -309,6 +312,7 @@ class AppStateController extends ChangeNotifier {
         }
         final loaded = await _replaceWithXtreamContent(clearCache: false);
         if (loaded) {
+          _pushRegistrationSuspended = false;
           unawaited(
             _connectTvNotifications(credentials, notificationGeneration),
           );
@@ -336,6 +340,8 @@ class AppStateController extends ChangeNotifier {
     final previousCredentials = authNotifier.credentials;
     if (previousCredentials != null &&
         !_sameCredentials(previousCredentials, credentials)) {
+      _pushRegistrationSuspended = true;
+      _pushLifecycleGeneration += 1;
       await _reverbService.disconnect();
       await _unregisterPushToken();
     }
@@ -355,6 +361,7 @@ class AppStateController extends ChangeNotifier {
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
+      _pushRegistrationSuspended = false;
       unawaited(_connectTvNotifications(credentials, notificationGeneration));
       await _registerPushToken(credentials);
     }
@@ -372,6 +379,8 @@ class AppStateController extends ChangeNotifier {
     try {
       final playlist = m3uParser.parse(playlistText);
       _notificationSessionGeneration += 1;
+      _pushRegistrationSuspended = true;
+      _pushLifecycleGeneration += 1;
       await _unregisterPushToken();
       await _reverbService.disconnect();
       await authNotifier.disconnect();
@@ -545,15 +554,30 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
-  Future<void> setPushToken(String token) => _queuePushLifecycle(() async {
-    if (_pushToken == token && _registeredPushToken == token) return;
-    _pushToken = token;
-    await _unregisterPushTokenNow();
-    final credentials = authNotifier.credentials;
-    if (credentials != null) {
-      await _registerPushTokenNow(credentials);
-    }
-  });
+  Future<void> setPushToken(String token) {
+    final generation = _pushLifecycleGeneration;
+    final registrationSuspended = _pushRegistrationSuspended;
+    return _queuePushLifecycle(() async {
+      final alreadyRegistered =
+          _pushToken == token && _registeredPushToken == token;
+      _pushToken = token;
+      if (generation != _pushLifecycleGeneration ||
+          registrationSuspended ||
+          _pushRegistrationSuspended ||
+          alreadyRegistered) {
+        return;
+      }
+      await _unregisterPushTokenNow();
+      if (generation != _pushLifecycleGeneration ||
+          _pushRegistrationSuspended) {
+        return;
+      }
+      final credentials = authNotifier.credentials;
+      if (credentials != null) {
+        await _registerPushTokenNow(credentials, generation);
+      }
+    });
+  }
 
   Future<void> _queuePushLifecycle(Future<void> Function() operation) {
     final next = _pushLifecycle.then((_) => operation());
@@ -561,10 +585,20 @@ class AppStateController extends ChangeNotifier {
     return next;
   }
 
-  Future<void> _registerPushToken(UserCredentials credentials) =>
-      _queuePushLifecycle(() => _registerPushTokenNow(credentials));
+  Future<void> _registerPushToken(UserCredentials credentials) {
+    final generation = _pushLifecycleGeneration;
+    return _queuePushLifecycle(
+      () => _registerPushTokenNow(credentials, generation),
+    );
+  }
 
-  Future<void> _registerPushTokenNow(UserCredentials credentials) async {
+  Future<void> _registerPushTokenNow(
+    UserCredentials credentials,
+    int generation,
+  ) async {
+    if (generation != _pushLifecycleGeneration || _pushRegistrationSuspended) {
+      return;
+    }
     final token = _pushToken;
     if (token == null) return;
     if (_registeredPushToken == token &&
@@ -572,6 +606,9 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     await _unregisterPushTokenNow();
+    if (generation != _pushLifecycleGeneration || _pushRegistrationSuspended) {
+      return;
+    }
     try {
       await _pushNotificationService.registerToken(
         credentials,
@@ -655,10 +692,10 @@ class AppStateController extends ChangeNotifier {
         return;
       }
       final matching = authorizedUnread.where((item) => item.id == id);
-      if (matching.isEmpty || !_activatedNotificationIds.add(id)) return;
-      _notificationActivationController.add(
-        notificationDestinationFor(matching.first.channel),
-      );
+      if (matching.isEmpty) return;
+      final destination = notificationDestinationFor(matching.first.channel);
+      if (destination == null || !_activatedNotificationIds.add(id)) return;
+      _notificationActivationController.add(destination);
     } on Object catch (_) {
       // A tap without an authorized REST record is a safe no-op.
     }
@@ -764,6 +801,8 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     _notificationSessionGeneration += 1;
+    _pushRegistrationSuspended = true;
+    _pushLifecycleGeneration += 1;
     await _unregisterPushToken();
     await _reverbService.disconnect();
     await authNotifier.disconnect();
