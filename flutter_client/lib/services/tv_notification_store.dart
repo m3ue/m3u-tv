@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 
@@ -89,7 +90,7 @@ class TvNotificationStore {
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? _store;
-  Future<void> _mutationQueue = Future<void>.value();
+  final SerialQueue _mutationQueue = SerialQueue();
 
   // In-memory cache so callers don't need to await for a hot-path check.
   Set<String>? _subscribedChannelsCache;
@@ -270,12 +271,6 @@ class TvNotificationStore {
     await _store?.write(_key, encoded);
   }
 
-  Future<T> _mutate<T>(Future<T> Function() operation) {
-    final result = _mutationQueue.then((_) => operation());
-    _mutationQueue = result.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
-    return result;
-  }
+  Future<T> _mutate<T>(Future<T> Function() operation) =>
+      _mutationQueue.run(operation);
 }

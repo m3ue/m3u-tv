@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show Locale;
 
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -140,8 +141,8 @@ class AppStateController extends ChangeNotifier {
   bool _pushRegistrationSuspended = false;
   UserCredentials? _registeredPushCredentials;
   String? _registeredPushToken;
-  Future<void> _pushLifecycle = Future<void>.value();
-  int _pushLifecycleGeneration = 0;
+  final SerialQueue _pushLifecycleQueue = SerialQueue();
+  final Generation _pushLifecycleGeneration = Generation();
   Future<void>? _pushInitialization;
   StreamSubscription<String>? _pushTokenSubscription;
   final Map<String, PushMessage> _pendingPushActivations =
@@ -153,7 +154,7 @@ class AppStateController extends ChangeNotifier {
       StreamController<TvNotificationDestination>.broadcast();
   static const _maxActivatedNotificationIds = 100;
   final Set<String> _activatedNotificationIds = <String>{};
-  int _notificationSessionGeneration = 0;
+  final Generation _notificationSessionGeneration = Generation();
   int _unreadNotificationCount = 0;
 
   /// Stream of incoming TV push notifications (from Reverb WebSocket or
@@ -298,7 +299,7 @@ class AppStateController extends ChangeNotifier {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
         final credentials = authNotifier.credentials!;
-        final notificationGeneration = ++_notificationSessionGeneration;
+        final notificationGeneration = _notificationSessionGeneration.advance();
         if (await _hydrateCachedXtreamContent()) {
           _isBootstrapping = false;
           notifyListeners();
@@ -333,7 +334,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<bool> connectXtream(UserCredentials credentials) async {
-    final notificationGeneration = ++_notificationSessionGeneration;
+    final notificationGeneration = _notificationSessionGeneration.advance();
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
@@ -342,7 +343,7 @@ class AppStateController extends ChangeNotifier {
     if (previousCredentials != null &&
         !_sameCredentials(previousCredentials, credentials)) {
       _pushRegistrationSuspended = true;
-      _pushLifecycleGeneration += 1;
+      _pushLifecycleGeneration.advance();
       await _reverbService.disconnect();
       await _unregisterPushToken();
     }
@@ -383,9 +384,9 @@ class AppStateController extends ChangeNotifier {
 
     try {
       final playlist = m3uParser.parse(playlistText);
-      _notificationSessionGeneration += 1;
+      _notificationSessionGeneration.advance();
       _pushRegistrationSuspended = true;
-      _pushLifecycleGeneration += 1;
+      _pushLifecycleGeneration.advance();
       await _unregisterPushToken();
       await _reverbService.disconnect();
       await authNotifier.disconnect();
@@ -439,9 +440,11 @@ class AppStateController extends ChangeNotifier {
         present: _pendingPushActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
-      if (notificationGeneration != _notificationSessionGeneration) return;
+      if (_notificationSessionGeneration.isStale(notificationGeneration)) {
+        return;
+      }
       await _drainPendingPushActivations();
-      if (notificationGeneration != _notificationSessionGeneration ||
+      if (_notificationSessionGeneration.isStale(notificationGeneration) ||
           !_sameCredentials(authNotifier.credentials, credentials)) {
         return;
       }
@@ -477,7 +480,7 @@ class AppStateController extends ChangeNotifier {
       credentials,
     );
     if ((notificationGeneration != null &&
-            notificationGeneration != _notificationSessionGeneration) ||
+            _notificationSessionGeneration.isStale(notificationGeneration)) ||
         !_sameCredentials(authNotifier.credentials, credentials)) {
       return null;
     }
@@ -527,7 +530,7 @@ class AppStateController extends ChangeNotifier {
   Future<void> resumeNotifications() async {
     final credentials = authNotifier.credentials;
     if (credentials == null) return;
-    final notificationGeneration = _notificationSessionGeneration;
+    final notificationGeneration = _notificationSessionGeneration.current;
     try {
       await _reconcileUnreadNotifications(
         credentials,
@@ -560,20 +563,20 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> setPushToken(String token) {
-    final generation = _pushLifecycleGeneration;
+    final generation = _pushLifecycleGeneration.current;
     final registrationSuspended = _pushRegistrationSuspended;
     return _queuePushLifecycle(() async {
       final alreadyRegistered =
           _pushToken == token && _registeredPushToken == token;
       _pushToken = token;
-      if (generation != _pushLifecycleGeneration ||
+      if (_pushLifecycleGeneration.isStale(generation) ||
           registrationSuspended ||
           _pushRegistrationSuspended ||
           alreadyRegistered) {
         return;
       }
       await _unregisterPushTokenNow();
-      if (generation != _pushLifecycleGeneration ||
+      if (_pushLifecycleGeneration.isStale(generation) ||
           _pushRegistrationSuspended) {
         return;
       }
@@ -584,14 +587,11 @@ class AppStateController extends ChangeNotifier {
     });
   }
 
-  Future<void> _queuePushLifecycle(Future<void> Function() operation) {
-    final next = _pushLifecycle.then((_) => operation());
-    _pushLifecycle = next.catchError((_) {});
-    return next;
-  }
+  Future<void> _queuePushLifecycle(Future<void> Function() operation) =>
+      _pushLifecycleQueue.run(operation);
 
   Future<void> _registerPushToken(UserCredentials credentials) {
-    final generation = _pushLifecycleGeneration;
+    final generation = _pushLifecycleGeneration.current;
     return _queuePushLifecycle(
       () => _registerPushTokenNow(credentials, generation),
     );
@@ -601,7 +601,8 @@ class AppStateController extends ChangeNotifier {
     UserCredentials credentials,
     int generation,
   ) async {
-    if (generation != _pushLifecycleGeneration || _pushRegistrationSuspended) {
+    if (_pushLifecycleGeneration.isStale(generation) ||
+        _pushRegistrationSuspended) {
       return;
     }
     final token = _pushToken;
@@ -611,7 +612,8 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     await _unregisterPushTokenNow();
-    if (generation != _pushLifecycleGeneration || _pushRegistrationSuspended) {
+    if (_pushLifecycleGeneration.isStale(generation) ||
+        _pushRegistrationSuspended) {
       return;
     }
     try {
@@ -654,7 +656,7 @@ class AppStateController extends ChangeNotifier {
     final id = message.notificationId;
     final credentials = authNotifier.credentials;
     if (id == null || credentials == null) return;
-    final notificationGeneration = _notificationSessionGeneration;
+    final notificationGeneration = _notificationSessionGeneration.current;
     try {
       await _reconcileUnreadNotifications(
         credentials,
@@ -674,13 +676,13 @@ class AppStateController extends ChangeNotifier {
       _pendingPushActivations[id] = message;
       return;
     }
-    final notificationGeneration = _notificationSessionGeneration;
+    final notificationGeneration = _notificationSessionGeneration.current;
 
     try {
       final (session, unread) = await _tvNotificationService.fetchUnread(
         credentials,
       );
-      if (notificationGeneration != _notificationSessionGeneration ||
+      if (_notificationSessionGeneration.isStale(notificationGeneration) ||
           !_sameCredentials(authNotifier.credentials, credentials)) {
         return;
       }
@@ -692,7 +694,7 @@ class AppStateController extends ChangeNotifier {
           : unread.where((item) => !item.adminOnly).toList(growable: false);
       await notificationStore.syncUnreadWithServer(authorizedUnread);
       await _refreshUnreadNotificationCount();
-      if (notificationGeneration != _notificationSessionGeneration ||
+      if (_notificationSessionGeneration.isStale(notificationGeneration) ||
           !_sameCredentials(authNotifier.credentials, credentials)) {
         return;
       }
@@ -805,9 +807,9 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
-    _notificationSessionGeneration += 1;
+    _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
-    _pushLifecycleGeneration += 1;
+    _pushLifecycleGeneration.advance();
     await _unregisterPushToken();
     await _reverbService.disconnect();
     await authNotifier.disconnect();

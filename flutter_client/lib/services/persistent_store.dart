@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
+
 class PersistentJsonStore {
   PersistentJsonStore({File? file}) : _file = file ?? File(_defaultPath());
 
   final File _file;
   Map<String, Object?>? _cache;
-  Future<void> _pendingWrite = Future<void>.value();
+  final SerialQueue _writeQueue = SerialQueue();
 
   Future<Object?> read(String key) async {
-    await _pendingWrite;
+    await _writeQueue.drained;
     final data = await _readAllUnlocked();
     return data[key];
   }
@@ -31,7 +33,7 @@ class PersistentJsonStore {
   }
 
   Future<Map<String, Object?>> snapshot() async {
-    await _pendingWrite;
+    await _writeQueue.drained;
     return Map<String, Object?>.from(await _readAllUnlocked());
   }
 
@@ -43,12 +45,8 @@ class PersistentJsonStore {
     });
   }
 
-  Future<void> _queueWrite(Future<void> Function() operation) {
-    final previous = _pendingWrite;
-    final next = previous.then((_) => operation(), onError: (_) => operation());
-    _pendingWrite = next.catchError((_) {});
-    return next;
-  }
+  Future<void> _queueWrite(Future<void> Function() operation) =>
+      _writeQueue.run(operation);
 
   Future<Map<String, Object?>> _readAllUnlocked() async {
     final cached = _cache;
