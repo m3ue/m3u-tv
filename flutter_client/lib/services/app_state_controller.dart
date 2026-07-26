@@ -151,6 +151,7 @@ class AppStateController extends ChangeNotifier {
   final StreamController<TvNotificationDestination>
   _notificationActivationController =
       StreamController<TvNotificationDestination>.broadcast();
+  static const _maxActivatedNotificationIds = 100;
   final Set<String> _activatedNotificationIds = <String>{};
   int _notificationSessionGeneration = 0;
   int _unreadNotificationCount = 0;
@@ -356,12 +357,16 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    // Credentials are authenticated as of here, so the transition this flag
+    // was guarding is over — clear it even if content fails to load below,
+    // otherwise a load failure leaves push registration stuck suspended
+    // until some future connect attempt happens to fully succeed.
+    _pushRegistrationSuspended = false;
 
     final loaded = await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
-      _pushRegistrationSuspended = false;
       unawaited(_connectTvNotifications(credentials, notificationGeneration));
       await _registerPushToken(credentials);
     }
@@ -694,7 +699,7 @@ class AppStateController extends ChangeNotifier {
       final matching = authorizedUnread.where((item) => item.id == id);
       if (matching.isEmpty) return;
       final destination = notificationDestinationFor(matching.first.channel);
-      if (destination == null || !_activatedNotificationIds.add(id)) return;
+      if (destination == null || !_markNotificationActivated(id)) return;
       _notificationActivationController.add(destination);
     } on Object catch (_) {
       // A tap without an authorized REST record is a safe no-op.
@@ -1377,6 +1382,17 @@ class AppStateController extends ChangeNotifier {
       first.server == second.server &&
       first.username == second.username &&
       first.password == second.password;
+
+  // Bounded like TvNotificationStore's own cap, so a long-running session
+  // can't grow this set without limit.
+  bool _markNotificationActivated(String id) {
+    if (_activatedNotificationIds.contains(id)) return false;
+    if (_activatedNotificationIds.length >= _maxActivatedNotificationIds) {
+      _activatedNotificationIds.remove(_activatedNotificationIds.first);
+    }
+    _activatedNotificationIds.add(id);
+    return true;
+  }
 
   @override
   void dispose() {
