@@ -559,7 +559,7 @@ class _ProgramsRow extends StatelessWidget {
                       child: Icon(
                         Icons.replay_rounded,
                         size: 10,
-                        color: fgColor.withValues(alpha: 0.85),
+                        color: colorScheme.tertiary,
                         semanticLabel: 'Replayable via catchup',
                       ),
                     ),
