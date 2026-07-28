@@ -538,7 +538,7 @@ class _ProgramsRow extends StatelessWidget {
                 children: [
                   Padding(
                     padding: EdgeInsets.only(
-                      right: showCatchupIcon(p, now) ? 14 : 0,
+                      right: showCatchupIcon(p, now) ? 22 : 0,
                     ),
                     child: Text(
                       p.title,
@@ -556,11 +556,24 @@ class _ProgramsRow extends StatelessWidget {
                     Positioned(
                       right: 0,
                       top: 0,
-                      child: Icon(
-                        Icons.replay_rounded,
-                        size: 10,
-                        color: colorScheme.tertiary,
-                        semanticLabel: 'Replayable via catchup',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: colorScheme.tertiary.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.replay_rounded,
+                          size: 10,
+                          color: colorScheme.onTertiaryContainer,
+                          semanticLabel: 'Replayable via catchup',
+                        ),
                       ),
                     ),
                 ],
