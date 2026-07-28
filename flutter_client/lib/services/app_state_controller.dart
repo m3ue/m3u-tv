@@ -1100,10 +1100,17 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     aiostreamsApiService.clearCache();
-    if (_sourceType == AppSourceType.xtream && !authNotifier.isConfigured) {
-      _isLoadingContent = false;
-      await boot();
-      return;
+    switch (_sourceType) {
+      case AppSourceType.m3u:
+        await _loadSavedM3uSource();
+        return;
+      case AppSourceType.xtream:
+        if (!authNotifier.isConfigured) {
+          _isLoadingContent = false;
+          await boot();
+          return;
+        }
+      case AppSourceType.none:
     }
     await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
