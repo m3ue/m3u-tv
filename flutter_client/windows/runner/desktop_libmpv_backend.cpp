@@ -864,14 +864,16 @@ void PlayerInstance::ReadTrackLists(EventSnapshot* snapshot) {
     for (int index = 0; index < node.u.list->num; ++index) {
       const mpv_node& item = node.u.list->values[index];
       const std::string type = TrackNodeString(MapNodeValue(item, "type"));
-      const std::string id = TrackNodeString(MapNodeValue(item, "id"));
-      if (id.empty() || (type != "audio" && type != "sub")) continue;
+      const std::string track_id = TrackNodeString(MapNodeValue(item, "id"));
+      if (track_id.empty() || (type != "audio" && type != "sub")) continue;
       const std::string language =
           TrackNodeString(MapNodeValue(item, "lang"));
       const std::string label = TrackNodeString(MapNodeValue(item, "title"));
       const std::string normalized_label = label.empty() ? language : label;
       EventSnapshot::Track track{
-          id, normalized_label.empty() ? id : normalized_label, language};
+          track_id,
+          normalized_label.empty() ? track_id : normalized_label,
+          language};
       if (type == "audio") {
         snapshot->audio_tracks.push_back(std::move(track));
       } else if (type == "sub") {

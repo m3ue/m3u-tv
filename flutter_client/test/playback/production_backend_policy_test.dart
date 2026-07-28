@@ -1323,7 +1323,7 @@ void main() {
       expect(reader, contains('type == "sub"'));
       expect(reader, contains('TrackNodeString'));
       expect(reader, contains('label.empty() ? language : label'));
-      expect(reader, contains('normalized_label.empty() ? id'));
+      expect(reader, contains('normalized_label.empty() ? track_id'));
       final normalizerStart = backend.indexOf(
         'std::string NormalizeTrackString',
       );
