@@ -42,6 +42,15 @@
   "liveTvRecording": "Recording",
   "liveTvFavorite": "Favorite",
   "liveTvRemoveFavorite": "Remove favorite",
+  "catchupBadgeAvailable": "Catchup available",
+  "catchupBadgeAvailableDays": "Catchup available: {days}d",
+  "@catchupBadgeAvailableDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "playerGoBack": "Go back",
   "playerResumeWatching": "Resume Watching",
   "playerContinue": "Continue",
