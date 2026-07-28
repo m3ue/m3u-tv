@@ -279,6 +279,8 @@ struct EventSnapshot {
   double speed = 0.0;
   std::string aid;
   std::string sid;
+  bool has_aid = false;
+  bool has_sid = false;
   struct Track {
     std::string id;
     std::string label;
@@ -700,18 +702,19 @@ bool FlagProperty(PlayerInstance* player, const char* name, bool* value) {
   return true;
 }
 
-std::string StringProperty(PlayerInstance* player, const char* name) {
+bool StringProperty(PlayerInstance* player, const char* name,
+                    std::string* value) {
   if (player == nullptr || player->api == nullptr ||
-      player->api->get_property == nullptr) {
-    return "";
+      player->api->get_property == nullptr || player->api->free == nullptr) {
+    return false;
   }
   char* current = nullptr;
   const int rc = player->api->get_property(
       player->handle, name, MPV_FORMAT_STRING, &current);
-  if (rc < 0 || current == nullptr || player->api->free == nullptr) return "";
-  std::string result(current);
+  if (rc < 0 || current == nullptr) return false;
+  *value = current;
   player->api->free(current);
-  return result;
+  return true;
 }
 
 FlValue* VideoAspectRatioResult(PlayerInstance* player) {
@@ -764,8 +767,12 @@ FlValue* BuildEventValue(const EventSnapshot& snapshot) {
   if (snapshot.speed > 0.0) {
     fl_value_set_string_take(event, "speed", fl_value_new_float(snapshot.speed));
   }
-  fl_value_set_string_take(event, "aid", fl_value_new_string(snapshot.aid.c_str()));
-  fl_value_set_string_take(event, "sid", fl_value_new_string(snapshot.sid.c_str()));
+  if (snapshot.has_aid) {
+    fl_value_set_string_take(event, "aid", fl_value_new_string(snapshot.aid.c_str()));
+  }
+  if (snapshot.has_sid) {
+    fl_value_set_string_take(event, "sid", fl_value_new_string(snapshot.sid.c_str()));
+  }
   if (snapshot.has_track_lists) {
     auto build_tracks = [](const std::vector<EventSnapshot::Track>& tracks) {
       FlValue* values = fl_value_new_list();
@@ -835,6 +842,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
   snapshot->speed = 0.0;
   snapshot->aid.clear();
   snapshot->sid.clear();
+  snapshot->has_aid = false;
+  snapshot->has_sid = false;
 
   DoubleProperty(this, "time-pos", &snapshot->position);
   DoubleProperty(this, "duration", &snapshot->duration);
@@ -856,8 +865,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
     }
   }
 
-  snapshot->aid = StringProperty(this, "aid");
-  snapshot->sid = StringProperty(this, "sid");
+  snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);
+  snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);
 }
 
 std::string NormalizeTrackString(std::string value) {

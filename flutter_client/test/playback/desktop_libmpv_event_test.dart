@@ -509,6 +509,46 @@ void main() {
       expect(selected.audioTracks, hasLength(2));
       expect(selected.subtitleTracks, hasLength(1));
     });
+
+    test('distinguishes unknown selections from confirmed disabled', () {
+      final loaded = DesktopLibmpvEventReducer.reduce(
+        idle,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 1,
+          'kind': 'FILE_LOADED',
+          'audioTracks': <Object?>[
+            <String, Object?>{'id': '1', 'label': 'English'},
+          ],
+          'subtitleTracks': <Object?>[
+            <String, Object?>{'id': '4', 'label': 'English CC'},
+          ],
+        }),
+        source,
+      );
+      final disabled = DesktopLibmpvEventReducer.reduce(
+        loaded,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 2,
+          'kind': 'PLAYBACK_RESTART',
+          'aid': 'no',
+          'sid': '',
+        }),
+        source,
+      );
+
+      expect(loaded.isAudioTrackSelectionKnown, isFalse);
+      expect(loaded.isSubtitleTrackSelectionKnown, isFalse);
+      expect(disabled.isAudioTrackSelectionKnown, isTrue);
+      expect(disabled.isSubtitleTrackSelectionKnown, isTrue);
+      expect(disabled.selectedAudioTrackId, isNull);
+      expect(disabled.selectedSubtitleTrackId, isNull);
+      expect(disabled.audioTracks, same(loaded.audioTracks));
+      expect(disabled.subtitleTracks, same(loaded.subtitleTracks));
+    });
   });
 
   group('DesktopLibmpvBackend event integration', () {

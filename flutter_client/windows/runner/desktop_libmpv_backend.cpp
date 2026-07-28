@@ -216,6 +216,8 @@ struct EventSnapshot {
   double speed = 0.0;
   std::string aid;
   std::string sid;
+  bool has_aid = false;
+  bool has_sid = false;
   struct Track {
     std::string id;
     std::string label;
@@ -292,11 +294,11 @@ class EventSinkState {
         {flutter::EncodableValue("eof"), flutter::EncodableValue(snapshot.eof)},
         {flutter::EncodableValue("videoAspectRatio"), flutter::EncodableValue(snapshot.video_aspect_ratio)},
         {flutter::EncodableValue("speed"), flutter::EncodableValue(snapshot.speed)},
-        {flutter::EncodableValue("aid"), flutter::EncodableValue(snapshot.aid)},
-        {flutter::EncodableValue("sid"), flutter::EncodableValue(snapshot.sid)},
         {flutter::EncodableValue("recoverable"), flutter::EncodableValue(snapshot.recoverable)},
     };
     if (snapshot.duration > 0.0) event[flutter::EncodableValue("durationMs")] = flutter::EncodableValue(static_cast<int64_t>(snapshot.duration * 1000.0));
+    if (snapshot.has_aid) event[flutter::EncodableValue("aid")] = flutter::EncodableValue(snapshot.aid);
+    if (snapshot.has_sid) event[flutter::EncodableValue("sid")] = flutter::EncodableValue(snapshot.sid);
     if (snapshot.has_track_lists) {
       auto encode_tracks = [](const std::vector<EventSnapshot::Track>& tracks) {
         flutter::EncodableList values;
@@ -772,13 +774,13 @@ bool FlagProperty(PlayerInstance* player, const char* name, bool* value) {
   return true;
 }
 
-std::string StringProperty(PlayerInstance* player, const char* name) {
+bool StringProperty(PlayerInstance* player, const char* name, std::string* value) {
   char* current = nullptr;
   if (player == nullptr || player->api == nullptr || player->api->get_property == nullptr ||
-      player->api->free == nullptr || player->api->get_property(player->handle, name, MPV_FORMAT_STRING, &current) < 0 || current == nullptr) return "";
-  std::string value(current);
+      player->api->free == nullptr || player->api->get_property(player->handle, name, MPV_FORMAT_STRING, &current) < 0 || current == nullptr) return false;
+  *value = current;
   player->api->free(current);
-  return value;
+  return true;
 }
 
 void PlayerInstance::QueueEvent(EventSnapshot snapshot) {
@@ -805,8 +807,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
     double height = 0.0;
     if (DoubleProperty(this, "dwidth", &width) && DoubleProperty(this, "dheight", &height) && height > 0.0) snapshot->video_aspect_ratio = width / height;
   }
-  snapshot->aid = StringProperty(this, "aid");
-  snapshot->sid = StringProperty(this, "sid");
+  snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);
+  snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);
 }
 
 std::string NormalizeTrackString(std::string value) {

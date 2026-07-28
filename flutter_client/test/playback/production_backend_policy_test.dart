@@ -1260,6 +1260,8 @@ void main() {
       expect(event, contains('"id"'));
       expect(event, contains('"label"'));
       expect(event, contains('"language"'));
+      expect(event, contains('if (snapshot.has_aid)'));
+      expect(event, contains('if (snapshot.has_sid)'));
       expect(
         event,
         contains(
@@ -1272,8 +1274,18 @@ void main() {
           'fl_value_set_string_take(event, "sid", fl_value_new_string(snapshot.sid.c_str()));',
         ),
       );
-      expect(event, isNot(contains('if (!snapshot.aid.empty())')));
-      expect(event, isNot(contains('if (!snapshot.sid.empty())')));
+      expect(
+        backend,
+        contains(
+          'snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);',
+        ),
+      );
 
       final fileLoadedStart = backend.indexOf(
         'case 8:   // MPV_EVENT_FILE_LOADED',
@@ -1348,16 +1360,30 @@ void main() {
       expect(event, contains('"id"'));
       expect(event, contains('"label"'));
       expect(event, contains('"language"'));
+      expect(event, contains('if (snapshot.has_aid)'));
+      expect(event, contains('if (snapshot.has_sid)'));
       expect(
         event,
         contains(
-          '{flutter::EncodableValue("aid"), flutter::EncodableValue(snapshot.aid)}',
+          'event[flutter::EncodableValue("aid")] = flutter::EncodableValue(snapshot.aid)',
         ),
       );
       expect(
         event,
         contains(
-          '{flutter::EncodableValue("sid"), flutter::EncodableValue(snapshot.sid)}',
+          'event[flutter::EncodableValue("sid")] = flutter::EncodableValue(snapshot.sid)',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);',
         ),
       );
 

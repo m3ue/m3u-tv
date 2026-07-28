@@ -771,6 +771,39 @@ void main() {
       expect(find.text('English'), findsWidgets);
     });
 
+    testWidgets('marks Disable selected after audio disable is confirmed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TrackSelector(
+            audioTracks: const [
+              PlaybackTrack(id: '1', label: 'English'),
+              PlaybackTrack(id: '2', label: 'Spanish'),
+            ],
+            subtitleTracks: const [],
+            selectedAudioTrackId: null,
+            selectedSubtitleTrackId: null,
+            isAudioTrackSelectionKnown: true,
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.audiotrack));
+      await tester.pumpAndSettle();
+
+      final disableTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Disable'),
+      );
+      final englishTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'English'),
+      );
+      expect(disableTile.selected, isTrue);
+      expect(englishTile.selected, isFalse);
+    });
+
     testWidgets('opens subtitle track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -790,6 +823,72 @@ void main() {
       await tester.tap(find.byIcon(Icons.subtitles));
       await tester.pumpAndSettle();
       expect(find.text('English CC'), findsWidgets);
+    });
+
+    testWidgets(
+      'does not mark Off selected while subtitle selection is unknown',
+      (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: TrackSelector(
+              audioTracks: const [],
+              subtitleTracks: const [
+                PlaybackTrack(id: '1', label: 'English CC'),
+              ],
+              selectedAudioTrackId: null,
+              selectedSubtitleTrackId: null,
+              onAudioTrackSelected: (_) {},
+              onSubtitleTrackSelected: (_) {},
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.subtitles));
+        await tester.pumpAndSettle();
+
+        final offTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'Off'),
+        );
+        final englishTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'English CC'),
+        );
+        expect(offTile.selected, isFalse);
+        expect(englishTile.selected, isFalse);
+      },
+    );
+
+    testWidgets('marks Off selected after subtitle disable is confirmed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TrackSelector(
+            audioTracks: const [],
+            subtitleTracks: const [
+              PlaybackTrack(id: '1', label: 'English CC'),
+            ],
+            selectedAudioTrackId: null,
+            selectedSubtitleTrackId: null,
+            isSubtitleTrackSelectionKnown: true,
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.subtitles));
+      await tester.pumpAndSettle();
+
+      final offTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Off'),
+      );
+      final englishTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'English CC'),
+      );
+      expect(offTile.selected, isTrue);
+      expect(englishTile.selected, isFalse);
     });
 
     testWidgets('calls onAudioTrackSelected when track chosen', (tester) async {
@@ -1431,6 +1530,150 @@ void main() {
           expect(tester.takeException(), isNull);
           expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
           expect(adapter.setSubtitleTrackCalls, <String?>['sub-eng']);
+        },
+      );
+    }
+
+    for (final systemName in <String>['Linux libmpv', 'Windows libmpv']) {
+      testWidgets(
+        '$systemName confirms disabled tracks without losing track lists',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 42,
+          );
+          final orchestrator = PlaybackOrchestrator(
+            platform: PlaybackPlatform.desktop,
+            adapters: <PlaybackBackend, PlayerAdapter>{
+              PlaybackBackend.desktopLibmpv: adapter,
+            },
+            transcodeGateway: FakeTranscodeGateway(),
+          );
+          addTearDown(orchestrator.dispose);
+          const audioTracks = <PlaybackTrack>[
+            PlaybackTrack(id: 'audio-eng', label: 'English'),
+            PlaybackTrack(id: 'audio-spa', label: 'Spanish'),
+          ];
+          const subtitleTracks = <PlaybackTrack>[
+            PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+          ];
+
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/movie.m3u8',
+                  title: 'Track Fixture',
+                  type: 'movie',
+                ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.ready,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              selectedAudioTrackId: 'audio-eng',
+              selectedSubtitleTrackId: 'sub-eng',
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Disable'));
+          await tester.pumpAndSettle();
+          expect(adapter.setAudioTrackCalls, <String?>[null]);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              selectedSubtitleTrackId: 'sub-eng',
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(
+            tester
+                .widget<PlaybackControls>(find.byType(PlaybackControls))
+                .isAudioTrackSelectionKnown,
+            isTrue,
+          );
+          expect(
+            tester
+                .widget<TrackSelector>(find.byType(TrackSelector))
+                .isAudioTrackSelectionKnown,
+            isTrue,
+          );
+          expect(
+            tester
+                .widget<TrackSelector>(find.byType(TrackSelector))
+                .selectedAudioTrackId,
+            isNull,
+          );
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+
+          expect(
+            tester
+                .widget<ListTile>(find.widgetWithText(ListTile, 'Disable'))
+                .selected,
+            isTrue,
+          );
+          expect(find.text('English'), findsOneWidget);
+          expect(find.text('Spanish'), findsOneWidget);
+          tester.state<NavigatorState>(find.byType(Navigator)).pop();
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Off'));
+          await tester.pumpAndSettle();
+          expect(adapter.setSubtitleTrackCalls, <String?>[null]);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(
+            tester
+                .widget<PlaybackControls>(find.byType(PlaybackControls))
+                .isSubtitleTrackSelectionKnown,
+            isTrue,
+          );
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+
+          expect(
+            tester
+                .widget<ListTile>(find.widgetWithText(ListTile, 'Off'))
+                .selected,
+            isTrue,
+          );
+          expect(find.text('English CC'), findsOneWidget);
         },
       );
     }

@@ -73,6 +73,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   List<PlaybackTrack> _subtitleTracks = [];
   String? _selectedAudioTrackId;
   String? _selectedSubtitleTrackId;
+  bool _isAudioTrackSelectionKnown = false;
+  bool _isSubtitleTrackSelectionKnown = false;
 
   EpgCurrentNext? _epgData;
 
@@ -113,7 +115,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // widget already holds focus when the player opens via the AppShell Stack).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Overlay is visible on open — focus the play/pause button directly
+        // Overlay is visible on open - focus the play/pause button directly
         // so D-pad traversal works immediately. Falls back to _screenFocusNode
         // if somehow the overlay was already hidden.
         if (_overlayVisible) {
@@ -276,6 +278,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _subtitleTracks = state.subtitleTracks;
       _selectedAudioTrackId = state.selectedAudioTrackId;
       _selectedSubtitleTrackId = state.selectedSubtitleTrackId;
+      _isAudioTrackSelectionKnown = state.isAudioTrackSelectionKnown;
+      _isSubtitleTrackSelectionKnown = state.isSubtitleTrackSelectionKnown;
 
       final aspectRatio =
           state.videoAspectRatio ?? state.source?.videoAspectRatio;
@@ -508,7 +512,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const _PlayPauseIntent(),
-          // Only claim arrow keys when the overlay is hidden — when visible,
+          // Only claim arrow keys when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
@@ -535,7 +539,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               if (event is KeyDownEvent &&
                   !_overlayVisible &&
                   _errorMessage == null) {
-                // Don't intercept back/escape — let the Shortcuts above handle
+                // Don't intercept back/escape - let the Shortcuts above handle
                 // it as a direct back action. Intercepting it here would set
                 // _overlayVisible = true, causing _handleBack() to call
                 // _hideOverlay() instead of _goBack(), making back a no-op.
@@ -646,6 +650,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     subtitleTracks: _subtitleTracks,
                     selectedAudioTrackId: _selectedAudioTrackId,
                     selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                    isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
+                    isSubtitleTrackSelectionKnown:
+                        _isSubtitleTrackSelectionKnown,
                     onAudioTrackSelected: _handleAudioTrackSelected,
                     onSubtitleTrackSelected: _handleSubtitleTrackSelected,
                     fallbackReason: _showPlaybackDiagnostics

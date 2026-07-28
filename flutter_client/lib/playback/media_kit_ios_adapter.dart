@@ -97,6 +97,7 @@ class MediaKitIosAdapter
                 _player.state.track.audio,
                 tracks.audio,
               ),
+              isAudioTrackSelectionKnown: true,
             ),
           );
         }),
@@ -113,6 +114,8 @@ class MediaKitIosAdapter
                   track.subtitle.id == 'no' || track.subtitle.id == 'auto'
                   ? null
                   : track.subtitle.id,
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
             ),
           );
         }),
@@ -174,7 +177,12 @@ class MediaKitIosAdapter
             orElse: () => mk.AudioTrack(trackId, null, null),
           );
     await _player.setAudioTrack(track);
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -186,7 +194,12 @@ class MediaKitIosAdapter
             orElse: () => mk.SubtitleTrack(trackId, null, null),
           );
     await _player.setSubtitleTrack(track);
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override

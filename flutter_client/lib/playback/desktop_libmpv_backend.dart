@@ -670,6 +670,8 @@ class DesktopLibmpvEventReducer {
           subtitleTracks: event.subtitleTracks ?? const <PlaybackTrack>[],
           selectedAudioTrackId: event.hasAid ? event.aid : null,
           selectedSubtitleTrackId: event.hasSid ? event.sid : null,
+          isAudioTrackSelectionKnown: event.hasAid,
+          isSubtitleTrackSelectionKnown: event.hasSid,
         );
       case DesktopLibmpvEventKind.playbackRestart:
         final status = event.paused
@@ -692,6 +694,10 @@ class DesktopLibmpvEventReducer {
           selectedSubtitleTrackId: event.hasSid
               ? event.sid
               : current.selectedSubtitleTrackId,
+          isAudioTrackSelectionKnown:
+              event.hasAid || current.isAudioTrackSelectionKnown,
+          isSubtitleTrackSelectionKnown:
+              event.hasSid || current.isSubtitleTrackSelectionKnown,
         );
       case DesktopLibmpvEventKind.videoReconfig:
         return current.copyWith(

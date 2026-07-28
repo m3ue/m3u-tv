@@ -97,6 +97,7 @@ class MediaKitDesktopAdapter
                 _player.state.track.audio,
                 tracks.audio,
               ),
+              isAudioTrackSelectionKnown: true,
             ),
           );
         }),
@@ -110,6 +111,8 @@ class MediaKitDesktopAdapter
                 _player.state.tracks.audio,
               ),
               selectedSubtitleTrackId: _selectedTrackId(track.subtitle.id),
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
             ),
           );
         }),
@@ -166,7 +169,12 @@ class MediaKitDesktopAdapter
             orElse: () => mk.AudioTrack(trackId, null, null),
           );
     await _player.setAudioTrack(track);
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -178,7 +186,12 @@ class MediaKitDesktopAdapter
             orElse: () => mk.SubtitleTrack(trackId, null, null),
           );
     await _player.setSubtitleTrack(track);
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
