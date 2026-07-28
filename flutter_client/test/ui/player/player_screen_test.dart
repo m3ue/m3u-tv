@@ -1299,59 +1299,141 @@ void main() {
       expect(requests.last.params, {'stream_id': '101', 'limit': '4'});
     });
 
-    testWidgets('shows audio track selector and applies selection', (
-      tester,
-    ) async {
-      final adapter = FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.desktopLibmpv,
-        textureId: 42,
-      );
-      final orchestrator = PlaybackOrchestrator(
-        platform: PlaybackPlatform.desktop,
-        adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.desktopLibmpv: adapter,
-        },
-        transcodeGateway: FakeTranscodeGateway(),
-      );
-      addTearDown(orchestrator.dispose);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PlayerScreen(
-            args: const PlayerArgs(
-              streamUrl: 'https://example.com/movie.m3u8',
-              title: 'Multi Audio Fixture',
-              type: 'movie',
-            ),
-            orchestrator: orchestrator,
-            epgService: EpgService(clock: () => DateTime.utc(2026)),
+    final trackSelectorSystems =
+        <
+          ({
+            String name,
+            PlaybackPlatform platform,
+            PlaybackCapabilities capabilities,
+            Size size,
+          })
+        >[
+          (
+            name: 'Android TV Media3',
+            platform: PlaybackPlatform.android,
+            capabilities: PlaybackCapabilities.androidExoPlayer,
+            size: const Size(1920, 1080),
           ),
-        ),
+          (
+            name: 'Android phone Media3',
+            platform: PlaybackPlatform.android,
+            capabilities: PlaybackCapabilities.androidExoPlayer,
+            size: const Size(412, 915),
+          ),
+          (
+            name: 'Apple TV AVKit',
+            platform: PlaybackPlatform.apple,
+            capabilities: PlaybackCapabilities.appleAvKit,
+            size: const Size(1920, 1080),
+          ),
+          (
+            name: 'iPhone MediaKit',
+            platform: PlaybackPlatform.apple,
+            capabilities: PlaybackCapabilities.appleMediaKit,
+            size: const Size(430, 932),
+          ),
+          (
+            name: 'macOS MediaKit',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopMediaKit,
+            size: const Size(1440, 900),
+          ),
+          (
+            name: 'Linux libmpv',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            size: const Size(1280, 720),
+          ),
+          (
+            name: 'Windows libmpv',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            size: const Size(1366, 768),
+          ),
+        ];
+
+    for (final system in trackSelectorSystems) {
+      testWidgets(
+        '${system.name} shows both track selectors and applies selections',
+        (tester) async {
+          await tester.binding.setSurfaceSize(system.size);
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final adapter = FakePlayerAdapter(
+            capabilities: system.capabilities,
+            textureId: 42,
+          );
+          final backend = system.capabilities.backend;
+          final orchestrator = PlaybackOrchestrator(
+            platform: system.platform,
+            adapters: <PlaybackBackend, PlayerAdapter>{backend: adapter},
+            transcodeGateway: FakeTranscodeGateway(),
+          );
+          addTearDown(orchestrator.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/movie.m3u8',
+                  title: 'Track Fixture',
+                  type: 'movie',
+                ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          adapter.emitState(
+            PlaybackState(
+              backend: backend,
+              status: PlaybackStatus.ready,
+              duration: const Duration(hours: 1),
+              audioTracks: const <PlaybackTrack>[
+                PlaybackTrack(
+                  id: 'audio-eng',
+                  label: 'English',
+                  language: 'eng',
+                ),
+                PlaybackTrack(
+                  id: 'audio-spa',
+                  label: 'Spanish',
+                  language: 'spa',
+                ),
+              ],
+              subtitleTracks: const <PlaybackTrack>[
+                PlaybackTrack(
+                  id: 'sub-eng',
+                  label: 'English CC',
+                  language: 'eng',
+                ),
+              ],
+              selectedAudioTrackId: 'audio-eng',
+            ),
+          );
+          await tester.pump();
+
+          expect(tester.takeException(), isNull);
+          expect(find.byIcon(Icons.audiotrack), findsOneWidget);
+          expect(find.byIcon(Icons.subtitles), findsOneWidget);
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Spanish').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('English CC').last);
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
+          expect(adapter.setSubtitleTrackCalls, <String?>['sub-eng']);
+        },
       );
-      await tester.pump();
-
-      adapter.emitState(
-        const PlaybackState(
-          backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
-          duration: Duration(hours: 1),
-          audioTracks: <PlaybackTrack>[
-            PlaybackTrack(id: 'audio-eng', label: 'English', language: 'eng'),
-            PlaybackTrack(id: 'audio-spa', label: 'Spanish', language: 'spa'),
-          ],
-          selectedAudioTrackId: 'audio-eng',
-        ),
-      );
-      await tester.pump();
-
-      expect(find.byIcon(Icons.audiotrack), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.audiotrack));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Spanish').last);
-      await tester.pumpAndSettle();
-
-      expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
-    });
+    }
 
     testWidgets('backs out of the route when playback error is visible', (
       tester,
