@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
@@ -486,6 +487,7 @@ class _ProgramsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
 
     final visible = programs
         .where((p) => p.end.isAfter(windowStart) && p.start.isBefore(windowEnd))
@@ -572,7 +574,7 @@ class _ProgramsRow extends StatelessWidget {
                           Icons.replay_rounded,
                           size: 10,
                           color: colorScheme.onTertiaryContainer,
-                          semanticLabel: 'Replayable via catchup',
+                          semanticLabel: l10n.catchupProgramReplayable,
                         ),
                       ),
                     ),

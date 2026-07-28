@@ -105,6 +105,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get catchupProgramReplayable => 'Catchup replay available';
+
+  @override
   String get playerGoBack => 'Go back';
 
   @override

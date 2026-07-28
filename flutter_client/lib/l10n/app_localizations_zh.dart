@@ -105,6 +105,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get catchupProgramReplayable => '可回看重播';
+
+  @override
   String get playerGoBack => '返回';
 
   @override

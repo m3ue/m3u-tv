@@ -51,6 +51,7 @@
       }
     }
   },
+  "catchupProgramReplayable": "Catchup-Wiedergabe verfügbar",
   "playerGoBack": "Zurück",
   "playerResumeWatching": "Weiterschauen",
   "playerContinue": "Fortsetzen",

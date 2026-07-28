@@ -105,6 +105,9 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get catchupProgramReplayable => 'Rediffusion catchup disponible';
+
+  @override
   String get playerGoBack => 'Retour';
 
   @override

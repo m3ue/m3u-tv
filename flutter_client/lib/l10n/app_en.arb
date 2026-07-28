@@ -51,6 +51,7 @@
       }
     }
   },
+  "catchupProgramReplayable": "Catchup replay available",
   "playerGoBack": "Go back",
   "playerResumeWatching": "Resume Watching",
   "playerContinue": "Continue",

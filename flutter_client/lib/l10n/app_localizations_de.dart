@@ -106,6 +106,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get catchupProgramReplayable => 'Catchup-Wiedergabe verfügbar';
+
+  @override
   String get playerGoBack => 'Zurück';
 
   @override
