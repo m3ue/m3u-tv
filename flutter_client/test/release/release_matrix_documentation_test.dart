@@ -31,7 +31,7 @@ void main() {
     final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
-    expect(workflow, contains("flutter-version: '3.44.2'"));
+    expect(workflow, contains("flutter-version: '3.44.8'"));
     expect(workflow, contains('run: flutter analyze'));
     expect(workflow, contains('run: flutter test'));
   });

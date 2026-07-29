@@ -97,6 +97,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvRemoveFavorite => '取消收藏';
 
   @override
+  String get catchupBadgeAvailable => '可回看';
+
+  @override
+  String catchupBadgeAvailableDays(int days) {
+    return '可回看 $days 天';
+  }
+
+  @override
+  String get catchupProgramReplayable => '可回看重播';
+
+  @override
   String get playerGoBack => '返回';
 
   @override

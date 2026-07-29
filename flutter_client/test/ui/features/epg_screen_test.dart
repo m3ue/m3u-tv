@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/epg_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 
@@ -165,6 +166,39 @@ void main() {
       expect(selectedChannel, isNotNull);
       expect(selectedChannel!.id, 1);
     });
+
+    testWidgets('catchup-supported channels render the catchup badge', (
+      tester,
+    ) async {
+      final channelsWithCatchup = [
+        const Channel(
+          id: 1,
+          name: 'BBC One',
+          streamUrl: 'http://example.com/1.m3u8',
+          epgChannelId: 'bbc.one',
+          catchupSupported: true,
+          catchupDays: 7,
+        ),
+        const Channel(
+          id: 2,
+          name: 'CNN',
+          streamUrl: 'http://example.com/2.m3u8',
+          epgChannelId: 'cnn',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        _TestApp(
+          channels: channelsWithCatchup,
+          epgService: epgService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // BBC One has catchup — both icon and "7d" label render.
+      expect(find.byIcon(Icons.replay_rounded), findsOneWidget);
+      expect(find.text('7d'), findsOneWidget);
+    });
   });
 }
 
@@ -183,6 +217,8 @@ class _TestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData.dark(useMaterial3: true),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: EpgScreen(
           channels: channels,

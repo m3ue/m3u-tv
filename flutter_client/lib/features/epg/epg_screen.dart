@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/shared/catchup_badge.dart';
 
 /// EPG screen showing current/next program info for live channels.
 ///
@@ -126,11 +127,21 @@ class _EpgScreenState extends State<EpgScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        channel.name,
-                        style: Theme.of(context).textTheme.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              channel.name,
+                              style: Theme.of(context).textTheme.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (channel.catchupSupported) ...[
+                            const SizedBox(width: 6),
+                            CatchupBadge(days: channel.catchupDays),
+                          ],
+                        ],
                       ),
                       if (epg != null) ...[
                         const SizedBox(height: 2),
@@ -233,6 +244,10 @@ class _EpgScreenState extends State<EpgScreen> {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                     ),
+                    if (channel.catchupSupported) ...[
+                      const SizedBox(height: 4),
+                      CatchupBadge(days: channel.catchupDays),
+                    ],
                     if (epg != null) ...[
                       const SizedBox(height: 4),
                       Text(

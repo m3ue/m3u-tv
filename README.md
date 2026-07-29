@@ -150,7 +150,7 @@ flutter test
 
 tvOS builds use [flutter-tvos](https://github.com/fluttertv/flutter-tvos) — a drop-in companion CLI that targets tvOS instead of iOS. Install it once, alongside your normal Flutter SDK.
 
-**Install flutter-tvos** (one-time, version 1.3.0 / Flutter 3.44.1):
+**Install flutter-tvos** (one-time, version 1.4.3 / Flutter 3.44.8):
 
 ```bash
 git clone https://github.com/fluttertv/flutter-tvos.git ~/flutter-tvos

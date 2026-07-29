@@ -42,6 +42,16 @@
   "liveTvRecording": "录制中",
   "liveTvFavorite": "收藏",
   "liveTvRemoveFavorite": "取消收藏",
+  "catchupBadgeAvailable": "可回看",
+  "catchupBadgeAvailableDays": "可回看 {days} 天",
+  "@catchupBadgeAvailableDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "catchupProgramReplayable": "可回看重播",
   "playerGoBack": "返回",
   "playerResumeWatching": "继续观看",
   "playerContinue": "继续",

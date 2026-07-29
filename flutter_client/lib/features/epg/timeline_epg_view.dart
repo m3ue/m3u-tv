@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 typedef CatchupProgramSelect =
@@ -271,6 +273,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                               pixelsPerMinute: _kPxPerMin,
                               totalWidth: _totalW,
                               rowHeight: _kRowH,
+                              catchupSupported: channel.catchupSupported,
                               onTap: (program) {
                                 final canReplay =
                                     channel.catchupSupported &&
@@ -372,57 +375,9 @@ class _ChannelCell extends StatelessWidget {
           ),
           if (channel.catchupSupported) ...[
             const SizedBox(width: 4),
-            _CatchupBadge(days: channel.catchupDays),
+            CatchupBadge(days: channel.catchupDays),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _CatchupBadge extends StatelessWidget {
-  const _CatchupBadge({this.days});
-
-  final int? days;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final label = days == null
-        ? 'Catchup available'
-        : 'Catchup available: ${days}d';
-    return Tooltip(
-      message: label,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(
-          color: colorScheme.tertiaryContainer,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: colorScheme.tertiary.withValues(alpha: 0.55),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.replay_rounded,
-              size: 12,
-              color: colorScheme.onTertiaryContainer,
-            ),
-            if (days != null) ...[
-              const SizedBox(width: 2),
-              Text(
-                '${days}d',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onTertiaryContainer,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -514,6 +469,7 @@ class _ProgramsRow extends StatelessWidget {
     required this.totalWidth,
     required this.rowHeight,
     required this.onTap,
+    required this.catchupSupported,
   });
 
   final List<EpgProgram> programs;
@@ -523,10 +479,15 @@ class _ProgramsRow extends StatelessWidget {
   final double totalWidth;
   final double rowHeight;
   final void Function(EpgProgram program) onTap;
+  final bool catchupSupported;
+
+  bool showCatchupIcon(EpgProgram program, DateTime now) =>
+      catchupSupported && program.end.isBefore(now);
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
 
     final visible = programs
         .where((p) => p.end.isAfter(windowStart) && p.start.isBefore(windowEnd))
@@ -575,14 +536,49 @@ class _ProgramsRow extends StatelessWidget {
                 border: Border.all(color: borderColor),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Text(
-                p.title,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: fgColor,
-                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: showCatchupIcon(p, now) ? 22 : 0,
+                    ),
+                    child: Text(
+                      p.title,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: fgColor,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (showCatchupIcon(p, now))
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: colorScheme.tertiary.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.replay_rounded,
+                          size: 10,
+                          color: colorScheme.onTertiaryContainer,
+                          semanticLabel: l10n.catchupProgramReplayable,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

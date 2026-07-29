@@ -272,6 +272,24 @@ abstract class AppLocalizations {
   /// **'Remove favorite'**
   String get liveTvRemoveFavorite;
 
+  /// No description provided for @catchupBadgeAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Catchup available'**
+  String get catchupBadgeAvailable;
+
+  /// No description provided for @catchupBadgeAvailableDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Catchup available: {days}d'**
+  String catchupBadgeAvailableDays(int days);
+
+  /// No description provided for @catchupProgramReplayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Catchup replay available'**
+  String get catchupProgramReplayable;
+
   /// No description provided for @playerGoBack.
   ///
   /// In en, this message translates to:

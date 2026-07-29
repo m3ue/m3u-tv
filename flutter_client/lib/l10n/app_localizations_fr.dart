@@ -97,6 +97,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveTvRemoveFavorite => 'Retirer des favoris';
 
   @override
+  String get catchupBadgeAvailable => 'Catchup disponible';
+
+  @override
+  String catchupBadgeAvailableDays(int days) {
+    return 'Catchup disponible : $days j';
+  }
+
+  @override
+  String get catchupProgramReplayable => 'Rediffusion catchup disponible';
+
+  @override
   String get playerGoBack => 'Retour';
 
   @override
