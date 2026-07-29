@@ -293,8 +293,8 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         if let ar = videoAspectRatio { event["videoAspectRatio"] = ar }
         if let a  = audioTracks { event["audioTracks"] = a        }
         if let st = subtitleTracks { event["subtitleTracks"] = st }
-        if includeSelectedAudioTrackId { event["selectedAudioTrackId"] = selectedAudioTrackId }
-        if includeSelectedSubtitleTrackId { event["selectedSubtitleTrackId"] = selectedSubtitleTrackId }
+        if includeSelectedAudioTrackId { event["selectedAudioTrackId"] = selectedAudioTrackId ?? NSNull() }
+        if includeSelectedSubtitleTrackId { event["selectedSubtitleTrackId"] = selectedSubtitleTrackId ?? NSNull() }
         if let c  = code        { event["code"]        = c        }
         if let m  = message     { event["message"]     = m        }
         if recoverable          { event["recoverable"] = true      }
