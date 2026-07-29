@@ -39,6 +39,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navMore => '更多';
 
   @override
+  String get notificationsDesktopOpen => '打开';
+
+  @override
   String get appBackToExit => '再次按返回键退出';
 
   @override

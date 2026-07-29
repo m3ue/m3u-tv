@@ -10,6 +10,7 @@
   "navNotifications": "Notifications",
   "navSettings": "Settings",
   "navMore": "More",
+  "notificationsDesktopOpen": "Open",
   "appBackToExit": "Press back again to exit",
   "appRecordingScheduled": "Recording scheduled: {title}",
   "@appRecordingScheduled": {

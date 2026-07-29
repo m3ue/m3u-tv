@@ -155,8 +155,7 @@ class AppStateController extends ChangeNotifier {
   final Generation _pushLifecycleGeneration = Generation();
   Future<void>? _pushInitialization;
   StreamSubscription<String>? _pushTokenSubscription;
-  final Map<String, PushMessage> _pendingPushActivations =
-      <String, PushMessage>{};
+  final Set<String> _pendingNotificationActivations = <String>{};
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
   final StreamController<TvNotificationDestination>
@@ -447,7 +446,7 @@ class AppStateController extends ChangeNotifier {
     try {
       final session = await _reconcileUnreadNotifications(
         credentials,
-        present: _pendingPushActivations.isEmpty,
+        present: _pendingNotificationActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
       if (_notificationSessionGeneration.isStale(notificationGeneration)) {
@@ -545,7 +544,7 @@ class AppStateController extends ChangeNotifier {
     try {
       await _reconcileUnreadNotifications(
         credentials,
-        present: _pendingPushActivations.isEmpty,
+        present: _pendingNotificationActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
     } on Object catch (_) {
@@ -679,12 +678,15 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  Future<void> handlePushActivation(PushMessage message) async {
-    final id = message.notificationId;
+  Future<void> handlePushActivation(PushMessage message) =>
+      handleNotificationActivation(message.notificationId);
+
+  Future<void> handleNotificationActivation(String? notificationId) async {
+    final id = canonicalNotificationId(notificationId);
     if (id == null) return;
     final credentials = authNotifier.credentials;
     if (credentials == null) {
-      _pendingPushActivations[id] = message;
+      _pendingNotificationActivations.add(id);
       return;
     }
     final notificationGeneration = _notificationSessionGeneration.current;
@@ -720,13 +722,14 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> _drainPendingPushActivations() async {
-    if (authNotifier.credentials == null || _pendingPushActivations.isEmpty) {
+    if (authNotifier.credentials == null ||
+        _pendingNotificationActivations.isEmpty) {
       return;
     }
-    final pending = _pendingPushActivations.values.toList(growable: false);
-    _pendingPushActivations.clear();
-    for (final message in pending) {
-      await handlePushActivation(message);
+    final pending = _pendingNotificationActivations.toList(growable: false);
+    _pendingNotificationActivations.clear();
+    for (final id in pending) {
+      await handleNotificationActivation(id);
     }
   }
 

@@ -10,6 +10,7 @@
   "navNotifications": "Notificaciones",
   "navSettings": "Ajustes",
   "navMore": "Más",
+  "notificationsDesktopOpen": "Abrir",
   "appBackToExit": "Pulse atrás de nuevo para salir",
   "appRecordingScheduled": "Grabación programada: {title}",
   "@appRecordingScheduled": {

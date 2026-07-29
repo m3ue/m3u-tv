@@ -10,6 +10,7 @@
   "navNotifications": "Notifications",
   "navSettings": "Paramètres",
   "navMore": "Plus",
+  "notificationsDesktopOpen": "Ouvrir",
   "appBackToExit": "Appuyez à nouveau sur Retour pour quitter",
   "appRecordingScheduled": "Enregistrement programmé : {title}",
   "@appRecordingScheduled": {

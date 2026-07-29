@@ -39,6 +39,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navMore => 'More';
 
   @override
+  String get notificationsDesktopOpen => 'Open';
+
+  @override
   String get appBackToExit => 'Press back again to exit';
 
   @override

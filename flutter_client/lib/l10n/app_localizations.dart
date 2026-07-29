@@ -164,6 +164,12 @@ abstract class AppLocalizations {
   /// **'More'**
   String get navMore;
 
+  /// No description provided for @notificationsDesktopOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get notificationsDesktopOpen;
+
   /// No description provided for @appBackToExit.
   ///
   /// In en, this message translates to:
