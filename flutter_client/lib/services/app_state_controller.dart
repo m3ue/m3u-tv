@@ -1182,6 +1182,41 @@ class AppStateController extends ChangeNotifier {
         .toSet();
   }
 
+  /// Cancels a scheduled or in-progress DVR recording and removes it from the
+  /// local list. The server is the source of truth — on a 404 we still drop
+  /// the row locally so the UI doesn't get stuck on a "ghost" cancel.
+  Future<void> cancelDvrRecording(String uuid) async {
+    try {
+      await xtreamService.cancelDvrRecording(uuid);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: cancel failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+    _dvrRecordings = _dvrRecordings
+        .where((recording) => recording.uuid != uuid)
+        .toList(growable: false);
+    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    notifyListeners();
+  }
+
+  /// Deletes a completed/failed/cancelled DVR recording and removes it from
+  /// the local list. Same fail-safe: 404 still drops the row locally.
+  Future<void> deleteDvrRecording(String uuid) async {
+    try {
+      await xtreamService.deleteDvrRecording(uuid);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: delete failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+    _dvrRecordings = _dvrRecordings
+        .where((recording) => recording.uuid != uuid)
+        .toList(growable: false);
+    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    notifyListeners();
+  }
+
   /// Lightweight poll for which channels are currently recording, used to
   /// mark Live TV tiles without waiting for a full app refresh. Callers
   /// (e.g. LiveTvScreen) are expected to invoke this on a short timer only

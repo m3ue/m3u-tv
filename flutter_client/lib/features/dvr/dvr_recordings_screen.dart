@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -12,6 +13,8 @@ class DvrRecordingsScreen extends StatelessWidget {
     required this.isLoading,
     required this.isConfigured,
     required this.onPlay,
+    this.onCancelRecording,
+    this.onDeleteRecording,
     this.onSidebarActivate,
   });
 
@@ -19,16 +22,19 @@ class DvrRecordingsScreen extends StatelessWidget {
   final bool isLoading;
   final bool isConfigured;
   final void Function(PlayerArgs args) onPlay;
+  final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onDeleteRecording;
   final VoidCallback? onSidebarActivate;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (!isConfigured) {
       return Scaffold(
-        appBar: AppBar(title: const Text('DVR Recordings')),
+        appBar: AppBar(title: Text(l10n.dvrRecordingsTitle)),
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            l10n.dvrNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -42,12 +48,12 @@ class DvrRecordingsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'DVR Recordings',
+              l10n.dvrRecordingsTitle,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Completed recordings and currently recording programmes',
+              l10n.dvrRecordingsSubtitle,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: MediaBrowsingMetrics.contentPadding),
@@ -57,13 +63,15 @@ class DvrRecordingsScreen extends StatelessWidget {
                   : recordings.isEmpty
                   ? Center(
                       child: Text(
-                        'No DVR recordings available',
+                        l10n.dvrNoRecordings,
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     )
                   : _RecordingList(
                       recordings: recordings,
                       onPlay: onPlay,
+                      onCancelRecording: onCancelRecording,
+                      onDeleteRecording: onDeleteRecording,
                       onSidebarActivate: onSidebarActivate,
                     ),
             ),
@@ -78,11 +86,15 @@ class _RecordingList extends StatelessWidget {
   const _RecordingList({
     required this.recordings,
     required this.onPlay,
+    this.onCancelRecording,
+    this.onDeleteRecording,
     this.onSidebarActivate,
   });
 
   final List<DvrRecording> recordings;
   final void Function(PlayerArgs args) onPlay;
+  final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onDeleteRecording;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -105,6 +117,12 @@ class _RecordingList extends StatelessWidget {
               recording: recording,
               autofocus: index == 0,
               onTap: () => _openRecording(recording),
+              onCancel: onCancelRecording == null
+                  ? null
+                  : () => onCancelRecording!(recording.uuid),
+              onDelete: onDeleteRecording == null
+                  ? null
+                  : () => onDeleteRecording!(recording.uuid),
             ),
           );
         },
@@ -141,11 +159,15 @@ class _RecordingCard extends StatelessWidget {
   const _RecordingCard({
     required this.recording,
     required this.onTap,
+    this.onCancel,
+    this.onDelete,
     this.autofocus = false,
   });
 
   final DvrRecording recording;
   final VoidCallback onTap;
+  final Future<void> Function()? onCancel;
+  final Future<void> Function()? onDelete;
   final bool autofocus;
 
   @override
@@ -208,11 +230,11 @@ class _RecordingCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: MediaBrowsingMetrics.contentPadding),
-            Icon(
-              playable ? Icons.play_arrow : Icons.block,
-              color: playable
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
+            _CardTrailing(
+              recording: recording,
+              playable: playable,
+              onCancel: onCancel,
+              onDelete: onDelete,
             ),
           ],
         ),
@@ -241,6 +263,180 @@ class _RecordingCard extends StatelessWidget {
     if (gib >= 1) return '${gib.toStringAsFixed(1)} GB';
     final mib = bytes / (1024 * 1024);
     return '${mib.toStringAsFixed(0)} MB';
+  }
+}
+
+class _CardTrailing extends StatelessWidget {
+  const _CardTrailing({
+    required this.recording,
+    required this.playable,
+    this.onCancel,
+    this.onDelete,
+  });
+
+  final DvrRecording recording;
+  final bool playable;
+  final Future<void> Function()? onCancel;
+  final Future<void> Function()? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final cancelHandler = onCancel;
+    final deleteHandler = onDelete;
+    final canCancel =
+        cancelHandler != null &&
+        (recording.status == DvrRecordingStatus.scheduled ||
+            recording.status == DvrRecordingStatus.recording);
+    final canDelete =
+        deleteHandler != null &&
+        (recording.status == DvrRecordingStatus.completed ||
+            recording.status == DvrRecordingStatus.failed ||
+            recording.status == DvrRecordingStatus.cancelled);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (canDelete)
+          _DangerActionButton(
+            tooltip: l10n.dvrDelete,
+            icon: Icons.delete_outline,
+            color: theme.colorScheme.error,
+            onTap: () => _confirmDelete(context, recording, deleteHandler),
+          ),
+        if (canCancel) ...[
+          if (canDelete) const SizedBox(width: 8),
+          _DangerActionButton(
+            tooltip: l10n.dvrCancel,
+            icon: Icons.cancel_outlined,
+            color: theme.colorScheme.error,
+            onTap: () => _confirmCancel(context, recording, cancelHandler),
+          ),
+        ],
+        if (!canCancel && !canDelete) ...[
+          const SizedBox(width: 8),
+          Icon(
+            playable ? Icons.play_arrow : Icons.block,
+            color: playable
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _confirmCancel(
+    BuildContext context,
+    DvrRecording recording,
+    Future<void> Function() action,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.dvrCancelTitle),
+        content: Text(l10n.dvrCancelMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.dvrCancelDismiss),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.dvrCancelConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await _runWithFeedback(
+      context,
+      action,
+      successMessage: l10n.dvrCancelSuccess,
+      failureMessage: l10n.dvrCancelFailed,
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    DvrRecording recording,
+    Future<void> Function() action,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.dvrDeleteTitle),
+        content: Text(l10n.dvrDeleteMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.dvrDeleteDismiss),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.dvrDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await _runWithFeedback(
+      context,
+      action,
+      successMessage: l10n.dvrDeleteSuccess,
+      failureMessage: l10n.dvrDeleteFailed,
+    );
+  }
+
+  Future<void> _runWithFeedback(
+    BuildContext context,
+    Future<void> Function() action, {
+    required String successMessage,
+    required String failureMessage,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+      messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+    } on Object catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(failureMessage)));
+    }
+  }
+}
+
+class _DangerActionButton extends StatelessWidget {
+  const _DangerActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadInkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Tooltip(
+        message: tooltip,
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(icon, color: color),
+        ),
+      ),
+    );
   }
 }
 

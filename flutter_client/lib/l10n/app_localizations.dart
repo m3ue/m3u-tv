@@ -1207,6 +1207,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown'**
   String get requestsStatusUnknown;
+
+  /// No description provided for @dvrRecordingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR Recordings'**
+  String get dvrRecordingsTitle;
+
+  /// No description provided for @dvrRecordingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed recordings and currently recording programmes'**
+  String get dvrRecordingsSubtitle;
+
+  /// No description provided for @dvrNoRecordings.
+  ///
+  /// In en, this message translates to:
+  /// **'No DVR recordings available'**
+  String get dvrNoRecordings;
+
+  /// No description provided for @dvrNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to your service in Settings'**
+  String get dvrNotConfigured;
+
+  /// No description provided for @dvrCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dvrCancel;
+
+  /// No description provided for @dvrDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get dvrDelete;
+
+  /// No description provided for @dvrCancelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel recording?'**
+  String get dvrCancelTitle;
+
+  /// No description provided for @dvrCancelMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording will be cancelled.'**
+  String get dvrCancelMessage;
+
+  /// No description provided for @dvrCancelDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get dvrCancelDismiss;
+
+  /// No description provided for @dvrCancelConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel recording'**
+  String get dvrCancelConfirm;
+
+  /// No description provided for @dvrCancelSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording cancelled'**
+  String get dvrCancelSuccess;
+
+  /// No description provided for @dvrCancelFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not cancel recording'**
+  String get dvrCancelFailed;
+
+  /// No description provided for @dvrDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete recording?'**
+  String get dvrDeleteTitle;
+
+  /// No description provided for @dvrDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording will be deleted permanently.'**
+  String get dvrDeleteMessage;
+
+  /// No description provided for @dvrDeleteDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get dvrDeleteDismiss;
+
+  /// No description provided for @dvrDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete recording'**
+  String get dvrDeleteConfirm;
+
+  /// No description provided for @dvrDeleteSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording deleted'**
+  String get dvrDeleteSuccess;
+
+  /// No description provided for @dvrDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete recording'**
+  String get dvrDeleteFailed;
 }
 
 class _AppLocalizationsDelegate

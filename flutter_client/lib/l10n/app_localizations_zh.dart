@@ -597,4 +597,58 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => '未知';
+
+  @override
+  String get dvrRecordingsTitle => 'DVR 录制';
+
+  @override
+  String get dvrRecordingsSubtitle => '已完成的录制和正在录制的节目';
+
+  @override
+  String get dvrNoRecordings => '没有可用的 DVR 录制';
+
+  @override
+  String get dvrNotConfigured => '请在设置中连接到您的服务';
+
+  @override
+  String get dvrCancel => '取消';
+
+  @override
+  String get dvrDelete => '删除';
+
+  @override
+  String get dvrCancelTitle => '取消录制？';
+
+  @override
+  String get dvrCancelMessage => '此录制将被取消。';
+
+  @override
+  String get dvrCancelDismiss => '保留';
+
+  @override
+  String get dvrCancelConfirm => '取消录制';
+
+  @override
+  String get dvrCancelSuccess => '录制已取消';
+
+  @override
+  String get dvrCancelFailed => '无法取消录制';
+
+  @override
+  String get dvrDeleteTitle => '删除录制？';
+
+  @override
+  String get dvrDeleteMessage => '此录制将被永久删除。';
+
+  @override
+  String get dvrDeleteDismiss => '保留';
+
+  @override
+  String get dvrDeleteConfirm => '删除录制';
+
+  @override
+  String get dvrDeleteSuccess => '录制已删除';
+
+  @override
+  String get dvrDeleteFailed => '无法删除录制';
 }

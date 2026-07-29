@@ -750,6 +750,8 @@ class AppShellState extends ConsumerState<AppShell>
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
             onPlay: _openPlayerDirect,
+            onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
+            onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
             onSidebarActivate: _activateSidebar,
           );
         },
