@@ -104,18 +104,19 @@ class MediaKitIosAdapter
       )
       ..add(
         _player.stream.track.listen((track) {
+          final subtitleSelection = selectedMediaKitSubtitleTrack(
+            track.subtitle,
+            _player.state.tracks.subtitle,
+          );
           _emit(
             _state.copyWith(
               selectedAudioTrackId: selectedMediaKitAudioTrackId(
                 track.audio,
                 _player.state.tracks.audio,
               ),
-              selectedSubtitleTrackId:
-                  track.subtitle.id == 'no' || track.subtitle.id == 'auto'
-                  ? null
-                  : track.subtitle.id,
+              selectedSubtitleTrackId: subtitleSelection.selectedTrackId,
               isAudioTrackSelectionKnown: true,
-              isSubtitleTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: subtitleSelection.isKnown,
             ),
           );
         }),
