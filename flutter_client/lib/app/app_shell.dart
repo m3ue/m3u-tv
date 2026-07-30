@@ -26,6 +26,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -80,6 +81,7 @@ class AppShell extends ConsumerStatefulWidget {
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
     this.systemUiPolicy,
+    this.desktopNotificationPresenter,
   });
 
   final StatefulNavigationShell navigationShell;
@@ -88,6 +90,7 @@ class AppShell extends ConsumerStatefulWidget {
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
   final SystemUiPolicy? systemUiPolicy;
+  final DesktopNotificationPresenter? desktopNotificationPresenter;
 
   @override
   ConsumerState<AppShell> createState() => AppShellState();
@@ -108,6 +111,7 @@ class AppShellState extends ConsumerState<AppShell>
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
   StreamSubscription<TvNotificationDestination>? _notificationActivationSub;
   final _toastKey = GlobalKey<NotificationToastOverlayState>();
+  late final DesktopNotificationDispatcher _desktopNotificationDispatcher;
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
@@ -148,6 +152,12 @@ class AppShellState extends ConsumerState<AppShell>
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _systemUiPolicy = widget.systemUiPolicy ?? SystemUiPolicy();
+    _desktopNotificationDispatcher = DesktopNotificationDispatcher(
+      presenter:
+          widget.desktopNotificationPresenter ??
+          NativeDesktopNotificationPresenter(),
+      onFallback: _enqueueNotificationToast,
+    );
     _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
@@ -158,6 +168,19 @@ class AppShellState extends ConsumerState<AppShell>
       unawaited(_appState.boot());
     }
     _initSidebarFocusNodes();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    unawaited(
+      _desktopNotificationDispatcher.initialize(
+        defaultActionName: AppLocalizations.of(
+          context,
+        ).notificationsDesktopOpen,
+        onActivation: _appState.handleNotificationActivation,
+      ),
+    );
   }
 
   Future<bool> _handleSystemBack() async {
@@ -222,6 +245,10 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _onTvNotification(TvNotificationItem item) {
+    unawaited(_desktopNotificationDispatcher.dispatch(item));
+  }
+
+  void _enqueueNotificationToast(TvNotificationItem item) {
     if (!mounted) return;
     _toastKey.currentState?.enqueue(item);
   }
@@ -246,6 +273,7 @@ class AppShellState extends ConsumerState<AppShell>
     _backExitTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
     _notificationActivationSub?.cancel().ignore();
+    _desktopNotificationDispatcher.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {

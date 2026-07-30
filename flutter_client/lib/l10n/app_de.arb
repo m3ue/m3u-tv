@@ -10,6 +10,7 @@
   "navNotifications": "Mitteilungen",
   "navSettings": "Einstellungen",
   "navMore": "Mehr",
+  "notificationsDesktopOpen": "Öffnen",
   "appBackToExit": "Zum Beenden erneut Zurück drücken",
   "appRecordingScheduled": "Aufnahme geplant: {title}",
   "@appRecordingScheduled": {

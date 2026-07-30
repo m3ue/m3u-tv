@@ -10,6 +10,7 @@
   "navNotifications": "通知",
   "navSettings": "设置",
   "navMore": "更多",
+  "notificationsDesktopOpen": "打开",
   "appBackToExit": "再次按返回键退出",
   "appRecordingScheduled": "录制已安排：{title}",
   "@appRecordingScheduled": {
