@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications_linux/flutter_local_notifications_linux.dart';
@@ -15,6 +16,8 @@ abstract interface class DesktopNotificationPresenter {
   });
 
   Future<bool> present(TvNotificationItem item);
+
+  void dispose();
 }
 
 abstract interface class DesktopNotificationBackend {
@@ -49,10 +52,15 @@ class NativeDesktopNotificationPresenter
     required this._backend,
   });
 
+  static const _maxHandledIds = 500;
+
   final String _operatingSystem;
   final DesktopNotificationBackend _backend;
+  final Queue<String> _handledIdOrder = Queue<String>();
   final Set<String> _handledIds = <String>{};
   Future<bool>? _initialization;
+  String? _initializedActionName;
+  bool _disposed = false;
 
   bool get _isSupported =>
       _operatingSystem == 'linux' || _operatingSystem == 'windows';
@@ -62,8 +70,14 @@ class NativeDesktopNotificationPresenter
     required String defaultActionName,
     required DesktopNotificationActivation onActivation,
   }) async {
-    if (!_isSupported) return;
-    _initialization ??= _initialize(
+    if (!_isSupported || _disposed) return;
+    if (_initialization != null &&
+        _initializedActionName == defaultActionName) {
+      await _initialization;
+      return;
+    }
+    _initializedActionName = defaultActionName;
+    _initialization = _initialize(
       defaultActionName: defaultActionName,
       onActivation: onActivation,
     );
@@ -78,6 +92,7 @@ class NativeDesktopNotificationPresenter
       await _backend.initialize(
         defaultActionName: defaultActionName,
         onActivation: (payload) {
+          if (_disposed) return;
           final id = canonicalNotificationId(payload);
           if (id != null) unawaited(onActivation(id));
         },
@@ -90,10 +105,15 @@ class NativeDesktopNotificationPresenter
 
   @override
   Future<bool> present(TvNotificationItem item) async {
-    if (!_isSupported) return false;
+    if (!_isSupported || _disposed) return false;
     final initialization = _initialization;
     if (initialization == null || !await initialization) return false;
+    if (_disposed) return false;
     if (!_handledIds.add(item.id)) return true;
+    _handledIdOrder.addLast(item.id);
+    if (_handledIdOrder.length > _maxHandledIds) {
+      _handledIds.remove(_handledIdOrder.removeFirst());
+    }
     try {
       await _backend.show(
         id: desktopNotificationId(item.id),
@@ -105,6 +125,11 @@ class NativeDesktopNotificationPresenter
     } on Object catch (_) {
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
   }
 }
 
@@ -128,6 +153,8 @@ class DesktopNotificationDispatcher {
   Future<void> dispatch(TvNotificationItem item) async {
     if (!await presenter.present(item)) onFallback(item);
   }
+
+  void dispose() => presenter.dispose();
 }
 
 class LinuxDesktopNotificationBackend implements DesktopNotificationBackend {
@@ -170,7 +197,7 @@ class WindowsDesktopNotificationBackend implements DesktopNotificationBackend {
 
   static const _windowsSettings = WindowsInitializationSettings(
     appName: 'M3U TV',
-    appUserModelId: 'dev.sparkison.M3UTV',
+    appUserModelId: 'dev.sparkison.tv',
     guid: '6d47bd72-7948-4e9a-977b-2df18d38ab8c',
   );
 

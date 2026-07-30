@@ -167,6 +167,82 @@ void main() {
       expect(activated, <String>[_notification.id]);
     });
 
+    test('re-initializes the backend when the action name changes', () async {
+      final backend = _FakeDesktopNotificationBackend();
+      final presenter = NativeDesktopNotificationPresenter(
+        operatingSystem: 'linux',
+        backend: backend,
+      );
+
+      await presenter.initialize(
+        defaultActionName: 'Open',
+        onActivation: (_) async {},
+      );
+      await presenter.initialize(
+        defaultActionName: 'Open',
+        onActivation: (_) async {},
+      );
+      expect(backend.initializeCalls, 1);
+
+      await presenter.initialize(
+        defaultActionName: 'Öffnen',
+        onActivation: (_) async {},
+      );
+
+      expect(backend.initializeCalls, 2);
+      expect(backend.defaultActionName, 'Öffnen');
+    });
+
+    test('dispose suppresses further presentation and activation', () async {
+      final backend = _FakeDesktopNotificationBackend();
+      final activated = <String>[];
+      final presenter = NativeDesktopNotificationPresenter(
+        operatingSystem: 'linux',
+        backend: backend,
+      );
+      await presenter.initialize(
+        defaultActionName: 'Open',
+        onActivation: (id) async => activated.add(id),
+      );
+
+      presenter.dispose();
+      backend.activate(_notification.id);
+      await Future<void>.delayed(Duration.zero);
+      final presented = await presenter.present(_notification);
+
+      expect(activated, isEmpty);
+      expect(presented, isFalse);
+      expect(backend.shown, isEmpty);
+    });
+
+    test('handled ID de-duplication is bounded', () async {
+      final backend = _FakeDesktopNotificationBackend();
+      final presenter = NativeDesktopNotificationPresenter(
+        operatingSystem: 'linux',
+        backend: backend,
+      );
+      await presenter.initialize(
+        defaultActionName: 'Open',
+        onActivation: (_) async {},
+      );
+
+      final overflow = List<TvNotificationItem>.generate(
+        501,
+        (index) => _notificationWithId(
+          'bbbbbbbb-bbbb-4bbb-8bbb-${index.toRadixString(16).padLeft(12, '0')}',
+        ),
+      );
+      for (final item in overflow) {
+        await presenter.present(item);
+      }
+      expect(backend.shown, hasLength(501));
+
+      // The oldest handled ID should have been evicted, so it presents again.
+      await presenter.present(overflow.first);
+
+      expect(backend.shown, hasLength(502));
+    });
+
     test('notification ID mapping is stable and bounded', () {
       final first = desktopNotificationId(_notification.id);
 
@@ -182,6 +258,14 @@ void main() {
 
 const _notification = TvNotificationItem(
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  channel: 'general',
+  title: 'Authoritative title',
+  body: 'Authoritative body',
+  status: 'info',
+);
+
+TvNotificationItem _notificationWithId(String id) => TvNotificationItem(
+  id: id,
   channel: 'general',
   title: 'Authoritative title',
   body: 'Authoritative body',

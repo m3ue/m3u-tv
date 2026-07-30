@@ -273,6 +273,7 @@ class AppShellState extends ConsumerState<AppShell>
     _backExitTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
     _notificationActivationSub?.cancel().ignore();
+    _desktopNotificationDispatcher.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
