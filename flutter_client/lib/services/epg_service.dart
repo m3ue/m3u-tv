@@ -8,10 +8,13 @@ class EpgService extends ChangeNotifier {
     : _clock = clock ?? DateTime.now;
 
   final Clock _clock;
-  final Duration cacheTtl;
+  static const retryBackoff = Duration(minutes: 1);
+  Duration cacheTtl;
   final Map<String, List<EpgProgram>> _programsByChannel =
       <String, List<EpgProgram>>{};
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};
+  final Map<String, DateTime> _failedAtByChannel = <String, DateTime>{};
+  final Set<String> _fetchesInFlight = <String>{};
   DateTime? _loadedAt;
 
   void loadPrograms(List<EpgProgram> programs) {
@@ -42,6 +45,23 @@ class EpgService extends ChangeNotifier {
     for (final channelId in channelIds) {
       if (channelId.isEmpty) continue;
       _fetchedAtByChannel[channelId] = now;
+      _failedAtByChannel.remove(channelId);
+      _fetchesInFlight.remove(channelId);
+    }
+  }
+
+  void markFetchStarted(Iterable<String> channelIds) {
+    _fetchesInFlight.addAll(
+      channelIds.where((channelId) => channelId.isNotEmpty),
+    );
+  }
+
+  void markFetchFailed(Iterable<String> channelIds) {
+    final now = _clock();
+    for (final channelId in channelIds) {
+      if (channelId.isEmpty) continue;
+      _fetchesInFlight.remove(channelId);
+      _failedAtByChannel[channelId] = now;
     }
   }
 
@@ -59,6 +79,31 @@ class EpgService extends ChangeNotifier {
       }
     }
     return false;
+  }
+
+  bool shouldFetchDataForChannel(Channel channel) {
+    final ids = <String?>[channel.epgChannelId, channel.tvgName, channel.name];
+    return _shouldFetchData(ids);
+  }
+
+  bool shouldFetchData(String channelId) =>
+      _shouldFetchData(<String>[channelId]);
+
+  bool _shouldFetchData(Iterable<String?> ids) {
+    final now = _clock();
+    for (final id in ids) {
+      if (id == null || id.isEmpty) continue;
+      final fetchedAt = _fetchedAtByChannel[id];
+      if (fetchedAt != null && now.difference(fetchedAt) < cacheTtl) {
+        return false;
+      }
+      if (_fetchesInFlight.contains(id)) return false;
+      final failedAt = _failedAtByChannel[id];
+      if (failedAt != null && now.difference(failedAt) < retryBackoff) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _storePrograms(List<EpgProgram> programs) {
@@ -125,6 +170,8 @@ class EpgService extends ChangeNotifier {
   void clear() {
     _programsByChannel.clear();
     _fetchedAtByChannel.clear();
+    _failedAtByChannel.clear();
+    _fetchesInFlight.clear();
     _loadedAt = null;
   }
 }

@@ -13,6 +13,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
@@ -22,6 +23,184 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
   group('app state boot', () {
+    test('runtime EPG interval changes update EPG freshness', () async {
+      var now = DateTime.utc(2026, 7, 30, 12);
+      final epgService = EpgService(clock: () => now);
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: _FakeXtreamTransport.success().call,
+        epgService: epgService,
+      );
+      addTearDown(controller.dispose);
+      const channel = Channel(
+        id: 101,
+        name: 'BBC One',
+        streamUrl: 'https://fixture.example/live/101',
+        epgChannelId: 'bbc.one',
+      );
+
+      for (final interval in AppStateController.epgRefreshOptions) {
+        await controller.setEpgRefreshInterval(interval);
+        expect(controller.epgService.cacheTtl, interval);
+
+        epgService.markFetched(const <String>['bbc.one']);
+        now = now.add(interval - const Duration(microseconds: 1));
+        expect(epgService.hasFreshDataForChannel(channel), isTrue);
+        now = now.add(const Duration(microseconds: 1));
+        expect(epgService.hasFreshDataForChannel(channel), isFalse);
+      }
+    });
+
+    test('boot restores the EPG freshness interval', () async {
+      final storage = InMemorySecureStorage();
+      await storage.write('m3ue_tv_epg_interval_minutes', '360');
+      final controller = _controller(
+        storage: storage,
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(controller.dispose);
+
+      await controller.boot();
+
+      expect(controller.epgService.cacheTtl, const Duration(hours: 6));
+    });
+
+    test(
+      'failed EPG batches preserve guide data and retry after backoff',
+      () async {
+        var now = DateTime.utc(2026, 7, 30, 12);
+        final epgService = EpgService(clock: () => now)
+          ..loadPrograms(<EpgProgram>[
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Loaded guide',
+              description: '',
+              start: now.subtract(const Duration(hours: 1)),
+              end: now.add(const Duration(hours: 3)),
+            ),
+          ]);
+        now = now.add(const Duration(hours: 2));
+        var epgRequests = 0;
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) {
+          if (request.action == 'get_epg_batch') {
+            epgRequests += 1;
+            return Future<Object?>.error(StateError('temporary EPG outage'));
+          }
+          return fixtures.call(request);
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          epgService: epgService,
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(epgRequests, 1);
+        expect(epgService.lookup('bbc.one')?.current.title, 'Loaded guide');
+        controller
+          ..ensureEpgForChannels(controller.channels)
+          ..ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(epgRequests, 1);
+
+        now = now.add(EpgService.retryBackoff);
+        controller.ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+
+        expect(epgRequests, 2);
+        expect(epgService.lookup('bbc.one')?.current.title, 'Loaded guide');
+        expect(
+          epgService.hasFreshDataForChannel(controller.channels.single),
+          isFalse,
+        );
+      },
+    );
+
+    test('successful empty EPG batches are marked fresh', () async {
+      final fixtures = _FakeXtreamTransport.success().withResponse(
+        'get_epg_batch',
+        <String, Object?>{},
+      );
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: fixtures.call,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.epgService.hasFreshDataForChannel(
+          controller.channels.single,
+        ),
+        isTrue,
+      );
+    });
+
+    test('lazy EPG refresh does not duplicate an in-flight prime', () async {
+      final epgGate = Completer<Object?>();
+      var epgRequests = 0;
+      final fixtures = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) {
+        if (request.action == 'get_epg_batch') {
+          epgRequests += 1;
+          return epgGate.future;
+        }
+        return fixtures.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(epgRequests, 1);
+
+      controller
+        ..ensureEpgForChannels(controller.channels)
+        ..ensureEpgForChannels(controller.channels);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(epgRequests, 1);
+      epgGate.complete(<String, Object?>{});
+      await Future<void>.delayed(Duration.zero);
+    });
+
     test(
       'cached Xtream state is visible before remote refresh finishes',
       () async {
@@ -556,6 +735,7 @@ AppStateController _controller({
   required XtreamTransport transport,
   Map<String, Object?>? cacheMemory,
   Map<String, Object?>? localMemory,
+  EpgService? epgService,
 }) {
   final sharedLocalMemory = localMemory ?? <String, Object?>{};
   return AppStateController(
@@ -565,6 +745,7 @@ AppStateController _controller({
     ),
     secureStorage: storage,
     cacheService: CacheService(memory: cacheMemory ?? <String, Object?>{}),
+    epgService: epgService,
     favoritesService: FavoritesService(memory: sharedLocalMemory),
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),

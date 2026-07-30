@@ -112,6 +112,7 @@ class AppStateController extends ChangeNotifier {
     required this.proxyPlaybackSettings,
     required this._pushNotificationService,
   }) {
+    epgService.cacheTtl = cacheService.refreshInterval;
     favoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('live', streamId, favorited: favorited);
     vodFavoritesService.onChanged = (streamId, {required favorited}) =>
@@ -299,7 +300,9 @@ class AppStateController extends ChangeNotifier {
     if (savedIntervalRaw != null) {
       final minutes = int.tryParse(savedIntervalRaw);
       if (minutes != null && minutes > 0) {
-        cacheService.refreshInterval = Duration(minutes: minutes);
+        final interval = Duration(minutes: minutes);
+        cacheService.refreshInterval = interval;
+        epgService.cacheTtl = interval;
       }
     }
 
@@ -1074,10 +1077,11 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Duration get epgRefreshInterval => cacheService.refreshInterval;
+  Duration get epgRefreshInterval => epgService.cacheTtl;
 
   Future<void> setEpgRefreshInterval(Duration interval) async {
     cacheService.refreshInterval = interval;
+    epgService.cacheTtl = interval;
     await secureStorage.write(
       _epgIntervalKey,
       '${interval.inMinutes}',
@@ -1554,7 +1558,7 @@ class AppStateController extends ChangeNotifier {
     if (_sourceType != AppSourceType.xtream) return;
     var added = false;
     for (final channel in channels) {
-      if (epgService.hasFreshDataForChannel(channel)) continue;
+      if (!epgService.shouldFetchDataForChannel(channel)) continue;
       if (_pendingEpgChannelIds.add(channel.id)) added = true;
     }
     if (!added) return;
@@ -1568,11 +1572,11 @@ class AppStateController extends ChangeNotifier {
     _pendingEpgChannelIds.clear();
     final channels = _channels
         .where((channel) => ids.contains(channel.id))
+        .where(epgService.shouldFetchDataForChannel)
         .toList(growable: false);
     if (channels.isEmpty) return;
-    final channelIds = channels.map(
-      (channel) => channel.epgChannelId ?? channel.tvgName ?? channel.name,
-    );
+    final channelIds = channels.map(_epgChannelId).toList(growable: false);
+    epgService.markFetchStarted(channelIds);
     try {
       final programs = await xtreamService.getEpgBatch(channels);
       epgService
@@ -1584,34 +1588,40 @@ class AppStateController extends ChangeNotifier {
         );
       }
     } on Object catch (e) {
-      // Mark as fetched even on failure so a persistently erroring channel
-      // doesn't get re-queued (and reschedule the debounce timer) on every
-      // rebuild — it'll be retried once cacheTtl expires.
-      epgService.markFetched(channelIds);
+      epgService.markFetchFailed(channelIds);
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
   }
 
   Future<void> _loadXtreamEpg(List<Channel> channels) async {
+    final channelsToFetch = channels
+        .where(epgService.shouldFetchDataForChannel)
+        .toList(growable: false);
+    if (channelsToFetch.isEmpty) return;
+    final channelIds = channelsToFetch
+        .map(_epgChannelId)
+        .toList(growable: false);
+    epgService.markFetchStarted(channelIds);
     try {
-      final programs = await xtreamService.getEpgBatch(channels);
+      final programs = await xtreamService.getEpgBatch(channelsToFetch);
       if (kDebugMode) {
         debugPrint(
-          '[EPG] getEpgBatch → ${programs.length} programs for ${channels.length} channels',
+          '[EPG] getEpgBatch → ${programs.length} programs for ${channelsToFetch.length} channels',
         );
       }
-      if (programs.isNotEmpty) {
-        // EpgService.loadPrograms() calls notifyListeners() on the EpgService
-        // itself — widgets watching epgServiceProvider will rebuild without
-        // triggering a full AppStateController rebuild.
-        epgService.loadPrograms(programs);
-      }
+      epgService
+        ..mergePrograms(programs)
+        ..markFetched(channelIds);
     } on Object catch (e) {
+      epgService.markFetchFailed(channelIds);
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
       // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.
     }
   }
+
+  String _epgChannelId(Channel channel) =>
+      channel.epgChannelId ?? channel.tvgName ?? channel.name;
 
   Future<void> _loadSavedM3uSource() async {
     final raw = await secureStorage.read(_sourceKey);

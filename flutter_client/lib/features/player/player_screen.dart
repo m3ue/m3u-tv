@@ -391,17 +391,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) {
         setState(() => _epgData = result);
       }
-      return;
-    }
-
-    if (mounted) {
+    } else if (mounted) {
       setState(() => _epgData = result);
     }
 
     final streamId = widget.args.streamId;
     final xtreamService = widget.xtreamService;
-    if (streamId == null || xtreamService == null || _epgFetch != null) return;
+    if (streamId == null ||
+        xtreamService == null ||
+        _epgFetch != null ||
+        !widget.epgService.shouldFetchData(channelId)) {
+      return;
+    }
 
+    widget.epgService.markFetchStarted(<String>[channelId]);
     final fetch = xtreamService.getShortEpg(
       streamId,
       channelId: channelId,
@@ -410,13 +413,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
+      widget.epgService
+        ..mergePrograms(programs)
+        ..markFetched(<String>[channelId]);
       if (_disposed || !mounted) return;
-      widget.epgService.mergePrograms(programs);
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
         setState(() => _epgData = refreshed);
       }
     } on Object catch (_) {
+      widget.epgService.markFetchFailed(<String>[channelId]);
       if (_disposed || !mounted) return;
     } finally {
       if (identical(_epgFetch, fetch)) {
