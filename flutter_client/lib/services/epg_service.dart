@@ -15,6 +15,7 @@ class EpgService extends ChangeNotifier {
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};
   final Map<String, DateTime> _failedAtByChannel = <String, DateTime>{};
   final Set<String> _fetchesInFlight = <String>{};
+  int _sourceGeneration = 0;
   DateTime? _loadedAt;
 
   void loadPrograms(List<EpgProgram> programs) {
@@ -33,8 +34,12 @@ class EpgService extends ChangeNotifier {
 
   void applySuccessfulResponse(
     Iterable<String> channelIds,
-    List<EpgProgram> programs,
-  ) {
+    List<EpgProgram> programs, {
+    int? sourceGeneration,
+  }) {
+    if (sourceGeneration != null && sourceGeneration != _sourceGeneration) {
+      return;
+    }
     for (final channelId in channelIds) {
       if (channelId.isEmpty) continue;
       _programsByChannel.remove(channelId);
@@ -58,19 +63,33 @@ class EpgService extends ChangeNotifier {
     }
   }
 
-  void markFetchStarted(Iterable<String> channelIds) {
+  int markFetchStarted(Iterable<String> channelIds) {
     _fetchesInFlight.addAll(
       channelIds.where((channelId) => channelId.isNotEmpty),
     );
+    return _sourceGeneration;
   }
 
-  void markFetchFailed(Iterable<String> channelIds) {
+  void markFetchFailed(
+    Iterable<String> channelIds, {
+    int? sourceGeneration,
+  }) {
+    if (sourceGeneration != null && sourceGeneration != _sourceGeneration) {
+      return;
+    }
     final now = _clock();
     for (final channelId in channelIds) {
       if (channelId.isEmpty) continue;
       _fetchesInFlight.remove(channelId);
       _failedAtByChannel[channelId] = now;
     }
+  }
+
+  void invalidateSourceFetchState() {
+    _sourceGeneration += 1;
+    _fetchedAtByChannel.clear();
+    _failedAtByChannel.clear();
+    _fetchesInFlight.clear();
   }
 
   /// Whether any of [channel]'s known identifiers have been fetched within

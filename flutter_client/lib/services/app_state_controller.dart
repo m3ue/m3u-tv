@@ -376,7 +376,12 @@ class AppStateController extends ChangeNotifier {
     // until some future connect attempt happens to fully succeed.
     _pushRegistrationSuspended = false;
 
-    final loaded = await _replaceWithXtreamContent(clearCache: true);
+    final loaded = await _replaceWithXtreamContent(
+      clearCache: true,
+      invalidateEpgFreshness:
+          _sourceType != AppSourceType.xtream ||
+          !_sameCredentials(previousCredentials, credentials),
+    );
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
@@ -1277,7 +1282,10 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> _replaceWithXtreamContent({required bool clearCache}) async {
+  Future<bool> _replaceWithXtreamContent({
+    required bool clearCache,
+    bool invalidateEpgFreshness = false,
+  }) async {
     try {
       final liveCategoriesFuture = xtreamService.getLiveCategories();
       final vodCategoriesFuture = xtreamService.getVodCategories();
@@ -1333,6 +1341,12 @@ class AppStateController extends ChangeNotifier {
           ? _progressList
           : fetched;
 
+      if (invalidateEpgFreshness) {
+        _epgFetchDebounce?.cancel();
+        _epgFetchDebounce = null;
+        _pendingEpgChannelIds.clear();
+        epgService.invalidateSourceFetchState();
+      }
       _sourceType = AppSourceType.xtream;
       _liveCategories = liveCategories;
       _vodCategories = vodCategories;
@@ -1579,17 +1593,24 @@ class AppStateController extends ChangeNotifier {
         .toList(growable: false);
     if (channels.isEmpty) return;
     final channelIds = channels.map(_epgChannelId).toList(growable: false);
-    epgService.markFetchStarted(channelIds);
+    final sourceGeneration = epgService.markFetchStarted(channelIds);
     try {
       final programs = await xtreamService.getEpgBatch(channels);
-      epgService.applySuccessfulResponse(channelIds, programs);
+      epgService.applySuccessfulResponse(
+        channelIds,
+        programs,
+        sourceGeneration: sourceGeneration,
+      );
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
         );
       }
     } on Object catch (e) {
-      epgService.markFetchFailed(channelIds);
+      epgService.markFetchFailed(
+        channelIds,
+        sourceGeneration: sourceGeneration,
+      );
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
   }
@@ -1602,7 +1623,7 @@ class AppStateController extends ChangeNotifier {
     final channelIds = channelsToFetch
         .map(_epgChannelId)
         .toList(growable: false);
-    epgService.markFetchStarted(channelIds);
+    final sourceGeneration = epgService.markFetchStarted(channelIds);
     try {
       final programs = await xtreamService.getEpgBatch(channelsToFetch);
       if (kDebugMode) {
@@ -1610,9 +1631,16 @@ class AppStateController extends ChangeNotifier {
           '[EPG] getEpgBatch → ${programs.length} programs for ${channelsToFetch.length} channels',
         );
       }
-      epgService.applySuccessfulResponse(channelIds, programs);
+      epgService.applySuccessfulResponse(
+        channelIds,
+        programs,
+        sourceGeneration: sourceGeneration,
+      );
     } on Object catch (e) {
-      epgService.markFetchFailed(channelIds);
+      epgService.markFetchFailed(
+        channelIds,
+        sourceGeneration: sourceGeneration,
+      );
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
       // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.

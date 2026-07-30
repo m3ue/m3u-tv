@@ -408,7 +408,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
 
-    widget.epgService.markFetchStarted(<String>[channelId]);
+    final sourceGeneration = widget.epgService.markFetchStarted(<String>[
+      channelId,
+    ]);
     final fetch = xtreamService.getShortEpg(
       streamId,
       channelId: channelId,
@@ -417,14 +419,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
-      widget.epgService.applySuccessfulResponse(<String>[channelId], programs);
+      widget.epgService.applySuccessfulResponse(
+        <String>[channelId],
+        programs,
+        sourceGeneration: sourceGeneration,
+      );
       if (_disposed || !mounted) return;
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
         setState(() => _epgData = refreshed);
       }
     } on Object catch (_) {
-      widget.epgService.markFetchFailed(<String>[channelId]);
+      widget.epgService.markFetchFailed(
+        <String>[channelId],
+        sourceGeneration: sourceGeneration,
+      );
       if (_disposed || !mounted) return;
     } finally {
       if (identical(_epgFetch, fetch)) {

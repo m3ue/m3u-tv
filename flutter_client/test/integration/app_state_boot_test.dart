@@ -264,6 +264,273 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     });
 
+    test('source switch refreshes EPG with shared channel IDs', () async {
+      final fixtures = _FakeXtreamTransport.success();
+      var serverBEpgRequests = 0;
+      Future<Object?> transport(XtreamRequest request) {
+        if (request.action == 'get_epg_batch' &&
+            request.credentials.server == 'https://server-b.example') {
+          serverBEpgRequests += 1;
+          return Future<Object?>.value(<String, Object?>{
+            '101': <Map<String, Object?>>[
+              <String, Object?>{
+                'stream_id': 101,
+                'title': base64Encode(utf8.encode('Server B guide')),
+                'description': '',
+                'start_timestamp':
+                    DateTime.now()
+                        .subtract(const Duration(minutes: 10))
+                        .millisecondsSinceEpoch ~/
+                    1000,
+                'stop_timestamp':
+                    DateTime.now()
+                        .add(const Duration(minutes: 20))
+                        .millisecondsSinceEpoch ~/
+                    1000,
+              },
+            ],
+          });
+        }
+        return fixtures.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-a.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.epgService.lookup('bbc.one'), isNotNull);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-b.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(serverBEpgRequests, 1);
+      expect(
+        controller.epgService.lookup('bbc.one')?.current.title,
+        'Server B guide',
+      );
+    });
+
+    test(
+      'failed authentication preserves the active source and guide',
+      () async {
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) {
+          if (request.action == null &&
+              request.credentials.server == 'https://server-b.example') {
+            return Future<Object?>.value(<String, Object?>{
+              'user_info': <String, Object?>{
+                'auth': 0,
+                'status': 'Invalid credentials',
+              },
+              'm3u_editor': <String, Object?>{'version': '0.10.0'},
+            });
+          }
+          return fixtures.call(request);
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+        );
+        addTearDown(controller.dispose);
+        const serverACredentials = UserCredentials(
+          server: 'https://server-a.example',
+          username: 'fixture-user',
+          password: 'fixture-password',
+        );
+
+        expect(await controller.connectXtream(serverACredentials), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'News at Noon',
+        );
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://server-b.example',
+              username: 'fixture-user',
+              password: 'wrong-password',
+            ),
+          ),
+          isFalse,
+        );
+
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.authNotifier.credentials, serverACredentials);
+        expect(controller.channels.single.name, 'BBC One');
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'News at Noon',
+        );
+        expect(
+          controller.epgService.hasFreshDataForChannel(
+            controller.channels.single,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'failed EPG after a source switch retains guide and retries',
+      () async {
+        var now = DateTime.now();
+        var serverBEpgRequests = 0;
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) {
+          if (request.action == 'get_epg_batch' &&
+              request.credentials.server == 'https://server-b.example') {
+            serverBEpgRequests += 1;
+            if (serverBEpgRequests == 1) {
+              return Future<Object?>.error(StateError('temporary EPG outage'));
+            }
+            return Future<Object?>.value(_epgBatch('Server B guide', now));
+          }
+          return fixtures.call(request);
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          epgService: EpgService(clock: () => now),
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://server-a.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://server-b.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(serverBEpgRequests, 1);
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'News at Noon',
+        );
+        controller
+          ..ensureEpgForChannels(controller.channels)
+          ..ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(serverBEpgRequests, 1);
+
+        now = now.add(EpgService.retryBackoff);
+        controller.ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+
+        expect(serverBEpgRequests, 2);
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'Server B guide',
+        );
+      },
+    );
+
+    test('late EPG response from the previous source is ignored', () async {
+      final now = DateTime.now();
+      final serverAEpg = Completer<Object?>();
+      var serverAEpgRequests = 0;
+      var serverBEpgRequests = 0;
+      final fixtures = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) {
+        if (request.action == 'get_epg_batch') {
+          if (request.credentials.server == 'https://server-a.example') {
+            serverAEpgRequests += 1;
+            return serverAEpg.future;
+          }
+          if (request.credentials.server == 'https://server-b.example') {
+            serverBEpgRequests += 1;
+            return Future<Object?>.value(_epgBatch('Server B guide', now));
+          }
+        }
+        return fixtures.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-a.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(serverAEpgRequests, 1);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-b.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(serverBEpgRequests, 1);
+      expect(
+        controller.epgService.lookup('bbc.one')?.current.title,
+        'Server B guide',
+      );
+
+      serverAEpg.complete(_epgBatch('Late server A guide', now));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.epgService.lookup('bbc.one')?.current.title,
+        'Server B guide',
+      );
+    });
+
     test(
       'cached Xtream state is visible before remote refresh finishes',
       () async {
@@ -862,6 +1129,21 @@ Future<void> _waitForXtreamRefresh(AppStateController controller) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
 }
+
+Map<String, Object?> _epgBatch(String title, DateTime now) => <String, Object?>{
+  '101': <Map<String, Object?>>[
+    <String, Object?>{
+      'stream_id': 101,
+      'title': base64Encode(utf8.encode(title)),
+      'description': '',
+      'start_timestamp':
+          now.subtract(const Duration(minutes: 10)).millisecondsSinceEpoch ~/
+          1000,
+      'stop_timestamp':
+          now.add(const Duration(minutes: 20)).millisecondsSinceEpoch ~/ 1000,
+    },
+  ],
+};
 
 Finder _sidebarDestination(String label) {
   return find.byWidgetPredicate(
