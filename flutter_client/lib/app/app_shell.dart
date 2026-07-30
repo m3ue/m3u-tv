@@ -565,6 +565,26 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
+  /// Cancels a scheduled or in-progress recording and deletes the row from the
+  /// editor. The two calls are chained because m3u-editor's
+  /// `cancel_dvr_recording` only marks the recording `cancelled` (a stop +
+  /// history-keep operation); the user-facing intent of "Cancel" in this app
+  /// is "stop this and get it out of my list", so we follow up with
+  /// `delete_dvr_recording` once the row is in a deletable state.
+  ///
+  /// If the cancel succeeds but the delete fails (e.g. transient server
+  /// hiccup), the active recording is still stopped — we drop the row from
+  /// the local list anyway and let the user retry Delete from the next list
+  /// refresh.
+  Future<void> _cancelAndDeleteRecording(String uuid) async {
+    await _appState.cancelDvrRecording(uuid);
+    try {
+      await _appState.deleteDvrRecording(uuid);
+    } on Object catch (error) {
+      debugPrint('DVR: post-cancel delete failed: $error');
+    }
+  }
+
   Future<void> _pushDetail(String path, {Object? extra}) async {
     await Future<void>.microtask(() {});
     final savedFocus = FocusManager.instance.primaryFocus;
@@ -750,7 +770,7 @@ class AppShellState extends ConsumerState<AppShell>
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
             onPlay: _openPlayerDirect,
-            onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
+            onCancelRecording: _cancelAndDeleteRecording,
             onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
             onSidebarActivate: _activateSidebar,
           );
