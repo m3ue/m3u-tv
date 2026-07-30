@@ -25,14 +25,22 @@ class EpgService extends ChangeNotifier {
   }
 
   void mergePrograms(List<EpgProgram> programs) {
-    final channelIds = programs
-        .map((program) => program.channelId)
-        .where((channelId) => channelId.isNotEmpty)
-        .toSet();
+    applySuccessfulResponse(
+      programs.map((program) => program.channelId),
+      programs,
+    );
+  }
+
+  void applySuccessfulResponse(
+    Iterable<String> channelIds,
+    List<EpgProgram> programs,
+  ) {
     for (final channelId in channelIds) {
+      if (channelId.isEmpty) continue;
       _programsByChannel.remove(channelId);
     }
     _storePrograms(programs);
+    markFetched(channelIds);
     _loadedAt = _clock();
     notifyListeners();
   }
@@ -99,8 +107,9 @@ class EpgService extends ChangeNotifier {
       }
       if (_fetchesInFlight.contains(id)) return false;
       final failedAt = _failedAtByChannel[id];
-      if (failedAt != null && now.difference(failedAt) < retryBackoff) {
-        return false;
+      if (failedAt != null) {
+        final elapsed = now.difference(failedAt);
+        if (!elapsed.isNegative && elapsed < retryBackoff) return false;
       }
     }
     return true;

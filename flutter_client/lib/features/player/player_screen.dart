@@ -413,9 +413,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
-      widget.epgService
-        ..mergePrograms(programs)
-        ..markFetched(<String>[channelId]);
+      widget.epgService.applySuccessfulResponse(<String>[channelId], programs);
       if (_disposed || !mounted) return;
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {

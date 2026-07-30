@@ -1579,9 +1579,7 @@ class AppStateController extends ChangeNotifier {
     epgService.markFetchStarted(channelIds);
     try {
       final programs = await xtreamService.getEpgBatch(channels);
-      epgService
-        ..mergePrograms(programs)
-        ..markFetched(channelIds);
+      epgService.applySuccessfulResponse(channelIds, programs);
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
@@ -1609,9 +1607,7 @@ class AppStateController extends ChangeNotifier {
           '[EPG] getEpgBatch → ${programs.length} programs for ${channelsToFetch.length} channels',
         );
       }
-      epgService
-        ..mergePrograms(programs)
-        ..markFetched(channelIds);
+      epgService.applySuccessfulResponse(channelIds, programs);
     } on Object catch (e) {
       epgService.markFetchFailed(channelIds);
       if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');

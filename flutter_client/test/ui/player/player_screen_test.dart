@@ -1391,7 +1391,7 @@ void main() {
       expect(shortEpgRequests, 2);
     });
 
-    testWidgets('successful empty short EPG response is marked fresh', (
+    testWidgets('successful empty short EPG response clears stale guide', (
       tester,
     ) async {
       var now = DateTime.utc(2026, 1, 1, 12);
@@ -1407,6 +1407,18 @@ void main() {
         transcodeGateway: FakeTranscodeGateway(),
       );
       addTearDown(orchestrator.dispose);
+      final epgService = EpgService(clock: () => now)
+        ..loadPrograms(<EpgProgram>[
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Stale News',
+            description: '',
+            start: now.subtract(const Duration(minutes: 10)),
+            end: now.add(const Duration(hours: 2)),
+          ),
+        ]);
+      now = now.add(const Duration(minutes: 30));
+      expect(epgService.lookup('bbc.one')?.current.title, 'Stale News');
       var shortEpgRequests = 0;
       final xtreamService = XtreamService(
         transport: (request) async {
@@ -1442,7 +1454,7 @@ void main() {
               epgChannelId: 'bbc.one',
             ),
             orchestrator: orchestrator,
-            epgService: EpgService(clock: () => now),
+            epgService: epgService,
             xtreamService: xtreamService,
           ),
         ),
@@ -1457,6 +1469,8 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(shortEpgRequests, 1);
+      expect(epgService.lookup('bbc.one'), isNull);
+      expect(find.text('Stale News'), findsNothing);
 
       now = now.add(const Duration(seconds: 30));
       await tester.pump(const Duration(seconds: 30));

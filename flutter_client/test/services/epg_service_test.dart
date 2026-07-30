@@ -23,7 +23,34 @@ void main() {
     expect(service.hasFreshDataForChannel(channel), isFalse);
     expect(service.shouldFetchDataForChannel(channel), isFalse);
 
-    now = now.add(EpgService.retryBackoff);
+    now = now.add(
+      EpgService.retryBackoff - const Duration(microseconds: 1),
+    );
+    expect(service.shouldFetchDataForChannel(channel), isFalse);
+
+    now = now.add(const Duration(microseconds: 1));
     expect(service.shouldFetchDataForChannel(channel), isTrue);
+
+    service
+      ..markFetchStarted(const <String>['bbc.one'])
+      ..markFetchFailed(const <String>['bbc.one']);
+    now = now.add(
+      EpgService.retryBackoff - const Duration(microseconds: 1),
+    );
+    expect(service.shouldFetchDataForChannel(channel), isFalse);
+
+    now = now.add(const Duration(microseconds: 1));
+    expect(service.shouldFetchDataForChannel(channel), isTrue);
+  });
+
+  test('backward clock movement makes failed EPG fetch retryable', () {
+    var now = DateTime.utc(2026, 7, 30, 12);
+    final service = EpgService(clock: () => now)
+      ..markFetchStarted(const <String>['bbc.one'])
+      ..markFetchFailed(const <String>['bbc.one']);
+
+    now = now.subtract(const Duration(hours: 1));
+
+    expect(service.shouldFetchData('bbc.one'), isTrue);
   });
 }

@@ -130,36 +130,99 @@ void main() {
       },
     );
 
-    test('successful empty EPG batches are marked fresh', () async {
-      final fixtures = _FakeXtreamTransport.success().withResponse(
-        'get_epg_batch',
-        <String, Object?>{},
-      );
-      final controller = _controller(
-        storage: InMemorySecureStorage(),
-        transport: fixtures.call,
-      );
-      addTearDown(controller.dispose);
+    test(
+      'successful EPG batches clear stale channels with no programs',
+      () async {
+        var now = DateTime.utc(2026, 7, 30, 12);
+        final epgService = EpgService(clock: () => now)
+          ..loadPrograms(<EpgProgram>[
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Stale BBC guide',
+              description: '',
+              start: now.subtract(const Duration(minutes: 10)),
+              end: now.add(const Duration(hours: 2)),
+            ),
+            EpgProgram(
+              channelId: 'cnn',
+              title: 'Stale CNN guide',
+              description: '',
+              start: now.subtract(const Duration(minutes: 10)),
+              end: now.add(const Duration(hours: 2)),
+            ),
+          ]);
+        now = now.add(const Duration(hours: 1));
+        var epgRequests = 0;
+        final fixtures = _FakeXtreamTransport.success()
+            .withResponse('get_live_streams', <Map<String, Object?>>[
+              <String, Object?>{
+                'stream_id': 101,
+                'name': 'BBC One',
+                'category_id': '10',
+                'epg_channel_id': 'bbc.one',
+              },
+              <String, Object?>{
+                'stream_id': 102,
+                'name': 'CNN',
+                'category_id': '10',
+                'epg_channel_id': 'cnn',
+              },
+            ])
+            .withResponse('get_epg_batch', <String, Object?>{
+              '101': <Map<String, Object?>>[
+                <String, Object?>{
+                  'stream_id': 101,
+                  'title': base64Encode(utf8.encode('Fresh BBC guide')),
+                  'description': '',
+                  'start_timestamp':
+                      now
+                          .subtract(const Duration(minutes: 10))
+                          .millisecondsSinceEpoch ~/
+                      1000,
+                  'stop_timestamp':
+                      now
+                          .add(const Duration(minutes: 20))
+                          .millisecondsSinceEpoch ~/
+                      1000,
+                },
+              ],
+            });
+        Future<Object?> transport(XtreamRequest request) {
+          if (request.action == 'get_epg_batch') epgRequests += 1;
+          return fixtures.call(request);
+        }
 
-      expect(
-        await controller.connectXtream(
-          const UserCredentials(
-            server: 'https://fixture.example',
-            username: 'fixture-user',
-            password: 'fixture-password',
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          epgService: epgService,
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
           ),
-        ),
-        isTrue,
-      );
-      await Future<void>.delayed(Duration.zero);
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
 
-      expect(
-        controller.epgService.hasFreshDataForChannel(
-          controller.channels.single,
-        ),
-        isTrue,
-      );
-    });
+        expect(epgRequests, 1);
+        expect(epgService.lookup('bbc.one')?.current.title, 'Fresh BBC guide');
+        expect(epgService.lookup('cnn'), isNull);
+        expect(
+          controller.channels.every(epgService.hasFreshDataForChannel),
+          isTrue,
+        );
+        controller.ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(epgRequests, 1);
+      },
+    );
 
     test('lazy EPG refresh does not duplicate an in-flight prime', () async {
       final epgGate = Completer<Object?>();
