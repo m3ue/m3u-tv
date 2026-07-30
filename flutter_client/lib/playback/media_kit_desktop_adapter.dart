@@ -97,19 +97,26 @@ class MediaKitDesktopAdapter
                 _player.state.track.audio,
                 tracks.audio,
               ),
+              isAudioTrackSelectionKnown: true,
             ),
           );
         }),
       )
       ..add(
         _player.stream.track.listen((track) {
+          final subtitleSelection = selectedMediaKitSubtitleTrack(
+            track.subtitle,
+            _player.state.tracks.subtitle,
+          );
           _emit(
             _state.copyWith(
               selectedAudioTrackId: selectedMediaKitAudioTrackId(
                 track.audio,
                 _player.state.tracks.audio,
               ),
-              selectedSubtitleTrackId: _selectedTrackId(track.subtitle.id),
+              selectedSubtitleTrackId: subtitleSelection.selectedTrackId,
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: subtitleSelection.isKnown,
             ),
           );
         }),
@@ -166,7 +173,12 @@ class MediaKitDesktopAdapter
             orElse: () => mk.AudioTrack(trackId, null, null),
           );
     await _player.setAudioTrack(track);
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -178,7 +190,12 @@ class MediaKitDesktopAdapter
             orElse: () => mk.SubtitleTrack(trackId, null, null),
           );
     await _player.setSubtitleTrack(track);
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -280,6 +297,25 @@ String? selectedMediaKitAudioTrackId(
       ?.id;
 }
 
-String? _selectedTrackId(String id) => id == 'no' || id == 'auto' ? null : id;
+({String? selectedTrackId, bool isKnown}) selectedMediaKitSubtitleTrack(
+  mk.SubtitleTrack selectedTrack,
+  List<mk.SubtitleTrack> availableTracks,
+) {
+  if (selectedTrack.id == 'no') {
+    return (selectedTrackId: null, isKnown: true);
+  }
+  if (selectedTrack.id != 'auto') {
+    return (selectedTrackId: selectedTrack.id, isKnown: true);
+  }
+
+  final selectedTrackId = availableTracks
+      .where((track) => !_isMediaKitSentinelTrack(track.id))
+      .firstOrNull
+      ?.id;
+  return (
+    selectedTrackId: selectedTrackId,
+    isKnown: selectedTrackId != null,
+  );
+}
 
 bool _isMediaKitSentinelTrack(String id) => id == 'auto' || id == 'no';

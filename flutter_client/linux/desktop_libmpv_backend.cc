@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -33,12 +34,32 @@ constexpr uint32_t kTextureHeight = 720;
 constexpr int kBytesPerPixel = 4;
 
 using mpv_handle = struct mpv_handle;
+struct mpv_node;
+struct mpv_node_list;
+union mpv_node_union {
+  char* string;
+  int flag;
+  int64_t int64;
+  double double_;
+  mpv_node_list* list;
+  void* ba;
+};
+struct mpv_node {
+  mpv_node_union u;
+  int format;
+};
+struct mpv_node_list {
+  int num;
+  mpv_node* values;
+  char** keys;
+};
 using mpv_create_fn = mpv_handle* (*)();
 using mpv_initialize_fn = int (*)(mpv_handle*);
 using mpv_command_fn = int (*)(mpv_handle*, const char**);
 using mpv_set_option_string_fn = int (*)(mpv_handle*, const char*, const char*);
 using mpv_get_property_fn = int (*)(mpv_handle*, const char*, int, void*);
 using mpv_free_fn = void (*)(void*);
+using mpv_free_node_contents_fn = void (*)(mpv_node*);
 using mpv_terminate_destroy_fn = void (*)(mpv_handle*);
 using mpv_observe_property_fn = int (*)(mpv_handle*, uint64_t, const char*, int);
 using mpv_unobserve_property_fn = int (*)(mpv_handle*, uint64_t);
@@ -82,6 +103,10 @@ constexpr int MPV_END_FILE_REASON_REDIRECT = 5;
 constexpr int MPV_FORMAT_DOUBLE = 5;
 constexpr int MPV_FORMAT_FLAG = 3;
 constexpr int MPV_FORMAT_STRING = 1;
+constexpr int MPV_FORMAT_INT64 = 4;
+constexpr int MPV_FORMAT_NODE = 6;
+constexpr int MPV_FORMAT_NODE_ARRAY = 7;
+constexpr int MPV_FORMAT_NODE_MAP = 8;
 
 constexpr int MPV_RENDER_PARAM_INVALID = 0;
 constexpr int MPV_RENDER_PARAM_API_TYPE = 1;
@@ -100,6 +125,7 @@ struct LibmpvApi {
   mpv_set_option_string_fn set_option_string = nullptr;
   mpv_get_property_fn get_property = nullptr;
   mpv_free_fn free = nullptr;
+  mpv_free_node_contents_fn free_node_contents = nullptr;
   mpv_terminate_destroy_fn terminate_destroy = nullptr;
   mpv_observe_property_fn observe_property = nullptr;
   mpv_unobserve_property_fn unobserve_property = nullptr;
@@ -116,7 +142,8 @@ struct LibmpvApi {
   bool client_available() const {
     return library != nullptr && create != nullptr && initialize != nullptr &&
            command != nullptr && set_option_string != nullptr &&
-           get_property != nullptr && free != nullptr && terminate_destroy != nullptr &&
+           get_property != nullptr && free != nullptr &&
+           free_node_contents != nullptr && terminate_destroy != nullptr &&
            observe_property != nullptr && unobserve_property != nullptr &&
            wakeup != nullptr && wait_event != nullptr;
   }
@@ -252,6 +279,16 @@ struct EventSnapshot {
   double speed = 0.0;
   std::string aid;
   std::string sid;
+  bool has_aid = false;
+  bool has_sid = false;
+  struct Track {
+    std::string id;
+    std::string label;
+    std::string language;
+  };
+  std::vector<Track> audio_tracks;
+  std::vector<Track> subtitle_tracks;
+  bool has_track_lists = false;
   std::string message;
   std::string code;
   bool recoverable = false;
@@ -410,6 +447,7 @@ struct PlayerInstance {
   void StartEventThread();
   void QueueEvent(EventSnapshot snapshot);
   void ReadSnapshotProperties(EventSnapshot* snapshot);
+  void ReadTrackLists(EventSnapshot* snapshot);
 
   LibmpvApi* api = nullptr;
   FlTextureRegistrar* texture_registrar = nullptr;
@@ -461,6 +499,8 @@ LibmpvApi& Api() {
   g_api.set_option_string = reinterpret_cast<mpv_set_option_string_fn>(LoadSymbol(g_api.library, "mpv_set_option_string"));
   g_api.get_property = reinterpret_cast<mpv_get_property_fn>(LoadSymbol(g_api.library, "mpv_get_property"));
   g_api.free = reinterpret_cast<mpv_free_fn>(LoadSymbol(g_api.library, "mpv_free"));
+  g_api.free_node_contents = reinterpret_cast<mpv_free_node_contents_fn>(
+      LoadSymbol(g_api.library, "mpv_free_node_contents"));
   g_api.terminate_destroy = reinterpret_cast<mpv_terminate_destroy_fn>(LoadSymbol(g_api.library, "mpv_terminate_destroy"));
   g_api.observe_property = reinterpret_cast<mpv_observe_property_fn>(LoadSymbol(g_api.library, "mpv_observe_property"));
   g_api.unobserve_property = reinterpret_cast<mpv_unobserve_property_fn>(LoadSymbol(g_api.library, "mpv_unobserve_property"));
@@ -662,18 +702,19 @@ bool FlagProperty(PlayerInstance* player, const char* name, bool* value) {
   return true;
 }
 
-std::string StringProperty(PlayerInstance* player, const char* name) {
+bool StringProperty(PlayerInstance* player, const char* name,
+                    std::string* value) {
   if (player == nullptr || player->api == nullptr ||
-      player->api->get_property == nullptr) {
-    return "";
+      player->api->get_property == nullptr || player->api->free == nullptr) {
+    return false;
   }
   char* current = nullptr;
   const int rc = player->api->get_property(
       player->handle, name, MPV_FORMAT_STRING, &current);
-  if (rc < 0 || current == nullptr || player->api->free == nullptr) return "";
-  std::string result(current);
+  if (rc < 0 || current == nullptr) return false;
+  *value = current;
   player->api->free(current);
-  return result;
+  return true;
 }
 
 FlValue* VideoAspectRatioResult(PlayerInstance* player) {
@@ -707,7 +748,7 @@ void RenderUpdate(void* data) {
 
 FlValue* BuildEventValue(const EventSnapshot& snapshot) {
   g_autoptr(FlValue) event = fl_value_new_map();
-  fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(1));
+  fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(2));
   fl_value_set_string_take(event, "handle", fl_value_new_int(snapshot.handle));
   fl_value_set_string_take(event, "sequence", fl_value_new_int(snapshot.sequence));
   fl_value_set_string_take(event, "kind", fl_value_new_string(snapshot.kind.c_str()));
@@ -726,11 +767,31 @@ FlValue* BuildEventValue(const EventSnapshot& snapshot) {
   if (snapshot.speed > 0.0) {
     fl_value_set_string_take(event, "speed", fl_value_new_float(snapshot.speed));
   }
-  if (!snapshot.aid.empty()) {
+  if (snapshot.has_aid) {
     fl_value_set_string_take(event, "aid", fl_value_new_string(snapshot.aid.c_str()));
   }
-  if (!snapshot.sid.empty()) {
+  if (snapshot.has_sid) {
     fl_value_set_string_take(event, "sid", fl_value_new_string(snapshot.sid.c_str()));
+  }
+  if (snapshot.has_track_lists) {
+    auto build_tracks = [](const std::vector<EventSnapshot::Track>& tracks) {
+      FlValue* values = fl_value_new_list();
+      for (const EventSnapshot::Track& track : tracks) {
+        FlValue* value = fl_value_new_map();
+        fl_value_set_string_take(value, "id", fl_value_new_string(track.id.c_str()));
+        fl_value_set_string_take(value, "label", fl_value_new_string(track.label.c_str()));
+        if (!track.language.empty()) {
+          fl_value_set_string_take(value, "language",
+                                   fl_value_new_string(track.language.c_str()));
+        }
+        fl_value_append_take(values, value);
+      }
+      return values;
+    };
+    fl_value_set_string_take(event, "audioTracks",
+                             build_tracks(snapshot.audio_tracks));
+    fl_value_set_string_take(event, "subtitleTracks",
+                             build_tracks(snapshot.subtitle_tracks));
   }
   if (!snapshot.message.empty()) {
     fl_value_set_string_take(event, "message", fl_value_new_string(snapshot.message.c_str()));
@@ -781,6 +842,8 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
   snapshot->speed = 0.0;
   snapshot->aid.clear();
   snapshot->sid.clear();
+  snapshot->has_aid = false;
+  snapshot->has_sid = false;
 
   DoubleProperty(this, "time-pos", &snapshot->position);
   DoubleProperty(this, "duration", &snapshot->duration);
@@ -802,8 +865,81 @@ void PlayerInstance::ReadSnapshotProperties(EventSnapshot* snapshot) {
     }
   }
 
-  snapshot->aid = StringProperty(this, "aid");
-  snapshot->sid = StringProperty(this, "sid");
+  snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);
+  snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);
+}
+
+std::string NormalizeTrackString(std::string value) {
+  const auto first = std::find_if_not(
+      value.begin(), value.end(),
+      [](unsigned char character) { return std::isspace(character) != 0; });
+  const auto last = std::find_if_not(
+      value.rbegin(), value.rend(),
+      [](unsigned char character) { return std::isspace(character) != 0; })
+                        .base();
+  return first < last ? std::string(first, last) : "";
+}
+
+const mpv_node* MapNodeValue(const mpv_node& node, const char* key) {
+  if (node.format != MPV_FORMAT_NODE_MAP || node.u.list == nullptr ||
+      node.u.list->keys == nullptr || node.u.list->values == nullptr) {
+    return nullptr;
+  }
+  for (int index = 0; index < node.u.list->num; ++index) {
+    if (node.u.list->keys[index] != nullptr &&
+        std::strcmp(node.u.list->keys[index], key) == 0) {
+      return &node.u.list->values[index];
+    }
+  }
+  return nullptr;
+}
+
+std::string TrackNodeString(const mpv_node* node) {
+  if (node == nullptr) return "";
+  if (node->format == MPV_FORMAT_STRING && node->u.string != nullptr) {
+    return NormalizeTrackString(node->u.string);
+  }
+  if (node->format == MPV_FORMAT_INT64) {
+    return std::to_string(node->u.int64);
+  }
+  return "";
+}
+
+void PlayerInstance::ReadTrackLists(EventSnapshot* snapshot) {
+  snapshot->audio_tracks.clear();
+  snapshot->subtitle_tracks.clear();
+  snapshot->has_track_lists = false;
+  if (api == nullptr || api->get_property == nullptr ||
+      api->free_node_contents == nullptr) {
+    return;
+  }
+
+  mpv_node node{};
+  if (api->get_property(handle, "track-list", MPV_FORMAT_NODE, &node) < 0) {
+    return;
+  }
+  snapshot->has_track_lists = true;
+  if (node.format == MPV_FORMAT_NODE_ARRAY && node.u.list != nullptr &&
+      node.u.list->values != nullptr) {
+    for (int index = 0; index < node.u.list->num; ++index) {
+      const mpv_node& item = node.u.list->values[index];
+      const std::string type = TrackNodeString(MapNodeValue(item, "type"));
+      const std::string id = TrackNodeString(MapNodeValue(item, "id"));
+      if (id.empty() || (type != "audio" && type != "sub")) continue;
+      const std::string language =
+          TrackNodeString(MapNodeValue(item, "lang"));
+      const std::string label = TrackNodeString(MapNodeValue(item, "title"));
+      const std::string normalized_label = label.empty() ? language : label;
+      EventSnapshot::Track track{
+          id, normalized_label.empty() ? id : normalized_label, language};
+      if (type == "audio") {
+        snapshot->audio_tracks.push_back(std::move(track));
+      } else if (type == "sub") {
+        snapshot->subtitle_tracks.push_back(std::move(track));
+      }
+    }
+  }
+  api->free_node_contents(&node);
 }
 
 void PlayerInstance::StartEventThread() {
@@ -866,6 +1002,7 @@ void PlayerInstance::StartEventThread() {
           snapshot.sequence = sequence.fetch_add(1);
           snapshot.kind = "FILE_LOADED";
           ReadSnapshotProperties(&snapshot);
+          ReadTrackLists(&snapshot);
           QueueEvent(snapshot);
           break;
         case 21:  // MPV_EVENT_PLAYBACK_RESTART
@@ -1072,10 +1209,24 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     const std::string track = StringArg(args, "trackId");
     const char* command[] = {"set", "aid", track.empty() ? "no" : track.c_str(), nullptr};
     player->api->command(player->handle, command);
+    EventSnapshot snapshot;
+    snapshot.handle = player->id;
+    snapshot.sequence = player->sequence.fetch_add(1);
+    snapshot.kind = "PLAYBACK_RESTART";
+    player->ReadSnapshotProperties(&snapshot);
+    player->ReadTrackLists(&snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "setSubtitleTrack") == 0) {
     const std::string track = StringArg(args, "trackId");
     const char* command[] = {"set", "sid", track.empty() ? "no" : track.c_str(), nullptr};
     player->api->command(player->handle, command);
+    EventSnapshot snapshot;
+    snapshot.handle = player->id;
+    snapshot.sequence = player->sequence.fetch_add(1);
+    snapshot.kind = "PLAYBACK_RESTART";
+    player->ReadSnapshotProperties(&snapshot);
+    player->ReadTrackLists(&snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "setPlaybackSpeed") == 0) {
     FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "speed");
     const double speed = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT

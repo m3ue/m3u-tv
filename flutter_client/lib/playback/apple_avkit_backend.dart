@@ -88,13 +88,23 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
   @override
   Future<void> setAudioTrack(String? trackId) async {
     await _host.setAudioTrack(trackId);
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
   Future<void> setSubtitleTrack(String? trackId) async {
     await _host.setSubtitleTrack(trackId);
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -142,11 +152,13 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
     if (event.hasSelectedAudioTrackId) {
       nextState = nextState.copyWith(
         selectedAudioTrackId: event.selectedAudioTrackId,
+        isAudioTrackSelectionKnown: true,
       );
     }
     if (event.hasSelectedSubtitleTrackId) {
       nextState = nextState.copyWith(
         selectedSubtitleTrackId: event.selectedSubtitleTrackId,
+        isSubtitleTrackSelectionKnown: true,
       );
     }
     _emit(nextState);
@@ -158,7 +170,7 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
   }
 }
 
-// --- Host abstraction (private — uses private event types) ---
+// --- Host abstraction (private - uses private event types) ---
 
 abstract class _AvKitHost {
   Stream<_AvKitEvent> get events;

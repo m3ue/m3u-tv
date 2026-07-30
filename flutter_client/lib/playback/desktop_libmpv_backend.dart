@@ -515,14 +515,19 @@ class DesktopLibmpvEvent {
     this.speed,
     this.aid,
     this.sid,
+    this.hasAid = false,
+    this.hasSid = false,
+    this.audioTracks,
+    this.subtitleTracks,
     this.message,
     this.code,
     this.recoverable = false,
   });
 
   factory DesktopLibmpvEvent.fromMap(Map<String, Object?> map) {
+    final schemaVersion = (map['schemaVersion'] as num?)?.toInt() ?? 0;
     return DesktopLibmpvEvent(
-      schemaVersion: (map['schemaVersion'] as num?)?.toInt() ?? 0,
+      schemaVersion: schemaVersion,
       handle: (map['handle'] as num?)?.toInt() ?? 0,
       sequence: (map['sequence'] as num?)?.toInt() ?? 0,
       kind: _kindFromString(map['kind'] as String?),
@@ -542,8 +547,16 @@ class DesktopLibmpvEvent {
         height: map['videoHeight'] ?? map['height'],
       ),
       speed: _asPositiveDouble(map['speed']),
-      aid: _nonEmptyString(map['aid']),
-      sid: _nonEmptyString(map['sid']),
+      aid: _selectedTrackId(map['aid']),
+      sid: _selectedTrackId(map['sid']),
+      hasAid: map.containsKey('aid'),
+      hasSid: map.containsKey('sid'),
+      audioTracks: schemaVersion >= 2
+          ? _tracksFromValue(map['audioTracks'])
+          : null,
+      subtitleTracks: schemaVersion >= 2
+          ? _tracksFromValue(map['subtitleTracks'])
+          : null,
       message: map['message'] as String?,
       code: map['code'] as String?,
       recoverable: map['recoverable'] == true,
@@ -563,6 +576,10 @@ class DesktopLibmpvEvent {
   final double? speed;
   final String? aid;
   final String? sid;
+  final bool hasAid;
+  final bool hasSid;
+  final List<PlaybackTrack>? audioTracks;
+  final List<PlaybackTrack>? subtitleTracks;
   final String? message;
   final String? code;
   final bool recoverable;
@@ -597,7 +614,28 @@ class DesktopLibmpvEvent {
   }
 
   static String? _nonEmptyString(Object? value) {
-    return value is String && value.isNotEmpty ? value : null;
+    if (value is! String) return null;
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static String? _selectedTrackId(Object? value) {
+    final id = _nonEmptyString(value);
+    return id == null || id.toLowerCase() == 'no' ? null : id;
+  }
+
+  static List<PlaybackTrack>? _tracksFromValue(Object? value) {
+    if (value is! List<Object?>) return null;
+    final tracks = <PlaybackTrack>[];
+    for (final item in value) {
+      if (item is! Map<Object?, Object?>) continue;
+      final id = _nonEmptyString(item['id']);
+      if (id == null) continue;
+      final language = _nonEmptyString(item['language']);
+      final label = _nonEmptyString(item['label']) ?? language ?? id;
+      tracks.add(PlaybackTrack(id: id, label: label, language: language));
+    }
+    return tracks;
   }
 }
 
@@ -628,8 +666,12 @@ class DesktopLibmpvEventReducer {
           duration: event.duration,
           videoAspectRatio: event.videoAspectRatio,
           playbackSpeed: event.speed,
-          selectedAudioTrackId: event.aid,
-          selectedSubtitleTrackId: event.sid,
+          audioTracks: event.audioTracks ?? const <PlaybackTrack>[],
+          subtitleTracks: event.subtitleTracks ?? const <PlaybackTrack>[],
+          selectedAudioTrackId: event.hasAid ? event.aid : null,
+          selectedSubtitleTrackId: event.hasSid ? event.sid : null,
+          isAudioTrackSelectionKnown: event.hasAid,
+          isSubtitleTrackSelectionKnown: event.hasSid,
         );
       case DesktopLibmpvEventKind.playbackRestart:
         final status = event.paused
@@ -644,8 +686,18 @@ class DesktopLibmpvEventReducer {
           duration: event.duration ?? current.duration,
           videoAspectRatio: event.videoAspectRatio ?? current.videoAspectRatio,
           playbackSpeed: event.speed ?? current.playbackSpeed,
-          selectedAudioTrackId: event.aid ?? current.selectedAudioTrackId,
-          selectedSubtitleTrackId: event.sid ?? current.selectedSubtitleTrackId,
+          audioTracks: event.audioTracks ?? current.audioTracks,
+          subtitleTracks: event.subtitleTracks ?? current.subtitleTracks,
+          selectedAudioTrackId: event.hasAid
+              ? event.aid
+              : current.selectedAudioTrackId,
+          selectedSubtitleTrackId: event.hasSid
+              ? event.sid
+              : current.selectedSubtitleTrackId,
+          isAudioTrackSelectionKnown:
+              event.hasAid || current.isAudioTrackSelectionKnown,
+          isSubtitleTrackSelectionKnown:
+              event.hasSid || current.isSubtitleTrackSelectionKnown,
         );
       case DesktopLibmpvEventKind.videoReconfig:
         return current.copyWith(

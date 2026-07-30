@@ -97,22 +97,26 @@ class MediaKitIosAdapter
                 _player.state.track.audio,
                 tracks.audio,
               ),
+              isAudioTrackSelectionKnown: true,
             ),
           );
         }),
       )
       ..add(
         _player.stream.track.listen((track) {
+          final subtitleSelection = selectedMediaKitSubtitleTrack(
+            track.subtitle,
+            _player.state.tracks.subtitle,
+          );
           _emit(
             _state.copyWith(
               selectedAudioTrackId: selectedMediaKitAudioTrackId(
                 track.audio,
                 _player.state.tracks.audio,
               ),
-              selectedSubtitleTrackId:
-                  track.subtitle.id == 'no' || track.subtitle.id == 'auto'
-                  ? null
-                  : track.subtitle.id,
+              selectedSubtitleTrackId: subtitleSelection.selectedTrackId,
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: subtitleSelection.isKnown,
             ),
           );
         }),
@@ -174,7 +178,12 @@ class MediaKitIosAdapter
             orElse: () => mk.AudioTrack(trackId, null, null),
           );
     await _player.setAudioTrack(track);
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -186,7 +195,12 @@ class MediaKitIosAdapter
             orElse: () => mk.SubtitleTrack(trackId, null, null),
           );
     await _player.setSubtitleTrack(track);
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override

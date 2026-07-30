@@ -43,14 +43,50 @@ void main() {
     expect(service.shouldFetchDataForChannel(channel), isTrue);
   });
 
-  test('backward clock movement makes failed EPG fetch retryable', () {
+  test('retained EPG failures retry after a backward clock adjustment', () {
     var now = DateTime.utc(2026, 7, 30, 12);
+    final fetchedAt = now;
+    const channel = Channel(
+      id: 101,
+      name: 'BBC One',
+      streamUrl: 'https://fixture.example/live/101',
+      epgChannelId: 'bbc.one',
+    );
+    final retainedProgram = EpgProgram(
+      channelId: 'bbc.one',
+      title: 'Retained guide',
+      description: '',
+      start: now.subtract(const Duration(hours: 2)),
+      end: now.add(const Duration(hours: 2)),
+    );
     final service = EpgService(clock: () => now)
+      ..applySuccessfulResponse(
+        const <String>['bbc.one'],
+        <EpgProgram>[retainedProgram],
+      );
+
+    now = fetchedAt.add(service.cacheTtl);
+    service
+      ..markFetchStarted(const <String>['bbc.one'])
+      ..markFetchFailed(const <String>['bbc.one']);
+    expect(service.shouldFetchData('bbc.one'), isFalse);
+
+    now = now.add(
+      EpgService.retryBackoff - const Duration(microseconds: 1),
+    );
+    expect(service.shouldFetchData('bbc.one'), isFalse);
+
+    now = now.add(const Duration(microseconds: 1));
+    expect(service.shouldFetchData('bbc.one'), isTrue);
+
+    service
       ..markFetchStarted(const <String>['bbc.one'])
       ..markFetchFailed(const <String>['bbc.one']);
 
-    now = now.subtract(const Duration(hours: 1));
+    now = fetchedAt.subtract(const Duration(minutes: 1));
 
     expect(service.shouldFetchData('bbc.one'), isTrue);
+    expect(service.lookup('bbc.one')?.current, same(retainedProgram));
+    expect(service.programsForChannel(channel), <EpgProgram>[retainedProgram]);
   });
 }

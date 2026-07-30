@@ -101,15 +101,16 @@ class EpgService extends ChangeNotifier {
     final now = _clock();
     for (final id in ids) {
       if (id == null || id.isEmpty) continue;
-      final fetchedAt = _fetchedAtByChannel[id];
-      if (fetchedAt != null && now.difference(fetchedAt) < cacheTtl) {
-        return false;
-      }
       if (_fetchesInFlight.contains(id)) return false;
       final failedAt = _failedAtByChannel[id];
       if (failedAt != null) {
         final elapsed = now.difference(failedAt);
         if (!elapsed.isNegative && elapsed < retryBackoff) return false;
+        continue;
+      }
+      final fetchedAt = _fetchedAtByChannel[id];
+      if (fetchedAt != null && now.difference(fetchedAt) < cacheTtl) {
+        return false;
       }
     }
     return true;
