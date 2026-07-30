@@ -12,8 +12,15 @@ import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 
 // Register your public app at https://trakt.tv/oauth/applications and pass the
-// client id with TRAKT_CLIENT_ID when building.
-const _clientIdFromEnvironment = String.fromEnvironment('TRAKT_CLIENT_ID');
+// client id with TRAKT_CLIENT_ID when building, or fall back to the app's
+// own public client id below. A Trakt client id is not a secret — it's sent
+// on every API request as the trakt-api-key header.
+const _kDefaultClientId =
+    '1b95226b593a8c4eb9c933c307fe8e7cf9f5e4d5d73d2d743d73dc33c6dbd84f';
+const _envClientId = String.fromEnvironment('TRAKT_CLIENT_ID');
+const String _clientIdFromEnvironment = _envClientId == ''
+    ? _kDefaultClientId
+    : _envClientId;
 
 const _kApi = 'https://api.trakt.tv';
 const _kKeyAccess = 'trakt_access_token';
