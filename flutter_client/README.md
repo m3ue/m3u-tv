@@ -1,4 +1,4 @@
-# M3U TV — Flutter Client
+# M3U TV - Flutter Client
 
 Flutter app for M3U TV targeting Android TV, iOS, macOS, Linux, Windows, and Apple TV (tvOS).
 
@@ -20,7 +20,7 @@ flutter analyze lib test
 flutter test
 ```
 
-Scope `format`/`analyze` to `lib test` rather than `.` — if you've run an iOS/macOS build locally, `ios/build/` and `macos/build/` contain vendored SPM checkouts (e.g. `firebase_messaging`) with their own `pubspec.yaml`, which the analyzer treats as separate projects to fully lint/type-check. `analyzer.exclude` globs can't suppress this once a directory has its own `pubspec.yaml`, so directory scoping is the only reliable fix.
+Scope `format`/`analyze` to `lib test` rather than `.` - if you've run an iOS/macOS build locally, `ios/build/` and `macos/build/` contain vendored SPM checkouts (e.g. `firebase_messaging`) with their own `pubspec.yaml`, which the analyzer treats as separate projects to fully lint/type-check. `analyzer.exclude` globs can't suppress this once a directory has its own `pubspec.yaml`, so directory scoping is the only reliable fix.
 
 ## Platform commands
 
@@ -44,7 +44,7 @@ If you hit `Package product 'firebase-core' requires minimum platform version 15
 export FLUTTER_SWIFT_PACKAGE_MANAGER=false
 ```
 
-This is a Flutter SDK limitation, not a project misconfig: Flutter hardcodes the auto-generated `FlutterGeneratedPluginSwiftPackage` wrapper's minimum iOS version to 13.0 regardless of `IPHONEOS_DEPLOYMENT_TARGET` (which is correctly 15.0 here), and `firebase_core`/`firebase_messaging` require 15.0. It regenerates on every `flutter clean`/`pub get`, so the error resurfaces even if you haven't touched anything. Disabling SPM routes all plugins — Firebase included, via its still-published podspec — through CocoaPods instead, which honors the Podfile's real `platform :ios, '15.0'`. CI (`release.yml`) sets this env var for the `build-ios` job already.
+This is a Flutter SDK limitation, not a project misconfig: Flutter hardcodes the auto-generated `FlutterGeneratedPluginSwiftPackage` wrapper's minimum iOS version to 13.0 regardless of `IPHONEOS_DEPLOYMENT_TARGET` (which is correctly 15.0 here), and `firebase_core`/`firebase_messaging` require 15.0. It regenerates on every `flutter clean`/`pub get`, so the error resurfaces even if you haven't touched anything. Disabling SPM routes all plugins - Firebase included, via its still-published podspec - through CocoaPods instead, which honors the Podfile's real `platform :ios, '15.0'`. CI (`release.yml`) sets this env var for the `build-ios` job already.
 
 ### macOS / Linux / Windows
 
@@ -68,57 +68,53 @@ flutter-tvos build tvos --simulator --debug   # build only
 
 ## Release builds
 
-All release builds require the Trakt credentials passed via `--dart-define`.
-Set the environment variables first (see [Trakt setup](#trakt-setup)), then use the commands below.
+All release builds require the public Trakt client id passed via `--dart-define`.
+Set the environment variable first (see [Trakt setup](#trakt-setup)), then use the commands below.
 
 ### Android TV / Android (release APK / App Bundle)
 
 ```bash
 # App Bundle (Play Store / sideload)
 flutter build appbundle --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 
 # APK (direct sideload)
 flutter build apk --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 ```
 
-`release.yml` builds iOS and tvOS on every tag push too, but only as **unsigned** sideload artifacts attached to the GitHub Release (see `build-ios`/`build-tvos` jobs) — it does not submit to App Store Connect. Actual App Store/TestFlight submission for iOS and tvOS is a manual step you run locally, below.
+`release.yml` builds iOS and tvOS on every tag push too, but only as **unsigned** sideload artifacts attached to the GitHub Release (see `build-ios`/`build-tvos` jobs) - it does not submit to App Store Connect. Actual App Store/TestFlight submission for iOS and tvOS is a manual step you run locally, below.
 
 ### iOS (manual App Store submission)
 
-`--dart-define` values are baked into `ios/Flutter/Generated.xcconfig` only as a side effect of a CLI `flutter build`/`flutter run` — if you skip straight to Xcode's **Archive** action without running one first, the archive silently ships without the Trakt credentials (whatever was last written to that file, possibly nothing).
+`--dart-define` values are baked into `ios/Flutter/Generated.xcconfig` only as a side effect of a CLI `flutter build`/`flutter run` - if you skip straight to Xcode's **Archive** action without running one first, the archive silently ships without the Trakt credentials (whatever was last written to that file, possibly nothing).
 
 Build, archive, and export in one step from the CLI:
 
 ```bash
 flutter build ipa --release \
   --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET \
   --export-options-plist=ios/ExportOptions.plist
 ```
 
-This produces `build/ios/ipa/Runner.ipa` — upload it with [Transporter](https://apps.apple.com/app/transporter/id1450874784) or `xcrun altool --upload-app`.
+This produces `build/ios/ipa/Runner.ipa` - upload it with [Transporter](https://apps.apple.com/app/transporter/id1450874784) or `xcrun altool --upload-app`.
 
 Prefer Xcode's Organizer instead? Run the `flutter build ipa` command above first (so the defines are baked in and the archive already exists at `build/ios/archive/Runner.xcarchive`), then open it in Xcode and **Distribute App → App Store Connect**. Do not archive directly from a bare Xcode session that skipped the CLI step.
 
-`ios/ExportOptions.plist` (method `app-store-connect`, your Team ID) is checked into the repo. Use `app-store-connect`, not the older `app-store` value — Xcode 26 treats it as deprecated and `flutter build ipa`'s IPA-export step fails silently on it (`xcodebuild -exportArchive` alone still works either way, but the wrapper doesn't).
+`ios/ExportOptions.plist` (method `app-store-connect`, your Team ID) is checked into the repo. Use `app-store-connect`, not the older `app-store` value - Xcode 26 treats it as deprecated and `flutter build ipa`'s IPA-export step fails silently on it (`xcodebuild -exportArchive` alone still works either way, but the wrapper doesn't).
 
 ### Apple TV / tvOS (manual App Store submission)
 
-This project signs the tvOS target **Manually**, pinned to the `M3U TV (tvOS)` distribution profile (Signing & Capabilities in Xcode) — that's the config that has actually produced working App Store submissions. `flutter-tvos build tvos --release`, however, always forces `CODE_SIGN_STYLE=Automatic` on the `xcodebuild` invocation it runs internally, with no way to opt out — so running it end-to-end **will fail** with `Runner has conflicting provisioning settings`, unrelated to whether your Apple ID is signed into Xcode.
+This project signs the tvOS target **Manually**, pinned to the `M3U TV (tvOS)` distribution profile (Signing & Capabilities in Xcode) - that's the config that has actually produced working App Store submissions. `flutter-tvos build tvos --release`, however, always forces `CODE_SIGN_STYLE=Automatic` on the `xcodebuild` invocation it runs internally, with no way to opt out - so running it end-to-end **will fail** with `Runner has conflicting provisioning settings`, unrelated to whether your Apple ID is signed into Xcode.
 
 Run it anyway, for one reason only: the Dart AOT compile step (where `--dart-define` values get baked in) completes and writes `tvos/Flutter/App.framework` to disk *before* that incompatible `xcodebuild` call runs, so the framework comes out correct even though the command as a whole reports failure:
 
 ```bash
 flutter-tvos build tvos --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 ```
 
-Ignore the failure output — a fresh `tvos/Flutter/App.framework` with the Trakt credentials compiled in is what you need, and it's already there. Then open `tvos/Runner.xcworkspace` in Xcode and **Product → Archive → Distribute App**, exactly as before; the project's own "Embed App.framework" build phase picks up the file that's already on disk and doesn't re-run flutter-tvos itself, so the Manual-signing Archive path is untouched by any of this.
+Ignore the failure output. A fresh `tvos/Flutter/App.framework` with the Trakt client id compiled in is what you need, and it's already there. Then open `tvos/Runner.xcworkspace` in Xcode and **Product → Archive → Distribute App**, exactly as before; the project's own "Embed App.framework" build phase picks up the file that's already on disk and doesn't re-run flutter-tvos itself, so the Manual-signing Archive path is untouched by any of this.
 
 If you'd rather not rely on flutter-tvos's `build tvos` reporting a "failure" that isn't one, the fully-CLI archive/export path also works once you're archiving (not just building):
 
@@ -137,46 +133,43 @@ xcodebuild -exportArchive \
 
 Upload `build/export/Runner.ipa` the same way as iOS. `tvos/ExportOptions.plist` is checked into the repo alongside the iOS one.
 
-If a plain `xcodebuild archive`/`-allowProvisioningUpdates` run (not `flutter-tvos build`) ever reports `Communication with Apple failed: Your team has no devices...`, that's not really about registering a device — `flutter-tvos` (and a bare `xcodebuild` invocation with no `DEVELOPMENT_TEAM` build setting) resolves the team from whichever certificate your local keychain happens to surface first, which can be a different team than this project's. Pass the right one explicitly and it goes away:
+If a plain `xcodebuild archive`/`-allowProvisioningUpdates` run (not `flutter-tvos build`) ever reports `Communication with Apple failed: Your team has no devices...`, that's not really about registering a device - `flutter-tvos` (and a bare `xcodebuild` invocation with no `DEVELOPMENT_TEAM` build setting) resolves the team from whichever certificate your local keychain happens to surface first, which can be a different team than this project's. Pass the right one explicitly and it goes away:
 
 ```bash
 export DEVELOPMENT_TEAM=5AMT94T836   # this project's team ID
 ```
 
-> **Run `flutter-tvos run -d <simulator-id>` at least once before opening Xcode for simulator debugging.** `flutter-tvos` swaps the entire `Flutter.xcframework` per build mode/environment (debug/release × device/simulator); a stale one left over from a prior release build breaks simulator runs in Xcode with a "no library for this platform" error. `flutter-tvos build tvos --release` (used above to bake in dart-defines) doesn't fix this itself — its own `xcodebuild` step always fails against this project's Manual-signing config, so it never gets to regenerate the simulator slice. If you need to go back to simulator debugging afterward, run `flutter-tvos run -d <simulator-id>` again to restore it. See the [tvOS setup section in the root README](../README.md#apple-tv-tvos) for one-time install instructions. Likewise, never run `pod install` by hand in `tvos/` — it reads the plugin list from `.flutter-plugins-dependencies`, which is only populated correctly as a side effect of `flutter-tvos build`/`run`; running `pod install` standalone (before that list is populated) silently strips tvOS-only pods like `sqflite_tvos` from `Podfile.lock`. If pods look wrong, re-run `flutter-tvos build tvos`/`run` — don't call `pod install` directly.
+> **Run `flutter-tvos run -d <simulator-id>` at least once before opening Xcode for simulator debugging.** `flutter-tvos` swaps the entire `Flutter.xcframework` per build mode/environment (debug/release × device/simulator); a stale one left over from a prior release build breaks simulator runs in Xcode with a "no library for this platform" error. `flutter-tvos build tvos --release` (used above to bake in dart-defines) doesn't fix this itself - its own `xcodebuild` step always fails against this project's Manual-signing config, so it never gets to regenerate the simulator slice. If you need to go back to simulator debugging afterward, run `flutter-tvos run -d <simulator-id>` again to restore it. See the [tvOS setup section in the root README](../README.md#apple-tv-tvos) for one-time install instructions. Likewise, never run `pod install` by hand in `tvos/` - it reads the plugin list from `.flutter-plugins-dependencies`, which is only populated correctly as a side effect of `flutter-tvos build`/`run`; running `pod install` standalone (before that list is populated) silently strips tvOS-only pods like `sqflite_tvos` from `Podfile.lock`. If pods look wrong, re-run `flutter-tvos build tvos`/`run` - don't call `pod install` directly.
 
-### macOS (via GitHub Actions — not the Mac App Store)
+### macOS (via GitHub Actions - not the Mac App Store)
 
-Unlike iOS/tvOS/Android, macOS release builds are never submitted to an app store by hand. Every `v*.*.*` tag push runs the `build-macos` job in `.github/workflows/release.yml` end-to-end: release build, code-sign with the Developer ID Application certificate, notarize via `notarytool`, staple the ticket, and publish the DMG straight to the GitHub Release — the same all-desktop-via-CI path Linux and Windows use below. There is no separate manual macOS release step.
+Unlike iOS/tvOS/Android, macOS release builds are never submitted to an app store by hand. Every `v*.*.*` tag push runs the `build-macos` job in `.github/workflows/release.yml` end-to-end: release build, code-sign with the Developer ID Application certificate, notarize via `notarytool`, staple the ticket, and publish the DMG straight to the GitHub Release - the same all-desktop-via-CI path Linux and Windows use below. There is no separate manual macOS release step.
 
 To build a local macOS release for testing only (not signed or notarized, so not distributable):
 
 ```bash
 flutter build macos --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 ```
 
 ### Linux
 
 ```bash
 flutter build linux --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 ```
 
 ### Windows
 
 ```bash
 flutter build windows --release \
-  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-  --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET
+  --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID
 ```
 
 ## Updating icons and splash screens
 
 All platform icons and splash screens are generated from the SVG source at `../logo.svg`.
-Do not hand-edit the generated PNGs — run the script instead.
+Do not hand-edit the generated PNGs - run the script instead.
 
 ### Prerequisites
 
@@ -193,9 +186,9 @@ bash scripts/setup-icons.sh
 This script:
 1. Renders `logo.svg` → transparent PNGs at the required sizes
 2. Builds `assets/icons/icon.png` (opaque, for iOS/macOS/Windows) and `adaptive-icon.png` / `splash-icon.png` (transparent)
-3. Runs `dart run flutter_launcher_icons` — Android, iOS, macOS, Web, Windows, Linux
-4. Runs `dart run flutter_native_splash:create` — Android + iOS splash screens
-5. Generates the **tvOS layered icons** (Back / Middle / Front layers for the parallax effect) and the **Top Shelf image** — these are not covered by `flutter_launcher_icons`
+3. Runs `dart run flutter_launcher_icons` - Android, iOS, macOS, Web, Windows, Linux
+4. Runs `dart run flutter_native_splash:create` - Android + iOS splash screens
+5. Generates the **tvOS layered icons** (Back / Middle / Front layers for the parallax effect) and the **Top Shelf image** - these are not covered by `flutter_launcher_icons`
 
 After running, rebuild the tvOS target in Xcode to pick up the refreshed icons.
 
@@ -203,13 +196,13 @@ After running, rebuild the tvOS target in Xcode to pick up the refreshed icons.
 
 | Asset | Size |
 |---|---|
-| App Icon — Large (focused) | 1280 × 768 px per layer |
-| App Icon — Small (home shelf) | 400 × 240 px (1x), 800 × 480 px (2x) per layer |
+| App Icon - Large (focused) | 1280 × 768 px per layer |
+| App Icon - Small (home shelf) | 400 × 240 px (1x), 800 × 480 px (2x) per layer |
 | Top Shelf Image | 2320 × 720 px (Wide) |
 
 ## Generating store screenshots
 
-Store-ready screenshots and marketing assets are generated from the source images in `screenshots/app-screenshots/` and the SVG logo at `../logo.svg`. Do not hand-edit the output files — run the script instead.
+Store-ready screenshots and marketing assets are generated from the source images in `screenshots/app-screenshots/` and the SVG logo at `../logo.svg`. Do not hand-edit the output files - run the script instead.
 
 ### Prerequisites
 
@@ -228,7 +221,7 @@ Output is written to `screenshots/store/` with the following structure:
 | Platform | Directory | Notes |
 |---|---|---|
 | Apple tvOS | `apple/tvos/1920x1080/` | Required for all submissions |
-| Apple tvOS 4K | `apple/tvos/3840x2160/` | Optional — copied from source |
+| Apple tvOS 4K | `apple/tvos/3840x2160/` | Optional - copied from source |
 | Apple iPhone 6.7" | `apple/ios/6.7in-1290x2796/` | Required for iPhone 14+/15+ |
 | Apple iPhone 6.5" | `apple/ios/6.5in-1242x2688/` | Required for older iPhones |
 | Apple iPhone 5.5" | `apple/ios/5.5in-1242x2208/` | Optional legacy device class |
@@ -236,8 +229,8 @@ Output is written to `screenshots/store/` with the following structure:
 | Android TV | `google/android-tv/1920x1080/` | Required |
 | Android TV (legacy) | `google/android-tv/1280x720/` | Optional |
 | Android Phone | `google/android-phone/1080x2340/` | |
-| Google Play Feature Graphic | `google/android-feature-graphic/feature-graphic.png` | Required — single 1024 × 500 image |
-| Android TV Banner | `google/android-tv-banner/tv-banner.png` | Required for TV listing — 1280 × 720 |
+| Google Play Feature Graphic | `google/android-feature-graphic/feature-graphic.png` | Required - single 1024 × 500 image |
+| Android TV Banner | `google/android-tv-banner/tv-banner.png` | Required for TV listing - 1280 × 720 |
 
 The feature graphic and TV banner are generated from `../logo.svg` on the app's diagonal gradient background (`#1a1528` → `#09090b`) rather than from screenshots.
 
@@ -251,7 +244,7 @@ The feature graphic and TV banner are generated from `../logo.svg` on the app's 
 
 ## Trakt setup
 
-Trakt credentials are injected at compile time via `--dart-define` and are never stored in source control.
+Trakt uses a public client id for device authorization in this app. It is injected at compile time via `--dart-define` and is not stored in source control.
 
 1. Register an app at <https://trakt.tv/oauth/applications>
    - Redirect URI: `urn:ietf:wg:oauth:2.0:oob`
@@ -259,32 +252,28 @@ Trakt credentials are injected at compile time via `--dart-define` and are never
 2. Add to your shell profile (`~/.zshrc` or `~/.zprofile`):
    ```bash
    export TRAKT_CLIENT_ID="your_client_id"
-   export TRAKT_CLIENT_SECRET="your_client_secret"
    ```
 3. Re-source your profile: `source ~/.zshrc`
-4. Pass the defines on every `flutter run` / `flutter build`:
+4. Pass the define on every `flutter run` / `flutter build`:
    ```bash
    flutter run \
      --dart-define=TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
-     --dart-define=TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET \
      -d <device-id>
    ```
 
-For CI (GitHub Actions), store `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` as repository secrets and reference them in your workflow:
+For CI (GitHub Actions), store `TRAKT_CLIENT_ID` as a repository secret and reference it in your workflow:
 
 ```yaml
 --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
---dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
 ```
 
 ## Developer dart-defines
 
-These compile-time flags are for local development and debugging. Pass them via `--dart-define` — they default to off and are never required for normal builds.
+These compile-time flags are for local development and debugging. Pass them via `--dart-define` - they default to off and are never required for normal builds.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `TRAKT_CLIENT_ID` | _(empty)_ | Trakt API client ID — required for Trakt scrobbling. See [Trakt setup](#trakt-setup). |
-| `TRAKT_CLIENT_SECRET` | _(empty)_ | Trakt API client secret — required for Trakt scrobbling. See [Trakt setup](#trakt-setup). |
+| `TRAKT_CLIENT_ID` | _(empty)_ | Trakt API client ID - required for Trakt scrobbling. See [Trakt setup](#trakt-setup). |
 | `M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS` | `false` | Renders the in-player backend diagnostics panel and fallback reason badge. Useful when debugging playback fallback behaviour. |
 
 Example enabling diagnostics on a debug run:
@@ -304,7 +293,7 @@ lib/
   l10n/           ARB source files + generated AppLocalizations
   navigation/     Router, route names, PlayerArgs
   playback/       Platform playback adapters and orchestrator
-  providers/      Riverpod providers (app_providers.dart — single source of truth)
+  providers/      Riverpod providers (app_providers.dart - single source of truth)
   services/       Domain models, Xtream API, EPG, AppStateController
   shared/         Reusable UI widgets
 tvos/             Apple TV (tvOS) Xcode runner
@@ -321,7 +310,7 @@ State is managed with **Riverpod 2**. The key split:
 | Concern | Who handles it |
 |---|---|
 | Reactive data reads (channels, isConfigured, etc.) | Riverpod providers in `lib/providers/app_providers.dart` |
-| Business logic / mutations (connect, disconnect, etc.) | `AppStateController` — called via callbacks passed from `AppShell` |
+| Business logic / mutations (connect, disconnect, etc.) | `AppStateController` - called via callbacks passed from `AppShell` |
 | Service instances (EPG, favorites, etc.) | `AppStateController` owns them; providers expose stable refs via `ref.read` |
 
 **The rule:** feature screens extend `ConsumerStatefulWidget` and read all display data via `ref.watch(someProvider)`. They never hold or accept an `AppStateController` reference. Actions arrive as typed callbacks in the constructor.
@@ -334,7 +323,7 @@ The app is fully localized using Flutter `gen_l10n`. Supported languages: **Engl
 
 ### Adding or updating strings
 
-1. Edit `lib/l10n/app_en.arb` (source of truth) — add the new key and English value.
+1. Edit `lib/l10n/app_en.arb` (source of truth) - add the new key and English value.
 2. Add the translated key to all other ARB files (`app_de.arb`, `app_es.arb`, `app_fr.arb`, `app_zh.arb`).
 3. Regenerate:
    ```bash
