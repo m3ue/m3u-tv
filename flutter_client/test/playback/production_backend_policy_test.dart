@@ -208,6 +208,34 @@ void main() {
       },
     );
 
+    test('desktop libmpv delegates aspect correction to Flutter', () {
+      final linuxBackend = File(
+        'linux/desktop_libmpv_backend.cc',
+      ).readAsStringSync();
+      final windowsBackend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+      final playerScreen = File(
+        'lib/features/player/player_screen.dart',
+      ).readAsStringSync();
+      const keepAspectOption =
+          'api.set_option_string(handle, "keepaspect", "no");';
+
+      for (final backend in <String>[linuxBackend, windowsBackend]) {
+        expect(backend, contains('constexpr uint32_t kTextureWidth = 1280;'));
+        expect(backend, contains('constexpr uint32_t kTextureHeight = 720;'));
+        final keepAspectIndex = backend.indexOf(keepAspectOption);
+        final initializeIndex = backend.indexOf('api.initialize(handle)');
+        expect(keepAspectIndex, isNonNegative);
+        expect(initializeIndex, greaterThan(keepAspectIndex));
+        expect(backend.split(keepAspectOption), hasLength(2));
+        expect(backend, contains('"video-params/aspect"'));
+      }
+
+      expect(playerScreen, contains('aspectRatio: _videoAspectRatio'));
+      expect(playerScreen, contains('aspectRatio: aspectRatio'));
+    });
+
     test('desktop libmpv load applies resume start position', () {
       final linuxBackend = File(
         'linux/desktop_libmpv_backend.cc',
