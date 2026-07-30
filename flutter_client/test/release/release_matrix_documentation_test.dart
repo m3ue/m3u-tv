@@ -36,6 +36,35 @@ void main() {
     expect(workflow, contains('run: flutter test'));
   });
 
+  test('release builds use only the public Trakt client id', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    expect(releaseWorkflow, isNot(contains('TRAKT_CLIENT_SECRET')));
+    expect(releaseWorkflow, isNot(contains('secrets.TRAKT_CLIENT_SECRET')));
+    expect(
+      releaseWorkflow,
+      isNot(contains('--dart-define=TRAKT_CLIENT_SECRET')),
+    );
+
+    for (final stepName in <String>[
+      'Build APK',
+      'Build iOS IPA (unsigned)',
+      'Build tvOS (unsigned)',
+      'Build macOS app (unsigned)',
+      'Build Linux app',
+      'Build Windows app',
+    ]) {
+      final step = workflowStep(releaseWorkflow, stepName);
+      expect(step, contains('--dart-define=TRAKT_CLIENT_ID'));
+      expect(
+        step,
+        isNot(contains('TRAKT_CLIENT_SECRET')),
+        reason:
+            '$stepName must not compile a client secret into release output',
+      );
+    }
+  });
+
   test('CI executes native Android playback speed unit tests', () {
     final ciWorkflow = readFile(ciWorkflowPath);
     final releaseWorkflow = readFile(releaseWorkflowPath);

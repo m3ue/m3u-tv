@@ -148,8 +148,7 @@ jobs:
       - name: Build APK
         run: |
           flutter build apk --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
         env:
           ANDROID_KEYSTORE_PATH: ../../upload-keystore.jks
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -258,8 +257,7 @@ jobs:
       - name: Build iOS IPA (unsigned)
         run: |
           flutter build ipa --release --no-codesign \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 
       - name: Stage artifact
         # flutter build ipa --no-codesign creates an xcarchive, not a Payload IPA.
@@ -371,8 +369,7 @@ jobs:
       - name: Build tvOS (unsigned)
         run: |
           flutter-tvos build tvos --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 
       - name: Package IPA
         # flutter-tvos build tvos creates an xcarchive; package the .app manually.
@@ -457,8 +454,7 @@ jobs:
           FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
         run: |
           flutter build macos --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 
       - name: Sign app bundle
         # Notarization requires: Developer ID Application cert, Hardened Runtime
@@ -574,8 +570,7 @@ jobs:
       - name: Build Linux app
         run: |
           flutter build linux --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 
       - name: Verify Linux bundle
         run: |
@@ -781,8 +776,7 @@ jobs:
       - name: Build Windows app
         run: |
           flutter build windows --release `
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} `
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 
       - name: Verify Windows bundle
         run: |
