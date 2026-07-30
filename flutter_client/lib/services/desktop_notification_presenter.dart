@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications_linux/flutter_local_notifications_linux.dart';
-import 'package:flutter_local_notifications_windows/flutter_local_notifications_windows.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 
 typedef DesktopNotificationActivation =
@@ -63,7 +62,9 @@ class NativeDesktopNotificationPresenter
   bool _disposed = false;
 
   bool get _isSupported =>
-      _operatingSystem == 'linux' || _operatingSystem == 'windows';
+      _operatingSystem == 'linux' ||
+      _operatingSystem == 'windows' ||
+      _operatingSystem == 'macos';
 
   @override
   Future<void> initialize({
@@ -228,10 +229,54 @@ class WindowsDesktopNotificationBackend implements DesktopNotificationBackend {
   }) => _plugin.show(id: id, title: title, body: body, payload: payload);
 }
 
+class MacosDesktopNotificationBackend implements DesktopNotificationBackend {
+  MacosDesktopNotificationBackend({FlutterLocalNotificationsPlugin? plugin})
+    : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+
+  static const _macosSettings = InitializationSettings(
+    macOS: DarwinInitializationSettings(),
+  );
+
+  final FlutterLocalNotificationsPlugin _plugin;
+
+  @override
+  Future<void> initialize({
+    required String defaultActionName,
+    required void Function(String? payload) onActivation,
+  }) async {
+    final initialized = await _plugin.initialize(
+      settings: _macosSettings,
+      onDidReceiveNotificationResponse: (response) {
+        onActivation(response.payload);
+      },
+    );
+    if (initialized == false) {
+      throw StateError('macOS notification initialization failed');
+    }
+  }
+
+  @override
+  Future<void> show({
+    required int id,
+    required String title,
+    required String? body,
+    required String payload,
+  }) => _plugin.show(
+    id: id,
+    title: title,
+    body: body,
+    notificationDetails: const NotificationDetails(
+      macOS: DarwinNotificationDetails(),
+    ),
+    payload: payload,
+  );
+}
+
 DesktopNotificationBackend _defaultBackend(String operatingSystem) =>
     switch (operatingSystem) {
       'linux' => LinuxDesktopNotificationBackend(),
       'windows' => WindowsDesktopNotificationBackend(),
+      'macos' => MacosDesktopNotificationBackend(),
       _ => _UnsupportedDesktopNotificationBackend(),
     };
 

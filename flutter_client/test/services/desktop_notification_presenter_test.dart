@@ -4,7 +4,7 @@ import 'package:m3u_tv/services/tv_notification_service.dart';
 
 void main() {
   group('NativeDesktopNotificationPresenter', () {
-    for (final operatingSystem in <String>['linux', 'windows']) {
+    for (final operatingSystem in <String>['linux', 'windows', 'macos']) {
       test(
         '$operatingSystem initializes and presents native content',
         () async {
@@ -35,13 +35,7 @@ void main() {
       );
     }
 
-    for (final operatingSystem in <String>[
-      'android',
-      'ios',
-      'tvos',
-      'macos',
-      'web',
-    ]) {
+    for (final operatingSystem in <String>['android', 'ios', 'tvos', 'web']) {
       test('$operatingSystem is a native presentation no-op', () async {
         final backend = _FakeDesktopNotificationBackend();
         final presenter = NativeDesktopNotificationPresenter(
