@@ -40,6 +40,7 @@ class AuthNotifier extends ChangeNotifier {
   UserCredentials? _credentials;
   String? _error;
   bool _isLoading = false;
+  int _connectionGeneration = 0;
 
   bool get isConfigured => _isConfigured;
   XtreamAuthResponse? get authResponse => _authResponse;
@@ -59,6 +60,7 @@ class AuthNotifier extends ChangeNotifier {
   );
 
   Future<void> restoreSession(AuthSessionSnapshot snapshot) async {
+    _connectionGeneration += 1;
     final credentials = snapshot._credentials;
     if (credentials == null) {
       await secureStorage.delete(_credentialsKey);
@@ -85,13 +87,21 @@ class AuthNotifier extends ChangeNotifier {
   ///
   /// Returns true on success. On failure, sets [error] and returns false.
   /// Credentials are persisted to secure storage on success.
-  Future<bool> connect(UserCredentials credentials) async {
+  Future<bool> connect(
+    UserCredentials credentials, {
+    bool Function()? isCurrent,
+  }) async {
+    final connectionGeneration = ++_connectionGeneration;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final response = await xtreamService.authenticate(credentials);
+      if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
+        _finishStaleConnection(connectionGeneration);
+        return false;
+      }
       await secureStorage.write(
         _credentialsKey,
         jsonEncode({
@@ -100,6 +110,10 @@ class AuthNotifier extends ChangeNotifier {
           'password': credentials.password,
         }),
       );
+      if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
+        _finishStaleConnection(connectionGeneration);
+        return false;
+      }
 
       _isConfigured = true;
       _authResponse = response;
@@ -108,11 +122,19 @@ class AuthNotifier extends ChangeNotifier {
       notifyListeners();
       return true;
     } on XtreamAuthException catch (e) {
+      if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
+        _finishStaleConnection(connectionGeneration);
+        return false;
+      }
       _error = _redact(e.message, credentials);
       _isLoading = false;
       notifyListeners();
       return false;
     } on Object catch (e) {
+      if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
+        _finishStaleConnection(connectionGeneration);
+        return false;
+      }
       _error = _redact(userFacingXtreamError(e), credentials);
       _isLoading = false;
       notifyListeners();
@@ -122,6 +144,7 @@ class AuthNotifier extends ChangeNotifier {
 
   /// Disconnects from the server, clearing all auth state and stored credentials.
   Future<void> disconnect() async {
+    _connectionGeneration += 1;
     await secureStorage.delete(_credentialsKey);
     xtreamService.clearCredentials();
     _isConfigured = false;
@@ -135,7 +158,7 @@ class AuthNotifier extends ChangeNotifier {
   /// Attempts to restore credentials from secure storage and reconnect.
   ///
   /// Returns true if credentials were found and reconnection succeeded.
-  Future<bool> loadSavedCredentials() async {
+  Future<bool> loadSavedCredentials({bool Function()? isCurrent}) async {
     final saved = await secureStorage.read(_credentialsKey);
     if (saved == null) return false;
 
@@ -146,7 +169,7 @@ class AuthNotifier extends ChangeNotifier {
         username: '${json['username'] ?? ''}',
         password: '${json['password'] ?? ''}',
       );
-      return await connect(credentials);
+      return await connect(credentials, isCurrent: isCurrent);
     } on Object catch (_) {
       return false;
     }
@@ -155,6 +178,19 @@ class AuthNotifier extends ChangeNotifier {
   /// Clears the current error message.
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  bool _isCurrentConnection(
+    int connectionGeneration,
+    bool Function()? isCurrent,
+  ) =>
+      connectionGeneration == _connectionGeneration &&
+      (isCurrent?.call() ?? true);
+
+  void _finishStaleConnection(int connectionGeneration) {
+    if (connectionGeneration != _connectionGeneration) return;
+    _isLoading = false;
     notifyListeners();
   }
 

@@ -10,6 +10,13 @@ class CacheEntry<T> {
   final bool isStale;
 }
 
+class CacheSnapshot {
+  const CacheSnapshot._(this._memory, this._persisted);
+
+  final Map<String, Object?> _memory;
+  final Map<String, Object?> _persisted;
+}
+
 class CacheService {
   CacheService({
     Map<String, Object?>? memory,
@@ -45,6 +52,28 @@ class CacheService {
       data: value.data as T,
       isStale: DateTime.now().difference(value.timestamp) > refreshInterval,
     );
+  }
+
+  Future<CacheSnapshot> snapshot() async {
+    final memory = Map<String, Object?>.fromEntries(
+      _memory.entries.where((entry) => entry.key.startsWith('m3ue_cache_')),
+    );
+    final persisted = Map<String, Object?>.from(
+      await _store?.snapshot() ?? const <String, Object?>{},
+    )..removeWhere((key, _) => !key.startsWith('m3ue_cache_'));
+    return CacheSnapshot._(memory, persisted);
+  }
+
+  Future<void> restore(CacheSnapshot snapshot) async {
+    _memory
+      ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
+      ..addAll(snapshot._memory);
+    final store = _store;
+    if (store == null) return;
+    await store.removeWhere((key) => key.startsWith('m3ue_cache_'));
+    for (final entry in snapshot._persisted.entries) {
+      await store.write(entry.key, entry.value);
+    }
   }
 
   Future<void> clear() async {

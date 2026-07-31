@@ -165,6 +165,7 @@ class AppStateController extends ChangeNotifier {
   static const _maxActivatedNotificationIds = 100;
   final Set<String> _activatedNotificationIds = <String>{};
   final Generation _notificationSessionGeneration = Generation();
+  final Generation _sourceOperationGeneration = Generation();
   int _unreadNotificationCount = 0;
 
   /// Stream of incoming TV push notifications (from Reverb WebSocket or
@@ -286,6 +287,7 @@ class AppStateController extends ChangeNotifier {
       _sourceType == AppSourceType.xtream ? xtreamService.serverTimezone : null;
 
   Future<void> boot() async {
+    final sourceGeneration = _sourceOperationGeneration.advance();
     _isBootstrapping = true;
     _error = null;
     notifyListeners();
@@ -308,7 +310,9 @@ class AppStateController extends ChangeNotifier {
     final savedSource = await _readSavedSourceType();
     if (savedSource == AppSourceType.xtream ||
         savedSource == AppSourceType.none) {
-      final restored = await authNotifier.loadSavedCredentials();
+      final restored = await authNotifier.loadSavedCredentials(
+        isCurrent: () => !_sourceOperationGeneration.isStale(sourceGeneration),
+      );
       if (restored) {
         final credentials = authNotifier.credentials!;
         final notificationGeneration = _notificationSessionGeneration.advance();
@@ -316,7 +320,12 @@ class AppStateController extends ChangeNotifier {
           _isBootstrapping = false;
           notifyListeners();
           unawaited(_refreshRecentlyWatchedForActiveViewer());
-          unawaited(_replaceWithXtreamContent(clearCache: false));
+          unawaited(
+            _replaceWithXtreamContent(
+              clearCache: false,
+              sourceGeneration: sourceGeneration,
+            ),
+          );
           _pushRegistrationSuspended = false;
           unawaited(
             _connectTvNotifications(credentials, notificationGeneration),
@@ -324,7 +333,10 @@ class AppStateController extends ChangeNotifier {
           unawaited(_registerPushToken(credentials));
           return;
         }
-        final loaded = await _replaceWithXtreamContent(clearCache: false);
+        final loaded = await _replaceWithXtreamContent(
+          clearCache: false,
+          sourceGeneration: sourceGeneration,
+        );
         if (loaded) {
           _pushRegistrationSuspended = false;
           unawaited(
@@ -346,6 +358,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<bool> connectXtream(UserCredentials credentials) async {
+    final sourceGeneration = _sourceOperationGeneration.advance();
     final notificationGeneration = _notificationSessionGeneration.advance();
     _isLoadingContent = true;
     _error = null;
@@ -353,16 +366,33 @@ class AppStateController extends ChangeNotifier {
 
     final previousCredentials = authNotifier.credentials;
     final previousAuthSession = authNotifier.snapshotSession();
-    if (previousCredentials != null &&
-        !_sameCredentials(previousCredentials, credentials)) {
+    final previousCache = await cacheService.snapshot();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+    final replacingNotificationSession =
+        previousCredentials != null &&
+        !_sameCredentials(previousCredentials, credentials);
+    if (replacingNotificationSession) {
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
       await _reverbService.disconnect();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await _unregisterPushToken();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     }
 
-    final connected = await authNotifier.connect(credentials);
+    final connected = await authNotifier.connect(
+      credentials,
+      isCurrent: () => !_sourceOperationGeneration.isStale(sourceGeneration),
+    );
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     if (!connected) {
+      if (replacingNotificationSession) {
+        await _restoreNotificationSession(
+          previousCredentials,
+          sourceGeneration: sourceGeneration,
+          notificationGeneration: notificationGeneration,
+        );
+      }
       _isLoadingContent = false;
       _error = _redact(
         authNotifier.error ?? 'Authentication failed',
@@ -379,11 +409,23 @@ class AppStateController extends ChangeNotifier {
 
     final loaded = await _replaceWithXtreamContent(
       clearCache: true,
+      sourceGeneration: sourceGeneration,
       invalidateEpgFreshness:
           _sourceType != AppSourceType.xtream ||
           !_sameCredentials(previousCredentials, credentials),
     );
-    if (!loaded) await authNotifier.restoreSession(previousAuthSession);
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+    if (!loaded) {
+      await authNotifier.restoreSession(previousAuthSession);
+      await cacheService.restore(previousCache);
+      if (replacingNotificationSession) {
+        await _restoreNotificationSession(
+          previousCredentials,
+          sourceGeneration: sourceGeneration,
+          notificationGeneration: notificationGeneration,
+        );
+      }
+    }
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
@@ -391,6 +433,21 @@ class AppStateController extends ChangeNotifier {
       await _registerPushToken(credentials);
     }
     return loaded;
+  }
+
+  Future<void> _restoreNotificationSession(
+    UserCredentials credentials, {
+    required int sourceGeneration,
+    required int notificationGeneration,
+  }) async {
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    _pushRegistrationSuspended = false;
+    await _connectTvNotifications(credentials, notificationGeneration);
+    if (_sourceOperationGeneration.isStale(sourceGeneration) ||
+        _notificationSessionGeneration.isStale(notificationGeneration)) {
+      return;
+    }
+    await _registerPushToken(credentials);
   }
 
   Future<bool> switchToM3u({
@@ -403,16 +460,24 @@ class AppStateController extends ChangeNotifier {
 
     try {
       final playlist = m3uParser.parse(playlistText);
+      final sourceGeneration = _sourceOperationGeneration.advance();
       _notificationSessionGeneration.advance();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
       await _unregisterPushToken();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await _reverbService.disconnect();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await authNotifier.disconnect();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.clear();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('sourceType', 'm3u');
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('liveCategories', playlist.categories);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('liveStreams', playlist.channels);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await secureStorage.write(
         _sourceKey,
         jsonEncode(<String, Object?>{
@@ -421,6 +486,7 @@ class AppStateController extends ChangeNotifier {
           'playlist': playlistText,
         }),
       );
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       _epgFetchDebounce?.cancel();
       _epgFetchDebounce = null;
       _pendingEpgChannelIds.clear();
@@ -443,7 +509,9 @@ class AppStateController extends ChangeNotifier {
         name: 'Local M3U',
         isAdmin: true,
       );
-      _progressList = await resumeService.all(_activeViewer!.ulid);
+      final progress = await resumeService.all(_activeViewer!.ulid);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+      _progressList = progress;
       _isLoadingContent = false;
       notifyListeners();
       return true;
@@ -1069,13 +1137,18 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    final sourceGeneration = _sourceOperationGeneration.advance();
     _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
     _pushLifecycleGeneration.advance();
     await _unregisterPushToken();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await _reverbService.disconnect();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await authNotifier.disconnect();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];
     _activeViewer = null;
@@ -1116,6 +1189,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> clearAndRefresh() async {
+    final sourceGeneration = _sourceOperationGeneration.advance();
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
@@ -1125,7 +1199,11 @@ class AppStateController extends ChangeNotifier {
       await boot();
       return;
     }
-    await _replaceWithXtreamContent(clearCache: true);
+    await _replaceWithXtreamContent(
+      clearCache: true,
+      sourceGeneration: sourceGeneration,
+    );
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     _isLoadingContent = false;
     notifyListeners();
   }
@@ -1292,6 +1370,7 @@ class AppStateController extends ChangeNotifier {
 
   Future<bool> _replaceWithXtreamContent({
     required bool clearCache,
+    required int sourceGeneration,
     bool invalidateEpgFreshness = false,
   }) async {
     try {
@@ -1326,6 +1405,7 @@ class AppStateController extends ChangeNotifier {
         viewersFuture,
         mediaRequestsFuture,
       ]);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
 
       final viewers = results[7] as List<Viewer>;
       final channels = results[3] as List<Channel>;
@@ -1341,9 +1421,11 @@ class AppStateController extends ChangeNotifier {
         viewers,
         loginKey: _currentLoginKey(),
       );
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       final fetched = activeViewer == null
           ? const <Progress>[]
           : await _loadRecentlyWatchedDeduped(activeViewer.ulid);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       // Keep local progress if the server returned nothing (e.g. sync lag).
       final progress = fetched.isEmpty && _progressList.isNotEmpty
           ? _progressList
@@ -1380,20 +1462,30 @@ class AppStateController extends ChangeNotifier {
 
       if (clearCache) {
         await cacheService.clear();
+        if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
         aiostreamsApiService.clearCache();
       }
       await cacheService.set('sourceType', 'xtream');
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('liveCategories', liveCategories);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('vodCategories', vodCategories);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('seriesCategories', seriesCategories);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('liveStreams', channels);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('vodStreams', vodItems);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('seriesStreams', seriesList);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await cacheService.set('viewers', viewers);
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       await secureStorage.write(
         _sourceKey,
         jsonEncode(<String, Object?>{'type': 'xtream'}),
       );
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       return true;
     } on Object catch (error) {
       _error = _redact(userFacingXtreamError(error), xtreamService.credentials);

@@ -328,6 +328,8 @@ class XtreamService {
   UserCredentials? _credentials;
   tz.Location _serverLocation = tz.UTC;
   bool _isM3UEditor = false;
+  int _sessionGeneration = 0;
+  int _authenticationGeneration = 0;
 
   bool get isConfigured => _credentials != null;
 
@@ -347,9 +349,13 @@ class XtreamService {
     _credentials = snapshot._credentials;
     _serverLocation = snapshot._serverLocation;
     _isM3UEditor = snapshot._isM3UEditor;
+    _sessionGeneration += 1;
+    _authenticationGeneration += 1;
   }
 
   Future<XtreamAuthResponse> authenticate(UserCredentials credentials) async {
+    final authenticationGeneration = ++_authenticationGeneration;
+    _sessionGeneration += 1;
     final normalized = credentials.normalized();
     final response = await _requestWithCredentials(
       normalized,
@@ -383,14 +389,13 @@ class XtreamService {
       );
     }
 
-    _credentials = normalized;
-    _isM3UEditor = true;
     final tzName =
         _stringOrNull(_asMap(json['server_info'])['timezone']) ?? 'UTC';
+    late final tz.Location serverLocation;
     try {
-      _serverLocation = tz.getLocation(tzName);
+      serverLocation = tz.getLocation(tzName);
     } on Exception catch (_) {
-      _serverLocation = tz.UTC;
+      serverLocation = tz.UTC;
     }
     final features = _asList(m3uEditor['features'])
         .map((feature) => '$feature')
@@ -408,7 +413,7 @@ class XtreamService {
     final requests = requestsJson is Map<String, dynamic>
         ? RequestsCapability.fromJson(requestsJson)
         : null;
-    return XtreamAuthResponse(
+    final authResponse = XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
       m3uEditorVersion: '${m3uEditor['version'] ?? ''}',
@@ -417,12 +422,20 @@ class XtreamService {
       proxy: proxy,
       requests: requests,
     );
+    if (authenticationGeneration == _authenticationGeneration) {
+      _credentials = normalized;
+      _isM3UEditor = true;
+      _serverLocation = serverLocation;
+    }
+    return authResponse;
   }
 
   void clearCredentials() {
     _credentials = null;
     _isM3UEditor = false;
     _serverLocation = tz.UTC;
+    _sessionGeneration += 1;
+    _authenticationGeneration += 1;
   }
 
   Future<List<Category>> getLiveCategories() async =>
@@ -922,11 +935,13 @@ class XtreamService {
   }
 
   Future<List<Category>> _categories(String action) async {
+    final sessionGeneration = _sessionGeneration;
     final response = await _request(action);
     final categories = _asList(
       response,
     ).map((item) => Category.fromXtream(_asMap(item))).toList(growable: false);
-    if (action == 'get_live_categories') {
+    if (action == 'get_live_categories' &&
+        sessionGeneration == _sessionGeneration) {
       await _cache?.set('liveCategories', categories);
     }
     return categories;
