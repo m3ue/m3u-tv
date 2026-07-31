@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -119,6 +120,69 @@ void main() {
       expect(find.byTooltip('Delete'), findsOneWidget);
       expect(find.byTooltip('Cancel'), findsNothing);
     });
+
+    testWidgets(
+      'shows a play icon alongside the delete button for a playable completed recording',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            onDeleteRecording: (_) async {},
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byTooltip('Delete'), findsOneWidget);
+        expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+      },
+    );
+
+    testWidgets('hides the play icon for a non-playable recording', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_failedRecording(), _cancelledRecording()],
+          onDeleteRecording: (_) async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Delete'), findsNWidgets(2));
+      expect(find.byIcon(Icons.play_arrow), findsNothing);
+    });
+
+    testWidgets(
+      'delete button is reachable and selectable via D-pad, not just touch',
+      (tester) async {
+        // Regression test: DpadFocusable excludes descendant focus by
+        // default, so a button nested inside the row's own play DpadInkWell
+        // was permanently unreachable by remote even though it was tappable.
+        // The row's play area autofocuses first (index == 0); moving right
+        // must land on the delete button and D-pad select must activate it.
+        String? deletedUuid;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            onDeleteRecording: (uuid) async {
+              deletedUuid = uuid;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Delete recording?'), findsOneWidget);
+        await tester.tap(find.text('Delete recording'));
+        await tester.pumpAndSettle();
+
+        expect(deletedUuid, 'rec-1');
+      },
+    );
 
     testWidgets('shows delete button for failed and cancelled recordings', (
       tester,

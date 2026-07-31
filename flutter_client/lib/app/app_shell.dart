@@ -575,13 +575,17 @@ class AppShellState extends ConsumerState<AppShell>
   ///
   /// If the cancel succeeds but the delete fails (e.g. transient server
   /// hiccup), the recording is still stopped and stays in the local list with
-  /// its Cancelled status — the user can retry Delete from there.
+  /// its Cancelled status — the user can retry Delete from there. The delete
+  /// failure is rethrown (not swallowed) so DvrRecordingsScreen's
+  /// _runWithFeedback shows the "could not delete" SnackBar instead of a
+  /// false "deleted" success message for a recording that's still there.
   Future<void> _cancelAndDeleteRecording(String uuid) async {
     await _appState.cancelDvrRecording(uuid);
     try {
       await _appState.deleteDvrRecording(uuid);
     } on Object catch (error) {
       debugPrint('DVR: post-cancel delete failed: $error');
+      rethrow;
     }
   }
 
