@@ -613,6 +613,82 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'live channel skip-next reuses the orchestrator instead of rebuilding it',
+    (tester) async {
+      // Regression test: the Android Media3 and Apple AVKit native plugins
+      // each hold a single global player behind their MethodChannel. Building
+      // a fresh PlaybackOrchestrator per channel switch (as skip-next used
+      // to) let the previous orchestrator's deferred dispose tear down the
+      // channel the user had just switched to, once its load already landed.
+      // AppShell must now reuse the existing orchestrator across an
+      // in-session channel switch instead of building a new one.
+      var builderCallCount = 0;
+      final adapter = _NavigationPlayerAdapter();
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(
+          liveChannels: const <Channel>[
+            Channel(
+              id: 101,
+              name: 'Route News',
+              streamUrl: 'http://example.com/live/101.m3u8',
+              categoryId: 'live',
+            ),
+            Channel(
+              id: 102,
+              name: 'Route Sports',
+              streamUrl: 'http://example.com/live/102.m3u8',
+              categoryId: 'live',
+            ),
+          ],
+        ),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          useProductionPlayer: true,
+          playbackOrchestratorBuilder: () {
+            builderCallCount++;
+            return _testPlaybackOrchestrator(adapter);
+          },
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      await tester.tap(find.text('Route News').last);
+      await _pumpAppFrame(tester);
+
+      expect(builderCallCount, 1);
+      expect(adapter.loadCallCount, 1);
+
+      await tester.tap(find.byIcon(Icons.skip_next));
+      await _pumpAppFrame(tester);
+
+      expect(
+        builderCallCount,
+        1,
+        reason: 'channel switch must reuse the existing orchestrator',
+      );
+      expect(
+        adapter.disposeCallCount,
+        0,
+        reason: 'the just-opened channel must not be torn down mid-switch',
+      );
+      expect(adapter.loadCallCount, 2);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('lifecycle resume keeps an active player immersive', (
     tester,
   ) async {
@@ -1763,6 +1839,9 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
   final StreamController<PlaybackError> _errorController =
       StreamController<PlaybackError>.broadcast();
 
+  int loadCallCount = 0;
+  int disposeCallCount = 0;
+
   @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
 
@@ -1774,6 +1853,7 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
 
   @override
   Future<void> load(PlaybackSource source) async {
+    loadCallCount++;
     _stateController.add(
       PlaybackState(
         backend: PlaybackBackend.desktopLibmpv,
@@ -1809,6 +1889,7 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
 
   @override
   Future<void> dispose() async {
+    disposeCallCount++;
     await _stateController.close();
     await _errorController.close();
   }

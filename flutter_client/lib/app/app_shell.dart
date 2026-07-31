@@ -118,6 +118,17 @@ class AppShellState extends ConsumerState<AppShell>
   bool _playerHasFailed = false;
   FocusNode? _focusBeforePlayer;
 
+  // Bumped only when a brand-new player session starts (not on in-session
+  // source switches, e.g. skip-previous/skip-next), so PlayerScreen's key
+  // stays stable across a channel switch and its State survives via
+  // didUpdateWidget instead of being torn down and rebuilt. This matters
+  // because the Android Media3 and Apple AVKit native plugins each hold a
+  // single global player behind their MethodChannel — remounting PlayerScreen
+  // per channel would dispose the *previous* orchestrator after the *new*
+  // one has already started loading, and that deferred dispose tears down
+  // whatever the native side currently has loaded (the new channel).
+  int _playerSessionId = 0;
+
   // Channels the user was browsing when the live player opened (filtered
   // category/favorites/search list), so skip-previous/skip-next in
   // PlaybackControls stays within that view instead of always cycling the
@@ -414,10 +425,6 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _openPlayerDirect(PlayerArgs rawArgs) {
     final args = _applyProxyPlayback(rawArgs);
-    final oldOrch = _playerOrchestrator;
-    final newOrch =
-        widget.playbackOrchestratorBuilder?.call() ??
-        buildPlaybackOrchestrator();
     // Save the focused node so we can restore it precisely after the player
     // closes. _contentFocusNode.requestFocus() alone is unreliable: when
     // PlayerScreen disposes _screenFocusNode, Flutter's _willDisposeFocusNode
@@ -428,16 +435,29 @@ class AppShellState extends ConsumerState<AppShell>
     final focus = FocusManager.instance.primaryFocus;
     _focusBeforePlayer = _isInContentScope(focus) ? focus : null;
     unawaited(_systemUiPolicy.applyPlayer());
+
+    if (_playerOrchestrator != null) {
+      // A player is already open (e.g. skip-previous/skip-next) — reuse its
+      // orchestrator/session rather than building a new one. PlayerScreen's
+      // key is unchanged, so the framework updates the existing State via
+      // didUpdateWidget instead of disposing it, keeping exactly one native
+      // player instance alive for the whole session.
+      setState(() {
+        _playerArgs = args;
+        _playerHasFailed = false;
+      });
+      return;
+    }
+
+    _playerSessionId += 1;
+    final newOrch =
+        widget.playbackOrchestratorBuilder?.call() ??
+        buildPlaybackOrchestrator();
     setState(() {
       _playerArgs = args;
       _playerOrchestrator = newOrch;
       _playerHasFailed = false;
     });
-    if (oldOrch != null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => oldOrch.dispose().ignore(),
-      );
-    }
   }
 
   bool _isInContentScope(FocusNode? node) {
@@ -459,6 +479,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerOrchestrator = null;
       _playerHasFailed = false;
     });
+    _playerChannelContext = const <Channel>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       orch?.dispose().ignore();
       if (!mounted) return;
@@ -922,7 +943,7 @@ class AppShellState extends ConsumerState<AppShell>
             child:
                 widget.playerRouteBuilder?.call(args) ??
                 PlayerScreen(
-                  key: ValueKey(args.streamUrl),
+                  key: ValueKey(_playerSessionId),
                   args: args,
                   orchestrator: orch,
                   epgService: _appState.epgService,

@@ -125,9 +125,56 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       }
     });
-    _startPlayback();
+    _stateSubscription = widget.orchestrator.onState.listen(_handleState);
+    _errorSubscription = widget.orchestrator.onError.listen(_handleError);
+    _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+  }
+
+  // Live-TV skip-previous/skip-next replaces `args` on an already-mounted
+  // PlayerScreen (AppShell keeps the same orchestrator/State alive across a
+  // channel switch — see app_shell.dart's `_playerSessionId` — so the single
+  // native player behind Media3/AVKit is never torn down mid-switch). Reset
+  // everything initState/_openSource would normally set up for a fresh
+  // mount, but reuse the existing stream subscriptions rather than doubling
+  // them up on the same orchestrator.
+  @override
+  void didUpdateWidget(covariant PlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.args.streamUrl == widget.args.streamUrl) return;
+
+    if (_traktScrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
+    _traktScrobbleActive = false;
+    _failureReported = false;
+    _lastValidProgress = 0;
+    _stopPositionTimer();
+    _progressTimer?.cancel();
+    _epgTimer?.cancel();
+    _epgFetch = null;
+
+    setState(() {
+      _status = PlaybackStatus.idle;
+      _currentPosition = Duration.zero;
+      _duration = Duration.zero;
+      _errorMessage = null;
+      _fallbackReason = null;
+      _isPlaying = false;
+      _videoAspectRatio = 16 / 9;
+      _audioTracks = const <PlaybackTrack>[];
+      _subtitleTracks = const <PlaybackTrack>[];
+      _selectedAudioTrackId = null;
+      _selectedSubtitleTrackId = null;
+      _epgData = null;
+      _overlayVisible = true;
+    });
+
+    _openSource(widget.args);
+    _startLoadingTimeout();
+    _scheduleOverlayHide();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+    });
   }
 
   void _startPositionTimer() {
@@ -148,10 +195,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer = null;
   }
 
-  void _scrobble(String action) {
+  void _scrobble(String action) => _scrobbleFor(widget.args, action);
+
+  void _scrobbleFor(PlayerArgs args, String action) {
     final service = widget.traktService;
     if (service == null || service.status != TraktAuthStatus.connected) return;
-    if (_isLive || widget.args.type == 'catchup') return;
+    if (args.type == 'live' || args.type == 'catchup') return;
     final duration = _duration.inSeconds;
     var progress = duration > 0
         ? (_currentPosition.inSeconds / duration * 100).clamp(0.0, 100.0)
@@ -164,7 +213,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       progress = _lastValidProgress;
     }
     if (progress > 0) _lastValidProgress = progress;
-    final args = widget.args;
     unawaited(
       service.scrobble(
         action: action,
@@ -216,13 +264,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _startPlayback() {
-    _stateSubscription = widget.orchestrator.onState.listen(_handleState);
-    _errorSubscription = widget.orchestrator.onError.listen(_handleError);
-
-    final source = widget.args.toPlaybackSource();
-
-    unawaited(_openAndSeek(source));
+  void _openSource(PlayerArgs args) {
+    unawaited(_openAndSeek(args.toPlaybackSource()));
   }
 
   Future<void> _openAndSeek(PlaybackSource source) async {
@@ -414,7 +457,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
-      if (_disposed || !mounted) return;
+      // The player may have switched to a different channel while this was
+      // in flight (didUpdateWidget cancels the timer but can't cancel this
+      // future) — don't let a stale response overwrite the new channel's EPG.
+      if (_disposed || !mounted || widget.args.epgChannelId != channelId) {
+        return;
+      }
       widget.epgService.mergePrograms(programs);
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {

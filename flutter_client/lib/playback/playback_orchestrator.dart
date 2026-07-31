@@ -84,12 +84,19 @@ class PlaybackOrchestrator {
 
   Future<void> open(PlaybackSource source) async {
     _ensureNotDisposed();
-    _playbackGeneration += 1;
-    _cancelBufferingTimer();
     _activeRecoveryAttempts = 0;
     _recovering = false;
+    // _stopActiveAdapter() bumps _playbackGeneration itself — capture the
+    // value it lands on rather than bumping again here, then bail out after
+    // every subsequent await if a *newer* open() call (e.g. a second
+    // skip-channel press before this one finished loading) has bumped it
+    // again. Without this, two concurrent open() calls can both reach
+    // adapter.load() and whichever assigns _activeAdapter/_activeSource last
+    // wins regardless of which one the native side actually kept loaded.
     await _stopActiveAdapter();
+    final generation = _playbackGeneration;
     await _cleanupSessions();
+    if (generation != _playbackGeneration) return;
     _activeAdapter = null;
     _activeBackend = null;
     _activeSource = null;
@@ -98,6 +105,7 @@ class PlaybackOrchestrator {
     PlaybackBackend? previousBackend;
     var attempt = 0;
     for (final backend in _nativeBackends()) {
+      if (generation != _playbackGeneration) return;
       final failure = await _tryLoadBackend(
         backend: backend,
         source: source,
@@ -105,6 +113,7 @@ class PlaybackOrchestrator {
             ? 'direct:${backend.name}:ready'
             : 'fallback:${backend.name}:preferred ${previousBackend?.name ?? 'none'} unsupported',
       );
+      if (generation != _playbackGeneration) return;
       attempt += 1;
       if (failure == null) return;
       if (_platform == PlaybackPlatform.android &&
@@ -116,6 +125,7 @@ class PlaybackOrchestrator {
       lastRecoverableFailure = failure;
     }
 
+    if (generation != _playbackGeneration) return;
     await _openServerTranscode(source, lastFailure: lastRecoverableFailure);
   }
 
