@@ -810,6 +810,164 @@ void main() {
     );
 
     test(
+      'resume persistence entered by a stale source cannot commit',
+      () async {
+        final store = _BlockingPostCommitStore();
+        final transport = _PostCommitOwnershipTransport();
+        final fixture = _Fixture(
+          transport: transport.call,
+          persistentStore: store,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForProgress(fixture.controller, 'Server A Progress');
+        store.blockResumeFor('viewer-server-b');
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await store.blockedResumeWriteStarted.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await _waitForProgress(fixture.controller, 'Server C Progress');
+        await _waitForStoredProgress(
+          fixture.controller,
+          viewerId: 'viewer-server-c',
+          streamId: 203,
+        );
+
+        store.releaseBlockedResumeWrite.complete();
+        await store.blockedResumeWriteCompleted.future;
+        await pumpEventQueue();
+
+        expect(fixture.auth.credentials, _thirdCredentials);
+        expect(fixture.controller.activeViewer?.ulid, 'viewer-server-c');
+        expect(
+          fixture.controller.progressList.single.title,
+          'Server C Progress',
+        );
+        expect(
+          await fixture.controller.resumeService.load(
+            'viewer-server-b',
+            ContentType.vod,
+            202,
+          ),
+          isNull,
+        );
+        expect(
+          (await fixture.controller.resumeService.load(
+            'viewer-server-c',
+            ContentType.vod,
+            203,
+          ))?.title,
+          'Server C Progress',
+        );
+        final persisted = jsonEncode(await store.snapshot());
+        expect(persisted, isNot(contains('Server B Progress')));
+        expect(persisted, contains('Server C Progress'));
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.action == 'update_progress' &&
+                request.username == 'third' &&
+                request.viewerId == 'viewer-server-b',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'resume persistence entered by a stale viewer cannot commit',
+      () async {
+        final store = _BlockingPostCommitStore();
+        final transport = _PostCommitOwnershipTransport();
+        final fixture = _Fixture(
+          transport: transport.call,
+          persistentStore: store,
+        );
+        addTearDown(fixture.controller.dispose);
+        const secondViewer = Viewer(
+          id: 20,
+          ulid: 'viewer-local-b',
+          name: 'Local Viewer B',
+          isAdmin: false,
+        );
+        const thirdViewer = Viewer(
+          id: 30,
+          ulid: 'viewer-local-c',
+          name: 'Local Viewer C',
+          isAdmin: false,
+        );
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForProgress(fixture.controller, 'Server A Progress');
+        store.blockResumeFor(secondViewer.ulid);
+
+        final secondSwitch = fixture.controller.switchViewer(secondViewer);
+        await store.blockedResumeWriteStarted.future;
+        await fixture.controller.switchViewer(thirdViewer);
+        await _waitForStoredProgress(
+          fixture.controller,
+          viewerId: thirdViewer.ulid,
+          streamId: 201,
+        );
+
+        store.releaseBlockedResumeWrite.complete();
+        await store.blockedResumeWriteCompleted.future;
+        await secondSwitch;
+        await pumpEventQueue();
+
+        expect(fixture.controller.activeViewer, thirdViewer);
+        expect(
+          fixture.controller.progressList.single.title,
+          'Server A Progress',
+        );
+        expect(
+          await fixture.controller.resumeService.load(
+            secondViewer.ulid,
+            ContentType.vod,
+            201,
+          ),
+          isNull,
+        );
+        expect(
+          (await fixture.controller.resumeService.load(
+            thirdViewer.ulid,
+            ContentType.vod,
+            201,
+          ))?.title,
+          'Server A Progress',
+        );
+        expect(
+          jsonEncode(await store.snapshot()),
+          isNot(contains('m3ue_resume_${secondViewer.ulid}_')),
+        );
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.action == 'get_recently_watched' &&
+                request.username == 'first' &&
+                request.viewerId != 'viewer-server-a' &&
+                request.viewerId != secondViewer.ulid &&
+                request.viewerId != thirdViewer.ulid,
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
       'late favorites pull cannot replace a newer source',
       () async {
         final storage = InMemorySecureStorage();
@@ -847,6 +1005,85 @@ void main() {
         await pumpEventQueue();
 
         expect(await fixture.controller.favoritesService.all(), <int>{103});
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.isFavorites &&
+                request.viewerId !=
+                    'viewer-server-${request.source.toLowerCase()}',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'favorites persistence entered by a stale source cannot commit',
+      () async {
+        final store = _BlockingPostCommitStore();
+        final storage = InMemorySecureStorage();
+        final transport = _PostCommitOwnershipTransport(
+          blockThirdFavoritesPull: true,
+        );
+        final fixture = _Fixture(
+          transport: transport.call,
+          persistentStore: store,
+          secureStorage: storage,
+        );
+        addTearDown(fixture.controller.dispose);
+        await storage.write(
+          'm3ue_tv_favorites_migrated_viewers',
+          jsonEncode(<String>[
+            'viewer-server-a',
+            'viewer-server-b',
+            'viewer-server-c',
+          ]),
+        );
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForFavorite(fixture.controller, 101);
+        store.blockFavoritesFor(102);
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await store.blockedFavoritesWriteStarted.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await transport.thirdFavoritesPullStarted.future;
+        var staleNotifications = 0;
+        var currentNotifications = 0;
+        fixture.controller.favoritesService.addListener(() {
+          final favorites = fixture.controller.favoritesService.all();
+          unawaited(
+            favorites.then((ids) {
+              if (ids.contains(102)) staleNotifications += 1;
+              if (ids.contains(103)) currentNotifications += 1;
+            }),
+          );
+        });
+
+        store.releaseBlockedFavoritesWrite.complete();
+        await store.blockedFavoritesWriteCompleted.future;
+        await pumpEventQueue();
+
+        expect(await fixture.controller.favoritesService.all(), <int>{101});
+        expect(await store.read('m3ue_favorites'), <int>[101]);
+        expect(staleNotifications, 0);
+
+        transport.releaseThirdFavoritesPull.complete();
+        await _waitForFavorite(fixture.controller, 103);
+        await pumpEventQueue();
+
+        expect(await fixture.controller.favoritesService.all(), <int>{103});
+        expect(await store.read('m3ue_favorites'), <int>[103]);
+        expect(currentNotifications, 1);
         expect(
           transport.requests.where(
             (request) =>
@@ -907,6 +1144,70 @@ void main() {
                 request.isFavorites && request.viewerId == 'viewer-server-b',
           ),
           isEmpty,
+        );
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.isFavorites &&
+                request.viewerId !=
+                    'viewer-server-${request.source.toLowerCase()}',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'migration marker entered by a stale source cannot commit',
+      () async {
+        final storage = _BlockingFavoritesMigrationWriteStorage();
+        final transport = _PostCommitOwnershipTransport();
+        final fixture = _Fixture(
+          transport: transport.call,
+          secureStorage: storage,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForMigratedViewer(storage, 'viewer-server-a');
+        storage.blockViewer('viewer-server-b');
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await storage.blockedWriteStarted.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await _waitForMigratedViewer(storage, 'viewer-server-c');
+
+        storage.releaseBlockedWrite.complete();
+        await storage.blockedWriteCompleted.future;
+        await pumpEventQueue();
+
+        final migratedAfterRelease = await _migratedViewers(storage);
+        expect(migratedAfterRelease, contains('viewer-server-a'));
+        expect(migratedAfterRelease, contains('viewer-server-c'));
+        expect(migratedAfterRelease, isNot(contains('viewer-server-b')));
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await _waitForMigratedViewer(storage, 'viewer-server-b');
+
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.action == 'sync_favorites' &&
+                request.viewerId == 'viewer-server-b',
+          ),
+          hasLength(2),
         );
         expect(
           transport.requests.where(
@@ -1442,6 +1743,82 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
   }
 }
 
+class _BlockingPostCommitStore extends PersistentJsonStore {
+  _BlockingPostCommitStore()
+    : super(
+        file: File(
+          '${Directory.systemTemp.path}/m3u-tv-post-commit-${DateTime.now().microsecondsSinceEpoch}.json',
+        ),
+      );
+
+  final Completer<void> blockedFavoritesWriteStarted = Completer<void>();
+  final Completer<void> releaseBlockedFavoritesWrite = Completer<void>();
+  final Completer<void> blockedFavoritesWriteCompleted = Completer<void>();
+  final Completer<void> blockedResumeWriteStarted = Completer<void>();
+  final Completer<void> releaseBlockedResumeWrite = Completer<void>();
+  final Completer<void> blockedResumeWriteCompleted = Completer<void>();
+  int? _blockedFavorite;
+  String? _blockedResumeViewer;
+
+  void blockFavoritesFor(int streamId) => _blockedFavorite = streamId;
+
+  void blockResumeFor(String viewerId) => _blockedResumeViewer = viewerId;
+
+  Future<void> _blockWrite(String key, Object? value) async {
+    if (key == 'm3ue_favorites' &&
+        value is List<Object?> &&
+        value.contains(_blockedFavorite) &&
+        !blockedFavoritesWriteStarted.isCompleted) {
+      blockedFavoritesWriteStarted.complete();
+      await releaseBlockedFavoritesWrite.future;
+    }
+    final resumeViewer = _blockedResumeViewer;
+    if (resumeViewer != null &&
+        key.startsWith('m3ue_resume_${resumeViewer}_') &&
+        !blockedResumeWriteStarted.isCompleted) {
+      blockedResumeWriteStarted.complete();
+      await releaseBlockedResumeWrite.future;
+    }
+  }
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    await _blockWrite(key, value);
+    await super.write(key, value);
+    if (key == 'm3ue_favorites' &&
+        value is List<Object?> &&
+        value.contains(_blockedFavorite) &&
+        !blockedFavoritesWriteCompleted.isCompleted) {
+      blockedFavoritesWriteCompleted.complete();
+    }
+    if (key.startsWith('m3ue_resume_${_blockedResumeViewer}_') &&
+        !blockedResumeWriteCompleted.isCompleted) {
+      blockedResumeWriteCompleted.complete();
+    }
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    await _blockWrite(key, value);
+    final committed = await super.writeIf(key, value, shouldCommit);
+    if (key == 'm3ue_favorites' &&
+        value is List<Object?> &&
+        value.contains(_blockedFavorite) &&
+        !blockedFavoritesWriteCompleted.isCompleted) {
+      blockedFavoritesWriteCompleted.complete();
+    }
+    if (key.startsWith('m3ue_resume_${_blockedResumeViewer}_') &&
+        !blockedResumeWriteCompleted.isCompleted) {
+      blockedResumeWriteCompleted.complete();
+    }
+    return committed;
+  }
+}
+
 class _ThreeSourceXtreamTransport {
   _ThreeSourceXtreamTransport({this.failThirdAuth = false});
 
@@ -1587,15 +1964,19 @@ class _PostCommitOwnershipTransport {
   _PostCommitOwnershipTransport({
     this.blockSecondProgressRefresh = false,
     this.blockSecondFavoritesPull = false,
+    this.blockThirdFavoritesPull = false,
   });
 
   final bool blockSecondProgressRefresh;
   final bool blockSecondFavoritesPull;
+  final bool blockThirdFavoritesPull;
   final List<_SourceRequest> requests = <_SourceRequest>[];
   final Completer<void> secondProgressRefreshStarted = Completer<void>();
   final Completer<void> releaseSecondProgressRefresh = Completer<void>();
   final Completer<void> secondFavoritesPullStarted = Completer<void>();
   final Completer<void> releaseSecondFavoritesPull = Completer<void>();
+  final Completer<void> thirdFavoritesPullStarted = Completer<void>();
+  final Completer<void> releaseThirdFavoritesPull = Completer<void>();
   final Map<String, int> _recentlyWatchedCalls = <String, int>{};
 
   Future<Object?> call(XtreamRequest request) async {
@@ -1698,6 +2079,10 @@ class _PostCommitOwnershipTransport {
           secondFavoritesPullStarted.complete();
           await releaseSecondFavoritesPull.future;
         }
+        if (username == 'third' && blockThirdFavoritesPull) {
+          thirdFavoritesPullStarted.complete();
+          await releaseThirdFavoritesPull.future;
+        }
         return <Map<String, Object?>>[
           <String, Object?>{
             'content_type': 'live',
@@ -1745,6 +2130,55 @@ class _BlockingFavoritesMigrationStorage extends InMemorySecureStorage {
       await releaseBlockedRead.future;
     }
     return super.read(key);
+  }
+}
+
+class _BlockingFavoritesMigrationWriteStorage extends InMemorySecureStorage {
+  static const _migrationKey = 'm3ue_tv_favorites_migrated_viewers';
+
+  final Completer<void> blockedWriteStarted = Completer<void>();
+  final Completer<void> releaseBlockedWrite = Completer<void>();
+  final Completer<void> blockedWriteCompleted = Completer<void>();
+  String? _blockedViewer;
+
+  void blockViewer(String viewerUlid) => _blockedViewer = viewerUlid;
+
+  Future<void> _blockWrite(String key, String value) async {
+    if (_blockedViewer == null ||
+        key != _migrationKey ||
+        !value.contains(_blockedViewer!) ||
+        blockedWriteStarted.isCompleted) {
+      return;
+    }
+    blockedWriteStarted.complete();
+    await releaseBlockedWrite.future;
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    await _blockWrite(key, value);
+    await super.write(key, value);
+    if (key == _migrationKey &&
+        value.contains(_blockedViewer ?? '') &&
+        !blockedWriteCompleted.isCompleted) {
+      blockedWriteCompleted.complete();
+    }
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    String value,
+    bool Function() shouldCommit,
+  ) async {
+    await _blockWrite(key, value);
+    final committed = await super.writeIf(key, value, shouldCommit);
+    if (key == _migrationKey &&
+        value.contains(_blockedViewer ?? '') &&
+        !blockedWriteCompleted.isCompleted) {
+      blockedWriteCompleted.complete();
+    }
+    return committed;
   }
 }
 
@@ -1930,6 +2364,25 @@ Future<void> _waitForProgress(
   fail('Timed out waiting for progress');
 }
 
+Future<void> _waitForStoredProgress(
+  AppStateController controller, {
+  required String viewerId,
+  required int streamId,
+}) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (await controller.resumeService.load(
+          viewerId,
+          ContentType.vod,
+          streamId,
+        ) !=
+        null) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for stored progress');
+}
+
 Future<void> _waitForFavorite(
   AppStateController controller,
   int streamId,
@@ -1939,4 +2392,21 @@ Future<void> _waitForFavorite(
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   fail('Timed out waiting for favorite');
+}
+
+Future<Set<String>> _migratedViewers(SecureStorage storage) async {
+  final raw = await storage.read('m3ue_tv_favorites_migrated_viewers');
+  if (raw == null) return <String>{};
+  return (jsonDecode(raw) as List<Object?>).map((value) => '$value').toSet();
+}
+
+Future<void> _waitForMigratedViewer(
+  SecureStorage storage,
+  String viewerUlid,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if ((await _migratedViewers(storage)).contains(viewerUlid)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for migrated viewer');
 }

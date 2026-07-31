@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 
 /// Secure storage abstraction for persisting sensitive data like credentials.
@@ -9,6 +10,36 @@ abstract class SecureStorage {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
   Future<void> delete(String key);
+}
+
+extension ConditionalSecureStorageWrite on SecureStorage {
+  Future<bool> writeIfCurrent(
+    String key,
+    String value,
+    bool Function() shouldCommit,
+  ) async {
+    final storage = this;
+    if (storage is InMemorySecureStorage) {
+      return storage.writeIf(key, value, shouldCommit);
+    }
+    if (storage is FlutterSecureStorageAdapter) {
+      return storage.writeIf(key, value, shouldCommit);
+    }
+    if (storage is FileSecureStorage) {
+      return storage.writeIf(key, value, shouldCommit);
+    }
+    if (!shouldCommit()) return false;
+    final previous = await read(key);
+    if (!shouldCommit()) return false;
+    await write(key, value);
+    if (shouldCommit()) return true;
+    if (previous == null) {
+      await delete(key);
+    } else {
+      await write(key, previous);
+    }
+    return false;
+  }
 }
 
 /// In-memory secure storage for tests. Does NOT log or expose stored values
@@ -22,6 +53,16 @@ class InMemorySecureStorage implements SecureStorage {
   @override
   Future<void> write(String key, String value) async {
     _store[key] = value;
+  }
+
+  Future<bool> writeIf(
+    String key,
+    String value,
+    bool Function() shouldCommit,
+  ) async {
+    if (!shouldCommit()) return false;
+    _store[key] = value;
+    return true;
   }
 
   @override
@@ -39,16 +80,40 @@ class FlutterSecureStorageAdapter implements SecureStorage {
   FlutterSecureStorageAdapter() : _storage = const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
+  final SerialQueue _queue = SerialQueue();
 
   @override
-  Future<String?> read(String key) => _storage.read(key: key);
+  Future<String?> read(String key) => _queue.run(
+    () => _storage.read(key: key),
+  );
 
   @override
-  Future<void> write(String key, String value) =>
-      _storage.write(key: key, value: value);
+  Future<void> write(String key, String value) => _queue.run(
+    () => _storage.write(key: key, value: value),
+  );
+
+  Future<bool> writeIf(
+    String key,
+    String value,
+    bool Function() shouldCommit,
+  ) => _queue.run(() async {
+    if (!shouldCommit()) return false;
+    final previous = await _storage.read(key: key);
+    if (!shouldCommit()) return false;
+    await _storage.write(key: key, value: value);
+    if (shouldCommit()) return true;
+    if (previous == null) {
+      await _storage.delete(key: key);
+    } else {
+      await _storage.write(key: key, value: previous);
+    }
+    return false;
+  });
 
   @override
-  Future<void> delete(String key) => _storage.delete(key: key);
+  Future<void> delete(String key) => _queue.run(
+    () => _storage.delete(key: key),
+  );
 }
 
 class FileSecureStorage implements SecureStorage {
@@ -67,6 +132,12 @@ class FileSecureStorage implements SecureStorage {
   Future<void> write(String key, String value) async {
     await _store.write(key, value);
   }
+
+  Future<bool> writeIf(
+    String key,
+    String value,
+    bool Function() shouldCommit,
+  ) => _store.writeIf(key, value, shouldCommit);
 
   @override
   Future<void> delete(String key) async {

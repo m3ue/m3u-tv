@@ -62,9 +62,18 @@ class FavoritesService extends ChangeNotifier {
   /// Overwrites the full local set from the server's authoritative list
   /// (e.g. after `get_favorites` on connect/viewer switch), without
   /// triggering [onChanged].
-  Future<void> replaceAll(Iterable<int> streamIds) async {
-    await _write(_favoritesKey, streamIds.toSet().toList()..sort());
+  Future<bool> replaceAll(
+    Iterable<int> streamIds, {
+    bool Function()? shouldCommit,
+  }) async {
+    final value = streamIds.toSet().toList()..sort();
+    if (shouldCommit == null) {
+      await _write(_favoritesKey, value);
+    } else if (!await _writeIf(_favoritesKey, value, shouldCommit)) {
+      return false;
+    }
     notifyListeners();
+    return true;
   }
 
   Future<bool> isFavorite(int streamId) async =>
@@ -96,5 +105,19 @@ class FavoritesService extends ChangeNotifier {
   Future<void> _write(String key, Object? value) async {
     _memory[key] = value;
     await _store?.write(key, value);
+  }
+
+  Future<bool> _writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    final store = _store;
+    if (store != null && !await store.writeIf(key, value, shouldCommit)) {
+      return false;
+    }
+    if (!shouldCommit()) return false;
+    _memory[key] = value;
+    return true;
   }
 }

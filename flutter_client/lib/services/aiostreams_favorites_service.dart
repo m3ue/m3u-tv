@@ -136,10 +136,25 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   /// Overwrites the full local set from the server's authoritative list
   /// (e.g. after `get_favorites` on connect/viewer switch), without
   /// triggering [onAdded]/[onRemoved].
-  Future<void> replaceAll(Iterable<AIOStreamsFavoriteItem> items) async {
-    _cache = {for (final item in items) item.id: item};
-    await _persist();
+  Future<bool> replaceAll(
+    Iterable<AIOStreamsFavoriteItem> items, {
+    bool Function()? shouldCommit,
+  }) async {
+    final cache = {for (final item in items) item.id: item};
+    if (shouldCommit == null) {
+      _cache = cache;
+      await _persist();
+    } else {
+      final data = cache.map((key, value) => MapEntry(key, value.toJson()));
+      final store = _store;
+      if (store != null && !await store.writeIf(_key, data, shouldCommit)) {
+        return false;
+      }
+      if (!shouldCommit()) return false;
+      _cache = cache;
+    }
     notifyListeners();
+    return true;
   }
 
   /// Returns favorites in most-recently-added order (reversed insertion).

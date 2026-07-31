@@ -1207,14 +1207,19 @@ class AppStateController extends ChangeNotifier {
       }
     }
     if (!isCurrent()) return false;
-    await favoritesService.replaceAll(live);
-    if (!isCurrent()) return false;
-    await vodFavoritesService.replaceAll(vod);
-    if (!isCurrent()) return false;
-    await seriesFavoritesService.replaceAll(series);
-    if (!isCurrent()) return false;
-    await aioFavoritesService.replaceAll(aio);
-    return isCurrent();
+    if (!await favoritesService.replaceAll(live, shouldCommit: isCurrent)) {
+      return false;
+    }
+    if (!await vodFavoritesService.replaceAll(vod, shouldCommit: isCurrent)) {
+      return false;
+    }
+    if (!await seriesFavoritesService.replaceAll(
+      series,
+      shouldCommit: isCurrent,
+    )) {
+      return false;
+    }
+    return aioFavoritesService.replaceAll(aio, shouldCommit: isCurrent);
   }
 
   Future<Set<String>> _readMigratedFavoriteViewers() async {
@@ -1234,11 +1239,11 @@ class AppStateController extends ChangeNotifier {
     final viewers = await _readMigratedFavoriteViewers()
       ..add(viewerUlid);
     if (!isCurrent()) return false;
-    await secureStorage.write(
+    return secureStorage.writeIfCurrent(
       _favoritesMigratedKey,
       jsonEncode(viewers.toList()),
+      isCurrent,
     );
-    return isCurrent();
   }
 
   Future<void> receiveTvNotification(TvNotificationItem item) async {
@@ -1963,8 +1968,9 @@ class AppStateController extends ChangeNotifier {
     if (persist) {
       for (final p in result) {
         if (!ownsWork()) return const <Progress>[];
-        await resumeService.save(p);
-        if (!ownsWork()) return const <Progress>[];
+        if (!await resumeService.save(p, shouldCommit: ownsWork)) {
+          return const <Progress>[];
+        }
       }
     }
 

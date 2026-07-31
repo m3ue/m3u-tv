@@ -24,6 +24,20 @@ class PersistentJsonStore {
     });
   }
 
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) => _writeQueue.run(() async {
+    if (!shouldCommit()) return false;
+    final previous = Map<String, Object?>.from(await _readAllUnlocked());
+    final data = Map<String, Object?>.from(previous)..[key] = value;
+    await _writeAll(data);
+    if (shouldCommit()) return true;
+    await _writeAll(previous);
+    return false;
+  });
+
   Future<void> delete(String key) async {
     await _queueWrite(() async {
       final data = await _readAllUnlocked();
