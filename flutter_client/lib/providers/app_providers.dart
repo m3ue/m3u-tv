@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';

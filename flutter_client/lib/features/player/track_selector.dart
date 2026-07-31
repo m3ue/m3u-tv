@@ -18,6 +18,8 @@ class TrackSelector extends StatelessWidget {
     required this.selectedSubtitleTrackId,
     required this.onAudioTrackSelected,
     required this.onSubtitleTrackSelected,
+    this.isAudioTrackSelectionKnown = false,
+    this.isSubtitleTrackSelectionKnown = false,
     super.key,
   });
 
@@ -35,6 +37,10 @@ class TrackSelector extends StatelessWidget {
 
   /// Currently selected subtitle track ID, or null for off.
   final String? selectedSubtitleTrackId;
+
+  final bool isAudioTrackSelectionKnown;
+
+  final bool isSubtitleTrackSelectionKnown;
 
   /// Called when the user selects an audio track.
   final ValueChanged<String?> onAudioTrackSelected;
@@ -65,8 +71,9 @@ class TrackSelector extends StatelessWidget {
     );
   }
 
-  String? get _effectiveAudioTrackId =>
-      selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
+  String? get _effectiveAudioTrackId => isAudioTrackSelectionKnown
+      ? selectedAudioTrackId
+      : selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
 
   void _showAudioDialog(BuildContext context) {
     unawaited(
@@ -114,7 +121,9 @@ class TrackSelector extends StatelessWidget {
               children: [
                 ListTile(
                   title: const Text('Off'),
-                  selected: selectedSubtitleTrackId == null,
+                  selected:
+                      isSubtitleTrackSelectionKnown &&
+                      selectedSubtitleTrackId == null,
                   onTap: () {
                     onSubtitleTrackSelected(null);
                     Navigator.of(context).pop();

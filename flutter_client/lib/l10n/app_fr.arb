@@ -10,6 +10,7 @@
   "navNotifications": "Notifications",
   "navSettings": "Paramètres",
   "navMore": "Plus",
+  "notificationsDesktopOpen": "Ouvrir",
   "appBackToExit": "Appuyez à nouveau sur Retour pour quitter",
   "appRecordingScheduled": "Enregistrement programmé : {title}",
   "@appRecordingScheduled": {
@@ -42,6 +43,16 @@
   "liveTvRecording": "Enregistrement en cours",
   "liveTvFavorite": "Favori",
   "liveTvRemoveFavorite": "Retirer des favoris",
+  "catchupBadgeAvailable": "Catchup disponible",
+  "catchupBadgeAvailableDays": "Catchup disponible : {days} j",
+  "@catchupBadgeAvailableDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "catchupProgramReplayable": "Rediffusion catchup disponible",
   "playerGoBack": "Retour",
   "playerResumeWatching": "Reprendre la lecture",
   "playerContinue": "Continuer",
@@ -302,5 +313,31 @@
   "requestsStatusApproved": "Approuvé",
   "requestsStatusRejected": "Rejeté",
   "requestsStatusCompleted": "Terminé",
-  "requestsStatusUnknown": "Inconnu"
+  "requestsStatusUnknown": "Inconnu",
+  "dvrRecordingsTitle": "Enregistrements DVR",
+  "dvrRecordingsSubtitle": "Enregistrements terminés et en cours",
+  "dvrNoRecordings": "Aucun enregistrement DVR disponible",
+  "dvrNotConfigured": "Veuillez vous connecter à votre service dans les paramètres",
+  "dvrCancel": "Annuler",
+  "dvrDelete": "Supprimer",
+  "dvrStopTitle": "Arrêter l'enregistrement — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "La conserver dans votre liste ou la supprimer maintenant ?",
+  "dvrStopKeep": "Conserver l'enregistrement",
+  "dvrStopDelete": "Supprimer l'enregistrement",
+  "dvrStopBack": "Retour",
+  "dvrCancelSuccess": "Enregistrement annulé",
+  "dvrCancelFailed": "Impossible d'annuler l'enregistrement",
+  "dvrDeleteTitle": "Supprimer l'enregistrement ?",
+  "dvrDeleteMessage": "Cet enregistrement sera supprimé définitivement.",
+  "dvrDeleteDismiss": "Conserver",
+  "dvrDeleteConfirm": "Supprimer l'enregistrement",
+  "dvrDeleteSuccess": "Enregistrement supprimé",
+  "dvrDeleteFailed": "Impossible de supprimer l'enregistrement"
 }

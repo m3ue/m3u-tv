@@ -515,6 +515,45 @@ class XtreamService {
     );
   }
 
+  /// Cancels a scheduled or in-progress DVR recording on
+  /// m3u-editor's `cancel_dvr_recording` action.
+  ///
+  /// Valid for statuses `scheduled` and `recording`. Server returns
+  /// `{ success: true }` on success or HTTP 404 with `{ error }` if the
+  /// recording is not found or no longer cancellable. Throws the standard
+  /// request exception on failure so callers can surface the error message.
+  Future<void> cancelDvrRecording(String uuid) async {
+    final response = await _request(
+      'cancel_dvr_recording',
+      method: 'POST',
+      body: {'recording_id': uuid},
+    );
+    final map = _asMap(response);
+    final errorMessage = map['error'];
+    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+      throw XtreamDvrScheduleException('$errorMessage');
+    }
+  }
+
+  /// Deletes a completed/failed/cancelled DVR recording on
+  /// m3u-editor's `delete_dvr_recording` action.
+  ///
+  /// Server returns `{ success: true }` on success or HTTP 404 with
+  /// `{ error }` if the recording is not found or not in a deletable
+  /// state. Throws the standard request exception on failure.
+  Future<void> deleteDvrRecording(String uuid) async {
+    final response = await _request(
+      'delete_dvr_recording',
+      method: 'POST',
+      body: {'recording_id': uuid},
+    );
+    final map = _asMap(response);
+    final errorMessage = map['error'];
+    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+      throw XtreamDvrScheduleException('$errorMessage');
+    }
+  }
+
   /// Searches every guest-enabled Arr integration for [query] via
   /// `request_search`. [type] restricts to `movie` or `series`; omit to
   /// search both. Throws [XtreamRequestException] on the documented error

@@ -39,6 +39,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navMore => '更多';
 
   @override
+  String get notificationsDesktopOpen => '打开';
+
+  @override
   String get appBackToExit => '再次按返回键退出';
 
   @override
@@ -95,6 +98,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get liveTvRemoveFavorite => '取消收藏';
+
+  @override
+  String get catchupBadgeAvailable => '可回看';
+
+  @override
+  String catchupBadgeAvailableDays(int days) {
+    return '可回看 $days 天';
+  }
+
+  @override
+  String get catchupProgramReplayable => '可回看重播';
 
   @override
   String get playerGoBack => '返回';
@@ -586,4 +600,63 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => '未知';
+
+  @override
+  String get dvrRecordingsTitle => 'DVR 录制';
+
+  @override
+  String get dvrRecordingsSubtitle => '已完成的录制和正在录制的节目';
+
+  @override
+  String get dvrNoRecordings => '没有可用的 DVR 录制';
+
+  @override
+  String get dvrNotConfigured => '请在设置中连接到您的服务';
+
+  @override
+  String get dvrCancel => '取消';
+
+  @override
+  String get dvrDelete => '删除';
+
+  @override
+  String dvrStopTitle(String title) {
+    return '停止录制 — $title';
+  }
+
+  @override
+  String get dvrStopMessage => '保留在录制列表中，还是立即删除？';
+
+  @override
+  String get dvrStopKeep => '保留录制';
+
+  @override
+  String get dvrStopDelete => '删除录制';
+
+  @override
+  String get dvrStopBack => '返回';
+
+  @override
+  String get dvrCancelSuccess => '录制已取消';
+
+  @override
+  String get dvrCancelFailed => '无法取消录制';
+
+  @override
+  String get dvrDeleteTitle => '删除录制？';
+
+  @override
+  String get dvrDeleteMessage => '此录制将被永久删除。';
+
+  @override
+  String get dvrDeleteDismiss => '保留';
+
+  @override
+  String get dvrDeleteConfirm => '删除录制';
+
+  @override
+  String get dvrDeleteSuccess => '录制已删除';
+
+  @override
+  String get dvrDeleteFailed => '无法删除录制';
 }

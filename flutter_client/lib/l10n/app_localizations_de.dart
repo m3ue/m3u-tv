@@ -39,6 +39,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navMore => 'Mehr';
 
   @override
+  String get notificationsDesktopOpen => 'Öffnen';
+
+  @override
   String get appBackToExit => 'Zum Beenden erneut Zurück drücken';
 
   @override
@@ -96,6 +99,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get liveTvRemoveFavorite => 'Aus Favoriten entfernen';
+
+  @override
+  String get catchupBadgeAvailable => 'Catchup verfügbar';
+
+  @override
+  String catchupBadgeAvailableDays(int days) {
+    return 'Catchup verfügbar: $days Tage';
+  }
+
+  @override
+  String get catchupProgramReplayable => 'Catchup-Wiedergabe verfügbar';
 
   @override
   String get playerGoBack => 'Zurück';
@@ -599,4 +613,65 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => 'Unbekannt';
+
+  @override
+  String get dvrRecordingsTitle => 'DVR-Aufnahmen';
+
+  @override
+  String get dvrRecordingsSubtitle => 'Abgeschlossene und laufende Aufnahmen';
+
+  @override
+  String get dvrNoRecordings => 'Keine DVR-Aufnahmen verfügbar';
+
+  @override
+  String get dvrNotConfigured =>
+      'Bitte verbinde dich in den Einstellungen mit deinem Dienst';
+
+  @override
+  String get dvrCancel => 'Abbrechen';
+
+  @override
+  String get dvrDelete => 'Löschen';
+
+  @override
+  String dvrStopTitle(String title) {
+    return 'Aufnahme stoppen — $title';
+  }
+
+  @override
+  String get dvrStopMessage =>
+      'In der Aufnahmeliste behalten oder jetzt löschen?';
+
+  @override
+  String get dvrStopKeep => 'Aufnahme behalten';
+
+  @override
+  String get dvrStopDelete => 'Aufnahme löschen';
+
+  @override
+  String get dvrStopBack => 'Zurück';
+
+  @override
+  String get dvrCancelSuccess => 'Aufnahme abgebrochen';
+
+  @override
+  String get dvrCancelFailed => 'Aufnahme konnte nicht abgebrochen werden';
+
+  @override
+  String get dvrDeleteTitle => 'Aufnahme löschen?';
+
+  @override
+  String get dvrDeleteMessage => 'Diese Aufnahme wird dauerhaft gelöscht.';
+
+  @override
+  String get dvrDeleteDismiss => 'Behalten';
+
+  @override
+  String get dvrDeleteConfirm => 'Aufnahme löschen';
+
+  @override
+  String get dvrDeleteSuccess => 'Aufnahme gelöscht';
+
+  @override
+  String get dvrDeleteFailed => 'Aufnahme konnte nicht gelöscht werden';
 }

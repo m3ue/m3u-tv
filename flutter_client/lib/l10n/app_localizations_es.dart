@@ -39,6 +39,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navMore => 'Más';
 
   @override
+  String get notificationsDesktopOpen => 'Abrir';
+
+  @override
   String get appBackToExit => 'Pulse atrás de nuevo para salir';
 
   @override
@@ -95,6 +98,17 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get liveTvRemoveFavorite => 'Quitar de favoritos';
+
+  @override
+  String get catchupBadgeAvailable => 'Catchup disponible';
+
+  @override
+  String catchupBadgeAvailableDays(int days) {
+    return 'Catchup disponible: $days d';
+  }
+
+  @override
+  String get catchupProgramReplayable => 'Repetición por catchup disponible';
 
   @override
   String get playerGoBack => 'Volver';
@@ -599,4 +613,65 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => 'Desconocido';
+
+  @override
+  String get dvrRecordingsTitle => 'Grabaciones DVR';
+
+  @override
+  String get dvrRecordingsSubtitle => 'Grabaciones completadas y en curso';
+
+  @override
+  String get dvrNoRecordings => 'No hay grabaciones DVR disponibles';
+
+  @override
+  String get dvrNotConfigured =>
+      'Por favor, conéctate a tu servicio en Ajustes';
+
+  @override
+  String get dvrCancel => 'Cancelar';
+
+  @override
+  String get dvrDelete => 'Eliminar';
+
+  @override
+  String dvrStopTitle(String title) {
+    return 'Detener grabación — $title';
+  }
+
+  @override
+  String get dvrStopMessage =>
+      '¿Mantenerla en tu lista de grabaciones o eliminarla ahora?';
+
+  @override
+  String get dvrStopKeep => 'Mantener grabación';
+
+  @override
+  String get dvrStopDelete => 'Eliminar grabación';
+
+  @override
+  String get dvrStopBack => 'Atrás';
+
+  @override
+  String get dvrCancelSuccess => 'Grabación cancelada';
+
+  @override
+  String get dvrCancelFailed => 'No se pudo cancelar la grabación';
+
+  @override
+  String get dvrDeleteTitle => '¿Eliminar grabación?';
+
+  @override
+  String get dvrDeleteMessage => 'Esta grabación se eliminará permanentemente.';
+
+  @override
+  String get dvrDeleteDismiss => 'Mantener';
+
+  @override
+  String get dvrDeleteConfirm => 'Eliminar grabación';
+
+  @override
+  String get dvrDeleteSuccess => 'Grabación eliminada';
+
+  @override
+  String get dvrDeleteFailed => 'No se pudo eliminar la grabación';
 }

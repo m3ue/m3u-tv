@@ -41,7 +41,7 @@ void main() {
       expect(event.videoAspectRatio, 1.78);
       expect(event.speed, 1.0);
       expect(event.aid, '1');
-      expect(event.sid, 'no');
+      expect(event.sid, isNull);
     });
 
     test('parses minimal snapshot with defaults', () {
@@ -95,6 +95,74 @@ void main() {
 
       expect(event.aid, isNull);
       expect(event.sid, isNull);
+    });
+
+    test('parses and normalizes schema v2 track lists', () {
+      final event = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 2,
+        'handle': 1,
+        'sequence': 0,
+        'kind': 'FILE_LOADED',
+        'audioTracks': <Object?>[
+          <String, Object?>{
+            'id': ' 1 ',
+            'label': ' English ',
+            'language': ' eng ',
+          },
+          <String, Object?>{'id': '2', 'label': ' ', 'language': ' deu '},
+          <String, Object?>{'id': '3', 'label': ''},
+          <String, Object?>{'id': '', 'label': 'Missing ID'},
+          <String, Object?>{'id': 4, 'label': 'Wrong ID type'},
+          'not a map',
+        ],
+        'subtitleTracks': <Object?>[
+          <String, Object?>{'id': '4', 'label': ' Commentary '},
+          <String, Object?>{'id': '5', 'label': 5, 'language': ''},
+        ],
+      });
+
+      expect(event.audioTracks, hasLength(3));
+      expect(event.audioTracks![0].id, '1');
+      expect(event.audioTracks![0].label, 'English');
+      expect(event.audioTracks![0].language, 'eng');
+      expect(event.audioTracks![1].label, 'deu');
+      expect(event.audioTracks![1].language, 'deu');
+      expect(event.audioTracks![2].label, '3');
+      expect(event.audioTracks![2].language, isNull);
+      expect(event.subtitleTracks, hasLength(2));
+      expect(event.subtitleTracks![0].label, 'Commentary');
+      expect(event.subtitleTracks![0].language, isNull);
+      expect(event.subtitleTracks![1].label, '5');
+      expect(event.subtitleTracks![1].language, isNull);
+    });
+
+    test('gates track lists by schema version and payload shape', () {
+      final legacy = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 1,
+        'kind': 'FILE_LOADED',
+        'audioTracks': <Object?>[
+          <String, Object?>{'id': '1', 'label': 'Legacy'},
+        ],
+      });
+      final malformed = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 2,
+        'kind': 'FILE_LOADED',
+        'audioTracks': <String, Object?>{'id': '1'},
+        'subtitleTracks': 'not a list',
+      });
+      final empty = DesktopLibmpvEvent.fromMap(<String, Object?>{
+        'schemaVersion': 2,
+        'kind': 'PLAYBACK_RESTART',
+        'audioTracks': <Object?>[],
+        'subtitleTracks': <Object?>[],
+      });
+
+      expect(legacy.audioTracks, isNull);
+      expect(legacy.subtitleTracks, isNull);
+      expect(malformed.audioTracks, isNull);
+      expect(malformed.subtitleTracks, isNull);
+      expect(empty.audioTracks, isEmpty);
+      expect(empty.subtitleTracks, isEmpty);
     });
 
     test('parses ERROR kind with message and code', () {
@@ -365,6 +433,122 @@ void main() {
       expect(next.selectedAudioTrackId, '2');
       expect(next.selectedSubtitleTrackId, '3');
     });
+
+    test('preserves track lists across selection and disable events', () {
+      final loaded = DesktopLibmpvEventReducer.reduce(
+        idle,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 1,
+          'kind': 'FILE_LOADED',
+          'aid': '1',
+          'sid': '4',
+          'audioTracks': <Object?>[
+            <String, Object?>{'id': '1', 'label': 'English'},
+            <String, Object?>{'id': '2', 'label': 'Deutsch'},
+          ],
+          'subtitleTracks': <Object?>[
+            <String, Object?>{'id': '4', 'label': 'English CC'},
+          ],
+        }),
+        source,
+      );
+      final omitted = DesktopLibmpvEventReducer.reduce(
+        loaded,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 2,
+          'kind': 'PLAYBACK_RESTART',
+        }),
+        source,
+      );
+      final disabled = DesktopLibmpvEventReducer.reduce(
+        omitted,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 3,
+          'kind': 'PLAYBACK_RESTART',
+          'aid': 'no',
+          'sid': '',
+        }),
+        source,
+      );
+      final selected = DesktopLibmpvEventReducer.reduce(
+        disabled,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 4,
+          'kind': 'PLAYBACK_RESTART',
+          'aid': '2',
+          'sid': '4',
+          'audioTracks': <Object?>[
+            <String, Object?>{'id': '1', 'label': 'English'},
+            <String, Object?>{'id': '2', 'label': 'Deutsch'},
+          ],
+          'subtitleTracks': <Object?>[
+            <String, Object?>{'id': '4', 'label': 'English CC'},
+          ],
+        }),
+        source,
+      );
+
+      expect(loaded.audioTracks, hasLength(2));
+      expect(loaded.subtitleTracks, hasLength(1));
+      expect(omitted.audioTracks, same(loaded.audioTracks));
+      expect(omitted.subtitleTracks, same(loaded.subtitleTracks));
+      expect(disabled.selectedAudioTrackId, isNull);
+      expect(disabled.selectedSubtitleTrackId, isNull);
+      expect(disabled.audioTracks, same(loaded.audioTracks));
+      expect(disabled.subtitleTracks, same(loaded.subtitleTracks));
+      expect(selected.selectedAudioTrackId, '2');
+      expect(selected.selectedSubtitleTrackId, '4');
+      expect(selected.audioTracks, hasLength(2));
+      expect(selected.subtitleTracks, hasLength(1));
+    });
+
+    test('distinguishes unknown selections from confirmed disabled', () {
+      final loaded = DesktopLibmpvEventReducer.reduce(
+        idle,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 1,
+          'kind': 'FILE_LOADED',
+          'audioTracks': <Object?>[
+            <String, Object?>{'id': '1', 'label': 'English'},
+          ],
+          'subtitleTracks': <Object?>[
+            <String, Object?>{'id': '4', 'label': 'English CC'},
+          ],
+        }),
+        source,
+      );
+      final disabled = DesktopLibmpvEventReducer.reduce(
+        loaded,
+        DesktopLibmpvEvent.fromMap(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 1,
+          'sequence': 2,
+          'kind': 'PLAYBACK_RESTART',
+          'aid': 'no',
+          'sid': '',
+        }),
+        source,
+      );
+
+      expect(loaded.isAudioTrackSelectionKnown, isFalse);
+      expect(loaded.isSubtitleTrackSelectionKnown, isFalse);
+      expect(disabled.isAudioTrackSelectionKnown, isTrue);
+      expect(disabled.isSubtitleTrackSelectionKnown, isTrue);
+      expect(disabled.selectedAudioTrackId, isNull);
+      expect(disabled.selectedSubtitleTrackId, isNull);
+      expect(disabled.audioTracks, same(loaded.audioTracks));
+      expect(disabled.subtitleTracks, same(loaded.subtitleTracks));
+    });
   });
 
   group('DesktopLibmpvBackend event integration', () {
@@ -462,6 +646,79 @@ void main() {
         await events.close();
       },
     );
+
+    test('publishes v2 track lists through selection transitions', () async {
+      final events = StreamController<Map<String, Object?>>.broadcast();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            if (call.method == 'load') {
+              scheduleMicrotask(() {
+                events.add(<String, Object?>{
+                  'schemaVersion': 2,
+                  'handle': 70,
+                  'sequence': 0,
+                  'kind': 'FILE_LOADED',
+                  'aid': '1',
+                  'sid': '4',
+                  'audioTracks': <Object?>[
+                    <String, Object?>{'id': '1', 'label': 'English'},
+                    <String, Object?>{'id': '2', 'label': 'Deutsch'},
+                  ],
+                  'subtitleTracks': <Object?>[
+                    <String, Object?>{'id': '4', 'label': 'English CC'},
+                  ],
+                });
+              });
+              return <String, Object?>{
+                'ok': true,
+                'handle': 70,
+                'textureId': 700,
+              };
+            }
+            return null;
+          });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+            eventChannel,
+            MockStreamHandler.inline(
+              onListen: (arguments, eventSink) {
+                events.stream.listen(eventSink.success);
+              },
+            ),
+          );
+
+      final backend = DesktopLibmpvBackend();
+      final states = <PlaybackState>[];
+      final stateSub = backend.onState.listen(states.add);
+      await backend.load(
+        const PlaybackSource(uri: 'https://example.test/tracks.mkv'),
+      );
+      events
+        ..add(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 70,
+          'sequence': 1,
+          'kind': 'PLAYBACK_RESTART',
+          'sid': 'no',
+        })
+        ..add(<String, Object?>{
+          'schemaVersion': 2,
+          'handle': 70,
+          'sequence': 2,
+          'kind': 'PLAYBACK_RESTART',
+          'aid': '2',
+        });
+      await pumpEventQueue();
+
+      expect(states.last.audioTracks, hasLength(2));
+      expect(states.last.subtitleTracks, hasLength(1));
+      expect(states.last.selectedAudioTrackId, '2');
+      expect(states.last.selectedSubtitleTrackId, isNull);
+
+      await stateSub.cancel();
+      await backend.dispose();
+      await events.close();
+    });
 
     test('ignores events from stale handle', () async {
       final events = StreamController<Map<String, Object?>>.broadcast();

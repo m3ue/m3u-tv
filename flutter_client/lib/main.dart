@@ -84,9 +84,14 @@ Future<AppStateController> _buildAppState() async {
 Future<PersistentJsonStore> _createAppStateStore(
   String operatingSystem,
 ) async {
-  if (operatingSystem == 'android' ||
-      operatingSystem == 'ios' ||
-      operatingSystem == 'tvos') {
+  if (operatingSystem == 'tvos') {
+    // Documents exists but is read-only on a physical Apple TV; only
+    // Library/Caches and tmp are writable there. See path_provider_tvos's
+    // PathProviderPlugin.swift for the on-device sandbox measurements.
+    final dir = await getApplicationCacheDirectory();
+    return PersistentJsonStore(file: File('${dir.path}/app_state.json'));
+  }
+  if (operatingSystem == 'android' || operatingSystem == 'ios') {
     final dir = await getApplicationDocumentsDirectory();
     return PersistentJsonStore(file: File('${dir.path}/app_state.json'));
   }

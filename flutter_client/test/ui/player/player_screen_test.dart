@@ -771,6 +771,39 @@ void main() {
       expect(find.text('English'), findsWidgets);
     });
 
+    testWidgets('marks Disable selected after audio disable is confirmed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TrackSelector(
+            audioTracks: const [
+              PlaybackTrack(id: '1', label: 'English'),
+              PlaybackTrack(id: '2', label: 'Spanish'),
+            ],
+            subtitleTracks: const [],
+            selectedAudioTrackId: null,
+            selectedSubtitleTrackId: null,
+            isAudioTrackSelectionKnown: true,
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.audiotrack));
+      await tester.pumpAndSettle();
+
+      final disableTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Disable'),
+      );
+      final englishTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'English'),
+      );
+      expect(disableTile.selected, isTrue);
+      expect(englishTile.selected, isFalse);
+    });
+
     testWidgets('opens subtitle track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -790,6 +823,72 @@ void main() {
       await tester.tap(find.byIcon(Icons.subtitles));
       await tester.pumpAndSettle();
       expect(find.text('English CC'), findsWidgets);
+    });
+
+    testWidgets(
+      'does not mark Off selected while subtitle selection is unknown',
+      (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: TrackSelector(
+              audioTracks: const [],
+              subtitleTracks: const [
+                PlaybackTrack(id: '1', label: 'English CC'),
+              ],
+              selectedAudioTrackId: null,
+              selectedSubtitleTrackId: null,
+              onAudioTrackSelected: (_) {},
+              onSubtitleTrackSelected: (_) {},
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.subtitles));
+        await tester.pumpAndSettle();
+
+        final offTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'Off'),
+        );
+        final englishTile = tester.widget<ListTile>(
+          find.widgetWithText(ListTile, 'English CC'),
+        );
+        expect(offTile.selected, isFalse);
+        expect(englishTile.selected, isFalse);
+      },
+    );
+
+    testWidgets('marks Off selected after subtitle disable is confirmed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TrackSelector(
+            audioTracks: const [],
+            subtitleTracks: const [
+              PlaybackTrack(id: '1', label: 'English CC'),
+            ],
+            selectedAudioTrackId: null,
+            selectedSubtitleTrackId: null,
+            isSubtitleTrackSelectionKnown: true,
+            onAudioTrackSelected: (_) {},
+            onSubtitleTrackSelected: (_) {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.subtitles));
+      await tester.pumpAndSettle();
+
+      final offTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'Off'),
+      );
+      final englishTile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, 'English CC'),
+      );
+      expect(offTile.selected, isTrue);
+      expect(englishTile.selected, isFalse);
     });
 
     testWidgets('calls onAudioTrackSelected when track chosen', (tester) async {
@@ -1299,59 +1398,285 @@ void main() {
       expect(requests.last.params, {'stream_id': '101', 'limit': '4'});
     });
 
-    testWidgets('shows audio track selector and applies selection', (
-      tester,
-    ) async {
-      final adapter = FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.desktopLibmpv,
-        textureId: 42,
-      );
-      final orchestrator = PlaybackOrchestrator(
-        platform: PlaybackPlatform.desktop,
-        adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.desktopLibmpv: adapter,
-        },
-        transcodeGateway: FakeTranscodeGateway(),
-      );
-      addTearDown(orchestrator.dispose);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PlayerScreen(
-            args: const PlayerArgs(
-              streamUrl: 'https://example.com/movie.m3u8',
-              title: 'Multi Audio Fixture',
-              type: 'movie',
-            ),
-            orchestrator: orchestrator,
-            epgService: EpgService(clock: () => DateTime.utc(2026)),
+    final trackSelectorSystems =
+        <
+          ({
+            String name,
+            PlaybackPlatform platform,
+            PlaybackCapabilities capabilities,
+            Size size,
+          })
+        >[
+          (
+            name: 'Android TV Media3',
+            platform: PlaybackPlatform.android,
+            capabilities: PlaybackCapabilities.androidExoPlayer,
+            size: const Size(1920, 1080),
           ),
-        ),
+          (
+            name: 'Android phone Media3',
+            platform: PlaybackPlatform.android,
+            capabilities: PlaybackCapabilities.androidExoPlayer,
+            size: const Size(412, 915),
+          ),
+          (
+            name: 'Apple TV AVKit',
+            platform: PlaybackPlatform.apple,
+            capabilities: PlaybackCapabilities.appleAvKit,
+            size: const Size(1920, 1080),
+          ),
+          (
+            name: 'iPhone MediaKit',
+            platform: PlaybackPlatform.apple,
+            capabilities: PlaybackCapabilities.appleMediaKit,
+            size: const Size(430, 932),
+          ),
+          (
+            name: 'macOS MediaKit',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopMediaKit,
+            size: const Size(1440, 900),
+          ),
+          (
+            name: 'Linux libmpv',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            size: const Size(1280, 720),
+          ),
+          (
+            name: 'Windows libmpv',
+            platform: PlaybackPlatform.desktop,
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            size: const Size(1366, 768),
+          ),
+        ];
+
+    for (final system in trackSelectorSystems) {
+      testWidgets(
+        '${system.name} shows both track selectors and applies selections',
+        (tester) async {
+          await tester.binding.setSurfaceSize(system.size);
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final adapter = FakePlayerAdapter(
+            capabilities: system.capabilities,
+            textureId: 42,
+          );
+          final backend = system.capabilities.backend;
+          final orchestrator = PlaybackOrchestrator(
+            platform: system.platform,
+            adapters: <PlaybackBackend, PlayerAdapter>{backend: adapter},
+            transcodeGateway: FakeTranscodeGateway(),
+          );
+          addTearDown(orchestrator.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/movie.m3u8',
+                  title: 'Track Fixture',
+                  type: 'movie',
+                ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          adapter.emitState(
+            PlaybackState(
+              backend: backend,
+              status: PlaybackStatus.ready,
+              duration: const Duration(hours: 1),
+              audioTracks: const <PlaybackTrack>[
+                PlaybackTrack(
+                  id: 'audio-eng',
+                  label: 'English',
+                  language: 'eng',
+                ),
+                PlaybackTrack(
+                  id: 'audio-spa',
+                  label: 'Spanish',
+                  language: 'spa',
+                ),
+              ],
+              subtitleTracks: const <PlaybackTrack>[
+                PlaybackTrack(
+                  id: 'sub-eng',
+                  label: 'English CC',
+                  language: 'eng',
+                ),
+              ],
+              selectedAudioTrackId: 'audio-eng',
+            ),
+          );
+          await tester.pump();
+
+          expect(tester.takeException(), isNull);
+          expect(find.byIcon(Icons.audiotrack), findsOneWidget);
+          expect(find.byIcon(Icons.subtitles), findsOneWidget);
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Spanish').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('English CC').last);
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
+          expect(adapter.setSubtitleTrackCalls, <String?>['sub-eng']);
+        },
       );
-      await tester.pump();
+    }
 
-      adapter.emitState(
-        const PlaybackState(
-          backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
-          duration: Duration(hours: 1),
-          audioTracks: <PlaybackTrack>[
-            PlaybackTrack(id: 'audio-eng', label: 'English', language: 'eng'),
-            PlaybackTrack(id: 'audio-spa', label: 'Spanish', language: 'spa'),
-          ],
-          selectedAudioTrackId: 'audio-eng',
-        ),
+    for (final systemName in <String>['Linux libmpv', 'Windows libmpv']) {
+      testWidgets(
+        '$systemName confirms disabled tracks without losing track lists',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 42,
+          );
+          final orchestrator = PlaybackOrchestrator(
+            platform: PlaybackPlatform.desktop,
+            adapters: <PlaybackBackend, PlayerAdapter>{
+              PlaybackBackend.desktopLibmpv: adapter,
+            },
+            transcodeGateway: FakeTranscodeGateway(),
+          );
+          addTearDown(orchestrator.dispose);
+          const audioTracks = <PlaybackTrack>[
+            PlaybackTrack(id: 'audio-eng', label: 'English'),
+            PlaybackTrack(id: 'audio-spa', label: 'Spanish'),
+          ];
+          const subtitleTracks = <PlaybackTrack>[
+            PlaybackTrack(id: 'sub-eng', label: 'English CC'),
+          ];
+
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/movie.m3u8',
+                  title: 'Track Fixture',
+                  type: 'movie',
+                ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.ready,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              selectedAudioTrackId: 'audio-eng',
+              selectedSubtitleTrackId: 'sub-eng',
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Disable'));
+          await tester.pumpAndSettle();
+          expect(adapter.setAudioTrackCalls, <String?>[null]);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              selectedSubtitleTrackId: 'sub-eng',
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(
+            tester
+                .widget<PlaybackControls>(find.byType(PlaybackControls))
+                .isAudioTrackSelectionKnown,
+            isTrue,
+          );
+          expect(
+            tester
+                .widget<TrackSelector>(find.byType(TrackSelector))
+                .isAudioTrackSelectionKnown,
+            isTrue,
+          );
+          expect(
+            tester
+                .widget<TrackSelector>(find.byType(TrackSelector))
+                .selectedAudioTrackId,
+            isNull,
+          );
+          await tester.tap(find.byIcon(Icons.audiotrack));
+          await tester.pumpAndSettle();
+
+          expect(
+            tester
+                .widget<ListTile>(find.widgetWithText(ListTile, 'Disable'))
+                .selected,
+            isTrue,
+          );
+          expect(find.text('English'), findsOneWidget);
+          expect(find.text('Spanish'), findsOneWidget);
+          tester.state<NavigatorState>(find.byType(Navigator)).pop();
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Off'));
+          await tester.pumpAndSettle();
+          expect(adapter.setSubtitleTrackCalls, <String?>[null]);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              audioTracks: audioTracks,
+              subtitleTracks: subtitleTracks,
+              isAudioTrackSelectionKnown: true,
+              isSubtitleTrackSelectionKnown: true,
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(
+            tester
+                .widget<PlaybackControls>(find.byType(PlaybackControls))
+                .isSubtitleTrackSelectionKnown,
+            isTrue,
+          );
+          await tester.tap(find.byIcon(Icons.subtitles));
+          await tester.pumpAndSettle();
+
+          expect(
+            tester
+                .widget<ListTile>(find.widgetWithText(ListTile, 'Off'))
+                .selected,
+            isTrue,
+          );
+          expect(find.text('English CC'), findsOneWidget);
+        },
       );
-      await tester.pump();
-
-      expect(find.byIcon(Icons.audiotrack), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.audiotrack));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Spanish').last);
-      await tester.pumpAndSettle();
-
-      expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
-    });
+    }
 
     testWidgets('backs out of the route when playback error is visible', (
       tester,
@@ -1429,5 +1754,143 @@ void main() {
       expect(find.text('Launcher'), findsOneWidget);
       expect(find.text('Playback error'), findsNothing);
     });
+
+    testWidgets(
+      'switching live channel via a stable key reuses the orchestrator '
+      'instead of disposing it',
+      (tester) async {
+        // Mirrors AppShell: skip-previous/skip-next replaces `args` on an
+        // already-mounted PlayerScreen (stable key, same orchestrator)
+        // instead of remounting with a fresh orchestrator per channel. If
+        // that stops happening, the Android Media3/Apple AVKit native
+        // plugins' single global player gets released out from under the
+        // channel the user just switched to.
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 7,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const channelA = PlayerArgs(
+          streamUrl: 'https://example.com/channel-a.m3u8',
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+        );
+        const channelB = PlayerArgs(
+          streamUrl: 'https://example.com/channel-b.m3u8',
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+        );
+
+        var args = channelA;
+        late StateSetter setArgs;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                setArgs = setState;
+                return PlayerScreen(
+                  key: const ValueKey('player-session'),
+                  args: args,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(adapter.loadCalls, hasLength(1));
+        expect(adapter.loadCalls.single.uri, channelA.streamUrl);
+        expect(adapter.disposeCallCount, 0);
+
+        setArgs(() => args = channelB);
+        await tester.pump();
+
+        // The switch happened in place: same adapter kept loading, never
+        // torn down mid-flight.
+        expect(adapter.loadCalls, hasLength(2));
+        expect(adapter.loadCalls.last.uri, channelB.streamUrl);
+        expect(adapter.disposeCallCount, 0);
+      },
+    );
+
+    testWidgets(
+      'switching to a channel sharing a URL but a different stream ID '
+      'still re-opens the new source',
+      (tester) async {
+        // Two channels can share a stream URL (e.g. a proxied/transcoded URL
+        // keyed by query params the client doesn't see) while differing in
+        // stream ID, headers, EPG ID, or metadata. Comparing streamUrl alone
+        // in didUpdateWidget would wrongly treat this as a no-op switch and
+        // leave the previous channel's EPG/state in place.
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 9,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const sharedUrl = 'https://example.com/shared.m3u8';
+        const channelA = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+          epgChannelId: 'channel-a',
+        );
+        const channelB = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+          epgChannelId: 'channel-b',
+        );
+
+        var args = channelA;
+        late StateSetter setArgs;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                setArgs = setState;
+                return PlayerScreen(
+                  key: const ValueKey('player-session'),
+                  args: args,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(adapter.loadCalls, hasLength(1));
+
+        setArgs(() => args = channelB);
+        await tester.pump();
+
+        // Same URL, but a genuinely different channel — must still re-open.
+        expect(adapter.loadCalls, hasLength(2));
+      },
+    );
   });
 }

@@ -28,6 +28,8 @@ class PlaybackControls extends StatelessWidget {
     this.subtitleTracks = const <PlaybackTrack>[],
     this.selectedAudioTrackId,
     this.selectedSubtitleTrackId,
+    this.isAudioTrackSelectionKnown = false,
+    this.isSubtitleTrackSelectionKnown = false,
     this.onAudioTrackSelected,
     this.onSubtitleTrackSelected,
     this.fallbackReason,
@@ -49,6 +51,8 @@ class PlaybackControls extends StatelessWidget {
   final List<PlaybackTrack> subtitleTracks;
   final String? selectedAudioTrackId;
   final String? selectedSubtitleTrackId;
+  final bool isAudioTrackSelectionKnown;
+  final bool isSubtitleTrackSelectionKnown;
   final ValueChanged<String?>? onAudioTrackSelected;
   final ValueChanged<String?>? onSubtitleTrackSelected;
   final String? fallbackReason;
@@ -155,6 +159,8 @@ class PlaybackControls extends StatelessWidget {
       subtitleTracks: subtitleTracks,
       selectedAudioTrackId: selectedAudioTrackId,
       selectedSubtitleTrackId: selectedSubtitleTrackId,
+      isAudioTrackSelectionKnown: isAudioTrackSelectionKnown,
+      isSubtitleTrackSelectionKnown: isSubtitleTrackSelectionKnown,
       onAudioTrackSelected: onAudioTrackSelected ?? (_) {},
       onSubtitleTrackSelected: onSubtitleTrackSelected ?? (_) {},
     );

@@ -307,6 +307,7 @@ void main() {
         ]);
         expect(states.last.subtitleTracks.single.label, 'English CC');
         expect(states.last.selectedAudioTrackId, 'audio:0:0');
+        expect(states.last.isAudioTrackSelectionKnown, isTrue);
 
         await adapter.setAudioTrack('audio:0:1');
         await adapter.setSubtitleTrack('subtitle:1:0');
@@ -323,6 +324,7 @@ void main() {
         );
         expect(states.last.selectedAudioTrackId, 'audio:0:1');
         expect(states.last.selectedSubtitleTrackId, isNull);
+        expect(states.last.isSubtitleTrackSelectionKnown, isTrue);
 
         await subscription.cancel();
         await adapter.dispose();

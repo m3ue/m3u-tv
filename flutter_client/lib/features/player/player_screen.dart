@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -73,6 +74,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   List<PlaybackTrack> _subtitleTracks = [];
   String? _selectedAudioTrackId;
   String? _selectedSubtitleTrackId;
+  bool _isAudioTrackSelectionKnown = false;
+  bool _isSubtitleTrackSelectionKnown = false;
 
   EpgCurrentNext? _epgData;
 
@@ -113,7 +116,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // widget already holds focus when the player opens via the AppShell Stack).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Overlay is visible on open — focus the play/pause button directly
+        // Overlay is visible on open - focus the play/pause button directly
         // so D-pad traversal works immediately. Falls back to _screenFocusNode
         // if somehow the overlay was already hidden.
         if (_overlayVisible) {
@@ -123,9 +126,70 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       }
     });
-    _startPlayback();
+    _stateSubscription = widget.orchestrator.onState.listen(_handleState);
+    _errorSubscription = widget.orchestrator.onError.listen(_handleError);
+    _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+  }
+
+  // Live-TV skip-previous/skip-next replaces `args` on an already-mounted
+  // PlayerScreen (AppShell keeps the same orchestrator/State alive across a
+  // channel switch — see app_shell.dart's `_playerSessionId` — so the single
+  // native player behind Media3/AVKit is never torn down mid-switch). Reset
+  // everything initState/_openSource would normally set up for a fresh
+  // mount, but reuse the existing stream subscriptions rather than doubling
+  // them up on the same orchestrator.
+  @override
+  void didUpdateWidget(covariant PlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
+
+    if (_traktScrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
+    _traktScrobbleActive = false;
+    _failureReported = false;
+    _lastValidProgress = 0;
+    _stopPositionTimer();
+    _progressTimer?.cancel();
+    _epgTimer?.cancel();
+    _epgFetch = null;
+
+    setState(() {
+      _status = PlaybackStatus.idle;
+      _currentPosition = Duration.zero;
+      _duration = Duration.zero;
+      _errorMessage = null;
+      _fallbackReason = null;
+      _isPlaying = false;
+      _videoAspectRatio = 16 / 9;
+      _audioTracks = const <PlaybackTrack>[];
+      _subtitleTracks = const <PlaybackTrack>[];
+      _selectedAudioTrackId = null;
+      _selectedSubtitleTrackId = null;
+      _epgData = null;
+      _overlayVisible = true;
+    });
+
+    _openSource(widget.args);
+    _startLoadingTimeout();
+    _scheduleOverlayHide();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+    });
+  }
+
+  // Two channels can share a stream URL while differing in stream ID,
+  // headers, EPG ID, or metadata (e.g. a proxied/transcoded URL keyed by
+  // query params that get stripped, or distinct catchup sources pointing at
+  // the same base live URL) — comparing streamUrl alone would silently skip
+  // the switch and leave the previous channel's state in place.
+  bool _isSamePlaybackSession(PlayerArgs a, PlayerArgs b) {
+    return a.streamUrl == b.streamUrl &&
+        a.streamId == b.streamId &&
+        a.type == b.type &&
+        a.epgChannelId == b.epgChannelId &&
+        mapEquals(a.headers, b.headers) &&
+        mapEquals(a.metadata, b.metadata);
   }
 
   void _startPositionTimer() {
@@ -146,10 +210,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer = null;
   }
 
-  void _scrobble(String action) {
+  void _scrobble(String action) => _scrobbleFor(widget.args, action);
+
+  void _scrobbleFor(PlayerArgs args, String action) {
     final service = widget.traktService;
     if (service == null || service.status != TraktAuthStatus.connected) return;
-    if (_isLive || widget.args.type == 'catchup') return;
+    if (args.type == 'live' || args.type == 'catchup') return;
     final duration = _duration.inSeconds;
     var progress = duration > 0
         ? (_currentPosition.inSeconds / duration * 100).clamp(0.0, 100.0)
@@ -162,7 +228,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       progress = _lastValidProgress;
     }
     if (progress > 0) _lastValidProgress = progress;
-    final args = widget.args;
     unawaited(
       service.scrobble(
         action: action,
@@ -214,13 +279,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _startPlayback() {
-    _stateSubscription = widget.orchestrator.onState.listen(_handleState);
-    _errorSubscription = widget.orchestrator.onError.listen(_handleError);
-
-    final source = widget.args.toPlaybackSource();
-
-    unawaited(_openAndSeek(source));
+  void _openSource(PlayerArgs args) {
+    unawaited(_openAndSeek(args.toPlaybackSource()));
   }
 
   Future<void> _openAndSeek(PlaybackSource source) async {
@@ -276,6 +336,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _subtitleTracks = state.subtitleTracks;
       _selectedAudioTrackId = state.selectedAudioTrackId;
       _selectedSubtitleTrackId = state.selectedSubtitleTrackId;
+      _isAudioTrackSelectionKnown = state.isAudioTrackSelectionKnown;
+      _isSubtitleTrackSelectionKnown = state.isSubtitleTrackSelectionKnown;
 
       final aspectRatio =
           state.videoAspectRatio ?? state.source?.videoAspectRatio;
@@ -410,7 +472,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
-      if (_disposed || !mounted) return;
+      // The player may have switched to a different channel while this was
+      // in flight (didUpdateWidget cancels the timer but can't cancel this
+      // future) — don't let a stale response overwrite the new channel's EPG.
+      if (_disposed || !mounted || widget.args.epgChannelId != channelId) {
+        return;
+      }
       widget.epgService.mergePrograms(programs);
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
@@ -508,7 +575,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const _PlayPauseIntent(),
-          // Only claim arrow keys when the overlay is hidden — when visible,
+          // Only claim arrow keys when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
@@ -535,7 +602,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               if (event is KeyDownEvent &&
                   !_overlayVisible &&
                   _errorMessage == null) {
-                // Don't intercept back/escape — let the Shortcuts above handle
+                // Don't intercept back/escape - let the Shortcuts above handle
                 // it as a direct back action. Intercepting it here would set
                 // _overlayVisible = true, causing _handleBack() to call
                 // _hideOverlay() instead of _goBack(), making back a no-op.
@@ -646,6 +713,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     subtitleTracks: _subtitleTracks,
                     selectedAudioTrackId: _selectedAudioTrackId,
                     selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                    isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
+                    isSubtitleTrackSelectionKnown:
+                        _isSubtitleTrackSelectionKnown,
                     onAudioTrackSelected: _handleAudioTrackSelected,
                     onSubtitleTrackSelected: _handleSubtitleTrackSelected,
                     fallbackReason: _showPlaybackDiagnostics

@@ -62,7 +62,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -96,7 +96,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -147,9 +147,7 @@ jobs:
 
       - name: Build APK
         run: |
-          flutter build apk --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter build apk --release
         env:
           ANDROID_KEYSTORE_PATH: ../../upload-keystore.jks
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -230,7 +228,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -257,9 +255,7 @@ jobs:
 
       - name: Build iOS IPA (unsigned)
         run: |
-          flutter build ipa --release --no-codesign \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter build ipa --release --no-codesign
 
       - name: Stage artifact
         # flutter build ipa --no-codesign creates an xcarchive, not a Payload IPA.
@@ -370,9 +366,7 @@ jobs:
 
       - name: Build tvOS (unsigned)
         run: |
-          flutter-tvos build tvos --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter-tvos build tvos --release
 
       - name: Package IPA
         # flutter-tvos build tvos creates an xcarchive; package the .app manually.
@@ -413,7 +407,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -456,9 +450,7 @@ jobs:
           FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
           FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
         run: |
-          flutter build macos --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter build macos --release
 
       - name: Sign app bundle
         # Notarization requires: Developer ID Application cert, Hardened Runtime
@@ -561,7 +553,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -573,9 +565,7 @@ jobs:
 
       - name: Build Linux app
         run: |
-          flutter build linux --release \
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} \
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter build linux --release
 
       - name: Verify Linux bundle
         run: |
@@ -766,7 +756,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.2'
+          flutter-version: '3.44.8'
           cache: true
 
       - name: Get dependencies
@@ -780,9 +770,7 @@ jobs:
 
       - name: Build Windows app
         run: |
-          flutter build windows --release `
-            --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }} `
-            --dart-define=TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          flutter build windows --release
 
       - name: Verify Windows bundle
         run: |

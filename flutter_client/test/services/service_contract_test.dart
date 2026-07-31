@@ -402,6 +402,118 @@ void main() {
     );
 
     test(
+      'cancel DVR recording posts recording_id and resolves on success',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'cancel_dvr_recording': <String, Object?>{'success': true},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.cancelDvrRecording('rec-1');
+
+        final request = transport.requests.last;
+        expect(request.action, 'cancel_dvr_recording');
+        expect(request.method, 'POST');
+        expect(request.body, {'recording_id': 'rec-1'});
+      },
+    );
+
+    test(
+      'cancel DVR recording surfaces server error message',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'cancel_dvr_recording': <String, Object?>{
+            'error': 'Recording not found',
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await expectLater(
+          service.cancelDvrRecording('rec-missing'),
+          throwsA(
+            isA<XtreamDvrScheduleException>().having(
+              (e) => e.message,
+              'message',
+              'Recording not found',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'delete DVR recording posts recording_id and resolves on success',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'delete_dvr_recording': <String, Object?>{'success': true},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.deleteDvrRecording('rec-2');
+
+        final request = transport.requests.last;
+        expect(request.action, 'delete_dvr_recording');
+        expect(request.method, 'POST');
+        expect(request.body, {'recording_id': 'rec-2'});
+      },
+    );
+
+    test(
+      'delete DVR recording surfaces server error message',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'delete_dvr_recording': <String, Object?>{
+            'error': 'Recording is still active',
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await expectLater(
+          service.deleteDvrRecording('rec-busy'),
+          throwsA(
+            isA<XtreamDvrScheduleException>().having(
+              (e) => e.message,
+              'message',
+              'Recording is still active',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'loads DVR recordings list and detail through m3u-editor actions',
       () async {
         final transport = FakeXtreamTransport({

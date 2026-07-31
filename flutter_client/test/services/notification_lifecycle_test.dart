@@ -201,6 +201,27 @@ void main() {
       },
     );
 
+    test('ID-only activation uses authoritative unread state', () async {
+      final item = _item(id: _notificationId, channel: 'dvr');
+      final api = _FakeTvNotificationService(<TvNotificationItem>[item]);
+      final controller = _controller(api);
+      addTearDown(controller.dispose);
+      final destinations = <TvNotificationDestination>[];
+      final subscription = controller.notificationActivations.listen(
+        destinations.add,
+      );
+      addTearDown(subscription.cancel);
+
+      await controller.handleNotificationActivation(_notificationId);
+      await controller.handleNotificationActivation('malformed');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(api.fetchCalls, 1);
+      expect(destinations, <TvNotificationDestination>[
+        TvNotificationDestination.dvr,
+      ]);
+    });
+
     test('admin-only content fails closed for standard credentials', () async {
       final api = _FakeTvNotificationService(<TvNotificationItem>[
         const TvNotificationItem(

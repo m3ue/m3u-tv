@@ -31,9 +31,35 @@ void main() {
     final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
-    expect(workflow, contains("flutter-version: '3.44.2'"));
+    expect(workflow, contains("flutter-version: '3.44.8'"));
     expect(workflow, contains('run: flutter analyze'));
     expect(workflow, contains('run: flutter test'));
+  });
+
+  test('release builds rely on the built-in public Trakt client id', () {
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+
+    expect(releaseWorkflow, isNot(contains('TRAKT_CLIENT_SECRET')));
+    expect(releaseWorkflow, isNot(contains('secrets.TRAKT_CLIENT_SECRET')));
+    expect(releaseWorkflow, isNot(contains('TRAKT_CLIENT_ID')));
+
+    for (final stepName in <String>[
+      'Build APK',
+      'Build iOS IPA (unsigned)',
+      'Build tvOS (unsigned)',
+      'Build macOS app (unsigned)',
+      'Build Linux app',
+      'Build Windows app',
+    ]) {
+      final step = workflowStep(releaseWorkflow, stepName);
+      expect(
+        step,
+        isNot(contains('TRAKT_CLIENT')),
+        reason:
+            '$stepName should use the built-in Trakt client id, not a '
+            '--dart-define override',
+      );
+    }
   });
 
   test('CI executes native Android playback speed unit tests', () {
@@ -290,12 +316,12 @@ void main() {
         (
           verified: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
           uploaded: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
-          published: false,
+          published: true,
         ),
         (
           verified: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
           uploaded: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
-          published: false,
+          published: true,
         ),
       ],
     );
@@ -445,7 +471,7 @@ void main() {
   );
 
   test(
-    'release workflow blocks desktop ZIPs from public assets while keeping them as workflow artifacts',
+    'release workflow publishes desktop ZIPs as public release assets alongside workflow artifacts',
     () {
       final releaseWorkflow = readFile('../.github/workflows/release.yml');
 
@@ -484,13 +510,13 @@ void main() {
 
       expect(
         assetArray,
-        isNot(contains('linux-zip')),
-        reason: 'Linux ZIP must NOT be in public release assets',
+        contains('linux-zip'),
+        reason: 'Linux ZIP must be published as a public release asset',
       );
       expect(
         assetArray,
-        isNot(contains('windows-zip')),
-        reason: 'Windows ZIP must NOT be in public release assets',
+        contains('windows-zip'),
+        reason: 'Windows ZIP must be published as a public release asset',
       );
 
       expect(
@@ -503,12 +529,12 @@ void main() {
         releaseSection.indexOf('name: Release summary'),
       );
       expect(releaseSummary, contains('Android + Android TV'));
-      expect(releaseSummary, isNot(contains('| Linux |')));
-      expect(releaseSummary, isNot(contains('| Windows |')));
+      expect(releaseSummary, contains('| Linux |'));
+      expect(releaseSummary, contains('| Windows |'));
     },
   );
 
-  test('existing releases remove only version-bound desktop assets', () {
+  test('release upload clobbers existing version-bound desktop assets', () {
     final releaseWorkflow = readFile(releaseWorkflowPath);
     final releaseStep = workflowStep(
       releaseWorkflow,
@@ -529,63 +555,13 @@ void main() {
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty && !line.startsWith('#'))
         .toList();
-    final assetListStart = updatePath.indexOf(r'for blocked_asset in \');
-    final assetListEnd = updatePath.indexOf('; do', assetListStart);
-    expect(assetListStart, greaterThan(-1));
-    expect(assetListEnd, greaterThan(assetListStart));
-    const expectedAssets = <String>[
-      r'm3u-tv-v${V}-linux.zip',
-      r'm3u-tv-v${V}-linux.zip.sha256',
-      r'm3u-tv-v${V}-linux.tar.gz',
-      r'm3u-tv-v${V}-linux.tar.gz.sha256',
-      r'm3u-tv-v${V}-windows.zip',
-      r'm3u-tv-v${V}-windows.zip.sha256',
-    ];
-    final assetListLines = updatePath
-        .substring(assetListStart, assetListEnd)
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty && !line.startsWith('#'))
-        .toList();
-    expect(assetListLines, hasLength(expectedAssets.length + 1));
-    expect(assetListLines.first, r'for blocked_asset in \');
-    expect(
-      assetListLines.skip(1),
-      orderedEquals(<String>[
-        for (var index = 0; index < expectedAssets.length; index++)
-          if (index < expectedAssets.length - 1)
-            '"${expectedAssets[index]}" \\'
-          else
-            '"${expectedAssets[index]}"',
-      ]),
-    );
 
     expect(
       executableLines,
-      contains(
-        r'if grep -Fxq "$blocked_asset" <<< "$EXISTING_ASSETS"; then',
-      ),
-    );
-    expect(
-      executableLines,
-      contains(r'gh release delete-asset "$TAG" "$blocked_asset" --yes'),
-    );
-    expect(
-      executableLines.indexOf(
-        r'gh release delete-asset "$TAG" "$blocked_asset" --yes',
-      ),
-      lessThan(
-        executableLines.indexOf(
-          r'gh release upload "$TAG" --clobber "${ASSETS[@]}"',
-        ),
-      ),
-    );
-    expect(updatePath, isNot(contains(r'delete-asset "$TAG" "*')));
-    expect(
-      executableLines
-          .where((line) => line.contains('delete-asset'))
-          .every((line) => !line.contains('|| true')),
-      isTrue,
+      contains(r'gh release upload "$TAG" --clobber "${ASSETS[@]}"'),
+      reason:
+          '--clobber ensures re-running a release overwrites the same '
+          'version-bound assets instead of erroring or duplicating them',
     );
   });
 
@@ -757,7 +733,7 @@ void main() {
 
     expect(ciWorkflow, contains('workflow_dispatch'));
     expect(ciWorkflow, contains('name: Detect desktop-affecting changes'));
-    expect(ciWorkflow, contains('uses: dorny/paths-filter@v3'));
+    expect(ciWorkflow, contains('uses: dorny/paths-filter@v4'));
     expect(
       ciWorkflow,
       contains(

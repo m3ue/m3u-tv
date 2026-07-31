@@ -155,8 +155,7 @@ class AppStateController extends ChangeNotifier {
   final Generation _pushLifecycleGeneration = Generation();
   Future<void>? _pushInitialization;
   StreamSubscription<String>? _pushTokenSubscription;
-  final Map<String, PushMessage> _pendingPushActivations =
-      <String, PushMessage>{};
+  final Set<String> _pendingNotificationActivations = <String>{};
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
   final StreamController<TvNotificationDestination>
@@ -447,7 +446,7 @@ class AppStateController extends ChangeNotifier {
     try {
       final session = await _reconcileUnreadNotifications(
         credentials,
-        present: _pendingPushActivations.isEmpty,
+        present: _pendingNotificationActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
       if (_notificationSessionGeneration.isStale(notificationGeneration)) {
@@ -545,7 +544,7 @@ class AppStateController extends ChangeNotifier {
     try {
       await _reconcileUnreadNotifications(
         credentials,
-        present: _pendingPushActivations.isEmpty,
+        present: _pendingNotificationActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
     } on Object catch (_) {
@@ -679,12 +678,15 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  Future<void> handlePushActivation(PushMessage message) async {
-    final id = message.notificationId;
+  Future<void> handlePushActivation(PushMessage message) =>
+      handleNotificationActivation(message.notificationId);
+
+  Future<void> handleNotificationActivation(String? notificationId) async {
+    final id = canonicalNotificationId(notificationId);
     if (id == null) return;
     final credentials = authNotifier.credentials;
     if (credentials == null) {
-      _pendingPushActivations[id] = message;
+      _pendingNotificationActivations.add(id);
       return;
     }
     final notificationGeneration = _notificationSessionGeneration.current;
@@ -720,13 +722,14 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> _drainPendingPushActivations() async {
-    if (authNotifier.credentials == null || _pendingPushActivations.isEmpty) {
+    if (authNotifier.credentials == null ||
+        _pendingNotificationActivations.isEmpty) {
       return;
     }
-    final pending = _pendingPushActivations.values.toList(growable: false);
-    _pendingPushActivations.clear();
-    for (final message in pending) {
-      await handlePushActivation(message);
+    final pending = _pendingNotificationActivations.toList(growable: false);
+    _pendingNotificationActivations.clear();
+    for (final id in pending) {
+      await handleNotificationActivation(id);
     }
   }
 
@@ -1187,6 +1190,58 @@ class AppStateController extends ChangeNotifier {
         .map((recording) => recording.channelId)
         .whereType<int>()
         .toSet();
+  }
+
+  /// Cancels a scheduled or in-progress DVR recording, keeping it in the
+  /// local list with its refreshed (Cancelled) status — the server itself
+  /// only marks the row cancelled and keeps history; deleting it is a
+  /// separate, explicit action (see [deleteDvrRecording]). If the post-cancel
+  /// detail fetch 404s (the row is already gone server-side for some other
+  /// reason), drops it locally instead of leaving a stale pre-cancel row.
+  Future<void> cancelDvrRecording(String uuid) async {
+    try {
+      await xtreamService.cancelDvrRecording(uuid);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: cancel failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+    try {
+      final detail = await xtreamService.getDvrRecording(uuid);
+      final next = [..._dvrRecordings];
+      final index = next.indexWhere((recording) => recording.uuid == uuid);
+      if (index >= 0) {
+        next[index] = detail;
+      } else {
+        next.insert(0, detail);
+      }
+      _dvrRecordings = next;
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: refresh recording detail after cancel failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _dvrRecordings = _dvrRecordings
+          .where((recording) => recording.uuid != uuid)
+          .toList(growable: false);
+    }
+    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    notifyListeners();
+  }
+
+  /// Deletes a completed/failed/cancelled DVR recording and removes it from
+  /// the local list. Same fail-safe: 404 still drops the row locally.
+  Future<void> deleteDvrRecording(String uuid) async {
+    try {
+      await xtreamService.deleteDvrRecording(uuid);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: delete failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+    _dvrRecordings = _dvrRecordings
+        .where((recording) => recording.uuid != uuid)
+        .toList(growable: false);
+    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    notifyListeners();
   }
 
   /// Lightweight poll for which channels are currently recording, used to

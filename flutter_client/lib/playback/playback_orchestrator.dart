@@ -84,12 +84,20 @@ class PlaybackOrchestrator {
 
   Future<void> open(PlaybackSource source) async {
     _ensureNotDisposed();
-    _playbackGeneration += 1;
-    _cancelBufferingTimer();
+    // Assigned synchronously, before any await, so this call's generation is
+    // guaranteed unique — capturing it *after* an await (as this used to)
+    // lets a second concurrent open() call (e.g. a fast second skip-channel
+    // press) bump the counter first and land on the same value, so the
+    // older call is never recognized as stale. Every subsequent await below
+    // re-checks against this value and bails (cleaning up only what *this*
+    // call itself started) if a newer open()/stop() has since taken over.
+    final generation = _beginGeneration();
     _activeRecoveryAttempts = 0;
     _recovering = false;
     await _stopActiveAdapter();
+    if (!_isCurrentGeneration(generation)) return;
     await _cleanupSessions();
+    if (!_isCurrentGeneration(generation)) return;
     _activeAdapter = null;
     _activeBackend = null;
     _activeSource = null;
@@ -98,13 +106,16 @@ class PlaybackOrchestrator {
     PlaybackBackend? previousBackend;
     var attempt = 0;
     for (final backend in _nativeBackends()) {
+      if (!_isCurrentGeneration(generation)) return;
       final failure = await _tryLoadBackend(
         backend: backend,
         source: source,
         successDiagnostic: attempt == 0
             ? 'direct:${backend.name}:ready'
             : 'fallback:${backend.name}:preferred ${previousBackend?.name ?? 'none'} unsupported',
+        generation: generation,
       );
+      if (!_isCurrentGeneration(generation)) return;
       attempt += 1;
       if (failure == null) return;
       if (_platform == PlaybackPlatform.android &&
@@ -116,7 +127,11 @@ class PlaybackOrchestrator {
       lastRecoverableFailure = failure;
     }
 
-    await _openServerTranscode(source, lastFailure: lastRecoverableFailure);
+    await _openServerTranscode(
+      source,
+      generation: generation,
+      lastFailure: lastRecoverableFailure,
+    );
   }
 
   Future<void> play() => _requireActiveAdapter().play();
@@ -131,6 +146,7 @@ class PlaybackOrchestrator {
       _requireActiveAdapter().setPlaybackSpeed(speed);
 
   Future<void> stop() async {
+    _beginGeneration();
     await _stopActiveAdapter();
     await _cleanupSessions();
   }
@@ -170,6 +186,7 @@ class PlaybackOrchestrator {
     required PlaybackBackend backend,
     required PlaybackSource source,
     required String successDiagnostic,
+    required int generation,
   }) async {
     final adapter = _adapters[backend];
     if (adapter == null) return null;
@@ -179,13 +196,34 @@ class PlaybackOrchestrator {
     _activeSource = source;
     try {
       await adapter.load(source);
+      if (!_isCurrentGeneration(generation)) {
+        // A newer open()/stop() call has since taken over. This adapter
+        // just started playing content nobody asked for anymore — stop it
+        // rather than leaving it running unsupervised, but only touch the
+        // shared fields if they still point at THIS call's own source. A
+        // newer call may reuse the identical adapter+backend (there's only
+        // one adapter instance per backend), so checking adapter/backend
+        // identity alone can't tell the two calls apart — checking source
+        // identity too can, since each call builds its own PlaybackSource.
+        if (identical(_activeAdapter, adapter) &&
+            _activeBackend == backend &&
+            identical(_activeSource, source)) {
+          _activeAdapter = null;
+          _activeBackend = null;
+          _activeSource = null;
+        }
+        await adapter.stop();
+        return null;
+      }
       _activeSource = source;
       _diagnostics
         ..add(successDiagnostic)
         ..add('active-backend:${backend.name}:ready');
       return null;
     } on PlaybackException catch (error) {
-      if (identical(_activeAdapter, adapter) && _activeBackend == backend) {
+      if (identical(_activeAdapter, adapter) &&
+          _activeBackend == backend &&
+          identical(_activeSource, source)) {
         _activeAdapter = null;
         _activeBackend = null;
         _activeSource = null;
@@ -205,6 +243,7 @@ class PlaybackOrchestrator {
 
   Future<void> _openServerTranscode(
     PlaybackSource source, {
+    required int generation,
     required PlaybackException? lastFailure,
   }) async {
     final adapter = _adapters[PlaybackBackend.serverTranscode];
@@ -230,6 +269,7 @@ class PlaybackOrchestrator {
         _serverRequestFromSource(source),
       );
     } on TranscodeUnavailableException catch (error) {
+      if (!_isCurrentGeneration(generation)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -240,6 +280,7 @@ class PlaybackOrchestrator {
       );
       return;
     } on Object catch (error) {
+      if (!_isCurrentGeneration(generation)) return;
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -251,6 +292,14 @@ class PlaybackOrchestrator {
       return;
     }
 
+    if (!_isCurrentGeneration(generation)) {
+      // Superseded while starting the transcode — this call's session was
+      // never made active, so tear it down directly rather than through
+      // _cleanupSessions(), which would risk stopping a newer call's
+      // already-active session instead.
+      unawaited(_stopServerTranscode(response));
+      return;
+    }
     _activeServerTranscode = response;
     if (response.status == BroadcastStatus.stalled.value ||
         response.status == BroadcastStatus.failed.value) {
@@ -274,7 +323,11 @@ class PlaybackOrchestrator {
     try {
       broadcast = await _startBroadcastIfNeeded(source);
     } on Object catch (error) {
-      await _cleanupSessions();
+      if (_isCurrentGeneration(generation)) {
+        await _cleanupSessions();
+      } else {
+        unawaited(_abandonServerTranscode(response, null));
+      }
       _emitError(
         PlaybackError(
           backend: PlaybackBackend.serverTranscode,
@@ -283,6 +336,14 @@ class PlaybackOrchestrator {
           recoverable: true,
         ),
       );
+      return;
+    }
+
+    if (!_isCurrentGeneration(generation)) {
+      unawaited(_abandonServerTranscode(response, broadcast));
+      if (identical(_activeServerTranscode, response)) {
+        _activeServerTranscode = null;
+      }
       return;
     }
     if (broadcast != null) {
@@ -313,10 +374,33 @@ class PlaybackOrchestrator {
     _activeSource = transcodedSource;
     try {
       await adapter.load(transcodedSource);
+      if (!_isCurrentGeneration(generation)) {
+        // Same reasoning as _tryLoadBackend: the server-transcode adapter is
+        // also a single shared instance, so adapter/backend identity alone
+        // can't distinguish this call from a newer one that reused it —
+        // check source identity too.
+        if (identical(_activeAdapter, adapter) &&
+            _activeBackend == PlaybackBackend.serverTranscode &&
+            identical(_activeSource, transcodedSource)) {
+          _activeAdapter = null;
+          _activeBackend = null;
+          _activeSource = null;
+        }
+        await adapter.stop();
+        if (identical(_activeBroadcast, broadcast) && broadcast != null) {
+          _activeBroadcast = null;
+        }
+        if (identical(_activeServerTranscode, response)) {
+          _activeServerTranscode = null;
+        }
+        unawaited(_abandonServerTranscode(response, broadcast));
+        return;
+      }
       _diagnostics.add('active-backend:serverTranscode:ready');
     } on PlaybackException catch (error) {
       if (identical(_activeAdapter, adapter) &&
-          _activeBackend == PlaybackBackend.serverTranscode) {
+          _activeBackend == PlaybackBackend.serverTranscode &&
+          identical(_activeSource, transcodedSource)) {
         _activeAdapter = null;
         _activeBackend = null;
         _activeSource = null;
@@ -324,6 +408,22 @@ class PlaybackOrchestrator {
       await _cleanupSessions();
       _emitError(PlaybackError.fromException(error));
     }
+  }
+
+  // Tears down a transcode/broadcast pair that a superseded open() call
+  // started, without going through _cleanupSessions() (which operates on
+  // whatever is *currently* active and could belong to a newer call by now).
+  Future<void> _abandonServerTranscode(
+    TranscodeResponse response,
+    BroadcastSession? broadcast,
+  ) async {
+    if (broadcast != null) {
+      await _transcodeGateway.stopBroadcast(broadcast.networkId);
+      _diagnostics.add(
+        'cleanup:broadcast:stopped:${broadcast.networkId}:abandoned',
+      );
+    }
+    await _stopServerTranscode(response);
   }
 
   StreamRequest _serverRequestFromSource(PlaybackSource source) {
@@ -350,8 +450,12 @@ class PlaybackOrchestrator {
     return _transcodeGateway.startBroadcast(_serverRequestFromSource(source));
   }
 
+  // Does NOT bump _playbackGeneration itself — callers that represent the
+  // start of a new logical operation (open(), stop()) must bump exactly
+  // once, synchronously, before calling this. If this bumped on every call,
+  // open()'s own generation check would immediately see itself as stale
+  // right after calling this, even with no concurrent call in sight.
   Future<void> _stopActiveAdapter() async {
-    _playbackGeneration += 1;
     _cancelBufferingTimer();
     final adapter = _activeAdapter;
     if (adapter == null) return;
@@ -360,6 +464,11 @@ class PlaybackOrchestrator {
     _activeSource = null;
     await adapter.stop();
   }
+
+  int _beginGeneration() => _playbackGeneration += 1;
+
+  bool _isCurrentGeneration(int generation) =>
+      generation == _playbackGeneration;
 
   Future<void> _cleanupSessions() async {
     final broadcast = _activeBroadcast;
@@ -453,6 +562,7 @@ class PlaybackOrchestrator {
       return;
     }
     if (_activeRecoveryAttempts >= 1) {
+      _beginGeneration();
       await _stopActiveAdapter();
       await _cleanupSessions();
       _emitError(error);
@@ -475,11 +585,13 @@ class PlaybackOrchestrator {
       await adapter.load(source);
     } on PlaybackException catch (retryError) {
       if (_disposed || generation != _playbackGeneration) return;
+      _beginGeneration();
       await _stopActiveAdapter();
       await _cleanupSessions();
       _emitError(PlaybackError.fromException(retryError));
     } on Object catch (retryError) {
       if (_disposed || generation != _playbackGeneration) return;
+      _beginGeneration();
       await _stopActiveAdapter();
       await _cleanupSessions();
       _emitError(

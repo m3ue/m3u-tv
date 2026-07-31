@@ -26,6 +26,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -80,6 +81,7 @@ class AppShell extends ConsumerStatefulWidget {
     this.playbackOrchestratorBuilder,
     this.playerRouteBuilder,
     this.systemUiPolicy,
+    this.desktopNotificationPresenter,
   });
 
   final StatefulNavigationShell navigationShell;
@@ -88,6 +90,7 @@ class AppShell extends ConsumerStatefulWidget {
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
   final SystemUiPolicy? systemUiPolicy;
+  final DesktopNotificationPresenter? desktopNotificationPresenter;
 
   @override
   ConsumerState<AppShell> createState() => AppShellState();
@@ -108,11 +111,23 @@ class AppShellState extends ConsumerState<AppShell>
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
   StreamSubscription<TvNotificationDestination>? _notificationActivationSub;
   final _toastKey = GlobalKey<NotificationToastOverlayState>();
+  late final DesktopNotificationDispatcher _desktopNotificationDispatcher;
 
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
   bool _playerHasFailed = false;
   FocusNode? _focusBeforePlayer;
+
+  // Bumped only when a brand-new player session starts (not on in-session
+  // source switches, e.g. skip-previous/skip-next), so PlayerScreen's key
+  // stays stable across a channel switch and its State survives via
+  // didUpdateWidget instead of being torn down and rebuilt. This matters
+  // because the Android Media3 and Apple AVKit native plugins each hold a
+  // single global player behind their MethodChannel — remounting PlayerScreen
+  // per channel would dispose the *previous* orchestrator after the *new*
+  // one has already started loading, and that deferred dispose tears down
+  // whatever the native side currently has loaded (the new channel).
+  int _playerSessionId = 0;
 
   // Channels the user was browsing when the live player opened (filtered
   // category/favorites/search list), so skip-previous/skip-next in
@@ -148,6 +163,12 @@ class AppShellState extends ConsumerState<AppShell>
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _systemUiPolicy = widget.systemUiPolicy ?? SystemUiPolicy();
+    _desktopNotificationDispatcher = DesktopNotificationDispatcher(
+      presenter:
+          widget.desktopNotificationPresenter ??
+          NativeDesktopNotificationPresenter(),
+      onFallback: _enqueueNotificationToast,
+    );
     _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
@@ -158,6 +179,19 @@ class AppShellState extends ConsumerState<AppShell>
       unawaited(_appState.boot());
     }
     _initSidebarFocusNodes();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    unawaited(
+      _desktopNotificationDispatcher.initialize(
+        defaultActionName: AppLocalizations.of(
+          context,
+        ).notificationsDesktopOpen,
+        onActivation: _appState.handleNotificationActivation,
+      ),
+    );
   }
 
   Future<bool> _handleSystemBack() async {
@@ -222,6 +256,10 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _onTvNotification(TvNotificationItem item) {
+    unawaited(_desktopNotificationDispatcher.dispatch(item));
+  }
+
+  void _enqueueNotificationToast(TvNotificationItem item) {
     if (!mounted) return;
     _toastKey.currentState?.enqueue(item);
   }
@@ -246,6 +284,7 @@ class AppShellState extends ConsumerState<AppShell>
     _backExitTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
     _notificationActivationSub?.cancel().ignore();
+    _desktopNotificationDispatcher.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     for (final node in _sidebarFocusNodes) {
@@ -386,10 +425,6 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _openPlayerDirect(PlayerArgs rawArgs) {
     final args = _applyProxyPlayback(rawArgs);
-    final oldOrch = _playerOrchestrator;
-    final newOrch =
-        widget.playbackOrchestratorBuilder?.call() ??
-        buildPlaybackOrchestrator();
     // Save the focused node so we can restore it precisely after the player
     // closes. _contentFocusNode.requestFocus() alone is unreliable: when
     // PlayerScreen disposes _screenFocusNode, Flutter's _willDisposeFocusNode
@@ -400,16 +435,29 @@ class AppShellState extends ConsumerState<AppShell>
     final focus = FocusManager.instance.primaryFocus;
     _focusBeforePlayer = _isInContentScope(focus) ? focus : null;
     unawaited(_systemUiPolicy.applyPlayer());
+
+    if (_playerOrchestrator != null) {
+      // A player is already open (e.g. skip-previous/skip-next) — reuse its
+      // orchestrator/session rather than building a new one. PlayerScreen's
+      // key is unchanged, so the framework updates the existing State via
+      // didUpdateWidget instead of disposing it, keeping exactly one native
+      // player instance alive for the whole session.
+      setState(() {
+        _playerArgs = args;
+        _playerHasFailed = false;
+      });
+      return;
+    }
+
+    _playerSessionId += 1;
+    final newOrch =
+        widget.playbackOrchestratorBuilder?.call() ??
+        buildPlaybackOrchestrator();
     setState(() {
       _playerArgs = args;
       _playerOrchestrator = newOrch;
       _playerHasFailed = false;
     });
-    if (oldOrch != null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => oldOrch.dispose().ignore(),
-      );
-    }
   }
 
   bool _isInContentScope(FocusNode? node) {
@@ -431,6 +479,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerOrchestrator = null;
       _playerHasFailed = false;
     });
+    _playerChannelContext = const <Channel>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       orch?.dispose().ignore();
       if (!mounted) return;
@@ -562,6 +611,30 @@ class AppShellState extends ConsumerState<AppShell>
           ),
         ),
       );
+    }
+  }
+
+  /// Stops a scheduled or in-progress recording and deletes the row from the
+  /// editor — the "Delete recording" choice on the Recordings screen's stop
+  /// dialog (see DvrRecordingsScreen._confirmCancel). m3u-editor's
+  /// `cancel_dvr_recording` only marks the recording `cancelled` (a stop +
+  /// history-keep operation), so this chains a follow-up `delete_dvr_recording`
+  /// once the row is in a deletable state. The "Keep recording" choice instead
+  /// calls `AppStateController.cancelDvrRecording` directly and stops here.
+  ///
+  /// If the cancel succeeds but the delete fails (e.g. transient server
+  /// hiccup), the recording is still stopped and stays in the local list with
+  /// its Cancelled status — the user can retry Delete from there. The delete
+  /// failure is rethrown (not swallowed) so DvrRecordingsScreen's
+  /// _runWithFeedback shows the "could not delete" SnackBar instead of a
+  /// false "deleted" success message for a recording that's still there.
+  Future<void> _cancelAndDeleteRecording(String uuid) async {
+    await _appState.cancelDvrRecording(uuid);
+    try {
+      await _appState.deleteDvrRecording(uuid);
+    } on Object catch (error) {
+      debugPrint('DVR: post-cancel delete failed: $error');
+      rethrow;
     }
   }
 
@@ -750,6 +823,9 @@ class AppShellState extends ConsumerState<AppShell>
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
             onPlay: _openPlayerDirect,
+            onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
+            onCancelAndDeleteRecording: _cancelAndDeleteRecording,
+            onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
             onSidebarActivate: _activateSidebar,
           );
         },
@@ -894,7 +970,7 @@ class AppShellState extends ConsumerState<AppShell>
             child:
                 widget.playerRouteBuilder?.call(args) ??
                 PlayerScreen(
-                  key: ValueKey(args.streamUrl),
+                  key: ValueKey(_playerSessionId),
                   args: args,
                   orchestrator: orch,
                   epgService: _appState.epgService,

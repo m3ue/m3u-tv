@@ -332,7 +332,7 @@ void main() {
       expect(
         linuxEventValue,
         contains(
-          'fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(1));',
+          'fl_value_set_string_take(event, "schemaVersion", fl_value_new_int(2));',
         ),
       );
       expect(
@@ -350,7 +350,7 @@ void main() {
       expect(
         windowsEventValue,
         contains(
-          '{flutter::EncodableValue("schemaVersion"), flutter::EncodableValue(1)}',
+          '{flutter::EncodableValue("schemaVersion"), flutter::EncodableValue(2)}',
         ),
       );
       expect(
@@ -1204,6 +1204,207 @@ void main() {
           mapping,
           isNot(contains('} else {\n            snapshot.kind = "END_FILE"')),
         );
+      }
+    });
+
+    test('linux libmpv emits safely refreshed normalized track lists', () {
+      final backend = File(
+        'linux/desktop_libmpv_backend.cc',
+      ).readAsStringSync();
+
+      expect(backend, contains('using mpv_free_node_contents_fn'));
+      expect(
+        backend,
+        contains('LoadSymbol(g_api.library, "mpv_free_node_contents")'),
+      );
+      expect(backend, contains('free_node_contents != nullptr'));
+
+      final readerStart = backend.indexOf(
+        'void PlayerInstance::ReadTrackLists',
+      );
+      final readerEnd = backend.indexOf(
+        'void PlayerInstance::StartEventThread',
+        readerStart,
+      );
+      expect(readerStart, isNonNegative);
+      expect(readerEnd, greaterThan(readerStart));
+      final reader = backend.substring(readerStart, readerEnd);
+      expect(reader, contains('"track-list", MPV_FORMAT_NODE, &node'));
+      expect(reader, contains('api->free_node_contents(&node)'));
+      expect(reader, contains('type == "audio"'));
+      expect(reader, contains('type == "sub"'));
+      expect(reader, contains('TrackNodeString'));
+      expect(reader, contains('label.empty() ? language : label'));
+      expect(reader, contains('normalized_label.empty() ? id'));
+      final normalizerStart = backend.indexOf(
+        'std::string NormalizeTrackString',
+      );
+      final normalizerEnd = backend.indexOf(
+        'void PlayerInstance::ReadTrackLists',
+        normalizerStart,
+      );
+      final normalizer = backend.substring(normalizerStart, normalizerEnd);
+      expect(normalizer, contains('std::find_if_not'));
+      expect(normalizer, contains('std::isspace'));
+      expect(normalizer, contains('return NormalizeTrackString'));
+
+      final eventStart = backend.indexOf('FlValue* BuildEventValue');
+      final eventEnd = backend.indexOf(
+        'static gboolean SendEventSnapshotOnGtkThread',
+        eventStart,
+      );
+      final event = backend.substring(eventStart, eventEnd);
+      expect(event, contains('fl_value_new_int(2)'));
+      expect(event, contains('"audioTracks"'));
+      expect(event, contains('"subtitleTracks"'));
+      expect(event, contains('"id"'));
+      expect(event, contains('"label"'));
+      expect(event, contains('"language"'));
+      expect(event, contains('if (snapshot.has_aid)'));
+      expect(event, contains('if (snapshot.has_sid)'));
+      expect(
+        event,
+        contains(
+          'fl_value_set_string_take(event, "aid", fl_value_new_string(snapshot.aid.c_str()));',
+        ),
+      );
+      expect(
+        event,
+        contains(
+          'fl_value_set_string_take(event, "sid", fl_value_new_string(snapshot.sid.c_str()));',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);',
+        ),
+      );
+
+      final fileLoadedStart = backend.indexOf(
+        'case 8:   // MPV_EVENT_FILE_LOADED',
+      );
+      final fileLoadedEnd = backend.indexOf('case 21:', fileLoadedStart);
+      expect(
+        backend.substring(fileLoadedStart, fileLoadedEnd),
+        contains('ReadTrackLists(&snapshot)'),
+      );
+
+      for (final method in <String>['setAudioTrack', 'setSubtitleTrack']) {
+        final controlStart = backend.indexOf(
+          'g_strcmp0(method, "$method") == 0',
+        );
+        final controlEnd = backend.indexOf('} else if', controlStart + 1);
+        final control = backend.substring(controlStart, controlEnd);
+        expect(control, contains('player->ReadTrackLists(&snapshot)'));
+        expect(control, contains('player->QueueEvent(snapshot)'));
+      }
+    });
+
+    test('windows libmpv emits safely refreshed normalized track lists', () {
+      final backend = File(
+        'windows/runner/desktop_libmpv_backend.cpp',
+      ).readAsStringSync();
+
+      expect(backend, contains('using mpv_free_node_contents_fn'));
+      expect(
+        backend,
+        contains('LoadSymbol(g_api.library, "mpv_free_node_contents")'),
+      );
+      expect(backend, contains('free_node_contents != nullptr'));
+
+      final readerStart = backend.indexOf(
+        'void PlayerInstance::ReadTrackLists',
+      );
+      final readerEnd = backend.indexOf(
+        'void PlayerInstance::StartEventThread',
+        readerStart,
+      );
+      expect(readerStart, isNonNegative);
+      expect(readerEnd, greaterThan(readerStart));
+      final reader = backend.substring(readerStart, readerEnd);
+      expect(reader, contains('"track-list", MPV_FORMAT_NODE, &node'));
+      expect(reader, contains('api->free_node_contents(&node)'));
+      expect(reader, contains('type == "audio"'));
+      expect(reader, contains('type == "sub"'));
+      expect(reader, contains('TrackNodeString'));
+      expect(reader, contains('label.empty() ? language : label'));
+      expect(reader, contains('normalized_label.empty() ? track_id'));
+      final normalizerStart = backend.indexOf(
+        'std::string NormalizeTrackString',
+      );
+      final normalizerEnd = backend.indexOf(
+        'void PlayerInstance::ReadTrackLists',
+        normalizerStart,
+      );
+      final normalizer = backend.substring(normalizerStart, normalizerEnd);
+      expect(normalizer, contains('std::find_if_not'));
+      expect(normalizer, contains('std::isspace'));
+      expect(normalizer, contains('return NormalizeTrackString'));
+
+      final eventStart = backend.indexOf('class EventSinkState');
+      final eventEnd = backend.indexOf(
+        'class EventStreamHandler',
+        eventStart,
+      );
+      final event = backend.substring(eventStart, eventEnd);
+      expect(event, contains('flutter::EncodableValue(2)'));
+      expect(event, contains('"audioTracks"'));
+      expect(event, contains('"subtitleTracks"'));
+      expect(event, contains('"id"'));
+      expect(event, contains('"label"'));
+      expect(event, contains('"language"'));
+      expect(event, contains('if (snapshot.has_aid)'));
+      expect(event, contains('if (snapshot.has_sid)'));
+      expect(
+        event,
+        contains(
+          'event[flutter::EncodableValue("aid")] = flutter::EncodableValue(snapshot.aid)',
+        ),
+      );
+      expect(
+        event,
+        contains(
+          'event[flutter::EncodableValue("sid")] = flutter::EncodableValue(snapshot.sid)',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_aid = StringProperty(this, "aid", &snapshot->aid);',
+        ),
+      );
+      expect(
+        backend,
+        contains(
+          'snapshot->has_sid = StringProperty(this, "sid", &snapshot->sid);',
+        ),
+      );
+
+      final fileLoadedStart = backend.indexOf(
+        'event->event_id == MPV_EVENT_FILE_LOADED',
+      );
+      final fileLoadedEnd = backend.indexOf(
+        'event->event_id == MPV_EVENT_PLAYBACK_RESTART',
+        fileLoadedStart,
+      );
+      expect(
+        backend.substring(fileLoadedStart, fileLoadedEnd),
+        contains('ReadTrackLists(&snapshot)'),
+      );
+
+      for (final method in <String>['setAudioTrack', 'setSubtitleTrack']) {
+        final controlStart = backend.indexOf('method == "$method"');
+        final controlEnd = backend.indexOf('} else if', controlStart + 1);
+        final control = backend.substring(controlStart, controlEnd);
+        expect(control, contains('player->ReadTrackLists(&snapshot)'));
+        expect(control, contains('player->QueueEvent(std::move(snapshot))'));
       }
     });
 

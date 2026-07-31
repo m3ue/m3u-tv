@@ -60,10 +60,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -98,6 +95,12 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
 dependencies {
     implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
     implementation("androidx.media3:media3-exoplayer:$media3Version")
@@ -105,6 +108,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     testImplementation("junit:junit:4.13.2")
 }
 

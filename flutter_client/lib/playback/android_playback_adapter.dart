@@ -199,7 +199,12 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
     if (_activeBackend == PlaybackBackend.androidExoPlayer) {
       await _media3Host.setAudioTrack(trackId);
     }
-    _emit(_state.copyWith(selectedAudioTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedAudioTrackId: trackId,
+        isAudioTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -207,7 +212,12 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
     if (_activeBackend == PlaybackBackend.androidExoPlayer) {
       await _media3Host.setSubtitleTrack(trackId);
     }
-    _emit(_state.copyWith(selectedSubtitleTrackId: trackId));
+    _emit(
+      _state.copyWith(
+        selectedSubtitleTrackId: trackId,
+        isSubtitleTrackSelectionKnown: true,
+      ),
+    );
   }
 
   @override
@@ -330,11 +340,13 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
     if (event.hasSelectedAudioTrackId) {
       nextState = nextState.copyWith(
         selectedAudioTrackId: event.selectedAudioTrackId,
+        isAudioTrackSelectionKnown: true,
       );
     }
     if (event.hasSelectedSubtitleTrackId) {
       nextState = nextState.copyWith(
         selectedSubtitleTrackId: event.selectedSubtitleTrackId,
+        isSubtitleTrackSelectionKnown: true,
       );
     }
     _emit(nextState);

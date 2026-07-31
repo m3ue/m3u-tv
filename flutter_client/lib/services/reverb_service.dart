@@ -37,13 +37,17 @@ class ReverbService {
   WebSocketChannel? _ws;
   StreamSubscription<dynamic>? _sub;
   Timer? _reconnectTimer;
+  Timer? _idleTimer;
+  Timer? _pongTimer;
   bool _disposed = false;
   bool _paused = false;
   bool _connected = false;
   bool _hasConnectedBefore = false;
   int _retryDelay = 2;
+  int _activityTimeoutSeconds = 30;
 
   static const int _maxRetryDelay = 60;
+  static const int _pongGraceSeconds = 15;
 
   /// Connects to Reverb and starts listening for push notifications.
   ///
@@ -85,14 +89,45 @@ class ReverbService {
       _connected = false;
 
       _sub = _ws!.stream.listen(
-        (raw) => _onMessage(raw as String, session, creds),
+        (raw) {
+          _onMessage(raw as String, session, creds);
+          _resetIdleTimer();
+        },
         onError: (_) => _scheduleReconnect(),
         onDone: _scheduleReconnect,
         cancelOnError: true,
       );
+      _resetIdleTimer();
     } on Object catch (_) {
       _scheduleReconnect();
     }
+  }
+
+  /// Restarts the idle-silence watchdog. Called on every message received
+  /// (proving the socket is alive) and once right after connecting.
+  ///
+  /// Reverb tells clients (via `activity_timeout` on `connection_established`)
+  /// how long they may go without a message before they're expected to ping.
+  /// If nothing at all arrives within that window — not even the server's own
+  /// keep-alive — [_sendPing] probes the connection explicitly.
+  void _resetIdleTimer() {
+    _pongTimer?.cancel();
+    _pongTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(Duration(seconds: _activityTimeoutSeconds), _sendPing);
+  }
+
+  /// Probes a silent connection. If nothing (not even a reply to this ping)
+  /// arrives within the grace period, the socket is a zombie the transport
+  /// never reported as closed (e.g. after a laptop sleep/wake or a dropped
+  /// Wi-Fi hop) — force a reconnect rather than waiting on it forever.
+  void _sendPing() {
+    _send({'event': 'pusher:ping', 'data': {}});
+    _pongTimer?.cancel();
+    _pongTimer = Timer(
+      const Duration(seconds: _pongGraceSeconds),
+      _scheduleReconnect,
+    );
   }
 
   void _onMessage(
@@ -113,9 +148,16 @@ class ReverbService {
       case 'pusher:connection_established':
         final data = _parseData(msg['data']);
         final socketId = '${data['socket_id'] ?? ''}';
+        final activityTimeout = int.tryParse('${data['activity_timeout']}');
+        if (activityTimeout != null && activityTimeout > 0) {
+          _activityTimeoutSeconds = activityTimeout;
+        }
         if (socketId.isNotEmpty) {
           unawaited(_authenticate(session, creds, socketId));
         }
+
+      case 'pusher:ping':
+        _send({'event': 'pusher:pong', 'data': {}});
 
       case 'pusher_internal:subscription_succeeded':
         _connected = true;
@@ -179,6 +221,10 @@ class ReverbService {
   }
 
   void _scheduleReconnect() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _sub?.cancel().ignore();
     _sub = null;
     _ws = null;
@@ -199,6 +245,10 @@ class ReverbService {
   Future<void> pause() async {
     if (_disposed) return;
     _paused = true;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connected = false;
@@ -224,6 +274,10 @@ class ReverbService {
   Future<void> disconnect() async {
     _disposed = true;
     _paused = false;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connected = false;

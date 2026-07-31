@@ -201,6 +201,8 @@ class PlaybackState {
     this.subtitleTracks = const <PlaybackTrack>[],
     this.selectedAudioTrackId,
     this.selectedSubtitleTrackId,
+    this.isAudioTrackSelectionKnown = false,
+    this.isSubtitleTrackSelectionKnown = false,
     this.playbackSpeed = 1,
     this.videoAspectRatio,
   });
@@ -214,6 +216,8 @@ class PlaybackState {
       subtitleTracks = const <PlaybackTrack>[],
       selectedAudioTrackId = null,
       selectedSubtitleTrackId = null,
+      isAudioTrackSelectionKnown = false,
+      isSubtitleTrackSelectionKnown = false,
       playbackSpeed = 1,
       videoAspectRatio = null;
 
@@ -226,6 +230,8 @@ class PlaybackState {
   final List<PlaybackTrack> subtitleTracks;
   final String? selectedAudioTrackId;
   final String? selectedSubtitleTrackId;
+  final bool isAudioTrackSelectionKnown;
+  final bool isSubtitleTrackSelectionKnown;
   final double playbackSpeed;
   final double? videoAspectRatio;
 
@@ -239,6 +245,8 @@ class PlaybackState {
     List<PlaybackTrack>? subtitleTracks,
     Object? selectedAudioTrackId = _unchanged,
     Object? selectedSubtitleTrackId = _unchanged,
+    bool? isAudioTrackSelectionKnown,
+    bool? isSubtitleTrackSelectionKnown,
     double? playbackSpeed,
     double? videoAspectRatio,
   }) {
@@ -256,6 +264,10 @@ class PlaybackState {
       selectedSubtitleTrackId: identical(selectedSubtitleTrackId, _unchanged)
           ? this.selectedSubtitleTrackId
           : selectedSubtitleTrackId as String?,
+      isAudioTrackSelectionKnown:
+          isAudioTrackSelectionKnown ?? this.isAudioTrackSelectionKnown,
+      isSubtitleTrackSelectionKnown:
+          isSubtitleTrackSelectionKnown ?? this.isSubtitleTrackSelectionKnown,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       videoAspectRatio: videoAspectRatio ?? this.videoAspectRatio,
     );
