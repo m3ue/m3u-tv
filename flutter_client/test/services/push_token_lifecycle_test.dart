@@ -749,6 +749,178 @@ void main() {
     );
 
     test(
+      'late post-commit progress cannot replace a newer source',
+      () async {
+        final transport = _PostCommitOwnershipTransport(
+          blockSecondProgressRefresh: true,
+        );
+        final fixture = _Fixture(transport: transport.call);
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await pumpEventQueue();
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await transport.secondProgressRefreshStarted.future;
+
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await _waitForProgress(fixture.controller, 'Server C Progress');
+        var stalePublications = 0;
+        fixture.controller.addListener(() {
+          if (fixture.controller.progressList.any(
+            (progress) => progress.title == 'Server B delayed progress',
+          )) {
+            stalePublications += 1;
+          }
+        });
+
+        transport.releaseSecondProgressRefresh.complete();
+        await pumpEventQueue();
+
+        expect(fixture.auth.credentials, _thirdCredentials);
+        expect(fixture.controller.activeViewer?.ulid, 'viewer-server-c');
+        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(
+          fixture.controller.progressList.single.title,
+          'Server C Progress',
+        );
+        expect(stalePublications, 0);
+        expect(
+          jsonEncode(await fixture.store.snapshot()),
+          isNot(contains('Server B delayed progress')),
+        );
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.action == 'update_progress' &&
+                request.username == 'third' &&
+                request.viewerId == 'viewer-server-b',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'late favorites pull cannot replace a newer source',
+      () async {
+        final storage = InMemorySecureStorage();
+        final transport = _PostCommitOwnershipTransport(
+          blockSecondFavoritesPull: true,
+        );
+        final fixture = _Fixture(
+          transport: transport.call,
+          secureStorage: storage,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await pumpEventQueue();
+        await storage.write(
+          'm3ue_tv_favorites_migrated_viewers',
+          jsonEncode(<String>['viewer-server-b']),
+        );
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await transport.secondFavoritesPullStarted.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await _waitForFavorite(fixture.controller, 103);
+
+        transport.releaseSecondFavoritesPull.complete();
+        await pumpEventQueue();
+
+        expect(await fixture.controller.favoritesService.all(), <int>{103});
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.isFavorites &&
+                request.viewerId !=
+                    'viewer-server-${request.source.toLowerCase()}',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'stale first-time favorites migration cannot use newer credentials',
+      () async {
+        final storage = _BlockingFavoritesMigrationStorage();
+        final transport = _PostCommitOwnershipTransport();
+        final fixture = _Fixture(
+          transport: transport.call,
+          secureStorage: storage,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await pumpEventQueue();
+        storage.arm();
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await storage.blockedReadStarted.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await _waitForFavorite(fixture.controller, 103);
+
+        storage.releaseBlockedRead.complete();
+        await pumpEventQueue();
+
+        final migrated =
+            jsonDecode(
+                  (await storage.read(
+                    'm3ue_tv_favorites_migrated_viewers',
+                  ))!,
+                )
+                as List<Object?>;
+        expect(migrated, contains('viewer-server-c'));
+        expect(migrated, isNot(contains('viewer-server-b')));
+        expect(await fixture.controller.favoritesService.all(), <int>{103});
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.isFavorites && request.viewerId == 'viewer-server-b',
+          ),
+          isEmpty,
+        );
+        expect(
+          transport.requests.where(
+            (request) =>
+                request.isFavorites &&
+                request.viewerId !=
+                    'viewer-server-${request.source.toLowerCase()}',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
       'failed authentication restores the prior notification session',
       () async {
         final reverb = _RecordingReverbService();
@@ -1389,6 +1561,193 @@ class _ThreeSourceXtreamTransport {
   }
 }
 
+class _SourceRequest {
+  const _SourceRequest({
+    required this.action,
+    required this.username,
+    required this.viewerId,
+  });
+
+  final String action;
+  final String username;
+  final String? viewerId;
+
+  String get source => switch (username) {
+    'first' => 'A',
+    'second' => 'B',
+    'third' => 'C',
+    _ => throw StateError('Unexpected source user: $username'),
+  };
+
+  bool get isFavorites =>
+      action == 'get_favorites' || action == 'sync_favorites';
+}
+
+class _PostCommitOwnershipTransport {
+  _PostCommitOwnershipTransport({
+    this.blockSecondProgressRefresh = false,
+    this.blockSecondFavoritesPull = false,
+  });
+
+  final bool blockSecondProgressRefresh;
+  final bool blockSecondFavoritesPull;
+  final List<_SourceRequest> requests = <_SourceRequest>[];
+  final Completer<void> secondProgressRefreshStarted = Completer<void>();
+  final Completer<void> releaseSecondProgressRefresh = Completer<void>();
+  final Completer<void> secondFavoritesPullStarted = Completer<void>();
+  final Completer<void> releaseSecondFavoritesPull = Completer<void>();
+  final Map<String, int> _recentlyWatchedCalls = <String, int>{};
+
+  Future<Object?> call(XtreamRequest request) async {
+    final username = request.credentials.username;
+    final source = switch (username) {
+      'first' => 'A',
+      'second' => 'B',
+      'third' => 'C',
+      _ => throw StateError('Unexpected source user: $username'),
+    };
+    final slug = 'server-${source.toLowerCase()}';
+    final offset = source.codeUnitAt(0) - 'A'.codeUnitAt(0);
+    final action = request.action ?? 'auth';
+    final viewerId =
+        request.body['viewer_id']?.toString() ?? request.params['viewer_id'];
+    requests.add(
+      _SourceRequest(
+        action: action,
+        username: username,
+        viewerId: viewerId,
+      ),
+    );
+    switch (action) {
+      case 'auth':
+        return <String, Object?>{
+          'user_info': <String, Object?>{'auth': 1, 'status': 'Active'},
+          'm3u_editor': <String, Object?>{'version': '0.10.0'},
+        };
+      case 'get_live_categories':
+      case 'get_vod_categories':
+      case 'get_series_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': '$action-$slug',
+            'category_name': 'Server $source Category',
+          },
+        ];
+      case 'get_live_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': 101 + offset,
+            'name': 'Server $source Channel',
+            'category_id': 'get_live_categories-$slug',
+            'epg_channel_id': slug,
+          },
+        ];
+      case 'get_vod_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': 201 + offset,
+            'name': 'Server $source Movie',
+            'category_id': 'get_vod_categories-$slug',
+            'container_extension': 'mp4',
+          },
+        ];
+      case 'get_series':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'series_id': 301 + offset,
+            'name': 'Server $source Show',
+            'category_id': 'get_series_categories-$slug',
+          },
+        ];
+      case 'get_viewers':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'id': 1 + offset,
+            'ulid': 'viewer-$slug',
+            'name': 'Server $source Viewer',
+            'is_admin': true,
+          },
+        ];
+      case 'get_recently_watched':
+        final callCount = (_recentlyWatchedCalls[username] ?? 0) + 1;
+        _recentlyWatchedCalls[username] = callCount;
+        if (username == 'second' &&
+            callCount == 2 &&
+            blockSecondProgressRefresh) {
+          secondProgressRefreshStarted.complete();
+          await releaseSecondProgressRefresh.future;
+          return <Map<String, Object?>>[
+            <String, Object?>{
+              'content_type': 'vod',
+              'stream_id': 902,
+              'position_seconds': 92,
+              'title': 'Server B delayed progress',
+            },
+          ];
+        }
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'vod',
+            'stream_id': 201 + offset,
+            'position_seconds': 10 + offset,
+            'title': 'Server $source Progress',
+          },
+        ];
+      case 'get_favorites':
+        if (username == 'second' && blockSecondFavoritesPull) {
+          secondFavoritesPullStarted.complete();
+          await releaseSecondFavoritesPull.future;
+        }
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'live',
+            'stream_id': 101 + offset,
+          },
+        ];
+      case 'sync_favorites':
+        final requestedViewer = request.body['viewer_id']?.toString() ?? '';
+        final requestedSource = requestedViewer.endsWith('server-b')
+            ? 'B'
+            : source;
+        final requestedOffset =
+            requestedSource.codeUnitAt(0) - 'A'.codeUnitAt(0);
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'live',
+            'stream_id': 101 + requestedOffset,
+          },
+        ];
+      case 'get_epg_batch':
+        return <String, Object?>{};
+      case 'update_progress':
+        return <String, Object?>{};
+      default:
+        throw StateError('Unexpected fixture action: $action');
+    }
+  }
+}
+
+class _BlockingFavoritesMigrationStorage extends InMemorySecureStorage {
+  static const _migrationKey = 'm3ue_tv_favorites_migrated_viewers';
+
+  final Completer<void> blockedReadStarted = Completer<void>();
+  final Completer<void> releaseBlockedRead = Completer<void>();
+  bool _armed = false;
+  bool _blocked = false;
+
+  void arm() => _armed = true;
+
+  @override
+  Future<String?> read(String key) async {
+    if (_armed && !_blocked && key == _migrationKey) {
+      _blocked = true;
+      blockedReadStarted.complete();
+      await releaseBlockedRead.future;
+    }
+    return super.read(key);
+  }
+}
+
 class _TransactionalXtreamTransport {
   _TransactionalXtreamTransport({
     required this.onSecondSourceStaged,
@@ -1556,4 +1915,28 @@ Future<void> _waitForGuide(AppStateController controller, String title) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   fail('Timed out waiting for guide');
+}
+
+Future<void> _waitForProgress(
+  AppStateController controller,
+  String title,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (controller.progressList.any((progress) => progress.title == title)) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for progress');
+}
+
+Future<void> _waitForFavorite(
+  AppStateController controller,
+  int streamId,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (await controller.favoritesService.isFavorite(streamId)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for favorite');
 }
