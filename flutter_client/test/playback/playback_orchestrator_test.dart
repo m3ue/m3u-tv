@@ -687,6 +687,150 @@ void main() {
       },
       timeout: const Timeout(Duration(seconds: 3)),
     );
+
+    test(
+      'a slower older open() cannot win after a faster newer one completes',
+      () async {
+        // Regression test for a race a reviewer found: rapid channel
+        // switching starts a second open() before the first's adapter.load()
+        // resolves. If the first call's late success is allowed to run its
+        // normal "activate" path, it silently replaces the channel the user
+        // switched to with the one they switched away from.
+        final adapter = _GatedPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: adapter,
+          },
+          transcodeGateway: transcode,
+        );
+
+        const older = PlaybackSource(
+          uri: 'https://provider.example/live/older.ts',
+          isLive: true,
+        );
+        const newer = PlaybackSource(
+          uri: 'https://provider.example/live/newer.ts',
+          isLive: true,
+        );
+
+        adapter.holdLoad(older.uri);
+        final olderOpen = orchestrator.open(older);
+        await pumpEventQueue();
+        expect(adapter.loadedUris, <String>[older.uri]);
+
+        // A newer open() call for a different channel starts and completes
+        // in full while the older one is still stuck loading.
+        await orchestrator.open(newer);
+        expect(adapter.loadedUris, <String>[older.uri, newer.uri]);
+        final diagnosticsAfterNewer = List<String>.from(
+          orchestrator.diagnostics,
+        );
+
+        // Only now does the older call's load() finally resolve.
+        adapter.releaseLoad(older.uri);
+        await olderOpen;
+        await pumpEventQueue();
+
+        // The older load succeeded on the adapter, but arrived stale: the
+        // orchestrator must stop it rather than let it silently become
+        // "active" again, and must not re-run the activation diagnostics
+        // newer() already recorded.
+        expect(adapter.stoppedUris, contains(older.uri));
+        expect(orchestrator.diagnostics, diagnosticsAfterNewer);
+
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
+      'a slower older server-transcode response cannot win after a faster '
+      'newer one loads',
+      () async {
+        // Regression test for the same race in the server-transcode
+        // fallback path: _openServerTranscode previously never checked the
+        // generation at all, so a delayed startServerTranscode() response
+        // for an abandoned channel could still get loaded after a newer
+        // channel's transcode had already started playing.
+        final serverPlayer = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.serverTranscode,
+        );
+        final transcode = _GatedTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.android,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.serverTranscode: serverPlayer,
+          },
+          transcodeGateway: transcode,
+        );
+
+        const older = PlaybackSource(
+          uri: 'https://provider.example/live/older-source.ts',
+          isLive: true,
+        );
+        const newer = PlaybackSource(
+          uri: 'https://provider.example/live/newer-source.ts',
+          isLive: true,
+        );
+
+        final olderOpen = orchestrator.open(older);
+        await pumpEventQueue();
+        expect(transcode.startedUrls, <String>[older.uri]);
+
+        final newerOpen = orchestrator.open(newer);
+        await pumpEventQueue();
+        transcode.resolve(
+          newer.uri,
+          const TranscodeResponse(
+            streamId: 'newest-hls',
+            streamUrl:
+                'https://m3u-editor.example/hls/newest-hls/playlist.m3u8',
+            mode: TranscodeMode.server,
+            status: 'running',
+            sessionId: 'session-newest',
+          ),
+        );
+        await newerOpen;
+        await pumpEventQueue();
+
+        expect(serverPlayer.loadedSources, hasLength(1));
+        expect(
+          serverPlayer.loadedSources.single.uri,
+          'https://m3u-editor.example/hls/newest-hls/playlist.m3u8',
+        );
+
+        // Now resolve the older (stale) transcode request.
+        transcode.resolve(
+          older.uri,
+          const TranscodeResponse(
+            streamId: 'older-hls',
+            streamUrl: 'https://m3u-editor.example/hls/older-hls/playlist.m3u8',
+            mode: TranscodeMode.server,
+            status: 'running',
+            sessionId: 'session-older',
+          ),
+        );
+        await olderOpen;
+        await pumpEventQueue();
+
+        // The stale response must never reach the adapter — only
+        // "newest-hls" should ever have been loaded — and its now-orphaned
+        // server-transcode session must be torn down.
+        expect(serverPlayer.loadedSources, hasLength(1));
+        expect(
+          serverPlayer.loadedSources.single.uri,
+          'https://m3u-editor.example/hls/newest-hls/playlist.m3u8',
+        );
+        expect(
+          transcode.stoppedServerTranscodes,
+          contains('older-hls:session-older'),
+        );
+
+        await orchestrator.dispose();
+      },
+    );
   });
 }
 
@@ -783,6 +927,143 @@ class _FakeTranscodeGateway implements PlaybackTranscodeGateway {
     required String? sessionId,
   }) async {
     stoppedServerTranscodes.add('$streamId:$sessionId');
+  }
+}
+
+/// Gateway whose startServerTranscode() blocks per-URL until the test calls
+/// [resolve], so overlapping open() calls can be raced deterministically.
+class _GatedTranscodeGateway implements PlaybackTranscodeGateway {
+  final Map<String, Completer<TranscodeResponse>> _gates =
+      <String, Completer<TranscodeResponse>>{};
+  final List<String> startedUrls = <String>[];
+  final List<String> stoppedServerTranscodes = <String>[];
+  final List<String> stoppedBroadcasts = <String>[];
+
+  Completer<TranscodeResponse> _gateFor(String url) =>
+      _gates.putIfAbsent(url, Completer<TranscodeResponse>.new);
+
+  void resolve(String url, TranscodeResponse response) =>
+      _gateFor(url).complete(response);
+
+  @override
+  Future<TranscodeResponse> startServerTranscode(StreamRequest request) {
+    startedUrls.add(request.url);
+    return _gateFor(request.url).future;
+  }
+
+  @override
+  Future<BroadcastSession?> startBroadcast(StreamRequest request) async => null;
+
+  @override
+  Future<void> stopBroadcast(String networkId) async {
+    stoppedBroadcasts.add(networkId);
+  }
+
+  @override
+  Future<void> stopServerTranscode({
+    required String streamId,
+    required String? sessionId,
+  }) async {
+    stoppedServerTranscodes.add('$streamId:$sessionId');
+  }
+}
+
+/// Player adapter whose load() blocks per-URI until the test calls
+/// [releaseLoad], so overlapping open() calls can be raced deterministically.
+class _GatedPlayerAdapter implements PlayerAdapter {
+  _GatedPlayerAdapter({required this.capabilities});
+
+  @override
+  final PlaybackCapabilities capabilities;
+
+  final List<String> loadedUris = <String>[];
+  final List<String> stoppedUris = <String>[];
+  final Map<String, Completer<void>> _gates = <String, Completer<void>>{};
+  final Set<String> _held = <String>{};
+  String? _loadedUri;
+
+  final StreamController<PlaybackState> _stateController =
+      StreamController<PlaybackState>.broadcast();
+  final StreamController<PlaybackError> _errorController =
+      StreamController<PlaybackError>.broadcast();
+
+  PlaybackState _state = const PlaybackState.idle(
+    backend: PlaybackBackend.androidExoPlayer,
+  );
+
+  @override
+  Stream<PlaybackState> get onState => _stateController.stream;
+
+  @override
+  Stream<PlaybackError> get onError => _errorController.stream;
+
+  Completer<void> _gateFor(String uri) =>
+      _gates.putIfAbsent(uri, Completer<void>.new);
+
+  // Only URIs explicitly held block inside load() — every other URI
+  // resolves immediately, so a test only needs to gate the specific call
+  // it wants to race.
+  void holdLoad(String uri) {
+    _held.add(uri);
+    _gateFor(uri);
+  }
+
+  void releaseLoad(String uri) => _gateFor(uri).complete();
+
+  @override
+  Future<void> load(PlaybackSource source) async {
+    loadedUris.add(source.uri);
+    if (_held.contains(source.uri)) {
+      await _gateFor(source.uri).future;
+    }
+    _loadedUri = source.uri;
+    _emit(
+      PlaybackState(
+        backend: capabilities.backend,
+        status: PlaybackStatus.ready,
+        source: source,
+        position: source.startPosition,
+      ),
+    );
+  }
+
+  @override
+  Future<void> play() async =>
+      _emit(_state.copyWith(status: PlaybackStatus.playing));
+
+  @override
+  Future<void> pause() async =>
+      _emit(_state.copyWith(status: PlaybackStatus.paused));
+
+  @override
+  Future<void> seek(Duration position) async =>
+      _emit(_state.copyWith(position: position));
+
+  @override
+  Future<void> stop() async {
+    if (_loadedUri != null) stoppedUris.add(_loadedUri!);
+    _loadedUri = null;
+    _emit(_state.copyWith(status: PlaybackStatus.stopped));
+  }
+
+  @override
+  Future<void> setAudioTrack(String? trackId) async {}
+
+  @override
+  Future<void> setSubtitleTrack(String? trackId) async {}
+
+  @override
+  Future<void> setPlaybackSpeed(double speed) async {}
+
+  @override
+  Future<void> dispose() async {
+    await _stateController.close();
+    await _errorController.close();
+  }
+
+  void _emit(PlaybackState state) {
+    _state = state;
+    _stateController.add(state);
   }
 }
 

@@ -313,5 +313,31 @@
   "requestsStatusApproved": "Approved",
   "requestsStatusRejected": "Rejected",
   "requestsStatusCompleted": "Completed",
-  "requestsStatusUnknown": "Unknown"
+  "requestsStatusUnknown": "Unknown",
+  "dvrRecordingsTitle": "DVR Recordings",
+  "dvrRecordingsSubtitle": "Completed recordings and currently recording programmes",
+  "dvrNoRecordings": "No DVR recordings available",
+  "dvrNotConfigured": "Please connect to your service in Settings",
+  "dvrCancel": "Cancel",
+  "dvrDelete": "Delete",
+  "dvrStopTitle": "Stop recording — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "Keep it in your recordings list, or delete it now?",
+  "dvrStopKeep": "Keep recording",
+  "dvrStopDelete": "Delete recording",
+  "dvrStopBack": "Back",
+  "dvrCancelSuccess": "Recording cancelled",
+  "dvrCancelFailed": "Could not cancel recording",
+  "dvrDeleteTitle": "Delete recording?",
+  "dvrDeleteMessage": "This recording will be deleted permanently.",
+  "dvrDeleteDismiss": "Keep",
+  "dvrDeleteConfirm": "Delete recording",
+  "dvrDeleteSuccess": "Recording deleted",
+  "dvrDeleteFailed": "Could not delete recording"
 }

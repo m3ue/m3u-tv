@@ -313,5 +313,31 @@
   "requestsStatusApproved": "已批准",
   "requestsStatusRejected": "已拒绝",
   "requestsStatusCompleted": "已完成",
-  "requestsStatusUnknown": "未知"
+  "requestsStatusUnknown": "未知",
+  "dvrRecordingsTitle": "DVR 录制",
+  "dvrRecordingsSubtitle": "已完成的录制和正在录制的节目",
+  "dvrNoRecordings": "没有可用的 DVR 录制",
+  "dvrNotConfigured": "请在设置中连接到您的服务",
+  "dvrCancel": "取消",
+  "dvrDelete": "删除",
+  "dvrStopTitle": "停止录制 — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "保留在录制列表中，还是立即删除？",
+  "dvrStopKeep": "保留录制",
+  "dvrStopDelete": "删除录制",
+  "dvrStopBack": "返回",
+  "dvrCancelSuccess": "录制已取消",
+  "dvrCancelFailed": "无法取消录制",
+  "dvrDeleteTitle": "删除录制？",
+  "dvrDeleteMessage": "此录制将被永久删除。",
+  "dvrDeleteDismiss": "保留",
+  "dvrDeleteConfirm": "删除录制",
+  "dvrDeleteSuccess": "录制已删除",
+  "dvrDeleteFailed": "无法删除录制"
 }

@@ -37,14 +37,18 @@ class ReverbService {
   WebSocketChannel? _ws;
   StreamSubscription<dynamic>? _sub;
   Timer? _reconnectTimer;
+  Timer? _idleTimer;
+  Timer? _pongTimer;
   bool _disposed = false;
   bool _paused = false;
   bool _connected = false;
   bool _hasConnectedBefore = false;
   int _retryDelay = 2;
   int _connectionGeneration = 0;
+  int _activityTimeoutSeconds = 30;
 
   static const int _maxRetryDelay = 60;
+  static const int _pongGraceSeconds = 15;
 
   /// Connects to Reverb and starts listening for push notifications.
   ///
@@ -63,6 +67,10 @@ class ReverbService {
     final connectionGeneration = ++_connectionGeneration;
     final previousSubscription = _sub;
     final previousSocket = _ws;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _sub = null;
@@ -102,20 +110,65 @@ class ReverbService {
       _connected = false;
 
       _sub = socket.stream.listen(
-        (raw) => _onMessage(
-          raw as String,
-          session,
-          creds,
-          connectionGeneration,
-          socket,
-        ),
+        (raw) {
+          _onMessage(
+            raw as String,
+            session,
+            creds,
+            connectionGeneration,
+            socket,
+          );
+          _resetIdleTimer(connectionGeneration, socket);
+        },
         onError: (_) => _scheduleReconnect(connectionGeneration, socket),
         onDone: () => _scheduleReconnect(connectionGeneration, socket),
         cancelOnError: true,
       );
+      _resetIdleTimer(connectionGeneration, socket);
     } on Object catch (_) {
       _scheduleReconnect(connectionGeneration);
     }
+  }
+
+  /// Restarts the idle-silence watchdog. Called on every message received
+  /// (proving the socket is alive) and once right after connecting.
+  ///
+  /// Reverb tells clients (via `activity_timeout` on `connection_established`)
+  /// how long they may go without a message before they're expected to ping.
+  /// If nothing at all arrives within that window — not even the server's own
+  /// keep-alive — [_sendPing] probes the connection explicitly.
+  void _resetIdleTimer(
+    int connectionGeneration,
+    WebSocketChannel socket,
+  ) {
+    if (connectionGeneration != _connectionGeneration ||
+        !identical(_ws, socket)) {
+      return;
+    }
+    _pongTimer?.cancel();
+    _pongTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(
+      Duration(seconds: _activityTimeoutSeconds),
+      () => _sendPing(connectionGeneration, socket),
+    );
+  }
+
+  /// Probes a silent connection. If nothing (not even a reply to this ping)
+  /// arrives within the grace period, the socket is a zombie the transport
+  /// never reported as closed (e.g. after a laptop sleep/wake or a dropped
+  /// Wi-Fi hop) — force a reconnect rather than waiting on it forever.
+  void _sendPing(int connectionGeneration, WebSocketChannel socket) {
+    if (connectionGeneration != _connectionGeneration ||
+        !identical(_ws, socket)) {
+      return;
+    }
+    _send(socket, {'event': 'pusher:ping', 'data': {}});
+    _pongTimer?.cancel();
+    _pongTimer = Timer(
+      const Duration(seconds: _pongGraceSeconds),
+      () => _scheduleReconnect(connectionGeneration, socket),
+    );
   }
 
   void _onMessage(
@@ -142,6 +195,10 @@ class ReverbService {
       case 'pusher:connection_established':
         final data = _parseData(msg['data']);
         final socketId = '${data['socket_id'] ?? ''}';
+        final activityTimeout = int.tryParse('${data['activity_timeout']}');
+        if (activityTimeout != null && activityTimeout > 0) {
+          _activityTimeoutSeconds = activityTimeout;
+        }
         if (socketId.isNotEmpty) {
           unawaited(
             _authenticate(
@@ -153,6 +210,9 @@ class ReverbService {
             ),
           );
         }
+
+      case 'pusher:ping':
+        _send(socket, {'event': 'pusher:pong', 'data': {}});
 
       case 'pusher_internal:subscription_succeeded':
         _connected = true;
@@ -229,6 +289,10 @@ class ReverbService {
         (socket != null && !identical(_ws, socket))) {
       return;
     }
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _sub?.cancel().ignore();
     _sub = null;
     _ws = null;
@@ -254,6 +318,10 @@ class ReverbService {
     if (_disposed) return;
     _connectionGeneration += 1;
     _paused = true;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connected = false;
@@ -280,6 +348,10 @@ class ReverbService {
     _connectionGeneration += 1;
     _disposed = true;
     _paused = false;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connected = false;

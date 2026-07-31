@@ -613,4 +613,66 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => 'Inconnu';
+
+  @override
+  String get dvrRecordingsTitle => 'Enregistrements DVR';
+
+  @override
+  String get dvrRecordingsSubtitle => 'Enregistrements terminés et en cours';
+
+  @override
+  String get dvrNoRecordings => 'Aucun enregistrement DVR disponible';
+
+  @override
+  String get dvrNotConfigured =>
+      'Veuillez vous connecter à votre service dans les paramètres';
+
+  @override
+  String get dvrCancel => 'Annuler';
+
+  @override
+  String get dvrDelete => 'Supprimer';
+
+  @override
+  String dvrStopTitle(String title) {
+    return 'Arrêter l\'enregistrement — $title';
+  }
+
+  @override
+  String get dvrStopMessage =>
+      'La conserver dans votre liste ou la supprimer maintenant ?';
+
+  @override
+  String get dvrStopKeep => 'Conserver l\'enregistrement';
+
+  @override
+  String get dvrStopDelete => 'Supprimer l\'enregistrement';
+
+  @override
+  String get dvrStopBack => 'Retour';
+
+  @override
+  String get dvrCancelSuccess => 'Enregistrement annulé';
+
+  @override
+  String get dvrCancelFailed => 'Impossible d\'annuler l\'enregistrement';
+
+  @override
+  String get dvrDeleteTitle => 'Supprimer l\'enregistrement ?';
+
+  @override
+  String get dvrDeleteMessage =>
+      'Cet enregistrement sera supprimé définitivement.';
+
+  @override
+  String get dvrDeleteDismiss => 'Conserver';
+
+  @override
+  String get dvrDeleteConfirm => 'Supprimer l\'enregistrement';
+
+  @override
+  String get dvrDeleteSuccess => 'Enregistrement supprimé';
+
+  @override
+  String get dvrDeleteFailed => 'Impossible de supprimer l\'enregistrement';
 }

@@ -313,5 +313,31 @@
   "requestsStatusApproved": "Genehmigt",
   "requestsStatusRejected": "Abgelehnt",
   "requestsStatusCompleted": "Abgeschlossen",
-  "requestsStatusUnknown": "Unbekannt"
+  "requestsStatusUnknown": "Unbekannt",
+  "dvrRecordingsTitle": "DVR-Aufnahmen",
+  "dvrRecordingsSubtitle": "Abgeschlossene und laufende Aufnahmen",
+  "dvrNoRecordings": "Keine DVR-Aufnahmen verfügbar",
+  "dvrNotConfigured": "Bitte verbinde dich in den Einstellungen mit deinem Dienst",
+  "dvrCancel": "Abbrechen",
+  "dvrDelete": "Löschen",
+  "dvrStopTitle": "Aufnahme stoppen — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "In der Aufnahmeliste behalten oder jetzt löschen?",
+  "dvrStopKeep": "Aufnahme behalten",
+  "dvrStopDelete": "Aufnahme löschen",
+  "dvrStopBack": "Zurück",
+  "dvrCancelSuccess": "Aufnahme abgebrochen",
+  "dvrCancelFailed": "Aufnahme konnte nicht abgebrochen werden",
+  "dvrDeleteTitle": "Aufnahme löschen?",
+  "dvrDeleteMessage": "Diese Aufnahme wird dauerhaft gelöscht.",
+  "dvrDeleteDismiss": "Behalten",
+  "dvrDeleteConfirm": "Aufnahme löschen",
+  "dvrDeleteSuccess": "Aufnahme gelöscht",
+  "dvrDeleteFailed": "Aufnahme konnte nicht gelöscht werden"
 }

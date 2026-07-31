@@ -313,5 +313,31 @@
   "requestsStatusApproved": "Aprobado",
   "requestsStatusRejected": "Rechazado",
   "requestsStatusCompleted": "Completado",
-  "requestsStatusUnknown": "Desconocido"
+  "requestsStatusUnknown": "Desconocido",
+  "dvrRecordingsTitle": "Grabaciones DVR",
+  "dvrRecordingsSubtitle": "Grabaciones completadas y en curso",
+  "dvrNoRecordings": "No hay grabaciones DVR disponibles",
+  "dvrNotConfigured": "Por favor, conéctate a tu servicio en Ajustes",
+  "dvrCancel": "Cancelar",
+  "dvrDelete": "Eliminar",
+  "dvrStopTitle": "Detener grabación — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "¿Mantenerla en tu lista de grabaciones o eliminarla ahora?",
+  "dvrStopKeep": "Mantener grabación",
+  "dvrStopDelete": "Eliminar grabación",
+  "dvrStopBack": "Atrás",
+  "dvrCancelSuccess": "Grabación cancelada",
+  "dvrCancelFailed": "No se pudo cancelar la grabación",
+  "dvrDeleteTitle": "¿Eliminar grabación?",
+  "dvrDeleteMessage": "Esta grabación se eliminará permanentemente.",
+  "dvrDeleteDismiss": "Mantener",
+  "dvrDeleteConfirm": "Eliminar grabación",
+  "dvrDeleteSuccess": "Grabación eliminada",
+  "dvrDeleteFailed": "No se pudo eliminar la grabación"
 }

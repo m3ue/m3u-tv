@@ -612,4 +612,65 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get requestsStatusUnknown => 'Unknown';
+
+  @override
+  String get dvrRecordingsTitle => 'DVR Recordings';
+
+  @override
+  String get dvrRecordingsSubtitle =>
+      'Completed recordings and currently recording programmes';
+
+  @override
+  String get dvrNoRecordings => 'No DVR recordings available';
+
+  @override
+  String get dvrNotConfigured => 'Please connect to your service in Settings';
+
+  @override
+  String get dvrCancel => 'Cancel';
+
+  @override
+  String get dvrDelete => 'Delete';
+
+  @override
+  String dvrStopTitle(String title) {
+    return 'Stop recording — $title';
+  }
+
+  @override
+  String get dvrStopMessage =>
+      'Keep it in your recordings list, or delete it now?';
+
+  @override
+  String get dvrStopKeep => 'Keep recording';
+
+  @override
+  String get dvrStopDelete => 'Delete recording';
+
+  @override
+  String get dvrStopBack => 'Back';
+
+  @override
+  String get dvrCancelSuccess => 'Recording cancelled';
+
+  @override
+  String get dvrCancelFailed => 'Could not cancel recording';
+
+  @override
+  String get dvrDeleteTitle => 'Delete recording?';
+
+  @override
+  String get dvrDeleteMessage => 'This recording will be deleted permanently.';
+
+  @override
+  String get dvrDeleteDismiss => 'Keep';
+
+  @override
+  String get dvrDeleteConfirm => 'Delete recording';
+
+  @override
+  String get dvrDeleteSuccess => 'Recording deleted';
+
+  @override
+  String get dvrDeleteFailed => 'Could not delete recording';
 }

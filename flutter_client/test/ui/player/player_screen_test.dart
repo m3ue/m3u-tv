@@ -1933,5 +1933,143 @@ void main() {
       expect(find.text('Launcher'), findsOneWidget);
       expect(find.text('Playback error'), findsNothing);
     });
+
+    testWidgets(
+      'switching live channel via a stable key reuses the orchestrator '
+      'instead of disposing it',
+      (tester) async {
+        // Mirrors AppShell: skip-previous/skip-next replaces `args` on an
+        // already-mounted PlayerScreen (stable key, same orchestrator)
+        // instead of remounting with a fresh orchestrator per channel. If
+        // that stops happening, the Android Media3/Apple AVKit native
+        // plugins' single global player gets released out from under the
+        // channel the user just switched to.
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 7,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const channelA = PlayerArgs(
+          streamUrl: 'https://example.com/channel-a.m3u8',
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+        );
+        const channelB = PlayerArgs(
+          streamUrl: 'https://example.com/channel-b.m3u8',
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+        );
+
+        var args = channelA;
+        late StateSetter setArgs;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                setArgs = setState;
+                return PlayerScreen(
+                  key: const ValueKey('player-session'),
+                  args: args,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(adapter.loadCalls, hasLength(1));
+        expect(adapter.loadCalls.single.uri, channelA.streamUrl);
+        expect(adapter.disposeCallCount, 0);
+
+        setArgs(() => args = channelB);
+        await tester.pump();
+
+        // The switch happened in place: same adapter kept loading, never
+        // torn down mid-flight.
+        expect(adapter.loadCalls, hasLength(2));
+        expect(adapter.loadCalls.last.uri, channelB.streamUrl);
+        expect(adapter.disposeCallCount, 0);
+      },
+    );
+
+    testWidgets(
+      'switching to a channel sharing a URL but a different stream ID '
+      'still re-opens the new source',
+      (tester) async {
+        // Two channels can share a stream URL (e.g. a proxied/transcoded URL
+        // keyed by query params the client doesn't see) while differing in
+        // stream ID, headers, EPG ID, or metadata. Comparing streamUrl alone
+        // in didUpdateWidget would wrongly treat this as a no-op switch and
+        // leave the previous channel's EPG/state in place.
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 9,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const sharedUrl = 'https://example.com/shared.m3u8';
+        const channelA = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+          epgChannelId: 'channel-a',
+        );
+        const channelB = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+          epgChannelId: 'channel-b',
+        );
+
+        var args = channelA;
+        late StateSetter setArgs;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                setArgs = setState;
+                return PlayerScreen(
+                  key: const ValueKey('player-session'),
+                  args: args,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(adapter.loadCalls, hasLength(1));
+
+        setArgs(() => args = channelB);
+        await tester.pump();
+
+        // Same URL, but a genuinely different channel — must still re-open.
+        expect(adapter.loadCalls, hasLength(2));
+      },
+    );
   });
 }
