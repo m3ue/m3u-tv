@@ -1247,15 +1247,46 @@ void main() {
           const PlaybackState(
             backend: PlaybackBackend.desktopLibmpv,
             status: PlaybackStatus.ready,
+            videoAspectRatio: 16 / 9,
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final initialTextureSize = tester.getSize(find.byType(Texture));
+        expect(initialTextureSize.width, moreOrLessEquals(1600));
+        expect(initialTextureSize.height, moreOrLessEquals(900));
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.ready,
             videoAspectRatio: 4 / 3,
           ),
         );
         await tester.pump();
         await tester.pump();
 
-        final textureSize = tester.getSize(find.byType(Texture));
-        expect(textureSize.width, moreOrLessEquals(1200));
-        expect(textureSize.height, moreOrLessEquals(900));
+        final fourThreeTextureSize = tester.getSize(find.byType(Texture));
+        expect(fourThreeTextureSize.width, moreOrLessEquals(1200));
+        expect(fourThreeTextureSize.height, moreOrLessEquals(900));
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.ready,
+            videoAspectRatio: 3840 / 1608,
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        final ultrawideTextureSize = tester.getSize(find.byType(Texture));
+        expect(ultrawideTextureSize.width, moreOrLessEquals(1600));
+        expect(
+          ultrawideTextureSize.height,
+          moreOrLessEquals(670, epsilon: 0.01),
+        );
       },
     );
 

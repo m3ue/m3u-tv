@@ -685,6 +685,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   api.set_option_string(handle, "vo", "libmpv");
   api.set_option_string(handle, "hwdec", "auto-safe");
   api.set_option_string(handle, "idle", "yes");
+  api.set_option_string(handle, "keepaspect", "no");
   const std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   const std::string headers = HeaderString(args);
