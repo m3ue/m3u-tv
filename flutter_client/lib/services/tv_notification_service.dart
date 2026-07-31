@@ -247,10 +247,12 @@ class TvNotificationService {
     return uri.replace(path: path, queryParameters: <String, String>{});
   }
 
+  static const Duration _requestTimeout = Duration(seconds: 15);
+
   Future<Object?> _get(Uri uri) async {
-    final request = await _client.getUrl(uri);
-    final response = await request.close();
-    final text = await utf8.decodeStream(response);
+    final request = await _client.getUrl(uri).timeout(_requestTimeout);
+    final response = await request.close().timeout(_requestTimeout);
+    final text = await utf8.decodeStream(response).timeout(_requestTimeout);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw TvApiException(response.statusCode, text, uri);
     }
@@ -258,14 +260,14 @@ class TvNotificationService {
   }
 
   Future<Object?> _post(Uri uri, Map<String, String> body) async {
-    final request = await _client.postUrl(uri);
+    final request = await _client.postUrl(uri).timeout(_requestTimeout);
     final bytes = utf8.encode(jsonEncode(body));
     request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
     request
       ..contentLength = bytes.length
       ..add(bytes);
-    final response = await request.close();
-    final text = await utf8.decodeStream(response);
+    final response = await request.close().timeout(_requestTimeout);
+    final text = await utf8.decodeStream(response).timeout(_requestTimeout);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw TvApiException(response.statusCode, text, uri);
     }
