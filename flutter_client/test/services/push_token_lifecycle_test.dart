@@ -522,6 +522,192 @@ void main() {
     );
 
     test(
+      'stale cache replacement rolls back when the newer connection fails',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-stale-cache-failure-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final store = _BlockingSourceCacheStore(file: stateFile);
+        final transport = _ThreeSourceXtreamTransport(failThirdAuth: true);
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server A guide');
+        await fixture.controller.favoritesService.add(101);
+        final observedChannels = <String>[];
+        fixture.controller.addListener(() {
+          observedChannels.add(
+            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          );
+        });
+
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
+        );
+        await store.secondCachePersisted.future;
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        store.releaseSecondCache.complete();
+
+        expect(await secondConnect, isFalse);
+        expect(await thirdConnect, isFalse);
+        expect(fixture.auth.credentials, _firstCredentials);
+        expect(fixture.xtream.credentials?.username, 'first');
+        expect(fixture.controller.sourceType, AppSourceType.xtream);
+        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        expect(fixture.controller.activeViewer?.name, 'Server A Viewer');
+        expect(
+          fixture.controller.epgService.lookup('server-a')?.current.title,
+          'Server A guide',
+        );
+        expect(fixture.controller.epgService.lookup('server-b'), isNull);
+        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(
+          await fixture.controller.favoritesService.isFavorite(101),
+          isTrue,
+        );
+        expect(
+          (await fixture.cache.get<List<Channel>>(
+            'liveStreams',
+          ))?.data.single.name,
+          'Server A Channel',
+        );
+
+        final persisted = await PersistentJsonStore(file: stateFile).snapshot();
+        final persistedText = jsonEncode(persisted);
+        expect(persistedText, contains('Server A Channel'));
+        expect(persistedText, contains('viewer-server-a'));
+        expect(persistedText, isNot(contains('Server B Channel')));
+        expect(persistedText, isNot(contains('Server C Channel')));
+        final persistedCredentials =
+            jsonDecode(persisted['m3ue_tv_credentials']! as String)
+                as Map<String, Object?>;
+        final persistedSource =
+            jsonDecode(persisted['m3ue_tv_source']! as String)
+                as Map<String, Object?>;
+        expect(persistedCredentials['username'], 'first');
+        expect(persistedSource['type'], 'xtream');
+
+        final restarted = AppStateController(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          xtreamService: XtreamService(transport: transport.call),
+          tvNotificationService: _EmptyTvNotificationService(),
+        );
+        addTearDown(restarted.dispose);
+        await restarted.boot();
+        expect(restarted.authNotifier.credentials?.username, 'first');
+        expect(restarted.sourceType, AppSourceType.xtream);
+        expect(restarted.channels.single.name, 'Server A Channel');
+        expect(restarted.activeViewer?.name, 'Server A Viewer');
+        expect(await restarted.favoritesService.isFavorite(101), isTrue);
+      },
+    );
+
+    test(
+      'stale cache cleanup cannot overwrite a newer successful connection',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-stale-cache-success-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final store = _BlockingSourceCacheStore(file: stateFile);
+        final transport = _ThreeSourceXtreamTransport();
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server A guide');
+        final observedChannels = <String>[];
+        fixture.controller.addListener(() {
+          observedChannels.add(
+            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          );
+        });
+
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
+        );
+        await store.secondCachePersisted.future;
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        store.releaseSecondCache.complete();
+
+        expect(await secondConnect, isFalse);
+        expect(await thirdConnect, isTrue);
+        await _waitForGuide(fixture.controller, 'Server C guide');
+        expect(fixture.auth.credentials, _thirdCredentials);
+        expect(fixture.xtream.credentials?.username, 'third');
+        expect(fixture.controller.sourceType, AppSourceType.xtream);
+        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(fixture.controller.activeViewer?.name, 'Server C Viewer');
+        expect(
+          fixture.controller.epgService.lookup('server-c')?.current.title,
+          'Server C guide',
+        );
+        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(
+          (await fixture.cache.get<List<Channel>>(
+            'liveStreams',
+          ))?.data.single.name,
+          'Server C Channel',
+        );
+
+        final persisted = await PersistentJsonStore(file: stateFile).snapshot();
+        final persistedText = jsonEncode(persisted);
+        expect(persistedText, contains('Server C Channel'));
+        expect(persistedText, contains('viewer-server-c'));
+        expect(persistedText, isNot(contains('Server B Channel')));
+        final persistedCredentials =
+            jsonDecode(persisted['m3ue_tv_credentials']! as String)
+                as Map<String, Object?>;
+        final persistedSource =
+            jsonDecode(persisted['m3ue_tv_source']! as String)
+                as Map<String, Object?>;
+        expect(persistedCredentials['username'], 'third');
+        expect(persistedSource['type'], 'xtream');
+
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        final restarted = AppStateController(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          xtreamService: XtreamService(transport: transport.call),
+          tvNotificationService: _EmptyTvNotificationService(),
+        );
+        addTearDown(restarted.dispose);
+        await restarted.boot();
+        expect(restarted.authNotifier.credentials?.username, 'third');
+        expect(restarted.sourceType, AppSourceType.xtream);
+        expect(restarted.channels.single.name, 'Server C Channel');
+        expect(restarted.activeViewer?.name, 'Server C Viewer');
+      },
+    );
+
+    test(
       'cache rollback failure does not escape the source operation',
       () async {
         final directory = await Directory.systemTemp.createTemp(
@@ -655,6 +841,11 @@ const _secondCredentials = UserCredentials(
   server: 'https://fixture.invalid',
   username: 'second',
   password: 'second-private-value',
+);
+const _thirdCredentials = UserCredentials(
+  server: 'https://fixture.invalid',
+  username: 'third',
+  password: 'third-private-value',
 );
 
 class _Fixture {
@@ -1059,6 +1250,145 @@ class _SourceMarkerFailingStore extends PersistentJsonStore {
   }
 }
 
+class _BlockingSourceCacheStore extends PersistentJsonStore {
+  _BlockingSourceCacheStore({required super.file});
+
+  final Completer<void> secondCachePersisted = Completer<void>();
+  final Completer<void> releaseSecondCache = Completer<void>();
+
+  @override
+  Future<void> replaceWhere(
+    bool Function(String key) test,
+    Map<String, Object?> replacement,
+  ) async {
+    await super.replaceWhere(test, replacement);
+    if (jsonEncode(replacement).contains('Server B Channel') &&
+        !secondCachePersisted.isCompleted) {
+      secondCachePersisted.complete();
+      await releaseSecondCache.future;
+    }
+  }
+}
+
+class _ThreeSourceXtreamTransport {
+  _ThreeSourceXtreamTransport({this.failThirdAuth = false});
+
+  final bool failThirdAuth;
+
+  Future<Object?> call(XtreamRequest request) async {
+    final username = request.credentials.username;
+    final source = switch (username) {
+      'first' => 'A',
+      'second' => 'B',
+      'third' => 'C',
+      _ => throw StateError('Unexpected source user: $username'),
+    };
+    final slug = 'server-${source.toLowerCase()}';
+    final offset = source.codeUnitAt(0) - 'A'.codeUnitAt(0);
+    switch (request.action ?? 'auth') {
+      case 'auth':
+        return <String, Object?>{
+          'user_info': <String, Object?>{
+            'auth': username == 'third' && failThirdAuth ? 0 : 1,
+            'status': username == 'third' && failThirdAuth
+                ? 'Invalid credentials'
+                : 'Active',
+          },
+          'm3u_editor': <String, Object?>{'version': '0.10.0'},
+        };
+      case 'get_live_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'live-$slug',
+            'category_name': 'Server $source Live',
+          },
+        ];
+      case 'get_vod_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'vod-$slug',
+            'category_name': 'Server $source Movies',
+          },
+        ];
+      case 'get_series_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'series-$slug',
+            'category_name': 'Server $source Series',
+          },
+        ];
+      case 'get_live_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': 101 + offset,
+            'name': 'Server $source Channel',
+            'category_id': 'live-$slug',
+            'epg_channel_id': slug,
+          },
+        ];
+      case 'get_vod_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': 201 + offset,
+            'name': 'Server $source Movie',
+            'category_id': 'vod-$slug',
+            'container_extension': 'mp4',
+          },
+        ];
+      case 'get_series':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'series_id': 301 + offset,
+            'name': 'Server $source Show',
+            'category_id': 'series-$slug',
+          },
+        ];
+      case 'get_viewers':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'id': 1 + offset,
+            'ulid': 'viewer-$slug',
+            'name': 'Server $source Viewer',
+            'is_admin': true,
+          },
+        ];
+      case 'get_recently_watched':
+        return <Object?>[];
+      case 'get_favorites':
+      case 'sync_favorites':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'live',
+            'stream_id': 101 + offset,
+          },
+        ];
+      case 'toggle_favorite':
+        return <String, Object?>{'favorited': request.body['favorited']};
+      case 'get_epg_batch':
+        final now = DateTime.now();
+        return <String, Object?>{
+          '${101 + offset}': <Map<String, Object?>>[
+            <String, Object?>{
+              'stream_id': 101 + offset,
+              'title': base64Encode(utf8.encode('Server $source guide')),
+              'description': '',
+              'start_timestamp':
+                  now
+                      .subtract(const Duration(minutes: 10))
+                      .millisecondsSinceEpoch ~/
+                  1000,
+              'stop_timestamp':
+                  now.add(const Duration(minutes: 20)).millisecondsSinceEpoch ~/
+                  1000,
+            },
+          ],
+        };
+      default:
+        throw StateError('Unexpected fixture action: ${request.action}');
+    }
+  }
+}
+
 class _TransactionalXtreamTransport {
   _TransactionalXtreamTransport({
     required this.onSecondSourceStaged,
@@ -1217,7 +1547,11 @@ class _TransactionalXtreamTransport {
 
 Future<void> _waitForGuide(AppStateController controller, String title) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {
-    final channelId = title.contains('A') ? 'server-a' : 'server-b';
+    final channelId = switch (title) {
+      _ when title.contains('A') => 'server-a',
+      _ when title.contains('B') => 'server-b',
+      _ => 'server-c',
+    };
     if (controller.epgService.lookup(channelId)?.current.title == title) return;
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }

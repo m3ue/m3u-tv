@@ -166,6 +166,8 @@ class AppStateController extends ChangeNotifier {
   final Set<String> _activatedNotificationIds = <String>{};
   final Generation _notificationSessionGeneration = Generation();
   final Generation _sourceOperationGeneration = Generation();
+  final SerialQueue _sourceReplacementQueue = SerialQueue();
+  int _sourceReplacementOwners = 0;
   int _unreadNotificationCount = 0;
 
   /// Stream of incoming TV push notifications (from Reverb WebSocket or
@@ -357,8 +359,30 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> connectXtream(UserCredentials credentials) async {
+  Future<bool> connectXtream(UserCredentials credentials) {
     final sourceGeneration = _sourceOperationGeneration.advance();
+    if (_sourceReplacementOwners == 0) {
+      return _connectXtream(credentials, sourceGeneration, ownsQueue: false);
+    }
+    return _sourceReplacementQueue.run(() async {
+      _sourceReplacementOwners += 1;
+      try {
+        return await _connectXtream(
+          credentials,
+          sourceGeneration,
+          ownsQueue: true,
+        );
+      } finally {
+        _sourceReplacementOwners -= 1;
+      }
+    });
+  }
+
+  Future<bool> _connectXtream(
+    UserCredentials credentials,
+    int sourceGeneration, {
+    required bool ownsQueue,
+  }) async {
     final notificationGeneration = _notificationSessionGeneration.advance();
     _isLoadingContent = true;
     _error = null;
@@ -368,10 +392,29 @@ class AppStateController extends ChangeNotifier {
     final previousAuthSession = authNotifier.snapshotSession();
     final previousCache = await cacheService.snapshot();
     final previousSource = await secureStorage.read(_sourceKey);
-    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     final replacingNotificationSession =
         previousCredentials != null &&
         !_sameCredentials(previousCredentials, credentials);
+    var restoredPreviousSource = false;
+    Future<void> restorePreviousSource({required bool allowStaleSource}) async {
+      if (restoredPreviousSource) return;
+      restoredPreviousSource = true;
+      await _bestEffort(() => authNotifier.restoreSession(previousAuthSession));
+      await _bestEffort(() => cacheService.restore(previousCache));
+      await _bestEffort(() => _restoreSource(previousSource));
+      if (replacingNotificationSession) {
+        await _bestEffort(
+          () => _restoreNotificationSession(
+            previousCredentials,
+            sourceGeneration: sourceGeneration,
+            notificationGeneration: notificationGeneration,
+            allowStaleSource: allowStaleSource,
+          ),
+        );
+      }
+    }
+
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     if (replacingNotificationSession) {
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
@@ -417,31 +460,24 @@ class AppStateController extends ChangeNotifier {
           _sourceType != AppSourceType.xtream ||
           !_sameCredentials(previousCredentials, credentials),
       persistSession: authNotifier.persistSession,
+      ownsSourceReplacementQueue: ownsQueue,
+      rollbackSource: () => restorePreviousSource(allowStaleSource: true),
     );
-    if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-    if (!loaded) {
-      await _bestEffort(() => authNotifier.restoreSession(previousAuthSession));
-      await _bestEffort(() => cacheService.restore(previousCache));
-      await _bestEffort(() => _restoreSource(previousSource));
-      if (replacingNotificationSession) {
-        await _bestEffort(
-          () => _restoreNotificationSession(
-            previousCredentials,
-            sourceGeneration: sourceGeneration,
-            notificationGeneration: notificationGeneration,
-          ),
-        );
-      }
+    final isCurrent = !_sourceOperationGeneration.isStale(sourceGeneration);
+    if (!loaded && isCurrent) {
+      await restorePreviousSource(allowStaleSource: false);
     } else {
-      authNotifier.publishSession();
+      if (loaded && isCurrent) authNotifier.publishSession();
     }
-    _isLoadingContent = false;
-    notifyListeners();
-    if (loaded) {
+    if (isCurrent) {
+      _isLoadingContent = false;
+      notifyListeners();
+    }
+    if (loaded && isCurrent) {
       unawaited(_connectTvNotifications(credentials, notificationGeneration));
       await _registerPushToken(credentials);
     }
-    return loaded;
+    return loaded && isCurrent;
   }
 
   Future<void> _restoreSource(String? source) async {
@@ -462,11 +498,16 @@ class AppStateController extends ChangeNotifier {
     UserCredentials credentials, {
     required int sourceGeneration,
     required int notificationGeneration,
+    bool allowStaleSource = false,
   }) async {
-    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    if (!allowStaleSource &&
+        _sourceOperationGeneration.isStale(sourceGeneration)) {
+      return;
+    }
     _pushRegistrationSuspended = false;
     await _connectTvNotifications(credentials, notificationGeneration);
-    if (_sourceOperationGeneration.isStale(sourceGeneration) ||
+    if ((!allowStaleSource &&
+            _sourceOperationGeneration.isStale(sourceGeneration)) ||
         _notificationSessionGeneration.isStale(notificationGeneration)) {
       return;
     }
@@ -1214,6 +1255,10 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> clearAndRefresh() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
+    _epgFetchDebounce?.cancel();
+    _epgFetchDebounce = null;
+    _pendingEpgChannelIds.clear();
+    epgService.invalidateSourceFetchState();
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
@@ -1397,6 +1442,8 @@ class AppStateController extends ChangeNotifier {
     required int sourceGeneration,
     bool invalidateEpgFreshness = false,
     Future<void> Function()? persistSession,
+    bool ownsSourceReplacementQueue = false,
+    Future<void> Function()? rollbackSource,
   }) async {
     try {
       final liveCategoriesFuture = xtreamService.getLiveCategoriesUncached();
@@ -1457,63 +1504,91 @@ class AppStateController extends ChangeNotifier {
           ? _progressList
           : fetched;
 
-      await cacheService.replace(<String, Object?>{
-        'sourceType': 'xtream',
-        'liveCategories': liveCategories,
-        'vodCategories': vodCategories,
-        'seriesCategories': seriesCategories,
-        'liveStreams': channels,
-        'vodStreams': vodItems,
-        'seriesStreams': seriesList,
-        'viewers': viewers,
-      });
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await secureStorage.write(
-        _sourceKey,
-        jsonEncode(<String, Object?>{'type': 'xtream'}),
-      );
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await persistSession?.call();
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      if (activeViewer != null) {
-        await viewerService.setActiveViewer(
-          activeViewer,
-          loginKey: _currentLoginKey(),
-        );
+      Future<bool> commit() async {
         if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+        try {
+          await cacheService.replace(<String, Object?>{
+            'sourceType': 'xtream',
+            'liveCategories': liveCategories,
+            'vodCategories': vodCategories,
+            'seriesCategories': seriesCategories,
+            'liveStreams': channels,
+            'vodStreams': vodItems,
+            'seriesStreams': seriesList,
+            'viewers': viewers,
+          });
+          if (_sourceOperationGeneration.isStale(sourceGeneration)) {
+            await rollbackSource?.call();
+            return false;
+          }
+          await secureStorage.write(
+            _sourceKey,
+            jsonEncode(<String, Object?>{'type': 'xtream'}),
+          );
+          if (_sourceOperationGeneration.isStale(sourceGeneration)) {
+            await rollbackSource?.call();
+            return false;
+          }
+          await persistSession?.call();
+          if (_sourceOperationGeneration.isStale(sourceGeneration)) {
+            await rollbackSource?.call();
+            return false;
+          }
+          if (activeViewer != null) {
+            await viewerService.setActiveViewer(
+              activeViewer,
+              loginKey: _currentLoginKey(),
+            );
+            if (_sourceOperationGeneration.isStale(sourceGeneration)) {
+              await rollbackSource?.call();
+              return false;
+            }
+          }
+
+          if (invalidateEpgFreshness) {
+            _epgFetchDebounce?.cancel();
+            _epgFetchDebounce = null;
+            _pendingEpgChannelIds.clear();
+            epgService.invalidateSourceFetchState();
+          }
+          _sourceType = AppSourceType.xtream;
+          _liveCategories = liveCategories;
+          _vodCategories = vodCategories;
+          _seriesCategories = seriesCategories;
+          _channels = channels;
+          _vodItems = vodItems;
+          _seriesList = seriesList;
+          _dvrRecordings = dvrRecordings;
+          _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
+          _mediaRequests = mediaRequests;
+          _viewers = viewers;
+          _activeViewer = activeViewer;
+          _progressList = progress;
+          _error = null;
+          if (clearCache) aiostreamsApiService.clearCache();
+          notifyListeners();
+          unawaited(_syncFavoritesForActiveViewer());
+          unawaited(_refreshRecentlyWatchedForActiveViewer());
+
+          // Prime EPG for the first screen's worth of channels only; the rest is
+          // fetched lazily as screens request it via [ensureEpgForChannels] (e.g.
+          // as the channel list scrolls into view). Fetching all channels' EPG
+          // upfront was the main bottleneck on large playlists.
+          unawaited(_loadXtreamEpg(channels.take(_epgPrimeCount).toList()));
+          return true;
+        } on Object {
+          await rollbackSource?.call();
+          rethrow;
+        }
       }
 
-      if (invalidateEpgFreshness) {
-        _epgFetchDebounce?.cancel();
-        _epgFetchDebounce = null;
-        _pendingEpgChannelIds.clear();
-        epgService.invalidateSourceFetchState();
+      if (ownsSourceReplacementQueue) return await commit();
+      _sourceReplacementOwners += 1;
+      try {
+        return await _sourceReplacementQueue.run(commit);
+      } finally {
+        _sourceReplacementOwners -= 1;
       }
-      _sourceType = AppSourceType.xtream;
-      _liveCategories = liveCategories;
-      _vodCategories = vodCategories;
-      _seriesCategories = seriesCategories;
-      _channels = channels;
-      _vodItems = vodItems;
-      _seriesList = seriesList;
-      _dvrRecordings = dvrRecordings;
-      _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
-      _mediaRequests = mediaRequests;
-      _viewers = viewers;
-      _activeViewer = activeViewer;
-      _progressList = progress;
-      _error = null;
-      if (clearCache) aiostreamsApiService.clearCache();
-      notifyListeners();
-      unawaited(_syncFavoritesForActiveViewer());
-      unawaited(_refreshRecentlyWatchedForActiveViewer());
-
-      // Prime EPG for the first screen's worth of channels only; the rest is
-      // fetched lazily as screens request it via [ensureEpgForChannels] (e.g.
-      // as the channel list scrolls into view). Fetching all channels' EPG
-      // upfront was the main bottleneck on large playlists.
-      unawaited(_loadXtreamEpg(channels.take(_epgPrimeCount).toList()));
-      return true;
     } on Object catch (error) {
       _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
       return false;

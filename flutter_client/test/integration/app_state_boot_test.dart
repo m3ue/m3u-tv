@@ -610,6 +610,54 @@ void main() {
       );
     });
 
+    test('same-source refresh rejects a delayed pre-refresh EPG', () async {
+      final now = DateTime.now();
+      final oldEpg = Completer<Object?>();
+      final freshEpg = Completer<Object?>();
+      var epgRequests = 0;
+      final fixtures = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) {
+        if (request.action == 'get_epg_batch') {
+          epgRequests += 1;
+          return epgRequests == 1 ? oldEpg.future : freshEpg.future;
+        }
+        return fixtures.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-a.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(epgRequests, 1);
+
+      await controller.clearAndRefresh();
+      expect(controller.channels.single.epgChannelId, 'bbc.one');
+
+      oldEpg.complete(_epgBatch('Old guide', now));
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.epgService.lookup('bbc.one'), isNull);
+
+      expect(epgRequests, 2);
+      freshEpg.complete(_epgBatch('Fresh guide', now));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService.lookup('bbc.one')?.current.title,
+        'Fresh guide',
+      );
+    });
+
     test('late Xtream EPG response is ignored after M3U switch', () async {
       final now = DateTime.now();
       final xtreamEpg = Completer<Object?>();
