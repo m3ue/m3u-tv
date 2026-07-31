@@ -1105,7 +1105,7 @@ class AppStateController extends ChangeNotifier {
     aiostreamsApiService.clearCache();
     switch (_sourceType) {
       case AppSourceType.m3u:
-        await _loadSavedM3uSource();
+        await _loadSavedM3uSource(recoverFromInvalidSource: true);
         return;
       case AppSourceType.xtream:
         if (!authNotifier.isConfigured) {
@@ -1675,17 +1675,31 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadSavedM3uSource() async {
+  Future<void> _loadSavedM3uSource({
+    bool recoverFromInvalidSource = false,
+  }) async {
     final raw = await secureStorage.read(_sourceKey);
-    if (raw == null) return;
-    final json = jsonDecode(raw) as Map<String, Object?>;
-    final playlist = json['playlist'];
-    if (playlist is String) {
-      await switchToM3u(
-        playlistText: playlist,
-        name: '${json['name'] ?? 'Direct M3U'}',
-      );
+    if (raw == null && !recoverFromInvalidSource) return;
+    late String playlist;
+    late String name;
+    try {
+      if (raw == null) throw const FormatException();
+      final json = jsonDecode(raw) as Map<String, Object?>;
+      final savedPlaylist = json['playlist'];
+      if (savedPlaylist is! String) {
+        if (!recoverFromInvalidSource) return;
+        throw const FormatException();
+      }
+      playlist = savedPlaylist;
+      name = '${json['name'] ?? 'Direct M3U'}';
+    } on Object catch (_) {
+      if (!recoverFromInvalidSource) rethrow;
+      _error = 'Unable to refresh the saved Direct M3U source.';
+      _isLoadingContent = false;
+      notifyListeners();
+      return;
     }
+    await switchToM3u(playlistText: playlist, name: name);
   }
 
   Future<AppSourceType> _readSavedSourceType() async {
