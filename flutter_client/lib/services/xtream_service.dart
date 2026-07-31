@@ -300,6 +300,20 @@ class XtreamAuthResponse {
   bool get hasRequests => hasFeature('requests') && requests != null;
 }
 
+class XtreamSessionSnapshot {
+  const XtreamSessionSnapshot._({
+    required UserCredentials? credentials,
+    required tz.Location serverLocation,
+    required bool isM3UEditor,
+  }) : _credentials = credentials,
+       _serverLocation = serverLocation,
+       _isM3UEditor = isM3UEditor;
+
+  final UserCredentials? _credentials;
+  final tz.Location _serverLocation;
+  final bool _isM3UEditor;
+}
+
 class XtreamService {
   XtreamService({XtreamTransport? transport, CacheService? cache})
     : _transport = transport ?? createDefaultXtreamTransport(),
@@ -322,6 +336,18 @@ class XtreamService {
   String get serverTimezone => _serverLocation.name;
 
   UserCredentials? get credentials => _credentials;
+
+  XtreamSessionSnapshot snapshotSession() => XtreamSessionSnapshot._(
+    credentials: _credentials,
+    serverLocation: _serverLocation,
+    isM3UEditor: _isM3UEditor,
+  );
+
+  void restoreSession(XtreamSessionSnapshot snapshot) {
+    _credentials = snapshot._credentials;
+    _serverLocation = snapshot._serverLocation;
+    _isM3UEditor = snapshot._isM3UEditor;
+  }
 
   Future<XtreamAuthResponse> authenticate(UserCredentials credentials) async {
     final normalized = credentials.normalized();

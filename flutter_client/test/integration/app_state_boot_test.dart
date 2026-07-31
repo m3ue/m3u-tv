@@ -396,6 +396,85 @@ void main() {
     );
 
     test(
+      'failed catalog replacement restores the active Xtream session',
+      () async {
+        var now = DateTime.now();
+        var serverAEpgRequests = 0;
+        var serverBEpgRequests = 0;
+        final storage = InMemorySecureStorage();
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) {
+          if (request.action == 'get_live_categories' &&
+              request.credentials.server == 'https://server-b.example') {
+            return Future<Object?>.error(StateError('catalog unavailable'));
+          }
+          if (request.action == 'get_epg_batch') {
+            if (request.credentials.server == 'https://server-a.example') {
+              serverAEpgRequests += 1;
+              return Future<Object?>.value(_epgBatch('Server A guide', now));
+            }
+            if (request.credentials.server == 'https://server-b.example') {
+              serverBEpgRequests += 1;
+              return Future<Object?>.value(_epgBatch('Server B guide', now));
+            }
+          }
+          return fixtures.call(request);
+        }
+
+        final controller = _controller(
+          storage: storage,
+          transport: transport,
+          epgService: EpgService(clock: () => now),
+        );
+        addTearDown(controller.dispose);
+        const serverACredentials = UserCredentials(
+          server: 'https://server-a.example',
+          username: 'fixture-user',
+          password: 'fixture-password',
+        );
+
+        expect(await controller.connectXtream(serverACredentials), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(serverAEpgRequests, 1);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://server-b.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isFalse,
+        );
+
+        now = now.add(controller.epgService.cacheTtl);
+        controller.ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+
+        final persistedCredentials =
+            jsonDecode(
+                  (await storage.read('m3ue_tv_credentials'))!,
+                )
+                as Map<String, Object?>;
+        expect(serverBEpgRequests, 0);
+        expect(serverAEpgRequests, 2);
+        expect(controller.authNotifier.credentials, serverACredentials);
+        expect(persistedCredentials, <String, Object?>{
+          'server': serverACredentials.server,
+          'username': serverACredentials.username,
+          'password': serverACredentials.password,
+        });
+        expect(controller.sourceType, AppSourceType.xtream);
+        expect(controller.channels.single.name, 'BBC One');
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'Server A guide',
+        );
+      },
+    );
+
+    test(
       'failed EPG after a source switch retains guide and retries',
       () async {
         var now = DateTime.now();
@@ -529,6 +608,49 @@ void main() {
         controller.epgService.lookup('bbc.one')?.current.title,
         'Server B guide',
       );
+    });
+
+    test('late Xtream EPG response is ignored after M3U switch', () async {
+      final now = DateTime.now();
+      final xtreamEpg = Completer<Object?>();
+      final fixtures = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) {
+        if (request.action == 'get_epg_batch') return xtreamEpg.future;
+        return fixtures.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://server-a.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        await controller.switchToM3u(
+          playlistText:
+              '#EXTM3U\n'
+              '#EXTINF:-1 tvg-id="bbc.one" group-title="News",Local BBC\n'
+              'https://streams.example/live/bbc-one.m3u8',
+        ),
+        isTrue,
+      );
+
+      xtreamEpg.complete(_epgBatch('Late server A guide', now));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.sourceType, AppSourceType.m3u);
+      expect(controller.channels.single.epgChannelId, 'bbc.one');
+      expect(controller.epgService.lookup('bbc.one'), isNull);
     });
 
     test(

@@ -352,6 +352,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
 
     final previousCredentials = authNotifier.credentials;
+    final previousAuthSession = authNotifier.snapshotSession();
     if (previousCredentials != null &&
         !_sameCredentials(previousCredentials, credentials)) {
       _pushRegistrationSuspended = true;
@@ -382,6 +383,7 @@ class AppStateController extends ChangeNotifier {
           _sourceType != AppSourceType.xtream ||
           !_sameCredentials(previousCredentials, credentials),
     );
+    if (!loaded) await authNotifier.restoreSession(previousAuthSession);
     _isLoadingContent = false;
     notifyListeners();
     if (loaded) {
@@ -419,6 +421,12 @@ class AppStateController extends ChangeNotifier {
           'playlist': playlistText,
         }),
       );
+      _epgFetchDebounce?.cancel();
+      _epgFetchDebounce = null;
+      _pendingEpgChannelIds.clear();
+      epgService
+        ..invalidateSourceFetchState()
+        ..clear();
       _sourceType = AppSourceType.m3u;
       _liveCategories = playlist.categories;
       _vodCategories = const <Category>[];

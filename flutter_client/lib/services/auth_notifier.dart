@@ -6,6 +6,22 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
+class AuthSessionSnapshot {
+  const AuthSessionSnapshot._(
+    this._isConfigured,
+    this._authResponse,
+    this._credentials,
+    this._error,
+    this._xtreamSession,
+  );
+
+  final bool _isConfigured;
+  final XtreamAuthResponse? _authResponse;
+  final UserCredentials? _credentials;
+  final String? _error;
+  final XtreamSessionSnapshot _xtreamSession;
+}
+
 /// Manages authentication state, mirroring the RN XtreamContext behavior.
 ///
 /// Credentials are stored under the `m3ue_tv_credentials` key in secure storage.
@@ -33,6 +49,37 @@ class AuthNotifier extends ChangeNotifier {
 
   String? get error => _error;
   bool get isLoading => _isLoading;
+
+  AuthSessionSnapshot snapshotSession() => AuthSessionSnapshot._(
+    _isConfigured,
+    _authResponse,
+    _credentials,
+    _error,
+    xtreamService.snapshotSession(),
+  );
+
+  Future<void> restoreSession(AuthSessionSnapshot snapshot) async {
+    final credentials = snapshot._credentials;
+    if (credentials == null) {
+      await secureStorage.delete(_credentialsKey);
+    } else {
+      await secureStorage.write(
+        _credentialsKey,
+        jsonEncode({
+          'server': credentials.server,
+          'username': credentials.username,
+          'password': credentials.password,
+        }),
+      );
+    }
+    xtreamService.restoreSession(snapshot._xtreamSession);
+    _isConfigured = snapshot._isConfigured;
+    _authResponse = snapshot._authResponse;
+    _credentials = credentials;
+    _error = snapshot._error;
+    _isLoading = false;
+    notifyListeners();
+  }
 
   /// Connects to an Xtream/m3u-editor server with the given credentials.
   ///
