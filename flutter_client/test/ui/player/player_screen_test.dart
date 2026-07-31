@@ -1825,5 +1825,72 @@ void main() {
         expect(adapter.disposeCallCount, 0);
       },
     );
+
+    testWidgets(
+      'switching to a channel sharing a URL but a different stream ID '
+      'still re-opens the new source',
+      (tester) async {
+        // Two channels can share a stream URL (e.g. a proxied/transcoded URL
+        // keyed by query params the client doesn't see) while differing in
+        // stream ID, headers, EPG ID, or metadata. Comparing streamUrl alone
+        // in didUpdateWidget would wrongly treat this as a no-op switch and
+        // leave the previous channel's EPG/state in place.
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 9,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const sharedUrl = 'https://example.com/shared.m3u8';
+        const channelA = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+          epgChannelId: 'channel-a',
+        );
+        const channelB = PlayerArgs(
+          streamUrl: sharedUrl,
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+          epgChannelId: 'channel-b',
+        );
+
+        var args = channelA;
+        late StateSetter setArgs;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StatefulBuilder(
+              builder: (context, setState) {
+                setArgs = setState;
+                return PlayerScreen(
+                  key: const ValueKey('player-session'),
+                  args: args,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(adapter.loadCalls, hasLength(1));
+
+        setArgs(() => args = channelB);
+        await tester.pump();
+
+        // Same URL, but a genuinely different channel — must still re-open.
+        expect(adapter.loadCalls, hasLength(2));
+      },
+    );
   });
 }

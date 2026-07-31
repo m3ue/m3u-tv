@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -142,7 +143,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void didUpdateWidget(covariant PlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.args.streamUrl == widget.args.streamUrl) return;
+    if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
 
     if (_traktScrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
     _traktScrobbleActive = false;
@@ -175,6 +176,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
     });
+  }
+
+  // Two channels can share a stream URL while differing in stream ID,
+  // headers, EPG ID, or metadata (e.g. a proxied/transcoded URL keyed by
+  // query params that get stripped, or distinct catchup sources pointing at
+  // the same base live URL) — comparing streamUrl alone would silently skip
+  // the switch and leave the previous channel's state in place.
+  bool _isSamePlaybackSession(PlayerArgs a, PlayerArgs b) {
+    return a.streamUrl == b.streamUrl &&
+        a.streamId == b.streamId &&
+        a.type == b.type &&
+        a.epgChannelId == b.epgChannelId &&
+        mapEquals(a.headers, b.headers) &&
+        mapEquals(a.metadata, b.metadata);
   }
 
   void _startPositionTimer() {
