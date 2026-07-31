@@ -98,13 +98,15 @@ void main() {
         expect(
           channels,
           hasLength(1),
-          reason: 'no reconnect should have happened while the socket '
+          reason:
+              'no reconnect should have happened while the socket '
               'kept receiving activity within each window',
         );
         expect(
           channels.single.sent,
           everyElement(isNot(contains('"pusher:ping"'))),
-          reason: 'the client should not need to self-ping when the server '
+          reason:
+              'the client should not need to self-ping when the server '
               'is already sending activity',
         );
       });
@@ -160,7 +162,9 @@ void main() {
           ..elapse(const Duration(seconds: 30));
         expect(
           channels.single.sent,
-          contains(jsonEncode({'event': 'pusher:ping', 'data': <String, Object?>{}})),
+          contains(
+            jsonEncode({'event': 'pusher:ping', 'data': <String, Object?>{}}),
+          ),
           reason: 'client should self-ping after activity_timeout of silence',
         );
 
