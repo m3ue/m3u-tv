@@ -14,6 +14,7 @@ class DvrRecordingsScreen extends StatelessWidget {
     required this.isConfigured,
     required this.onPlay,
     this.onCancelRecording,
+    this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
     this.onSidebarActivate,
   });
@@ -23,6 +24,7 @@ class DvrRecordingsScreen extends StatelessWidget {
   final bool isConfigured;
   final void Function(PlayerArgs args) onPlay;
   final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
   final VoidCallback? onSidebarActivate;
 
@@ -71,6 +73,7 @@ class DvrRecordingsScreen extends StatelessWidget {
                       recordings: recordings,
                       onPlay: onPlay,
                       onCancelRecording: onCancelRecording,
+                      onCancelAndDeleteRecording: onCancelAndDeleteRecording,
                       onDeleteRecording: onDeleteRecording,
                       onSidebarActivate: onSidebarActivate,
                     ),
@@ -87,6 +90,7 @@ class _RecordingList extends StatelessWidget {
     required this.recordings,
     required this.onPlay,
     this.onCancelRecording,
+    this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
     this.onSidebarActivate,
   });
@@ -94,6 +98,7 @@ class _RecordingList extends StatelessWidget {
   final List<DvrRecording> recordings;
   final void Function(PlayerArgs args) onPlay;
   final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
   final VoidCallback? onSidebarActivate;
 
@@ -120,6 +125,9 @@ class _RecordingList extends StatelessWidget {
               onCancel: onCancelRecording == null
                   ? null
                   : () => onCancelRecording!(recording.uuid),
+              onCancelAndDelete: onCancelAndDeleteRecording == null
+                  ? null
+                  : () => onCancelAndDeleteRecording!(recording.uuid),
               onDelete: onDeleteRecording == null
                   ? null
                   : () => onDeleteRecording!(recording.uuid),
@@ -160,6 +168,7 @@ class _RecordingCard extends StatelessWidget {
     required this.recording,
     required this.onTap,
     this.onCancel,
+    this.onCancelAndDelete,
     this.onDelete,
     this.autofocus = false,
   });
@@ -167,6 +176,7 @@ class _RecordingCard extends StatelessWidget {
   final DvrRecording recording;
   final VoidCallback onTap;
   final Future<void> Function()? onCancel;
+  final Future<void> Function()? onCancelAndDelete;
   final Future<void> Function()? onDelete;
   final bool autofocus;
 
@@ -234,6 +244,7 @@ class _RecordingCard extends StatelessWidget {
               recording: recording,
               playable: playable,
               onCancel: onCancel,
+              onCancelAndDelete: onCancelAndDelete,
               onDelete: onDelete,
             ),
           ],
@@ -266,17 +277,21 @@ class _RecordingCard extends StatelessWidget {
   }
 }
 
+enum _StopRecordingChoice { keep, delete, back }
+
 class _CardTrailing extends StatelessWidget {
   const _CardTrailing({
     required this.recording,
     required this.playable,
     this.onCancel,
+    this.onCancelAndDelete,
     this.onDelete,
   });
 
   final DvrRecording recording;
   final bool playable;
   final Future<void> Function()? onCancel;
+  final Future<void> Function()? onCancelAndDelete;
   final Future<void> Function()? onDelete;
 
   @override
@@ -284,6 +299,7 @@ class _CardTrailing extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final cancelHandler = onCancel;
+    final cancelAndDeleteHandler = onCancelAndDelete;
     final deleteHandler = onDelete;
     final canCancel =
         cancelHandler != null &&
@@ -311,7 +327,12 @@ class _CardTrailing extends StatelessWidget {
             tooltip: l10n.dvrCancel,
             icon: Icons.cancel_outlined,
             color: theme.colorScheme.error,
-            onTap: () => _confirmCancel(context, recording, cancelHandler),
+            onTap: () => _confirmCancel(
+              context,
+              recording,
+              cancelHandler,
+              cancelAndDeleteHandler,
+            ),
           ),
         ],
         if (!canCancel && !canDelete) ...[
@@ -327,37 +348,75 @@ class _CardTrailing extends StatelessWidget {
     );
   }
 
+  /// Offers a choice instead of a plain confirm: the server's cancel action
+  /// only stops the recording and keeps it (status → Cancelled), while
+  /// deleting is a distinct, explicit follow-up action (see
+  /// AppShell._cancelAndDeleteRecording). AppShell always wires both
+  /// callbacks together; [deleteAction] is nullable only so this widget
+  /// degrades gracefully in isolation (e.g. tests) — when absent, cancels
+  /// immediately with no dialog, since there is nothing to choose between.
   Future<void> _confirmCancel(
     BuildContext context,
     DvrRecording recording,
-    Future<void> Function() action,
+    Future<void> Function() keepAction,
+    Future<void> Function()? deleteAction,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    if (deleteAction == null) {
+      await _runWithFeedback(
+        context,
+        keepAction,
+        successMessage: l10n.dvrCancelSuccess,
+        failureMessage: l10n.dvrCancelFailed,
+      );
+      return;
+    }
+
+    final choice = await showDialog<_StopRecordingChoice>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.dvrCancelTitle),
-        content: Text(l10n.dvrCancelMessage),
+        title: Text(l10n.dvrStopTitle(recording.title)),
+        content: Text(l10n.dvrStopMessage),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.dvrCancelDismiss),
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_StopRecordingChoice.back),
+            child: Text(l10n.dvrStopBack),
           ),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.dvrCancelConfirm),
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_StopRecordingChoice.delete),
+            child: Text(l10n.dvrStopDelete),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_StopRecordingChoice.keep),
+            child: Text(l10n.dvrStopKeep),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (choice == null || choice == _StopRecordingChoice.back) return;
     if (!context.mounted) return;
-    await _runWithFeedback(
-      context,
-      action,
-      successMessage: l10n.dvrCancelSuccess,
-      failureMessage: l10n.dvrCancelFailed,
-    );
+
+    if (choice == _StopRecordingChoice.keep) {
+      await _runWithFeedback(
+        context,
+        keepAction,
+        successMessage: l10n.dvrCancelSuccess,
+        failureMessage: l10n.dvrCancelFailed,
+      );
+    } else {
+      await _runWithFeedback(
+        context,
+        deleteAction,
+        successMessage: l10n.dvrDeleteSuccess,
+        failureMessage: l10n.dvrDeleteFailed,
+      );
+    }
   }
 
   Future<void> _confirmDelete(

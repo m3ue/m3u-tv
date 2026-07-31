@@ -319,10 +319,18 @@
   "dvrNotConfigured": "请在设置中连接到您的服务",
   "dvrCancel": "取消",
   "dvrDelete": "删除",
-  "dvrCancelTitle": "取消录制？",
-  "dvrCancelMessage": "此录制将被取消。",
-  "dvrCancelDismiss": "保留",
-  "dvrCancelConfirm": "取消录制",
+  "dvrStopTitle": "停止录制 — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "保留在录制列表中，还是立即删除？",
+  "dvrStopKeep": "保留录制",
+  "dvrStopDelete": "删除录制",
+  "dvrStopBack": "返回",
   "dvrCancelSuccess": "录制已取消",
   "dvrCancelFailed": "无法取消录制",
   "dvrDeleteTitle": "删除录制？",

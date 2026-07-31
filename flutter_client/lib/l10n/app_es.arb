@@ -319,10 +319,18 @@
   "dvrNotConfigured": "Por favor, conéctate a tu servicio en Ajustes",
   "dvrCancel": "Cancelar",
   "dvrDelete": "Eliminar",
-  "dvrCancelTitle": "¿Cancelar grabación?",
-  "dvrCancelMessage": "Esta grabación será cancelada.",
-  "dvrCancelDismiss": "Mantener",
-  "dvrCancelConfirm": "Cancelar grabación",
+  "dvrStopTitle": "Detener grabación — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "¿Mantenerla en tu lista de grabaciones o eliminarla ahora?",
+  "dvrStopKeep": "Mantener grabación",
+  "dvrStopDelete": "Eliminar grabación",
+  "dvrStopBack": "Atrás",
   "dvrCancelSuccess": "Grabación cancelada",
   "dvrCancelFailed": "No se pudo cancelar la grabación",
   "dvrDeleteTitle": "¿Eliminar grabación?",

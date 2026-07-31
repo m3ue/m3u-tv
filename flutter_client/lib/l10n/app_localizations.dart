@@ -1244,29 +1244,35 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get dvrDelete;
 
-  /// No description provided for @dvrCancelTitle.
+  /// No description provided for @dvrStopTitle.
   ///
   /// In en, this message translates to:
-  /// **'Cancel recording?'**
-  String get dvrCancelTitle;
+  /// **'Stop recording — {title}'**
+  String dvrStopTitle(String title);
 
-  /// No description provided for @dvrCancelMessage.
+  /// No description provided for @dvrStopMessage.
   ///
   /// In en, this message translates to:
-  /// **'This recording will be cancelled.'**
-  String get dvrCancelMessage;
+  /// **'Keep it in your recordings list, or delete it now?'**
+  String get dvrStopMessage;
 
-  /// No description provided for @dvrCancelDismiss.
+  /// No description provided for @dvrStopKeep.
   ///
   /// In en, this message translates to:
-  /// **'Keep'**
-  String get dvrCancelDismiss;
+  /// **'Keep recording'**
+  String get dvrStopKeep;
 
-  /// No description provided for @dvrCancelConfirm.
+  /// No description provided for @dvrStopDelete.
   ///
   /// In en, this message translates to:
-  /// **'Cancel recording'**
-  String get dvrCancelConfirm;
+  /// **'Delete recording'**
+  String get dvrStopDelete;
+
+  /// No description provided for @dvrStopBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get dvrStopBack;
 
   /// No description provided for @dvrCancelSuccess.
   ///

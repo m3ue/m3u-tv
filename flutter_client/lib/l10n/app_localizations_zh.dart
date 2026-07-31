@@ -617,16 +617,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dvrDelete => '删除';
 
   @override
-  String get dvrCancelTitle => '取消录制？';
+  String dvrStopTitle(String title) {
+    return '停止录制 — $title';
+  }
 
   @override
-  String get dvrCancelMessage => '此录制将被取消。';
+  String get dvrStopMessage => '保留在录制列表中，还是立即删除？';
 
   @override
-  String get dvrCancelDismiss => '保留';
+  String get dvrStopKeep => '保留录制';
 
   @override
-  String get dvrCancelConfirm => '取消录制';
+  String get dvrStopDelete => '删除录制';
+
+  @override
+  String get dvrStopBack => '返回';
 
   @override
   String get dvrCancelSuccess => '录制已取消';

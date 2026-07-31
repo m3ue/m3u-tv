@@ -319,10 +319,18 @@
   "dvrNotConfigured": "Please connect to your service in Settings",
   "dvrCancel": "Cancel",
   "dvrDelete": "Delete",
-  "dvrCancelTitle": "Cancel recording?",
-  "dvrCancelMessage": "This recording will be cancelled.",
-  "dvrCancelDismiss": "Keep",
-  "dvrCancelConfirm": "Cancel recording",
+  "dvrStopTitle": "Stop recording — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "Keep it in your recordings list, or delete it now?",
+  "dvrStopKeep": "Keep recording",
+  "dvrStopDelete": "Delete recording",
+  "dvrStopBack": "Back",
   "dvrCancelSuccess": "Recording cancelled",
   "dvrCancelFailed": "Could not cancel recording",
   "dvrDeleteTitle": "Delete recording?",

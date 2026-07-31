@@ -319,10 +319,18 @@
   "dvrNotConfigured": "Bitte verbinde dich in den Einstellungen mit deinem Dienst",
   "dvrCancel": "Abbrechen",
   "dvrDelete": "Löschen",
-  "dvrCancelTitle": "Aufnahme abbrechen?",
-  "dvrCancelMessage": "Diese Aufnahme wird abgebrochen.",
-  "dvrCancelDismiss": "Behalten",
-  "dvrCancelConfirm": "Aufnahme abbrechen",
+  "dvrStopTitle": "Aufnahme stoppen — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "In der Aufnahmeliste behalten oder jetzt löschen?",
+  "dvrStopKeep": "Aufnahme behalten",
+  "dvrStopDelete": "Aufnahme löschen",
+  "dvrStopBack": "Zurück",
   "dvrCancelSuccess": "Aufnahme abgebrochen",
   "dvrCancelFailed": "Aufnahme konnte nicht abgebrochen werden",
   "dvrDeleteTitle": "Aufnahme löschen?",

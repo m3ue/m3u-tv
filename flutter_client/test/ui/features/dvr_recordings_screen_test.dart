@@ -147,15 +147,19 @@ void main() {
       expect(find.byTooltip('Delete'), findsNothing);
     });
 
-    testWidgets('cancel button shows confirmation dialog and runs callback', (
+    testWidgets('cancel button "Keep recording" choice stops but keeps it', (
       tester,
     ) async {
       String? cancelledUuid;
+      String? cancelAndDeletedUuid;
       await tester.pumpWidget(
         _TestApp(
           recordings: [_recordingNow()],
           onCancelRecording: (uuid) async {
             cancelledUuid = uuid;
+          },
+          onCancelAndDeleteRecording: (uuid) async {
+            cancelAndDeletedUuid = uuid;
           },
         ),
       );
@@ -164,12 +168,41 @@ void main() {
       await tester.tap(find.byTooltip('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Cancel recording?'), findsOneWidget);
-      await tester.tap(find.text('Cancel recording'));
+      expect(find.text('Stop recording — Live News'), findsOneWidget);
+      await tester.tap(find.text('Keep recording'));
       await tester.pumpAndSettle();
 
       expect(cancelledUuid, 'rec-2');
+      expect(cancelAndDeletedUuid, isNull);
     });
+
+    testWidgets(
+      'cancel button "Delete recording" choice stops and deletes it',
+      (tester) async {
+        String? cancelledUuid;
+        String? cancelAndDeletedUuid;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_recordingNow()],
+            onCancelRecording: (uuid) async {
+              cancelledUuid = uuid;
+            },
+            onCancelAndDeleteRecording: (uuid) async {
+              cancelAndDeletedUuid = uuid;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Cancel'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete recording'));
+        await tester.pumpAndSettle();
+
+        expect(cancelAndDeletedUuid, 'rec-2');
+        expect(cancelledUuid, isNull);
+      },
+    );
 
     testWidgets('delete button shows confirmation dialog and runs callback', (
       tester,
@@ -195,15 +228,19 @@ void main() {
       expect(deletedUuid, 'rec-1');
     });
 
-    testWidgets('dismissing cancel dialog does not invoke callback', (
+    testWidgets('"Back" on the stop-recording dialog invokes no callback', (
       tester,
     ) async {
-      var calls = 0;
+      var cancelCalls = 0;
+      var cancelAndDeleteCalls = 0;
       await tester.pumpWidget(
         _TestApp(
           recordings: [_recordingNow()],
           onCancelRecording: (_) async {
-            calls += 1;
+            cancelCalls += 1;
+          },
+          onCancelAndDeleteRecording: (_) async {
+            cancelAndDeleteCalls += 1;
           },
         ),
       );
@@ -211,11 +248,12 @@ void main() {
 
       await tester.tap(find.byTooltip('Cancel'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Keep'));
+      await tester.tap(find.text('Back'));
       await tester.pumpAndSettle();
 
-      expect(calls, 0);
-      expect(find.text('Cancel recording?'), findsNothing);
+      expect(cancelCalls, 0);
+      expect(cancelAndDeleteCalls, 0);
+      expect(find.text('Stop recording — Live News'), findsNothing);
     });
   });
 }
@@ -225,12 +263,14 @@ class _TestApp extends StatelessWidget {
     required this.recordings,
     this.onPlay,
     this.onCancelRecording,
+    this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
   });
 
   final List<DvrRecording> recordings;
   final void Function(PlayerArgs args)? onPlay;
   final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
 
   @override
@@ -245,6 +285,7 @@ class _TestApp extends StatelessWidget {
         isConfigured: true,
         onPlay: onPlay ?? (_) {},
         onCancelRecording: onCancelRecording,
+        onCancelAndDeleteRecording: onCancelAndDeleteRecording,
         onDeleteRecording: onDeleteRecording,
       ),
     );

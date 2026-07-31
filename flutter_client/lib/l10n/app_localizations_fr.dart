@@ -631,16 +631,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get dvrDelete => 'Supprimer';
 
   @override
-  String get dvrCancelTitle => 'Annuler l\'enregistrement ?';
+  String dvrStopTitle(String title) {
+    return 'Arrêter l\'enregistrement — $title';
+  }
 
   @override
-  String get dvrCancelMessage => 'Cet enregistrement sera annulé.';
+  String get dvrStopMessage =>
+      'La conserver dans votre liste ou la supprimer maintenant ?';
 
   @override
-  String get dvrCancelDismiss => 'Conserver';
+  String get dvrStopKeep => 'Conserver l\'enregistrement';
 
   @override
-  String get dvrCancelConfirm => 'Annuler l\'enregistrement';
+  String get dvrStopDelete => 'Supprimer l\'enregistrement';
+
+  @override
+  String get dvrStopBack => 'Retour';
 
   @override
   String get dvrCancelSuccess => 'Enregistrement annulé';

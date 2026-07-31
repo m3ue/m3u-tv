@@ -631,16 +631,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dvrDelete => 'Eliminar';
 
   @override
-  String get dvrCancelTitle => '¿Cancelar grabación?';
+  String dvrStopTitle(String title) {
+    return 'Detener grabación — $title';
+  }
 
   @override
-  String get dvrCancelMessage => 'Esta grabación será cancelada.';
+  String get dvrStopMessage =>
+      '¿Mantenerla en tu lista de grabaciones o eliminarla ahora?';
 
   @override
-  String get dvrCancelDismiss => 'Mantener';
+  String get dvrStopKeep => 'Mantener grabación';
 
   @override
-  String get dvrCancelConfirm => 'Cancelar grabación';
+  String get dvrStopDelete => 'Eliminar grabación';
+
+  @override
+  String get dvrStopBack => 'Atrás';
 
   @override
   String get dvrCancelSuccess => 'Grabación cancelada';

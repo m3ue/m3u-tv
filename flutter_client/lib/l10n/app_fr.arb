@@ -319,10 +319,18 @@
   "dvrNotConfigured": "Veuillez vous connecter à votre service dans les paramètres",
   "dvrCancel": "Annuler",
   "dvrDelete": "Supprimer",
-  "dvrCancelTitle": "Annuler l'enregistrement ?",
-  "dvrCancelMessage": "Cet enregistrement sera annulé.",
-  "dvrCancelDismiss": "Conserver",
-  "dvrCancelConfirm": "Annuler l'enregistrement",
+  "dvrStopTitle": "Arrêter l'enregistrement — {title}",
+  "@dvrStopTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStopMessage": "La conserver dans votre liste ou la supprimer maintenant ?",
+  "dvrStopKeep": "Conserver l'enregistrement",
+  "dvrStopDelete": "Supprimer l'enregistrement",
+  "dvrStopBack": "Retour",
   "dvrCancelSuccess": "Enregistrement annulé",
   "dvrCancelFailed": "Impossible d'annuler l'enregistrement",
   "dvrDeleteTitle": "Supprimer l'enregistrement ?",
