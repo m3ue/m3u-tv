@@ -91,6 +91,7 @@
   "settingsSourceLabel": "来源",
   "settingsServerTimezone": "服务器时区",
   "settingsLastError": "最近错误",
+  "settingsSavedM3uRefreshFailed": "无法刷新已保存的 Direct M3U 来源。",
   "settingsRetryConnection": "重试连接",
   "settingsEditServer": "编辑服务器设置",
   "settingsActiveViewer": "当前用户",

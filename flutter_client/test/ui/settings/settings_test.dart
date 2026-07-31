@@ -547,6 +547,60 @@ void main() {
       expect(edited, isTrue);
     });
 
+    for (final MapEntry(key: locale, value: expected) in const <String, String>{
+      'en': 'Unable to refresh the saved Direct M3U source.',
+      'de':
+          'Die gespeicherte Direct-M3U-Quelle konnte nicht aktualisiert werden.',
+      'es': 'No se pudo actualizar la fuente Direct M3U guardada.',
+      'fr': "Impossible d'actualiser la source Direct M3U enregistrée.",
+      'zh': '无法刷新已保存的 Direct M3U 来源。',
+    }.entries) {
+      testWidgets(
+        'localizes saved Direct M3U refresh errors for $locale',
+        (tester) async {
+          final notifier = AuthNotifier(
+            xtreamService: XtreamService(transport: _FakeTransport({}).call),
+            secureStorage: InMemorySecureStorage(),
+          );
+
+          await tester.pumpWidget(
+            _settingsApp(
+              notifier,
+              locale: Locale(locale),
+              sourceError: savedM3uRefreshErrorCode,
+              isConfiguredOverride: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text(expected), findsOneWidget);
+          expect(find.text(savedM3uRefreshErrorCode), findsNothing);
+        },
+      );
+    }
+
+    testWidgets('preserves arbitrary source errors in localized settings', (
+      tester,
+    ) async {
+      const backendError = 'Server is currently unavailable.';
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          locale: const Locale('de'),
+          sourceError: backendError,
+          isConfiguredOverride: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(backendError), findsOneWidget);
+    });
+
     testWidgets('shows disconnect button when configured', (tester) async {
       final storage = InMemorySecureStorage();
       final transport = _FakeTransport({
@@ -865,6 +919,7 @@ Widget _testApp(Widget child) {
 Widget _settingsApp(
   AuthNotifier notifier, {
   Viewer? activeViewer,
+  Locale? locale,
   String? sourceError,
   bool? isConfiguredOverride,
   VoidCallback? onClearCache,
@@ -872,6 +927,7 @@ Widget _settingsApp(
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(

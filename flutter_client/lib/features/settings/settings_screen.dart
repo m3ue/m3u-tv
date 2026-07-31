@@ -22,6 +22,11 @@ const _kStadiumEffect = [
   GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
 ];
 
+String? _localizedSourceError(BuildContext context, String? error) =>
+    error == savedM3uRefreshErrorCode
+    ? AppLocalizations.of(context).settingsSavedM3uRefreshFailed
+    : error;
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
@@ -118,6 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final isConfigured =
         widget.isConfiguredOverride ?? widget.authNotifier.isConfigured;
+    final sourceError = _localizedSourceError(context, widget.sourceError);
 
     if (!isConfigured) {
       return Scaffold(
@@ -125,8 +131,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onConnect: _handleConnect,
           initialValues: _lastCredentials,
           error:
-              _connectionError ??
-              widget.sourceError ??
+              _localizedSourceError(context, _connectionError) ??
+              sourceError ??
               widget.authNotifier.error,
         ),
       );
@@ -140,7 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         viewers: widget.viewers,
         sourceLabel: widget.sourceLabel,
         serverTimezone: widget.serverTimezone,
-        sourceError: widget.sourceError,
+        sourceError: sourceError,
         epgRefreshInterval: widget.epgRefreshInterval,
         epgRefreshOptions: widget.epgRefreshOptions,
         onDisconnect:

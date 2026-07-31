@@ -91,6 +91,7 @@
   "settingsSourceLabel": "Fuente",
   "settingsServerTimezone": "Zona horaria del servidor",
   "settingsLastError": "Último error",
+  "settingsSavedM3uRefreshFailed": "No se pudo actualizar la fuente Direct M3U guardada.",
   "settingsRetryConnection": "Reintentar conexión",
   "settingsEditServer": "Editar configuración del servidor",
   "settingsActiveViewer": "Usuario activo",

@@ -482,6 +482,12 @@ abstract class AppLocalizations {
   /// **'Last error'**
   String get settingsLastError;
 
+  /// No description provided for @settingsSavedM3uRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to refresh the saved Direct M3U source.'**
+  String get settingsSavedM3uRefreshFailed;
+
   /// No description provided for @settingsRetryConnection.
   ///
   /// In en, this message translates to:

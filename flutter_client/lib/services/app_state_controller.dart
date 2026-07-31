@@ -1694,7 +1694,7 @@ class AppStateController extends ChangeNotifier {
       name = '${json['name'] ?? 'Direct M3U'}';
     } on Object catch (_) {
       if (!recoverFromInvalidSource) rethrow;
-      _error = 'Unable to refresh the saved Direct M3U source.';
+      _error = savedM3uRefreshErrorCode;
       _isLoadingContent = false;
       notifyListeners();
       return;

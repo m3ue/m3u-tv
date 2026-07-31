@@ -206,6 +206,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLastError => 'Último error';
 
   @override
+  String get settingsSavedM3uRefreshFailed =>
+      'No se pudo actualizar la fuente Direct M3U guardada.';
+
+  @override
   String get settingsRetryConnection => 'Reintentar conexión';
 
   @override

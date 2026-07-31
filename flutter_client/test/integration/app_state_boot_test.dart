@@ -553,7 +553,7 @@ void main() {
           expect(controller.channels.single.name, 'Original Channel');
           expect(
             controller.error,
-            'Unable to refresh the saved Direct M3U source.',
+            savedM3uRefreshErrorCode,
           );
           expect(controller.error, isNot(contains('persisted-secret')));
           expect(controller.isLoadingContent, isFalse);

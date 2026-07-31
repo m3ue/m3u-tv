@@ -206,6 +206,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLastError => '最近错误';
 
   @override
+  String get settingsSavedM3uRefreshFailed => '无法刷新已保存的 Direct M3U 来源。';
+
+  @override
   String get settingsRetryConnection => '重试连接';
 
   @override

@@ -206,6 +206,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLastError => 'Last error';
 
   @override
+  String get settingsSavedM3uRefreshFailed =>
+      'Unable to refresh the saved Direct M3U source.';
+
+  @override
   String get settingsRetryConnection => 'Retry connection';
 
   @override

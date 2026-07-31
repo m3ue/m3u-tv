@@ -2,6 +2,8 @@
 
 enum ContentType { live, vod, episode, aiostreams }
 
+const savedM3uRefreshErrorCode = 'saved_m3u_refresh_failed';
+
 class UserCredentials {
   const UserCredentials({
     required this.server,
