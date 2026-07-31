@@ -64,16 +64,41 @@ class CacheService {
     return CacheSnapshot._(memory, persisted);
   }
 
+  Future<void> replace(Map<String, Object?> values) async {
+    final timestamp = DateTime.now();
+    final memory = <String, Object?>{};
+    final persisted = <String, Object?>{};
+    for (final entry in values.entries) {
+      final key = 'm3ue_cache_${entry.key}';
+      memory[key] = _StampedValue<Object?>(entry.value, timestamp);
+      final encoded = _encodeCacheData(entry.key, entry.value);
+      if (encoded != null) {
+        persisted[key] = <String, Object?>{
+          'timestamp': timestamp.toIso8601String(),
+          'data': encoded,
+        };
+      }
+    }
+    await _store?.replaceWhere(
+      (key) => key.startsWith('m3ue_cache_'),
+      persisted,
+    );
+    _memory
+      ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
+      ..addAll(memory);
+  }
+
   Future<void> restore(CacheSnapshot snapshot) async {
+    final store = _store;
+    if (store != null) {
+      await store.replaceWhere(
+        (key) => key.startsWith('m3ue_cache_'),
+        snapshot._persisted,
+      );
+    }
     _memory
       ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
       ..addAll(snapshot._memory);
-    final store = _store;
-    if (store == null) return;
-    await store.removeWhere((key) => key.startsWith('m3ue_cache_'));
-    for (final entry in snapshot._persisted.entries) {
-      await store.write(entry.key, entry.value);
-    }
   }
 
   Future<void> clear() async {

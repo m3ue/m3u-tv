@@ -64,14 +64,17 @@ class AuthNotifier extends ChangeNotifier {
   Future<void> restoreSession(AuthSessionSnapshot snapshot) async {
     _connectionGeneration += 1;
     final credentials = snapshot._credentials;
-    await _persistCredentials(credentials);
-    xtreamService.restoreSession(snapshot._xtreamSession);
-    _isConfigured = snapshot._isConfigured;
-    _authResponse = snapshot._authResponse;
-    _credentials = credentials;
-    _error = snapshot._error;
-    _isLoading = false;
-    notifyListeners();
+    try {
+      await _persistCredentials(credentials);
+    } finally {
+      xtreamService.restoreSession(snapshot._xtreamSession);
+      _isConfigured = snapshot._isConfigured;
+      _authResponse = snapshot._authResponse;
+      _credentials = credentials;
+      _error = snapshot._error;
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   /// Connects to an Xtream/m3u-editor server with the given credentials.
@@ -81,6 +84,8 @@ class AuthNotifier extends ChangeNotifier {
   Future<bool> connect(
     UserCredentials credentials, {
     bool Function()? isCurrent,
+    bool persistCredentials = true,
+    bool publishSession = true,
   }) async {
     final connectionGeneration = ++_connectionGeneration;
     _isLoading = true;
@@ -93,7 +98,7 @@ class AuthNotifier extends ChangeNotifier {
         _finishStaleConnection(connectionGeneration);
         return false;
       }
-      await _persistCredentials(credentials);
+      if (persistCredentials) await _persistCredentials(credentials);
       if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
         _finishStaleConnection(connectionGeneration);
         return false;
@@ -103,7 +108,7 @@ class AuthNotifier extends ChangeNotifier {
       _authResponse = response;
       _credentials = credentials;
       _isLoading = false;
-      notifyListeners();
+      if (publishSession) notifyListeners();
       return true;
     } on XtreamAuthException catch (e) {
       if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
@@ -125,6 +130,14 @@ class AuthNotifier extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<void> persistSession() async {
+    final credentials = _credentials;
+    if (credentials == null) return;
+    await _persistCredentials(credentials);
+  }
+
+  void publishSession() => notifyListeners();
 
   /// Disconnects from the server, clearing all auth state and stored credentials.
   Future<void> disconnect() async {

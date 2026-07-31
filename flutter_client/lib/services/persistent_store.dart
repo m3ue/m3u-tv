@@ -45,6 +45,18 @@ class PersistentJsonStore {
     });
   }
 
+  Future<void> replaceWhere(
+    bool Function(String key) test,
+    Map<String, Object?> replacement,
+  ) async {
+    await _queueWrite(() async {
+      final data = Map<String, Object?>.from(await _readAllUnlocked())
+        ..removeWhere((key, value) => test(key))
+        ..addAll(replacement);
+      await _writeAll(data);
+    });
+  }
+
   Future<void> _queueWrite(Future<void> Function() operation) =>
       _writeQueue.run(operation);
 

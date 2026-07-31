@@ -1007,7 +1007,10 @@ void main() {
           ).call,
         );
         await restarted.boot();
-        await _waitForXtreamRefresh(restarted);
+        await _waitForXtreamRefresh(
+          restarted,
+          wait: () => tester.pump(const Duration(milliseconds: 10)),
+        );
 
         expect(restarted.channels.single.name, 'BBC One');
         expect(restarted.channels.single.epgChannelId, 'bbc.one');
@@ -1237,7 +1240,10 @@ Future<void> _pumpAppState(WidgetTester tester) async {
   await tester.pump();
 }
 
-Future<void> _waitForXtreamRefresh(AppStateController controller) async {
+Future<void> _waitForXtreamRefresh(
+  AppStateController controller, {
+  Future<void> Function()? wait,
+}) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {
     final hasEpg =
         controller.channels.isNotEmpty &&
@@ -1248,7 +1254,8 @@ Future<void> _waitForXtreamRefresh(AppStateController controller) async {
         controller.progressList.isNotEmpty) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
+    await (wait?.call() ??
+        Future<void>.delayed(const Duration(milliseconds: 10)));
   }
 }
 

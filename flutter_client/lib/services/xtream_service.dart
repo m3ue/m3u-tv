@@ -330,6 +330,7 @@ class XtreamService {
   bool _isM3UEditor = false;
   int _sessionGeneration = 0;
   int _authenticationGeneration = 0;
+  int _liveCategoryCacheSuppressions = 0;
 
   bool get isConfigured => _credentials != null;
 
@@ -440,6 +441,15 @@ class XtreamService {
 
   Future<List<Category>> getLiveCategories() async =>
       _categories('get_live_categories');
+  Future<List<Category>> getLiveCategoriesUncached() async {
+    _liveCategoryCacheSuppressions += 1;
+    try {
+      return await getLiveCategories();
+    } finally {
+      _liveCategoryCacheSuppressions -= 1;
+    }
+  }
+
   Future<List<Category>> getVodCategories() async =>
       _categories('get_vod_categories');
   Future<List<Category>> getSeriesCategories() async =>
@@ -940,7 +950,8 @@ class XtreamService {
     final categories = _asList(
       response,
     ).map((item) => Category.fromXtream(_asMap(item))).toList(growable: false);
-    if (action == 'get_live_categories' &&
+    if (_liveCategoryCacheSuppressions == 0 &&
+        action == 'get_live_categories' &&
         sessionGeneration == _sessionGeneration) {
       await _cache?.set('liveCategories', categories);
     }

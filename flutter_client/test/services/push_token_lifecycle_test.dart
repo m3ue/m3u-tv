@@ -269,7 +269,7 @@ void main() {
       final secondConnect = fixture.controller.connectXtream(
         _secondCredentials,
       );
-      await _waitForCachedLiveCategory(fixture.cache, 'Server B Live');
+      await transport.secondLiveCategoriesFetched.future;
       failedCatalog.completeError(StateError('catalog unavailable'));
 
       expect(await secondConnect, isFalse);
@@ -335,6 +335,232 @@ void main() {
         'Server A Show',
       );
     });
+
+    test(
+      'persistent cache failure rolls back the complete source transaction',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-atomic-cache-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final store = _SourceMarkerFailingStore(file: stateFile);
+        final transport = _TransactionalXtreamTransport(
+          onSecondSourceStaged: store.arm,
+          isSecondSourceCommitted: () => store.secondSourceCommitted,
+        );
+        final reverb = _RecordingReverbService();
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+          notificationApi: _SessionTvNotificationService(),
+          reverbService: reverb,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server A guide');
+        await reverb.firstConnected.future;
+        final observedChannels = <String>[];
+        fixture.controller.addListener(() {
+          observedChannels.add(
+            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          );
+        });
+        transport.secondSourcePostCommitEvents.clear();
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isFalse,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(store.didFail, isTrue);
+        expect(fixture.auth.credentials, _firstCredentials);
+        expect(fixture.controller.sourceType, AppSourceType.xtream);
+        expect(fixture.controller.liveCategories.single.name, 'Server A Live');
+        expect(fixture.controller.vodCategories.single.name, 'Server A Movies');
+        expect(
+          fixture.controller.seriesCategories.single.name,
+          'Server A Series',
+        );
+        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        expect(fixture.controller.vodItems.single.name, 'Server A Movie');
+        expect(fixture.controller.seriesList.single.name, 'Server A Show');
+        expect(fixture.controller.viewers.single.name, 'Server A Viewer');
+        expect(fixture.controller.activeViewer?.name, 'Server A Viewer');
+        expect(
+          fixture.controller.progressList.single.title,
+          'Server A Progress',
+        );
+        expect(fixture.controller.dvrRecordings.single.title, 'Server A DVR');
+        expect(
+          fixture.controller.mediaRequests.single.title,
+          'Server A Request',
+        );
+        expect(fixture.controller.isLoadingContent, isFalse);
+        expect(fixture.controller.unreadNotificationCount, 0);
+        expect(
+          fixture.controller.epgService.lookup('server-a')?.current.title,
+          'Server A guide',
+        );
+        expect(fixture.controller.epgService.lookup('server-b'), isNull);
+        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(transport.secondSourcePostCommitEvents, isEmpty);
+        expect(reverb.activeUser, 'first');
+        expect(reverb.connectedUsers, <String>['first', 'first']);
+
+        final persisted = jsonEncode(
+          await PersistentJsonStore(file: stateFile).snapshot(),
+        );
+        expect(persisted, isNot(contains('Server B')));
+        expect(persisted, isNot(contains('/second/')));
+        final persistedCredentials =
+            jsonDecode(
+                  (await fixture.storage.read('m3ue_tv_credentials'))!,
+                )
+                as Map<String, Object?>;
+        final persistedSource =
+            jsonDecode((await fixture.storage.read('m3ue_tv_source'))!)
+                as Map<String, Object?>;
+        expect(persistedCredentials['username'], 'first');
+        expect(persistedSource['type'], 'xtream');
+
+        final restarted = AppStateController(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          xtreamService: XtreamService(transport: transport.call),
+          tvNotificationService: _EmptyTvNotificationService(),
+        );
+        addTearDown(restarted.dispose);
+        await restarted.boot();
+        expect(
+          restarted.authNotifier.credentials?.server,
+          _firstCredentials.server,
+        );
+        expect(
+          restarted.authNotifier.credentials?.username,
+          _firstCredentials.username,
+        );
+        expect(restarted.sourceType, AppSourceType.xtream);
+        expect(restarted.channels.single.name, 'Server A Channel');
+        expect(restarted.viewers.single.name, 'Server A Viewer');
+      },
+    );
+
+    test(
+      'successful cache transaction publishes B before post-commit work',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-atomic-cache-success-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final store = _SourceMarkerFailingStore(
+          file: stateFile,
+          failWhenArmed: false,
+        );
+        final transport = _TransactionalXtreamTransport(
+          onSecondSourceStaged: store.arm,
+          isSecondSourceCommitted: () => store.secondSourceCommitted,
+        );
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server A guide');
+        transport.secondSourcePostCommitEvents.clear();
+        var publishedSource = '';
+        var sourceTransitions = 0;
+        fixture.controller.addListener(() {
+          final source = fixture.controller.channels.firstOrNull?.name ?? '';
+          if (source == publishedSource) return;
+          publishedSource = source;
+          if (source == 'Server B Channel') sourceTransitions += 1;
+        });
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server B guide');
+
+        expect(sourceTransitions, 1);
+        expect(fixture.controller.channels.single.name, 'Server B Channel');
+        expect(
+          (await fixture.cache.get<List<Channel>>(
+            'liveStreams',
+          ))?.data.single.name,
+          'Server B Channel',
+        );
+        expect(transport.secondSourcePostCommitEvents, isNotEmpty);
+        expect(
+          transport.secondSourcePostCommitEvents.every((event) => event.$2),
+          isTrue,
+        );
+        final persisted = jsonEncode(
+          await PersistentJsonStore(file: stateFile).snapshot(),
+        );
+        expect(persisted, contains('Server B Channel'));
+        expect(persisted, contains('/second/'));
+      },
+    );
+
+    test(
+      'cache rollback failure does not escape the source operation',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-atomic-cache-rollback-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final store = _SourceMarkerFailingStore(
+          file: File('${directory.path}/state.json'),
+          failRollback: true,
+        );
+        final transport = _TransactionalXtreamTransport(
+          onSecondSourceStaged: store.arm,
+          isSecondSourceCommitted: () => store.secondSourceCommitted,
+        );
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForGuide(fixture.controller, 'Server A guide');
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isFalse,
+        );
+
+        expect(fixture.auth.credentials, _firstCredentials);
+        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        expect(fixture.controller.isLoadingContent, isFalse);
+      },
+    );
 
     test(
       'failed authentication restores the prior notification session',
@@ -404,7 +630,7 @@ void main() {
       final secondConnect = fixture.controller.connectXtream(
         _secondCredentials,
       );
-      await _waitForCachedLiveCategory(fixture.cache, 'Server B Live');
+      await transport.secondLiveCategoriesFetched.future;
       failedCatalog.completeError(StateError('catalog unavailable'));
       expect(await secondConnect, isFalse);
       await reverb.firstReconnected.future;
@@ -436,14 +662,18 @@ class _Fixture {
     TvNotificationService? notificationApi,
     ReverbService? reverbService,
     XtreamTransport? transport,
+    PersistentJsonStore? persistentStore,
+    SecureStorage? secureStorage,
   }) {
-    store = PersistentJsonStore(
-      file: File(
-        '${Directory.systemTemp.path}/m3u-tv-push-${identityHashCode(this)}.json',
-      ),
-    );
+    store =
+        persistentStore ??
+        PersistentJsonStore(
+          file: File(
+            '${Directory.systemTemp.path}/m3u-tv-push-${identityHashCode(this)}.json',
+          ),
+        );
     cache = CacheService(memory: <String, Object?>{}, store: store);
-    storage = InMemorySecureStorage();
+    storage = secureStorage ?? InMemorySecureStorage();
     xtream = XtreamService(
       transport: transport ?? _FakeXtreamTransport().call,
       cache: cache,
@@ -470,7 +700,7 @@ class _Fixture {
 
   late final PersistentJsonStore store;
   late final CacheService cache;
-  late final InMemorySecureStorage storage;
+  late final SecureStorage storage;
   late final XtreamService xtream;
   late final AuthNotifier auth;
   late final _FakePushNotificationService push;
@@ -683,6 +913,7 @@ class _RacingXtreamTransport {
   final bool failSecondAuthentication;
   final Completer<void> firstCatalogStarted = Completer<void>();
   final Completer<void> releaseFirstCatalog = Completer<void>();
+  final Completer<void> secondLiveCategoriesFetched = Completer<void>();
 
   Future<Object?> call(XtreamRequest request) async {
     final isFirst = request.credentials.username == 'first';
@@ -707,6 +938,9 @@ class _RacingXtreamTransport {
         if (isFirst && blockFirstCatalog) {
           firstCatalogStarted.complete();
           await releaseFirstCatalog.future;
+        }
+        if (!isFirst && !secondLiveCategoriesFetched.isCompleted) {
+          secondLiveCategoriesFetched.complete();
         }
         return <Map<String, Object?>>[
           <String, Object?>{
@@ -784,6 +1018,203 @@ class _RacingXtreamTransport {
   }
 }
 
+class _SourceMarkerFailingStore extends PersistentJsonStore {
+  _SourceMarkerFailingStore({
+    required super.file,
+    this.failWhenArmed = true,
+    this.failRollback = false,
+  });
+
+  final bool failWhenArmed;
+  final bool failRollback;
+  bool _armed = false;
+  bool didFail = false;
+  bool secondSourceCommitted = false;
+
+  void arm() => _armed = true;
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    if (_armed && key == 'm3ue_tv_source') {
+      if (failWhenArmed && !didFail) {
+        didFail = true;
+        throw const FileSystemException('controlled cache transaction failure');
+      }
+      await super.write(key, value);
+      secondSourceCommitted = true;
+      return;
+    }
+    await super.write(key, value);
+  }
+
+  @override
+  Future<void> replaceWhere(
+    bool Function(String key) test,
+    Map<String, Object?> replacement,
+  ) {
+    if (failRollback && didFail) {
+      throw const FileSystemException('controlled cache rollback failure');
+    }
+    return super.replaceWhere(test, replacement);
+  }
+}
+
+class _TransactionalXtreamTransport {
+  _TransactionalXtreamTransport({
+    required this.onSecondSourceStaged,
+    required this.isSecondSourceCommitted,
+  });
+
+  final void Function() onSecondSourceStaged;
+  final bool Function() isSecondSourceCommitted;
+  final List<(String, bool)> secondSourcePostCommitEvents = <(String, bool)>[];
+
+  Future<Object?> call(XtreamRequest request) async {
+    final isFirst = request.credentials.username == 'first';
+    final source = isFirst ? 'A' : 'B';
+    final slug = isFirst ? 'server-a' : 'server-b';
+    switch (request.action ?? 'auth') {
+      case 'auth':
+        return <String, Object?>{
+          'user_info': <String, Object?>{'auth': 1, 'status': 'Active'},
+          'm3u_editor': <String, Object?>{
+            'version': '0.10.0',
+            'features': <String>['dvr', 'requests'],
+            'requests': <String, Object?>{
+              'content_types': <String>['movie'],
+              'approval_behavior': 'manual',
+            },
+          },
+        };
+      case 'get_live_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'live-$slug',
+            'category_name': 'Server $source Live',
+          },
+        ];
+      case 'get_vod_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'vod-$slug',
+            'category_name': 'Server $source Movies',
+          },
+        ];
+      case 'get_series_categories':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'category_id': 'series-$slug',
+            'category_name': 'Server $source Series',
+          },
+        ];
+      case 'get_live_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': isFirst ? 101 : 102,
+            'name': 'Server $source Channel',
+            'category_id': 'live-$slug',
+            'epg_channel_id': slug,
+          },
+        ];
+      case 'get_vod_streams':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'stream_id': isFirst ? 201 : 202,
+            'name': 'Server $source Movie',
+            'category_id': 'vod-$slug',
+            'container_extension': 'mp4',
+          },
+        ];
+      case 'get_series':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'series_id': isFirst ? 301 : 302,
+            'name': 'Server $source Show',
+            'category_id': 'series-$slug',
+          },
+        ];
+      case 'get_dvr_recordings':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'uuid': 'dvr-$slug',
+            'title': 'Server $source DVR',
+            'status': 'recording',
+            'channel_id': isFirst ? 101 : 102,
+          },
+        ];
+      case 'request_history':
+        return <String, Object?>{
+          'api_version': '1',
+          'data': <String, Object?>{
+            'requests': <Map<String, Object?>>[
+              <String, Object?>{
+                'id': isFirst ? 401 : 402,
+                'type': 'movie',
+                'title': 'Server $source Request',
+                'status': 'pending',
+              },
+            ],
+          },
+        };
+      case 'get_viewers':
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'id': isFirst ? 1 : 2,
+            'ulid': 'viewer-$slug',
+            'name': 'Server $source Viewer',
+            'is_admin': true,
+          },
+        ];
+      case 'get_recently_watched':
+        if (!isFirst) onSecondSourceStaged();
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'content_type': 'vod',
+            'stream_id': isFirst ? 201 : 202,
+            'position_seconds': isFirst ? 11 : 22,
+            'title': 'Server $source Progress',
+          },
+        ];
+      case 'sync_favorites':
+      case 'get_favorites':
+        if (!isFirst) {
+          secondSourcePostCommitEvents.add((
+            request.action!,
+            isSecondSourceCommitted(),
+          ));
+        }
+        return <Object?>[];
+      case 'get_epg_batch':
+        if (!isFirst) {
+          secondSourcePostCommitEvents.add((
+            request.action!,
+            isSecondSourceCommitted(),
+          ));
+        }
+        final now = DateTime.now();
+        return <String, Object?>{
+          '${isFirst ? 101 : 102}': <Map<String, Object?>>[
+            <String, Object?>{
+              'stream_id': isFirst ? 101 : 102,
+              'title': base64Encode(utf8.encode('Server $source guide')),
+              'description': '',
+              'start_timestamp':
+                  now
+                      .subtract(const Duration(minutes: 10))
+                      .millisecondsSinceEpoch ~/
+                  1000,
+              'stop_timestamp':
+                  now.add(const Duration(minutes: 20)).millisecondsSinceEpoch ~/
+                  1000,
+            },
+          ],
+        };
+      default:
+        throw StateError('Unexpected fixture action: ${request.action}');
+    }
+  }
+}
+
 Future<void> _waitForGuide(AppStateController controller, String title) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {
     final channelId = title.contains('A') ? 'server-a' : 'server-b';
@@ -791,16 +1222,4 @@ Future<void> _waitForGuide(AppStateController controller, String title) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   fail('Timed out waiting for guide');
-}
-
-Future<void> _waitForCachedLiveCategory(
-  CacheService cache,
-  String name,
-) async {
-  for (var attempt = 0; attempt < 100; attempt += 1) {
-    final categories = await cache.get<List<Category>>('liveCategories');
-    if (categories?.data.singleOrNull?.name == name) return;
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-  fail('Timed out waiting for cached live category');
 }

@@ -367,6 +367,7 @@ class AppStateController extends ChangeNotifier {
     final previousCredentials = authNotifier.credentials;
     final previousAuthSession = authNotifier.snapshotSession();
     final previousCache = await cacheService.snapshot();
+    final previousSource = await secureStorage.read(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     final replacingNotificationSession =
         previousCredentials != null &&
@@ -383,6 +384,8 @@ class AppStateController extends ChangeNotifier {
     final connected = await authNotifier.connect(
       credentials,
       isCurrent: () => !_sourceOperationGeneration.isStale(sourceGeneration),
+      persistCredentials: false,
+      publishSession: false,
     );
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     if (!connected) {
@@ -413,18 +416,24 @@ class AppStateController extends ChangeNotifier {
       invalidateEpgFreshness:
           _sourceType != AppSourceType.xtream ||
           !_sameCredentials(previousCredentials, credentials),
+      persistSession: authNotifier.persistSession,
     );
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     if (!loaded) {
-      await authNotifier.restoreSession(previousAuthSession);
-      await cacheService.restore(previousCache);
+      await _bestEffort(() => authNotifier.restoreSession(previousAuthSession));
+      await _bestEffort(() => cacheService.restore(previousCache));
+      await _bestEffort(() => _restoreSource(previousSource));
       if (replacingNotificationSession) {
-        await _restoreNotificationSession(
-          previousCredentials,
-          sourceGeneration: sourceGeneration,
-          notificationGeneration: notificationGeneration,
+        await _bestEffort(
+          () => _restoreNotificationSession(
+            previousCredentials,
+            sourceGeneration: sourceGeneration,
+            notificationGeneration: notificationGeneration,
+          ),
         );
       }
+    } else {
+      authNotifier.publishSession();
     }
     _isLoadingContent = false;
     notifyListeners();
@@ -433,6 +442,20 @@ class AppStateController extends ChangeNotifier {
       await _registerPushToken(credentials);
     }
     return loaded;
+  }
+
+  Future<void> _restoreSource(String? source) async {
+    if (source == null) {
+      await secureStorage.delete(_sourceKey);
+    } else {
+      await secureStorage.write(_sourceKey, source);
+    }
+  }
+
+  Future<void> _bestEffort(Future<void> Function() operation) async {
+    try {
+      await operation();
+    } on Object catch (_) {}
   }
 
   Future<void> _restoreNotificationSession(
@@ -1373,9 +1396,10 @@ class AppStateController extends ChangeNotifier {
     required bool clearCache,
     required int sourceGeneration,
     bool invalidateEpgFreshness = false,
+    Future<void> Function()? persistSession,
   }) async {
     try {
-      final liveCategoriesFuture = xtreamService.getLiveCategories();
+      final liveCategoriesFuture = xtreamService.getLiveCategoriesUncached();
       final vodCategoriesFuture = xtreamService.getVodCategories();
       final seriesCategoriesFuture = xtreamService.getSeriesCategories();
       final channelsFuture = xtreamService.getLiveStreams();
@@ -1421,16 +1445,43 @@ class AppStateController extends ChangeNotifier {
       final activeViewer = await viewerService.resolveActiveViewer(
         viewers,
         loginKey: _currentLoginKey(),
+        persist: false,
       );
       if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       final fetched = activeViewer == null
           ? const <Progress>[]
-          : await _loadRecentlyWatchedDeduped(activeViewer.ulid);
+          : await _loadRecentlyWatched(activeViewer.ulid, persist: false);
       if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       // Keep local progress if the server returned nothing (e.g. sync lag).
       final progress = fetched.isEmpty && _progressList.isNotEmpty
           ? _progressList
           : fetched;
+
+      await cacheService.replace(<String, Object?>{
+        'sourceType': 'xtream',
+        'liveCategories': liveCategories,
+        'vodCategories': vodCategories,
+        'seriesCategories': seriesCategories,
+        'liveStreams': channels,
+        'vodStreams': vodItems,
+        'seriesStreams': seriesList,
+        'viewers': viewers,
+      });
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+      await secureStorage.write(
+        _sourceKey,
+        jsonEncode(<String, Object?>{'type': 'xtream'}),
+      );
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+      await persistSession?.call();
+      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+      if (activeViewer != null) {
+        await viewerService.setActiveViewer(
+          activeViewer,
+          loginKey: _currentLoginKey(),
+        );
+        if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
+      }
 
       if (invalidateEpgFreshness) {
         _epgFetchDebounce?.cancel();
@@ -1452,41 +1503,16 @@ class AppStateController extends ChangeNotifier {
       _activeViewer = activeViewer;
       _progressList = progress;
       _error = null;
+      if (clearCache) aiostreamsApiService.clearCache();
       notifyListeners();
       unawaited(_syncFavoritesForActiveViewer());
+      unawaited(_refreshRecentlyWatchedForActiveViewer());
 
       // Prime EPG for the first screen's worth of channels only; the rest is
       // fetched lazily as screens request it via [ensureEpgForChannels] (e.g.
       // as the channel list scrolls into view). Fetching all channels' EPG
       // upfront was the main bottleneck on large playlists.
       unawaited(_loadXtreamEpg(channels.take(_epgPrimeCount).toList()));
-
-      if (clearCache) {
-        await cacheService.clear();
-        if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-        aiostreamsApiService.clearCache();
-      }
-      await cacheService.set('sourceType', 'xtream');
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('liveCategories', liveCategories);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('vodCategories', vodCategories);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('seriesCategories', seriesCategories);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('liveStreams', channels);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('vodStreams', vodItems);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('seriesStreams', seriesList);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await cacheService.set('viewers', viewers);
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      await secureStorage.write(
-        _sourceKey,
-        jsonEncode(<String, Object?>{'type': 'xtream'}),
-      );
-      if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
       return true;
     } on Object catch (error) {
       _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
@@ -1580,7 +1606,10 @@ class AppStateController extends ChangeNotifier {
     return future;
   }
 
-  Future<List<Progress>> _loadRecentlyWatched(String viewerId) async {
+  Future<List<Progress>> _loadRecentlyWatched(
+    String viewerId, {
+    bool persist = true,
+  }) async {
     final remote = await xtreamService.getRecentlyWatched(viewerId);
     final local = await resumeService.all(viewerId);
 
@@ -1592,7 +1621,7 @@ class AppStateController extends ChangeNotifier {
     // because it only ever fires while the server has nothing at all for
     // this viewer, and is naturally self-limiting — once seeded, remote is
     // no longer empty, so this never runs again for this viewer.
-    if (remote.isEmpty && local.isNotEmpty) {
+    if (persist && remote.isEmpty && local.isNotEmpty) {
       for (final p in local) {
         try {
           await xtreamService.updateProgress(p);
@@ -1661,8 +1690,10 @@ class AppStateController extends ChangeNotifier {
     // Remote is authoritative for all content types. Items absent from the
     // server response were either cleared or are beyond the top-20 window —
     // either way, don't show them. Persist so future metadata lookups are fast.
-    for (final p in result) {
-      await resumeService.save(p);
+    if (persist) {
+      for (final p in result) {
+        await resumeService.save(p);
+      }
     }
 
     return result;
