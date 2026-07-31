@@ -48,7 +48,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// Requests EPG data for the given channels be fetched (lazily, debounced)
   /// if not already fresh. Called per-item as the visible list/grid builds,
   /// so only channels actually scrolled into view get fetched.
-  final void Function(List<Channel>)? onEnsureEpg;
+  final EnsureEpg? onEnsureEpg;
 
   @override
   ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();

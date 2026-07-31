@@ -111,6 +111,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get catchupProgramReplayable => '可回看重播';
 
   @override
+  String get epgPreviousDay => '前一天';
+
+  @override
+  String get epgNow => '现在';
+
+  @override
+  String get epgNextDay => '后一天';
+
+  @override
+  String get epgChannels => '频道';
+
+  @override
+  String get epgNoData => '暂无 EPG 数据';
+
+  @override
   String get playerGoBack => '返回';
 
   @override

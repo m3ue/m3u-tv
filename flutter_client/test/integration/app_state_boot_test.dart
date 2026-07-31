@@ -548,8 +548,86 @@ void main() {
         );
       },
     );
+
+    test('newer EPG range wins when an older request completes last', () async {
+      final oldRange = Completer<Object?>();
+      final newRange = Completer<Object?>();
+      final fixture = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        return switch (request.params['date']) {
+          '2026-01-01' => oldRange.future,
+          '2026-01-02' => newRange.future,
+          _ => <String, Object?>{},
+        };
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: DateTime.utc(2026),
+        endDate: DateTime.utc(2026),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: DateTime.utc(2026, 1, 2),
+        endDate: DateTime.utc(2026, 1, 2),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      newRange.complete(_epgResponse('Newer day', DateTime.utc(2026, 1, 2)));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService.programsForChannel(controller.channels.single),
+        hasLength(1),
+      );
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Newer day',
+      );
+
+      oldRange.complete(_epgResponse('Older day', DateTime.utc(2026)));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Newer day',
+      );
+    });
   });
 }
+
+Map<String, Object?> _epgResponse(String title, DateTime start) => {
+  '101': <Map<String, Object?>>[
+    <String, Object?>{
+      'stream_id': 101,
+      'title': title,
+      'description': 'Fixture',
+      'start': start.toIso8601String(),
+      'end': start.add(const Duration(minutes: 30)).toIso8601String(),
+    },
+  ],
+};
 
 AppStateController _controller({
   required InMemorySecureStorage storage,

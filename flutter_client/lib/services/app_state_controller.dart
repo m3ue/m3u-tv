@@ -241,7 +241,12 @@ class AppStateController extends ChangeNotifier {
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
   final Set<int> _pendingEpgChannelIds = <int>{};
+  final Map<int, String> _fetchedEpgRangeByChannel = <int, String>{};
   Timer? _epgFetchDebounce;
+  DateTime? _pendingEpgStartDate;
+  DateTime? _pendingEpgEndDate;
+  String _activeEpgRangeKey = '';
+  int _epgRequestGeneration = 0;
   static const _epgPrimeCount = 60;
   static const _epgFetchDebounceDelay = Duration(milliseconds: 250);
 
@@ -1605,11 +1610,28 @@ class AppStateController extends ChangeNotifier {
   /// without fresh cached data are requested. Call this from a screen's
   /// `itemBuilder` (list/grid) so only currently visible channels get fetched
   /// as the user scrolls, instead of fetching the whole channel list upfront.
-  void ensureEpgForChannels(List<Channel> channels) {
+  void ensureEpgForChannels(
+    List<Channel> channels, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
     if (_sourceType != AppSourceType.xtream) return;
+    final rangeKey = _epgRangeKey(startDate, endDate);
+    if (rangeKey != _activeEpgRangeKey) {
+      _activeEpgRangeKey = rangeKey;
+      _pendingEpgStartDate = startDate;
+      _pendingEpgEndDate = endDate;
+      _pendingEpgChannelIds.clear();
+      _epgFetchDebounce?.cancel();
+      _epgRequestGeneration += 1;
+    }
     var added = false;
     for (final channel in channels) {
-      if (epgService.hasFreshDataForChannel(channel)) continue;
+      final isFresh = epgService.hasFreshDataForChannel(channel);
+      if (rangeKey.isEmpty && isFresh) continue;
+      if (_fetchedEpgRangeByChannel[channel.id] == rangeKey && isFresh) {
+        continue;
+      }
       if (_pendingEpgChannelIds.add(channel.id)) added = true;
     }
     if (!added) return;
@@ -1621,6 +1643,10 @@ class AppStateController extends ChangeNotifier {
     if (_pendingEpgChannelIds.isEmpty) return;
     final ids = _pendingEpgChannelIds.toSet();
     _pendingEpgChannelIds.clear();
+    final startDate = _pendingEpgStartDate;
+    final endDate = _pendingEpgEndDate;
+    final rangeKey = _activeEpgRangeKey;
+    final generation = _epgRequestGeneration;
     final channels = _channels
         .where((channel) => ids.contains(channel.id))
         .toList(growable: false);
@@ -1629,7 +1655,18 @@ class AppStateController extends ChangeNotifier {
       (channel) => channel.epgChannelId ?? channel.tvgName ?? channel.name,
     );
     try {
-      final programs = await xtreamService.getEpgBatch(channels);
+      final programs = await xtreamService.getEpgBatch(
+        channels,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        return;
+      }
+      for (final channel in channels) {
+        _fetchedEpgRangeByChannel[channel.id] = rangeKey;
+      }
       epgService
         ..mergePrograms(programs)
         ..markFetched(channelIds);
@@ -1648,8 +1685,10 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> _loadXtreamEpg(List<Channel> channels) async {
+    final generation = _epgRequestGeneration;
     try {
       final programs = await xtreamService.getEpgBatch(channels);
+      if (generation != _epgRequestGeneration) return;
       if (kDebugMode) {
         debugPrint(
           '[EPG] getEpgBatch → ${programs.length} programs for ${channels.length} channels',
@@ -1666,6 +1705,13 @@ class AppStateController extends ChangeNotifier {
       // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.
     }
+  }
+
+  String _epgRangeKey(DateTime? startDate, DateTime? endDate) {
+    if (startDate == null) return '';
+    String dateKey(DateTime value) =>
+        '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+    return '${dateKey(startDate)}:${dateKey(endDate ?? startDate)}';
   }
 
   Future<void> _loadSavedM3uSource() async {

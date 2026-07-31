@@ -111,6 +111,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catchupProgramReplayable => 'Catchup replay available';
 
   @override
+  String get epgPreviousDay => 'Previous day';
+
+  @override
+  String get epgNow => 'Now';
+
+  @override
+  String get epgNextDay => 'Next day';
+
+  @override
+  String get epgChannels => 'CHANNELS';
+
+  @override
+  String get epgNoData => 'No EPG data';
+
+  @override
   String get playerGoBack => 'Go back';
 
   @override

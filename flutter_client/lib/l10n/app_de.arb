@@ -53,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "Catchup-Wiedergabe verfügbar",
+  "epgPreviousDay": "Vorheriger Tag",
+  "epgNow": "Jetzt",
+  "epgNextDay": "Nächster Tag",
+  "epgChannels": "SENDER",
+  "epgNoData": "Keine EPG-Daten",
   "playerGoBack": "Zurück",
   "playerResumeWatching": "Weiterschauen",
   "playerContinue": "Fortsetzen",

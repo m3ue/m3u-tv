@@ -53,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "Repetición por catchup disponible",
+  "epgPreviousDay": "Día anterior",
+  "epgNow": "Ahora",
+  "epgNextDay": "Día siguiente",
+  "epgChannels": "CANALES",
+  "epgNoData": "No hay datos de EPG",
   "playerGoBack": "Volver",
   "playerResumeWatching": "Continuar viendo",
   "playerContinue": "Continuar",

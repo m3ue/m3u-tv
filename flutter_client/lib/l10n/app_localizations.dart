@@ -296,6 +296,36 @@ abstract class AppLocalizations {
   /// **'Catchup replay available'**
   String get catchupProgramReplayable;
 
+  /// No description provided for @epgPreviousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get epgPreviousDay;
+
+  /// No description provided for @epgNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get epgNow;
+
+  /// No description provided for @epgNextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get epgNextDay;
+
+  /// No description provided for @epgChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'CHANNELS'**
+  String get epgChannels;
+
+  /// No description provided for @epgNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No EPG data'**
+  String get epgNoData;
+
   /// No description provided for @playerGoBack.
   ///
   /// In en, this message translates to:

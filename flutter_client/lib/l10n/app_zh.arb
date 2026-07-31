@@ -53,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "可回看重播",
+  "epgPreviousDay": "前一天",
+  "epgNow": "现在",
+  "epgNextDay": "后一天",
+  "epgChannels": "频道",
+  "epgNoData": "暂无 EPG 数据",
   "playerGoBack": "返回",
   "playerResumeWatching": "继续观看",
   "playerContinue": "继续",

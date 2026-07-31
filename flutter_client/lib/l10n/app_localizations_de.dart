@@ -112,6 +112,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get catchupProgramReplayable => 'Catchup-Wiedergabe verfügbar';
 
   @override
+  String get epgPreviousDay => 'Vorheriger Tag';
+
+  @override
+  String get epgNow => 'Jetzt';
+
+  @override
+  String get epgNextDay => 'Nächster Tag';
+
+  @override
+  String get epgChannels => 'SENDER';
+
+  @override
+  String get epgNoData => 'Keine EPG-Daten';
+
+  @override
   String get playerGoBack => 'Zurück';
 
   @override

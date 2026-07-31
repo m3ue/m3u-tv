@@ -281,5 +281,222 @@ void main() {
         expect(find.byIcon(Icons.replay_rounded), findsNothing);
       },
     );
+
+    testWidgets('navigates days, displays the date, and returns to now', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      final requestedDates = <DateTime>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: const [
+                  Channel(
+                    id: 101,
+                    name: 'BBC One',
+                    streamUrl: 'https://streams.example/live/101.m3u8',
+                    catchupSupported: true,
+                    catchupDays: 7,
+                  ),
+                ],
+                epgService: EpgService(clock: () => now),
+                onChannelSelect: (_) {},
+                onEnsureEpg: (channels, {startDate, endDate}) {
+                  requestedDates.add(startDate!);
+                },
+                clock: () => now,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+      await tester.pump();
+      expect(find.text('Jul 30, 2026'), findsOneWidget);
+      expect(requestedDates.last, DateTime(2026, 7, 30));
+
+      await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+      await tester.pump();
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('timeline-now')));
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+      expect(requestedDates.last, DateTime(2026, 7, 31));
+
+      for (var day = 0; day < 8; day += 1) {
+        await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+        await tester.pump();
+      }
+      expect(find.text('Jul 24, 2026'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('timeline-now')));
+      await tester.pump();
+      for (var day = 0; day < 8; day += 1) {
+        await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+        await tester.pump();
+      }
+      expect(find.text('Aug 7, 2026'), findsOneWidget);
+
+      for (final key in const [
+        ValueKey('timeline-previous-day'),
+        ValueKey('timeline-now'),
+        ValueKey('timeline-next-day'),
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byKey(key),
+            matching: find.byType(DpadFocusable),
+          ),
+          findsOneWidget,
+        );
+      }
+    });
+
+    testWidgets('keeps horizontal pointer scrolling available', (tester) async {
+      final now = DateTime(2026, 7, 31, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: const [
+                  Channel(
+                    id: 101,
+                    name: 'BBC One',
+                    streamUrl: 'https://streams.example/live/101.m3u8',
+                  ),
+                ],
+                epgService: EpgService(clock: () => now),
+                onChannelSelect: (_) {},
+                clock: () => now,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final row = find.byKey(const ValueKey('timeline-row-scroll-101'));
+      final scrollable = find.descendant(
+        of: row,
+        matching: find.byType(Scrollable),
+      );
+      final before = tester.state<ScrollableState>(scrollable).position.pixels;
+      await tester.drag(row, const Offset(-300, 0));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.state<ScrollableState>(scrollable).position.pixels,
+        greaterThan(before),
+      );
+    });
+
+    testWidgets('replay stays bounded by each channel catchup range', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      final shortProgram = EpgProgram(
+        channelId: 'short',
+        title: 'Short Archive',
+        description: 'Outside one-day archive',
+        start: DateTime(2026, 7, 28, 10),
+        end: DateTime(2026, 7, 28, 11),
+      );
+      final longProgram = EpgProgram(
+        channelId: 'long',
+        title: 'Long Archive',
+        description: 'Inside seven-day archive',
+        start: DateTime(2026, 7, 28, 10),
+        end: DateTime(2026, 7, 28, 11),
+      );
+      final epg = EpgService(clock: () => now)
+        ..loadPrograms([shortProgram, longProgram]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: const [
+                  Channel(
+                    id: 101,
+                    name: 'Short',
+                    streamUrl: 'https://streams.example/live/101.m3u8',
+                    epgChannelId: 'short',
+                    catchupSupported: true,
+                    catchupDays: 1,
+                  ),
+                  Channel(
+                    id: 102,
+                    name: 'Long',
+                    streamUrl: 'https://streams.example/live/102.m3u8',
+                    epgChannelId: 'long',
+                    catchupSupported: true,
+                    catchupDays: 7,
+                  ),
+                ],
+                epgService: epg,
+                onChannelSelect: (_) {},
+                clock: () => now,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var day = 0; day < 3; day += 1) {
+        await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+        await tester.pump();
+      }
+
+      final shortBlock = find.byKey(
+        ValueKey(
+          'timeline-program-short-${shortProgram.start.toIso8601String()}',
+        ),
+      );
+      final longBlock = find.byKey(
+        ValueKey(
+          'timeline-program-long-${longProgram.start.toIso8601String()}',
+        ),
+      );
+      expect(
+        find.descendant(
+          of: shortBlock,
+          matching: find.byIcon(Icons.replay_rounded),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: longBlock,
+          matching: find.byIcon(Icons.replay_rounded),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }
