@@ -42,6 +42,7 @@ class ReverbService {
   bool _connected = false;
   bool _hasConnectedBefore = false;
   int _retryDelay = 2;
+  int _connectionGeneration = 0;
 
   static const int _maxRetryDelay = 60;
 
@@ -59,6 +60,14 @@ class ReverbService {
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
     void Function()? onConnected,
   }) async {
+    final connectionGeneration = ++_connectionGeneration;
+    final previousSubscription = _sub;
+    final previousSocket = _ws;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _sub = null;
+    _ws = null;
+    _connected = false;
     _session = session;
     _credentials = credentials;
     _subscribedChannels = subscribedChannels;
@@ -71,27 +80,41 @@ class ReverbService {
     _paused = false;
     _hasConnectedBefore = true;
     _retryDelay = 2;
-    await _connectOnce();
+    await previousSubscription?.cancel();
+    await previousSocket?.sink.close();
+    if (connectionGeneration != _connectionGeneration) return;
+    await _connectOnce(connectionGeneration);
   }
 
-  Future<void> _connectOnce() async {
-    if (_disposed) return;
+  Future<void> _connectOnce(int connectionGeneration) async {
+    if (_disposed || connectionGeneration != _connectionGeneration) return;
 
     final session = _session;
     final creds = _credentials;
 
     try {
-      _ws = _channelFactory(session.reverb.wsUri);
+      final socket = _channelFactory(session.reverb.wsUri);
+      if (connectionGeneration != _connectionGeneration) {
+        await socket.sink.close();
+        return;
+      }
+      _ws = socket;
       _connected = false;
 
-      _sub = _ws!.stream.listen(
-        (raw) => _onMessage(raw as String, session, creds),
-        onError: (_) => _scheduleReconnect(),
-        onDone: _scheduleReconnect,
+      _sub = socket.stream.listen(
+        (raw) => _onMessage(
+          raw as String,
+          session,
+          creds,
+          connectionGeneration,
+          socket,
+        ),
+        onError: (_) => _scheduleReconnect(connectionGeneration, socket),
+        onDone: () => _scheduleReconnect(connectionGeneration, socket),
         cancelOnError: true,
       );
     } on Object catch (_) {
-      _scheduleReconnect();
+      _scheduleReconnect(connectionGeneration);
     }
   }
 
@@ -99,7 +122,13 @@ class ReverbService {
     String raw,
     TvPlaylistSession session,
     UserCredentials creds,
+    int connectionGeneration,
+    WebSocketChannel socket,
   ) {
+    if (connectionGeneration != _connectionGeneration ||
+        !identical(_ws, socket)) {
+      return;
+    }
     final Map<String, Object?> msg;
     try {
       msg = (jsonDecode(raw) as Map).cast<String, Object?>();
@@ -114,7 +143,15 @@ class ReverbService {
         final data = _parseData(msg['data']);
         final socketId = '${data['socket_id'] ?? ''}';
         if (socketId.isNotEmpty) {
-          unawaited(_authenticate(session, creds, socketId));
+          unawaited(
+            _authenticate(
+              session,
+              creds,
+              socketId,
+              connectionGeneration,
+              socket,
+            ),
+          );
         }
 
       case 'pusher_internal:subscription_succeeded':
@@ -155,6 +192,8 @@ class ReverbService {
     TvPlaylistSession session,
     UserCredentials creds,
     String socketId,
+    int connectionGeneration,
+    WebSocketChannel socket,
   ) async {
     final channelName = session.channelName;
     try {
@@ -163,22 +202,33 @@ class ReverbService {
         socketId: socketId,
         channelName: channelName,
       );
-      _send({
+      if (connectionGeneration != _connectionGeneration ||
+          !identical(_ws, socket)) {
+        return;
+      }
+      _send(socket, {
         'event': 'pusher:subscribe',
         'data': {'auth': auth, 'channel': channelName},
       });
     } on Object catch (_) {
-      _scheduleReconnect();
+      _scheduleReconnect(connectionGeneration, socket);
     }
   }
 
-  void _send(Map<String, Object?> payload) {
+  void _send(WebSocketChannel socket, Map<String, Object?> payload) {
     try {
-      _ws?.sink.add(jsonEncode(payload));
+      socket.sink.add(jsonEncode(payload));
     } on Object catch (_) {}
   }
 
-  void _scheduleReconnect() {
+  void _scheduleReconnect(
+    int connectionGeneration, [
+    WebSocketChannel? socket,
+  ]) {
+    if (connectionGeneration != _connectionGeneration ||
+        (socket != null && !identical(_ws, socket))) {
+      return;
+    }
     _sub?.cancel().ignore();
     _sub = null;
     _ws = null;
@@ -186,9 +236,13 @@ class ReverbService {
     if (_disposed || _paused) return;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(seconds: _retryDelay), () {
-      if (_disposed || _paused) return;
+      if (_disposed ||
+          _paused ||
+          connectionGeneration != _connectionGeneration) {
+        return;
+      }
       _retryDelay = (_retryDelay * 2).clamp(2, _maxRetryDelay);
-      unawaited(_connectOnce());
+      unawaited(_connectOnce(++_connectionGeneration));
     });
   }
 
@@ -198,6 +252,7 @@ class ReverbService {
   /// [resume] rather than being permanently disabled.
   Future<void> pause() async {
     if (_disposed) return;
+    _connectionGeneration += 1;
     _paused = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -217,11 +272,12 @@ class ReverbService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _retryDelay = 2;
-    await _connectOnce();
+    await _connectOnce(++_connectionGeneration);
   }
 
   /// Disconnects and prevents any further reconnect attempts.
   Future<void> disconnect() async {
+    _connectionGeneration += 1;
     _disposed = true;
     _paused = false;
     _reconnectTimer?.cancel();

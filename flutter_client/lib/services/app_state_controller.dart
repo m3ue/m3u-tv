@@ -1138,6 +1138,7 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
+    _isLoadingContent = false;
     _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
     _pushLifecycleGeneration.advance();

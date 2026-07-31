@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -41,6 +42,7 @@ class AuthNotifier extends ChangeNotifier {
   String? _error;
   bool _isLoading = false;
   int _connectionGeneration = 0;
+  final SerialQueue _credentialPersistenceQueue = SerialQueue();
 
   bool get isConfigured => _isConfigured;
   XtreamAuthResponse? get authResponse => _authResponse;
@@ -62,18 +64,7 @@ class AuthNotifier extends ChangeNotifier {
   Future<void> restoreSession(AuthSessionSnapshot snapshot) async {
     _connectionGeneration += 1;
     final credentials = snapshot._credentials;
-    if (credentials == null) {
-      await secureStorage.delete(_credentialsKey);
-    } else {
-      await secureStorage.write(
-        _credentialsKey,
-        jsonEncode({
-          'server': credentials.server,
-          'username': credentials.username,
-          'password': credentials.password,
-        }),
-      );
-    }
+    await _persistCredentials(credentials);
     xtreamService.restoreSession(snapshot._xtreamSession);
     _isConfigured = snapshot._isConfigured;
     _authResponse = snapshot._authResponse;
@@ -102,14 +93,7 @@ class AuthNotifier extends ChangeNotifier {
         _finishStaleConnection(connectionGeneration);
         return false;
       }
-      await secureStorage.write(
-        _credentialsKey,
-        jsonEncode({
-          'server': credentials.server,
-          'username': credentials.username,
-          'password': credentials.password,
-        }),
-      );
+      await _persistCredentials(credentials);
       if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
         _finishStaleConnection(connectionGeneration);
         return false;
@@ -145,7 +129,7 @@ class AuthNotifier extends ChangeNotifier {
   /// Disconnects from the server, clearing all auth state and stored credentials.
   Future<void> disconnect() async {
     _connectionGeneration += 1;
-    await secureStorage.delete(_credentialsKey);
+    await _persistCredentials(null);
     xtreamService.clearCredentials();
     _isConfigured = false;
     _authResponse = null;
@@ -159,6 +143,7 @@ class AuthNotifier extends ChangeNotifier {
   ///
   /// Returns true if credentials were found and reconnection succeeded.
   Future<bool> loadSavedCredentials({bool Function()? isCurrent}) async {
+    await _credentialPersistenceQueue.drained;
     final saved = await secureStorage.read(_credentialsKey);
     if (saved == null) return false;
 
@@ -193,6 +178,22 @@ class AuthNotifier extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
+
+  Future<void> _persistCredentials(UserCredentials? credentials) =>
+      _credentialPersistenceQueue.run(() async {
+        if (credentials == null) {
+          await secureStorage.delete(_credentialsKey);
+          return;
+        }
+        await secureStorage.write(
+          _credentialsKey,
+          jsonEncode({
+            'server': credentials.server,
+            'username': credentials.username,
+            'password': credentials.password,
+          }),
+        );
+      });
 
   String _redact(String message, UserCredentials credentials) {
     var redacted = message;

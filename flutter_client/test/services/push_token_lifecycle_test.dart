@@ -233,6 +233,27 @@ void main() {
       );
     });
 
+    test(
+      'disconnect clears loading while a catalog request is pending',
+      () async {
+        final transport = _RacingXtreamTransport();
+        final fixture = _Fixture(transport: transport.call);
+        addTearDown(fixture.controller.dispose);
+
+        final connect = fixture.controller.connectXtream(_firstCredentials);
+        await transport.firstCatalogStarted.future;
+        expect(fixture.controller.isLoadingContent, isTrue);
+
+        await fixture.controller.disconnect();
+        final loadingAfterDisconnect = fixture.controller.isLoadingContent;
+        transport.releaseFirstCatalog.complete();
+        expect(await connect, isFalse);
+
+        expect(loadingAfterDisconnect, isFalse);
+        expect(fixture.controller.isLoadingContent, isFalse);
+      },
+    );
+
     test('failed catalog replacement restores the persistent cache', () async {
       final failedCatalog = Completer<Object?>();
       final transport = _RacingXtreamTransport(
