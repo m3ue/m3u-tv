@@ -7,6 +7,7 @@ import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
 /// Playback controls overlay for the player screen.
@@ -182,55 +183,66 @@ class PlaybackControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!isLive)
-          _ControlButton(
-            icon: Icons.replay_10,
-            onTap: () {
-              final target = currentPosition - seekStep;
-              final clamped = Duration(
-                milliseconds: target.inMilliseconds.clamp(
-                  0,
-                  duration.inMilliseconds,
-                ),
-              );
-              onSeek(clamped);
-            },
-            colorScheme: colorScheme,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.replay_10,
+              onPressed: () {
+                final target = currentPosition - seekStep;
+                final clamped = Duration(
+                  milliseconds: target.inMilliseconds.clamp(
+                    0,
+                    duration.inMilliseconds,
+                  ),
+                );
+                onSeek(clamped);
+              },
+            ),
           ),
         if (isLive && onPreviousChannel != null)
-          _ControlButton(
-            icon: Icons.skip_previous,
-            onTap: onPreviousChannel!,
-            colorScheme: colorScheme,
-            tooltip: AppLocalizations.of(context).playerSkipPreviousTooltip,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.skip_previous,
+              onPressed: onPreviousChannel,
+              tooltip: AppLocalizations.of(context).playerSkipPreviousTooltip,
+            ),
           ),
-        _ControlButton(
-          icon: isPlaying ? Icons.pause : Icons.play_arrow,
-          onTap: onPlayPause,
-          colorScheme: colorScheme,
-          autofocus: playPauseFocusNode == null,
-          focusNode: playPauseFocusNode,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: AppIconButton(
+            icon: isPlaying ? Icons.pause : Icons.play_arrow,
+            onPressed: onPlayPause,
+            variant: AppButtonVariant.primary,
+            autofocus: playPauseFocusNode == null,
+            focusNode: playPauseFocusNode,
+          ),
         ),
         if (isLive && onNextChannel != null)
-          _ControlButton(
-            icon: Icons.skip_next,
-            onTap: onNextChannel!,
-            colorScheme: colorScheme,
-            tooltip: AppLocalizations.of(context).playerSkipNextTooltip,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.skip_next,
+              onPressed: onNextChannel,
+              tooltip: AppLocalizations.of(context).playerSkipNextTooltip,
+            ),
           ),
         if (!isLive)
-          _ControlButton(
-            icon: Icons.forward_10,
-            onTap: () {
-              final target = currentPosition + seekStep;
-              final clamped = Duration(
-                milliseconds: target.inMilliseconds.clamp(
-                  0,
-                  duration.inMilliseconds,
-                ),
-              );
-              onSeek(clamped);
-            },
-            colorScheme: colorScheme,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.forward_10,
+              onPressed: () {
+                final target = currentPosition + seekStep;
+                final clamped = Duration(
+                  milliseconds: target.inMilliseconds.clamp(
+                    0,
+                    duration.inMilliseconds,
+                  ),
+                );
+                onSeek(clamped);
+              },
+            ),
           ),
       ],
     );
@@ -272,54 +284,6 @@ class PlaybackControls extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _ControlButton extends StatelessWidget {
-  const _ControlButton({
-    required this.icon,
-    required this.onTap,
-    required this.colorScheme,
-    this.autofocus = false,
-    this.focusNode,
-    this.tooltip,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final ColorScheme colorScheme;
-  final bool autofocus;
-  final FocusNode? focusNode;
-  final String? tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    return DpadFocusable(
-      autofocus: autofocus,
-      focusNode: focusNode,
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
-      ],
-      child: GestureDetector(
-        onTap: onTap,
-        child: Semantics(
-          label: tooltip,
-          button: true,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: Colors.white10,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 22, color: colorScheme.onSurface),
-          ),
-        ),
-      ),
     );
   }
 }

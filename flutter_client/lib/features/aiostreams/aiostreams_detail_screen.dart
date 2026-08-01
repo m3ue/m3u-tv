@@ -9,6 +9,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -347,19 +348,21 @@ class _MovieBody extends StatelessWidget {
         if (fullWidthButton)
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
+            child: AppButton(
               autofocus: true,
+              variant: AppButtonVariant.primary,
+              icon: Icons.play_arrow,
+              label: l.aiostreamsGetStreams,
               onPressed: isLoading ? null : onGetStreams,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(l.aiostreamsGetStreams),
             ),
           )
         else
-          FilledButton.icon(
+          AppButton(
             autofocus: true,
+            variant: AppButtonVariant.primary,
+            icon: Icons.play_arrow,
+            label: l.aiostreamsGetStreams,
             onPressed: isLoading ? null : onGetStreams,
-            icon: const Icon(Icons.play_arrow),
-            label: Text(l.aiostreamsGetStreams),
           ),
         const SizedBox(height: MediaBrowsingMetrics.pagePadding),
         if (isLoading) ...[

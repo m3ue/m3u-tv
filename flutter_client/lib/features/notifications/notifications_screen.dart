@@ -1,19 +1,15 @@
 import 'dart:async';
 
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart'
     show StoredTvNotification, TvNotificationChannel, TvNotificationStore;
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
-
-const _kStadiumEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
 
 /// Lists TV push notifications with local read/unread state, letting the
 /// user flip through history, mark items as read, and configure channel
@@ -164,14 +160,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         if (hasUnread)
           Align(
             alignment: Alignment.centerRight,
-            child: DpadFocusable(
-              onSelect: _markAllRead,
-              effects: _kStadiumEffect,
-              child: FilledButton.tonalIcon(
-                onPressed: _markAllRead,
-                icon: const Icon(Icons.done_all),
-                label: Text(l.notificationsMarkAllRead),
-              ),
+            child: AppButton(
+              icon: Icons.done_all,
+              label: l.notificationsMarkAllRead,
+              onPressed: _markAllRead,
             ),
           ),
         if (hasUnread) const SizedBox(height: 12),

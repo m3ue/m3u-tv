@@ -7,6 +7,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -294,19 +295,21 @@ class _VodDetailsBody extends StatelessWidget {
         if (fullWidthButton)
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
+            child: AppButton(
               autofocus: true,
+              variant: AppButtonVariant.primary,
+              icon: Icons.play_arrow,
+              label: buttonLabel,
               onPressed: () => _play(details, progress),
-              icon: const Icon(Icons.play_arrow),
-              label: Text(buttonLabel),
             ),
           )
         else
-          FilledButton.icon(
+          AppButton(
             autofocus: true,
+            variant: AppButtonVariant.primary,
+            icon: Icons.play_arrow,
+            label: buttonLabel,
             onPressed: () => _play(details, progress),
-            icon: const Icon(Icons.play_arrow),
-            label: Text(buttonLabel),
           ),
         if (progressValue != null) ...[
           const SizedBox(height: MediaBrowsingMetrics.chipGap),

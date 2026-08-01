@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/shared/app_button.dart';
+
 /// Resume prompt dialog shown when startPosition > 30 seconds.
 ///
 /// Mirrors the RN PlayerScreen resume behavior: when a VOD/episode has
@@ -60,29 +62,14 @@ class ResumePrompt extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  FilledButton(
+                  AppButton(
+                    autofocus: true,
+                    variant: AppButtonVariant.primary,
+                    label: 'Resume',
                     onPressed: onResume,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text('Resume'),
                   ),
                   const SizedBox(width: 16),
-                  FilledButton.tonal(
-                    onPressed: onStartOver,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text('Start Over'),
-                  ),
+                  AppButton(label: 'Start Over', onPressed: onStartOver),
                 ],
               ),
             ],

@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
@@ -129,34 +130,17 @@ class _ResumeModal extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    DpadFocusable(
-                      onSelect: () => Navigator.of(context).pop(),
-                      effects: const [
-                        GradientBorderEffect(
-                          borderRadius: BorderRadius.all(Radius.circular(50)),
-                        ),
-                      ],
-                      child: FilledButton.tonal(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(AppLocalizations.of(context).cancel),
-                      ),
+                    AppButton(
+                      label: AppLocalizations.of(context).cancel,
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(width: 8),
-                    DpadFocusable(
+                    AppButton(
                       autofocus: true,
-                      onSelect: () =>
+                      variant: AppButtonVariant.primary,
+                      label: AppLocalizations.of(context).playerResume,
+                      onPressed: () =>
                           Navigator.of(context).pop(positionSeconds.toDouble()),
-                      effects: const [
-                        GradientBorderEffect(
-                          borderRadius: BorderRadius.all(Radius.circular(50)),
-                        ),
-                      ],
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(
-                          context,
-                        ).pop(positionSeconds.toDouble()),
-                        child: Text(AppLocalizations.of(context).playerResume),
-                      ),
                     ),
                   ],
                 ),
