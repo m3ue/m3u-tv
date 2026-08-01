@@ -22,8 +22,9 @@ const double _kChannelColW = 128;
 const double _kTimeHeaderH = 28;
 const double _kRowH = 60;
 const double _kPxPerMin = 5; // 300 px per hour
+const int _kCatchupFallbackDays = 7;
 
-/// Horizontal TV-guide style EPG — channels on the Y-axis, time on the X-axis.
+/// Horizontal TV-guide style EPG with channels on Y and time on X.
 ///
 /// Programs appear as proportionally-sized blocks that can be scrolled left/right
 /// to move through the time window. The channel name column and time header stay
@@ -125,8 +126,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       DateTime(value.year, value.month, value.day + days);
 
   int get _maxCatchupDays => widget.channels
-      .where((channel) => channel.catchupSupported)
-      .map((channel) => channel.catchupDays ?? 0)
+      .map(
+        (channel) => _effectiveCatchupDays(
+          channel.catchupSupported,
+          channel.catchupDays,
+        ),
+      )
       .fold(0, math.max);
 
   void _selectDate(DateTime date) {
@@ -325,6 +330,11 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                             itemExtent: _kRowH,
                             itemBuilder: (_, i) {
                               final channel = widget.channels[i];
+                              final catchupRetentionDays =
+                                  _effectiveCatchupDays(
+                                    channel.catchupSupported,
+                                    channel.catchupDays,
+                                  );
                               widget.onEnsureEpg?.call(
                                 [channel],
                                 startDate: _selectedDate,
@@ -356,13 +366,11 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     pixelsPerMinute: _kPxPerMin,
                                     totalWidth: _totalW,
                                     rowHeight: _kRowH,
-                                    catchupSupported: channel.catchupSupported,
-                                    catchupDays: channel.catchupDays,
+                                    catchupRetentionDays: catchupRetentionDays,
                                     now: now,
                                     onTap: (program) {
                                       final canReplay = _canReplay(
-                                        channel.catchupSupported,
-                                        channel.catchupDays,
+                                        catchupRetentionDays,
                                         program,
                                         widget.clock(),
                                       );
@@ -662,8 +670,7 @@ class _ProgramsRow extends StatelessWidget {
     required this.totalWidth,
     required this.rowHeight,
     required this.onTap,
-    required this.catchupSupported,
-    required this.catchupDays,
+    required this.catchupRetentionDays,
     required this.now,
   });
 
@@ -674,12 +681,11 @@ class _ProgramsRow extends StatelessWidget {
   final double totalWidth;
   final double rowHeight;
   final void Function(EpgProgram program) onTap;
-  final bool catchupSupported;
-  final int? catchupDays;
+  final int catchupRetentionDays;
   final DateTime now;
 
   bool showCatchupIcon(EpgProgram program) =>
-      _canReplay(catchupSupported, catchupDays, program, now);
+      _canReplay(catchupRetentionDays, program, now);
 
   @override
   Widget build(BuildContext context) {
@@ -826,19 +832,21 @@ class _ProgramsRow extends StatelessWidget {
   }
 }
 
+int _effectiveCatchupDays(bool catchupSupported, int? catchupDays) {
+  if (!catchupSupported) return 0;
+  return catchupDays ?? _kCatchupFallbackDays;
+}
+
 bool _canReplay(
-  bool catchupSupported,
-  int? catchupDays,
+  int catchupRetentionDays,
   EpgProgram program,
   DateTime now,
 ) {
-  if (!catchupSupported || !program.end.isBefore(now)) return false;
-  if (catchupDays == null) return true;
-  if (catchupDays <= 0) return false;
+  if (catchupRetentionDays <= 0 || !program.end.isBefore(now)) return false;
   final earliest = DateTime(
     now.year,
     now.month,
-    now.day - catchupDays,
+    now.day - catchupRetentionDays,
     now.hour,
     now.minute,
     now.second,

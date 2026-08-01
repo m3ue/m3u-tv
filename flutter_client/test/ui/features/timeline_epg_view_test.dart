@@ -374,6 +374,220 @@ void main() {
     });
 
     testWidgets(
+      'null catchup metadata uses a finite seven-day retention',
+      (tester) async {
+        final now = DateTime(2026, 7, 31, 12);
+        const channel = Channel(
+          id: 101,
+          name: 'BBC One',
+          streamUrl: 'https://streams.example/live/101.m3u8',
+          epgChannelId: 'bbc.one',
+          catchupSupported: true,
+        );
+        const channels = [
+          channel,
+          Channel(
+            id: 102,
+            name: 'Short Archive',
+            streamUrl: 'https://streams.example/live/102.m3u8',
+            catchupSupported: true,
+            catchupDays: 2,
+          ),
+          Channel(
+            id: 103,
+            name: 'No Archive',
+            streamUrl: 'https://streams.example/live/103.m3u8',
+          ),
+        ];
+        final olderProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Outside Fallback',
+          description: 'Started before the fallback cutoff',
+          start: DateTime(2026, 7, 24, 10),
+          end: DateTime(2026, 7, 24, 11),
+        );
+        final retainedProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Inside Fallback',
+          description: 'Started after the fallback cutoff',
+          start: DateTime(2026, 7, 24, 13),
+          end: DateTime(2026, 7, 24, 14),
+        );
+        final epg = EpgService(clock: () => now)
+          ..loadPrograms([olderProgram, retainedProgram]);
+        final replayedPrograms = <EpgProgram>[];
+        final selectedChannels = <Channel>[];
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: channels,
+                  epgService: epg,
+                  onChannelSelect: selectedChannels.add,
+                  onCatchupProgramSelect: (_, program) {
+                    replayedPrograms.add(program);
+                  },
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        for (var day = 0; day < 7; day += 1) {
+          await tester.tap(
+            find.byKey(const ValueKey('timeline-previous-day')),
+          );
+          await tester.pump();
+        }
+        expect(find.text('Jul 24, 2026'), findsOneWidget);
+        expect(
+          _dateControlFocusable(
+            tester,
+            const ValueKey('timeline-previous-day'),
+          ).enabled,
+          isFalse,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+        await tester.pump();
+        expect(find.text('Jul 24, 2026'), findsOneWidget);
+
+        final retainedBlock = find.byKey(
+          ValueKey(
+            'timeline-program-bbc.one-${retainedProgram.start.toIso8601String()}',
+          ),
+        );
+        final olderBlock = find.byKey(
+          ValueKey(
+            'timeline-program-bbc.one-${olderProgram.start.toIso8601String()}',
+          ),
+        );
+        expect(
+          find.descendant(
+            of: retainedBlock,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: olderBlock,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsNothing,
+        );
+
+        tester.widget<DpadInkWell>(retainedBlock).onTap?.call();
+        tester.widget<DpadInkWell>(olderBlock).onTap?.call();
+
+        expect(replayedPrograms, [retainedProgram]);
+        expect(selectedChannels, [channel]);
+      },
+    );
+
+    testWidgets('zero and negative catchup retention remain unavailable', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      const channels = [
+        Channel(
+          id: 101,
+          name: 'Zero',
+          streamUrl: 'https://streams.example/live/101.m3u8',
+          epgChannelId: 'zero',
+          catchupSupported: true,
+          catchupDays: 0,
+        ),
+        Channel(
+          id: 102,
+          name: 'Negative',
+          streamUrl: 'https://streams.example/live/102.m3u8',
+          epgChannelId: 'negative',
+          catchupSupported: true,
+          catchupDays: -1,
+        ),
+      ];
+      final programs = [
+        EpgProgram(
+          channelId: 'zero',
+          title: 'Zero Archive',
+          description: 'Unavailable with zero retention',
+          start: DateTime(2026, 7, 31, 10),
+          end: DateTime(2026, 7, 31, 11),
+        ),
+        EpgProgram(
+          channelId: 'negative',
+          title: 'Negative Archive',
+          description: 'Unavailable with negative retention',
+          start: DateTime(2026, 7, 31, 10),
+          end: DateTime(2026, 7, 31, 11),
+        ),
+      ];
+      final epg = EpgService(clock: () => now)..loadPrograms(programs);
+      final replayedPrograms = <EpgProgram>[];
+      final selectedChannels = <Channel>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: channels,
+                epgService: epg,
+                onChannelSelect: selectedChannels.add,
+                onCatchupProgramSelect: (_, program) {
+                  replayedPrograms.add(program);
+                },
+                clock: () => now,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-previous-day'),
+        ).enabled,
+        isFalse,
+      );
+      for (final program in programs) {
+        final block = find.byKey(
+          ValueKey(
+            'timeline-program-${program.channelId}-${program.start.toIso8601String()}',
+          ),
+        );
+        expect(
+          find.descendant(
+            of: block,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsNothing,
+        );
+        tester.widget<DpadInkWell>(block).onTap?.call();
+      }
+
+      expect(replayedPrograms, isEmpty);
+      expect(selectedChannels, channels);
+    });
+
+    testWidgets(
       'spring-forward navigation and window keep calendar boundaries',
       (tester) async {
         final now = DateTime(2026, 3, 30, 12);
