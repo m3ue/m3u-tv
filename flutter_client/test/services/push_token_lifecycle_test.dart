@@ -618,6 +618,98 @@ void main() {
     );
 
     test(
+      'disconnect remains authoritative after a stale cache replacement',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-stale-cache-disconnect-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final store = _BlockingSourceCacheStore(file: stateFile);
+        final transport = _ThreeSourceXtreamTransport();
+        final reverb = _RecordingReverbService();
+        final fixture = _Fixture(
+          persistentStore: store,
+          secureStorage: FileSecureStorage(store: store),
+          transport: transport.call,
+          notificationApi: _SessionTvNotificationService(),
+          reverbService: reverb,
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await reverb.firstConnected.future;
+        await fixture.controller.setPushToken('device-token');
+        fixture.push.events.clear();
+
+        final replacement = fixture.controller.connectXtream(
+          _secondCredentials,
+        );
+        await store.secondCachePersisted.future;
+        await fixture.controller.disconnect();
+        expect(await fixture.storage.read('m3ue_tv_credentials'), isNull);
+        expect(await fixture.storage.read('m3ue_tv_source'), isNull);
+
+        store.releaseSecondCache.complete();
+        final replacementResult = await replacement;
+        await pumpEventQueue();
+        final persisted = await PersistentJsonStore(file: stateFile).snapshot();
+
+        final restarted = AppStateController(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          xtreamService: XtreamService(transport: transport.call),
+          tvNotificationService: _EmptyTvNotificationService(),
+        );
+        addTearDown(restarted.dispose);
+        await restarted.boot();
+
+        expect(
+          <String, Object?>{
+            'replacement': replacementResult,
+            'auth': fixture.auth.credentials?.username,
+            'source': fixture.controller.sourceType,
+            'credentials persisted': persisted.containsKey(
+              'm3ue_tv_credentials',
+            ),
+            'source persisted': persisted.containsKey('m3ue_tv_source'),
+            'cache source': (await fixture.cache.get<String>(
+              'sourceType',
+            ))?.data,
+            'channels': fixture.controller.channels.length,
+            'active viewer': fixture.controller.activeViewer?.ulid,
+            'push events': fixture.push.events,
+            'reverb user': reverb.activeUser,
+            'restart auth': restarted.authNotifier.credentials?.username,
+            'restart source': restarted.sourceType,
+          },
+          <String, Object?>{
+            'replacement': false,
+            'auth': null,
+            'source': AppSourceType.none,
+            'credentials persisted': false,
+            'source persisted': false,
+            'cache source': null,
+            'channels': 0,
+            'active viewer': null,
+            'push events': <String>[
+              'unsubscribe:first:device-token:true',
+            ],
+            'reverb user': null,
+            'restart auth': null,
+            'restart source': AppSourceType.none,
+          },
+        );
+        expect(jsonEncode(persisted), isNot(contains('Server B')));
+      },
+    );
+
+    test(
       'stale cache cleanup cannot overwrite a newer successful connection',
       () async {
         final directory = await Directory.systemTemp.createTemp(

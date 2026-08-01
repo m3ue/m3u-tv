@@ -671,7 +671,12 @@ void main() {
 
     test('toggling an AIOStreams favorite pushes its full metadata', () async {
       final transport = _FakeXtreamTransport();
-      final controller = _controller(transport: transport);
+      final store = _BlockingAioMutationStore();
+      final aioFavorites = AIOStreamsFavoritesService(store: store);
+      final controller = _controller(
+        transport: transport,
+        aioFavoritesService: aioFavorites,
+      );
       addTearDown(controller.dispose);
       expect(
         await controller.connectXtream(
@@ -683,17 +688,20 @@ void main() {
         ),
         isTrue,
       );
+      await pumpEventQueue();
+      await aioFavorites.replaceAll(const <AIOStreamsFavoriteItem>[]);
       transport.requests.clear();
+      var notifications = 0;
+      aioFavorites.addListener(() => notifications += 1);
 
-      await controller.aioFavoritesService.add(
-        const AIOStreamsFavoriteItem(
-          id: 'tt0111161',
-          type: 'movie',
-          name: 'The Shawshank Redemption',
-          integrationId: 7,
-          poster: 'https://example.com/poster.jpg',
-        ),
+      const item = AIOStreamsFavoriteItem(
+        id: 'tt0111161',
+        type: 'movie',
+        name: 'The Shawshank Redemption',
+        integrationId: 7,
+        poster: 'https://example.com/poster.jpg',
       );
+      await controller.aioFavoritesService.add(item);
       await pumpEventQueue();
 
       final request = transport.requests.singleWhere(
@@ -705,13 +713,108 @@ void main() {
       expect(request.body['thumbnail_url'], 'https://example.com/poster.jpg');
       expect(request.body['item_type'], 'movie');
       expect(request.body['aio_integration_id'], '7');
+      expect(notifications, 1);
+      expect(await _favoriteIds(aioFavorites), <String>[item.id]);
+      expect(
+        _persistedFavoriteIds(await store.snapshot()),
+        <String>{item.id},
+      );
     });
+
+    for (final remove in <bool>[false, true]) {
+      test(
+        'stale local AIOStreams ${remove ? 'remove' : 'add'} cannot target a newer viewer',
+        () async {
+          const prior = AIOStreamsFavoriteItem(
+            id: 'tt9999999',
+            type: 'series',
+            name: 'Prior Show',
+            integrationId: 3,
+          );
+          const item = AIOStreamsFavoriteItem(
+            id: 'tt0111161',
+            type: 'movie',
+            name: 'The Shawshank Redemption',
+            integrationId: 7,
+            poster: 'https://example.com/poster.jpg',
+          );
+          const viewerB = Viewer(
+            id: 2,
+            ulid: 'viewer-b',
+            name: 'Viewer B',
+            isAdmin: false,
+          );
+          final transport = _FakeXtreamTransport();
+          final store = _BlockingAioMutationStore();
+          final aioFavorites = AIOStreamsFavoritesService(store: store);
+          final controller = _controller(
+            transport: transport,
+            aioFavoritesService: aioFavorites,
+          );
+          addTearDown(controller.dispose);
+          expect(
+            await controller.connectXtream(
+              const UserCredentials(
+                server: 'https://fixture.example',
+                username: 'fixture-user',
+                password: 'fixture-password',
+              ),
+            ),
+            isTrue,
+          );
+          await pumpEventQueue();
+          await aioFavorites.replaceAll(<AIOStreamsFavoriteItem>[
+            prior,
+            if (remove) item,
+          ]);
+          final committedIds = <String>{prior.id, if (remove) item.id};
+          transport
+            ..requests.clear()
+            ..blockFavoritesFor(viewerB.ulid);
+          var notifications = 0;
+          aioFavorites.addListener(() => notifications += 1);
+          final write = store.blockNextWrite();
+
+          final mutation = remove
+              ? aioFavorites.remove(item.id)
+              : aioFavorites.add(item);
+          await write.started.future;
+          final switchViewer = controller.switchViewer(viewerB);
+          await transport.blockedFavoritesStarted.future;
+          await switchViewer;
+          write.release.complete();
+          await mutation;
+          await pumpEventQueue();
+
+          final toggleRequests = transport.requests.where(
+            (request) => request.action == 'toggle_favorite',
+          );
+          expect(
+            toggleRequests.map((request) => request.body['viewer_id']).toList(),
+            isEmpty,
+          );
+          expect(notifications, 0);
+          expect(
+            (await aioFavorites.all()).map((favorite) => favorite.id).toSet(),
+            committedIds,
+          );
+          expect(
+            _persistedFavoriteIds(await store.snapshot()),
+            committedIds,
+          );
+
+          transport.releaseBlockedFavorites.complete();
+          await pumpEventQueue();
+        },
+      );
+    }
   });
 }
 
 AppStateController _controller({
   Map<String, Object?>? memory,
   required _FakeXtreamTransport transport,
+  AIOStreamsFavoritesService? aioFavoritesService,
 }) {
   final sharedMemory = memory ?? <String, Object?>{};
   return AppStateController(
@@ -730,7 +833,7 @@ AppStateController _controller({
       memory: sharedMemory,
       namespace: 'series',
     ),
-    aioFavoritesService: AIOStreamsFavoritesService(),
+    aioFavoritesService: aioFavoritesService ?? AIOStreamsFavoritesService(),
     resumeService: ResumeService(memory: sharedMemory),
     viewerService: ViewerService(memory: sharedMemory),
   );
@@ -744,6 +847,13 @@ class _RecordedRequest {
 
 class _FakeXtreamTransport {
   final List<_RecordedRequest> requests = <_RecordedRequest>[];
+  final blockedFavoritesStarted = Completer<void>();
+  final releaseBlockedFavorites = Completer<void>();
+  String? _blockedFavoritesViewer;
+
+  void blockFavoritesFor(String viewerUlid) {
+    _blockedFavoritesViewer = viewerUlid;
+  }
 
   Future<Object?> call(XtreamRequest request) async {
     final action = request.action ?? 'auth';
@@ -776,6 +886,10 @@ class _FakeXtreamTransport {
       case 'get_epg_batch':
         return <String, Object?>{};
       case 'get_favorites':
+        if (request.params['viewer_id'] == _blockedFavoritesViewer) {
+          blockedFavoritesStarted.complete();
+          await releaseBlockedFavorites.future;
+        }
         return const <Object?>[];
       case 'toggle_favorite':
         return <String, Object?>{'favorited': request.body['favorited']};
@@ -874,6 +988,60 @@ class _ControlledWrite {
   final bool fail;
   final started = Completer<void>();
   final release = Completer<void>();
+}
+
+class _BlockingAioMutationStore extends PersistentJsonStore {
+  final _data = <String, Object?>{};
+  _ControlledWrite? _blockedWrite;
+
+  _ControlledWrite blockNextWrite() {
+    final write = _ControlledWrite(fail: false);
+    _blockedWrite = write;
+    return write;
+  }
+
+  @override
+  Future<Object?> read(String key) async => _data[key];
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    final previous = _data[key];
+    _data[key] = value;
+    final write = _blockedWrite;
+    if (write == null) return;
+    _blockedWrite = null;
+    write.started.complete();
+    await write.release.future;
+    if (write.fail) _data[key] = previous;
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    if (!shouldCommit()) return false;
+    final previous = _data[key];
+    _data[key] = value;
+    final write = _blockedWrite;
+    if (write != null) {
+      _blockedWrite = null;
+      write.started.complete();
+      await write.release.future;
+    }
+    if (shouldCommit()) return true;
+    if (previous == null) {
+      _data.remove(key);
+    } else {
+      _data[key] = previous;
+    }
+    return false;
+  }
+
+  @override
+  Future<Map<String, Object?>> snapshot() async =>
+      Map<String, Object?>.from(_data);
 }
 
 Set<Object?> _persistedFavoriteIds(Map<String, Object?> snapshot) =>

@@ -36,6 +36,10 @@ class AIOStreamsFavoriteItem {
   };
 }
 
+typedef AIOStreamsMutationOwnership = bool Function();
+typedef AIOStreamsMutationOwnershipCapture =
+    AIOStreamsMutationOwnership Function();
+
 /// Persists AIOStreams favourite items keyed by their string item ID.
 /// AIOStreams items are identified by IMDb-style string IDs (e.g. "tt1234567").
 class AIOStreamsFavoritesService extends ChangeNotifier {
@@ -57,6 +61,8 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
 
   /// Invoked after [remove] persists locally, mirroring [onAdded].
   void Function(String itemId)? onRemoved;
+
+  AIOStreamsMutationOwnershipCapture? captureMutationOwnership;
 
   Future<Map<String, AIOStreamsFavoriteItem>> _all() async {
     if (_cache != null) return _cache!;
@@ -80,50 +86,74 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     return _cache!;
   }
 
-  Future<void> _persist(Map<String, AIOStreamsFavoriteItem> cache) async {
+  Future<bool> _persist(
+    Map<String, AIOStreamsFavoriteItem> cache, {
+    AIOStreamsMutationOwnership? shouldCommit,
+  }) async {
     final data = cache.map((key, value) => MapEntry(key, value.toJson()));
-    await _store?.write(_key, data);
+    final store = _store;
+    if (shouldCommit == null) {
+      await store?.write(_key, data);
+      return true;
+    }
+    if (store == null) return shouldCommit();
+    return store.writeIf(_key, data, shouldCommit);
   }
 
   Future<bool> isFavorite(String itemId) async =>
       (await _all()).containsKey(itemId);
 
-  Future<void> add(AIOStreamsFavoriteItem item) =>
-      _mutationQueue.run(() => _add(item));
+  Future<void> add(AIOStreamsFavoriteItem item) {
+    final shouldCommit = captureMutationOwnership?.call();
+    return _mutationQueue.run(() => _add(item, shouldCommit: shouldCommit));
+  }
 
-  Future<void> _add(AIOStreamsFavoriteItem item) async {
+  Future<void> _add(
+    AIOStreamsFavoriteItem item, {
+    AIOStreamsMutationOwnership? shouldCommit,
+  }) async {
     final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
     cache[item.id] = item;
-    await _persist(cache);
+    if (!await _persist(cache, shouldCommit: shouldCommit)) return;
+    if (shouldCommit != null && !shouldCommit()) return;
     _cache = cache;
     notifyListeners();
     onAdded?.call(item);
   }
 
-  Future<void> remove(String itemId) =>
-      _mutationQueue.run(() => _remove(itemId));
+  Future<void> remove(String itemId) {
+    final shouldCommit = captureMutationOwnership?.call();
+    return _mutationQueue.run(
+      () => _remove(itemId, shouldCommit: shouldCommit),
+    );
+  }
 
-  Future<void> _remove(String itemId) async {
+  Future<void> _remove(
+    String itemId, {
+    AIOStreamsMutationOwnership? shouldCommit,
+  }) async {
     final cache = Map<String, AIOStreamsFavoriteItem>.of(
       await _all(),
     )..remove(itemId);
-    await _persist(cache);
+    if (!await _persist(cache, shouldCommit: shouldCommit)) return;
+    if (shouldCommit != null && !shouldCommit()) return;
     _cache = cache;
     notifyListeners();
     onRemoved?.call(itemId);
   }
 
-  Future<bool> toggle(AIOStreamsFavoriteItem item) => _mutationQueue.run(
-    () async {
+  Future<bool> toggle(AIOStreamsFavoriteItem item) {
+    final shouldCommit = captureMutationOwnership?.call();
+    return _mutationQueue.run(() async {
       if ((await _all()).containsKey(item.id)) {
-        await _remove(item.id);
+        await _remove(item.id, shouldCommit: shouldCommit);
         return false;
       } else {
-        await _add(item);
+        await _add(item, shouldCommit: shouldCommit);
         return true;
       }
-    },
-  );
+    });
+  }
 
   /// Applies a favorite/unfavorite pushed from another device (e.g. a Reverb
   /// `favorite.toggled` event) without re-triggering [onAdded]/[onRemoved]. A
@@ -134,18 +164,22 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     String itemId, {
     required bool favorited,
     AIOStreamsFavoriteItem? item,
-  }) => _mutationQueue.run(() async {
-    final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
-    if (favorited) {
-      if (item == null) return;
-      cache[itemId] = item;
-    } else {
-      if (cache.remove(itemId) == null) return;
-    }
-    await _persist(cache);
-    _cache = cache;
-    notifyListeners();
-  });
+  }) {
+    final shouldCommit = captureMutationOwnership?.call();
+    return _mutationQueue.run(() async {
+      final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
+      if (favorited) {
+        if (item == null) return;
+        cache[itemId] = item;
+      } else {
+        if (cache.remove(itemId) == null) return;
+      }
+      if (!await _persist(cache, shouldCommit: shouldCommit)) return;
+      if (shouldCommit != null && !shouldCommit()) return;
+      _cache = cache;
+      notifyListeners();
+    });
+  }
 
   /// Overwrites the full local set from the server's authoritative list
   /// (e.g. after `get_favorites` on connect/viewer switch), without
@@ -153,23 +187,23 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   Future<bool> replaceAll(
     Iterable<AIOStreamsFavoriteItem> items, {
     bool Function()? shouldCommit,
-  }) => _mutationQueue.run(() async {
-    final cache = {for (final item in items) item.id: item};
-    if (shouldCommit == null) {
-      await _persist(cache);
+  }) {
+    final capturedOwnership = captureMutationOwnership?.call();
+    final canCommit = switch ((capturedOwnership, shouldCommit)) {
+      (final ownership?, final requested?) => () => ownership() && requested(),
+      (final ownership?, null) => ownership,
+      (null, final requested?) => requested,
+      (null, null) => null,
+    };
+    return _mutationQueue.run(() async {
+      final cache = {for (final item in items) item.id: item};
+      if (!await _persist(cache, shouldCommit: canCommit)) return false;
+      if (canCommit != null && !canCommit()) return false;
       _cache = cache;
-    } else {
-      final data = cache.map((key, value) => MapEntry(key, value.toJson()));
-      final store = _store;
-      if (store != null && !await store.writeIf(_key, data, shouldCommit)) {
-        return false;
-      }
-      if (!shouldCommit()) return false;
-      _cache = cache;
-    }
-    notifyListeners();
-    return true;
-  });
+      notifyListeners();
+      return true;
+    });
+  }
 
   /// Returns favorites in most-recently-added order (reversed insertion).
   Future<List<AIOStreamsFavoriteItem>> all() async =>

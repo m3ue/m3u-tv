@@ -119,6 +119,8 @@ class AppStateController extends ChangeNotifier {
         _pushFavoriteChange('vod', streamId, favorited: favorited);
     seriesFavoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('series', streamId, favorited: favorited);
+    aioFavoritesService.captureMutationOwnership =
+        _captureAioFavoriteMutationOwnership;
     aioFavoritesService.onAdded = _pushAioFavoriteAdded;
     aioFavoritesService.onRemoved = _pushAioFavoriteRemoved;
   }
@@ -166,6 +168,7 @@ class AppStateController extends ChangeNotifier {
   final Set<String> _activatedNotificationIds = <String>{};
   final Generation _notificationSessionGeneration = Generation();
   final Generation _sourceOperationGeneration = Generation();
+  final Generation _sourceRollbackGeneration = Generation();
   final Generation _viewerOperationGeneration = Generation();
   final SerialQueue _sourceReplacementQueue = SerialQueue();
   int _sourceReplacementOwners = 0;
@@ -383,8 +386,14 @@ class AppStateController extends ChangeNotifier {
 
   Future<bool> connectXtream(UserCredentials credentials) {
     final sourceGeneration = _sourceOperationGeneration.advance();
+    final rollbackGeneration = _sourceRollbackGeneration.current;
     if (_sourceReplacementOwners == 0) {
-      return _connectXtream(credentials, sourceGeneration, ownsQueue: false);
+      return _connectXtream(
+        credentials,
+        sourceGeneration,
+        rollbackGeneration: rollbackGeneration,
+        ownsQueue: false,
+      );
     }
     return _sourceReplacementQueue.run(() async {
       _sourceReplacementOwners += 1;
@@ -392,6 +401,7 @@ class AppStateController extends ChangeNotifier {
         return await _connectXtream(
           credentials,
           sourceGeneration,
+          rollbackGeneration: rollbackGeneration,
           ownsQueue: true,
         );
       } finally {
@@ -403,6 +413,7 @@ class AppStateController extends ChangeNotifier {
   Future<bool> _connectXtream(
     UserCredentials credentials,
     int sourceGeneration, {
+    required int rollbackGeneration,
     required bool ownsQueue,
   }) async {
     final notificationGeneration = _notificationSessionGeneration.advance();
@@ -419,19 +430,37 @@ class AppStateController extends ChangeNotifier {
         !_sameCredentials(previousCredentials, credentials);
     var restoredPreviousSource = false;
     Future<void> restorePreviousSource({required bool allowStaleSource}) async {
+      if (_sourceRollbackGeneration.isStale(rollbackGeneration)) {
+        if (_sourceType == AppSourceType.none) {
+          await _bestEffort(cacheService.clear);
+        }
+        return;
+      }
       if (restoredPreviousSource) return;
       restoredPreviousSource = true;
-      await _bestEffort(() => authNotifier.restoreSession(previousAuthSession));
-      await _bestEffort(() => cacheService.restore(previousCache));
-      await _bestEffort(() => _restoreSource(previousSource));
+      await _bestEffort(() async {
+        if (_sourceRollbackGeneration.isStale(rollbackGeneration)) return;
+        await authNotifier.restoreSession(previousAuthSession);
+      });
+      await _bestEffort(() async {
+        if (_sourceRollbackGeneration.isStale(rollbackGeneration)) return;
+        await cacheService.restore(previousCache);
+      });
+      await _bestEffort(() async {
+        if (_sourceRollbackGeneration.isStale(rollbackGeneration)) return;
+        await _restoreSource(previousSource);
+      });
       if (replacingNotificationSession) {
         await _bestEffort(
-          () => _restoreNotificationSession(
-            previousCredentials,
-            sourceGeneration: sourceGeneration,
-            notificationGeneration: notificationGeneration,
-            allowStaleSource: allowStaleSource,
-          ),
+          () async {
+            if (_sourceRollbackGeneration.isStale(rollbackGeneration)) return;
+            await _restoreNotificationSession(
+              previousCredentials,
+              sourceGeneration: sourceGeneration,
+              notificationGeneration: notificationGeneration,
+              allowStaleSource: allowStaleSource,
+            );
+          },
         );
       }
     }
@@ -547,6 +576,7 @@ class AppStateController extends ChangeNotifier {
     try {
       final playlist = m3uParser.parse(playlistText);
       final sourceGeneration = _sourceOperationGeneration.advance();
+      _sourceRollbackGeneration.advance();
       _notificationSessionGeneration.advance();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
@@ -1029,6 +1059,18 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
+  AIOStreamsMutationOwnership _captureAioFavoriteMutationOwnership() {
+    final sourceGeneration = _sourceOperationGeneration.current;
+    final viewerGeneration = _viewerOperationGeneration.current;
+    final sourceType = _sourceType;
+    final viewerUlid = _activeViewer?.ulid;
+    return () =>
+        !_sourceOperationGeneration.isStale(sourceGeneration) &&
+        !_viewerOperationGeneration.isStale(viewerGeneration) &&
+        _sourceType == sourceType &&
+        _activeViewer?.ulid == viewerUlid;
+  }
+
   void _pushAioFavoriteRemoved(String itemId) {
     if (_sourceType != AppSourceType.xtream) return;
     final viewer = _activeViewer;
@@ -1260,6 +1302,7 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
+    _sourceRollbackGeneration.advance();
     _isLoadingContent = false;
     _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
@@ -1269,6 +1312,8 @@ class AppStateController extends ChangeNotifier {
     await _reverbService.disconnect();
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await authNotifier.disconnect();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    await cacheService.clear();
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
