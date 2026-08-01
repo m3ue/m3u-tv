@@ -134,6 +134,408 @@ void main() {
       },
     );
 
+    test('local add failure keeps committed cache unpublished', () async {
+      const prior = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Prior Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        prior.id: prior.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      expect((await service.all()).map((favorite) => favorite.id), <String>[
+        prior.id,
+      ]);
+      var notifications = 0;
+      var added = 0;
+      service
+        ..addListener(() => notifications += 1)
+        ..onAdded = (_) => added += 1;
+      final write = store.blockNextWrite(fail: true);
+
+      final add = service.add(item);
+      await write.started.future;
+      final visibleWhileBlocked = (await service.all())
+          .map((favorite) => favorite.id)
+          .toSet();
+      final persistedWhileBlocked = _persistedFavoriteIds(
+        await store.snapshot(),
+      );
+      write.release.complete();
+      await expectLater(add, throwsA(isA<StateError>()));
+
+      expect(
+        <String, Set<Object?>>{
+          'visible while blocked': visibleWhileBlocked,
+          'persisted while blocked': persistedWhileBlocked,
+          'visible after failure': (await service.all())
+              .map((favorite) => favorite.id)
+              .toSet(),
+          'persisted after failure': _persistedFavoriteIds(
+            await store.snapshot(),
+          ),
+        },
+        <String, Set<Object?>>{
+          'visible while blocked': <String>{prior.id},
+          'persisted while blocked': <String>{prior.id},
+          'visible after failure': <String>{prior.id},
+          'persisted after failure': <String>{prior.id},
+        },
+      );
+      expect(notifications, 0);
+      expect(added, 0);
+    });
+
+    test('local add publishes once after persistence succeeds', () async {
+      const prior = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Prior Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        prior.id: prior.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      final events = <String>[];
+      service
+        ..addListener(() => events.add('listener'))
+        ..onAdded = (favorite) => events.add('added:${favorite.id}');
+      final write = store.blockNextWrite(fail: false);
+
+      final add = service.add(item);
+      await write.started.future;
+      expect(await service.isFavorite(item.id), isFalse);
+      expect(await _favoriteIds(service), <String>[prior.id]);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{prior.id});
+      expect(events, isEmpty);
+
+      write.release.complete();
+      await add;
+
+      expect(
+        (await service.all()).map((favorite) => favorite.id),
+        <String>[item.id, prior.id],
+      );
+      expect(await service.isFavorite(item.id), isTrue);
+      expect(
+        (await store.snapshot())['aio_favorites'],
+        <String, Object?>{prior.id: prior.toJson(), item.id: item.toJson()},
+      );
+      expect(events, <String>['listener', 'added:${item.id}']);
+    });
+
+    test('local remove failure keeps committed cache published', () async {
+      const prior = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Prior Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        prior.id: prior.toJson(),
+        item.id: item.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      var notifications = 0;
+      var removed = 0;
+      service
+        ..addListener(() => notifications += 1)
+        ..onRemoved = (_) => removed += 1;
+      final write = store.blockNextWrite(fail: true);
+
+      final remove = service.remove(item.id);
+      await write.started.future;
+      expect(await service.isFavorite(item.id), isTrue);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{
+        prior.id,
+        item.id,
+      });
+      write.release.complete();
+      await expectLater(remove, throwsA(isA<StateError>()));
+
+      expect(await service.isFavorite(item.id), isTrue);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{
+        prior.id,
+        item.id,
+      });
+      expect(notifications, 0);
+      expect(removed, 0);
+    });
+
+    test('local remove publishes once after persistence succeeds', () async {
+      const prior = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Prior Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        prior.id: prior.toJson(),
+        item.id: item.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      final events = <String>[];
+      service
+        ..addListener(() => events.add('listener'))
+        ..onRemoved = (itemId) => events.add('removed:$itemId');
+      final write = store.blockNextWrite(fail: false);
+
+      final remove = service.remove(item.id);
+      await write.started.future;
+      expect(await service.isFavorite(item.id), isTrue);
+      expect(events, isEmpty);
+
+      write.release.complete();
+      await remove;
+
+      expect(await _favoriteIds(service), <String>[prior.id]);
+      expect(await service.isFavorite(item.id), isFalse);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{prior.id});
+      expect(events, <String>['listener', 'removed:${item.id}']);
+    });
+
+    test(
+      'toggle completes through one queued copy-on-write mutation',
+      () async {
+        final store = _ControlledFavoritesStore();
+        await store.write('aio_favorites', <String, Object?>{});
+        final service = AIOStreamsFavoritesService(store: store);
+        await service.all();
+        final events = <String>[];
+        service
+          ..onAdded = (favorite) {
+            events.add('added:${favorite.id}');
+          }
+          ..onRemoved = (itemId) => events.add('removed:$itemId');
+        final write = store.blockNextWrite(fail: false);
+
+        final added = service.toggle(item);
+        await write.started.future;
+        expect(await service.isFavorite(item.id), isFalse);
+        write.release.complete();
+        expect(
+          await added.timeout(const Duration(seconds: 1)),
+          isTrue,
+        );
+        expect(await service.isFavorite(item.id), isTrue);
+
+        expect(
+          await service.toggle(item).timeout(const Duration(seconds: 1)),
+          isFalse,
+        );
+        expect(await service.isFavorite(item.id), isFalse);
+        expect(events, <String>['added:${item.id}', 'removed:${item.id}']);
+      },
+    );
+
+    test(
+      'remote changes publish after persistence without local callbacks',
+      () async {
+        const prior = AIOStreamsFavoriteItem(
+          id: 'tt9999999',
+          type: 'series',
+          name: 'Prior Show',
+          integrationId: 3,
+        );
+        final store = _ControlledFavoritesStore();
+        await store.write('aio_favorites', <String, Object?>{
+          prior.id: prior.toJson(),
+        });
+        final service = AIOStreamsFavoritesService(store: store);
+        await service.all();
+        var notifications = 0;
+        var localCallbacks = 0;
+        service
+          ..addListener(() => notifications += 1)
+          ..onAdded = (_) {
+            localCallbacks += 1;
+          }
+          ..onRemoved = (_) => localCallbacks += 1;
+
+        final addWrite = store.blockNextWrite(fail: false);
+        final add = service.applyRemote(item.id, favorited: true, item: item);
+        await addWrite.started.future;
+        expect(await service.isFavorite(item.id), isFalse);
+        expect(notifications, 0);
+        addWrite.release.complete();
+        await add;
+        expect(await service.isFavorite(item.id), isTrue);
+        expect(notifications, 1);
+
+        final removeWrite = store.blockNextWrite(fail: false);
+        final remove = service.applyRemote(item.id, favorited: false);
+        await removeWrite.started.future;
+        expect(await service.isFavorite(item.id), isTrue);
+        expect(notifications, 1);
+        removeWrite.release.complete();
+        await remove;
+
+        expect(await _favoriteIds(service), <String>[prior.id]);
+        expect(_persistedFavoriteIds(await store.snapshot()), <String>{
+          prior.id,
+        });
+        expect(notifications, 2);
+        expect(localCallbacks, 0);
+      },
+    );
+
+    test('remote add failure leaves committed state unchanged', () async {
+      const prior = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Prior Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        prior.id: prior.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      var notifications = 0;
+      service.addListener(() => notifications += 1);
+      final write = store.blockNextWrite(fail: true);
+
+      final add = service.applyRemote(item.id, favorited: true, item: item);
+      await write.started.future;
+      expect(await service.isFavorite(item.id), isFalse);
+      write.release.complete();
+      await expectLater(add, throwsA(isA<StateError>()));
+
+      expect(await _favoriteIds(service), <String>[prior.id]);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{prior.id});
+      expect(notifications, 0);
+    });
+
+    test(
+      'unconditional replacement publishes only after persistence',
+      () async {
+        const prior = AIOStreamsFavoriteItem(
+          id: 'tt9999999',
+          type: 'series',
+          name: 'Prior Show',
+          integrationId: 3,
+        );
+        final store = _ControlledFavoritesStore();
+        await store.write('aio_favorites', <String, Object?>{
+          prior.id: prior.toJson(),
+        });
+        final service = AIOStreamsFavoritesService(store: store);
+        await service.all();
+        var notifications = 0;
+        var localCallbacks = 0;
+        service
+          ..addListener(() => notifications += 1)
+          ..onAdded = (_) {
+            localCallbacks += 1;
+          }
+          ..onRemoved = (_) => localCallbacks += 1;
+
+        final failedWrite = store.blockNextWrite(fail: true);
+        final failedReplacement = service.replaceAll(<AIOStreamsFavoriteItem>[
+          item,
+        ]);
+        await failedWrite.started.future;
+        expect(await _favoriteIds(service), <String>[prior.id]);
+        failedWrite.release.complete();
+        await expectLater(failedReplacement, throwsA(isA<StateError>()));
+        expect(await _favoriteIds(service), <String>[prior.id]);
+        expect(notifications, 0);
+
+        final successfulWrite = store.blockNextWrite(fail: false);
+        final successfulReplacement = service.replaceAll(
+          <AIOStreamsFavoriteItem>[item],
+        );
+        await successfulWrite.started.future;
+        expect(await _favoriteIds(service), <String>[prior.id]);
+        expect(notifications, 0);
+        successfulWrite.release.complete();
+        expect(await successfulReplacement, isTrue);
+
+        expect(await _favoriteIds(service), <String>[item.id]);
+        expect(
+          (await store.snapshot())['aio_favorites'],
+          <String, Object?>{item.id: item.toJson()},
+        );
+        expect(notifications, 1);
+        expect(localCallbacks, 0);
+      },
+    );
+
+    test('conditional replacement checks ownership before writing', () async {
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        item.id: item.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      var checks = 0;
+      var notifications = 0;
+      service.addListener(() => notifications += 1);
+
+      expect(
+        await service.replaceAll(
+          const <AIOStreamsFavoriteItem>[],
+          shouldCommit: () {
+            checks += 1;
+            return false;
+          },
+        ),
+        isFalse,
+      );
+
+      expect(checks, 1);
+      expect(await _favoriteIds(service), <String>[item.id]);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{item.id});
+      expect(notifications, 0);
+    });
+
+    test('conditional replacement rolls back stale persisted work', () async {
+      const remote = AIOStreamsFavoriteItem(
+        id: 'tt9999999',
+        type: 'series',
+        name: 'Remote Show',
+        integrationId: 3,
+      );
+      final store = _ControlledFavoritesStore();
+      await store.write('aio_favorites', <String, Object?>{
+        item.id: item.toJson(),
+      });
+      final service = AIOStreamsFavoritesService(store: store);
+      await service.all();
+      var current = true;
+      var checks = 0;
+      var notifications = 0;
+      service.addListener(() => notifications += 1);
+
+      final replacement = service.replaceAll(
+        const <AIOStreamsFavoriteItem>[remote],
+        shouldCommit: () {
+          checks += 1;
+          return current;
+        },
+      );
+      await store.conditionalWriteStarted.future;
+      current = false;
+      store.releaseConditionalWrite.complete();
+
+      expect(await replacement, isFalse);
+      expect(checks, 2);
+      expect(await _favoriteIds(service), <String>[item.id]);
+      expect(_persistedFavoriteIds(await store.snapshot()), <String>{item.id});
+      expect(notifications, 0);
+    });
+
     test(
       'local add survives a pending conditional replacement',
       () async {
@@ -403,6 +805,13 @@ class _ControlledFavoritesStore extends PersistentJsonStore {
   final releaseConditionalWrite = Completer<void>();
   final _conditionalWriteCompleted = Completer<void>();
   final _data = <String, Object?>{};
+  _ControlledWrite? _ordinaryWrite;
+
+  _ControlledWrite blockNextWrite({required bool fail}) {
+    final write = _ControlledWrite(fail: fail);
+    _ordinaryWrite = write;
+    return write;
+  }
 
   @override
   Future<Object?> read(String key) async {
@@ -418,6 +827,13 @@ class _ControlledFavoritesStore extends PersistentJsonStore {
     if (conditionalWriteStarted.isCompleted &&
         !_conditionalWriteCompleted.isCompleted) {
       await _conditionalWriteCompleted.future;
+    }
+    final write = _ordinaryWrite;
+    if (write != null) {
+      write.started.complete();
+      await write.release.future;
+      _ordinaryWrite = null;
+      if (write.fail) throw StateError('controlled write failure');
     }
     _data[key] = value;
   }
@@ -451,3 +867,17 @@ class _ControlledFavoritesStore extends PersistentJsonStore {
     return Map<String, Object?>.from(_data);
   }
 }
+
+class _ControlledWrite {
+  _ControlledWrite({required this.fail});
+
+  final bool fail;
+  final started = Completer<void>();
+  final release = Completer<void>();
+}
+
+Set<Object?> _persistedFavoriteIds(Map<String, Object?> snapshot) =>
+    (snapshot['aio_favorites']! as Map<Object?, Object?>).keys.toSet();
+
+Future<List<String>> _favoriteIds(AIOStreamsFavoritesService service) async =>
+    (await service.all()).map((favorite) => favorite.id).toList();

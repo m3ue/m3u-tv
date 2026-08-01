@@ -80,9 +80,9 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     return _cache!;
   }
 
-  Future<void> _persist() async {
-    final data = _cache?.map((k, v) => MapEntry(k, v.toJson()));
-    await _store?.write(_key, data ?? {});
+  Future<void> _persist(Map<String, AIOStreamsFavoriteItem> cache) async {
+    final data = cache.map((key, value) => MapEntry(key, value.toJson()));
+    await _store?.write(_key, data);
   }
 
   Future<bool> isFavorite(String itemId) async =>
@@ -92,9 +92,10 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
       _mutationQueue.run(() => _add(item));
 
   Future<void> _add(AIOStreamsFavoriteItem item) async {
-    final all = await _all();
-    all[item.id] = item;
-    await _persist();
+    final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
+    cache[item.id] = item;
+    await _persist(cache);
+    _cache = cache;
     notifyListeners();
     onAdded?.call(item);
   }
@@ -103,9 +104,11 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
       _mutationQueue.run(() => _remove(itemId));
 
   Future<void> _remove(String itemId) async {
-    final all = await _all();
-    all.remove(itemId);
-    await _persist();
+    final cache = Map<String, AIOStreamsFavoriteItem>.of(
+      await _all(),
+    )..remove(itemId);
+    await _persist(cache);
+    _cache = cache;
     notifyListeners();
     onRemoved?.call(itemId);
   }
@@ -132,14 +135,15 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     required bool favorited,
     AIOStreamsFavoriteItem? item,
   }) => _mutationQueue.run(() async {
-    final all = await _all();
+    final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
     if (favorited) {
       if (item == null) return;
-      all[itemId] = item;
+      cache[itemId] = item;
     } else {
-      if (all.remove(itemId) == null) return;
+      if (cache.remove(itemId) == null) return;
     }
-    await _persist();
+    await _persist(cache);
+    _cache = cache;
     notifyListeners();
   });
 
@@ -152,8 +156,8 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   }) => _mutationQueue.run(() async {
     final cache = {for (final item in items) item.id: item};
     if (shouldCommit == null) {
+      await _persist(cache);
       _cache = cache;
-      await _persist();
     } else {
       final data = cache.map((key, value) => MapEntry(key, value.toJson()));
       final store = _store;
