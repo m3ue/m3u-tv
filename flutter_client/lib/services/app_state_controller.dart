@@ -312,6 +312,7 @@ class AppStateController extends ChangeNotifier {
         savedSource == AppSourceType.none) {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
+        _resetEpgSession();
         final credentials = authNotifier.credentials!;
         final notificationGeneration = _notificationSessionGeneration.advance();
         if (await _hydrateCachedXtreamContent()) {
@@ -378,6 +379,7 @@ class AppStateController extends ChangeNotifier {
     // until some future connect attempt happens to fully succeed.
     _pushRegistrationSuspended = false;
 
+    _resetEpgSession();
     final loaded = await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -398,6 +400,7 @@ class AppStateController extends ChangeNotifier {
 
     try {
       final playlist = m3uParser.parse(playlistText);
+      _resetEpgSession();
       _notificationSessionGeneration.advance();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
@@ -1058,6 +1061,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _resetEpgSession();
     _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
     _pushLifecycleGeneration.advance();
@@ -1113,6 +1117,7 @@ class AppStateController extends ChangeNotifier {
       await boot();
       return;
     }
+    _resetEpgSession(clearGuide: false);
     await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -1680,6 +1685,10 @@ class AppStateController extends ChangeNotifier {
         );
       }
     } on Object catch (e) {
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        return;
+      }
       if (rangeKey.isEmpty) {
         epgService.markFetched(channelIds);
       } else {
@@ -1733,6 +1742,18 @@ class AppStateController extends ChangeNotifier {
     for (final channel in channels) {
       _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
     }
+  }
+
+  void _resetEpgSession({bool clearGuide = true}) {
+    _epgRequestGeneration += 1;
+    _epgFetchDebounce?.cancel();
+    _epgFetchDebounce = null;
+    _pendingEpgChannelIds.clear();
+    _fetchedEpgRanges.clear();
+    _pendingEpgStartDate = null;
+    _pendingEpgEndDate = null;
+    _activeEpgRangeKey = '';
+    if (clearGuide) epgService.clear();
   }
 
   Future<void> _loadSavedM3uSource() async {
@@ -1800,6 +1821,7 @@ class AppStateController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _epgRequestGeneration += 1;
     _epgFetchDebounce?.cancel();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());

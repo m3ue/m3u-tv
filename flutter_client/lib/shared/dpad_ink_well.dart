@@ -22,6 +22,7 @@ class DpadInkWell extends StatefulWidget {
     this.onLongTap,
     this.effects,
     this.autofocus = false,
+    this.enabled = true,
     this.entry = false,
     this.color,
     this.borderRadius,
@@ -34,6 +35,7 @@ class DpadInkWell extends StatefulWidget {
   final VoidCallback? onLongTap;
   final List<DpadEffect>? effects;
   final bool autofocus;
+  final bool enabled;
   final bool entry;
   final Color? color;
   final BorderRadius? borderRadius;
@@ -55,11 +57,13 @@ class _DpadInkWellState extends State<DpadInkWell> {
   }
 
   void _onTap() {
+    if (!widget.enabled) return;
     _focusNode.requestFocus();
     widget.onTap?.call();
   }
 
-  bool get _isInteractive => widget.onTap != null || widget.onLongTap != null;
+  bool get _isInteractive =>
+      widget.enabled && (widget.onTap != null || widget.onLongTap != null);
 
   void _setHovered(bool hovered) {
     if (!_isInteractive || _hovered == hovered) return;
@@ -90,6 +94,7 @@ class _DpadInkWellState extends State<DpadInkWell> {
         focusNode: _focusNode,
         onSelect: widget.onTap == null ? null : _onTap,
         onLongSelect: widget.onLongTap,
+        enabled: widget.enabled,
         // InkWell handles touch taps; DpadFocusable.onSelect handles D-pad key
         // events. The default tapToSelect: true wraps the child in a
         // GestureDetector whose onTapDown calls requestFocus() before the
@@ -114,8 +119,8 @@ class _DpadInkWellState extends State<DpadInkWell> {
           borderRadius: widget.borderRadius,
           clipBehavior: widget.clipBehavior,
           child: InkWell(
-            onTap: widget.onTap == null ? null : _onTap,
-            onLongPress: widget.onLongTap,
+            onTap: widget.enabled && widget.onTap != null ? _onTap : null,
+            onLongPress: widget.enabled ? widget.onLongTap : null,
             borderRadius: widget.borderRadius,
             child: widget.child,
           ),

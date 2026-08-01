@@ -810,6 +810,228 @@ void main() {
         );
       },
     );
+
+    test('ranged EPG freshness is isolated between Xtream sessions', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final rangedRequestUsers = <String>[];
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        rangedRequestUsers.add(request.credentials.username);
+        return _epgResponse(
+          '${request.credentials.username} guide',
+          DateTime.utc(2026, 7, 30, 12),
+        );
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'provider-a guide',
+      );
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        controller.epgService.programsForChannel(controller.channels.single),
+        isEmpty,
+      );
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(rangedRequestUsers, <String>['provider-a', 'provider-b']);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'provider-b guide',
+      );
+    });
+
+    test('old Xtream range completion cannot update a new session', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final oldRange = Completer<Object?>();
+      final newRange = Completer<Object?>();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        return request.credentials.username == 'provider-a'
+            ? oldRange.future
+            : newRange.future;
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      newRange.complete(
+        _epgResponse('Provider B guide', DateTime.utc(2026, 7, 30, 12)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+
+      oldRange.complete(
+        _epgResponse('Provider A guide', DateTime.utc(2026, 7, 30, 12)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+    });
+
+    test('old Xtream range failure cannot back off a new session', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final oldRange = Completer<Object?>();
+      var newSessionRequests = 0;
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        if (request.credentials.username == 'provider-a') {
+          return oldRange.future;
+        }
+        newSessionRequests += 1;
+        return _epgResponse('Provider B guide', DateTime.utc(2026, 7, 30, 12));
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      oldRange.completeError(StateError('Provider A guide failed'));
+      await Future<void>.delayed(Duration.zero);
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(newSessionRequests, 1);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+    });
   });
 }
 

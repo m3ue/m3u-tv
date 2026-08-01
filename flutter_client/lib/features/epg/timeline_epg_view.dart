@@ -87,7 +87,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _initWindow() {
     _windowStart = _selectedDate;
-    _windowEnd = _windowStart.add(Duration(hours: widget.windowHours));
+    _windowEnd = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      widget.windowHours,
+    );
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
   }
 
@@ -116,6 +121,9 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
+  DateTime _offsetDate(DateTime value, int days) =>
+      DateTime(value.year, value.month, value.day + days);
+
   int get _maxCatchupDays => widget.channels
       .where((channel) => channel.catchupSupported)
       .map((channel) => channel.catchupDays ?? 0)
@@ -123,13 +131,14 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _selectDate(DateTime date) {
     final today = _dateOnly(widget.clock());
-    final earliest = today.subtract(Duration(days: _maxCatchupDays));
-    final latest = today.add(Duration(days: widget.futureDays));
-    final selected = date.isBefore(earliest)
+    final earliest = _offsetDate(today, -_maxCatchupDays);
+    final latest = _offsetDate(today, widget.futureDays);
+    final requested = _dateOnly(date);
+    final selected = requested.isBefore(earliest)
         ? earliest
-        : date.isAfter(latest)
+        : requested.isAfter(latest)
         ? latest
-        : date;
+        : requested;
     if (selected == _selectedDate) return;
     setState(() {
       _selectedDate = selected;
@@ -177,11 +186,11 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       }
       _rowHCtrls = _makeRowCtrls(widget.channels.length);
     }
-    final earliest = _dateOnly(
-      widget.clock(),
-    ).subtract(Duration(days: _maxCatchupDays));
-    if (_selectedDate.isBefore(earliest)) {
-      _selectedDate = earliest;
+    final today = _dateOnly(widget.clock());
+    final earliest = _offsetDate(today, -_maxCatchupDays);
+    final latest = _offsetDate(today, widget.futureDays);
+    if (_selectedDate.isBefore(earliest) || _selectedDate.isAfter(latest)) {
+      _selectedDate = _selectedDate.isBefore(earliest) ? earliest : latest;
       _initWindow();
     }
   }
@@ -209,16 +218,14 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
         _DayControls(
           selectedDate: _selectedDate,
           canGoPrevious: _selectedDate.isAfter(
-            _dateOnly(now).subtract(Duration(days: _maxCatchupDays)),
+            _offsetDate(now, -_maxCatchupDays),
           ),
           canGoNext: _selectedDate.isBefore(
-            _dateOnly(now).add(Duration(days: widget.futureDays)),
+            _offsetDate(now, widget.futureDays),
           ),
-          onPrevious: () => _selectDate(
-            _selectedDate.subtract(const Duration(days: 1)),
-          ),
+          onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
           onNow: () => _selectDate(_dateOnly(widget.clock())),
-          onNext: () => _selectDate(_selectedDate.add(const Duration(days: 1))),
+          onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
         ),
         Expanded(
           child: Row(
@@ -455,6 +462,7 @@ class _DayControls extends StatelessWidget {
             key: const ValueKey('timeline-previous-day'),
             onTap: canGoPrevious ? onPrevious : null,
             autofocus: canGoPrevious,
+            enabled: canGoPrevious,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.all(5),
@@ -501,6 +509,7 @@ class _DayControls extends StatelessWidget {
           DpadInkWell(
             key: const ValueKey('timeline-next-day'),
             onTap: canGoNext ? onNext : null,
+            enabled: canGoNext,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.all(5),
@@ -826,5 +835,15 @@ bool _canReplay(
   if (!catchupSupported || !program.end.isBefore(now)) return false;
   if (catchupDays == null) return true;
   if (catchupDays <= 0) return false;
-  return !program.start.isBefore(now.subtract(Duration(days: catchupDays)));
+  final earliest = DateTime(
+    now.year,
+    now.month,
+    now.day - catchupDays,
+    now.hour,
+    now.minute,
+    now.second,
+    now.millisecond,
+    now.microsecond,
+  );
+  return !program.start.isBefore(earliest);
 }

@@ -9,6 +9,12 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 void main() {
+  final observesBerlinDst =
+      DateTime(2026, 3, 29).timeZoneOffset == const Duration(hours: 1) &&
+      DateTime(2026, 3, 30).timeZoneOffset == const Duration(hours: 2) &&
+      DateTime(2026, 10, 25).timeZoneOffset == const Duration(hours: 2) &&
+      DateTime(2026, 10, 26).timeZoneOffset == const Duration(hours: 1);
+
   group('TimelineEpgView', () {
     testWidgets('catchup channels show replay availability indicator', (
       tester,
@@ -367,6 +373,121 @@ void main() {
       }
     });
 
+    testWidgets(
+      'spring-forward navigation and window keep calendar boundaries',
+      (tester) async {
+        final now = DateTime(2026, 3, 30, 12);
+        final lateProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Late Sunday',
+          description: 'Inside Sunday',
+          start: DateTime(2026, 3, 29, 23, 30),
+          end: DateTime(2026, 3, 29, 23, 50),
+        );
+        final nextDayProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Early Monday',
+          description: 'Outside Sunday',
+          start: DateTime(2026, 3, 30, 0, 15),
+          end: DateTime(2026, 3, 30, 0, 45),
+        );
+        final epg = EpgService(clock: () => now)
+          ..loadPrograms([lateProgram, nextDayProgram]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                      epgChannelId: 'bbc.one',
+                      catchupSupported: true,
+                      catchupDays: 7,
+                    ),
+                  ],
+                  epgService: epg,
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+        await tester.pump();
+
+        expect(find.text('Mar 29, 2026'), findsOneWidget);
+        expect(find.text('Late Sunday'), findsOneWidget);
+        expect(find.text('Early Monday'), findsNothing);
+      },
+      skip: !observesBerlinDst,
+    );
+
+    testWidgets(
+      'fall-back navigation and window keep calendar boundaries',
+      (tester) async {
+        final now = DateTime(2026, 10, 24, 12);
+        final lateProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Late Sunday',
+          description: 'Inside Sunday',
+          start: DateTime(2026, 10, 25, 23, 30),
+          end: DateTime(2026, 10, 25, 23, 50),
+        );
+        final epg = EpgService(clock: () => now)..loadPrograms([lateProgram]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                      epgChannelId: 'bbc.one',
+                    ),
+                  ],
+                  epgService: epg,
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+        await tester.pump();
+        expect(find.text('Oct 25, 2026'), findsOneWidget);
+        expect(find.text('Late Sunday'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+        await tester.pump();
+        expect(find.text('Oct 26, 2026'), findsOneWidget);
+        expect(find.text('Late Sunday'), findsNothing);
+      },
+      skip: !observesBerlinDst,
+    );
+
     testWidgets('keeps horizontal pointer scrolling available', (tester) async {
       final now = DateTime(2026, 7, 31, 12);
       await tester.pumpWidget(
@@ -469,6 +590,160 @@ void main() {
       expect(find.text('Jul 31, 2026'), findsOneWidget);
     });
 
+    testWidgets('D-pad skips disabled previous control at catchup boundary', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: DpadRegion(
+              child: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                      catchupSupported: true,
+                      catchupDays: 0,
+                    ),
+                  ],
+                  epgService: EpgService(clock: () => now),
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final previous = _dateControlFocusable(
+        tester,
+        const ValueKey('timeline-previous-day'),
+      );
+      expect(previous.enabled, isFalse);
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-now'),
+        ).focusNode?.hasFocus,
+        isTrue,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-now'),
+        ).focusNode?.hasFocus,
+        isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-next-day'),
+        ).focusNode?.hasFocus,
+        isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+    });
+
+    testWidgets('D-pad skips disabled next control at future boundary', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: DpadRegion(
+              child: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                      catchupSupported: true,
+                      catchupDays: 7,
+                    ),
+                  ],
+                  epgService: EpgService(clock: () => now),
+                  onChannelSelect: (_) {},
+                  futureDays: 0,
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-previous-day'),
+        ).focusNode?.hasFocus,
+        isTrue,
+      );
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-next-day'),
+        ).enabled,
+        isFalse,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(
+        _dateControlFocusable(
+          tester,
+          const ValueKey('timeline-now'),
+        ).focusNode?.hasFocus,
+        isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 30, 2026'), findsOneWidget);
+    });
+
     testWidgets('replay stays bounded by each channel catchup range', (
       tester,
     ) async {
@@ -558,4 +833,10 @@ void main() {
       );
     });
   });
+}
+
+DpadFocusable _dateControlFocusable(WidgetTester tester, ValueKey<String> key) {
+  return tester.widget<DpadFocusable>(
+    find.descendant(of: find.byKey(key), matching: find.byType(DpadFocusable)),
+  );
 }

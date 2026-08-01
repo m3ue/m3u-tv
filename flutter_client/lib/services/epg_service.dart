@@ -149,5 +149,6 @@ class EpgService extends ChangeNotifier {
     _programsByChannel.clear();
     _fetchedAtByChannel.clear();
     _loadedAt = null;
+    notifyListeners();
   }
 }
