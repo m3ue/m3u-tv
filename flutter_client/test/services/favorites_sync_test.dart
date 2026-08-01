@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
@@ -128,6 +131,50 @@ void main() {
         final all = await service.all();
         expect(all.map((i) => i.id), <String>['tt9999999']);
         expect(added, <String>['tt0111161']);
+      },
+    );
+
+    test(
+      'local add survives a pending conditional replacement',
+      () async {
+        const remote = AIOStreamsFavoriteItem(
+          id: 'tt9999999',
+          type: 'series',
+          name: 'Remote Show',
+          integrationId: 3,
+        );
+        final store = _ControlledFavoritesStore();
+        final service = AIOStreamsFavoritesService(store: store);
+        await service.all();
+
+        final replacement = service.replaceAll(
+          const <AIOStreamsFavoriteItem>[remote],
+          shouldCommit: () => true,
+        );
+        await store.conditionalWriteStarted.future;
+
+        final localAdd = service.add(item);
+        await pumpEventQueue();
+        store.releaseConditionalWrite.complete();
+        await replacement;
+        await localAdd;
+
+        final visibleIds = (await service.all())
+            .map((favorite) => favorite.id)
+            .toSet();
+        final persisted = await store.snapshot();
+        final persistedIds =
+            (persisted['aio_favorites']! as Map<Object?, Object?>).keys.toSet();
+        expect(
+          <String, Set<Object?>>{
+            'visible': visibleIds,
+            'persisted': persistedIds,
+          },
+          <String, Set<Object?>>{
+            'visible': <String>{remote.id, item.id},
+            'persisted': <String>{remote.id, item.id},
+          },
+        );
       },
     );
   });
@@ -348,5 +395,59 @@ class _FakeXtreamTransport {
       default:
         throw StateError('No fixture for $action');
     }
+  }
+}
+
+class _ControlledFavoritesStore extends PersistentJsonStore {
+  final conditionalWriteStarted = Completer<void>();
+  final releaseConditionalWrite = Completer<void>();
+  final _conditionalWriteCompleted = Completer<void>();
+  final _data = <String, Object?>{};
+
+  @override
+  Future<Object?> read(String key) async {
+    if (conditionalWriteStarted.isCompleted &&
+        !_conditionalWriteCompleted.isCompleted) {
+      await _conditionalWriteCompleted.future;
+    }
+    return _data[key];
+  }
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    if (conditionalWriteStarted.isCompleted &&
+        !_conditionalWriteCompleted.isCompleted) {
+      await _conditionalWriteCompleted.future;
+    }
+    _data[key] = value;
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    conditionalWriteStarted.complete();
+    try {
+      if (!shouldCommit()) return false;
+      final previous = _data[key];
+      await releaseConditionalWrite.future;
+      _data[key] = value;
+      if (shouldCommit()) return true;
+      _data[key] = previous;
+      return false;
+    } finally {
+      _conditionalWriteCompleted.complete();
+    }
+  }
+
+  @override
+  Future<Map<String, Object?>> snapshot() async {
+    if (conditionalWriteStarted.isCompleted &&
+        !_conditionalWriteCompleted.isCompleted) {
+      await _conditionalWriteCompleted.future;
+    }
+    return Map<String, Object?>.from(_data);
   }
 }

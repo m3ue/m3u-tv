@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 
 /// Metadata stored per AIOStreams favourite item.
@@ -44,6 +45,7 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   static const _key = 'aio_favorites';
 
   final PersistentJsonStore? _store;
+  final SerialQueue _mutationQueue = SerialQueue();
 
   /// In-memory cache so reads after the first load are synchronous.
   Map<String, AIOStreamsFavoriteItem>? _cache;
@@ -86,7 +88,10 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   Future<bool> isFavorite(String itemId) async =>
       (await _all()).containsKey(itemId);
 
-  Future<void> add(AIOStreamsFavoriteItem item) async {
+  Future<void> add(AIOStreamsFavoriteItem item) =>
+      _mutationQueue.run(() => _add(item));
+
+  Future<void> _add(AIOStreamsFavoriteItem item) async {
     final all = await _all();
     all[item.id] = item;
     await _persist();
@@ -94,7 +99,10 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     onAdded?.call(item);
   }
 
-  Future<void> remove(String itemId) async {
+  Future<void> remove(String itemId) =>
+      _mutationQueue.run(() => _remove(itemId));
+
+  Future<void> _remove(String itemId) async {
     final all = await _all();
     all.remove(itemId);
     await _persist();
@@ -102,15 +110,17 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     onRemoved?.call(itemId);
   }
 
-  Future<bool> toggle(AIOStreamsFavoriteItem item) async {
-    if (await isFavorite(item.id)) {
-      await remove(item.id);
-      return false;
-    } else {
-      await add(item);
-      return true;
-    }
-  }
+  Future<bool> toggle(AIOStreamsFavoriteItem item) => _mutationQueue.run(
+    () async {
+      if ((await _all()).containsKey(item.id)) {
+        await _remove(item.id);
+        return false;
+      } else {
+        await _add(item);
+        return true;
+      }
+    },
+  );
 
   /// Applies a favorite/unfavorite pushed from another device (e.g. a Reverb
   /// `favorite.toggled` event) without re-triggering [onAdded]/[onRemoved]. A
@@ -121,7 +131,7 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     String itemId, {
     required bool favorited,
     AIOStreamsFavoriteItem? item,
-  }) async {
+  }) => _mutationQueue.run(() async {
     final all = await _all();
     if (favorited) {
       if (item == null) return;
@@ -131,7 +141,7 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     }
     await _persist();
     notifyListeners();
-  }
+  });
 
   /// Overwrites the full local set from the server's authoritative list
   /// (e.g. after `get_favorites` on connect/viewer switch), without
@@ -139,7 +149,7 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   Future<bool> replaceAll(
     Iterable<AIOStreamsFavoriteItem> items, {
     bool Function()? shouldCommit,
-  }) async {
+  }) => _mutationQueue.run(() async {
     final cache = {for (final item in items) item.id: item};
     if (shouldCommit == null) {
       _cache = cache;
@@ -155,7 +165,7 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     }
     notifyListeners();
     return true;
-  }
+  });
 
   /// Returns favorites in most-recently-added order (reversed insertion).
   Future<List<AIOStreamsFavoriteItem>> all() async =>
