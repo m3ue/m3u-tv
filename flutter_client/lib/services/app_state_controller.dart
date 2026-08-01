@@ -1788,7 +1788,12 @@ class AppStateController extends ChangeNotifier {
         _sourceReplacementOwners -= 1;
       }
     } on Object catch (error) {
-      _error = _redact(userFacingXtreamError(error), xtreamService.credentials);
+      if (!_sourceOperationGeneration.isStale(sourceGeneration)) {
+        _error = _redact(
+          userFacingXtreamError(error),
+          xtreamService.credentials,
+        );
+      }
       return false;
     }
   }

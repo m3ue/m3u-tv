@@ -234,6 +234,50 @@ void main() {
     });
 
     test(
+      'stale failed Xtream replacement preserves newer source error',
+      () async {
+        final failedCatalog = Completer<Object?>();
+        final transport = _ThreeSourceXtreamTransport(
+          secondVodCategories: failedCatalog.future,
+          thirdHasViewer: false,
+        );
+        final reverb = _RecordingReverbService();
+        final fixture = _Fixture(
+          transport: transport.call,
+          notificationApi: _SessionTvNotificationService(),
+          reverbService: reverb,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
+        );
+        await transport.secondLiveCategoriesFetched.future;
+        expect(
+          await fixture.controller.connectXtream(_thirdCredentials),
+          isTrue,
+        );
+        await reverb.thirdConnected.future;
+        expect(fixture.controller.error, isNull);
+        var notifications = 0;
+        fixture.controller.addListener(() => notifications += 1);
+
+        failedCatalog.completeError(StateError('stale catalog unavailable'));
+        expect(await secondConnect, isFalse);
+        await pumpEventQueue();
+
+        expect(fixture.auth.credentials, _thirdCredentials);
+        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(fixture.controller.error, isNull);
+        expect(notifications, 0);
+      },
+    );
+
+    test(
       'disconnect clears loading while a catalog request is pending',
       () async {
         final transport = _RacingXtreamTransport();
@@ -270,9 +314,18 @@ void main() {
         _secondCredentials,
       );
       await transport.secondLiveCategoriesFetched.future;
-      failedCatalog.completeError(StateError('catalog unavailable'));
+      failedCatalog.completeError(
+        StateError(
+          'catalog unavailable for ${_secondCredentials.username}: '
+          '${_secondCredentials.password}',
+        ),
+      );
 
       expect(await secondConnect, isFalse);
+      expect(
+        fixture.controller.error,
+        'Bad state: catalog unavailable for [redacted]: [redacted]',
+      );
       final persistedCredentials =
           jsonDecode(
                 (await fixture.storage.read('m3ue_tv_credentials'))!,
@@ -1608,6 +1661,7 @@ class _RecordingReverbService extends ReverbService {
   final Completer<void> firstConnected = Completer<void>();
   final Completer<void> firstReconnected = Completer<void>();
   final Completer<void> secondConnected = Completer<void>();
+  final Completer<void> thirdConnected = Completer<void>();
   String? activeUser;
 
   @override
@@ -1636,6 +1690,7 @@ class _RecordingReverbService extends ReverbService {
       }
     }
     if (credentials.username == 'second') secondConnected.complete();
+    if (credentials.username == 'third') thirdConnected.complete();
   }
 }
 
@@ -1912,9 +1967,16 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
 }
 
 class _ThreeSourceXtreamTransport {
-  _ThreeSourceXtreamTransport({this.failThirdAuth = false});
+  _ThreeSourceXtreamTransport({
+    this.failThirdAuth = false,
+    this.secondVodCategories,
+    this.thirdHasViewer = true,
+  });
 
   final bool failThirdAuth;
+  final Future<Object?>? secondVodCategories;
+  final bool thirdHasViewer;
+  final Completer<void> secondLiveCategoriesFetched = Completer<void>();
 
   Future<Object?> call(XtreamRequest request) async {
     final username = request.credentials.username;
@@ -1938,6 +2000,9 @@ class _ThreeSourceXtreamTransport {
           'm3u_editor': <String, Object?>{'version': '0.10.0'},
         };
       case 'get_live_categories':
+        if (username == 'second' && !secondLiveCategoriesFetched.isCompleted) {
+          secondLiveCategoriesFetched.complete();
+        }
         return <Map<String, Object?>>[
           <String, Object?>{
             'category_id': 'live-$slug',
@@ -1945,6 +2010,9 @@ class _ThreeSourceXtreamTransport {
           },
         ];
       case 'get_vod_categories':
+        if (username == 'second' && secondVodCategories != null) {
+          return secondVodCategories;
+        }
         return <Map<String, Object?>>[
           <String, Object?>{
             'category_id': 'vod-$slug',
@@ -1985,6 +2053,7 @@ class _ThreeSourceXtreamTransport {
           },
         ];
       case 'get_viewers':
+        if (username == 'third' && !thirdHasViewer) return <Object?>[];
         return <Map<String, Object?>>[
           <String, Object?>{
             'id': 1 + offset,
