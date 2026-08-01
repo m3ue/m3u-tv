@@ -143,9 +143,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   void _loadEpgForChannels(List<Channel> channels, EpgService epgService) {
     for (final channel in channels) {
       final result = epgService.lookupForChannel(channel);
-      if (result != null) {
-        _epgMap[channel.id] = result;
-      }
+      _epgMap[channel.id] = result;
     }
   }
 

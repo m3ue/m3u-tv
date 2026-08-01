@@ -125,4 +125,57 @@ void main() {
       expect(recordedProgram?.title, 'Noon News');
     },
   );
+
+  testWidgets('list clears stale current and next guide data', (tester) async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+    final favorites = FavoritesService(memory: <String, Object?>{});
+    final epg = EpgService(clock: () => now)
+      ..loadPrograms([
+        EpgProgram(
+          channelId: 'news.epg',
+          title: 'Stale Noon News',
+          description: 'News',
+          start: now.subtract(const Duration(minutes: 30)),
+          end: now.add(const Duration(minutes: 30)),
+        ),
+      ]);
+    const channels = [
+      Channel(
+        id: 101,
+        name: 'Route News',
+        streamUrl: 'https://example.com/news.m3u8',
+        epgChannelId: 'news.epg',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isBootstrappingProvider.overrideWith((_) => false),
+          isConfiguredProvider.overrideWith((_) => true),
+          isLoadingContentProvider.overrideWith((_) => false),
+          liveChannelsProvider.overrideWith((_) => channels),
+          liveCategoriesProvider.overrideWith((_) => const []),
+          epgServiceProvider.overrideWith((_) => epg),
+          dvrRecordingsProvider.overrideWith((_) => const []),
+          recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LiveTvScreen(
+            favoritesService: favorites,
+            onChannelSelect: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Stale Noon News'), findsOneWidget);
+
+    epg.loadPrograms(const []);
+    await tester.pump();
+
+    expect(find.text('Stale Noon News'), findsNothing);
+  });
 }

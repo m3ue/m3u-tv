@@ -454,6 +454,7 @@ class _DayControls extends StatelessWidget {
           DpadInkWell(
             key: const ValueKey('timeline-previous-day'),
             onTap: canGoPrevious ? onPrevious : null,
+            autofocus: canGoPrevious,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.all(5),
@@ -482,6 +483,7 @@ class _DayControls extends StatelessWidget {
           DpadInkWell(
             key: const ValueKey('timeline-now'),
             onTap: onNow,
+            autofocus: !canGoPrevious,
             borderRadius: BorderRadius.circular(50),
             color: colorScheme.primaryContainer,
             child: Padding(

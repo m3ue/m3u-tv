@@ -241,7 +241,7 @@ class AppStateController extends ChangeNotifier {
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
   final Set<int> _pendingEpgChannelIds = <int>{};
-  final Map<int, String> _fetchedEpgRangeByChannel = <int, String>{};
+  final Map<String, DateTime> _fetchedEpgRanges = <String, DateTime>{};
   Timer? _epgFetchDebounce;
   DateTime? _pendingEpgStartDate;
   DateTime? _pendingEpgEndDate;
@@ -1629,7 +1629,7 @@ class AppStateController extends ChangeNotifier {
     for (final channel in channels) {
       final isFresh = epgService.hasFreshDataForChannel(channel);
       if (rangeKey.isEmpty && isFresh) continue;
-      if (_fetchedEpgRangeByChannel[channel.id] == rangeKey && isFresh) {
+      if (rangeKey.isNotEmpty && _hasFreshEpgRange(channel.id, rangeKey)) {
         continue;
       }
       if (_pendingEpgChannelIds.add(channel.id)) added = true;
@@ -1664,22 +1664,27 @@ class AppStateController extends ChangeNotifier {
           rangeKey != _activeEpgRangeKey) {
         return;
       }
-      for (final channel in channels) {
-        _fetchedEpgRangeByChannel[channel.id] = rangeKey;
+      if (rangeKey.isNotEmpty) {
+        _markEpgRangeFetched(channels, rangeKey);
       }
-      epgService
-        ..mergePrograms(programs)
-        ..markFetched(channelIds);
+      epgService.mergePrograms(
+        programs,
+        channelIds: channelIds,
+        replaceExisting: rangeKey.isEmpty,
+        markFresh: rangeKey.isEmpty,
+      );
+      if (rangeKey.isEmpty) epgService.markFetched(channelIds);
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
         );
       }
     } on Object catch (e) {
-      // Mark as fetched even on failure so a persistently erroring channel
-      // doesn't get re-queued (and reschedule the debounce timer) on every
-      // rebuild — it'll be retried once cacheTtl expires.
-      epgService.markFetched(channelIds);
+      if (rangeKey.isEmpty) {
+        epgService.markFetched(channelIds);
+      } else {
+        _markEpgRangeFetched(channels, rangeKey);
+      }
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
   }
@@ -1712,6 +1717,22 @@ class AppStateController extends ChangeNotifier {
     String dateKey(DateTime value) =>
         '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
     return '${dateKey(startDate)}:${dateKey(endDate ?? startDate)}';
+  }
+
+  bool _hasFreshEpgRange(int channelId, String rangeKey) {
+    final key = '$channelId:$rangeKey';
+    final fetchedAt = _fetchedEpgRanges[key];
+    if (fetchedAt == null) return false;
+    if (DateTime.now().difference(fetchedAt) < epgService.cacheTtl) return true;
+    _fetchedEpgRanges.remove(key);
+    return false;
+  }
+
+  void _markEpgRangeFetched(List<Channel> channels, String rangeKey) {
+    final now = DateTime.now();
+    for (final channel in channels) {
+      _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
+    }
   }
 
   Future<void> _loadSavedM3uSource() async {

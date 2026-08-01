@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -408,6 +409,64 @@ void main() {
         tester.state<ScrollableState>(scrollable).position.pixels,
         greaterThan(before),
       );
+    });
+
+    testWidgets('date controls traverse and activate with D-pad keys', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: DpadRegion(
+              child: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                      catchupSupported: true,
+                      catchupDays: 7,
+                    ),
+                  ],
+                  epgService: EpgService(clock: () => now),
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 30, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
     });
 
     testWidgets('replay stays bounded by each channel catchup range', (
