@@ -4,14 +4,8 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-
-// M3 buttons and chips use StadiumBorder. A large radius makes the dpad
-// focus border match the pill/circular shape regardless of widget height.
-const _kStadiumEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
 
 class DvrRecordingsScreen extends StatelessWidget {
   const DvrRecordingsScreen({
@@ -306,8 +300,6 @@ class _RecordingCard extends StatelessWidget {
   }
 }
 
-enum _StopRecordingChoice { keep, delete, back }
-
 class _CardTrailing extends StatelessWidget {
   const _CardTrailing({
     required this.recording,
@@ -378,7 +370,7 @@ class _CardTrailing extends StatelessWidget {
   ) async {
     final l10n = AppLocalizations.of(context);
     if (deleteAction == null) {
-      await _runWithFeedback(
+      await runDvrActionWithFeedback(
         context,
         keepAction,
         successMessage: l10n.dvrCancelSuccess,
@@ -387,58 +379,22 @@ class _CardTrailing extends StatelessWidget {
       return;
     }
 
-    final choice = await showDialog<_StopRecordingChoice>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.dvrStopTitle(recording.title)),
-        content: Text(l10n.dvrStopMessage),
-        actions: [
-          DpadRegion(
-            memoryKey: 'dvr/stop-dialog-actions',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _DialogActionButton(
-                  label: l10n.dvrStopBack,
-                  onSelect: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.back),
-                ),
-                const SizedBox(width: 8),
-                _DialogActionButton(
-                  label: l10n.dvrStopDelete,
-                  style: _DialogButtonStyle.destructive,
-                  onSelect: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.delete),
-                ),
-                const SizedBox(width: 8),
-                _DialogActionButton(
-                  label: l10n.dvrStopKeep,
-                  style: _DialogButtonStyle.primary,
-                  autofocus: true,
-                  onSelect: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.keep),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final choice = await showStopRecordingDialog(
+      context,
+      title: recording.title,
     );
-    if (choice == null || choice == _StopRecordingChoice.back) return;
+    if (choice == null || choice == StopRecordingChoice.back) return;
     if (!context.mounted) return;
 
-    if (choice == _StopRecordingChoice.keep) {
-      await _runWithFeedback(
+    if (choice == StopRecordingChoice.keep) {
+      await runDvrActionWithFeedback(
         context,
         keepAction,
         successMessage: l10n.dvrCancelSuccess,
         failureMessage: l10n.dvrCancelFailed,
       );
     } else {
-      await _runWithFeedback(
+      await runDvrActionWithFeedback(
         context,
         deleteAction,
         successMessage: l10n.dvrDeleteSuccess,
@@ -453,103 +409,14 @@ class _CardTrailing extends StatelessWidget {
     Future<void> Function() action,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.dvrDeleteTitle),
-        content: Text(l10n.dvrDeleteMessage),
-        actions: [
-          DpadRegion(
-            memoryKey: 'dvr/delete-dialog-actions',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _DialogActionButton(
-                  label: l10n.dvrDeleteDismiss,
-                  autofocus: true,
-                  onSelect: () => Navigator.of(dialogContext).pop(false),
-                ),
-                const SizedBox(width: 8),
-                _DialogActionButton(
-                  label: l10n.dvrDeleteConfirm,
-                  style: _DialogButtonStyle.destructive,
-                  onSelect: () => Navigator.of(dialogContext).pop(true),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showDeleteRecordingDialog(context);
     if (confirmed != true) return;
     if (!context.mounted) return;
-    await _runWithFeedback(
+    await runDvrActionWithFeedback(
       context,
       action,
       successMessage: l10n.dvrDeleteSuccess,
       failureMessage: l10n.dvrDeleteFailed,
-    );
-  }
-
-  Future<void> _runWithFeedback(
-    BuildContext context,
-    Future<void> Function() action, {
-    required String successMessage,
-    required String failureMessage,
-  }) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await action();
-      messenger.showSnackBar(SnackBar(content: Text(successMessage)));
-    } on Object catch (_) {
-      messenger.showSnackBar(SnackBar(content: Text(failureMessage)));
-    }
-  }
-}
-
-enum _DialogButtonStyle { tonal, primary, destructive }
-
-/// A filled dialog action button (never outline/ghost, per project
-/// convention), wrapped in [DpadFocusable] per the Material-button rule.
-class _DialogActionButton extends StatelessWidget {
-  const _DialogActionButton({
-    required this.label,
-    required this.onSelect,
-    this.style = _DialogButtonStyle.tonal,
-    this.autofocus = false,
-  });
-
-  final String label;
-  final VoidCallback onSelect;
-  final _DialogButtonStyle style;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final button = switch (style) {
-      _DialogButtonStyle.tonal => FilledButton.tonal(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      _DialogButtonStyle.primary => FilledButton(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      _DialogButtonStyle.destructive => FilledButton(
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.errorContainer,
-          foregroundColor: colorScheme.onErrorContainer,
-        ),
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-    };
-    return DpadFocusable(
-      autofocus: autofocus,
-      effects: _kStadiumEffect,
-      onSelect: onSelect,
-      child: button,
     );
   }
 }
@@ -572,7 +439,7 @@ class _DangerActionButton extends StatelessWidget {
     // own ink/ripple. Filled (not outline/ghost) per project convention.
     return DpadFocusable(
       onSelect: onTap,
-      effects: _kStadiumEffect,
+      effects: kDvrDialogButtonEffect,
       child: IconButton.filledTonal(
         tooltip: tooltip,
         onPressed: onTap,

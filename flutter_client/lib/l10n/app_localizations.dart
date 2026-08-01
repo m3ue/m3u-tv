@@ -266,6 +266,12 @@ abstract class AppLocalizations {
   /// **'Recording'**
   String get liveTvRecording;
 
+  /// No description provided for @liveTvStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get liveTvStopRecording;
+
   /// No description provided for @liveTvFavorite.
   ///
   /// In en, this message translates to:
@@ -343,6 +349,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next channel'**
   String get playerSkipNextTooltip;
+
+  /// No description provided for @playerRecordNowTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record current program'**
+  String get playerRecordNowTooltip;
+
+  /// No description provided for @playerStopRecordingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get playerStopRecordingTooltip;
 
   /// No description provided for @searchHint.
   ///

@@ -94,6 +94,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveTvRecording => 'Recording';
 
   @override
+  String get liveTvStopRecording => 'Stop recording';
+
+  @override
   String get liveTvFavorite => 'Favorite';
 
   @override
@@ -135,6 +138,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerSkipNextTooltip => 'Next channel';
+
+  @override
+  String get playerRecordNowTooltip => 'Record current program';
+
+  @override
+  String get playerStopRecordingTooltip => 'Stop recording';
 
   @override
   String get searchHint => 'Search live TV, movies, and series...';

@@ -38,6 +38,8 @@ class PlayerScreen extends StatefulWidget {
     this.onPlaybackFailure,
     this.onNextChannel,
     this.onPreviousChannel,
+    this.onRecordProgram,
+    this.isRecordingCurrentChannel = false,
     super.key,
   });
 
@@ -52,6 +54,8 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onPlaybackFailure;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
+  final void Function(EpgProgram program)? onRecordProgram;
+  final bool isRecordingCurrentChannel;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -724,6 +728,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     playPauseFocusNode: _controlsFocusNode,
                     onNextChannel: widget.onNextChannel,
                     onPreviousChannel: widget.onPreviousChannel,
+                    onRecordNow:
+                        (_isLive &&
+                            widget.onRecordProgram != null &&
+                            _epgData?.current != null)
+                        ? () => widget.onRecordProgram!(_epgData!.current)
+                        : null,
+                    isRecording: widget.isRecordingCurrentChannel,
                   ),
 
                 if (_showPlaybackDiagnostics &&

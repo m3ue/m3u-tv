@@ -94,6 +94,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvRecording => '录制中';
 
   @override
+  String get liveTvStopRecording => '停止录制';
+
+  @override
   String get liveTvFavorite => '收藏';
 
   @override
@@ -135,6 +138,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerSkipNextTooltip => '下一个频道';
+
+  @override
+  String get playerRecordNowTooltip => '录制当前节目';
+
+  @override
+  String get playerStopRecordingTooltip => '停止录制';
 
   @override
   String get searchHint => '搜索直播电视、电影和剧集…';
