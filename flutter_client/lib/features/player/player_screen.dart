@@ -89,7 +89,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // Comskip (commercial-skip) state — only populated when args.metadata
   // carries an 'edl_url' (completed DVR recordings with comskip enabled).
   List<({double start, double end})> _comskipSegments = const [];
-  double? _lastAutoSkippedSegmentEnd;
+  final Set<double> _autoSkippedSegmentEnds = {};
   ({double start, double end})? _activeComskipSegment;
   bool _showComskipSkippedBadge = false;
   Timer? _comskipBadgeTimer;
@@ -224,7 +224,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _epgData = null;
       _overlayVisible = true;
       _comskipSegments = const [];
-      _lastAutoSkippedSegmentEnd = null;
+      _autoSkippedSegmentEnds.clear();
       _activeComskipSegment = null;
       _showComskipSkippedBadge = false;
     });
@@ -333,10 +333,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
 
-    final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? true;
+    final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
     if (autoSkip) {
-      if (_lastAutoSkippedSegmentEnd == current.end) return;
-      _lastAutoSkippedSegmentEnd = current.end;
+      if (_autoSkippedSegmentEnds.contains(current.end)) return;
+      _autoSkippedSegmentEnds.add(current.end);
       unawaited(
         widget.orchestrator.seek(Duration(seconds: current.end.round())),
       );

@@ -2257,6 +2257,7 @@ void main() {
                   args: recordingArgs,
                   orchestrator: orchestrator,
                   epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: ComskipSettings(),
                 ),
               ),
             );
@@ -2409,6 +2410,127 @@ void main() {
             expect(adapter.seekCalls, isEmpty);
           }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
                 {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        'falls back to confirm prompt when comskipSettings is null',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  // comskipSettings intentionally omitted — null fallback
+                ),
+              ),
+            );
+            await tester.pump();
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            expect(adapter.seekCalls, isEmpty);
+            expect(find.text('Skip commercial'), findsOneWidget);
+
+            await tester.tap(find.text('Skip commercial'));
+            await tester.pump();
+
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+            expect(find.text('Skip commercial'), findsNothing);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        'does not re-trigger auto-skip when rewinding into an already-skipped segment',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            // Enter segment A (10–20) → auto-skip to 20.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+            // Rewind back to 15 — still inside A — must NOT seek again.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 15),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+            // Advance into segment B (30–40) — must auto-skip to 40.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 35),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [
+              const Duration(seconds: 20),
+              const Duration(seconds: 40),
+            ]);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+                {'start': 30.0, 'end': 40.0},
               ])));
         },
       );
