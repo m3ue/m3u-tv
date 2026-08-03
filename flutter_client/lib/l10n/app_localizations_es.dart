@@ -163,6 +163,12 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get playerCommercialSkipped => 'Anuncio omitido';
+
+  @override
+  String get playerSkipCommercial => 'Omitir anuncio';
+
+  @override
   String get searchHint => 'Buscar Televisión en vivo, cine y series…';
 
   @override
@@ -325,6 +331,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsProxyNoProfiles =>
       'No hay perfiles de transcodificación disponibles; las transmisiones usan el proxy directo.';
+
+  @override
+  String get settingsComskip => 'Omisión de anuncios';
+
+  @override
+  String get settingsComskipSubtitle =>
+      'Controla cómo reacciona el reproductor a los anuncios detectados en las grabaciones DVR.';
+
+  @override
+  String get settingsComskipAutoSkip => 'Omitir anuncios automáticamente';
 
   @override
   String get settingsDisconnectTitle => '¿Desconectar?';

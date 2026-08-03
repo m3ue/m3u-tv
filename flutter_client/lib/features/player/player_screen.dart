@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io' show HttpClient, HttpStatus;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
@@ -13,10 +15,12 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
@@ -32,6 +36,7 @@ class PlayerScreen extends StatefulWidget {
     required this.orchestrator,
     required this.epgService,
     this.xtreamService,
+    this.comskipSettings,
     this.progressReporter,
     this.traktService,
     this.viewerId = '',
@@ -46,6 +51,7 @@ class PlayerScreen extends StatefulWidget {
   final PlaybackOrchestrator orchestrator;
   final EpgService epgService;
   final XtreamService? xtreamService;
+  final ComskipSettings? comskipSettings;
   final void Function(Progress progress)? progressReporter;
   final TraktService? traktService;
   final String viewerId;
@@ -79,6 +85,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isSubtitleTrackSelectionKnown = false;
 
   EpgCurrentNext? _epgData;
+
+  // Comskip (commercial-skip) state — only populated when args.metadata
+  // carries an 'edl_url' (completed DVR recordings with comskip enabled).
+  List<({double start, double end})> _comskipSegments = const [];
+  double? _lastAutoSkippedSegmentEnd;
+  ({double start, double end})? _activeComskipSegment;
+  bool _showComskipSkippedBadge = false;
+  Timer? _comskipBadgeTimer;
 
   bool _overlayVisible = true;
 
@@ -170,6 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+    unawaited(_initComskip(widget.args));
   }
 
   // Live-TV skip-previous/skip-next replaces `args` on an already-mounted
@@ -192,6 +207,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _epgTimer?.cancel();
     _epgFetch = null;
+    _comskipBadgeTimer?.cancel();
 
     setState(() {
       _status = PlaybackStatus.idle;
@@ -207,11 +223,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _selectedSubtitleTrackId = null;
       _epgData = null;
       _overlayVisible = true;
+      _comskipSegments = const [];
+      _lastAutoSkippedSegmentEnd = null;
+      _activeComskipSegment = null;
+      _showComskipSkippedBadge = false;
     });
 
     _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+    unawaited(_initComskip(widget.args));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
     });
@@ -241,12 +262,107 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ? _duration
             : next;
       });
+      _checkComskip();
     });
   }
 
   void _stopPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = null;
+  }
+
+  // ── Comskip (commercial-skip) ──────────────────────────────────────────
+
+  /// Fetches the comskip EDL segment list for completed DVR recordings.
+  /// Fire-and-forget: an older server, a recording with comskip disabled, or
+  /// any fetch failure just leaves [_comskipSegments] empty, so the rest of
+  /// the player behaves exactly as if this recording had no EDL at all.
+  Future<void> _initComskip(PlayerArgs args) async {
+    final edlUrl = args.metadata['edl_url'] as String?;
+    if (edlUrl == null || edlUrl.isEmpty) return;
+
+    try {
+      final client = HttpClient();
+      final request = await client.getUrl(Uri.parse(edlUrl));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
+      if (response.statusCode != HttpStatus.ok) return;
+      final body = await utf8.decodeStream(response);
+      final decoded = jsonDecode(body);
+      if (decoded is! List) return;
+
+      final segments = decoded
+          .whereType<Map<String, Object?>>()
+          .map((segment) {
+            final start = segment['start'];
+            final end = segment['end'];
+            if (start is! num || end is! num) return null;
+            return (start: start.toDouble(), end: end.toDouble());
+          })
+          .whereType<({double start, double end})>()
+          .toList(growable: false);
+
+      if (!mounted || !identical(args, widget.args)) return;
+      setState(() => _comskipSegments = segments);
+    } on Object catch (error) {
+      debugPrint('Comskip: failed to fetch EDL: $error');
+    }
+  }
+
+  /// Checks whether the current playback position has entered a commercial
+  /// segment and reacts per the user's auto-skip/prompt preference. Called
+  /// after every position update, mirroring the web player's
+  /// timeupdate-driven `_checkComskip`.
+  void _checkComskip() {
+    if (_comskipSegments.isEmpty || _disposed || !mounted) return;
+
+    final positionSeconds = _currentPosition.inMilliseconds / 1000.0;
+    ({double start, double end})? current;
+    for (final segment in _comskipSegments) {
+      if (positionSeconds >= segment.start && positionSeconds < segment.end) {
+        current = segment;
+        break;
+      }
+    }
+
+    if (current == null) {
+      if (_activeComskipSegment != null) {
+        setState(() => _activeComskipSegment = null);
+      }
+      return;
+    }
+
+    final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? true;
+    if (autoSkip) {
+      if (_lastAutoSkippedSegmentEnd == current.end) return;
+      _lastAutoSkippedSegmentEnd = current.end;
+      unawaited(
+        widget.orchestrator.seek(Duration(seconds: current.end.round())),
+      );
+      _flashComskipSkippedBadge();
+    } else if (_activeComskipSegment?.end != current.end) {
+      setState(() => _activeComskipSegment = current);
+    }
+  }
+
+  void _flashComskipSkippedBadge() {
+    _comskipBadgeTimer?.cancel();
+    setState(() => _showComskipSkippedBadge = true);
+    _comskipBadgeTimer = Timer(const Duration(seconds: 3), () {
+      if (!_disposed && mounted) {
+        setState(() => _showComskipSkippedBadge = false);
+      }
+    });
+  }
+
+  /// Confirms the prompt-mode skip control, jumping to the active segment's
+  /// end the same way auto-skip would.
+  void _confirmComskipSkip() {
+    final segment = _activeComskipSegment;
+    if (segment == null) return;
+    unawaited(widget.orchestrator.seek(Duration(seconds: segment.end.round())));
+    setState(() => _activeComskipSegment = null);
   }
 
   void _scrobble(String action) => _scrobbleFor(widget.args, action);
@@ -292,6 +408,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _positionTimer?.cancel();
     _epgTimer?.cancel();
+    _comskipBadgeTimer?.cancel();
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
@@ -419,6 +536,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _goBack();
       }
     });
+    _checkComskip();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
     // pausing cancels it (keeping the overlay up), resuming restarts the
@@ -835,6 +953,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       description: _nowPlayingDescription(),
                     ),
                   ),
+
+                // Comskip: brief auto-skip indicator (DVR recordings only)
+                if (_showComskipSkippedBadge)
+                  Positioned(
+                    top: 40,
+                    left: 40,
+                    child: _ComskipSkippedBadge(
+                      label: AppLocalizations.of(
+                        context,
+                      ).playerCommercialSkipped,
+                    ),
+                  ),
+
+                // Comskip: confirm-to-skip prompt (auto-skip disabled)
+                if (_activeComskipSegment != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 140,
+                    child: Center(
+                      child: _ComskipSkipPrompt(
+                        label: AppLocalizations.of(
+                          context,
+                        ).playerSkipCommercial,
+                        onSkip: _confirmComskipSkip,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1096,6 +1242,78 @@ class FallbackReasonBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 11,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// Brief, non-interactive indicator shown when a commercial segment was
+/// auto-skipped. Self-dismisses via [_PlayerScreenState._flashComskipSkippedBadge].
+class _ComskipSkippedBadge extends StatelessWidget {
+  const _ComskipSkippedBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.fast_forward, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirm-to-skip control shown while playback is inside a commercial
+/// segment and auto-skip is disabled. Hides itself once the play-head
+/// exits the segment — see [_PlayerScreenState._checkComskip].
+class _ComskipSkipPrompt extends StatelessWidget {
+  const _ComskipSkipPrompt({required this.label, required this.onSkip});
+
+  final String label;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadInkWell(
+      autofocus: true,
+      onTap: onSkip,
+      borderRadius: BorderRadius.circular(50),
+      color: Colors.black.withValues(alpha: 0.75),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.fast_forward, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

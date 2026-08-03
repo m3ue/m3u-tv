@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "Werbung übersprungen",
+  "playerSkipCommercial": "Werbung überspringen",
   "searchHint": "Live-TV, Filme und Serien durchsuchen …",
   "searchSectionLiveTv": "Live-TV",
   "searchSectionMovies": "Filme",
@@ -126,6 +128,9 @@
   "settingsProxyProfileDefault": "Standard",
   "settingsProxyProfileDirect": "Direkt (ohne Transkodierung)",
   "settingsProxyNoProfiles": "Keine Transkodierungsprofile verfügbar — Streams nutzen den direkten Proxy.",
+  "settingsComskip": "Werbeerkennung",
+  "settingsComskipSubtitle": "Legt fest, wie der Player auf erkannte Werbeunterbrechungen in DVR-Aufnahmen reagiert.",
+  "settingsComskipAutoSkip": "Werbung automatisch überspringen",
   "settingsDisconnectTitle": "Trennen?",
   "settingsDisconnectBody": "Du wirst abgemeldet und musst deine Anmeldedaten erneut eingeben, um dich wieder zu verbinden.",
   "settingsDisconnectConfirm": "Trennen",

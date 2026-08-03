@@ -392,6 +392,18 @@ abstract class AppLocalizations {
   /// **'S{season} · E{episode}'**
   String playerNowPlayingSeasonEpisode(int season, int episode);
 
+  /// No description provided for @playerCommercialSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped commercial'**
+  String get playerCommercialSkipped;
+
+  /// No description provided for @playerSkipCommercial.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip commercial'**
+  String get playerSkipCommercial;
+
   /// No description provided for @searchHint.
   ///
   /// In en, this message translates to:
@@ -697,6 +709,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No transcoding profiles available — streams use the direct proxy.'**
   String get settingsProxyNoProfiles;
+
+  /// No description provided for @settingsComskip.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial Skipping'**
+  String get settingsComskip;
+
+  /// No description provided for @settingsComskipSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Controls how the player reacts to commercial breaks detected in DVR recordings.'**
+  String get settingsComskipSubtitle;
+
+  /// No description provided for @settingsComskipAutoSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-skip commercials'**
+  String get settingsComskipAutoSkip;
 
   /// No description provided for @settingsDisconnectTitle.
   ///

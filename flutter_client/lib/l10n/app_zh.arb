@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "已跳过广告",
+  "playerSkipCommercial": "跳过广告",
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",
@@ -126,6 +128,9 @@
   "settingsProxyProfileDefault": "默认",
   "settingsProxyProfileDirect": "直连（不转码）",
   "settingsProxyNoProfiles": "没有可用的转码配置——将使用直连代理播放。",
+  "settingsComskip": "广告跳过",
+  "settingsComskipSubtitle": "控制播放器在录制内容中检测到广告时的处理方式。",
+  "settingsComskipAutoSkip": "自动跳过广告",
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",

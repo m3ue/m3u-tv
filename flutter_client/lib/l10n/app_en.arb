@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "Skipped commercial",
+  "playerSkipCommercial": "Skip commercial",
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
@@ -151,6 +153,9 @@
   "settingsProxyProfileDefault": "Default",
   "settingsProxyProfileDirect": "Direct (no transcoding)",
   "settingsProxyNoProfiles": "No transcoding profiles available — streams use the direct proxy.",
+  "settingsComskip": "Commercial Skipping",
+  "settingsComskipSubtitle": "Controls how the player reacts to commercial breaks detected in DVR recordings.",
+  "settingsComskipAutoSkip": "Auto-skip commercials",
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",

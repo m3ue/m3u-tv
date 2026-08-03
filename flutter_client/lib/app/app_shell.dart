@@ -877,6 +877,7 @@ class AppShellState extends ConsumerState<AppShell>
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
           proxyPlaybackSettings: _appState.proxyPlaybackSettings,
+          comskipSettings: _appState.comskipSettings,
         ),
       ),
       _ => const PlaceholderScreen(title: 'Home'),
@@ -975,6 +976,7 @@ class AppShellState extends ConsumerState<AppShell>
                   orchestrator: orch,
                   epgService: _appState.epgService,
                   xtreamService: _appState.xtreamService,
+                  comskipSettings: _appState.comskipSettings,
                   viewerId: viewerId,
                   onNextChannel: args.type == 'live' ? _openNextChannel : null,
                   onPreviousChannel: args.type == 'live'

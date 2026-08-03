@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -16,12 +18,74 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 import 'fake_player_adapter.dart';
 import 'fake_transcode_gateway.dart';
+
+/// Minimal `HttpClient` fake for testing the comskip EDL fetch — every
+/// request returns the same canned body/status, regardless of URL. Only
+/// [getUrl] and [close] are implemented; anything else falls through to
+/// [noSuchMethod], which is fine since `_initComskip` never touches it.
+class _FakeHttpClient implements HttpClient {
+  _FakeHttpClient(this._body);
+
+  final String _body;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    return _FakeHttpClientRequest(_body, HttpStatus.ok);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpClientRequest implements HttpClientRequest {
+  _FakeHttpClientRequest(this._body, this._statusCode);
+
+  final String _body;
+  final int _statusCode;
+
+  @override
+  Future<HttpClientResponse> close() async =>
+      _FakeHttpClientResponse(_body, _statusCode);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeHttpClientResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  _FakeHttpClientResponse(String body, this.statusCode)
+    : _stream = Stream.value(utf8.encode(body));
+
+  final Stream<List<int>> _stream;
+
+  @override
+  final int statusCode;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   group('formatTime', () {
@@ -2109,5 +2173,245 @@ void main() {
         expect(adapter.loadCalls, hasLength(2));
       },
     );
+
+    group('Comskip', () {
+      PlaybackOrchestrator buildOrchestrator(FakePlayerAdapter adapter) {
+        return PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+      }
+
+      const recordingArgs = PlayerArgs(
+        streamUrl: 'https://example.com/recording.mp4',
+        title: 'Comskip Fixture',
+        type: 'vod',
+        metadata: <String, Object?>{
+          'edl_url': 'https://example.com/recording/edl',
+        },
+      );
+
+      testWidgets(
+        'never fetches or shows comskip UI when edl_url is absent',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/recording.mp4',
+                  title: 'No EDL Fixture',
+                  type: 'vod',
+                ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          expect(adapter.seekCalls, isEmpty);
+          expect(find.text('Skipped commercial'), findsNothing);
+          expect(find.text('Skip commercial'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'auto-skip mode seeks past a segment once and does not re-trigger',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 5),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, isEmpty);
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+            expect(find.text('Skipped commercial'), findsOneWidget);
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 15),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            // Still inside the same segment — must not seek a second time.
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        'prompt mode shows the skip control inside a segment and confirms on tap',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+          final settings = ComskipSettings();
+          await settings.setAutoSkipEnabled(enabled: false);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: settings,
+                ),
+              ),
+            );
+            await tester.pump();
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            expect(adapter.seekCalls, isEmpty);
+            expect(find.text('Skip commercial'), findsOneWidget);
+
+            await tester.tap(find.text('Skip commercial'));
+            await tester.pump();
+
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+            expect(find.text('Skip commercial'), findsNothing);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        'prompt mode hides the skip control once playback exits the segment',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+          final settings = ComskipSettings();
+          await settings.setAutoSkipEnabled(enabled: false);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: settings,
+                ),
+              ),
+            );
+            await tester.pump();
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(find.text('Skip commercial'), findsOneWidget);
+
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 25),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            expect(find.text('Skip commercial'), findsNothing);
+            expect(adapter.seekCalls, isEmpty);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+    });
   });
 }

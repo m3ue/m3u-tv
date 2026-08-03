@@ -163,6 +163,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get playerCommercialSkipped => '已跳过广告';
+
+  @override
+  String get playerSkipCommercial => '跳过广告';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override
@@ -319,6 +325,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsProxyNoProfiles => '没有可用的转码配置——将使用直连代理播放。';
+
+  @override
+  String get settingsComskip => '广告跳过';
+
+  @override
+  String get settingsComskipSubtitle => '控制播放器在录制内容中检测到广告时的处理方式。';
+
+  @override
+  String get settingsComskipAutoSkip => '自动跳过广告';
 
   @override
   String get settingsDisconnectTitle => '断开连接？';
