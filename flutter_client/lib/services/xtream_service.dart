@@ -506,7 +506,20 @@ class XtreamService {
     DvrRecordingStatus? status,
     int? limit,
   }) async {
-    final response = await _request(
+    final params = {'status': ?status?.name, 'limit': ?limit?.toString()};
+    final response = await _request('get_dvr_recordings', params: params);
+    return _asList(response)
+        .map((item) => DvrRecording.fromXtream(_asMap(item)))
+        .toList(growable: false);
+  }
+
+  Future<List<DvrRecording>> getDvrRecordingsFor(
+    UserCredentials credentials, {
+    DvrRecordingStatus? status,
+    int? limit,
+  }) async {
+    final response = await _requestWithCredentials(
+      credentials,
       'get_dvr_recordings',
       params: {'status': ?status?.name, 'limit': ?limit?.toString()},
     );
@@ -516,10 +529,20 @@ class XtreamService {
   }
 
   Future<DvrRecording> getDvrRecording(String uuid) async {
-    final response = await _request(
+    // m3u-editor's XtreamApiController::getDvrRecording() reads
+    // `recording_id`, not `uuid`.
+    final params = {'recording_id': uuid};
+    final response = await _request('get_dvr_recording', params: params);
+    return DvrRecording.fromXtream(_asMap(response));
+  }
+
+  Future<DvrRecording> getDvrRecordingFor(
+    UserCredentials credentials,
+    String uuid,
+  ) async {
+    final response = await _requestWithCredentials(
+      credentials,
       'get_dvr_recording',
-      // m3u-editor's XtreamApiController::getDvrRecording() reads
-      // `recording_id`, not `uuid`.
       params: {'recording_id': uuid},
     );
     return DvrRecording.fromXtream(_asMap(response));

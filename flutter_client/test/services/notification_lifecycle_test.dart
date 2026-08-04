@@ -84,6 +84,7 @@ void main() {
 
     test('concurrent duplicate receipts report one insertion', () async {
       final store = TvNotificationStore(memory: <String, Object?>{});
+      _selectFixtureOwner(store);
       final item = _item(id: _notificationId, channel: 'general');
 
       final inserted = await Future.wait<bool>(<Future<bool>>[
@@ -98,6 +99,7 @@ void main() {
     test('restores the admin-only flag from persisted notifications', () async {
       final memory = <String, Object?>{};
       final store = TvNotificationStore(memory: memory);
+      _selectFixtureOwner(store);
       await store.add(
         const TvNotificationItem(
           id: _notificationId,
@@ -108,9 +110,39 @@ void main() {
         ),
       );
 
-      final restored = await TvNotificationStore(memory: memory).all();
+      final restarted = TvNotificationStore(memory: memory);
+      _selectFixtureOwner(restarted);
+      final restored = await restarted.all();
 
       expect(restored.single.item.adminOnly, isTrue);
+    });
+
+    test('legacy unowned notification data fails closed', () async {
+      final store = TvNotificationStore(
+        memory: <String, Object?>{
+          'm3ue_tv_notifications': <Map<String, Object?>>[
+            <String, Object?>{
+              'id': _notificationId,
+              'channel': 'general',
+              'title': 'Legacy private title',
+              'body': 'Legacy private body',
+              'status': 'warning',
+              'admin_only': true,
+              'received_at': DateTime.now().toIso8601String(),
+              'is_read': false,
+            },
+          ],
+          'm3ue_tv_notification_channels': <String>['general'],
+          'm3ue_tv_server_channels': <Map<String, Object?>>[
+            <String, Object?>{'name': 'general', 'label': 'General'},
+          ],
+        },
+      );
+      _selectFixtureOwner(store);
+
+      expect(await store.all(), isEmpty);
+      expect(await store.subscribedChannels(), isEmpty);
+      expect(await store.knownChannels(), isEmpty);
     });
   });
 
@@ -477,4 +509,25 @@ class _FakeTvNotificationService extends TvNotificationService {
       unread,
     );
   }
+}
+
+void _selectFixtureOwner(TvNotificationStore store) {
+  expect(
+    store.selectOwner(
+      server: _credentials.server,
+      session: const TvPlaylistSession(
+        notifiableId: 1,
+        notifiableType: 'playlist',
+        isAdmin: false,
+        channelName: '',
+        reverb: ReverbConfig(
+          host: 'fixture.invalid',
+          port: 443,
+          scheme: 'wss',
+          appKey: '',
+        ),
+      ),
+    ),
+    isTrue,
+  );
 }

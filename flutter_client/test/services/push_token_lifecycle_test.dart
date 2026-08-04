@@ -231,10 +231,15 @@ void main() {
 
             expect(
               (await notificationStore.all()).map((stored) => stored.item.id),
-              <String>[_existingNotification.id],
+              transition == 'viewer'
+                  ? <String>[_existingNotification.id]
+                  : <String>[],
             );
             expect(await notificationStore.serverChannels(), isEmpty);
-            expect(fixture.controller.unreadNotificationCount, 1);
+            expect(
+              fixture.controller.unreadNotificationCount,
+              transition == 'viewer' ? 1 : 0,
+            );
             expect(notificationPersistence.commits, 0);
             expect(persistenceCallbacks, 0);
             expect(controllerNotifications, 0);
@@ -415,6 +420,310 @@ void main() {
         expect(presented, <TvNotificationItem>[item]);
       },
     );
+
+    test(
+      'account handoff isolates notification data and restores A on reload',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'm3u-tv-notification-owner-',
+        );
+        addTearDown(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await directory.delete(recursive: true);
+        });
+        final stateFile = File('${directory.path}/state.json');
+        final api = _AccountNotificationService(blockSecondAccount: true);
+        addTearDown(api.releaseSecondAccount);
+        final fixture = _Fixture(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          notificationApi: api,
+        );
+        addTearDown(fixture.controller.dispose);
+        final presented = <TvNotificationItem>[];
+        final subscription = fixture.controller.tvNotifications.listen(
+          presented.add,
+        );
+        addTearDown(subscription.cancel);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForNotificationTitle(
+          fixture.controller,
+          'Account A private',
+        );
+        expect(
+          (await fixture.controller.notificationStore.all())
+              .single
+              .item
+              .adminOnly,
+          isTrue,
+        );
+        await fixture.controller.markNotificationRead(_accountANotificationId);
+        await fixture.controller.setNotificationChannels(<String>{'dvr'});
+        expect(fixture.controller.unreadNotificationCount, 0);
+        presented.clear();
+
+        expect(
+          await fixture.controller.connectXtream(_secondCredentials),
+          isTrue,
+        );
+        await api.secondAccountFetchStarted.future;
+
+        expect(await fixture.controller.notificationStore.all(), isEmpty);
+        expect(
+          await fixture.controller.notificationStore.subscribedChannels(),
+          isEmpty,
+        );
+        expect(
+          await fixture.controller.notificationStore.knownChannels(),
+          isEmpty,
+        );
+        expect(fixture.controller.unreadNotificationCount, 0);
+        expect(presented, isEmpty);
+
+        api.releaseSecondAccount();
+        await _waitForNotificationTitle(fixture.controller, 'Account B public');
+        final accountBNotifications = await fixture.controller.notificationStore
+            .all();
+        expect(
+          accountBNotifications.map((stored) => stored.item.title),
+          <String>['Account B public'],
+        );
+        expect(
+          accountBNotifications.any((stored) => stored.item.adminOnly),
+          isFalse,
+        );
+        expect(fixture.controller.unreadNotificationCount, 1);
+        expect(
+          await fixture.controller.notificationStore.subscribedChannels(),
+          isEmpty,
+        );
+        expect(
+          (await fixture.controller.notificationStore.knownChannels()).map(
+            (channel) => channel.name,
+          ),
+          <String>['general'],
+        );
+        expect(
+          presented.map((notification) => notification.title),
+          <String>['Account B public'],
+        );
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForNotificationTitle(
+          fixture.controller,
+          'Account A private',
+        );
+        final restoredA =
+            (await fixture.controller.notificationStore.all()).single;
+        expect(restoredA.isRead, isTrue);
+        expect(fixture.controller.unreadNotificationCount, 0);
+        expect(
+          await fixture.controller.notificationStore.subscribedChannels(),
+          <String>{'dvr'},
+        );
+        final persisted = await PersistentJsonStore(file: stateFile).snapshot();
+        final notificationKeys = persisted.keys
+            .where(
+              (key) =>
+                  key.startsWith('m3ue_tv_notification') ||
+                  key.startsWith('m3ue_tv_server_channels'),
+            )
+            .toList(growable: false);
+        expect(notificationKeys, isNotEmpty);
+        for (final key in notificationKeys) {
+          expect(key, isNot(contains(_firstCredentials.username)));
+          expect(key, isNot(contains(_secondCredentials.username)));
+          expect(key, isNot(contains(_firstCredentials.password)));
+          expect(key, isNot(contains(_secondCredentials.password)));
+        }
+        expect(persisted.containsKey('m3ue_tv_notifications'), isFalse);
+        expect(
+          persisted.containsKey('m3ue_tv_notification_channels'),
+          isFalse,
+        );
+
+        final restartedApi = _AccountNotificationService();
+        final restarted = _Fixture(
+          persistentStore: PersistentJsonStore(file: stateFile),
+          notificationApi: restartedApi,
+        );
+        addTearDown(restarted.controller.dispose);
+        expect(
+          await restarted.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForNotificationTitle(
+          restarted.controller,
+          'Account A private',
+        );
+        expect(
+          (await restarted.controller.notificationStore.all()).single.isRead,
+          isTrue,
+        );
+        expect(restarted.controller.unreadNotificationCount, 0);
+      },
+    );
+
+    test('direct M3U exposes no prior account notification data', () async {
+      final api = _AccountNotificationService();
+      final fixture = _Fixture(notificationApi: api);
+      addTearDown(fixture.controller.dispose);
+      expect(
+        await fixture.controller.connectXtream(_firstCredentials),
+        isTrue,
+      );
+      await _waitForNotificationTitle(fixture.controller, 'Account A private');
+      await fixture.controller.setNotificationChannels(<String>{'dvr'});
+
+      expect(
+        await fixture.controller.switchToM3u(
+          playlistText:
+              '#EXTM3U\n#EXTINF:-1,Fixture Channel\nhttps://media.invalid/live.m3u8',
+        ),
+        isTrue,
+      );
+
+      expect(await fixture.controller.notificationStore.all(), isEmpty);
+      expect(
+        await fixture.controller.notificationStore.subscribedChannels(),
+        isEmpty,
+      );
+      expect(
+        await fixture.controller.notificationStore.knownChannels(),
+        isEmpty,
+      );
+      expect(fixture.controller.unreadNotificationCount, 0);
+    });
+
+    test(
+      'disconnected state exposes no prior account notification data',
+      () async {
+        final api = _AccountNotificationService();
+        final fixture = _Fixture(notificationApi: api);
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await _waitForNotificationTitle(
+          fixture.controller,
+          'Account A private',
+        );
+        await fixture.controller.setNotificationChannels(<String>{'dvr'});
+
+        await fixture.controller.disconnect();
+
+        expect(await fixture.controller.notificationStore.all(), isEmpty);
+        expect(
+          await fixture.controller.notificationStore.subscribedChannels(),
+          isEmpty,
+        );
+        expect(
+          await fixture.controller.notificationStore.knownChannels(),
+          isEmpty,
+        );
+        expect(fixture.controller.unreadNotificationCount, 0);
+      },
+    );
+
+    for (final transition in <String>['account B', 'direct M3U']) {
+      test(
+        'delayed dvr.status detail cannot survive A to $transition',
+        () async {
+          final transport = _DvrOwnershipTransport();
+          addTearDown(transport.releaseDetail);
+          final reverb = _RecordingReverbService();
+          final fixture = _Fixture(
+            transport: transport.call,
+            notificationApi: _SessionTvNotificationService(),
+            reverbService: reverb,
+          );
+          addTearDown(fixture.controller.dispose);
+          expect(
+            await fixture.controller.connectXtream(_firstCredentials),
+            isTrue,
+          );
+          await reverb.firstConnected.future;
+
+          reverb.emitDvrStatus('first', _dvrStatusPing);
+          await transport.detailStarted.future;
+          if (transition == 'account B') {
+            expect(
+              await fixture.controller.connectXtream(_secondCredentials),
+              isTrue,
+            );
+            await reverb.secondConnected.future;
+          } else {
+            expect(
+              await fixture.controller.switchToM3u(
+                playlistText:
+                    '#EXTM3U\n#EXTINF:-1,Fixture Channel\nhttps://media.invalid/live.m3u8',
+              ),
+              isTrue,
+            );
+          }
+          reverb.emitDvrStatus('first', _dvrStatusPing);
+          transport.releaseDetail();
+          await transport.detailReturned.future;
+          await pumpEventQueue();
+
+          expect(transport.detailUsers, <String>['first']);
+          expect(fixture.controller.dvrRecordings, isEmpty);
+          expect(fixture.controller.recordingChannelIds, isEmpty);
+        },
+      );
+
+      test(
+        'delayed Reverb onConnected DVR refresh cannot survive A to $transition',
+        () async {
+          final transport = _DvrOwnershipTransport();
+          addTearDown(transport.releaseActiveRefresh);
+          final reverb = _RecordingReverbService();
+          final fixture = _Fixture(
+            transport: transport.call,
+            notificationApi: _SessionTvNotificationService(),
+            reverbService: reverb,
+          );
+          addTearDown(fixture.controller.dispose);
+          expect(
+            await fixture.controller.connectXtream(_firstCredentials),
+            isTrue,
+          );
+          await reverb.firstConnected.future;
+
+          reverb.emitConnected('first');
+          await transport.activeRefreshStarted.future;
+          if (transition == 'account B') {
+            expect(
+              await fixture.controller.connectXtream(_secondCredentials),
+              isTrue,
+            );
+            await reverb.secondConnected.future;
+          } else {
+            expect(
+              await fixture.controller.switchToM3u(
+                playlistText:
+                    '#EXTM3U\n#EXTINF:-1,Fixture Channel\nhttps://media.invalid/live.m3u8',
+              ),
+              isTrue,
+            );
+          }
+          reverb.emitConnected('first');
+          transport.releaseActiveRefresh();
+          await transport.activeRefreshReturned.future;
+          await pumpEventQueue();
+
+          expect(transport.activeRefreshUsers, <String>['first']);
+          expect(fixture.controller.recordingChannelIds, isEmpty);
+        },
+      );
+    }
 
     test('late source operation cannot replace a newer connection', () async {
       final transport = _RacingXtreamTransport();
@@ -1735,6 +2044,15 @@ const _reconciledNotification = TvNotificationItem(
   title: 'Reconciled notification',
   status: 'info',
 );
+const _accountANotificationId = '11111111-1111-4111-8111-111111111111';
+const _accountBNotificationId = '22222222-2222-4222-8222-222222222222';
+const _accountBAdminNotificationId = '33333333-3333-4333-8333-333333333333';
+const _dvrStatusPing = DvrRecording(
+  uuid: 'recording-a',
+  title: 'Account A recording status',
+  status: DvrRecordingStatus.recording,
+  channelId: 701,
+);
 
 class _Fixture {
   _Fixture({
@@ -1970,6 +2288,170 @@ class _UnreadReconciliationTvNotificationService extends TvNotificationService {
   }
 }
 
+class _AccountNotificationService extends TvNotificationService {
+  _AccountNotificationService({this.blockSecondAccount = false});
+
+  final bool blockSecondAccount;
+  final Completer<void> secondAccountFetchStarted = Completer<void>();
+  final Completer<void> _releaseSecondAccount = Completer<void>();
+
+  void releaseSecondAccount() {
+    if (!_releaseSecondAccount.isCompleted) _releaseSecondAccount.complete();
+  }
+
+  @override
+  Future<(TvPlaylistSession, List<TvNotificationItem>)> fetchUnread(
+    UserCredentials creds, {
+    List<String>? channels,
+  }) async {
+    final isFirst = creds.username == _firstCredentials.username;
+    if (!isFirst) {
+      if (!secondAccountFetchStarted.isCompleted) {
+        secondAccountFetchStarted.complete();
+      }
+      if (blockSecondAccount) await _releaseSecondAccount.future;
+    }
+    return (
+      TvPlaylistSession(
+        notifiableId: isFirst ? 101 : 202,
+        notifiableType: 'playlist',
+        isAdmin: isFirst,
+        channelName: '',
+        reverb: const ReverbConfig(
+          host: 'fixture.invalid',
+          port: 443,
+          scheme: 'wss',
+          appKey: '',
+        ),
+        availableChannels: <TvNotificationChannel>[
+          TvNotificationChannel(
+            name: isFirst ? 'dvr' : 'general',
+            label: isFirst ? 'DVR' : 'General',
+          ),
+        ],
+      ),
+      isFirst
+          ? const <TvNotificationItem>[
+              TvNotificationItem(
+                id: _accountANotificationId,
+                channel: 'dvr',
+                title: 'Account A private',
+                body: 'Account A private body',
+                status: 'warning',
+                adminOnly: true,
+              ),
+            ]
+          : const <TvNotificationItem>[
+              TvNotificationItem(
+                id: _accountBNotificationId,
+                channel: 'general',
+                title: 'Account B public',
+                body: 'Account B public body',
+                status: 'info',
+              ),
+              TvNotificationItem(
+                id: _accountBAdminNotificationId,
+                channel: 'general',
+                title: 'Account B admin only',
+                status: 'warning',
+                adminOnly: true,
+              ),
+            ],
+    );
+  }
+
+  @override
+  Future<void> markRead(UserCredentials creds, String id) async {}
+}
+
+class _DvrOwnershipTransport {
+  final Completer<void> detailStarted = Completer<void>();
+  final Completer<void> detailReturned = Completer<void>();
+  final Completer<void> _releaseDetail = Completer<void>();
+  final Completer<void> activeRefreshStarted = Completer<void>();
+  final Completer<void> activeRefreshReturned = Completer<void>();
+  final Completer<void> _releaseActiveRefresh = Completer<void>();
+  final List<String> detailUsers = <String>[];
+  final List<String> activeRefreshUsers = <String>[];
+
+  void releaseDetail() {
+    if (!_releaseDetail.isCompleted) _releaseDetail.complete();
+  }
+
+  void releaseActiveRefresh() {
+    if (!_releaseActiveRefresh.isCompleted) _releaseActiveRefresh.complete();
+  }
+
+  Future<Object?> call(XtreamRequest request) async {
+    final username = request.credentials.username;
+    switch (request.action ?? 'auth') {
+      case 'auth':
+        return <String, Object?>{
+          'user_info': <String, Object?>{'auth': 1, 'status': 'Active'},
+          'm3u_editor': <String, Object?>{
+            'version': '0.10.0',
+            'features': <String>['dvr'],
+          },
+        };
+      case 'get_live_categories':
+      case 'get_vod_categories':
+      case 'get_series_categories':
+      case 'get_live_streams':
+      case 'get_vod_streams':
+      case 'get_series':
+      case 'get_viewers':
+        return <Object?>[];
+      case 'get_dvr_recordings':
+        if (request.params['status'] != DvrRecordingStatus.recording.name) {
+          return <Object?>[];
+        }
+        activeRefreshUsers.add(username);
+        if (username == _firstCredentials.username &&
+            !activeRefreshStarted.isCompleted) {
+          activeRefreshStarted.complete();
+          await _releaseActiveRefresh.future;
+          if (!activeRefreshReturned.isCompleted) {
+            activeRefreshReturned.complete();
+          }
+        }
+        return <Map<String, Object?>>[
+          _dvrDetail(
+            username: username,
+            channelId: username == _firstCredentials.username ? 701 : 802,
+          ),
+        ];
+      case 'get_dvr_recording':
+        detailUsers.add(username);
+        if (username == _firstCredentials.username &&
+            !detailStarted.isCompleted) {
+          detailStarted.complete();
+          await _releaseDetail.future;
+          if (!detailReturned.isCompleted) detailReturned.complete();
+        }
+        return _dvrDetail(
+          username: username,
+          channelId: username == _firstCredentials.username ? 701 : 802,
+        );
+      default:
+        throw StateError('Unexpected DVR fixture action: ${request.action}');
+    }
+  }
+
+  static Map<String, Object?> _dvrDetail({
+    required String username,
+    required int channelId,
+  }) => <String, Object?>{
+    'uuid': 'recording-a',
+    'title': '$username private recording',
+    'status': 'recording',
+    'channel_id': channelId,
+    'stream_url': 'https://media.invalid/$username/recording.ts',
+    'live_url': 'https://media.invalid/$username/live.ts',
+    'edl_url': 'https://media.invalid/$username/recording.edl',
+    'metadata': <String, Object?>{'owner': username},
+  };
+}
+
 class _RecordingReverbService extends ReverbService {
   final List<String> connectedUsers = <String>[];
   final Completer<void> firstConnected = Completer<void>();
@@ -1979,9 +2461,18 @@ class _RecordingReverbService extends ReverbService {
   String? activeUser;
   final Map<String, void Function(TvNotificationItem)> _notificationCallbacks =
       <String, void Function(TvNotificationItem)>{};
+  final Map<String, void Function(DvrRecording)> _dvrCallbacks =
+      <String, void Function(DvrRecording)>{};
+  final Map<String, void Function()> _connectedCallbacks =
+      <String, void Function()>{};
 
   void emitNotification(String username, TvNotificationItem item) =>
       _notificationCallbacks[username]!(item);
+
+  void emitDvrStatus(String username, DvrRecording recording) =>
+      _dvrCallbacks[username]!(recording);
+
+  void emitConnected(String username) => _connectedCallbacks[username]!();
 
   @override
   Future<void> disconnect() async {
@@ -2002,6 +2493,12 @@ class _RecordingReverbService extends ReverbService {
     connectedUsers.add(credentials.username);
     activeUser = credentials.username;
     _notificationCallbacks[credentials.username] = onNotification;
+    if (onDvrStatus != null) {
+      _dvrCallbacks[credentials.username] = onDvrStatus;
+    }
+    if (onConnected != null) {
+      _connectedCallbacks[credentials.username] = onConnected;
+    }
     if (credentials.username == 'first') {
       if (!firstConnected.isCompleted) {
         firstConnected.complete();
@@ -2900,6 +3397,21 @@ Future<void> _waitForGuide(AppStateController controller, String title) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   fail('Timed out waiting for guide');
+}
+
+Future<void> _waitForNotificationTitle(
+  AppStateController controller,
+  String title,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if ((await controller.notificationStore.all()).any(
+      (stored) => stored.item.title == title,
+    )) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for notification: $title');
 }
 
 Future<void> _waitForProgress(

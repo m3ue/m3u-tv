@@ -487,6 +487,7 @@ class AppStateController extends ChangeNotifier {
 
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
     if (replacingNotificationSession) {
+      _clearNotificationOwner();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
       await _reverbService.disconnect();
@@ -598,6 +599,7 @@ class AppStateController extends ChangeNotifier {
       final sourceGeneration = _sourceOperationGeneration.advance();
       _sourceRollbackGeneration.advance();
       _notificationSessionGeneration.advance();
+      _clearNotificationOwner();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
       await _unregisterPushToken();
@@ -675,16 +677,23 @@ class AppStateController extends ChangeNotifier {
       // Older server versions don't return Reverb config — skip WebSocket setup
       // rather than hammering a connection that can never succeed.
       if (session == null) return;
+      final ownsDvr = _captureDvrOwnership(
+        credentials,
+        notificationGeneration: notificationGeneration,
+      );
       await _reverbService.connect(
         session: session,
         credentials: credentials,
         onNotification: _onPushNotification,
-        onDvrStatus: _onDvrStatusPush,
+        onDvrStatus: (recording) =>
+            _onDvrStatusPush(recording, credentials, ownsDvr),
         onRequestStatus: _onRequestStatusPush,
         onFavoriteToggled: _onFavoriteTogglePush,
         // Reconciles any status pushes missed while disconnected (app
         // suspended, network drop) — cheap, status-filtered fetch, not a poll.
-        onConnected: () => unawaited(refreshActiveDvrRecordings()),
+        onConnected: () => unawaited(
+          _refreshActiveDvrRecordings(credentials, ownsDvr),
+        ),
       );
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
@@ -710,6 +719,13 @@ class AppStateController extends ChangeNotifier {
       credentials,
     );
     if (!ownsNotification()) return null;
+    if (!notificationStore.selectOwner(
+      server: credentials.server,
+      session: session,
+    )) {
+      _clearNotificationOwner();
+      return null;
+    }
     if (session.availableChannels.isNotEmpty) {
       await notificationStore.setServerChannels(
         session.availableChannels,
@@ -917,6 +933,27 @@ class AppStateController extends ChangeNotifier {
         _activeViewer?.ulid == viewerUlid;
   }
 
+  bool Function() _captureDvrOwnership(
+    UserCredentials credentials, {
+    int? notificationGeneration,
+  }) {
+    final ownedNotificationGeneration =
+        notificationGeneration ?? _notificationSessionGeneration.current;
+    final sourceGeneration = _sourceOperationGeneration.current;
+    final viewerGeneration = _viewerOperationGeneration.current;
+    final viewerUlid = _activeViewer?.ulid;
+    return () =>
+        !_notificationSessionGeneration.isStale(
+          ownedNotificationGeneration,
+        ) &&
+        !_sourceOperationGeneration.isStale(sourceGeneration) &&
+        !_viewerOperationGeneration.isStale(viewerGeneration) &&
+        _sourceType == AppSourceType.xtream &&
+        _sameCredentials(authNotifier.credentials, credentials) &&
+        _sameCredentials(xtreamService.credentials, credentials) &&
+        _activeViewer?.ulid == viewerUlid;
+  }
+
   Future<void> handleForegroundPush(PushMessage message) async {
     final id = message.notificationId;
     final credentials = authNotifier.credentials;
@@ -956,6 +993,13 @@ class AppStateController extends ChangeNotifier {
         credentials,
       );
       if (!ownsNotification()) return;
+      if (!notificationStore.selectOwner(
+        server: credentials.server,
+        session: session,
+      )) {
+        _clearNotificationOwner();
+        return;
+      }
       if (session.availableChannels.isNotEmpty) {
         await notificationStore.setServerChannels(
           session.availableChannels,
@@ -1002,7 +1046,12 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  void _onDvrStatusPush(DvrRecording recording) {
+  void _onDvrStatusPush(
+    DvrRecording recording,
+    UserCredentials credentials,
+    bool Function() ownsWork,
+  ) {
+    if (!ownsWork()) return;
     final channelId = recording.channelId;
     if (channelId != null) {
       final updated = Set<int>.of(_recordingChannelIds);
@@ -1012,7 +1061,9 @@ class AppStateController extends ChangeNotifier {
         updated.remove(channelId);
       }
       if (!setEquals(_recordingChannelIds, updated)) {
+        if (!ownsWork()) return;
         _recordingChannelIds = updated;
+        if (!ownsWork()) return;
         notifyListeners();
       }
     }
@@ -1025,7 +1076,9 @@ class AppStateController extends ChangeNotifier {
           .where((r) => r.uuid != recording.uuid)
           .toList(growable: false);
       if (next.length != _dvrRecordings.length) {
+        if (!ownsWork()) return;
         _dvrRecordings = next;
+        if (!ownsWork()) return;
         notifyListeners();
       }
       return;
@@ -1041,12 +1094,25 @@ class AppStateController extends ChangeNotifier {
     // TvNotification on the 'dvr' channel at those points instead, which
     // arrives through the same _onPushNotification path as every other
     // notification (unread badge, history, subscription filter all for free).
-    unawaited(_refreshDvrRecordingDetail(recording.uuid));
+    if (!ownsWork()) return;
+    unawaited(
+      _refreshDvrRecordingDetail(
+        recording.uuid,
+        credentials,
+        ownsWork,
+      ),
+    );
   }
 
-  Future<void> _refreshDvrRecordingDetail(String uuid) async {
+  Future<void> _refreshDvrRecordingDetail(
+    String uuid,
+    UserCredentials credentials,
+    bool Function() ownsWork,
+  ) async {
+    if (!ownsWork()) return;
     try {
-      final detail = await xtreamService.getDvrRecording(uuid);
+      final detail = await xtreamService.getDvrRecordingFor(credentials, uuid);
+      if (!ownsWork()) return;
       final next = [..._dvrRecordings];
       final index = next.indexWhere((r) => r.uuid == uuid);
       if (index >= 0) {
@@ -1054,7 +1120,9 @@ class AppStateController extends ChangeNotifier {
       } else {
         next.insert(0, detail);
       }
+      if (!ownsWork()) return;
       _dvrRecordings = next;
+      if (!ownsWork()) return;
       notifyListeners();
     } on Object catch (error) {
       debugPrint('DVR: refresh recording detail after push failed: $error');
@@ -1407,6 +1475,7 @@ class AppStateController extends ChangeNotifier {
     _sourceRollbackGeneration.advance();
     _isLoadingContent = false;
     _notificationSessionGeneration.advance();
+    _clearNotificationOwner();
     _pushRegistrationSuspended = true;
     _pushLifecycleGeneration.advance();
     await _unregisterPushToken();
@@ -1633,15 +1702,29 @@ class AppStateController extends ChangeNotifier {
   /// while the screen is visible — `status=recording` keeps the request
   /// small regardless of total recording history.
   Future<void> refreshActiveDvrRecordings() async {
-    if (!hasDvrFeature) return;
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsWork = _captureDvrOwnership(credentials);
+    await _refreshActiveDvrRecordings(credentials, ownsWork);
+  }
+
+  Future<void> _refreshActiveDvrRecordings(
+    UserCredentials credentials,
+    bool Function() ownsWork,
+  ) async {
+    if (!ownsWork() || !hasDvrFeature) return;
     try {
-      final active = await xtreamService.getDvrRecordings(
+      final active = await xtreamService.getDvrRecordingsFor(
+        credentials,
         status: DvrRecordingStatus.recording,
         limit: 200,
       );
+      if (!ownsWork()) return;
       final ids = _extractRecordingChannelIds(active);
       if (setEquals(_recordingChannelIds, ids)) return;
+      if (!ownsWork()) return;
       _recordingChannelIds = ids;
+      if (!ownsWork()) return;
       notifyListeners();
     } on Object catch (error) {
       debugPrint('DVR: refresh active recordings failed: $error');
@@ -2415,6 +2498,12 @@ class AppStateController extends ChangeNotifier {
       first.server == second.server &&
       first.username == second.username &&
       first.password == second.password;
+
+  void _clearNotificationOwner() {
+    notificationStore.clearOwner();
+    _unreadNotificationCount = 0;
+    _activatedNotificationIds.clear();
+  }
 
   // Scopes ViewerService's saved active-viewer ulid to this server+login so
   // switching logins on the same device can never reuse a viewer ulid saved

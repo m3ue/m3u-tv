@@ -30,12 +30,16 @@ class PersistentJsonStore {
     bool Function() shouldCommit,
   ) => _writeQueue.run(() async {
     if (!shouldCommit()) return false;
-    final previous = Map<String, Object?>.from(await _readAllUnlocked());
-    final data = Map<String, Object?>.from(previous)..[key] = value;
-    await _writeAll(data);
-    if (shouldCommit()) return true;
-    await _writeAll(previous);
-    return false;
+    final data = Map<String, Object?>.from(await _readAllUnlocked())
+      ..[key] = value;
+    await _writeStaging(data);
+    try {
+      if (!shouldCommit()) return false;
+      await _commitStaging(data);
+      return true;
+    } finally {
+      await _deleteStaging();
+    }
   });
 
   Future<void> delete(String key) async {
@@ -77,6 +81,7 @@ class PersistentJsonStore {
   Future<Map<String, Object?>> _readAllUnlocked() async {
     final cached = _cache;
     if (cached != null) return cached;
+    await _deleteStaging();
     if (!await _file.exists()) {
       _cache = <String, Object?>{};
       return _cache!;
@@ -94,17 +99,33 @@ class PersistentJsonStore {
   }
 
   Future<void> _writeAll(Map<String, Object?> data) async {
-    await _file.parent.create(recursive: true);
-    final temp = File('${_file.path}.tmp');
-    await temp.writeAsString(jsonEncode(data), flush: true);
+    await _writeStaging(data);
     try {
-      await _file.delete();
-    } on PathNotFoundException {
-      // File may not exist yet or was already removed by a concurrent write.
+      await _commitStaging(data);
+    } finally {
+      await _deleteStaging();
     }
-    await temp.rename(_file.path);
+  }
+
+  Future<void> _writeStaging(Map<String, Object?> data) async {
+    await _file.parent.create(recursive: true);
+    await _stagingFile.writeAsString(jsonEncode(data), flush: true);
+  }
+
+  Future<void> _commitStaging(Map<String, Object?> data) async {
+    await _stagingFile.rename(_file.path);
     _cache = data;
   }
+
+  Future<void> _deleteStaging() async {
+    try {
+      await _stagingFile.delete();
+    } on PathNotFoundException {
+      // A successful rename already consumed the staging file.
+    }
+  }
+
+  File get _stagingFile => File('${_file.path}.tmp');
 
   static String _defaultPath() {
     final env = Platform.environment;

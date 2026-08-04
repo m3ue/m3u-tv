@@ -1,6 +1,9 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -91,17 +94,42 @@ class TvNotificationStore {
   final Map<String, Object?> _memory;
   final PersistentJsonStore? _store;
   final SerialQueue _mutationQueue = SerialQueue();
+  String? _ownerKey;
 
   // In-memory cache so callers don't need to await for a hot-path check.
   Set<String>? _subscribedChannelsCache;
   List<TvNotificationChannel>? _serverChannelsCache;
 
+  bool selectOwner({
+    required String server,
+    required TvPlaylistSession session,
+  }) {
+    final ownerKey = _notificationOwnerKey(server, session);
+    if (ownerKey == null) {
+      clearOwner();
+      return false;
+    }
+    if (_ownerKey == ownerKey) return true;
+    _ownerKey = ownerKey;
+    _subscribedChannelsCache = null;
+    _serverChannelsCache = null;
+    return true;
+  }
+
+  void clearOwner() {
+    _ownerKey = null;
+    _subscribedChannelsCache = null;
+    _serverChannelsCache = null;
+  }
+
   /// The set of channel names the user wants to receive. Empty means all.
   Future<Set<String>> subscribedChannels() async {
+    final owner = _ownerKey;
+    if (owner == null) return <String>{};
     if (_subscribedChannelsCache != null) return _subscribedChannelsCache!;
-    final raw = _store == null
-        ? _memory[_channelsKey]
-        : await _store.read(_channelsKey);
+    final key = _ownedKey(_channelsKey, owner);
+    final raw = _store == null ? _memory[key] : await _store.read(key);
+    if (_ownerKey != owner) return <String>{};
     if (raw is List) {
       _subscribedChannelsCache = raw.map((e) => '$e').toSet();
     } else {
@@ -110,19 +138,29 @@ class TvNotificationStore {
     return _subscribedChannelsCache!;
   }
 
-  Future<void> setSubscribedChannels(Set<String> channels) async {
-    _subscribedChannelsCache = Set.unmodifiable(channels);
+  Future<void> setSubscribedChannels(Set<String> channels) => _mutate(() async {
+    final owner = _ownerKey;
+    if (owner == null) return;
+    bool ownsMutation() => _ownerKey == owner;
     final encoded = channels.toList(growable: false);
-    _memory[_channelsKey] = encoded;
-    await _store?.write(_channelsKey, encoded);
-  }
+    final key = _ownedKey(_channelsKey, owner);
+    final store = _store;
+    if (store != null && !await store.writeIf(key, encoded, ownsMutation)) {
+      return;
+    }
+    if (!ownsMutation()) return;
+    _subscribedChannelsCache = Set.unmodifiable(channels);
+    _memory[key] = encoded;
+  });
 
   /// Channels configured in the editor and delivered via the API on connect.
   Future<List<TvNotificationChannel>> serverChannels() async {
+    final owner = _ownerKey;
+    if (owner == null) return const <TvNotificationChannel>[];
     if (_serverChannelsCache != null) return _serverChannelsCache!;
-    final raw = _store == null
-        ? _memory[_serverChannelsKey]
-        : await _store.read(_serverChannelsKey);
+    final key = _ownedKey(_serverChannelsKey, owner);
+    final raw = _store == null ? _memory[key] : await _store.read(key);
+    if (_ownerKey != owner) return const <TvNotificationChannel>[];
     if (raw is List) {
       _serverChannelsCache = raw
           .whereType<Map<String, Object?>>()
@@ -139,30 +177,39 @@ class TvNotificationStore {
     List<TvNotificationChannel> channels, {
     bool Function()? shouldCommit,
   }) async {
+    final owner = _ownerKey;
+    if (owner == null) return;
+    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
     final encoded = channels
         .map((c) => {'name': c.name, 'label': c.label})
         .toList(growable: false);
-    if (shouldCommit != null) {
-      if (!shouldCommit()) return;
-      final store = _store;
-      if (store != null &&
-          !await store.writeIf(_serverChannelsKey, encoded, shouldCommit)) {
-        return;
-      }
-      if (!shouldCommit()) return;
-      _serverChannelsCache = List.unmodifiable(channels);
-      _memory[_serverChannelsKey] = encoded;
+    if (!ownsMutation()) return;
+    final key = _ownedKey(_serverChannelsKey, owner);
+    final store = _store;
+    if (store != null && !await store.writeIf(key, encoded, ownsMutation)) {
       return;
     }
+    if (!ownsMutation()) return;
     _serverChannelsCache = List.unmodifiable(channels);
-    _memory[_serverChannelsKey] = encoded;
-    await _store?.write(_serverChannelsKey, encoded);
+    _memory[key] = encoded;
   }
 
   /// Returns all stored notifications, most recent first.
   /// Pass [channelFilter] to restrict to specific channels (empty = all).
-  Future<List<StoredTvNotification>> all({Set<String>? channelFilter}) async {
-    final raw = await _read();
+  Future<List<StoredTvNotification>> all({Set<String>? channelFilter}) {
+    final owner = _ownerKey;
+    if (owner == null) {
+      return Future.value(const <StoredTvNotification>[]);
+    }
+    return _allFor(owner, channelFilter: channelFilter);
+  }
+
+  Future<List<StoredTvNotification>> _allFor(
+    String owner, {
+    Set<String>? channelFilter,
+  }) async {
+    final raw = await _read(owner);
+    if (_ownerKey != owner) return const <StoredTvNotification>[];
     if (raw is! List) return const <StoredTvNotification>[];
     final notifications = raw
         .map(StoredTvNotification.fromJson)
@@ -179,10 +226,14 @@ class TvNotificationStore {
   /// stored notifications. Server channels appear first (preserving editor
   /// order), then any additional channels discovered from notifications.
   Future<List<TvNotificationChannel>> knownChannels() async {
+    final owner = _ownerKey;
+    if (owner == null) return const <TvNotificationChannel>[];
     final server = await serverChannels();
+    if (_ownerKey != owner) return const <TvNotificationChannel>[];
     final serverNames = server.map((c) => c.name).toSet();
 
-    final notifications = await all();
+    final notifications = await _allFor(owner);
+    if (_ownerKey != owner) return const <TvNotificationChannel>[];
     final fromNotifications =
         notifications
             .map((n) => n.item.channel)
@@ -209,12 +260,15 @@ class TvNotificationStore {
     List<TvNotificationItem> serverUnread, {
     bool Function()? shouldCommit,
   }) => _mutate(() async {
-    if (shouldCommit != null && !shouldCommit()) {
+    final owner = _ownerKey;
+    if (owner == null) return const <TvNotificationItem>[];
+    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    if (!ownsMutation()) {
       return const <TvNotificationItem>[];
     }
     final serverUnreadIds = {for (final n in serverUnread) n.id};
-    final existing = await all();
-    if (shouldCommit != null && !shouldCommit()) {
+    final existing = await _allFor(owner);
+    if (!ownsMutation()) {
       return const <TvNotificationItem>[];
     }
     final existingIds = {for (final n in existing) n.item.id};
@@ -237,10 +291,11 @@ class TvNotificationStore {
         .toList(growable: false);
 
     final committed = await _write(
+      owner,
       [...newItems, ...kept].take(_maxStored).toList(growable: false),
-      shouldCommit: shouldCommit,
+      shouldCommit: ownsMutation,
     );
-    if (!committed || (shouldCommit != null && !shouldCommit())) {
+    if (!committed || !ownsMutation()) {
       return const <TvNotificationItem>[];
     }
     return newItems.map((n) => n.item).toList(growable: false);
@@ -252,9 +307,12 @@ class TvNotificationStore {
     TvNotificationItem item, {
     bool Function()? shouldCommit,
   }) => _mutate(() async {
-    if (shouldCommit != null && !shouldCommit()) return false;
-    final existing = await all();
-    if (shouldCommit != null && !shouldCommit()) return false;
+    final owner = _ownerKey;
+    if (owner == null) return false;
+    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    if (!ownsMutation()) return false;
+    final existing = await _allFor(owner);
+    if (!ownsMutation()) return false;
     if (existing.any((n) => n.item.id == item.id)) return false;
     final updated = [
       StoredTvNotification(
@@ -265,13 +323,18 @@ class TvNotificationStore {
       ...existing,
     ];
     return _write(
+      owner,
       updated.take(_maxStored).toList(growable: false),
-      shouldCommit: shouldCommit,
+      shouldCommit: ownsMutation,
     );
   });
 
-  Future<void> markRead(String id) async {
-    final existing = await all();
+  Future<void> markRead(String id) => _mutate(() async {
+    final owner = _ownerKey;
+    if (owner == null) return;
+    bool ownsMutation() => _ownerKey == owner;
+    final existing = await _allFor(owner);
+    if (!ownsMutation()) return;
     var changed = false;
     final now = DateTime.now();
     final updated = existing
@@ -281,42 +344,79 @@ class TvNotificationStore {
           return n.copyWith(isRead: true, readAt: now);
         })
         .toList(growable: false);
-    if (changed) await _write(updated);
-  }
+    if (changed) await _write(owner, updated, shouldCommit: ownsMutation);
+  });
 
-  Future<void> markAllRead() async {
-    final existing = await all();
+  Future<void> markAllRead() => _mutate(() async {
+    final owner = _ownerKey;
+    if (owner == null) return;
+    bool ownsMutation() => _ownerKey == owner;
+    final existing = await _allFor(owner);
+    if (!ownsMutation()) return;
     if (existing.every((n) => n.isRead)) return;
     final now = DateTime.now();
     await _write(
+      owner,
       existing
           .map((n) => n.isRead ? n : n.copyWith(isRead: true, readAt: now))
           .toList(growable: false),
+      shouldCommit: ownsMutation,
     );
+  });
+
+  Future<Object?> _read(String owner) async {
+    final key = _ownedKey(_key, owner);
+    return _store == null ? _memory[key] : _store.read(key);
   }
 
-  Future<Object?> _read() async =>
-      _store == null ? _memory[_key] : _store.read(_key);
-
   Future<bool> _write(
+    String owner,
     List<StoredTvNotification> notifications, {
     bool Function()? shouldCommit,
   }) async {
+    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    if (!ownsMutation()) return false;
     final encoded = notifications.map((n) => n.toJson()).toList();
-    if (shouldCommit != null) {
-      final store = _store;
-      if (store != null && !await store.writeIf(_key, encoded, shouldCommit)) {
-        return false;
-      }
-      if (!shouldCommit()) return false;
-      _memory[_key] = encoded;
-      return true;
+    final key = _ownedKey(_key, owner);
+    final store = _store;
+    if (store != null && !await store.writeIf(key, encoded, ownsMutation)) {
+      return false;
     }
-    _memory[_key] = encoded;
-    await _store?.write(_key, encoded);
+    if (!ownsMutation()) return false;
+    _memory[key] = encoded;
     return true;
   }
 
   Future<T> _mutate<T>(Future<T> Function() operation) =>
       _mutationQueue.run(operation);
+
+  static String _ownedKey(String key, String owner) => '${key}_v2_$owner';
+
+  static String? _notificationOwnerKey(
+    String server,
+    TvPlaylistSession session,
+  ) {
+    final type = session.notifiableType.trim().toLowerCase();
+    final uri = Uri.tryParse(server.trim());
+    if (session.notifiableId <= 0 ||
+        type.isEmpty ||
+        uri == null ||
+        !uri.hasScheme ||
+        uri.host.isEmpty) {
+      return null;
+    }
+    final defaultPort =
+        (uri.scheme.toLowerCase() == 'https' && uri.port == 443) ||
+        (uri.scheme.toLowerCase() == 'http' && uri.port == 80);
+    final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    final source = Uri(
+      scheme: uri.scheme.toLowerCase(),
+      host: uri.host.toLowerCase(),
+      port: uri.hasPort && !defaultPort ? uri.port : null,
+      path: path,
+    );
+    return sha256
+        .convert(utf8.encode('$source|$type|${session.notifiableId}'))
+        .toString();
+  }
 }
