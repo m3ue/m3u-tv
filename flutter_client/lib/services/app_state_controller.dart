@@ -1159,7 +1159,7 @@ class AppStateController extends ChangeNotifier {
       final migrated = await _readMigratedFavoriteViewers();
       if (!isCurrent()) return;
       if (!migrated.contains(viewer.ulid)) {
-        final synchronized = viewer.isAdmin
+        final synchronized = viewer.isAdmin && migrated.isEmpty
             ? await _pushLocalFavoritesOnce(viewer, isCurrent: isCurrent)
             : await _pullFavorites(viewer, isCurrent: isCurrent);
         if (!synchronized || !isCurrent()) return;
@@ -1729,7 +1729,9 @@ class AppStateController extends ChangeNotifier {
           }
 
           if (invalidateEpgFreshness) {
-            _resetEpgSession(clearGuide: false);
+            _resetEpgSession(
+              clearGuide: _sourceType != AppSourceType.none,
+            );
           }
           _sourceType = AppSourceType.xtream;
           _liveCategories = liveCategories;

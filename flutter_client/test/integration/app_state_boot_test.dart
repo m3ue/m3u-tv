@@ -475,7 +475,7 @@ void main() {
     );
 
     test(
-      'failed EPG after a source switch retains guide and retries',
+      'failed EPG after a source switch clears old guide and retries',
       () async {
         var now = DateTime.now();
         var serverBEpgRequests = 0;
@@ -524,10 +524,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
 
         expect(serverBEpgRequests, 1);
-        expect(
-          controller.epgService.lookup('bbc.one')?.current.title,
-          'News at Noon',
-        );
+        expect(controller.epgService.lookup('bbc.one'), isNull);
         controller
           ..ensureEpgForChannels(controller.channels)
           ..ensureEpgForChannels(controller.channels);

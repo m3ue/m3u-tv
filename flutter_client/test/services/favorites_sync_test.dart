@@ -640,6 +640,52 @@ void main() {
     );
 
     test(
+      'connecting a second source does not upload favorites cached from the first source',
+      () async {
+        final memory = <String, Object?>{};
+        final transport = _FakeXtreamTransport();
+        final controller = _controller(memory: memory, transport: transport);
+        addTearDown(controller.dispose);
+        await controller.favoritesService.add(101);
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://source-a.example',
+              username: 'source-a',
+              password: 'source-a-password',
+            ),
+          ),
+          isTrue,
+        );
+        await pumpEventQueue();
+        expect(
+          transport.requests.where((r) => r.action == 'sync_favorites'),
+          hasLength(1),
+        );
+        transport.requests.clear();
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://source-b.example',
+              username: 'source-b',
+              password: 'source-b-password',
+            ),
+          ),
+          isTrue,
+        );
+        await pumpEventQueue();
+
+        expect(
+          transport.requests.where((r) => r.action == 'sync_favorites'),
+          isEmpty,
+        );
+        expect(await controller.favoritesService.all(), isEmpty);
+      },
+    );
+
+    test(
       'toggling a live favorite pushes toggle_favorite to the server',
       () async {
         final transport = _FakeXtreamTransport();
@@ -875,10 +921,13 @@ class _FakeXtreamTransport {
       case 'get_recently_watched':
         return const <Object?>[];
       case 'get_viewers':
+        final viewerSuffix = request.credentials.username == 'fixture-user'
+            ? 'admin'
+            : request.credentials.username;
         return <Map<String, Object?>>[
           <String, Object?>{
             'id': 1,
-            'ulid': 'viewer-admin',
+            'ulid': 'viewer-$viewerSuffix',
             'name': 'Admin',
             'is_admin': true,
           },

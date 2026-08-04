@@ -1349,7 +1349,7 @@ void main() {
         expect(
           transport.requests.where(
             (request) =>
-                request.action == 'sync_favorites' &&
+                request.action == 'get_favorites' &&
                 request.viewerId == 'viewer-server-b',
           ),
           hasLength(2),
