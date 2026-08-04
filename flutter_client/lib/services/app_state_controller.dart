@@ -681,13 +681,18 @@ class AppStateController extends ChangeNotifier {
         credentials,
         notificationGeneration: notificationGeneration,
       );
+      final ownsRequests = _captureMediaRequestOwnership(
+        credentials,
+        notificationGeneration: notificationGeneration,
+      );
       await _reverbService.connect(
         session: session,
         credentials: credentials,
         onNotification: _onPushNotification,
         onDvrStatus: (recording) =>
             _onDvrStatusPush(recording, credentials, ownsDvr),
-        onRequestStatus: _onRequestStatusPush,
+        onRequestStatus: (request) =>
+            _onRequestStatusPush(request, ownsRequests),
         onFavoriteToggled: _onFavoriteTogglePush,
         // Reconciles any status pushes missed while disconnected (app
         // suspended, network drop) — cheap, status-filtered fetch, not a poll.
@@ -954,6 +959,22 @@ class AppStateController extends ChangeNotifier {
         _activeViewer?.ulid == viewerUlid;
   }
 
+  bool Function() _captureMediaRequestOwnership(
+    UserCredentials credentials, {
+    int? notificationGeneration,
+  }) {
+    final sourceGeneration = _sourceOperationGeneration.current;
+    return () =>
+        (notificationGeneration == null ||
+            !_notificationSessionGeneration.isStale(
+              notificationGeneration,
+            )) &&
+        !_sourceOperationGeneration.isStale(sourceGeneration) &&
+        _sourceType == AppSourceType.xtream &&
+        _sameCredentials(authNotifier.credentials, credentials) &&
+        _sameCredentials(xtreamService.credentials, credentials);
+  }
+
   Future<void> handleForegroundPush(PushMessage message) async {
     final id = message.notificationId;
     final credentials = authNotifier.credentials;
@@ -1133,7 +1154,11 @@ class AppStateController extends ChangeNotifier {
   /// from the lightweight `request.status` push (approved/rejected/completed
   /// by MediaRequestStatusEvent on the server) instead of re-polling
   /// request_history.
-  void _onRequestStatusPush(MediaRequestSummary request) {
+  void _onRequestStatusPush(
+    MediaRequestSummary request,
+    bool Function() ownsWork,
+  ) {
+    if (!ownsWork()) return;
     final next = [..._mediaRequests];
     final index = next.indexWhere((r) => r.id == request.id);
     if (index >= 0) {
@@ -1141,7 +1166,9 @@ class AppStateController extends ChangeNotifier {
     } else {
       next.insert(0, request);
     }
+    if (!ownsWork()) return;
     _mediaRequests = next;
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
@@ -1747,23 +1774,45 @@ class AppStateController extends ChangeNotifier {
     required String externalId,
     List<int>? seasons,
   }) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Xtream credentials not configured');
+    }
+    final ownsWork = _captureMediaRequestOwnership(credentials);
+    if (!ownsWork()) {
+      throw StateError('Xtream credentials not configured');
+    }
     final request = await xtreamService.submitContentRequest(
       type: type,
       integrationId: integrationId,
       externalId: externalId,
       seasons: seasons,
     );
-    _mediaRequests = [request, ..._mediaRequests];
+    if (!ownsWork()) return request;
+    final next = [request, ..._mediaRequests];
+    if (!ownsWork()) return request;
+    _mediaRequests = next;
+    if (!ownsWork()) return request;
     notifyListeners();
     return request;
   }
 
   /// Dismisses a completed or rejected request and removes it locally.
   Future<void> dismissMediaRequest(int requestId) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Xtream credentials not configured');
+    }
+    final ownsWork = _captureMediaRequestOwnership(credentials);
+    if (!ownsWork()) return;
     await xtreamService.dismissMediaRequest(requestId);
-    _mediaRequests = _mediaRequests
+    if (!ownsWork()) return;
+    final next = _mediaRequests
         .where((request) => request.id != requestId)
         .toList(growable: false);
+    if (!ownsWork()) return;
+    _mediaRequests = next;
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
@@ -1771,9 +1820,15 @@ class AppStateController extends ChangeNotifier {
   /// when the Requests screen becomes visible, since a push can be missed
   /// while the app is backgrounded and no other screen holds this list warm.
   Future<void> refreshMediaRequests() async {
-    if (!hasRequestsFeature) return;
+    final credentials = authNotifier.credentials;
+    if (credentials == null || !hasRequestsFeature) return;
+    final ownsWork = _captureMediaRequestOwnership(credentials);
+    if (!ownsWork()) return;
     try {
-      _mediaRequests = await xtreamService.getMediaRequests();
+      final requests = await xtreamService.getMediaRequests();
+      if (!ownsWork()) return;
+      _mediaRequests = requests;
+      if (!ownsWork()) return;
       notifyListeners();
     } on Object catch (error) {
       debugPrint('Requests: refresh failed: $error');
