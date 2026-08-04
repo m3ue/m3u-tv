@@ -701,16 +701,21 @@ class AppStateController extends ChangeNotifier {
     bool present = true,
     int? notificationGeneration,
   }) async {
+    final ownsNotification = _captureNotificationOwnership(
+      credentials: credentials,
+      notificationGeneration: notificationGeneration,
+    );
+    if (!ownsNotification()) return null;
     final (session, unread) = await _tvNotificationService.fetchUnread(
       credentials,
     );
-    if ((notificationGeneration != null &&
-            _notificationSessionGeneration.isStale(notificationGeneration)) ||
-        !_sameCredentials(authNotifier.credentials, credentials)) {
-      return null;
-    }
+    if (!ownsNotification()) return null;
     if (session.availableChannels.isNotEmpty) {
-      await notificationStore.setServerChannels(session.availableChannels);
+      await notificationStore.setServerChannels(
+        session.availableChannels,
+        shouldCommit: ownsNotification,
+      );
+      if (!ownsNotification()) return null;
     }
     // Sync local store with the server's authoritative unread list: stale
     // local unreads are marked read, new server items are added. Only
@@ -721,17 +726,26 @@ class AppStateController extends ChangeNotifier {
         : unread.where((item) => !item.adminOnly).toList(growable: false);
     final newItems = await notificationStore.syncUnreadWithServer(
       authorizedUnread,
+      shouldCommit: ownsNotification,
     );
-    await _refreshUnreadNotificationCount();
+    if (!ownsNotification()) return null;
+    if (!await _refreshUnreadNotificationCount(
+      shouldCommit: ownsNotification,
+    )) {
+      return null;
+    }
     if (present) {
       final subscribed = await notificationStore.subscribedChannels();
+      if (!ownsNotification()) return null;
       for (final item in newItems) {
         if ((presentOnlyId == null || item.id == presentOnlyId) &&
-            (subscribed.isEmpty || subscribed.contains(item.channel))) {
+            (subscribed.isEmpty || subscribed.contains(item.channel)) &&
+            ownsNotification()) {
           _tvNotificationController.add(item);
         }
       }
     }
+    if (!ownsNotification()) return null;
     if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) {
       return null;
     }
@@ -880,19 +894,25 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
-  bool Function() _captureNotificationOwnership() {
-    final notificationGeneration = _notificationSessionGeneration.current;
+  bool Function() _captureNotificationOwnership({
+    UserCredentials? credentials,
+    int? notificationGeneration,
+  }) {
+    final ownedCredentials = credentials ?? authNotifier.credentials;
+    final ownedNotificationGeneration =
+        notificationGeneration ?? _notificationSessionGeneration.current;
     final sourceGeneration = _sourceOperationGeneration.current;
     final viewerGeneration = _viewerOperationGeneration.current;
-    final credentials = authNotifier.credentials;
     final sourceType = _sourceType;
     final viewerUlid = _activeViewer?.ulid;
     return () =>
-        credentials != null &&
-        !_notificationSessionGeneration.isStale(notificationGeneration) &&
+        ownedCredentials != null &&
+        !_notificationSessionGeneration.isStale(
+          ownedNotificationGeneration,
+        ) &&
         !_sourceOperationGeneration.isStale(sourceGeneration) &&
         !_viewerOperationGeneration.isStale(viewerGeneration) &&
-        _sameCredentials(authNotifier.credentials, credentials) &&
+        _sameCredentials(authNotifier.credentials, ownedCredentials) &&
         _sourceType == sourceType &&
         _activeViewer?.ulid == viewerUlid;
   }
@@ -925,31 +945,45 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     final notificationGeneration = _notificationSessionGeneration.current;
+    final ownsNotification = _captureNotificationOwnership(
+      credentials: credentials,
+      notificationGeneration: notificationGeneration,
+    );
+    if (!ownsNotification()) return;
 
     try {
       final (session, unread) = await _tvNotificationService.fetchUnread(
         credentials,
       );
-      if (_notificationSessionGeneration.isStale(notificationGeneration) ||
-          !_sameCredentials(authNotifier.credentials, credentials)) {
-        return;
-      }
+      if (!ownsNotification()) return;
       if (session.availableChannels.isNotEmpty) {
-        await notificationStore.setServerChannels(session.availableChannels);
+        await notificationStore.setServerChannels(
+          session.availableChannels,
+          shouldCommit: ownsNotification,
+        );
+        if (!ownsNotification()) return;
       }
       final authorizedUnread = session.isAdmin
           ? unread
           : unread.where((item) => !item.adminOnly).toList(growable: false);
-      await notificationStore.syncUnreadWithServer(authorizedUnread);
-      await _refreshUnreadNotificationCount();
-      if (_notificationSessionGeneration.isStale(notificationGeneration) ||
-          !_sameCredentials(authNotifier.credentials, credentials)) {
+      await notificationStore.syncUnreadWithServer(
+        authorizedUnread,
+        shouldCommit: ownsNotification,
+      );
+      if (!ownsNotification()) return;
+      if (!await _refreshUnreadNotificationCount(
+        shouldCommit: ownsNotification,
+      )) {
         return;
       }
       final matching = authorizedUnread.where((item) => item.id == id);
       if (matching.isEmpty) return;
       final destination = notificationDestinationFor(matching.first.channel);
-      if (destination == null || !_markNotificationActivated(id)) return;
+      if (!ownsNotification() ||
+          destination == null ||
+          !_markNotificationActivated(id)) {
+        return;
+      }
       _notificationActivationController.add(destination);
     } on Object catch (_) {
       // A tap without an authorized REST record is a safe no-op.

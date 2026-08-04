@@ -135,11 +135,26 @@ class TvNotificationStore {
     return _serverChannelsCache!;
   }
 
-  Future<void> setServerChannels(List<TvNotificationChannel> channels) async {
-    _serverChannelsCache = List.unmodifiable(channels);
+  Future<void> setServerChannels(
+    List<TvNotificationChannel> channels, {
+    bool Function()? shouldCommit,
+  }) async {
     final encoded = channels
         .map((c) => {'name': c.name, 'label': c.label})
         .toList(growable: false);
+    if (shouldCommit != null) {
+      if (!shouldCommit()) return;
+      final store = _store;
+      if (store != null &&
+          !await store.writeIf(_serverChannelsKey, encoded, shouldCommit)) {
+        return;
+      }
+      if (!shouldCommit()) return;
+      _serverChannelsCache = List.unmodifiable(channels);
+      _memory[_serverChannelsKey] = encoded;
+      return;
+    }
+    _serverChannelsCache = List.unmodifiable(channels);
     _memory[_serverChannelsKey] = encoded;
     await _store?.write(_serverChannelsKey, encoded);
   }
@@ -191,10 +206,17 @@ class TvNotificationStore {
   /// [serverUnread] not yet stored locally are prepended as unread. Returns
   /// only the newly added items so callers can decide whether to toast them.
   Future<List<TvNotificationItem>> syncUnreadWithServer(
-    List<TvNotificationItem> serverUnread,
-  ) => _mutate(() async {
+    List<TvNotificationItem> serverUnread, {
+    bool Function()? shouldCommit,
+  }) => _mutate(() async {
+    if (shouldCommit != null && !shouldCommit()) {
+      return const <TvNotificationItem>[];
+    }
     final serverUnreadIds = {for (final n in serverUnread) n.id};
     final existing = await all();
+    if (shouldCommit != null && !shouldCommit()) {
+      return const <TvNotificationItem>[];
+    }
     final existingIds = {for (final n in existing) n.item.id};
     final now = DateTime.now();
 
@@ -214,9 +236,13 @@ class TvNotificationStore {
         )
         .toList(growable: false);
 
-    await _write(
+    final committed = await _write(
       [...newItems, ...kept].take(_maxStored).toList(growable: false),
+      shouldCommit: shouldCommit,
     );
+    if (!committed || (shouldCommit != null && !shouldCommit())) {
+      return const <TvNotificationItem>[];
+    }
     return newItems.map((n) => n.item).toList(growable: false);
   });
 

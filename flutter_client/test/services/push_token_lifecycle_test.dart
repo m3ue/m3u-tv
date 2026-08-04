@@ -161,6 +161,144 @@ void main() {
       expect(reverb.connectedUsers, <String>['second']);
     });
 
+    for (final boundary in <String>['server channels', 'unread sync']) {
+      for (final transition in <String>['viewer', 'source']) {
+        test(
+          'post-fetch $boundary cannot survive a $transition handoff',
+          () async {
+            final notificationPersistence = _BlockingNotificationStore();
+            final notificationStore = TvNotificationStore(
+              store: notificationPersistence,
+            );
+            final api = _UnreadReconciliationTvNotificationService(
+              includeServerChannels: boundary == 'server channels',
+            );
+            final fixture = _Fixture(
+              notificationApi: api,
+              notificationStore: notificationStore,
+            );
+            addTearDown(fixture.controller.dispose);
+            expect(
+              await fixture.controller.connectXtream(_firstCredentials),
+              isTrue,
+            );
+            await api.initialFetchCompleted.future;
+            await fixture.controller.receiveTvNotification(
+              _existingNotification,
+            );
+            final presented = <TvNotificationItem>[];
+            final subscription = fixture.controller.tvNotifications.listen(
+              presented.add,
+            );
+            addTearDown(subscription.cancel);
+            var controllerNotifications = 0;
+            fixture.controller.addListener(
+              () => controllerNotifications += 1,
+            );
+            var persistenceCallbacks = 0;
+            void onPersistenceCommit() => persistenceCallbacks += 1;
+            notificationPersistence
+              ..onCommit = onPersistenceCommit
+              ..resetCommits();
+            final write = notificationPersistence.blockNextWrite();
+
+            final reconciliation = fixture.controller.reconcileNotifications();
+            await write.started.future;
+            if (transition == 'viewer') {
+              await fixture.controller.switchViewer(
+                const Viewer(
+                  id: 2,
+                  ulid: 'viewer-b',
+                  name: 'Viewer B',
+                  isAdmin: false,
+                ),
+              );
+            } else {
+              expect(
+                await fixture.controller.switchToM3u(
+                  playlistText:
+                      '#EXTM3U\n#EXTINF:-1,Fixture Channel\nhttps://media.invalid/live.m3u8',
+                ),
+                isTrue,
+              );
+            }
+            controllerNotifications = 0;
+            notificationPersistence.resetCommits();
+            write.release.complete();
+            await reconciliation;
+            await write.completed.future;
+            await pumpEventQueue();
+
+            expect(
+              (await notificationStore.all()).map((stored) => stored.item.id),
+              <String>[_existingNotification.id],
+            );
+            expect(await notificationStore.serverChannels(), isEmpty);
+            expect(fixture.controller.unreadNotificationCount, 1);
+            expect(notificationPersistence.commits, 0);
+            expect(persistenceCallbacks, 0);
+            expect(controllerNotifications, 0);
+            expect(presented, isEmpty);
+          },
+        );
+      }
+    }
+
+    test(
+      'current reconciliation owner persists and publishes exactly once',
+      () async {
+        final notificationPersistence = _BlockingNotificationStore();
+        final notificationStore = TvNotificationStore(
+          store: notificationPersistence,
+        );
+        final api = _UnreadReconciliationTvNotificationService(
+          includeServerChannels: true,
+        );
+        final fixture = _Fixture(
+          notificationApi: api,
+          notificationStore: notificationStore,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await api.initialFetchCompleted.future;
+        await fixture.controller.receiveTvNotification(_existingNotification);
+        final presented = <TvNotificationItem>[];
+        final subscription = fixture.controller.tvNotifications.listen(
+          presented.add,
+        );
+        addTearDown(subscription.cancel);
+        var controllerNotifications = 0;
+        fixture.controller.addListener(() => controllerNotifications += 1);
+        var persistenceCallbacks = 0;
+        void onPersistenceCommit() => persistenceCallbacks += 1;
+        notificationPersistence
+          ..onCommit = onPersistenceCommit
+          ..resetCommits();
+
+        await fixture.controller.reconcileNotifications();
+        await pumpEventQueue();
+
+        expect(
+          (await notificationStore.all()).map((stored) => stored.item.id),
+          <String>[_reconciledNotification.id],
+        );
+        expect(
+          (await notificationStore.serverChannels()).map(
+            (channel) => channel.name,
+          ),
+          <String>['general'],
+        );
+        expect(fixture.controller.unreadNotificationCount, 1);
+        expect(notificationPersistence.commits, 2);
+        expect(persistenceCallbacks, 2);
+        expect(controllerNotifications, 1);
+        expect(presented, <TvNotificationItem>[_reconciledNotification]);
+      },
+    );
+
     for (final transition in <String>['viewer', 'source']) {
       test(
         'delayed Reverb notification cannot survive a $transition handoff',
@@ -1585,6 +1723,18 @@ const _thirdCredentials = UserCredentials(
   username: 'third',
   password: 'third-private-value',
 );
+const _existingNotification = TvNotificationItem(
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  channel: 'general',
+  title: 'Existing notification',
+  status: 'info',
+);
+const _reconciledNotification = TvNotificationItem(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  channel: 'general',
+  title: 'Reconciled notification',
+  status: 'info',
+);
 
 class _Fixture {
   _Fixture({
@@ -1778,6 +1928,48 @@ class _DelayedTvNotificationService extends TvNotificationService {
   }
 }
 
+class _UnreadReconciliationTvNotificationService extends TvNotificationService {
+  _UnreadReconciliationTvNotificationService({
+    required this.includeServerChannels,
+  });
+
+  final bool includeServerChannels;
+  final Completer<void> initialFetchCompleted = Completer<void>();
+  int _fetches = 0;
+
+  @override
+  Future<(TvPlaylistSession, List<TvNotificationItem>)> fetchUnread(
+    UserCredentials creds, {
+    List<String>? channels,
+  }) async {
+    _fetches += 1;
+    final initialFetch = _fetches == 1;
+    if (initialFetch) initialFetchCompleted.complete();
+    return (
+      TvPlaylistSession(
+        notifiableId: 1,
+        notifiableType: 'playlist',
+        isAdmin: false,
+        channelName: '',
+        reverb: const ReverbConfig(
+          host: 'fixture.invalid',
+          port: 443,
+          scheme: 'wss',
+          appKey: '',
+        ),
+        availableChannels: !initialFetch && includeServerChannels
+            ? const <TvNotificationChannel>[
+                TvNotificationChannel(name: 'general', label: 'General'),
+              ]
+            : const <TvNotificationChannel>[],
+      ),
+      initialFetch
+          ? const <TvNotificationItem>[]
+          : const <TvNotificationItem>[_reconciledNotification],
+    );
+  }
+}
+
 class _RecordingReverbService extends ReverbService {
   final List<String> connectedUsers = <String>[];
   final Completer<void> firstConnected = Completer<void>();
@@ -1825,6 +2017,10 @@ class _RecordingReverbService extends ReverbService {
 class _BlockingNotificationStore extends PersistentJsonStore {
   final _data = <String, Object?>{};
   _BlockedNotificationWrite? _blockedWrite;
+  int commits = 0;
+  void Function()? onCommit;
+
+  void resetCommits() => commits = 0;
 
   _BlockedNotificationWrite blockNextWrite() {
     final write = _BlockedNotificationWrite();
@@ -1844,6 +2040,8 @@ class _BlockingNotificationStore extends PersistentJsonStore {
       await write.release.future;
     }
     _data[key] = value;
+    commits += 1;
+    onCommit?.call();
     write?.completed.complete();
   }
 
@@ -1863,6 +2061,8 @@ class _BlockingNotificationStore extends PersistentJsonStore {
     }
     _data[key] = value;
     if (shouldCommit()) {
+      commits += 1;
+      onCommit?.call();
       write?.completed.complete();
       return true;
     }
