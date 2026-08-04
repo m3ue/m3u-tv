@@ -19,9 +19,23 @@ const kStadiumFocusEffects = [
 const _kMinSize = Size(64, 48);
 const _kPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 12);
 
+/// Icon-only buttons get a fixed square instead of [_kMinSize]'s flexible
+/// minimum — `ElevatedButton` (primary) and `IconButton` (tonal/destructive)
+/// resolve padding/constraints slightly differently, so a shared minimum can
+/// still end up rendering a couple of pixels shorter on one variant.
+/// `fixedSize` pins both to the exact same box no matter which widget draws
+/// it, which is what keeps transport controls visually level with each other.
+const _kIconButtonSize = Size(56, 56);
+
 enum AppButtonVariant { primary, tonal, destructive }
 
 const _kBlack = Color(0xFF09090b);
+
+/// `tonal` reads as the "default/secondary" action next to a `destructive`
+/// sibling (e.g. Back vs. Delete recording) — muted further below
+/// [_ghostStyle]'s defaults so it recedes instead of competing with it.
+const _kTonalBackgroundAlpha = 0.04;
+const _kTonalBorderAlpha = 0.12;
 
 /// Paints the `primary` variant's black-to-dark-gray gradient in place of a
 /// flat fill, via the `backgroundBuilder` hook `ButtonStyle` gained for
@@ -65,18 +79,27 @@ ButtonStyle _primaryGradientStyle(ButtonStyle base) {
 /// The "ghost button" look — a barely-there fill with a subtle outline,
 /// instead of Material 3's default solid container fill (which renders as
 /// flat gray/red against this app's dark theme). [tint] lets `destructive`
-/// reuse the same look while still reading as red. Still a
+/// reuse the same look while still reading as red, with its own (brighter)
+/// [backgroundAlpha]/[borderAlpha] since red needs more presence than the
+/// muted `tonal` default to read as "destructive". Still a
 /// [FilledButton]/[IconButton], just restyled — not an [OutlinedButton].
-ButtonStyle _ghostStyle(ButtonStyle base, {Color tint = Colors.white}) {
+ButtonStyle _ghostStyle(
+  ButtonStyle base, {
+  Color tint = Colors.white,
+  double backgroundAlpha = 0.08,
+  double borderAlpha = 0.4,
+}) {
   return base.copyWith(
-    backgroundColor: WidgetStatePropertyAll(tint.withValues(alpha: 0.08)),
+    backgroundColor: WidgetStatePropertyAll(
+      tint.withValues(alpha: backgroundAlpha),
+    ),
     foregroundColor: WidgetStatePropertyAll(tint),
     // See the matching comment in _primaryGradientStyle — the gradient
     // DpadFocusable border is the one focus/hover indicator; a background
     // state layer on top of it just reads as flicker.
     overlayColor: const WidgetStatePropertyAll(Colors.transparent),
     side: WidgetStatePropertyAll(
-      BorderSide(color: tint.withValues(alpha: 0.4)),
+      BorderSide(color: tint.withValues(alpha: borderAlpha)),
     ),
   );
 }
@@ -175,7 +198,11 @@ class AppButton extends StatelessWidget {
         tint: colorScheme.error,
       ),
       AppButtonVariant.primary => _primaryGradientStyle(baseStyle),
-      AppButtonVariant.tonal => _ghostStyle(baseStyle),
+      AppButtonVariant.tonal => _ghostStyle(
+        baseStyle,
+        backgroundAlpha: _kTonalBackgroundAlpha,
+        borderAlpha: _kTonalBorderAlpha,
+      ),
     };
 
     final effectiveOnPressed = loading ? null : onPressed;
@@ -256,14 +283,18 @@ class AppIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final baseStyle = IconButton.styleFrom(minimumSize: _kMinSize);
+    final baseStyle = IconButton.styleFrom(fixedSize: _kIconButtonSize);
     final style = switch (variant) {
       AppButtonVariant.destructive => _ghostStyle(
         baseStyle,
         tint: colorScheme.error,
       ),
       AppButtonVariant.primary => _primaryGradientStyle(baseStyle),
-      AppButtonVariant.tonal => _ghostStyle(baseStyle),
+      AppButtonVariant.tonal => _ghostStyle(
+        baseStyle,
+        backgroundAlpha: _kTonalBackgroundAlpha,
+        borderAlpha: _kTonalBorderAlpha,
+      ),
     };
 
     Widget rawButton;

@@ -53,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "可回看重播",
+  "epgPreviousDay": "前一天",
+  "epgNow": "现在",
+  "epgNextDay": "后一天",
+  "epgChannels": "频道",
+  "epgNoData": "暂无 EPG 数据",
   "playerGoBack": "返回",
   "playerResumeWatching": "继续观看",
   "playerContinue": "继续",
@@ -68,6 +73,19 @@
   "playerResume": "恢复播放",
   "playerSkipPreviousTooltip": "上一个频道",
   "playerSkipNextTooltip": "下一个频道",
+  "playerNowPlayingMovie": "电影",
+  "playerNowPlayingSeries": "剧集",
+  "playerNowPlayingSeasonEpisode": "第{season}季 · 第{episode}集",
+  "@playerNowPlayingSeasonEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",

@@ -876,6 +876,54 @@ void main() {
       expect(programs.last.channelId, 'epg.205');
     });
 
+    test('EPG batch composes a dated range without breaking chunks', () async {
+      final transport = FakeXtreamTransport({'auth': xtreamAuth(auth: 1)});
+      transport.onRequest = (request) {
+        if (request.action == 'get_epg_batch') return <String, Object?>{};
+        return transport.responses[request.action ?? 'auth'];
+      };
+      final service = XtreamService(transport: transport.call);
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      await service.getEpgBatch(
+        [
+          for (var index = 1; index <= 101; index += 1)
+            Channel(
+              id: index,
+              name: 'Channel $index',
+              streamUrl: 'https://example/live/$index.m3u8',
+            ),
+        ],
+        startDate: DateTime.utc(2026),
+        endDate: DateTime.utc(2026, 1, 3),
+      );
+
+      final epgRequests = transport.requests
+          .where((request) => request.action == 'get_epg_batch')
+          .toList(growable: false);
+      expect(epgRequests, hasLength(6));
+      expect(epgRequests.map((request) => request.params['date']), [
+        '2026-01-01',
+        '2026-01-02',
+        '2026-01-03',
+        '2026-01-01',
+        '2026-01-02',
+        '2026-01-03',
+      ]);
+      expect(
+        epgRequests.map(
+          (request) => request.params['stream_ids']!.split(',').length,
+        ),
+        [100, 100, 100, 1, 1, 1],
+      );
+    });
+
     test(
       'EPG batch uses listing channel_id when response key is stream id',
       () async {

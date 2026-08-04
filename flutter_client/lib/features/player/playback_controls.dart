@@ -213,7 +213,6 @@ class PlaybackControls extends StatelessWidget {
           child: AppIconButton(
             icon: isPlaying ? Icons.pause : Icons.play_arrow,
             onPressed: onPlayPause,
-            variant: AppButtonVariant.primary,
             autofocus: playPauseFocusNode == null,
             focusNode: playPauseFocusNode,
           ),

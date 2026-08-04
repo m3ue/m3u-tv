@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -10,13 +11,20 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 typedef CatchupProgramSelect =
     void Function(Channel channel, EpgProgram program);
+typedef EnsureEpg =
+    void Function(
+      List<Channel> channels, {
+      DateTime? startDate,
+      DateTime? endDate,
+    });
 
 const double _kChannelColW = 128;
 const double _kTimeHeaderH = 28;
 const double _kRowH = 60;
 const double _kPxPerMin = 5; // 300 px per hour
+const int _kCatchupFallbackDays = 7;
 
-/// Horizontal TV-guide style EPG — channels on the Y-axis, time on the X-axis.
+/// Horizontal TV-guide style EPG with channels on Y and time on X.
 ///
 /// Programs appear as proportionally-sized blocks that can be scrolled left/right
 /// to move through the time window. The channel name column and time header stay
@@ -29,7 +37,9 @@ class TimelineEpgView extends StatefulWidget {
     required this.onChannelSelect,
     this.onCatchupProgramSelect,
     this.onEnsureEpg,
-    this.windowHours = 6,
+    this.windowHours = 24,
+    this.futureDays = 7,
+    this.clock = DateTime.now,
   });
 
   final List<Channel> channels;
@@ -39,10 +49,12 @@ class TimelineEpgView extends StatefulWidget {
 
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
   /// already fresh. Called per-row as the visible timeline builds.
-  final void Function(List<Channel>)? onEnsureEpg;
+  final EnsureEpg? onEnsureEpg;
 
-  /// How many hours the visible window spans (default 6).
+  /// How many hours the selected-day window spans (default 24).
   final int windowHours;
+  final int futureDays;
+  final Clock clock;
 
   @override
   State<TimelineEpgView> createState() => _TimelineEpgViewState();
@@ -55,17 +67,20 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
   late List<ScrollController> _rowHCtrls;
   bool _vSyncing = false;
   bool _hSyncing = false;
+  late DateTime _selectedDate;
   late DateTime _windowStart;
   late DateTime _windowEnd;
   late double _totalW;
+  late double _nowOffset;
 
   @override
   void initState() {
     super.initState();
+    _selectedDate = _dateOnly(widget.clock());
     _initWindow();
     _leftVCtrl = ScrollController();
     _rightVCtrl = ScrollController();
-    _headerHCtrl = ScrollController();
+    _headerHCtrl = ScrollController(initialScrollOffset: _nowOffset);
     _rowHCtrls = _makeRowCtrls(widget.channels.length);
     _leftVCtrl.addListener(_onLeftV);
     _rightVCtrl.addListener(_onRightV);
@@ -73,30 +88,81 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   void _initWindow() {
-    final now = DateTime.now();
-    _windowStart = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-    ).subtract(const Duration(hours: 1));
-    _windowEnd = _windowStart.add(Duration(hours: widget.windowHours + 2));
+    _windowStart = _selectedDate;
+    _windowEnd = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      widget.windowHours,
+    );
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
+    _nowOffset = _computeNowOffset();
   }
 
-  List<ScrollController> _makeRowCtrls(int count) =>
-      List.generate(count, (_) => ScrollController());
+  double _computeNowOffset() {
+    final now = widget.clock();
+    final anchor = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      now.hour,
+      now.minute,
+    );
+    final nowOffset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
+    return math.max(0, nowOffset - 80.0).toDouble();
+  }
+
+  // Rows are built lazily by ListView.builder as they scroll into view, so a
+  // row's ScrollController may attach long after the "now" jump below has
+  // already run. Baking the target into initialScrollOffset means a
+  // late-attaching row still lands on the current time instead of 12am.
+  List<ScrollController> _makeRowCtrls(int count) => List.generate(
+    count,
+    (_) => ScrollController(initialScrollOffset: _nowOffset),
+  );
 
   void _scrollToNow(_) {
     if (!mounted) return;
-    final nowOffset =
-        DateTime.now().difference(_windowStart).inMinutes * _kPxPerMin;
-    final target = math.max(0, nowOffset - 80.0);
+    final target = _computeNowOffset();
     for (final c in [_headerHCtrl, ..._rowHCtrls]) {
       if (c.hasClients) {
-        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent).toDouble());
+        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent));
       }
     }
+  }
+
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  DateTime _offsetDate(DateTime value, int days) =>
+      DateTime(value.year, value.month, value.day + days);
+
+  int get _maxCatchupDays => widget.channels
+      .map(
+        (channel) => _effectiveCatchupDays(
+          channel.catchupSupported,
+          channel.catchupDays,
+        ),
+      )
+      .fold(0, math.max);
+
+  void _selectDate(DateTime date) {
+    final today = _dateOnly(widget.clock());
+    final earliest = _offsetDate(today, -_maxCatchupDays);
+    final latest = _offsetDate(today, widget.futureDays);
+    final requested = _dateOnly(date);
+    final selected = requested.isBefore(earliest)
+        ? earliest
+        : requested.isAfter(latest)
+        ? latest
+        : requested;
+    if (selected != _selectedDate) {
+      setState(() {
+        _selectedDate = selected;
+        _initWindow();
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback(_scrollToNow);
   }
 
   void _onLeftV() {
@@ -138,6 +204,13 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       }
       _rowHCtrls = _makeRowCtrls(widget.channels.length);
     }
+    final today = _dateOnly(widget.clock());
+    final earliest = _offsetDate(today, -_maxCatchupDays);
+    final latest = _offsetDate(today, widget.futureDays);
+    if (_selectedDate.isBefore(earliest) || _selectedDate.isAfter(latest)) {
+      _selectedDate = _selectedDate.isBefore(earliest) ? earliest : latest;
+      _initWindow();
+    }
   }
 
   @override
@@ -156,170 +229,212 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final now = widget.clock();
 
-    return Row(
+    return Column(
       children: [
-        // ── Fixed left channel column ──────────────────────────────────────
-        SizedBox(
-          width: _kChannelColW,
-          child: Column(
-            children: [
-              // Corner cell
-              Container(
-                height: _kTimeHeaderH,
-                color: colorScheme.surfaceContainerHighest,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'CHANNELS',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              // Channel name/logo list (synced vertically with program rows)
-              Expanded(
-                child: ListView.builder(
-                  controller: _leftVCtrl,
-                  itemCount: widget.channels.length,
-                  itemExtent: _kRowH,
-                  itemBuilder: (_, i) =>
-                      _ChannelCell(channel: widget.channels[i]),
-                ),
-              ),
-            ],
+        _DayControls(
+          selectedDate: _selectedDate,
+          canGoPrevious: _selectedDate.isAfter(
+            _offsetDate(now, -_maxCatchupDays),
           ),
+          canGoNext: _selectedDate.isBefore(
+            _offsetDate(now, widget.futureDays),
+          ),
+          onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
+          onNow: () => _selectDate(_dateOnly(widget.clock())),
+          onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
         ),
-
-        // Thin vertical divider
-        Container(width: 1, color: colorScheme.outlineVariant),
-
-        // ── Right: time header + scrollable program grid ───────────────────
         Expanded(
-          child: Column(
+          child: Row(
             children: [
-              // Time axis header
+              // ── Fixed left channel column ──────────────────────────────────────
               SizedBox(
-                height: _kTimeHeaderH,
-                child: AnimatedBuilder(
-                  animation: _headerHCtrl,
-                  builder: (context, _) {
-                    final hOffset = _headerHCtrl.hasClients
-                        ? _headerHCtrl.offset
-                        : 0.0;
-                    final nowX =
-                        DateTime.now().difference(_windowStart).inMinutes *
-                            _kPxPerMin -
-                        hOffset;
-
-                    return Stack(
-                      children: [
-                        SingleChildScrollView(
-                          controller: _headerHCtrl,
-                          scrollDirection: Axis.horizontal,
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: _TimeHeader(
-                            windowStart: _windowStart,
-                            windowEnd: _windowEnd,
-                            pixelsPerMinute: _kPxPerMin,
-                            height: _kTimeHeaderH,
-                          ),
+                width: _kChannelColW,
+                child: Column(
+                  children: [
+                    // Corner cell
+                    Container(
+                      height: _kTimeHeaderH,
+                      color: colorScheme.surfaceContainerHighest,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        AppLocalizations.of(context).epgChannels,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          letterSpacing: 1.2,
                         ),
-                        if (nowX >= 0)
-                          Positioned(
-                            left: nowX,
-                            top: 4,
-                            bottom: 0,
-                            width: 2,
-                            child: Container(
-                              color: colorScheme.primary.withValues(alpha: 0.8),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                      ),
+                    ),
+                    // Channel name/logo list (synced vertically with program rows)
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _leftVCtrl,
+                        itemCount: widget.channels.length,
+                        itemExtent: _kRowH,
+                        itemBuilder: (_, i) =>
+                            _ChannelCell(channel: widget.channels[i]),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // Program rows
+              // Thin vertical divider
+              Container(width: 1, color: colorScheme.outlineVariant),
+
+              // ── Right: time header + scrollable program grid ───────────────────
               Expanded(
-                child: Stack(
+                child: Column(
                   children: [
-                    ListView.builder(
-                      controller: _rightVCtrl,
-                      itemCount: widget.channels.length,
-                      itemExtent: _kRowH,
-                      itemBuilder: (_, i) {
-                        final channel = widget.channels[i];
-                        widget.onEnsureEpg?.call([channel]);
-                        final programs = widget.epgService.programsForChannel(
-                          channel,
-                        );
-                        return NotificationListener<ScrollUpdateNotification>(
-                          onNotification: (n) {
-                            _syncH(n.metrics.pixels);
-                            return false;
-                          },
-                          child: SingleChildScrollView(
-                            controller: i < _rowHCtrls.length
-                                ? _rowHCtrls[i]
-                                : null,
-                            scrollDirection: Axis.horizontal,
-                            child: _ProgramsRow(
-                              programs: programs,
-                              windowStart: _windowStart,
-                              windowEnd: _windowEnd,
-                              pixelsPerMinute: _kPxPerMin,
-                              totalWidth: _totalW,
-                              rowHeight: _kRowH,
-                              catchupSupported: channel.catchupSupported,
-                              onTap: (program) {
-                                final canReplay =
-                                    channel.catchupSupported &&
-                                    program.end.isBefore(DateTime.now());
-                                if (canReplay &&
-                                    widget.onCatchupProgramSelect != null) {
-                                  widget.onCatchupProgramSelect!(
-                                    channel,
-                                    program,
-                                  );
-                                  return;
-                                }
-                                widget.onChannelSelect(channel);
-                              },
-                            ),
-                          ),
-                        );
-                      },
+                    // Time axis header
+                    SizedBox(
+                      height: _kTimeHeaderH,
+                      child: AnimatedBuilder(
+                        animation: _headerHCtrl,
+                        builder: (context, _) {
+                          final hOffset = _headerHCtrl.hasClients
+                              ? _headerHCtrl.offset
+                              : 0.0;
+                          final nowX =
+                              now.difference(_windowStart).inMinutes *
+                                  _kPxPerMin -
+                              hOffset;
+
+                          return Stack(
+                            children: [
+                              SingleChildScrollView(
+                                controller: _headerHCtrl,
+                                scrollDirection: Axis.horizontal,
+                                physics: const NeverScrollableScrollPhysics(),
+                                child: _TimeHeader(
+                                  windowStart: _windowStart,
+                                  windowEnd: _windowEnd,
+                                  pixelsPerMinute: _kPxPerMin,
+                                  height: _kTimeHeaderH,
+                                ),
+                              ),
+                              if (nowX >= 0 && nowX <= _totalW)
+                                Positioned(
+                                  left: nowX,
+                                  top: 4,
+                                  bottom: 0,
+                                  width: 2,
+                                  child: Container(
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
 
-                    // "Now" vertical line over the program grid
-                    AnimatedBuilder(
-                      animation: _headerHCtrl,
-                      builder: (context, _) {
-                        if (!_headerHCtrl.hasClients) {
-                          return const SizedBox.shrink();
-                        }
-                        final nowX =
-                            DateTime.now().difference(_windowStart).inMinutes *
-                                _kPxPerMin -
-                            _headerHCtrl.offset;
-                        if (nowX < 0) return const SizedBox.shrink();
-                        return Positioned(
-                          left: nowX,
-                          top: 0,
-                          bottom: 0,
-                          width: 2,
-                          child: IgnorePointer(
-                            child: Container(
-                              color: colorScheme.primary.withValues(
-                                alpha: 0.35,
-                              ),
-                            ),
+                    // Program rows
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          ListView.builder(
+                            controller: _rightVCtrl,
+                            itemCount: widget.channels.length,
+                            itemExtent: _kRowH,
+                            itemBuilder: (_, i) {
+                              final channel = widget.channels[i];
+                              final catchupRetentionDays =
+                                  _effectiveCatchupDays(
+                                    channel.catchupSupported,
+                                    channel.catchupDays,
+                                  );
+                              widget.onEnsureEpg?.call(
+                                [channel],
+                                startDate: _selectedDate,
+                                endDate: _selectedDate,
+                              );
+                              final programs = widget.epgService
+                                  .programsForChannel(
+                                    channel,
+                                  );
+                              return NotificationListener<
+                                ScrollUpdateNotification
+                              >(
+                                onNotification: (n) {
+                                  _syncH(n.metrics.pixels);
+                                  return false;
+                                },
+                                child: SingleChildScrollView(
+                                  key: ValueKey(
+                                    'timeline-row-scroll-${channel.id}',
+                                  ),
+                                  controller: i < _rowHCtrls.length
+                                      ? _rowHCtrls[i]
+                                      : null,
+                                  scrollDirection: Axis.horizontal,
+                                  child: _ProgramsRow(
+                                    programs: programs,
+                                    windowStart: _windowStart,
+                                    windowEnd: _windowEnd,
+                                    pixelsPerMinute: _kPxPerMin,
+                                    totalWidth: _totalW,
+                                    rowHeight: _kRowH,
+                                    catchupRetentionDays: catchupRetentionDays,
+                                    now: now,
+                                    onTap: (program) {
+                                      final canReplay = _canReplay(
+                                        catchupRetentionDays,
+                                        program,
+                                        widget.clock(),
+                                      );
+                                      if (canReplay &&
+                                          widget.onCatchupProgramSelect !=
+                                              null) {
+                                        widget.onCatchupProgramSelect!(
+                                          channel,
+                                          program,
+                                        );
+                                        return;
+                                      }
+                                      widget.onChannelSelect(channel);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+
+                          // "Now" vertical line over the program grid
+                          AnimatedBuilder(
+                            animation: _headerHCtrl,
+                            builder: (context, _) {
+                              if (!_headerHCtrl.hasClients) {
+                                return const SizedBox.shrink();
+                              }
+                              final nowX =
+                                  now.difference(_windowStart).inMinutes *
+                                      _kPxPerMin -
+                                  _headerHCtrl.offset;
+                              if (nowX < 0 || nowX > _totalW) {
+                                return const SizedBox.shrink();
+                              }
+                              return Positioned(
+                                left: nowX,
+                                top: 0,
+                                bottom: 0,
+                                width: 2,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -335,6 +450,105 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Private sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _DayControls extends StatelessWidget {
+  const _DayControls({
+    required this.selectedDate,
+    required this.canGoPrevious,
+    required this.canGoNext,
+    required this.onPrevious,
+    required this.onNow,
+    required this.onNext,
+  });
+
+  final DateTime selectedDate;
+  final bool canGoPrevious;
+  final bool canGoNext;
+  final VoidCallback onPrevious;
+  final VoidCallback onNow;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      height: 42,
+      color: colorScheme.surfaceContainerHigh,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          DpadInkWell(
+            key: const ValueKey('timeline-previous-day'),
+            onTap: canGoPrevious ? onPrevious : null,
+            autofocus: canGoPrevious,
+            enabled: canGoPrevious,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(5),
+              child: Icon(
+                Icons.chevron_left,
+                size: 20,
+                color: canGoPrevious
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurface.withValues(alpha: 0.35),
+                semanticLabel: l10n.epgPreviousDay,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 116,
+            child: Text(
+              DateFormat.yMMMd(
+                Localizations.localeOf(context).toLanguageTag(),
+              ).format(selectedDate),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
+          const SizedBox(width: 6),
+          DpadInkWell(
+            key: const ValueKey('timeline-now'),
+            onTap: onNow,
+            autofocus: !canGoPrevious,
+            borderRadius: BorderRadius.circular(50),
+            color: colorScheme.primaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              child: Text(
+                l10n.epgNow,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          DpadInkWell(
+            key: const ValueKey('timeline-next-day'),
+            onTap: canGoNext ? onNext : null,
+            enabled: canGoNext,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(5),
+              child: Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: canGoNext
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurface.withValues(alpha: 0.35),
+                semanticLabel: l10n.epgNextDay,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _ChannelCell extends StatelessWidget {
   const _ChannelCell({required this.channel});
@@ -469,7 +683,8 @@ class _ProgramsRow extends StatelessWidget {
     required this.totalWidth,
     required this.rowHeight,
     required this.onTap,
-    required this.catchupSupported,
+    required this.catchupRetentionDays,
+    required this.now,
   });
 
   final List<EpgProgram> programs;
@@ -479,10 +694,11 @@ class _ProgramsRow extends StatelessWidget {
   final double totalWidth;
   final double rowHeight;
   final void Function(EpgProgram program) onTap;
-  final bool catchupSupported;
+  final int catchupRetentionDays;
+  final DateTime now;
 
-  bool showCatchupIcon(EpgProgram program, DateTime now) =>
-      catchupSupported && program.end.isBefore(now);
+  bool showCatchupIcon(EpgProgram program) =>
+      _canReplay(catchupRetentionDays, program, now);
 
   @override
   Widget build(BuildContext context) {
@@ -493,7 +709,6 @@ class _ProgramsRow extends StatelessWidget {
         .where((p) => p.end.isAfter(windowStart) && p.start.isBefore(windowEnd))
         .toList();
 
-    final now = DateTime.now();
     final blocks = <Widget>[];
     for (final p in visible) {
       final isCurrent = !now.isBefore(p.start) && now.isBefore(p.end);
@@ -540,7 +755,7 @@ class _ProgramsRow extends StatelessWidget {
                 children: [
                   Padding(
                     padding: EdgeInsets.only(
-                      right: showCatchupIcon(p, now) ? 22 : 0,
+                      right: showCatchupIcon(p) ? 22 : 0,
                     ),
                     child: Text(
                       p.title,
@@ -554,7 +769,7 @@ class _ProgramsRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (showCatchupIcon(p, now))
+                  if (showCatchupIcon(p))
                     Positioned(
                       right: 0,
                       top: 0,
@@ -595,7 +810,7 @@ class _ProgramsRow extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Text(
-              'No EPG data',
+              l10n.epgNoData,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
                 fontStyle: FontStyle.italic,
@@ -628,4 +843,28 @@ class _ProgramsRow extends StatelessWidget {
       ),
     );
   }
+}
+
+int _effectiveCatchupDays(bool catchupSupported, int? catchupDays) {
+  if (!catchupSupported) return 0;
+  return catchupDays ?? _kCatchupFallbackDays;
+}
+
+bool _canReplay(
+  int catchupRetentionDays,
+  EpgProgram program,
+  DateTime now,
+) {
+  if (catchupRetentionDays <= 0 || !program.end.isBefore(now)) return false;
+  final earliest = DateTime(
+    now.year,
+    now.month,
+    now.day - catchupRetentionDays,
+    now.hour,
+    now.minute,
+    now.second,
+    now.millisecond,
+    now.microsecond,
+  );
+  return !program.start.isBefore(earliest);
 }

@@ -251,7 +251,13 @@ class AppStateController extends ChangeNotifier {
   int? _recentlyWatchedRefreshSourceGeneration;
   int? _recentlyWatchedRefreshViewerGeneration;
   final Set<int> _pendingEpgChannelIds = <int>{};
+  final Set<int> _pendingForcedEpgChannelIds = <int>{};
+  final Map<String, DateTime> _fetchedEpgRanges = <String, DateTime>{};
   Timer? _epgFetchDebounce;
+  DateTime? _pendingEpgStartDate;
+  DateTime? _pendingEpgEndDate;
+  String _activeEpgRangeKey = '';
+  int _epgRequestGeneration = 0;
   static const _epgPrimeCount = 60;
   static const _epgFetchDebounceDelay = Duration(milliseconds: 250);
 
@@ -322,6 +328,7 @@ class AppStateController extends ChangeNotifier {
         isCurrent: () => !_sourceOperationGeneration.isStale(sourceGeneration),
       );
       if (restored) {
+        _resetEpgSession();
         final credentials = authNotifier.credentials!;
         final notificationGeneration = _notificationSessionGeneration.advance();
         if (await _hydrateCachedXtreamContent(
@@ -603,12 +610,7 @@ class AppStateController extends ChangeNotifier {
         }),
       );
       if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      _epgFetchDebounce?.cancel();
-      _epgFetchDebounce = null;
-      _pendingEpgChannelIds.clear();
-      epgService
-        ..invalidateSourceFetchState()
-        ..clear();
+      _resetEpgSession();
       _sourceType = AppSourceType.m3u;
       _liveCategories = playlist.categories;
       _vodCategories = const <Category>[];
@@ -1317,6 +1319,7 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    _resetEpgSession();
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];
     _viewerOperationGeneration.advance();
@@ -1359,10 +1362,7 @@ class AppStateController extends ChangeNotifier {
 
   Future<void> clearAndRefresh() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
-    _epgFetchDebounce?.cancel();
-    _epgFetchDebounce = null;
-    _pendingEpgChannelIds.clear();
-    epgService.invalidateSourceFetchState();
+    _resetEpgSession(clearGuide: false);
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
@@ -1729,10 +1729,7 @@ class AppStateController extends ChangeNotifier {
           }
 
           if (invalidateEpgFreshness) {
-            _epgFetchDebounce?.cancel();
-            _epgFetchDebounce = null;
-            _pendingEpgChannelIds.clear();
-            epgService.invalidateSourceFetchState();
+            _resetEpgSession(clearGuide: false);
           }
           _sourceType = AppSourceType.xtream;
           _liveCategories = liveCategories;
@@ -2041,11 +2038,40 @@ class AppStateController extends ChangeNotifier {
   /// without fresh cached data are requested. Call this from a screen's
   /// `itemBuilder` (list/grid) so only currently visible channels get fetched
   /// as the user scrolls, instead of fetching the whole channel list upfront.
-  void ensureEpgForChannels(List<Channel> channels) {
+  void ensureEpgForChannels(
+    List<Channel> channels, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
     if (_sourceType != AppSourceType.xtream) return;
+    final rangeKey = _epgRangeKey(startDate, endDate);
+    final returningToCurrentGuide =
+        rangeKey.isEmpty && _activeEpgRangeKey.isNotEmpty;
+    if (rangeKey != _activeEpgRangeKey) {
+      _activeEpgRangeKey = rangeKey;
+      _pendingEpgStartDate = startDate;
+      _pendingEpgEndDate = endDate;
+      _pendingEpgChannelIds.clear();
+      _pendingForcedEpgChannelIds.clear();
+      _epgFetchDebounce?.cancel();
+      _epgRequestGeneration += 1;
+    }
     var added = false;
     for (final channel in channels) {
-      if (!epgService.shouldFetchDataForChannel(channel)) continue;
+      if (rangeKey.isEmpty) {
+        final forceRefresh =
+            returningToCurrentGuide &&
+            epgService.programsForChannel(channel).isEmpty;
+        if (!forceRefresh && !epgService.shouldFetchDataForChannel(channel)) {
+          continue;
+        }
+        if (forceRefresh) _pendingForcedEpgChannelIds.add(channel.id);
+      } else {
+        if (_hasFreshEpgRange(channel.id, rangeKey) ||
+            !epgService.shouldFetchData(_epgRangeFetchId(channel, rangeKey))) {
+          continue;
+        }
+      }
       if (_pendingEpgChannelIds.add(channel.id)) added = true;
     }
     if (!added) return;
@@ -2057,20 +2083,63 @@ class AppStateController extends ChangeNotifier {
     if (_pendingEpgChannelIds.isEmpty) return;
     final ids = _pendingEpgChannelIds.toSet();
     _pendingEpgChannelIds.clear();
+    final forcedIds = _pendingForcedEpgChannelIds.intersection(ids);
+    _pendingForcedEpgChannelIds.removeAll(ids);
+    final startDate = _pendingEpgStartDate;
+    final endDate = _pendingEpgEndDate;
+    final rangeKey = _activeEpgRangeKey;
+    final generation = _epgRequestGeneration;
     final channels = _channels
         .where((channel) => ids.contains(channel.id))
-        .where(epgService.shouldFetchDataForChannel)
+        .where(
+          (channel) => rangeKey.isEmpty
+              ? forcedIds.contains(channel.id) ||
+                    epgService.shouldFetchDataForChannel(channel)
+              : !_hasFreshEpgRange(channel.id, rangeKey) &&
+                    epgService.shouldFetchData(
+                      _epgRangeFetchId(channel, rangeKey),
+                    ),
+        )
         .toList(growable: false);
     if (channels.isEmpty) return;
     final channelIds = channels.map(_epgChannelId).toList(growable: false);
-    final sourceGeneration = epgService.markFetchStarted(channelIds);
+    final fetchIds = rangeKey.isEmpty
+        ? channelIds
+        : channels
+              .map((channel) => _epgRangeFetchId(channel, rangeKey))
+              .toList(growable: false);
+    final sourceGeneration = epgService.markFetchStarted(fetchIds);
     try {
-      final programs = await xtreamService.getEpgBatch(channels);
-      epgService.applySuccessfulResponse(
-        channelIds,
-        programs,
-        sourceGeneration: sourceGeneration,
+      final programs = await xtreamService.getEpgBatch(
+        channels,
+        startDate: startDate,
+        endDate: endDate,
       );
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        epgService.markFetchFailed(
+          fetchIds,
+          sourceGeneration: sourceGeneration,
+        );
+        return;
+      }
+      if (rangeKey.isEmpty) {
+        epgService.applySuccessfulResponse(
+          channelIds,
+          programs,
+          sourceGeneration: sourceGeneration,
+        );
+      } else {
+        _markEpgRangeFetched(channels, rangeKey);
+        epgService
+          ..mergePrograms(
+            programs,
+            channelIds: channelIds,
+            replaceExisting: false,
+            markFresh: false,
+          )
+          ..markFetched(fetchIds);
+      }
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
@@ -2078,14 +2147,19 @@ class AppStateController extends ChangeNotifier {
       }
     } on Object catch (e) {
       epgService.markFetchFailed(
-        channelIds,
+        fetchIds,
         sourceGeneration: sourceGeneration,
       );
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        return;
+      }
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
   }
 
   Future<void> _loadXtreamEpg(List<Channel> channels) async {
+    final generation = _epgRequestGeneration;
     final channelsToFetch = channels
         .where(epgService.shouldFetchDataForChannel)
         .toList(growable: false);
@@ -2096,6 +2170,13 @@ class AppStateController extends ChangeNotifier {
     final sourceGeneration = epgService.markFetchStarted(channelIds);
     try {
       final programs = await xtreamService.getEpgBatch(channelsToFetch);
+      if (generation != _epgRequestGeneration) {
+        epgService.markFetchFailed(
+          channelIds,
+          sourceGeneration: sourceGeneration,
+        );
+        return;
+      }
       if (kDebugMode) {
         debugPrint(
           '[EPG] getEpgBatch → ${programs.length} programs for ${channelsToFetch.length} channels',
@@ -2119,6 +2200,46 @@ class AppStateController extends ChangeNotifier {
 
   String _epgChannelId(Channel channel) =>
       channel.epgChannelId ?? channel.tvgName ?? channel.name;
+
+  String _epgRangeFetchId(Channel channel, String rangeKey) =>
+      '${_epgChannelId(channel)}:$rangeKey';
+
+  String _epgRangeKey(DateTime? startDate, DateTime? endDate) {
+    if (startDate == null) return '';
+    String dateKey(DateTime value) =>
+        '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+    return '${dateKey(startDate)}:${dateKey(endDate ?? startDate)}';
+  }
+
+  bool _hasFreshEpgRange(int channelId, String rangeKey) {
+    final key = '$channelId:$rangeKey';
+    final fetchedAt = _fetchedEpgRanges[key];
+    if (fetchedAt == null) return false;
+    if (DateTime.now().difference(fetchedAt) < epgService.cacheTtl) return true;
+    _fetchedEpgRanges.remove(key);
+    return false;
+  }
+
+  void _markEpgRangeFetched(List<Channel> channels, String rangeKey) {
+    final now = DateTime.now();
+    for (final channel in channels) {
+      _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
+    }
+  }
+
+  void _resetEpgSession({bool clearGuide = true}) {
+    _epgRequestGeneration += 1;
+    _epgFetchDebounce?.cancel();
+    _epgFetchDebounce = null;
+    _pendingEpgChannelIds.clear();
+    _pendingForcedEpgChannelIds.clear();
+    _fetchedEpgRanges.clear();
+    _pendingEpgStartDate = null;
+    _pendingEpgEndDate = null;
+    _activeEpgRangeKey = '';
+    epgService.invalidateSourceFetchState();
+    if (clearGuide) epgService.clear();
+  }
 
   Future<void> _loadSavedM3uSource() async {
     final raw = await secureStorage.read(_sourceKey);
@@ -2185,6 +2306,7 @@ class AppStateController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _epgRequestGeneration += 1;
     _epgFetchDebounce?.cancel();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());

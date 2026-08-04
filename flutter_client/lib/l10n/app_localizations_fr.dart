@@ -111,6 +111,21 @@ class AppLocalizationsFr extends AppLocalizations {
   String get catchupProgramReplayable => 'Rediffusion catchup disponible';
 
   @override
+  String get epgPreviousDay => 'Jour précédent';
+
+  @override
+  String get epgNow => 'Maintenant';
+
+  @override
+  String get epgNextDay => 'Jour suivant';
+
+  @override
+  String get epgChannels => 'CHAÎNES';
+
+  @override
+  String get epgNoData => 'Aucune donnée EPG';
+
+  @override
   String get playerGoBack => 'Retour';
 
   @override
@@ -135,6 +150,17 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get playerSkipNextTooltip => 'Chaîne suivante';
+
+  @override
+  String get playerNowPlayingMovie => 'Film';
+
+  @override
+  String get playerNowPlayingSeries => 'Série';
+
+  @override
+  String playerNowPlayingSeasonEpisode(int season, int episode) {
+    return 'S$season · É$episode';
+  }
 
   @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';

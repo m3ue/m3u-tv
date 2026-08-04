@@ -111,6 +111,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get catchupProgramReplayable => '可回看重播';
 
   @override
+  String get epgPreviousDay => '前一天';
+
+  @override
+  String get epgNow => '现在';
+
+  @override
+  String get epgNextDay => '后一天';
+
+  @override
+  String get epgChannels => '频道';
+
+  @override
+  String get epgNoData => '暂无 EPG 数据';
+
+  @override
   String get playerGoBack => '返回';
 
   @override
@@ -135,6 +150,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerSkipNextTooltip => '下一个频道';
+
+  @override
+  String get playerNowPlayingMovie => '电影';
+
+  @override
+  String get playerNowPlayingSeries => '剧集';
+
+  @override
+  String playerNowPlayingSeasonEpisode(int season, int episode) {
+    return '第$season季 · 第$episode集';
+  }
 
   @override
   String get searchHint => '搜索直播电视、电影和剧集…';
