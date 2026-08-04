@@ -8,7 +8,9 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
+import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -59,6 +61,25 @@ void main() {
         expect(pushed, <String>['5:true', '5:false']);
       },
     );
+
+    test('listener ownership change suppresses the server callback', () async {
+      var current = true;
+      var notifications = 0;
+      var serverCallbacks = 0;
+      final service = FavoritesService(memory: <String, Object?>{})
+        ..captureMutationOwnership = (() =>
+            () => current)
+        ..addListener(() {
+          notifications += 1;
+          current = false;
+        })
+        ..onChanged = (_, {required favorited}) => serverCallbacks += 1;
+
+      await service.add(5);
+
+      expect(notifications, 1);
+      expect(serverCallbacks, 0);
+    });
   });
 
   group('AIOStreamsFavoritesService remote sync primitives', () {
@@ -939,6 +960,204 @@ void main() {
       },
     );
 
+    for (final contentType in <String>['live', 'vod', 'series']) {
+      test(
+        'stale remote $contentType mutation cannot persist for a newer viewer',
+        () async {
+          const staleId = 777;
+          const viewerB = Viewer(
+            id: 2,
+            ulid: 'viewer-b',
+            name: 'Viewer B',
+            isAdmin: false,
+          );
+          final transport = _FakeXtreamTransport();
+          final store = _BlockingNumericMutationStore();
+          final live = FavoritesService(store: store);
+          final vod = FavoritesService(store: store, namespace: 'vod');
+          final series = FavoritesService(store: store, namespace: 'series');
+          final reverb = _RecordingFavoriteReverbService();
+          final controller = _controller(
+            transport: transport,
+            favoritesService: live,
+            vodFavoritesService: vod,
+            seriesFavoritesService: series,
+            reverbService: reverb,
+            tvNotificationService: _FavoriteSessionNotificationService(),
+          );
+          addTearDown(controller.dispose);
+          expect(
+            await controller.connectXtream(
+              const UserCredentials(
+                server: 'https://fixture.example',
+                username: 'fixture-user',
+                password: 'fixture-password',
+              ),
+            ),
+            isTrue,
+          );
+          await reverb.connected.future;
+          await pumpEventQueue();
+          transport.blockFavoritesFor(viewerB.ulid);
+          final service = switch (contentType) {
+            'live' => live,
+            'vod' => vod,
+            _ => series,
+          };
+          var notifications = 0;
+          service.addListener(() => notifications += 1);
+          final write = store.blockNextWrite();
+
+          reverb.emitFavorite(
+            FavoriteToggleEvent(
+              viewerId: controller.activeViewer!.ulid,
+              contentType: contentType,
+              streamId: staleId,
+              favorited: true,
+            ),
+          );
+          await write.started.future;
+          await controller.switchViewer(viewerB);
+          await transport.blockedFavoritesStarted.future;
+          write.release.complete();
+          await write.completed.future;
+          await pumpEventQueue();
+
+          expect(controller.activeViewer, viewerB);
+          expect(await service.all(), isNot(contains(staleId)));
+          expect(
+            _persistedNumericFavoriteIds(
+              await store.snapshot(),
+              contentType,
+            ),
+            isNot(contains(staleId)),
+          );
+          expect(notifications, 0);
+
+          transport.releaseBlockedFavorites.complete();
+          await pumpEventQueue();
+        },
+      );
+
+      test(
+        'stale local $contentType add cannot target a newer viewer',
+        () async {
+          await _verifyStaleLocalNumericMutation(
+            contentType: contentType,
+            mutation: _NumericMutation.add,
+          );
+        },
+      );
+      test(
+        'stale local $contentType remove cannot target a newer viewer',
+        () async {
+          await _verifyStaleLocalNumericMutation(
+            contentType: contentType,
+            mutation: _NumericMutation.remove,
+          );
+        },
+      );
+      test(
+        'stale local $contentType toggle captures ownership before reading',
+        () async {
+          await _verifyStaleLocalNumericMutation(
+            contentType: contentType,
+            mutation: _NumericMutation.toggle,
+          );
+        },
+      );
+      test(
+        'current owner publishes local and remote $contentType mutations',
+        () async {
+          const localId = 778;
+          const remoteId = 779;
+          final transport = _FakeXtreamTransport();
+          final store = _BlockingNumericMutationStore();
+          final live = FavoritesService(store: store);
+          final vod = FavoritesService(store: store, namespace: 'vod');
+          final series = FavoritesService(store: store, namespace: 'series');
+          final reverb = _RecordingFavoriteReverbService();
+          final controller = _controller(
+            transport: transport,
+            favoritesService: live,
+            vodFavoritesService: vod,
+            seriesFavoritesService: series,
+            reverbService: reverb,
+            tvNotificationService: _FavoriteSessionNotificationService(),
+          );
+          addTearDown(controller.dispose);
+          expect(
+            await controller.connectXtream(
+              const UserCredentials(
+                server: 'https://fixture.example',
+                username: 'fixture-user',
+                password: 'fixture-password',
+              ),
+            ),
+            isTrue,
+          );
+          await reverb.connected.future;
+          await pumpEventQueue();
+          final service = switch (contentType) {
+            'live' => live,
+            'vod' => vod,
+            _ => series,
+          };
+          transport.requests.clear();
+          var notifications = 0;
+          service.addListener(() => notifications += 1);
+
+          final localWrite = store.blockNextWrite();
+          final localMutation = service.add(localId);
+          await localWrite.started.future;
+          expect(await service.all(), isNot(contains(localId)));
+          localWrite.release.complete();
+          await localMutation;
+          await localWrite.completed.future;
+          await pumpEventQueue();
+
+          final remoteWrite = store.blockNextWrite();
+          reverb.emitFavorite(
+            FavoriteToggleEvent(
+              viewerId: controller.activeViewer!.ulid,
+              contentType: contentType,
+              streamId: remoteId,
+              favorited: true,
+            ),
+          );
+          await remoteWrite.started.future;
+          remoteWrite.release.complete();
+          await remoteWrite.completed.future;
+          await pumpEventQueue();
+
+          expect(await service.all(), containsAll(<int>[localId, remoteId]));
+          expect(
+            _persistedNumericFavoriteIds(
+              await store.snapshot(),
+              contentType,
+            ),
+            containsAll(<int>[localId, remoteId]),
+          );
+          expect(notifications, 2);
+          final requests = transport.requests
+              .where(
+                (request) =>
+                    request.action == 'toggle_favorite' &&
+                    request.body['stream_id'] == '$localId',
+              )
+              .toList();
+          expect(requests, hasLength(1));
+          expect(requests.single.body['viewer_id'], 'viewer-admin');
+          expect(
+            transport.requests.where(
+              (request) => request.body['stream_id'] == '$remoteId',
+            ),
+            isEmpty,
+          );
+        },
+      );
+    }
+
     test('toggling an AIOStreams favorite pushes its full metadata', () async {
       final transport = _FakeXtreamTransport();
       final store = _BlockingAioMutationStore();
@@ -1081,10 +1300,109 @@ void main() {
   });
 }
 
+enum _NumericMutation { add, remove, toggle }
+
+Future<void> _verifyStaleLocalNumericMutation({
+  required String contentType,
+  required _NumericMutation mutation,
+}) async {
+  const staleId = 777;
+  const viewerB = Viewer(
+    id: 2,
+    ulid: 'viewer-b',
+    name: 'Viewer B',
+    isAdmin: false,
+  );
+  final transport = _FakeXtreamTransport();
+  final store = _BlockingNumericMutationStore();
+  final live = FavoritesService(store: store);
+  final vod = FavoritesService(store: store, namespace: 'vod');
+  final series = FavoritesService(store: store, namespace: 'series');
+  final controller = _controller(
+    transport: transport,
+    favoritesService: live,
+    vodFavoritesService: vod,
+    seriesFavoritesService: series,
+  );
+  addTearDown(controller.dispose);
+  expect(
+    await controller.connectXtream(
+      const UserCredentials(
+        server: 'https://fixture.example',
+        username: 'fixture-user',
+        password: 'fixture-password',
+      ),
+    ),
+    isTrue,
+  );
+  await pumpEventQueue();
+  final service = switch (contentType) {
+    'live' => live,
+    'vod' => vod,
+    _ => series,
+  };
+  if (mutation == _NumericMutation.remove) {
+    await service.add(staleId);
+    await pumpEventQueue();
+  }
+  transport
+    ..requests.clear()
+    ..blockFavoritesFor(viewerB.ulid);
+  var notifications = 0;
+  service.addListener(() => notifications += 1);
+  final write = mutation == _NumericMutation.toggle
+      ? null
+      : store.blockNextWrite();
+  final read = mutation == _NumericMutation.toggle
+      ? store.blockNextRead()
+      : null;
+
+  final pendingMutation = switch (mutation) {
+    _NumericMutation.add => service.add(staleId),
+    _NumericMutation.remove => service.remove(staleId),
+    _NumericMutation.toggle => service.toggle(staleId),
+  };
+  await (write?.started.future ?? read!.started.future);
+  await controller.switchViewer(viewerB);
+  await transport.blockedFavoritesStarted.future;
+  write?.release.complete();
+  read?.release.complete();
+  await pendingMutation;
+  if (write != null) await write.completed.future;
+  await pumpEventQueue();
+
+  final shouldContain = mutation == _NumericMutation.remove;
+  expect((await service.all()).contains(staleId), shouldContain);
+  expect(
+    _persistedNumericFavoriteIds(
+      await store.snapshot(),
+      contentType,
+    ).contains(staleId),
+    shouldContain,
+  );
+  expect(notifications, 0);
+  expect(
+    transport.requests.where(
+      (request) =>
+          request.action == 'toggle_favorite' &&
+          request.body['stream_id'] == '$staleId',
+    ),
+    isEmpty,
+  );
+
+  transport.releaseBlockedFavorites.complete();
+  await pumpEventQueue();
+}
+
 AppStateController _controller({
   Map<String, Object?>? memory,
   required _FakeXtreamTransport transport,
   AIOStreamsFavoritesService? aioFavoritesService,
+  FavoritesService? favoritesService,
+  FavoritesService? vodFavoritesService,
+  FavoritesService? seriesFavoritesService,
+  ReverbService? reverbService,
+  TvNotificationService? tvNotificationService,
 }) {
   final sharedMemory = memory ?? <String, Object?>{};
   return AppStateController(
@@ -1094,18 +1412,19 @@ AppStateController _controller({
     ),
     secureStorage: InMemorySecureStorage(),
     cacheService: CacheService(memory: <String, Object?>{}),
-    favoritesService: FavoritesService(memory: sharedMemory),
-    vodFavoritesService: FavoritesService(
-      memory: sharedMemory,
-      namespace: 'vod',
-    ),
-    seriesFavoritesService: FavoritesService(
-      memory: sharedMemory,
-      namespace: 'series',
-    ),
+    favoritesService:
+        favoritesService ?? FavoritesService(memory: sharedMemory),
+    vodFavoritesService:
+        vodFavoritesService ??
+        FavoritesService(memory: sharedMemory, namespace: 'vod'),
+    seriesFavoritesService:
+        seriesFavoritesService ??
+        FavoritesService(memory: sharedMemory, namespace: 'series'),
     aioFavoritesService: aioFavoritesService ?? AIOStreamsFavoritesService(),
     resumeService: ResumeService(memory: sharedMemory),
     viewerService: ViewerService(memory: sharedMemory),
+    reverbService: reverbService,
+    tvNotificationService: tvNotificationService,
   );
 }
 
@@ -1326,6 +1645,152 @@ class _BlockingAioMutationStore extends PersistentJsonStore {
   @override
   Future<Map<String, Object?>> snapshot() async =>
       Map<String, Object?>.from(_data);
+}
+
+class _BlockingNumericMutationStore extends PersistentJsonStore {
+  final _data = <String, Object?>{};
+  _ControlledNumericWrite? _blockedWrite;
+  _ControlledNumericRead? _blockedRead;
+
+  _ControlledNumericWrite blockNextWrite() {
+    final write = _ControlledNumericWrite();
+    _blockedWrite = write;
+    return write;
+  }
+
+  _ControlledNumericRead blockNextRead() {
+    final read = _ControlledNumericRead();
+    _blockedRead = read;
+    return read;
+  }
+
+  @override
+  Future<Object?> read(String key) async {
+    final read = _blockedRead;
+    if (read != null) {
+      _blockedRead = null;
+      read.started.complete();
+      await read.release.future;
+    }
+    return _data[key];
+  }
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    final write = _blockedWrite;
+    if (write != null) {
+      _blockedWrite = null;
+      write.started.complete();
+      await write.release.future;
+    }
+    _data[key] = value;
+    write?.completed.complete();
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    if (!shouldCommit()) return false;
+    final previous = _data[key];
+    final write = _blockedWrite;
+    if (write != null) {
+      _blockedWrite = null;
+      write.started.complete();
+      await write.release.future;
+    }
+    _data[key] = value;
+    if (shouldCommit()) {
+      write?.completed.complete();
+      return true;
+    }
+    if (previous == null) {
+      _data.remove(key);
+    } else {
+      _data[key] = previous;
+    }
+    write?.completed.complete();
+    return false;
+  }
+
+  @override
+  Future<Map<String, Object?>> snapshot() async =>
+      Map<String, Object?>.from(_data);
+}
+
+class _ControlledNumericWrite {
+  final started = Completer<void>();
+  final release = Completer<void>();
+  final completed = Completer<void>();
+}
+
+class _ControlledNumericRead {
+  final started = Completer<void>();
+  final release = Completer<void>();
+}
+
+class _RecordingFavoriteReverbService extends ReverbService {
+  final connected = Completer<void>();
+  void Function(FavoriteToggleEvent)? _onFavoriteToggled;
+
+  void emitFavorite(FavoriteToggleEvent event) => _onFavoriteToggled!(event);
+
+  @override
+  Future<void> connect({
+    required TvPlaylistSession session,
+    required UserCredentials credentials,
+    Set<String> subscribedChannels = const <String>{},
+    required void Function(TvNotificationItem) onNotification,
+    void Function(DvrRecording)? onDvrStatus,
+    void Function(MediaRequestSummary)? onRequestStatus,
+    void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function()? onConnected,
+  }) async {
+    _onFavoriteToggled = onFavoriteToggled;
+    if (!connected.isCompleted) connected.complete();
+  }
+
+  @override
+  Future<void> disconnect() async {}
+}
+
+class _FavoriteSessionNotificationService extends TvNotificationService {
+  @override
+  Future<(TvPlaylistSession, List<TvNotificationItem>)> fetchUnread(
+    UserCredentials creds, {
+    List<String>? channels,
+  }) async => (
+    const TvPlaylistSession(
+      notifiableId: 1,
+      notifiableType: 'playlist',
+      isAdmin: false,
+      channelName: 'private-tv.playlist.fixture',
+      reverb: ReverbConfig(
+        host: 'fixture.invalid',
+        port: 443,
+        scheme: 'wss',
+        appKey: 'fixture-key',
+      ),
+    ),
+    const <TvNotificationItem>[],
+  );
+}
+
+Set<int> _persistedNumericFavoriteIds(
+  Map<String, Object?> snapshot,
+  String contentType,
+) {
+  final key = switch (contentType) {
+    'vod' => 'm3ue_favorites_vod',
+    'series' => 'm3ue_favorites_series',
+    _ => 'm3ue_favorites',
+  };
+  final raw = snapshot[key];
+  return raw is Iterable
+      ? raw.map((value) => int.parse('$value')).toSet()
+      : <int>{};
 }
 
 Set<Object?> _persistedFavoriteIds(Map<String, Object?> snapshot) =>

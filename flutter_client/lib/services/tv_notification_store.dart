@@ -222,8 +222,13 @@ class TvNotificationStore {
 
   /// Adds a newly received notification as unread. No-op if its id is
   /// already stored (e.g. delivered via both the unread-fetch and Reverb push).
-  Future<bool> add(TvNotificationItem item) => _mutate(() async {
+  Future<bool> add(
+    TvNotificationItem item, {
+    bool Function()? shouldCommit,
+  }) => _mutate(() async {
+    if (shouldCommit != null && !shouldCommit()) return false;
     final existing = await all();
+    if (shouldCommit != null && !shouldCommit()) return false;
     if (existing.any((n) => n.item.id == item.id)) return false;
     final updated = [
       StoredTvNotification(
@@ -233,8 +238,10 @@ class TvNotificationStore {
       ),
       ...existing,
     ];
-    await _write(updated.take(_maxStored).toList(growable: false));
-    return true;
+    return _write(
+      updated.take(_maxStored).toList(growable: false),
+      shouldCommit: shouldCommit,
+    );
   });
 
   Future<void> markRead(String id) async {
@@ -265,10 +272,23 @@ class TvNotificationStore {
   Future<Object?> _read() async =>
       _store == null ? _memory[_key] : _store.read(_key);
 
-  Future<void> _write(List<StoredTvNotification> notifications) async {
+  Future<bool> _write(
+    List<StoredTvNotification> notifications, {
+    bool Function()? shouldCommit,
+  }) async {
     final encoded = notifications.map((n) => n.toJson()).toList();
+    if (shouldCommit != null) {
+      final store = _store;
+      if (store != null && !await store.writeIf(_key, encoded, shouldCommit)) {
+        return false;
+      }
+      if (!shouldCommit()) return false;
+      _memory[_key] = encoded;
+      return true;
+    }
     _memory[_key] = encoded;
     await _store?.write(_key, encoded);
+    return true;
   }
 
   Future<T> _mutate<T>(Future<T> Function() operation) =>

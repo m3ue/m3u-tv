@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/push_notification_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 void main() {
@@ -159,6 +160,123 @@ void main() {
 
       expect(reverb.connectedUsers, <String>['second']);
     });
+
+    for (final transition in <String>['viewer', 'source']) {
+      test(
+        'delayed Reverb notification cannot survive a $transition handoff',
+        () async {
+          final notificationPersistence = _BlockingNotificationStore();
+          final notificationStore = TvNotificationStore(
+            store: notificationPersistence,
+          );
+          final reverb = _RecordingReverbService();
+          final fixture = _Fixture(
+            notificationApi: _SessionTvNotificationService(),
+            notificationStore: notificationStore,
+            reverbService: reverb,
+          );
+          addTearDown(fixture.controller.dispose);
+          expect(
+            await fixture.controller.connectXtream(_firstCredentials),
+            isTrue,
+          );
+          await reverb.firstConnected.future;
+          final presented = <TvNotificationItem>[];
+          final subscription = fixture.controller.tvNotifications.listen(
+            presented.add,
+          );
+          addTearDown(subscription.cancel);
+          var controllerNotifications = 0;
+          fixture.controller.addListener(() => controllerNotifications += 1);
+          final write = notificationPersistence.blockNextWrite();
+
+          reverb.emitNotification(
+            'first',
+            const TvNotificationItem(
+              id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              channel: 'general',
+              title: 'Source A notification',
+              status: 'info',
+            ),
+          );
+          await write.started.future;
+          if (transition == 'viewer') {
+            await fixture.controller.switchViewer(
+              const Viewer(
+                id: 2,
+                ulid: 'viewer-b',
+                name: 'Viewer B',
+                isAdmin: false,
+              ),
+            );
+          } else {
+            expect(
+              await fixture.controller.switchToM3u(
+                playlistText:
+                    '#EXTM3U\n#EXTINF:-1,Fixture Channel\nhttps://media.invalid/live.m3u8',
+              ),
+              isTrue,
+            );
+          }
+          controllerNotifications = 0;
+          write.release.complete();
+          await write.completed.future;
+          await pumpEventQueue();
+
+          expect(await notificationStore.all(), isEmpty);
+          expect(fixture.controller.unreadNotificationCount, 0);
+          expect(presented, isEmpty);
+          expect(controllerNotifications, 0);
+        },
+      );
+    }
+
+    test(
+      'current Reverb owner persists, refreshes, and presents once',
+      () async {
+        const item = TvNotificationItem(
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          channel: 'general',
+          title: 'Current notification',
+          status: 'info',
+        );
+        final notificationPersistence = _BlockingNotificationStore();
+        final notificationStore = TvNotificationStore(
+          store: notificationPersistence,
+        );
+        final reverb = _RecordingReverbService();
+        final fixture = _Fixture(
+          notificationApi: _SessionTvNotificationService(),
+          notificationStore: notificationStore,
+          reverbService: reverb,
+        );
+        addTearDown(fixture.controller.dispose);
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+        await reverb.firstConnected.future;
+        final presented = <TvNotificationItem>[];
+        final subscription = fixture.controller.tvNotifications.listen(
+          presented.add,
+        );
+        addTearDown(subscription.cancel);
+        final write = notificationPersistence.blockNextWrite();
+
+        reverb.emitNotification('first', item);
+        await write.started.future;
+        expect(await notificationStore.all(), isEmpty);
+        expect(fixture.controller.unreadNotificationCount, 0);
+        expect(presented, isEmpty);
+        write.release.complete();
+        await write.completed.future;
+        await pumpEventQueue();
+
+        expect((await notificationStore.all()).single.item.id, item.id);
+        expect(fixture.controller.unreadNotificationCount, 1);
+        expect(presented, <TvNotificationItem>[item]);
+      },
+    );
 
     test('late source operation cannot replace a newer connection', () async {
       final transport = _RacingXtreamTransport();
@@ -1475,6 +1593,7 @@ class _Fixture {
     XtreamTransport? transport,
     PersistentJsonStore? persistentStore,
     SecureStorage? secureStorage,
+    TvNotificationStore? notificationStore,
   }) {
     store =
         persistentStore ??
@@ -1505,6 +1624,7 @@ class _Fixture {
       persistentStore: store,
       pushNotificationService: push,
       tvNotificationService: notificationApi ?? _EmptyTvNotificationService(),
+      tvNotificationStore: notificationStore,
       reverbService: reverbService,
     );
   }
@@ -1665,6 +1785,11 @@ class _RecordingReverbService extends ReverbService {
   final Completer<void> secondConnected = Completer<void>();
   final Completer<void> thirdConnected = Completer<void>();
   String? activeUser;
+  final Map<String, void Function(TvNotificationItem)> _notificationCallbacks =
+      <String, void Function(TvNotificationItem)>{};
+
+  void emitNotification(String username, TvNotificationItem item) =>
+      _notificationCallbacks[username]!(item);
 
   @override
   Future<void> disconnect() async {
@@ -1684,6 +1809,7 @@ class _RecordingReverbService extends ReverbService {
   }) async {
     connectedUsers.add(credentials.username);
     activeUser = credentials.username;
+    _notificationCallbacks[credentials.username] = onNotification;
     if (credentials.username == 'first') {
       if (!firstConnected.isCompleted) {
         firstConnected.complete();
@@ -1694,6 +1820,66 @@ class _RecordingReverbService extends ReverbService {
     if (credentials.username == 'second') secondConnected.complete();
     if (credentials.username == 'third') thirdConnected.complete();
   }
+}
+
+class _BlockingNotificationStore extends PersistentJsonStore {
+  final _data = <String, Object?>{};
+  _BlockedNotificationWrite? _blockedWrite;
+
+  _BlockedNotificationWrite blockNextWrite() {
+    final write = _BlockedNotificationWrite();
+    _blockedWrite = write;
+    return write;
+  }
+
+  @override
+  Future<Object?> read(String key) async => _data[key];
+
+  @override
+  Future<void> write(String key, Object? value) async {
+    final write = _blockedWrite;
+    if (write != null) {
+      _blockedWrite = null;
+      write.started.complete();
+      await write.release.future;
+    }
+    _data[key] = value;
+    write?.completed.complete();
+  }
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    if (!shouldCommit()) return false;
+    final previous = _data[key];
+    final write = _blockedWrite;
+    if (write != null) {
+      _blockedWrite = null;
+      write.started.complete();
+      await write.release.future;
+    }
+    _data[key] = value;
+    if (shouldCommit()) {
+      write?.completed.complete();
+      return true;
+    }
+    if (previous == null) {
+      _data.remove(key);
+    } else {
+      _data[key] = previous;
+    }
+    write?.completed.complete();
+    return false;
+  }
+}
+
+class _BlockedNotificationWrite {
+  final started = Completer<void>();
+  final release = Completer<void>();
+  final completed = Completer<void>();
 }
 
 class _FakeXtreamTransport {
@@ -1709,7 +1895,9 @@ class _FakeXtreamTransport {
         'get_live_streams' ||
         'get_vod_streams' ||
         'get_series' ||
-        'get_viewers' => <Object?>[],
+        'get_viewers' ||
+        'get_recently_watched' ||
+        'get_favorites' => <Object?>[],
         _ => throw StateError('Unexpected fixture action'),
       };
 }

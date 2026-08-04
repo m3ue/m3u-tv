@@ -119,6 +119,12 @@ class AppStateController extends ChangeNotifier {
         _pushFavoriteChange('vod', streamId, favorited: favorited);
     seriesFavoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('series', streamId, favorited: favorited);
+    favoritesService.captureMutationOwnership =
+        _captureFavoriteMutationOwnership;
+    vodFavoritesService.captureMutationOwnership =
+        _captureFavoriteMutationOwnership;
+    seriesFavoritesService.captureMutationOwnership =
+        _captureFavoriteMutationOwnership;
     aioFavoritesService.captureMutationOwnership =
         _captureAioFavoriteMutationOwnership;
     aioFavoritesService.onAdded = _pushAioFavoriteAdded;
@@ -185,12 +191,19 @@ class AppStateController extends ChangeNotifier {
 
   int get unreadNotificationCount => _unreadNotificationCount;
 
-  Future<void> _refreshUnreadNotificationCount() async {
+  Future<bool> _refreshUnreadNotificationCount({
+    bool Function()? shouldCommit,
+  }) async {
+    if (shouldCommit != null && !shouldCommit()) return false;
     final subscribed = await notificationStore.subscribedChannels();
-    _unreadNotificationCount = await notificationStore.unreadCount(
+    if (shouldCommit != null && !shouldCommit()) return false;
+    final unreadCount = await notificationStore.unreadCount(
       channelFilter: subscribed.isEmpty ? null : subscribed,
     );
+    if (shouldCommit != null && !shouldCommit()) return false;
+    _unreadNotificationCount = unreadCount;
     notifyListeners();
+    return true;
   }
 
   Future<void> markNotificationRead(String id) async {
@@ -861,7 +874,27 @@ class AppStateController extends ChangeNotifier {
   }
 
   void _onPushNotification(TvNotificationItem item) {
-    unawaited(receiveTvNotification(item));
+    final ownsNotification = _captureNotificationOwnership();
+    unawaited(
+      receiveTvNotification(item, shouldCommit: ownsNotification),
+    );
+  }
+
+  bool Function() _captureNotificationOwnership() {
+    final notificationGeneration = _notificationSessionGeneration.current;
+    final sourceGeneration = _sourceOperationGeneration.current;
+    final viewerGeneration = _viewerOperationGeneration.current;
+    final credentials = authNotifier.credentials;
+    final sourceType = _sourceType;
+    final viewerUlid = _activeViewer?.ulid;
+    return () =>
+        credentials != null &&
+        !_notificationSessionGeneration.isStale(notificationGeneration) &&
+        !_sourceOperationGeneration.isStale(sourceGeneration) &&
+        !_viewerOperationGeneration.isStale(viewerGeneration) &&
+        _sameCredentials(authNotifier.credentials, credentials) &&
+        _sourceType == sourceType &&
+        _activeViewer?.ulid == viewerUlid;
   }
 
   Future<void> handleForegroundPush(PushMessage message) async {
@@ -1073,6 +1106,18 @@ class AppStateController extends ChangeNotifier {
         _activeViewer?.ulid == viewerUlid;
   }
 
+  FavoritesMutationOwnership _captureFavoriteMutationOwnership() {
+    final sourceGeneration = _sourceOperationGeneration.current;
+    final viewerGeneration = _viewerOperationGeneration.current;
+    final sourceType = _sourceType;
+    final viewerUlid = _activeViewer?.ulid;
+    return () =>
+        !_sourceOperationGeneration.isStale(sourceGeneration) &&
+        !_viewerOperationGeneration.isStale(viewerGeneration) &&
+        _sourceType == sourceType &&
+        _activeViewer?.ulid == viewerUlid;
+  }
+
   void _pushAioFavoriteRemoved(String itemId) {
     if (_sourceType != AppSourceType.xtream) return;
     final viewer = _activeViewer;
@@ -1099,6 +1144,7 @@ class AppStateController extends ChangeNotifier {
   void _onFavoriteTogglePush(FavoriteToggleEvent event) {
     final viewer = _activeViewer;
     if (viewer == null || viewer.ulid != event.viewerId) return;
+    final ownsMutation = _captureFavoriteMutationOwnership();
 
     if (event.contentType == 'aiostreams') {
       final aioItemId = event.aioItemId;
@@ -1121,7 +1167,13 @@ class AppStateController extends ChangeNotifier {
       'series' => seriesFavoritesService,
       _ => null,
     };
-    unawaited(service?.applyRemote(streamId, favorited: event.favorited));
+    unawaited(
+      service?.applyRemote(
+        streamId,
+        favorited: event.favorited,
+        shouldCommit: ownsMutation,
+      ),
+    );
   }
 
   AIOStreamsFavoriteItem? _aioItemFromEvent(FavoriteToggleEvent event) {
@@ -1294,13 +1346,23 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
-  Future<void> receiveTvNotification(TvNotificationItem item) async {
-    final inserted = await notificationStore.add(item);
-    if (!inserted) return;
-    await _refreshUnreadNotificationCount();
+  Future<void> receiveTvNotification(
+    TvNotificationItem item, {
+    bool Function()? shouldCommit,
+  }) async {
+    if (shouldCommit != null && !shouldCommit()) return;
+    final inserted = await notificationStore.add(
+      item,
+      shouldCommit: shouldCommit,
+    );
+    if (!inserted || (shouldCommit != null && !shouldCommit())) return;
+    if (!await _refreshUnreadNotificationCount(shouldCommit: shouldCommit)) {
+      return;
+    }
     // Only surface the notification in the stream (banners/toasts) if the
     // channel passes the user's subscription filter.
     final subscribed = await notificationStore.subscribedChannels();
+    if (shouldCommit != null && !shouldCommit()) return;
     if (subscribed.isEmpty || subscribed.contains(item.channel)) {
       _tvNotificationController.add(item);
     }
