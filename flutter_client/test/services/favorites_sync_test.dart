@@ -686,6 +686,230 @@ void main() {
     );
 
     test(
+      'publishing a second source never exposes the first source favorites',
+      () async {
+        const sourceBFavorites = <Map<String, Object?>>[
+          <String, Object?>{'content_type': 'live', 'stream_id': 202},
+          <String, Object?>{'content_type': 'vod', 'stream_id': 302},
+          <String, Object?>{'content_type': 'series', 'stream_id': 402},
+          <String, Object?>{
+            'content_type': 'aiostreams',
+            'aio_item_id': 'tt2222222',
+            'title': 'Source B Title',
+            'thumbnail_url': 'https://source-b.example/poster.jpg',
+            'item_type': 'movie',
+            'aio_integration_id': 22,
+          },
+        ];
+        final transport = _FakeXtreamTransport()
+          ..liveStreamsByUsername['source-a'] = const <Map<String, Object?>>[
+            <String, Object?>{'stream_id': 101, 'name': 'Source A Channel'},
+          ]
+          ..liveStreamsByUsername['source-b'] = const <Map<String, Object?>>[
+            <String, Object?>{'stream_id': 202, 'name': 'Source B Channel'},
+          ]
+          ..favoritesByViewer['viewer-source-b'] = sourceBFavorites
+          ..blockFavoritesFor('viewer-source-b');
+        addTearDown(() {
+          if (!transport.releaseBlockedFavorites.isCompleted) {
+            transport.releaseBlockedFavorites.complete();
+          }
+        });
+        final controller = _controller(transport: transport);
+        addTearDown(controller.dispose);
+        await controller.favoritesService.add(101);
+        await controller.vodFavoritesService.add(201);
+        await controller.seriesFavoritesService.add(301);
+        await controller.aioFavoritesService.add(
+          const AIOStreamsFavoriteItem(
+            id: 'tt1111111',
+            type: 'series',
+            name: 'Source A Title',
+            integrationId: 11,
+            poster: 'https://source-a.example/poster.jpg',
+          ),
+        );
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://source-a.example',
+              username: 'source-a',
+              password: 'source-a-password',
+            ),
+          ),
+          isTrue,
+        );
+        await pumpEventQueue();
+        expect(await controller.favoritesService.all(), contains(101));
+        expect(await controller.vodFavoritesService.all(), contains(201));
+        expect(await controller.seriesFavoritesService.all(), contains(301));
+        expect(
+          (await controller.aioFavoritesService.all()).map((item) => item.id),
+          contains('tt0111161'),
+        );
+        transport.requests.clear();
+
+        final sourceBPublished = Completer<Map<String, Object?>>();
+        var sourceBPublishCaptured = false;
+        controller.addListener(() {
+          if (controller.activeViewer?.ulid != 'viewer-source-b' ||
+              sourceBPublishCaptured) {
+            return;
+          }
+          sourceBPublishCaptured = true;
+          final sourceType = controller.sourceType;
+          final channelIds = controller.channels
+              .map((channel) => channel.id)
+              .toList();
+          unawaited(
+            Future.wait<Object>(<Future<Object>>[
+              controller.favoritesService.all(),
+              controller.vodFavoritesService.all(),
+              controller.seriesFavoritesService.all(),
+              controller.aioFavoritesService.all(),
+            ]).then((favorites) {
+              sourceBPublished.complete(<String, Object?>{
+                'sourceType': sourceType,
+                'channelIds': channelIds,
+                'viewerId': controller.activeViewer?.ulid,
+                'live': favorites[0],
+                'vod': favorites[1],
+                'series': favorites[2],
+                'aio': (favorites[3] as List<AIOStreamsFavoriteItem>)
+                    .map((item) => item.toJson())
+                    .toList(),
+              });
+            }),
+          );
+        });
+
+        final sourceBConnect = controller.connectXtream(
+          const UserCredentials(
+            server: 'https://source-b.example',
+            username: 'source-b',
+            password: 'source-b-password',
+          ),
+        );
+        await transport.blockedFavoritesStarted.future;
+        await pumpEventQueue();
+        expect(controller.activeViewer?.ulid, 'viewer-source-a');
+        expect(controller.channels.map((channel) => channel.id), <int>[101]);
+        expect(await controller.favoritesService.all(), contains(101));
+        expect(sourceBPublishCaptured, isFalse);
+        expect(
+          transport.requests.where(
+            (request) => request.action == 'sync_favorites',
+          ),
+          isEmpty,
+        );
+
+        expect(sourceBPublished.isCompleted, isFalse);
+
+        transport.releaseBlockedFavorites.complete();
+        expect(await sourceBConnect, isTrue);
+        expect(await sourceBPublished.future, <String, Object?>{
+          'sourceType': AppSourceType.xtream,
+          'channelIds': <int>[202],
+          'viewerId': 'viewer-source-b',
+          'live': <int>{202},
+          'vod': <int>{302},
+          'series': <int>{402},
+          'aio': <Map<String, Object?>>[
+            <String, Object?>{
+              'id': 'tt2222222',
+              'type': 'movie',
+              'name': 'Source B Title',
+              'integrationId': 22,
+              'poster': 'https://source-b.example/poster.jpg',
+            },
+          ],
+        });
+        expect(await controller.favoritesService.all(), <int>{202});
+        expect(await controller.vodFavoritesService.all(), <int>{302});
+        expect(await controller.seriesFavoritesService.all(), <int>{402});
+        expect(
+          (await controller.aioFavoritesService.all()).map(
+            (item) => item.toJson(),
+          ),
+          <Map<String, Object?>>[
+            <String, Object?>{
+              'id': 'tt2222222',
+              'type': 'movie',
+              'name': 'Source B Title',
+              'integrationId': 22,
+              'poster': 'https://source-b.example/poster.jpg',
+            },
+          ],
+        );
+      },
+    );
+
+    test(
+      'a current replacement publishes empty favorites when its pull fails',
+      () async {
+        final transport = _FakeXtreamTransport()
+          ..liveStreamsByUsername['source-a'] = const <Map<String, Object?>>[
+            <String, Object?>{'stream_id': 101, 'name': 'Source A Channel'},
+          ]
+          ..liveStreamsByUsername['source-b'] = const <Map<String, Object?>>[
+            <String, Object?>{'stream_id': 202, 'name': 'Source B Channel'},
+          ]
+          ..failingFavoriteViewers.add('viewer-source-b');
+        final controller = _controller(transport: transport);
+        addTearDown(controller.dispose);
+        await controller.favoritesService.add(101);
+        await controller.vodFavoritesService.add(201);
+        await controller.seriesFavoritesService.add(301);
+        await controller.aioFavoritesService.add(
+          const AIOStreamsFavoriteItem(
+            id: 'tt1111111',
+            type: 'series',
+            name: 'Source A Title',
+            integrationId: 11,
+          ),
+        );
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://source-a.example',
+              username: 'source-a',
+              password: 'source-a-password',
+            ),
+          ),
+          isTrue,
+        );
+        await pumpEventQueue();
+        transport.requests.clear();
+
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://source-b.example',
+              username: 'source-b',
+              password: 'source-b-password',
+            ),
+          ),
+          isTrue,
+        );
+
+        expect(controller.activeViewer?.ulid, 'viewer-source-b');
+        expect(controller.channels.map((channel) => channel.id), <int>[202]);
+        expect(await controller.favoritesService.all(), isEmpty);
+        expect(await controller.vodFavoritesService.all(), isEmpty);
+        expect(await controller.seriesFavoritesService.all(), isEmpty);
+        expect(await controller.aioFavoritesService.all(), isEmpty);
+        expect(
+          transport.requests.where(
+            (request) => request.action == 'sync_favorites',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
       'toggling a live favorite pushes toggle_favorite to the server',
       () async {
         final transport = _FakeXtreamTransport();
@@ -893,6 +1117,11 @@ class _RecordedRequest {
 
 class _FakeXtreamTransport {
   final List<_RecordedRequest> requests = <_RecordedRequest>[];
+  final Map<String, List<Map<String, Object?>>> liveStreamsByUsername =
+      <String, List<Map<String, Object?>>>{};
+  final Map<String, List<Map<String, Object?>>> favoritesByViewer =
+      <String, List<Map<String, Object?>>>{};
+  final Set<String> failingFavoriteViewers = <String>{};
   final blockedFavoritesStarted = Completer<void>();
   final releaseBlockedFavorites = Completer<void>();
   String? _blockedFavoritesViewer;
@@ -915,11 +1144,13 @@ class _FakeXtreamTransport {
       case 'get_live_categories':
       case 'get_vod_categories':
       case 'get_series_categories':
-      case 'get_live_streams':
       case 'get_vod_streams':
       case 'get_series':
       case 'get_recently_watched':
         return const <Object?>[];
+      case 'get_live_streams':
+        return liveStreamsByUsername[request.credentials.username] ??
+            const <Object?>[];
       case 'get_viewers':
         final viewerSuffix = request.credentials.username == 'fixture-user'
             ? 'admin'
@@ -935,11 +1166,15 @@ class _FakeXtreamTransport {
       case 'get_epg_batch':
         return <String, Object?>{};
       case 'get_favorites':
-        if (request.params['viewer_id'] == _blockedFavoritesViewer) {
+        final viewerId = '${request.params['viewer_id']}';
+        if (failingFavoriteViewers.contains(viewerId)) {
+          throw StateError('controlled favorites fetch failure');
+        }
+        if (viewerId == _blockedFavoritesViewer) {
           blockedFavoritesStarted.complete();
           await releaseBlockedFavorites.future;
         }
-        return const <Object?>[];
+        return favoritesByViewer[viewerId] ?? const <Object?>[];
       case 'toggle_favorite':
         return <String, Object?>{'favorited': request.body['favorited']};
       case 'sync_favorites':

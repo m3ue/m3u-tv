@@ -1144,31 +1144,35 @@ class AppStateController extends ChangeNotifier {
   /// one shared local list before server sync existed) and so just pulls.
   /// After that one-time reconciliation, the server is authoritative and
   /// every call here simply replaces the local cache with `get_favorites`.
-  Future<void> _syncFavoritesForActiveViewer(
+  Future<bool> _syncFavoritesForActiveViewer(
     Viewer viewer, {
     required int sourceGeneration,
     required int viewerGeneration,
+    bool Function()? ownsWork,
   }) async {
-    bool isCurrent() => _ownsXtreamViewer(
-      viewer,
-      sourceGeneration: sourceGeneration,
-      viewerGeneration: viewerGeneration,
-    );
-    if (!isCurrent()) return;
+    bool isCurrent() =>
+        ownsWork?.call() ??
+        _ownsXtreamViewer(
+          viewer,
+          sourceGeneration: sourceGeneration,
+          viewerGeneration: viewerGeneration,
+        );
+    if (!isCurrent()) return false;
     try {
       final migrated = await _readMigratedFavoriteViewers();
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       if (!migrated.contains(viewer.ulid)) {
         final synchronized = viewer.isAdmin && migrated.isEmpty
             ? await _pushLocalFavoritesOnce(viewer, isCurrent: isCurrent)
             : await _pullFavorites(viewer, isCurrent: isCurrent);
-        if (!synchronized || !isCurrent()) return;
+        if (!synchronized || !isCurrent()) return false;
         await _markFavoritesMigrated(viewer.ulid, isCurrent: isCurrent);
-      } else {
-        await _pullFavorites(viewer, isCurrent: isCurrent);
+        return isCurrent();
       }
+      return _pullFavorites(viewer, isCurrent: isCurrent);
     } on Object catch (error) {
       debugPrint('Favorites: sync failed for viewer ${viewer.ulid}: $error');
+      return false;
     }
   }
 
@@ -1728,6 +1732,35 @@ class AppStateController extends ChangeNotifier {
             }
           }
 
+          final viewerGeneration = _viewerOperationGeneration.advance();
+          final replacingXtreamSource =
+              invalidateEpgFreshness && _sourceType == AppSourceType.xtream;
+          if (replacingXtreamSource) {
+            bool ownsReplacement() =>
+                !_sourceOperationGeneration.isStale(sourceGeneration) &&
+                !_viewerOperationGeneration.isStale(viewerGeneration);
+            final synchronized =
+                activeViewer != null &&
+                await _syncFavoritesForActiveViewer(
+                  activeViewer,
+                  sourceGeneration: sourceGeneration,
+                  viewerGeneration: viewerGeneration,
+                  ownsWork: ownsReplacement,
+                );
+            if (!ownsReplacement()) {
+              await rollbackSource?.call();
+              return false;
+            }
+            if (!synchronized &&
+                !await _applyServerFavorites(
+                  const <Map<String, Object?>>[],
+                  isCurrent: ownsReplacement,
+                )) {
+              await rollbackSource?.call();
+              return false;
+            }
+          }
+
           if (invalidateEpgFreshness) {
             _resetEpgSession(
               clearGuide: _sourceType != AppSourceType.none,
@@ -1744,20 +1777,21 @@ class AppStateController extends ChangeNotifier {
           _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
           _mediaRequests = mediaRequests;
           _viewers = viewers;
-          final viewerGeneration = _viewerOperationGeneration.advance();
           _activeViewer = activeViewer;
           _progressList = progress;
           _error = null;
           if (clearCache) aiostreamsApiService.clearCache();
           notifyListeners();
           if (activeViewer != null) {
-            unawaited(
-              _syncFavoritesForActiveViewer(
-                activeViewer,
-                sourceGeneration: sourceGeneration,
-                viewerGeneration: viewerGeneration,
-              ),
-            );
+            if (!replacingXtreamSource) {
+              unawaited(
+                _syncFavoritesForActiveViewer(
+                  activeViewer,
+                  sourceGeneration: sourceGeneration,
+                  viewerGeneration: viewerGeneration,
+                ),
+              );
+            }
             unawaited(
               _refreshRecentlyWatchedForActiveViewer(
                 activeViewer,

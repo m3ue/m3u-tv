@@ -1135,18 +1135,18 @@ void main() {
           jsonEncode(<String>['viewer-server-b']),
         );
 
-        expect(
-          await fixture.controller.connectXtream(_secondCredentials),
-          isTrue,
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
         );
         await transport.secondFavoritesPullStarted.future;
-        expect(
-          await fixture.controller.connectXtream(_thirdCredentials),
-          isTrue,
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
         );
-        await _waitForFavorite(fixture.controller, 103);
 
         transport.releaseSecondFavoritesPull.complete();
+        expect(await secondConnect, isFalse);
+        expect(await thirdConnect, isTrue);
+        await _waitForFavorite(fixture.controller, 103);
         await pumpEventQueue();
 
         expect(await fixture.controller.favoritesService.all(), <int>{103});
@@ -1192,16 +1192,6 @@ void main() {
         await _waitForFavorite(fixture.controller, 101);
         store.blockFavoritesFor(102);
 
-        expect(
-          await fixture.controller.connectXtream(_secondCredentials),
-          isTrue,
-        );
-        await store.blockedFavoritesWriteStarted.future;
-        expect(
-          await fixture.controller.connectXtream(_thirdCredentials),
-          isTrue,
-        );
-        await transport.thirdFavoritesPullStarted.future;
         var staleNotifications = 0;
         var currentNotifications = 0;
         fixture.controller.favoritesService.addListener(() {
@@ -1214,15 +1204,27 @@ void main() {
           );
         });
 
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
+        );
+        await store.blockedFavoritesWriteStarted.future;
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
+        );
+
         store.releaseBlockedFavoritesWrite.complete();
         await store.blockedFavoritesWriteCompleted.future;
+        expect(await secondConnect, isFalse);
+        await transport.thirdFavoritesPullStarted.future;
         await pumpEventQueue();
 
+        expect(fixture.controller.activeViewer?.ulid, 'viewer-server-a');
         expect(await fixture.controller.favoritesService.all(), <int>{101});
         expect(await store.read('m3ue_favorites'), <int>[101]);
         expect(staleNotifications, 0);
 
         transport.releaseThirdFavoritesPull.complete();
+        expect(await thirdConnect, isTrue);
         await _waitForFavorite(fixture.controller, 103);
         await pumpEventQueue();
 
@@ -1259,18 +1261,18 @@ void main() {
         await pumpEventQueue();
         storage.arm();
 
-        expect(
-          await fixture.controller.connectXtream(_secondCredentials),
-          isTrue,
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
         );
         await storage.blockedReadStarted.future;
-        expect(
-          await fixture.controller.connectXtream(_thirdCredentials),
-          isTrue,
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
         );
-        await _waitForFavorite(fixture.controller, 103);
 
         storage.releaseBlockedRead.complete();
+        expect(await secondConnect, isFalse);
+        expect(await thirdConnect, isTrue);
+        await _waitForFavorite(fixture.controller, 103);
         await pumpEventQueue();
 
         final migrated =
@@ -1320,19 +1322,19 @@ void main() {
         await _waitForMigratedViewer(storage, 'viewer-server-a');
         storage.blockViewer('viewer-server-b');
 
-        expect(
-          await fixture.controller.connectXtream(_secondCredentials),
-          isTrue,
+        final secondConnect = fixture.controller.connectXtream(
+          _secondCredentials,
         );
         await storage.blockedWriteStarted.future;
-        expect(
-          await fixture.controller.connectXtream(_thirdCredentials),
-          isTrue,
+        final thirdConnect = fixture.controller.connectXtream(
+          _thirdCredentials,
         );
-        await _waitForMigratedViewer(storage, 'viewer-server-c');
 
         storage.releaseBlockedWrite.complete();
         await storage.blockedWriteCompleted.future;
+        expect(await secondConnect, isFalse);
+        expect(await thirdConnect, isTrue);
+        await _waitForMigratedViewer(storage, 'viewer-server-c');
         await pumpEventQueue();
 
         final migratedAfterRelease = await _migratedViewers(storage);
