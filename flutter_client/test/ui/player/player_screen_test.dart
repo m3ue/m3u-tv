@@ -34,9 +34,11 @@ class _FakeHttpClient implements HttpClient {
   _FakeHttpClient(this._body);
 
   final String _body;
+  final List<Uri> requestedUrls = <Uri>[];
 
   @override
   Future<HttpClientRequest> getUrl(Uri url) async {
+    requestedUrls.add(url);
     return _FakeHttpClientRequest(_body, HttpStatus.ok);
   }
 
@@ -2532,6 +2534,149 @@ void main() {
                 {'start': 10.0, 'end': 20.0},
                 {'start': 30.0, 'end': 40.0},
               ])));
+        },
+      );
+
+      testWidgets(
+        'rewrites a localhost edl_url host to the Xtream server before fetching',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([{'start': 10.0, 'end': 20.0}]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://example.com/recording.mp4',
+                    title: 'Localhost EDL Fixture',
+                    type: 'vod',
+                    metadata: <String, Object?>{
+                      'edl_url': 'http://localhost/dvr/some/path/edl',
+                    },
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            // Give the fire-and-forget EDL fetch a chance to settle.
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isNotEmpty);
+            final fetched = httpClient.requestedUrls.single;
+            expect(fetched.scheme, 'https');
+            expect(fetched.host, 'xtream.example');
+            expect(fetched.path, '/dvr/some/path/edl');
+            expect(fetched.hasPort, isFalse);
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'leaves a non-localhost edl_url host untouched',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([{'start': 10.0, 'end': 20.0}]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://example.com/recording.mp4',
+                    title: 'Real Host EDL Fixture',
+                    type: 'vod',
+                    metadata: <String, Object?>{
+                      'edl_url':
+                          'https://m3u.bearald.com/dvr/real/path/edl',
+                    },
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isNotEmpty);
+            final fetched = httpClient.requestedUrls.single;
+            expect(fetched.scheme, 'https');
+            expect(fetched.host, 'm3u.bearald.com');
+            expect(fetched.path, '/dvr/real/path/edl');
+          }, createHttpClient: (_) => httpClient);
         },
       );
     });

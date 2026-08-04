@@ -283,7 +283,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     try {
       final client = HttpClient();
-      final request = await client.getUrl(Uri.parse(edlUrl));
+      final request = await client.getUrl(_resolveEdlUri(Uri.parse(edlUrl)));
       final response = await request.close().timeout(
         const Duration(seconds: 8),
       );
@@ -308,6 +308,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } on Object catch (error) {
       debugPrint('Comskip: failed to fetch EDL: $error');
     }
+  }
+
+  /// Rewrites a localhost/127.0.0.1 EDL host to the connected Xtream server's
+  /// real scheme/host/port. The m3u-editor backend occasionally returns an
+  /// edl_url pointing at its own loopback (e.g. `http://localhost/dvr/...`)
+  /// instead of the public host, which makes the client hit the user's own
+  /// machine. Only rewrites when the parsed host is loopback AND we have
+  /// configured credentials; otherwise returns the input unchanged so the
+  /// existing failure path runs untouched.
+  Uri _resolveEdlUri(Uri edlUri) {
+    final host = edlUri.host.toLowerCase();
+    if (host != 'localhost' && host != '127.0.0.1') return edlUri;
+    final server = widget.xtreamService?.credentials?.server;
+    if (server == null) return edlUri;
+    final serverUri = Uri.tryParse(server);
+    if (serverUri == null) return edlUri;
+    return edlUri.replace(
+      scheme: serverUri.scheme,
+      host: serverUri.host,
+      port: serverUri.port,
+    );
   }
 
   /// Checks whether the current playback position has entered a commercial

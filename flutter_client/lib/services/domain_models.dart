@@ -992,9 +992,9 @@ bool _asBool(Object? value) {
 }
 
 String? _asNullableString(Object? value) {
-  if (value == null) return null;
-  final text = '$value';
-  return text.isEmpty ? null : text;
+  if (value is String) return value.isEmpty ? null : value;
+  if (value is num) return '$value';
+  return null;
 }
 
 Map<String, Object?> _asMap(Object? value) {
