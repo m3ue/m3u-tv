@@ -43,6 +43,9 @@ class _FakeHttpClient implements HttpClient {
   }
 
   @override
+  void close({bool force = false}) {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -2889,7 +2892,7 @@ void main() {
       );
 
       testWidgets(
-        'rewrites a localhost edl_url host to the Xtream server before fetching',
+        're-fires auto-skip when user restarts playback from the beginning',
         (tester) async {
           final adapter = FakePlayerAdapter(
             capabilities: PlaybackCapabilities.desktopLibmpv,

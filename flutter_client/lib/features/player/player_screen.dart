@@ -292,8 +292,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final edlUrl = args.metadata['edl_url'] as String?;
     if (edlUrl == null || edlUrl.isEmpty) return;
 
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       final request = await client.getUrl(_resolveEdlUri(Uri.parse(edlUrl)));
       final response = await request.close().timeout(
         const Duration(seconds: 8),
@@ -318,6 +318,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       setState(() => _comskipSegments = segments);
     } on Object catch (error) {
       debugPrint('Comskip: failed to fetch EDL: $error');
+    } finally {
+      client.close();
     }
   }
 
@@ -1108,6 +1110,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               context,
                             ).playerSkipCommercial,
                             onSkip: _confirmComskipSkip,
+                            // Only steal focus when the controls overlay is
+                            // hidden (nothing else is being actively
+                            // navigated). If the user is mid-interaction
+                            // with visible controls, let the prompt appear
+                            // without yanking focus away from them.
+                            autofocus: !_overlayVisible,
                           ),
                         ),
                       ),
@@ -1418,15 +1426,20 @@ class _ComskipSkippedBadge extends StatelessWidget {
 /// segment and auto-skip is disabled. Hides itself once the play-head
 /// exits the segment — see [_PlayerScreenState._checkComskip].
 class _ComskipSkipPrompt extends StatelessWidget {
-  const _ComskipSkipPrompt({required this.label, required this.onSkip});
+  const _ComskipSkipPrompt({
+    required this.label,
+    required this.onSkip,
+    required this.autofocus,
+  });
 
   final String label;
   final VoidCallback onSkip;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
     return DpadInkWell(
-      autofocus: true,
+      autofocus: autofocus,
       onTap: onSkip,
       borderRadius: BorderRadius.circular(50),
       color: Colors.black.withValues(alpha: 0.75),
