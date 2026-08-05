@@ -362,5 +362,8 @@
   "dvrDeleteDismiss": "保留",
   "dvrDeleteConfirm": "删除录制",
   "dvrDeleteSuccess": "录制已删除",
-  "dvrDeleteFailed": "无法删除录制"
+  "dvrDeleteFailed": "无法删除录制",
+  "liveTvStopRecording": "停止录制",
+  "playerRecordNowTooltip": "录制当前节目",
+  "playerStopRecordingTooltip": "停止录制"
 }

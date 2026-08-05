@@ -5,6 +5,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class DvrRecordingsScreen extends StatelessWidget {
@@ -300,8 +301,6 @@ class _RecordingCard extends StatelessWidget {
   }
 }
 
-enum _StopRecordingChoice { keep, delete, back }
-
 class _CardTrailing extends StatelessWidget {
   const _CardTrailing({
     required this.recording,
@@ -374,7 +373,7 @@ class _CardTrailing extends StatelessWidget {
   ) async {
     final l10n = AppLocalizations.of(context);
     if (deleteAction == null) {
-      await _runWithFeedback(
+      await runDvrActionWithFeedback(
         context,
         keepAction,
         successMessage: l10n.dvrCancelSuccess,
@@ -383,58 +382,22 @@ class _CardTrailing extends StatelessWidget {
       return;
     }
 
-    final choice = await showDialog<_StopRecordingChoice>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.dvrStopTitle(recording.title)),
-        content: Text(l10n.dvrStopMessage),
-        actions: [
-          DpadRegion(
-            memoryKey: 'dvr/stop-dialog-actions',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                AppButton(
-                  label: l10n.dvrStopBack,
-                  onPressed: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.back),
-                ),
-                const SizedBox(width: 8),
-                AppButton(
-                  label: l10n.dvrStopDelete,
-                  variant: AppButtonVariant.destructive,
-                  onPressed: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.delete),
-                ),
-                const SizedBox(width: 8),
-                AppButton(
-                  label: l10n.dvrStopKeep,
-                  variant: AppButtonVariant.primary,
-                  autofocus: true,
-                  onPressed: () => Navigator.of(
-                    dialogContext,
-                  ).pop(_StopRecordingChoice.keep),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final choice = await showStopRecordingDialog(
+      context,
+      title: recording.title,
     );
-    if (choice == null || choice == _StopRecordingChoice.back) return;
+    if (choice == null || choice == StopRecordingChoice.back) return;
     if (!context.mounted) return;
 
-    if (choice == _StopRecordingChoice.keep) {
-      await _runWithFeedback(
+    if (choice == StopRecordingChoice.keep) {
+      await runDvrActionWithFeedback(
         context,
         keepAction,
         successMessage: l10n.dvrCancelSuccess,
         failureMessage: l10n.dvrCancelFailed,
       );
     } else {
-      await _runWithFeedback(
+      await runDvrActionWithFeedback(
         context,
         deleteAction,
         successMessage: l10n.dvrDeleteSuccess,
@@ -449,57 +412,15 @@ class _CardTrailing extends StatelessWidget {
     Future<void> Function() action,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.dvrDeleteTitle),
-        content: Text(l10n.dvrDeleteMessage),
-        actions: [
-          DpadRegion(
-            memoryKey: 'dvr/delete-dialog-actions',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                AppButton(
-                  label: l10n.dvrDeleteDismiss,
-                  autofocus: true,
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                ),
-                const SizedBox(width: 8),
-                AppButton(
-                  label: l10n.dvrDeleteConfirm,
-                  variant: AppButtonVariant.destructive,
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showDeleteRecordingDialog(context);
     if (confirmed != true) return;
     if (!context.mounted) return;
-    await _runWithFeedback(
+    await runDvrActionWithFeedback(
       context,
       action,
       successMessage: l10n.dvrDeleteSuccess,
       failureMessage: l10n.dvrDeleteFailed,
     );
-  }
-
-  Future<void> _runWithFeedback(
-    BuildContext context,
-    Future<void> Function() action, {
-    required String successMessage,
-    required String failureMessage,
-  }) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await action();
-      messenger.showSnackBar(SnackBar(content: Text(successMessage)));
-    } on Object catch (_) {
-      messenger.showSnackBar(SnackBar(content: Text(failureMessage)));
-    }
   }
 }
 

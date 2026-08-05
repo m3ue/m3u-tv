@@ -44,6 +44,8 @@ class PlayerScreen extends StatefulWidget {
     this.onPlaybackFailure,
     this.onNextChannel,
     this.onPreviousChannel,
+    this.onRecordProgram,
+    this.isRecordingCurrentChannel = false,
     super.key,
   });
 
@@ -59,6 +61,8 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onPlaybackFailure;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
+  final void Function(EpgProgram program)? onRecordProgram;
+  final bool isRecordingCurrentChannel;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -884,197 +888,232 @@ class _PlayerScreenState extends State<PlayerScreen> {
               }
               return KeyEventResult.ignored;
             },
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _VideoSurface(
-                    textureId: widget.orchestrator.activeTextureId,
-                    aspectRatio: _videoAspectRatio,
-                  ),
-                ),
+            child: Builder(
+              builder: (context) {
+                // TV/tablet layouts get the fixed 104px left inset that
+                // clears the sidebar rail plus a generous top margin; narrow
+                // portrait phones have no sidebar to clear and a much
+                // smaller viewport, so the same fixed offsets push the
+                // overlay's fixed 420px width off the right edge and its
+                // top edge under the status bar/notch.
+                final mediaQuery = MediaQuery.of(context);
+                final isCompact = mediaQuery.size.width < 600;
+                final overlayLeft = isCompact ? 16.0 : 104.0;
+                // On compact/portrait layouts the back button lives in
+                // PlaybackControls' own top-left corner (40px padding + a
+                // ~44px circular hit target); the overlay must clear that
+                // whole row instead of overlapping it.
+                final overlayTop =
+                    mediaQuery.padding.top + (isCompact ? 96.0 : 40.0);
+                final overlayWidth = isCompact
+                    ? mediaQuery.size.width - overlayLeft * 2
+                    : 420.0;
 
-                if (widget.orchestrator.activeSubtitleController != null)
-                  Positioned.fill(
-                    child: mkv.SubtitleView(
-                      controller: widget.orchestrator.activeSubtitleController!,
-                      configuration: const mkv.SubtitleViewConfiguration(),
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _VideoSurface(
+                        textureId: widget.orchestrator.activeTextureId,
+                        aspectRatio: _videoAspectRatio,
+                      ),
                     ),
-                  ),
 
-                // Loading indicator
-                if (_status == PlaybackStatus.loading && _errorMessage == null)
-                  const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: Colors.white),
-                        SizedBox(height: 12),
-                        Text(
-                          'Loading stream...',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                    if (widget.orchestrator.activeSubtitleController != null)
+                      Positioned.fill(
+                        child: mkv.SubtitleView(
+                          controller:
+                              widget.orchestrator.activeSubtitleController!,
+                          configuration: const mkv.SubtitleViewConfiguration(),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                // Error display
-                if (_errorMessage != null)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Playback error',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
+                    // Loading indicator
+                    if (_status == PlaybackStatus.loading &&
+                        _errorMessage == null)
+                      const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(color: Colors.white),
+                            SizedBox(height: 12),
+                            Text(
+                              'Loading stream...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                            maxLines: 6,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 24),
-                          DpadFocusable(
-                            focusNode: _errorButtonFocusNode,
-                            onSelect: _goBack,
-                            effects: const [
-                              GradientBorderEffect(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(50),
+                          ],
+                        ),
+                      ),
+
+                    // Error display
+                    if (_errorMessage != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Playback error',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 6,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 24),
+                              DpadFocusable(
+                                focusNode: _errorButtonFocusNode,
+                                onSelect: _goBack,
+                                effects: const [
+                                  GradientBorderEffect(
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(50),
+                                    ),
+                                  ),
+                                ],
+                                child: FilledButton.icon(
+                                  onPressed: _goBack,
+                                  icon: const Icon(Icons.arrow_back),
+                                  label: Text(
+                                    AppLocalizations.of(context).playerGoBack,
+                                  ),
                                 ),
                               ),
                             ],
-                            child: FilledButton.icon(
-                              onPressed: _goBack,
-                              icon: const Icon(Icons.arrow_back),
-                              label: Text(
-                                AppLocalizations.of(context).playerGoBack,
-                              ),
-                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
 
-                // Playback controls overlay
-                if (_overlayVisible && _errorMessage == null)
-                  PlaybackControls(
-                    isPlaying: _isPlaying,
-                    isLive: _isLive,
-                    canSeek: _canSeek,
-                    currentPosition: _currentPosition,
-                    duration: _duration,
-                    onPlayPause: _togglePlayPause,
-                    onSeek: _seekTo,
-                    onBack: _goBack,
-                    audioTracks: _audioTracks,
-                    subtitleTracks: _subtitleTracks,
-                    selectedAudioTrackId: _selectedAudioTrackId,
-                    selectedSubtitleTrackId: _selectedSubtitleTrackId,
-                    isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
-                    isSubtitleTrackSelectionKnown:
-                        _isSubtitleTrackSelectionKnown,
-                    onAudioTrackSelected: _handleAudioTrackSelected,
-                    onSubtitleTrackSelected: _handleSubtitleTrackSelected,
-                    fallbackReason: _showPlaybackDiagnostics
-                        ? _fallbackReason
-                        : null,
-                    playPauseFocusNode: _controlsFocusNode,
-                    onNextChannel: widget.onNextChannel,
-                    onPreviousChannel: widget.onPreviousChannel,
-                  ),
-
-                if (_showPlaybackDiagnostics &&
-                    _overlayVisible &&
-                    _errorMessage == null)
-                  Positioned(
-                    top: 40,
-                    right: 40,
-                    child: _PlaybackDiagnosticsPanel(
-                      activeBackend: widget.orchestrator.activeBackend,
-                      diagnostics: widget.orchestrator.diagnostics,
-                    ),
-                  ),
-
-                // Hidden overlay tap area
-                if (!_overlayVisible && _errorMessage == null)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _showOverlay,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-
-                // EPG overlay (live only)
-                if (_isLive && _epgData != null && _overlayVisible)
-                  Positioned(
-                    top: 40,
-                    left: 104,
-                    width: 420,
-                    child: EpgOverlay(
-                      currentTitle: _epgData!.current.title,
-                      currentProgress: _epgData!.progress,
-                      nextTitle: _epgData?.next?.title,
-                    ),
-                  ),
-
-                // "Now playing" overlay (VOD/series, including AIOStreams
-                // on-demand content, which reuses the same 'vod'/'series'
-                // types once resolved to a stream URL).
-                if (!_isLive && _overlayVisible)
-                  Positioned(
-                    top: 40,
-                    left: 104,
-                    width: 420,
-                    child: NowPlayingOverlay(
-                      badgeLabel: _nowPlayingBadgeLabel(context),
-                      title: _nowPlayingTitle(),
-                      subtitle: _nowPlayingSubtitle(context),
-                      description: _nowPlayingDescription(),
-                    ),
-                  ),
-
-                // Comskip: brief auto-skip indicator (DVR recordings only)
-                if (_showComskipSkippedBadge)
-                  Positioned(
-                    top: 40,
-                    left: 40,
-                    child: _ComskipSkippedBadge(
-                      label: AppLocalizations.of(
-                        context,
-                      ).playerCommercialSkipped,
-                    ),
-                  ),
-
-                // Comskip: confirm-to-skip prompt (auto-skip disabled)
-                if (_activeComskipSegment != null)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 140,
-                    child: Center(
-                      child: _ComskipSkipPrompt(
-                        label: AppLocalizations.of(
-                          context,
-                        ).playerSkipCommercial,
-                        onSkip: _confirmComskipSkip,
+                    // Playback controls overlay
+                    if (_overlayVisible && _errorMessage == null)
+                      PlaybackControls(
+                        isPlaying: _isPlaying,
+                        isLive: _isLive,
+                        canSeek: _canSeek,
+                        currentPosition: _currentPosition,
+                        duration: _duration,
+                        onPlayPause: _togglePlayPause,
+                        onSeek: _seekTo,
+                        onBack: _goBack,
+                        audioTracks: _audioTracks,
+                        subtitleTracks: _subtitleTracks,
+                        selectedAudioTrackId: _selectedAudioTrackId,
+                        selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                        isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
+                        isSubtitleTrackSelectionKnown:
+                            _isSubtitleTrackSelectionKnown,
+                        onAudioTrackSelected: _handleAudioTrackSelected,
+                        onSubtitleTrackSelected: _handleSubtitleTrackSelected,
+                        fallbackReason: _showPlaybackDiagnostics
+                            ? _fallbackReason
+                            : null,
+                        playPauseFocusNode: _controlsFocusNode,
+                        onNextChannel: widget.onNextChannel,
+                        onPreviousChannel: widget.onPreviousChannel,
+                        onRecordNow:
+                            (_isLive &&
+                                widget.onRecordProgram != null &&
+                                _epgData?.current != null)
+                            ? () => widget.onRecordProgram!(_epgData!.current)
+                            : null,
+                        isRecording: widget.isRecordingCurrentChannel,
                       ),
-                    ),
-                  ),
-              ],
+
+                    if (_showPlaybackDiagnostics &&
+                        _overlayVisible &&
+                        _errorMessage == null)
+                      Positioned(
+                        top: 40,
+                        right: 40,
+                        child: _PlaybackDiagnosticsPanel(
+                          activeBackend: widget.orchestrator.activeBackend,
+                          diagnostics: widget.orchestrator.diagnostics,
+                        ),
+                      ),
+
+                    // Hidden overlay tap area
+                    if (!_overlayVisible && _errorMessage == null)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _showOverlay,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+
+                    // EPG overlay (live only)
+                    if (_isLive && _epgData != null && _overlayVisible)
+                      Positioned(
+                        top: overlayTop,
+                        left: overlayLeft,
+                        width: overlayWidth,
+                        child: EpgOverlay(
+                          currentTitle: _epgData!.current.title,
+                          currentProgress: _epgData!.progress,
+                          nextTitle: _epgData?.next?.title,
+                        ),
+                      ),
+
+                    // "Now playing" overlay (VOD/series, including AIOStreams
+                    // on-demand content, which reuses the same 'vod'/'series'
+                    // types once resolved to a stream URL).
+                    if (!_isLive && _overlayVisible)
+                      Positioned(
+                        top: overlayTop,
+                        left: overlayLeft,
+                        width: overlayWidth,
+                        child: NowPlayingOverlay(
+                          badgeLabel: _nowPlayingBadgeLabel(context),
+                          title: _nowPlayingTitle(),
+                          subtitle: _nowPlayingSubtitle(context),
+                          description: _nowPlayingDescription(),
+                        ),
+                      ),
+
+                    // Comskip: brief auto-skip indicator (DVR recordings only)
+                    if (_showComskipSkippedBadge)
+                      Positioned(
+                        top: 40,
+                        left: 40,
+                        child: _ComskipSkippedBadge(
+                          label: AppLocalizations.of(
+                            context,
+                          ).playerCommercialSkipped,
+                        ),
+                      ),
+
+                    // Comskip: confirm-to-skip prompt (auto-skip disabled)
+                    if (_activeComskipSegment != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 140,
+                        child: Center(
+                          child: _ComskipSkipPrompt(
+                            label: AppLocalizations.of(
+                              context,
+                            ).playerSkipCommercial,
+                            onSkip: _confirmComskipSkip,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),

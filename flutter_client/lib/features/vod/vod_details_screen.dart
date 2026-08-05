@@ -297,7 +297,7 @@ class _VodDetailsBody extends StatelessWidget {
             width: double.infinity,
             child: AppButton(
               autofocus: true,
-              variant: AppButtonVariant.primary,
+              variant: AppButtonVariant.primaryInverted,
               icon: Icons.play_arrow,
               label: buttonLabel,
               onPressed: () => _play(details, progress),
@@ -306,7 +306,7 @@ class _VodDetailsBody extends StatelessWidget {
         else
           AppButton(
             autofocus: true,
-            variant: AppButtonVariant.primary,
+            variant: AppButtonVariant.primaryInverted,
             icon: Icons.play_arrow,
             label: buttonLabel,
             onPressed: () => _play(details, progress),

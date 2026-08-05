@@ -123,7 +123,7 @@ class _ConnectionFormState extends State<ConnectionForm> {
           ),
           const SizedBox(height: 24),
           AppButton(
-            variant: AppButtonVariant.primary,
+            variant: AppButtonVariant.primaryInverted,
             label: 'Connect',
             loading: widget.isLoading,
             onPressed: _handleConnect,

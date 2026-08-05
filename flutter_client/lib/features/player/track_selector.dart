@@ -24,7 +24,8 @@ class TrackSelector extends StatelessWidget {
 
   static const double buttonWidth = 136;
   static const double buttonHeight = 48;
-  static const double controlsWidth = buttonWidth * 2 + 8;
+  static const double buttonGap = 6;
+  static const double controlsWidth = buttonWidth * 2 + buttonGap;
 
   /// Available audio tracks.
   final List<PlaybackTrack> audioTracks;
@@ -50,7 +51,7 @@ class TrackSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (audioTracks.isNotEmpty)
@@ -67,7 +68,7 @@ class TrackSelector extends StatelessWidget {
             ),
           ),
         if (audioTracks.isNotEmpty && subtitleTracks.isNotEmpty)
-          const SizedBox(width: 8),
+          const SizedBox(width: buttonGap),
         if (subtitleTracks.isNotEmpty)
           SizedBox(
             width: buttonWidth,
@@ -82,6 +83,15 @@ class TrackSelector extends StatelessWidget {
             ),
           ),
       ],
+    );
+    // Individual buttons already shrink their own label via FittedBox, but
+    // the row's total width (2 * buttonWidth + gap) is otherwise fixed —
+    // wrapping the whole row lets it scale down as a unit instead of
+    // overflowing off the edge of narrow/portrait screens.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: row,
     );
   }
 

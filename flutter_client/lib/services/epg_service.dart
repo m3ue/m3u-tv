@@ -9,6 +9,13 @@ class EpgService extends ChangeNotifier {
 
   final Clock _clock;
   final Duration cacheTtl;
+
+  /// The service's notion of "now" — the injected [Clock] in tests, real
+  /// wall-clock time otherwise. Callers that need to reason about EPG
+  /// program timing (e.g. "is this program still in the future") should use
+  /// this instead of `DateTime.now()` directly, so they stay consistent with
+  /// this service's own current/next computation under a fake clock.
+  DateTime get now => _clock();
   final Map<String, List<EpgProgram>> _programsByChannel =
       <String, List<EpgProgram>>{};
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};

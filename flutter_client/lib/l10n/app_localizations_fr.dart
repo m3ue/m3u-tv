@@ -718,4 +718,13 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => 'Impossible de supprimer l\'enregistrement';
+
+  @override
+  String get liveTvStopRecording => 'Arrêter l\'enregistrement';
+
+  @override
+  String get playerRecordNowTooltip => 'Enregistrer le programme en cours';
+
+  @override
+  String get playerStopRecordingTooltip => 'Arrêter l\'enregistrement';
 }

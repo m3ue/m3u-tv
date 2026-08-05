@@ -302,7 +302,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
             width: double.infinity,
             child: AppButton(
               autofocus: true,
-              variant: AppButtonVariant.primary,
+              variant: AppButtonVariant.primaryInverted,
               label: 'Connect',
               onPressed: _handleConnect,
             ),

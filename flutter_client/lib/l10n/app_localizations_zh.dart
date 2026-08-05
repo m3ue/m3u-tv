@@ -700,4 +700,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => '无法删除录制';
+
+  @override
+  String get liveTvStopRecording => '停止录制';
+
+  @override
+  String get playerRecordNowTooltip => '录制当前节目';
+
+  @override
+  String get playerStopRecordingTooltip => '停止录制';
 }

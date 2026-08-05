@@ -10,7 +10,9 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/recording_dot.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
 
@@ -32,6 +34,8 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onSidebarActivate,
     this.onScheduleProgram,
     this.onEnsureEpg,
+    this.onCancelRecording,
+    this.onCancelAndDeleteRecording,
   });
 
   final FavoritesService favoritesService;
@@ -44,6 +48,8 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
+  final Future<void> Function(String uuid)? onCancelRecording;
+  final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
 
   /// Requests EPG data for the given channels be fetched (lazily, debounced)
   /// if not already fresh. Called per-item as the visible list/grid builds,
@@ -155,9 +161,28 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   Future<void> _openChannelContextMenu(
     BuildContext context,
     Channel channel,
-    EpgCurrentNext? epg,
+    // The program "Record" would act on if tapped — the channel's current
+    // program from the list/grid views, or whichever block was long-pressed
+    // in the EPG timeline (which may be a future program, schedulable ahead
+    // of time same as the editor supports; a past program is not, so callers
+    // pass null for those).
+    EpgProgram? pressedProgram,
   ) async {
-    final hasRecord = epg != null && widget.onScheduleProgram != null;
+    DvrRecording? activeRecording;
+    for (final recording in ref.read(dvrRecordingsProvider)) {
+      if (recording.channelId == channel.id && recording.isInProgress) {
+        activeRecording = recording;
+        break;
+      }
+    }
+    final recordableProgram =
+        pressedProgram != null &&
+            pressedProgram.end.isAfter(ref.read(epgServiceProvider).now)
+        ? pressedProgram
+        : null;
+    final hasRecord = activeRecording != null
+        ? widget.onCancelRecording != null
+        : recordableProgram != null && widget.onScheduleProgram != null;
     final isFavorite = _favoriteIds.contains(channel.id);
 
     final action = await showDialog<_ChannelContextAction>(
@@ -183,9 +208,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
               children: [
                 if (hasRecord)
                   _ContextMenuOption(
-                    icon: Icons.fiber_manual_record,
-                    label: AppLocalizations.of(dialogContext).liveTvRecord,
-                    subtitle: epg.current.title,
+                    icon: activeRecording != null
+                        ? Icons.stop_circle
+                        : Icons.fiber_manual_record,
+                    label: activeRecording != null
+                        ? AppLocalizations.of(dialogContext).liveTvStopRecording
+                        : AppLocalizations.of(dialogContext).liveTvRecord,
+                    subtitle: activeRecording != null
+                        ? null
+                        : recordableProgram?.title,
                     autofocus: true,
                     onTap: () => Navigator.of(
                       dialogContext,
@@ -213,10 +244,23 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
       ),
     );
 
+    if (!context.mounted) return;
     switch (action) {
       case _ChannelContextAction.record:
-        final current = epg?.current;
-        if (current != null) widget.onScheduleProgram?.call(channel, current);
+        if (activeRecording != null) {
+          if (widget.onCancelRecording == null) return;
+          await confirmStopOrDeleteRecording(
+            context,
+            recording: activeRecording,
+            onCancel: widget.onCancelRecording!,
+            onCancelAndDelete: widget.onCancelAndDeleteRecording,
+          );
+        } else {
+          final program = recordableProgram;
+          if (program != null) {
+            widget.onScheduleProgram?.call(channel, program);
+          }
+        }
       case _ChannelContextAction.toggleFavorite:
         await _toggleFavorite(channel);
       case null:
@@ -268,7 +312,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
                     ),
                   )
                 : switch (_viewMode) {
-                    _ViewMode.epgGrid => _buildEpgGrid(filtered, epgService),
+                    _ViewMode.epgGrid => _buildEpgGrid(
+                      filtered,
+                      epgService,
+                      recordingChannelIds,
+                    ),
                     _ViewMode.logoGrid => _buildGridView(
                       filtered,
                       recordingChannelIds,
@@ -355,15 +403,20 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
               widget.onChannelContextChanged?.call(channels);
               widget.onChannelSelect(channel);
             },
-            onLongPress: () =>
-                unawaited(_openChannelContextMenu(context, channel, epg)),
+            onLongPress: () => unawaited(
+              _openChannelContextMenu(context, channel, epg?.current),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildEpgGrid(List<Channel> channels, EpgService epgService) {
+  Widget _buildEpgGrid(
+    List<Channel> channels,
+    EpgService epgService,
+    Set<int> recordingChannelIds,
+  ) {
     return DpadRegion(
       memoryKey: 'live-tv/epg',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -375,12 +428,20 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
       child: TimelineEpgView(
         channels: channels,
         epgService: epgService,
+        recordingChannelIds: recordingChannelIds,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);
         },
         onCatchupProgramSelect: widget.onCatchupProgramSelect,
         onEnsureEpg: widget.onEnsureEpg,
+        onChannelLongPress: (channel, program) => unawaited(
+          // Pass the exact block that was pressed — schedulable for both
+          // the currently-airing and future programs, same as the editor
+          // supports; _openChannelContextMenu withholds "Record" itself
+          // if this program has already ended.
+          _openChannelContextMenu(context, channel, program),
+        ),
       ),
     );
   }
@@ -416,8 +477,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
               widget.onChannelContextChanged?.call(channels);
               widget.onChannelSelect(channel);
             },
-            onLongPress: () =>
-                unawaited(_openChannelContextMenu(context, channel, epg)),
+            onLongPress: () => unawaited(
+              _openChannelContextMenu(context, channel, epg?.current),
+            ),
           );
         },
       ),
@@ -531,7 +593,7 @@ class _ChannelRow extends StatelessWidget {
                       Row(
                         children: [
                           if (isRecording) ...[
-                            _RecordingDot(color: colorScheme.error),
+                            RecordingDot(color: colorScheme.error),
                             const SizedBox(width: 6),
                           ],
                           Expanded(
@@ -658,7 +720,7 @@ class _ChannelGridItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isRecording) ...[
-                _RecordingDot(color: colorScheme.error),
+                RecordingDot(color: colorScheme.error),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -675,28 +737,6 @@ class _ChannelGridItem extends StatelessWidget {
           if (isFavorite)
             Icon(Icons.star, color: colorScheme.tertiary, size: 16),
         ],
-      ),
-    );
-  }
-}
-
-/// Small themed dot marking a channel as currently recording. Deliberately
-/// compact (no text label) so it holds up on narrow mobile widths; the
-/// full description is exposed to screen readers via [Semantics].
-class _RecordingDot extends StatelessWidget {
-  const _RecordingDot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: AppLocalizations.of(context).liveTvRecording,
-      child: Container(
-        key: const Key('recording-dot'),
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

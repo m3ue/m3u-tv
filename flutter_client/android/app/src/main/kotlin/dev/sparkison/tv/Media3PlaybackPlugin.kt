@@ -310,7 +310,11 @@ class Media3PlaybackPlugin(
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             val state = playerState ?: return
             if (videoSize.width > 0 && videoSize.height > 0) {
-                state.surfaceProducer.setSize(videoSize.width, videoSize.height)
+                if (state.lastVideoWidth != videoSize.width || state.lastVideoHeight != videoSize.height) {
+                    state.surfaceProducer.setSize(videoSize.width, videoSize.height)
+                    state.lastVideoWidth = videoSize.width
+                    state.lastVideoHeight = videoSize.height
+                }
                 val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
                 val player = state.player
                 emit(
@@ -369,6 +373,8 @@ class Media3PlaybackPlugin(
         val textureId: Long,
         val uri: String,
         var retriedHlsAsProgressive: Boolean = false,
+        var lastVideoWidth: Int = 0,
+        var lastVideoHeight: Int = 0,
     ) {
         fun retryAsTs(error: PlaybackException): Boolean {
             if (retriedHlsAsProgressive || !error.looksLikeFormatMismatch()) {

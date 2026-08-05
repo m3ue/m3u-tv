@@ -716,4 +716,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => 'Aufnahme konnte nicht gelöscht werden';
+
+  @override
+  String get liveTvStopRecording => 'Aufnahme stoppen';
+
+  @override
+  String get playerRecordNowTooltip => 'Aktuelle Sendung aufnehmen';
+
+  @override
+  String get playerStopRecordingTooltip => 'Aufnahme stoppen';
 }

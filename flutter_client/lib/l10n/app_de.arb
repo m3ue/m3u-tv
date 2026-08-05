@@ -362,5 +362,8 @@
   "dvrDeleteDismiss": "Behalten",
   "dvrDeleteConfirm": "Aufnahme löschen",
   "dvrDeleteSuccess": "Aufnahme gelöscht",
-  "dvrDeleteFailed": "Aufnahme konnte nicht gelöscht werden"
+  "dvrDeleteFailed": "Aufnahme konnte nicht gelöscht werden",
+  "liveTvStopRecording": "Aufnahme stoppen",
+  "playerRecordNowTooltip": "Aktuelle Sendung aufnehmen",
+  "playerStopRecordingTooltip": "Aufnahme stoppen"
 }

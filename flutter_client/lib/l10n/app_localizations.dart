@@ -1405,6 +1405,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not delete recording'**
   String get dvrDeleteFailed;
+
+  /// No description provided for @liveTvStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get liveTvStopRecording;
+
+  /// No description provided for @playerRecordNowTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record current program'**
+  String get playerRecordNowTooltip;
+
+  /// No description provided for @playerStopRecordingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get playerStopRecordingTooltip;
 }
 
 class _AppLocalizationsDelegate
