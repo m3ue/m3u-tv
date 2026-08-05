@@ -329,10 +329,19 @@ class TvNotificationStore {
     );
   });
 
-  Future<void> markRead(String id) => _mutate(() async {
+  Future<void> markRead(String id) => _markRead(id);
+
+  Future<void> markReadIf(String id, bool Function() shouldCommit) =>
+      _markRead(id, shouldCommit: shouldCommit);
+
+  Future<void> _markRead(
+    String id, {
+    bool Function()? shouldCommit,
+  }) => _mutate(() async {
     final owner = _ownerKey;
     if (owner == null) return;
-    bool ownsMutation() => _ownerKey == owner;
+    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    if (!ownsMutation()) return;
     final existing = await _allFor(owner);
     if (!ownsMutation()) return;
     var changed = false;

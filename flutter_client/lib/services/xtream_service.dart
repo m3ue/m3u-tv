@@ -664,8 +664,23 @@ class XtreamService {
     String? type,
     int page = 1,
     int perPage = 20,
+  }) => searchContentRequestsFor(
+    _requireCredentials(),
+    query,
+    type: type,
+    page: page,
+    perPage: perPage,
+  );
+
+  Future<List<ContentRequestSearchResult>> searchContentRequestsFor(
+    UserCredentials credentials,
+    String query, {
+    String? type,
+    int page = 1,
+    int perPage = 20,
   }) async {
-    final response = await _request(
+    final response = await _requestWithCredentials(
+      credentials,
       'request_search',
       params: {
         'query': query,
@@ -693,8 +708,23 @@ class XtreamService {
     required int integrationId,
     required String externalId,
     List<int>? seasons,
+  }) => submitContentRequestFor(
+    _requireCredentials(),
+    type: type,
+    integrationId: integrationId,
+    externalId: externalId,
+    seasons: seasons,
+  );
+
+  Future<MediaRequestSummary> submitContentRequestFor(
+    UserCredentials credentials, {
+    required String type,
+    required int integrationId,
+    required String externalId,
+    List<int>? seasons,
   }) async {
-    final response = await _request(
+    final response = await _requestWithCredentials(
+      credentials,
       'request_submit',
       method: 'POST',
       body: {

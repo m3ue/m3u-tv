@@ -28,6 +28,13 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 enum AppSourceType { none, xtream, m3u }
 
+typedef MediaRequestOwner = ({
+  int sourceGeneration,
+  int notificationGeneration,
+  AppSourceType sourceType,
+  UserCredentials? credentials,
+});
+
 class AppStateController extends ChangeNotifier {
   factory AppStateController({
     AuthNotifier? authNotifier,
@@ -207,14 +214,24 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> markNotificationRead(String id) async {
-    await notificationStore.markRead(id);
-    await _refreshUnreadNotificationCount();
     final credentials = authNotifier.credentials;
-    if (credentials != null) {
-      unawaited(
-        _tvNotificationService.markRead(credentials, id).catchError((_) {}),
-      );
+    if (credentials == null) return;
+    final ownsNotification = _captureNotificationOwnership(
+      credentials: credentials,
+      notificationGeneration: _notificationSessionGeneration.current,
+    );
+    if (!ownsNotification()) return;
+    await notificationStore.markReadIf(id, ownsNotification);
+    if (!ownsNotification()) return;
+    if (!await _refreshUnreadNotificationCount(
+      shouldCommit: ownsNotification,
+    )) {
+      return;
     }
+    if (!ownsNotification()) return;
+    unawaited(
+      _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+    );
   }
 
   Future<void> markAllNotificationsRead() async {
@@ -298,6 +315,12 @@ class AppStateController extends ChangeNotifier {
       authNotifier.authResponse?.hasFeature('requests') ?? false;
   RequestsCapability? get requestsCapability =>
       authNotifier.authResponse?.requests;
+  MediaRequestOwner get mediaRequestOwner => (
+    sourceGeneration: _sourceOperationGeneration.current,
+    notificationGeneration: _notificationSessionGeneration.current,
+    sourceType: _sourceType,
+    credentials: authNotifier.credentials,
+  );
   bool get hasAioStreams => authNotifier.authResponse?.hasAioStreams ?? false;
   List<AIOStreamsIntegration> get aiostreamsIntegrations =>
       authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
@@ -962,17 +985,28 @@ class AppStateController extends ChangeNotifier {
   bool Function() _captureMediaRequestOwnership(
     UserCredentials credentials, {
     int? notificationGeneration,
+    MediaRequestOwner? owner,
   }) {
-    final sourceGeneration = _sourceOperationGeneration.current;
+    final owned =
+        owner ??
+        (
+          sourceGeneration: _sourceOperationGeneration.current,
+          notificationGeneration:
+              notificationGeneration ?? _notificationSessionGeneration.current,
+          sourceType: _sourceType,
+          credentials: credentials,
+        );
     return () =>
-        (notificationGeneration == null ||
-            !_notificationSessionGeneration.isStale(
-              notificationGeneration,
-            )) &&
-        !_sourceOperationGeneration.isStale(sourceGeneration) &&
-        _sourceType == AppSourceType.xtream &&
-        _sameCredentials(authNotifier.credentials, credentials) &&
-        _sameCredentials(xtreamService.credentials, credentials);
+        owned.credentials != null &&
+        !_notificationSessionGeneration.isStale(
+          owned.notificationGeneration,
+        ) &&
+        !_sourceOperationGeneration.isStale(owned.sourceGeneration) &&
+        owned.sourceType == AppSourceType.xtream &&
+        _sourceType == owned.sourceType &&
+        _sameCredentials(owned.credentials, credentials) &&
+        _sameCredentials(authNotifier.credentials, owned.credentials) &&
+        _sameCredentials(xtreamService.credentials, owned.credentials);
   }
 
   Future<void> handleForegroundPush(PushMessage message) async {
@@ -1802,7 +1836,19 @@ class AppStateController extends ChangeNotifier {
   Future<List<ContentRequestSearchResult>> searchContentRequests(
     String query, {
     String? type,
-  }) => xtreamService.searchContentRequests(query, type: type);
+  }) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return const <ContentRequestSearchResult>[];
+    final ownsWork = _captureMediaRequestOwnership(credentials);
+    if (!ownsWork()) return const <ContentRequestSearchResult>[];
+    final results = await xtreamService.searchContentRequestsFor(
+      credentials,
+      query,
+      type: type,
+    );
+    if (!ownsWork()) return const <ContentRequestSearchResult>[];
+    return results;
+  }
 
   /// Submits a content request and adds it to the local requests list so it
   /// shows up immediately, without waiting for a `request.status` push.
@@ -1811,16 +1857,21 @@ class AppStateController extends ChangeNotifier {
     required int integrationId,
     required String externalId,
     List<int>? seasons,
+    MediaRequestOwner? requestOwner,
   }) async {
     final credentials = authNotifier.credentials;
     if (credentials == null) {
       throw StateError('Xtream credentials not configured');
     }
-    final ownsWork = _captureMediaRequestOwnership(credentials);
+    final ownsWork = _captureMediaRequestOwnership(
+      credentials,
+      owner: requestOwner,
+    );
     if (!ownsWork()) {
       throw StateError('Xtream credentials not configured');
     }
-    final request = await xtreamService.submitContentRequest(
+    final request = await xtreamService.submitContentRequestFor(
+      credentials,
       type: type,
       integrationId: integrationId,
       externalId: externalId,
