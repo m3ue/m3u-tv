@@ -94,9 +94,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveTvRecording => 'Enregistrement en cours';
 
   @override
-  String get liveTvStopRecording => 'Arrêter l\'enregistrement';
-
-  @override
   String get liveTvFavorite => 'Favori';
 
   @override
@@ -112,6 +109,21 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get catchupProgramReplayable => 'Rediffusion catchup disponible';
+
+  @override
+  String get epgPreviousDay => 'Jour précédent';
+
+  @override
+  String get epgNow => 'Maintenant';
+
+  @override
+  String get epgNextDay => 'Jour suivant';
+
+  @override
+  String get epgChannels => 'CHAÎNES';
+
+  @override
+  String get epgNoData => 'Aucune donnée EPG';
 
   @override
   String get playerGoBack => 'Retour';
@@ -140,10 +152,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerSkipNextTooltip => 'Chaîne suivante';
 
   @override
-  String get playerRecordNowTooltip => 'Enregistrer le programme en cours';
+  String get playerNowPlayingMovie => 'Film';
 
   @override
-  String get playerStopRecordingTooltip => 'Arrêter l\'enregistrement';
+  String get playerNowPlayingSeries => 'Série';
+
+  @override
+  String playerNowPlayingSeasonEpisode(int season, int episode) {
+    return 'S$season · É$episode';
+  }
 
   @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
@@ -684,4 +701,13 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => 'Impossible de supprimer l\'enregistrement';
+
+  @override
+  String get liveTvStopRecording => 'Arrêter l\'enregistrement';
+
+  @override
+  String get playerRecordNowTooltip => 'Enregistrer le programme en cours';
+
+  @override
+  String get playerStopRecordingTooltip => 'Arrêter l\'enregistrement';
 }

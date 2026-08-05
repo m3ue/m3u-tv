@@ -266,12 +266,6 @@ abstract class AppLocalizations {
   /// **'Recording'**
   String get liveTvRecording;
 
-  /// No description provided for @liveTvStopRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop recording'**
-  String get liveTvStopRecording;
-
   /// No description provided for @liveTvFavorite.
   ///
   /// In en, this message translates to:
@@ -301,6 +295,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Catchup replay available'**
   String get catchupProgramReplayable;
+
+  /// No description provided for @epgPreviousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get epgPreviousDay;
+
+  /// No description provided for @epgNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get epgNow;
+
+  /// No description provided for @epgNextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get epgNextDay;
+
+  /// No description provided for @epgChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'CHANNELS'**
+  String get epgChannels;
+
+  /// No description provided for @epgNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No EPG data'**
+  String get epgNoData;
 
   /// No description provided for @playerGoBack.
   ///
@@ -350,17 +374,23 @@ abstract class AppLocalizations {
   /// **'Next channel'**
   String get playerSkipNextTooltip;
 
-  /// No description provided for @playerRecordNowTooltip.
+  /// No description provided for @playerNowPlayingMovie.
   ///
   /// In en, this message translates to:
-  /// **'Record current program'**
-  String get playerRecordNowTooltip;
+  /// **'Movie'**
+  String get playerNowPlayingMovie;
 
-  /// No description provided for @playerStopRecordingTooltip.
+  /// No description provided for @playerNowPlayingSeries.
   ///
   /// In en, this message translates to:
-  /// **'Stop recording'**
-  String get playerStopRecordingTooltip;
+  /// **'Series'**
+  String get playerNowPlayingSeries;
+
+  /// No description provided for @playerNowPlayingSeasonEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'S{season} · E{episode}'**
+  String playerNowPlayingSeasonEpisode(int season, int episode);
 
   /// No description provided for @searchHint.
   ///
@@ -1345,6 +1375,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not delete recording'**
   String get dvrDeleteFailed;
+
+  /// No description provided for @liveTvStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get liveTvStopRecording;
+
+  /// No description provided for @playerRecordNowTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record current program'**
+  String get playerRecordNowTooltip;
+
+  /// No description provided for @playerStopRecordingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get playerStopRecordingTooltip;
 }
 
 class _AppLocalizationsDelegate

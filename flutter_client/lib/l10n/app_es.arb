@@ -41,7 +41,6 @@
   "liveTvNext": "SIGUIENTE",
   "liveTvRecord": "Grabar",
   "liveTvRecording": "Grabando",
-  "liveTvStopRecording": "Detener grabación",
   "liveTvFavorite": "Favorito",
   "liveTvRemoveFavorite": "Quitar de favoritos",
   "catchupBadgeAvailable": "Catchup disponible",
@@ -54,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "Repetición por catchup disponible",
+  "epgPreviousDay": "Día anterior",
+  "epgNow": "Ahora",
+  "epgNextDay": "Día siguiente",
+  "epgChannels": "CANALES",
+  "epgNoData": "No hay datos de EPG",
   "playerGoBack": "Volver",
   "playerResumeWatching": "Continuar viendo",
   "playerContinue": "Continuar",
@@ -69,8 +73,19 @@
   "playerResume": "Reanudar",
   "playerSkipPreviousTooltip": "Canal anterior",
   "playerSkipNextTooltip": "Canal siguiente",
-  "playerRecordNowTooltip": "Grabar programa actual",
-  "playerStopRecordingTooltip": "Detener grabación",
+  "playerNowPlayingMovie": "Película",
+  "playerNowPlayingSeries": "Serie",
+  "playerNowPlayingSeasonEpisode": "T{season} · E{episode}",
+  "@playerNowPlayingSeasonEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
   "searchHint": "Buscar Televisión en vivo, cine y series…",
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",
@@ -342,5 +357,8 @@
   "dvrDeleteDismiss": "Mantener",
   "dvrDeleteConfirm": "Eliminar grabación",
   "dvrDeleteSuccess": "Grabación eliminada",
-  "dvrDeleteFailed": "No se pudo eliminar la grabación"
+  "dvrDeleteFailed": "No se pudo eliminar la grabación",
+  "liveTvStopRecording": "Detener grabación",
+  "playerRecordNowTooltip": "Grabar programa actual",
+  "playerStopRecordingTooltip": "Detener grabación"
 }

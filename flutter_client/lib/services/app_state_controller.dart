@@ -241,7 +241,12 @@ class AppStateController extends ChangeNotifier {
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
   final Set<int> _pendingEpgChannelIds = <int>{};
+  final Map<String, DateTime> _fetchedEpgRanges = <String, DateTime>{};
   Timer? _epgFetchDebounce;
+  DateTime? _pendingEpgStartDate;
+  DateTime? _pendingEpgEndDate;
+  String _activeEpgRangeKey = '';
+  int _epgRequestGeneration = 0;
   static const _epgPrimeCount = 60;
   static const _epgFetchDebounceDelay = Duration(milliseconds: 250);
 
@@ -307,6 +312,7 @@ class AppStateController extends ChangeNotifier {
         savedSource == AppSourceType.none) {
       final restored = await authNotifier.loadSavedCredentials();
       if (restored) {
+        _resetEpgSession();
         final credentials = authNotifier.credentials!;
         final notificationGeneration = _notificationSessionGeneration.advance();
         if (await _hydrateCachedXtreamContent()) {
@@ -373,6 +379,7 @@ class AppStateController extends ChangeNotifier {
     // until some future connect attempt happens to fully succeed.
     _pushRegistrationSuspended = false;
 
+    _resetEpgSession();
     final loaded = await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -393,6 +400,7 @@ class AppStateController extends ChangeNotifier {
 
     try {
       final playlist = m3uParser.parse(playlistText);
+      _resetEpgSession();
       _notificationSessionGeneration.advance();
       _pushRegistrationSuspended = true;
       _pushLifecycleGeneration.advance();
@@ -1053,6 +1061,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _resetEpgSession();
     _notificationSessionGeneration.advance();
     _pushRegistrationSuspended = true;
     _pushLifecycleGeneration.advance();
@@ -1108,6 +1117,7 @@ class AppStateController extends ChangeNotifier {
       await boot();
       return;
     }
+    _resetEpgSession(clearGuide: false);
     await _replaceWithXtreamContent(clearCache: true);
     _isLoadingContent = false;
     notifyListeners();
@@ -1605,11 +1615,28 @@ class AppStateController extends ChangeNotifier {
   /// without fresh cached data are requested. Call this from a screen's
   /// `itemBuilder` (list/grid) so only currently visible channels get fetched
   /// as the user scrolls, instead of fetching the whole channel list upfront.
-  void ensureEpgForChannels(List<Channel> channels) {
+  void ensureEpgForChannels(
+    List<Channel> channels, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
     if (_sourceType != AppSourceType.xtream) return;
+    final rangeKey = _epgRangeKey(startDate, endDate);
+    if (rangeKey != _activeEpgRangeKey) {
+      _activeEpgRangeKey = rangeKey;
+      _pendingEpgStartDate = startDate;
+      _pendingEpgEndDate = endDate;
+      _pendingEpgChannelIds.clear();
+      _epgFetchDebounce?.cancel();
+      _epgRequestGeneration += 1;
+    }
     var added = false;
     for (final channel in channels) {
-      if (epgService.hasFreshDataForChannel(channel)) continue;
+      final isFresh = epgService.hasFreshDataForChannel(channel);
+      if (rangeKey.isEmpty && isFresh) continue;
+      if (rangeKey.isNotEmpty && _hasFreshEpgRange(channel.id, rangeKey)) {
+        continue;
+      }
       if (_pendingEpgChannelIds.add(channel.id)) added = true;
     }
     if (!added) return;
@@ -1621,6 +1648,10 @@ class AppStateController extends ChangeNotifier {
     if (_pendingEpgChannelIds.isEmpty) return;
     final ids = _pendingEpgChannelIds.toSet();
     _pendingEpgChannelIds.clear();
+    final startDate = _pendingEpgStartDate;
+    final endDate = _pendingEpgEndDate;
+    final rangeKey = _activeEpgRangeKey;
+    final generation = _epgRequestGeneration;
     final channels = _channels
         .where((channel) => ids.contains(channel.id))
         .toList(growable: false);
@@ -1629,27 +1660,49 @@ class AppStateController extends ChangeNotifier {
       (channel) => channel.epgChannelId ?? channel.tvgName ?? channel.name,
     );
     try {
-      final programs = await xtreamService.getEpgBatch(channels);
-      epgService
-        ..mergePrograms(programs)
-        ..markFetched(channelIds);
+      final programs = await xtreamService.getEpgBatch(
+        channels,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        return;
+      }
+      if (rangeKey.isNotEmpty) {
+        _markEpgRangeFetched(channels, rangeKey);
+      }
+      epgService.mergePrograms(
+        programs,
+        channelIds: channelIds,
+        replaceExisting: rangeKey.isEmpty,
+        markFresh: rangeKey.isEmpty,
+      );
+      if (rangeKey.isEmpty) epgService.markFetched(channelIds);
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
         );
       }
     } on Object catch (e) {
-      // Mark as fetched even on failure so a persistently erroring channel
-      // doesn't get re-queued (and reschedule the debounce timer) on every
-      // rebuild — it'll be retried once cacheTtl expires.
-      epgService.markFetched(channelIds);
+      if (generation != _epgRequestGeneration ||
+          rangeKey != _activeEpgRangeKey) {
+        return;
+      }
+      if (rangeKey.isEmpty) {
+        epgService.markFetched(channelIds);
+      } else {
+        _markEpgRangeFetched(channels, rangeKey);
+      }
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
   }
 
   Future<void> _loadXtreamEpg(List<Channel> channels) async {
+    final generation = _epgRequestGeneration;
     try {
       final programs = await xtreamService.getEpgBatch(channels);
+      if (generation != _epgRequestGeneration) return;
       if (kDebugMode) {
         debugPrint(
           '[EPG] getEpgBatch → ${programs.length} programs for ${channels.length} channels',
@@ -1666,6 +1719,41 @@ class AppStateController extends ChangeNotifier {
       // Don't clear existing EPG data on a batch failure. A transient network
       // error shouldn't wipe a previously loaded guide.
     }
+  }
+
+  String _epgRangeKey(DateTime? startDate, DateTime? endDate) {
+    if (startDate == null) return '';
+    String dateKey(DateTime value) =>
+        '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+    return '${dateKey(startDate)}:${dateKey(endDate ?? startDate)}';
+  }
+
+  bool _hasFreshEpgRange(int channelId, String rangeKey) {
+    final key = '$channelId:$rangeKey';
+    final fetchedAt = _fetchedEpgRanges[key];
+    if (fetchedAt == null) return false;
+    if (DateTime.now().difference(fetchedAt) < epgService.cacheTtl) return true;
+    _fetchedEpgRanges.remove(key);
+    return false;
+  }
+
+  void _markEpgRangeFetched(List<Channel> channels, String rangeKey) {
+    final now = DateTime.now();
+    for (final channel in channels) {
+      _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
+    }
+  }
+
+  void _resetEpgSession({bool clearGuide = true}) {
+    _epgRequestGeneration += 1;
+    _epgFetchDebounce?.cancel();
+    _epgFetchDebounce = null;
+    _pendingEpgChannelIds.clear();
+    _fetchedEpgRanges.clear();
+    _pendingEpgStartDate = null;
+    _pendingEpgEndDate = null;
+    _activeEpgRangeKey = '';
+    if (clearGuide) epgService.clear();
   }
 
   Future<void> _loadSavedM3uSource() async {
@@ -1733,6 +1821,7 @@ class AppStateController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _epgRequestGeneration += 1;
     _epgFetchDebounce?.cancel();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());

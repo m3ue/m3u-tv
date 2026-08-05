@@ -2,63 +2,9 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
-
-// M3 buttons and chips use StadiumBorder. A large radius makes the dpad
-// focus border match the pill/circular shape regardless of widget height.
-const kDvrDialogButtonEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
+import 'package:m3u_tv/shared/app_button.dart';
 
 enum StopRecordingChoice { keep, delete, back }
-
-enum DvrDialogButtonStyle { tonal, primary, destructive }
-
-/// A filled dialog action button (never outline/ghost, per project
-/// convention), wrapped in [DpadFocusable] per the Material-button rule.
-class DvrDialogActionButton extends StatelessWidget {
-  const DvrDialogActionButton({
-    required this.label,
-    required this.onSelect,
-    this.style = DvrDialogButtonStyle.tonal,
-    this.autofocus = false,
-    super.key,
-  });
-
-  final String label;
-  final VoidCallback onSelect;
-  final DvrDialogButtonStyle style;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final button = switch (style) {
-      DvrDialogButtonStyle.tonal => FilledButton.tonal(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      DvrDialogButtonStyle.primary => FilledButton(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      DvrDialogButtonStyle.destructive => FilledButton(
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.errorContainer,
-          foregroundColor: colorScheme.onErrorContainer,
-        ),
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-    };
-    return DpadFocusable(
-      autofocus: autofocus,
-      effects: kDvrDialogButtonEffect,
-      onSelect: onSelect,
-      child: button,
-    );
-  }
-}
 
 /// Offers a choice instead of a plain confirm: the server's cancel action
 /// only stops the recording and keeps it (status → Cancelled), while
@@ -78,28 +24,30 @@ Future<StopRecordingChoice?> showStopRecordingDialog(
       actions: [
         DpadRegion(
           memoryKey: 'dvr/stop-dialog-actions',
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // OverflowBar (not Row) so three buttons on a narrow TV/mobile
+          // dialog stack vertically instead of overflowing horizontally.
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            overflowSpacing: 8,
             children: [
-              DvrDialogActionButton(
+              AppButton(
                 label: l10n.dvrStopBack,
-                onSelect: () =>
+                onPressed: () =>
                     Navigator.of(dialogContext).pop(StopRecordingChoice.back),
               ),
-              const SizedBox(width: 8),
-              DvrDialogActionButton(
+              AppButton(
                 label: l10n.dvrStopDelete,
-                style: DvrDialogButtonStyle.destructive,
-                onSelect: () => Navigator.of(
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.of(
                   dialogContext,
                 ).pop(StopRecordingChoice.delete),
               ),
-              const SizedBox(width: 8),
-              DvrDialogActionButton(
+              AppButton(
                 label: l10n.dvrStopKeep,
-                style: DvrDialogButtonStyle.primary,
+                variant: AppButtonVariant.primary,
                 autofocus: true,
-                onSelect: () =>
+                onPressed: () =>
                     Navigator.of(dialogContext).pop(StopRecordingChoice.keep),
               ),
             ],
@@ -120,19 +68,22 @@ Future<bool?> showDeleteRecordingDialog(BuildContext context) {
       actions: [
         DpadRegion(
           memoryKey: 'dvr/delete-dialog-actions',
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // OverflowBar (not Row) so buttons on a narrow dialog stack
+          // vertically instead of overflowing horizontally.
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            overflowSpacing: 8,
             children: [
-              DvrDialogActionButton(
+              AppButton(
                 label: l10n.dvrDeleteDismiss,
                 autofocus: true,
-                onSelect: () => Navigator.of(dialogContext).pop(false),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
               ),
-              const SizedBox(width: 8),
-              DvrDialogActionButton(
+              AppButton(
                 label: l10n.dvrDeleteConfirm,
-                style: DvrDialogButtonStyle.destructive,
-                onSelect: () => Navigator.of(dialogContext).pop(true),
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.of(dialogContext).pop(true),
               ),
             ],
           ),

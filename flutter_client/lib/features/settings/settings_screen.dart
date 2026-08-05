@@ -10,17 +10,12 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-// M3 buttons and chips use StadiumBorder. A large radius makes the dpad
-// focus border match the pill shape regardless of widget height.
-const _kStadiumEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -299,16 +294,13 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
             onFieldSubmitted: (_) => _handleConnect(),
           ),
           const SizedBox(height: 24),
-          DpadFocusable(
-            autofocus: true,
-            onSelect: _handleConnect,
-            effects: _kStadiumEffect,
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _handleConnect,
-                child: const Text('Connect'),
-              ),
+          SizedBox(
+            width: double.infinity,
+            child: AppButton(
+              autofocus: true,
+              variant: AppButtonVariant.primary,
+              label: 'Connect',
+              onPressed: _handleConnect,
             ),
           ),
         ],
@@ -565,28 +557,20 @@ class _ConnectedViewState extends State<_ConnectedView>
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: DpadFocusable(
+                  child: AppButton(
                     autofocus: true,
-                    onSelect: widget.onClearCache,
-                    effects: _kStadiumEffect,
-                    child: FilledButton.tonalIcon(
-                      onPressed: widget.onClearCache,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(l.settingsRetryConnection),
-                    ),
+                    icon: Icons.refresh,
+                    label: l.settingsRetryConnection,
+                    onPressed: widget.onClearCache,
                   ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
-                  child: DpadFocusable(
-                    onSelect: _handleDisconnect,
-                    effects: _kStadiumEffect,
-                    child: FilledButton.tonalIcon(
-                      onPressed: _handleDisconnect,
-                      icon: const Icon(Icons.settings),
-                      label: Text(l.settingsEditServer),
-                    ),
+                  child: AppButton(
+                    icon: Icons.settings,
+                    label: l.settingsEditServer,
+                    onPressed: _handleDisconnect,
                   ),
                 ),
               ],
@@ -629,15 +613,9 @@ class _ConnectedViewState extends State<_ConnectedView>
                     ],
                   ),
                 ),
-                DpadFocusable(
-                  onSelect: () => _openViewerManagement(context),
-                  effects: _kStadiumEffect,
-                  child: FilledButton.tonal(
-                    onPressed: () => _openViewerManagement(context),
-                    child: Text(
-                      AppLocalizations.of(context).settingsManageViewers,
-                    ),
-                  ),
+                AppButton(
+                  label: AppLocalizations.of(context).settingsManageViewers,
+                  onPressed: () => _openViewerManagement(context),
                 ),
               ],
             ),
@@ -675,15 +653,11 @@ class _ConnectedViewState extends State<_ConnectedView>
               ],
               SizedBox(
                 width: double.infinity,
-                child: DpadFocusable(
+                child: AppButton(
                   autofocus: widget.epgRefreshOptions.isEmpty,
-                  onSelect: _handleClearCache,
-                  effects: _kStadiumEffect,
-                  child: FilledButton.tonalIcon(
-                    onPressed: _handleClearCache,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(l.settingsClearCacheConfirm),
-                  ),
+                  icon: Icons.refresh,
+                  label: l.settingsClearCacheConfirm,
+                  onPressed: _handleClearCache,
                 ),
               ),
             ],
@@ -712,17 +686,10 @@ class _ConnectedViewState extends State<_ConnectedView>
           title: l.settingsAccount,
           child: SizedBox(
             width: double.infinity,
-            child: DpadFocusable(
-              onSelect: _handleDisconnect,
-              effects: _kStadiumEffect,
-              child: FilledButton(
-                onPressed: _handleDisconnect,
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
-                ),
-                child: Text(l.disconnect),
-              ),
+            child: AppButton(
+              variant: AppButtonVariant.destructive,
+              label: l.disconnect,
+              onPressed: _handleDisconnect,
             ),
           ),
         ),
@@ -858,19 +825,12 @@ class _AppReleaseLink extends StatelessWidget {
         }
         return SizedBox(
           width: double.infinity,
-          child: DpadFocusable(
-            onSelect: () => launchUrl(
+          child: AppButton(
+            icon: Icons.open_in_new,
+            label: l.settingsAppViewRelease,
+            onPressed: () => launchUrl(
               Uri.parse(_releaseUrl),
               mode: LaunchMode.externalApplication,
-            ),
-            effects: _kStadiumEffect,
-            child: FilledButton.tonalIcon(
-              onPressed: () => launchUrl(
-                Uri.parse(_releaseUrl),
-                mode: LaunchMode.externalApplication,
-              ),
-              icon: const Icon(Icons.open_in_new),
-              label: Text(l.settingsAppViewRelease),
             ),
           ),
         );
@@ -957,15 +917,12 @@ class _TraktDisconnected extends StatelessWidget {
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
-          child: DpadFocusable(
+          child: AppButton(
             autofocus: true,
-            onSelect: traktService.startDeviceAuth,
-            effects: _kStadiumEffect,
-            child: FilledButton.icon(
-              onPressed: traktService.startDeviceAuth,
-              icon: const Icon(Icons.link),
-              label: Text(l.traktConnectButton),
-            ),
+            variant: AppButtonVariant.primary,
+            icon: Icons.link,
+            label: l.traktConnectButton,
+            onPressed: traktService.startDeviceAuth,
           ),
         ),
       ],
@@ -1040,14 +997,10 @@ class _TraktPendingWide extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            DpadFocusable(
+            AppButton(
               autofocus: true,
-              onSelect: onCancel,
-              effects: _kStadiumEffect,
-              child: FilledButton.tonal(
-                onPressed: onCancel,
-                child: Text(AppLocalizations.of(context).cancel),
-              ),
+              label: AppLocalizations.of(context).cancel,
+              onPressed: onCancel,
             ),
           ],
         ),
@@ -1080,21 +1033,21 @@ class _TraktPendingNarrow extends StatelessWidget {
         const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
-          child: FilledButton.tonalIcon(
+          child: AppButton(
+            icon: Icons.open_in_new,
+            label: AppLocalizations.of(context).traktOpenBrowser,
             onPressed: () => launchUrl(
               Uri.parse(url),
               mode: LaunchMode.externalApplication,
             ),
-            icon: const Icon(Icons.open_in_new),
-            label: Text(AppLocalizations.of(context).traktOpenBrowser),
           ),
         ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
-          child: FilledButton.tonal(
+          child: AppButton(
+            label: AppLocalizations.of(context).cancel,
             onPressed: onCancel,
-            child: Text(AppLocalizations.of(context).cancel),
           ),
         ),
       ],
@@ -1203,14 +1156,10 @@ class _TraktConnected extends StatelessWidget {
             ),
           ),
         ),
-        DpadFocusable(
+        AppButton(
           autofocus: true,
-          onSelect: traktService.disconnect,
-          effects: _kStadiumEffect,
-          child: FilledButton.tonal(
-            onPressed: traktService.disconnect,
-            child: Text(AppLocalizations.of(context).traktDisconnectButton),
-          ),
+          label: AppLocalizations.of(context).traktDisconnectButton,
+          onPressed: traktService.disconnect,
         ),
       ],
     );
@@ -1249,29 +1198,18 @@ Future<bool> _showConfirmDialog(
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    DpadFocusable(
-                      onSelect: () => Navigator.pop(ctx, false),
-                      effects: _kStadiumEffect,
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(AppLocalizations.of(ctx).cancel),
-                      ),
+                    AppButton(
+                      label: AppLocalizations.of(ctx).cancel,
+                      onPressed: () => Navigator.pop(ctx, false),
                     ),
                     const SizedBox(width: 8),
-                    DpadFocusable(
+                    AppButton(
                       autofocus: true,
-                      onSelect: () => Navigator.pop(ctx, true),
-                      effects: _kStadiumEffect,
-                      child: FilledButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: isDestructive
-                            ? FilledButton.styleFrom(
-                                backgroundColor: theme.colorScheme.error,
-                                foregroundColor: theme.colorScheme.onError,
-                              )
-                            : null,
-                        child: Text(confirmLabel),
-                      ),
+                      variant: isDestructive
+                          ? AppButtonVariant.destructive
+                          : AppButtonVariant.primary,
+                      label: confirmLabel,
+                      onPressed: () => Navigator.pop(ctx, true),
                     ),
                   ],
                 ),
@@ -1369,7 +1307,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     const Spacer(),
                     DpadFocusable(
                       onSelect: () => Navigator.of(context).pop(),
-                      effects: _kStadiumEffect,
+                      effects: kStadiumFocusEffects,
                       child: IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(context).pop(),
@@ -1399,40 +1337,20 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      DpadFocusable(
-                        onSelect: () => setState(() {
+                      AppButton(
+                        label: AppLocalizations.of(context).cancel,
+                        onPressed: () => setState(() {
                           _showAddForm = false;
                           _nameController.clear();
                           _createError = null;
                         }),
-                        effects: _kStadiumEffect,
-                        child: TextButton(
-                          onPressed: () => setState(() {
-                            _showAddForm = false;
-                            _nameController.clear();
-                            _createError = null;
-                          }),
-                          child: Text(AppLocalizations.of(context).cancel),
-                        ),
                       ),
                       const SizedBox(width: 8),
-                      DpadFocusable(
-                        onSelect: _isCreating ? null : _handleCreate,
-                        effects: _kStadiumEffect,
-                        child: FilledButton(
-                          onPressed: _isCreating ? null : _handleCreate,
-                          child: _isCreating
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  AppLocalizations.of(context).settingsCreate,
-                                ),
-                        ),
+                      AppButton(
+                        variant: AppButtonVariant.primary,
+                        label: AppLocalizations.of(context).settingsCreate,
+                        loading: _isCreating,
+                        onPressed: _handleCreate,
                       ),
                     ],
                   ),
@@ -1490,17 +1408,12 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 8),
-                    DpadFocusable(
+                    AppButton(
                       autofocus: others.isEmpty,
-                      onSelect: () => setState(() => _showAddForm = true),
-                      effects: _kStadiumEffect,
-                      child: FilledButton.icon(
-                        onPressed: () => setState(() => _showAddForm = true),
-                        icon: const Icon(Icons.person_add),
-                        label: Text(
-                          AppLocalizations.of(context).settingsAddViewer,
-                        ),
-                      ),
+                      variant: AppButtonVariant.primary,
+                      icon: Icons.person_add,
+                      label: AppLocalizations.of(context).settingsAddViewer,
+                      onPressed: () => setState(() => _showAddForm = true),
                     ),
                   ],
                 ],

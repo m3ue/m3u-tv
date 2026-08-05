@@ -13,6 +13,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
@@ -548,14 +549,510 @@ void main() {
         );
       },
     );
+
+    test('newer EPG range wins when an older request completes last', () async {
+      final oldRange = Completer<Object?>();
+      final newRange = Completer<Object?>();
+      final fixture = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        return switch (request.params['date']) {
+          '2026-01-01' => oldRange.future,
+          '2026-01-02' => newRange.future,
+          _ => <String, Object?>{},
+        };
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: DateTime.utc(2026),
+        endDate: DateTime.utc(2026),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: DateTime.utc(2026, 1, 2),
+        endDate: DateTime.utc(2026, 1, 2),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      newRange.complete(_epgResponse('Newer day', DateTime.utc(2026, 1, 2)));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService.programsForChannel(controller.channels.single),
+        hasLength(1),
+      );
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Newer day',
+      );
+
+      oldRange.complete(_epgResponse('Older day', DateTime.utc(2026)));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Newer day',
+      );
+    });
+
+    test(
+      'dated browsing preserves current guide when returning to the list',
+      () async {
+        final now = DateTime.utc(2026, 7, 31, 12);
+        final fixture = _FakeXtreamTransport.success();
+        var currentGuideRequests = 0;
+        Future<Object?> transport(XtreamRequest request) async {
+          if (request.action != 'get_epg_batch') return fixture.call(request);
+          if (request.params['date'] == null) {
+            currentGuideRequests += 1;
+            return _epgResponse('Current guide', now);
+          }
+          return _epgResponse(
+            'Yesterday guide',
+            now.subtract(const Duration(days: 1)),
+          );
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          epgService: EpgService(clock: () => now),
+        );
+        addTearDown(controller.dispose);
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        expect(
+          controller.epgService
+              .lookupForChannel(controller.channels.single)
+              ?.current
+              .title,
+          'Current guide',
+        );
+
+        controller.ensureEpgForChannels(
+          controller.channels,
+          startDate: now.subtract(const Duration(days: 1)),
+          endDate: now.subtract(const Duration(days: 1)),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        controller.ensureEpgForChannels(controller.channels);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+
+        expect(currentGuideRequests, 1);
+        expect(
+          controller.epgService
+              .lookupForChannel(controller.channels.single)
+              ?.current
+              .title,
+          'Current guide',
+        );
+      },
+    );
+
+    test('failed EPG range is backed off independently', () async {
+      final fixture = _FakeXtreamTransport.success();
+      var rangedRequests = 0;
+      var currentGuideRequests = 0;
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') {
+          return fixture.call(request);
+        }
+        if (request.params['date'] == null) {
+          currentGuideRequests += 1;
+          return <String, Object?>{};
+        }
+        rangedRequests += 1;
+        throw StateError('dated EPG unavailable');
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(rangedRequests, 1);
+      controller.ensureEpgForChannels(controller.channels);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(currentGuideRequests, 2);
+      expect(
+        controller.epgService.hasFreshDataForChannel(
+          controller.channels.single,
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'adjacent EPG ranges deduplicate only the overlapping program',
+      () async {
+        final fixture = _FakeXtreamTransport.success();
+        final overlapStart = DateTime.utc(2026, 7, 31);
+        Map<String, Object?> response(List<DateTime> starts) => {
+          '101': [
+            for (final start in starts)
+              <String, Object?>{
+                'stream_id': 101,
+                'title': 'Daily News',
+                'description': 'Fixture',
+                'start': start.toIso8601String(),
+                'end': start.add(const Duration(hours: 1)).toIso8601String(),
+              },
+          ],
+        };
+        Future<Object?> transport(XtreamRequest request) async {
+          if (request.action != 'get_epg_batch') return fixture.call(request);
+          return switch (request.params['date']) {
+            '2026-07-30' => response([
+              DateTime.utc(2026, 7, 30, 10),
+              overlapStart,
+            ]),
+            '2026-07-31' => response([
+              overlapStart,
+              DateTime.utc(2026, 7, 31, 10),
+            ]),
+            _ => <String, Object?>{},
+          };
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+        );
+        addTearDown(controller.dispose);
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+
+        for (final date in [
+          DateTime.utc(2026, 7, 30),
+          DateTime.utc(2026, 7, 31),
+        ]) {
+          controller.ensureEpgForChannels(
+            controller.channels,
+            startDate: date,
+            endDate: date,
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+
+        final programs = controller.epgService.programsForChannel(
+          controller.channels.single,
+        );
+        expect(programs, hasLength(3));
+        expect(
+          programs.where((program) => program.title == 'Daily News'),
+          hasLength(3),
+        );
+        expect(
+          programs.where((program) => program.start == overlapStart),
+          hasLength(1),
+        );
+      },
+    );
+
+    test('ranged EPG freshness is isolated between Xtream sessions', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final rangedRequestUsers = <String>[];
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        rangedRequestUsers.add(request.credentials.username);
+        return _epgResponse(
+          '${request.credentials.username} guide',
+          DateTime.utc(2026, 7, 30, 12),
+        );
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'provider-a guide',
+      );
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        controller.epgService.programsForChannel(controller.channels.single),
+        isEmpty,
+      );
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(rangedRequestUsers, <String>['provider-a', 'provider-b']);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'provider-b guide',
+      );
+    });
+
+    test('old Xtream range completion cannot update a new session', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final oldRange = Completer<Object?>();
+      final newRange = Completer<Object?>();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        return request.credentials.username == 'provider-a'
+            ? oldRange.future
+            : newRange.future;
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      newRange.complete(
+        _epgResponse('Provider B guide', DateTime.utc(2026, 7, 30, 12)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+
+      oldRange.complete(
+        _epgResponse('Provider A guide', DateTime.utc(2026, 7, 30, 12)),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+    });
+
+    test('old Xtream range failure cannot back off a new session', () async {
+      final fixture = _FakeXtreamTransport.success();
+      final oldRange = Completer<Object?>();
+      var newSessionRequests = 0;
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        if (request.credentials.username == 'provider-a') {
+          return oldRange.future;
+        }
+        newSessionRequests += 1;
+        return _epgResponse('Provider B guide', DateTime.utc(2026, 7, 30, 12));
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-a',
+            password: 'provider-a-password',
+          ),
+        ),
+        isTrue,
+      );
+
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'provider-b',
+            password: 'provider-b-password',
+          ),
+        ),
+        isTrue,
+      );
+      oldRange.completeError(StateError('Provider A guide failed'));
+      await Future<void>.delayed(Duration.zero);
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(newSessionRequests, 1);
+      expect(
+        controller.epgService
+            .programsForChannel(controller.channels.single)
+            .single
+            .title,
+        'Provider B guide',
+      );
+    });
   });
 }
+
+Map<String, Object?> _epgResponse(String title, DateTime start) => {
+  '101': <Map<String, Object?>>[
+    <String, Object?>{
+      'stream_id': 101,
+      'title': title,
+      'description': 'Fixture',
+      'start': start.toIso8601String(),
+      'end': start.add(const Duration(minutes: 30)).toIso8601String(),
+    },
+  ],
+};
 
 AppStateController _controller({
   required InMemorySecureStorage storage,
   required XtreamTransport transport,
   Map<String, Object?>? cacheMemory,
   Map<String, Object?>? localMemory,
+  EpgService? epgService,
 }) {
   final sharedLocalMemory = localMemory ?? <String, Object?>{};
   return AppStateController(
@@ -568,6 +1065,7 @@ AppStateController _controller({
     favoritesService: FavoritesService(memory: sharedLocalMemory),
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),
+    epgService: epgService,
   );
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 
 /// Form for entering Xtream/M3U connection credentials.
 ///
@@ -121,18 +122,11 @@ class _ConnectionFormState extends State<ConnectionForm> {
             autocorrect: false,
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: widget.isLoading ? null : _handleConnect,
-              child: widget.isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Connect'),
-            ),
+          AppButton(
+            variant: AppButtonVariant.primary,
+            label: 'Connect',
+            loading: widget.isLoading,
+            onPressed: _handleConnect,
           ),
         ],
       ),

@@ -41,7 +41,6 @@
   "liveTvNext": "NEXT",
   "liveTvRecord": "Record",
   "liveTvRecording": "Recording",
-  "liveTvStopRecording": "Stop recording",
   "liveTvFavorite": "Favorite",
   "liveTvRemoveFavorite": "Remove favorite",
   "catchupBadgeAvailable": "Catchup available",
@@ -54,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "Catchup replay available",
+  "epgPreviousDay": "Previous day",
+  "epgNow": "Now",
+  "epgNextDay": "Next day",
+  "epgChannels": "CHANNELS",
+  "epgNoData": "No EPG data",
   "playerGoBack": "Go back",
   "playerResumeWatching": "Resume Watching",
   "playerContinue": "Continue",
@@ -69,8 +73,19 @@
   "playerResume": "Resume",
   "playerSkipPreviousTooltip": "Previous channel",
   "playerSkipNextTooltip": "Next channel",
-  "playerRecordNowTooltip": "Record current program",
-  "playerStopRecordingTooltip": "Stop recording",
+  "playerNowPlayingMovie": "Movie",
+  "playerNowPlayingSeries": "Series",
+  "playerNowPlayingSeasonEpisode": "S{season} · E{episode}",
+  "@playerNowPlayingSeasonEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
@@ -342,5 +357,8 @@
   "dvrDeleteDismiss": "Keep",
   "dvrDeleteConfirm": "Delete recording",
   "dvrDeleteSuccess": "Recording deleted",
-  "dvrDeleteFailed": "Could not delete recording"
+  "dvrDeleteFailed": "Could not delete recording",
+  "liveTvStopRecording": "Stop Recording",
+  "playerRecordNowTooltip": "Record current program",
+  "playerStopRecordingTooltip": "Stop recording"
 }

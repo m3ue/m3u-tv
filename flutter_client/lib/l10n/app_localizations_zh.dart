@@ -94,9 +94,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvRecording => '录制中';
 
   @override
-  String get liveTvStopRecording => '停止录制';
-
-  @override
   String get liveTvFavorite => '收藏';
 
   @override
@@ -112,6 +109,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get catchupProgramReplayable => '可回看重播';
+
+  @override
+  String get epgPreviousDay => '前一天';
+
+  @override
+  String get epgNow => '现在';
+
+  @override
+  String get epgNextDay => '后一天';
+
+  @override
+  String get epgChannels => '频道';
+
+  @override
+  String get epgNoData => '暂无 EPG 数据';
 
   @override
   String get playerGoBack => '返回';
@@ -140,10 +152,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerSkipNextTooltip => '下一个频道';
 
   @override
-  String get playerRecordNowTooltip => '录制当前节目';
+  String get playerNowPlayingMovie => '电影';
 
   @override
-  String get playerStopRecordingTooltip => '停止录制';
+  String get playerNowPlayingSeries => '剧集';
+
+  @override
+  String playerNowPlayingSeasonEpisode(int season, int episode) {
+    return '第$season季 · 第$episode集';
+  }
 
   @override
   String get searchHint => '搜索直播电视、电影和剧集…';
@@ -668,4 +685,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => '无法删除录制';
+
+  @override
+  String get liveTvStopRecording => '停止录制';
+
+  @override
+  String get playerRecordNowTooltip => '录制当前节目';
+
+  @override
+  String get playerStopRecordingTooltip => '停止录制';
 }

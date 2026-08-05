@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -333,17 +334,19 @@ class _CardTrailing extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (canDelete)
-          _DangerActionButton(
+          AppIconButton(
             tooltip: l10n.dvrDelete,
             icon: Icons.delete,
-            onTap: () => _confirmDelete(context, recording, deleteHandler),
+            variant: AppButtonVariant.destructive,
+            onPressed: () => _confirmDelete(context, recording, deleteHandler),
           ),
         if (canCancel) ...[
           if (canDelete) const SizedBox(width: 8),
-          _DangerActionButton(
+          AppIconButton(
             tooltip: l10n.dvrCancel,
             icon: Icons.close,
-            onTap: () => _confirmCancel(
+            variant: AppButtonVariant.destructive,
+            onPressed: () => _confirmCancel(
               context,
               recording,
               cancelHandler,
@@ -417,38 +420,6 @@ class _CardTrailing extends StatelessWidget {
       action,
       successMessage: l10n.dvrDeleteSuccess,
       failureMessage: l10n.dvrDeleteFailed,
-    );
-  }
-}
-
-class _DangerActionButton extends StatelessWidget {
-  const _DangerActionButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    // Material buttons wrap in plain DpadFocusable — the button provides its
-    // own ink/ripple. Filled (not outline/ghost) per project convention.
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: kDvrDialogButtonEffect,
-      child: IconButton.filledTonal(
-        tooltip: tooltip,
-        onPressed: onTap,
-        icon: Icon(icon),
-        style: IconButton.styleFrom(
-          backgroundColor: colorScheme.errorContainer,
-          foregroundColor: colorScheme.onErrorContainer,
-        ),
-      ),
     );
   }
 }
