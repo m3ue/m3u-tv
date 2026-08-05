@@ -363,38 +363,48 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
     if (autoSkip) {
-      // ceil() past the segment's actual end so sub-second EDL precision
-      // (e.g. end=2284.08) doesn't leave us inside the half-open interval
-      // after rounding to whole seconds. The same value is used for the
-      // optimistic bump and the real seek so they stay in lockstep.
-      final seekTargetMs = (current.end * 1000).ceil();
-      final seekTarget = Duration(milliseconds: seekTargetMs);
-      // Optimistically bump the local position past the segment's end so the
-      // very next tick no longer matches it — the manually-incremented
-      // _currentPosition otherwise lags the orchestrator's true position
-      // until onState confirms the seek asynchronously, which would
-      // re-match and re-fire on the next tick. _pendingComskipSeekTarget
-      // then prevents `_handleState` from clobbering the bump backward
-      // (the orchestrator's mid-seek position reports can lag/oscillate
-      // behind the optimistic value, which previously caused a re-fire
-      // loop). There's deliberately no persistent already-skipped tracking,
-      // since that would (and did) suppress a legitimate re-skip on
-      // scrub-back, replay, or restart-from-0.
-      _currentPosition = seekTarget;
-      _pendingComskipSeekTarget = seekTarget;
-      _pendingComskipSeekTimer?.cancel();
-      _pendingComskipSeekTimer = Timer(const Duration(seconds: 5), () {
-        if (_disposed || !mounted) return;
-        // Real seek never confirmed — give up holding position hostage so
-        // future auto-skips aren't silently broken.
-        _pendingComskipSeekTarget = null;
-        _pendingComskipSeekTimer = null;
-      });
-      unawaited(widget.orchestrator.seek(seekTarget));
+      _fireComskipSeek(current);
       _flashComskipSkippedBadge();
     } else if (_activeComskipSegment?.end != current.end) {
       setState(() => _activeComskipSegment = current);
     }
+  }
+
+  /// Seeks past the end of a commercial segment using sub-second EDL
+  /// precision, with the optimistic `_currentPosition` bump and
+  /// `_pendingComskipSeekTarget` guard required to keep the seek-storm
+  /// regression from coming back. Shared by the auto-skip branch above
+  /// and the prompt-mode confirm button so the two paths can't drift
+  /// out of sync again (which previously left the prompt flickering).
+  void _fireComskipSeek(({double start, double end}) segment) {
+    // ceil() past the segment's actual end so sub-second EDL precision
+    // (e.g. end=2284.08) doesn't leave us inside the half-open interval
+    // after rounding to whole seconds. The same value is used for the
+    // optimistic bump and the real seek so they stay in lockstep.
+    final seekTargetMs = (segment.end * 1000).ceil();
+    final seekTarget = Duration(milliseconds: seekTargetMs);
+    // Optimistically bump the local position past the segment's end so
+    // the very next tick no longer matches it — the manually-incremented
+    // _currentPosition otherwise lags the orchestrator's true position
+    // until onState confirms the seek asynchronously, which would
+    // re-match and re-fire on the next tick. _pendingComskipSeekTarget
+    // then prevents `_handleState` from clobbering the bump backward
+    // (the orchestrator's mid-seek position reports can lag/oscillate
+    // behind the optimistic value, which previously caused a re-fire
+    // loop). There's deliberately no persistent already-skipped
+    // tracking, since that would (and did) suppress a legitimate
+    // re-skip on scrub-back, replay, or restart-from-0.
+    _currentPosition = seekTarget;
+    _pendingComskipSeekTarget = seekTarget;
+    _pendingComskipSeekTimer?.cancel();
+    _pendingComskipSeekTimer = Timer(const Duration(seconds: 5), () {
+      if (_disposed || !mounted) return;
+      // Real seek never confirmed — give up holding position hostage so
+      // future comskip seeks aren't silently broken.
+      _pendingComskipSeekTarget = null;
+      _pendingComskipSeekTimer = null;
+    });
+    unawaited(widget.orchestrator.seek(seekTarget));
   }
 
   void _flashComskipSkippedBadge() {
@@ -412,7 +422,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _confirmComskipSkip() {
     final segment = _activeComskipSegment;
     if (segment == null) return;
-    unawaited(widget.orchestrator.seek(Duration(seconds: segment.end.round())));
+    _fireComskipSeek(segment);
     setState(() => _activeComskipSegment = null);
   }
 
@@ -549,8 +559,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // seek's buffering). Accept state.position only once it's at or past
     // the pending target — that proves the real seek genuinely caught up.
     final pendingTarget = _pendingComskipSeekTarget;
-    final acceptedPosition = pendingTarget != null &&
-            state.position < pendingTarget
+    final acceptedPosition =
+        pendingTarget != null && state.position < pendingTarget
         ? _currentPosition
         : state.position;
 
@@ -770,6 +780,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _seekTo(Duration position) {
     if (!_canSeek) return;
+    // A manual seek always supersedes any in-flight comskip seek — the
+    // user's deliberate new position should never be guarded by the
+    // auto-skip's pending target. Without this, the orchestrator's
+    // confirmation of the manual seek (which may briefly report a
+    // position before the auto-skip's target during the real seek's
+    // buffering) would be rejected as a stale regression and the
+    // player would hold _currentPosition at the auto-skip's target
+    // until the 5s safety-net timer cleared the guard.
+    _pendingComskipSeekTarget = null;
+    _pendingComskipSeekTimer?.cancel();
+    _pendingComskipSeekTimer = null;
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
