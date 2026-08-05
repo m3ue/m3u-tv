@@ -30,6 +30,7 @@ import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
@@ -554,6 +555,40 @@ class AppShellState extends ConsumerState<AppShell>
     _openChannel(channels[nextIndex]);
   }
 
+  void _handleRecordButtonTap(EpgProgram program) {
+    final args = _playerArgs;
+    if (args == null || args.type != 'live') return;
+    final channels = _playerChannelContext.isNotEmpty
+        ? _playerChannelContext
+        : ref.read(liveChannelsProvider);
+    final channel = channels.firstWhereOrNull((c) => c.id == args.streamId);
+    if (channel == null) return;
+
+    final activeRecording = _appState.dvrRecordings.firstWhereOrNull(
+      (r) => r.channelId == channel.id && r.isInProgress,
+    );
+    if (activeRecording != null) {
+      unawaited(_confirmStopRecording(context, activeRecording));
+      return;
+    }
+    unawaited(_scheduleDvr(context, channel, program));
+  }
+
+  /// Same choice offered on the Recordings screen for an in-progress
+  /// recording (see DvrRecordingsScreen._confirmCancel): keep the footage
+  /// captured so far, or cancel and delete it outright.
+  Future<void> _confirmStopRecording(
+    BuildContext context,
+    DvrRecording recording,
+  ) {
+    return confirmStopOrDeleteRecording(
+      context,
+      recording: recording,
+      onCancel: _appState.cancelDvrRecording,
+      onCancelAndDelete: _cancelAndDeleteRecording,
+    );
+  }
+
   void _openCatchupProgram(Channel channel, EpgProgram program) {
     if (_appState.sourceType != AppSourceType.xtream) {
       _openChannel(channel);
@@ -778,6 +813,8 @@ class AppShellState extends ConsumerState<AppShell>
         onScheduleProgram: (channel, program) =>
             unawaited(_scheduleDvr(context, channel, program)),
         onEnsureEpg: _appState.ensureEpgForChannels,
+        onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
+        onCancelAndDeleteRecording: _cancelAndDeleteRecording,
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
@@ -877,6 +914,7 @@ class AppShellState extends ConsumerState<AppShell>
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
           proxyPlaybackSettings: _appState.proxyPlaybackSettings,
+          comskipSettings: _appState.comskipSettings,
         ),
       ),
       _ => const PlaceholderScreen(title: 'Home'),
@@ -960,6 +998,7 @@ class AppShellState extends ConsumerState<AppShell>
     }
 
     final viewerId = _appState.activeViewer?.ulid ?? '';
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
 
     return NotificationToastOverlay(
       key: _toastKey,
@@ -975,11 +1014,19 @@ class AppShellState extends ConsumerState<AppShell>
                   orchestrator: orch,
                   epgService: _appState.epgService,
                   xtreamService: _appState.xtreamService,
+                  comskipSettings: _appState.comskipSettings,
                   viewerId: viewerId,
                   onNextChannel: args.type == 'live' ? _openNextChannel : null,
                   onPreviousChannel: args.type == 'live'
                       ? _openPreviousChannel
                       : null,
+                  onRecordProgram:
+                      args.type == 'live' && _appState.hasDvrFeature
+                      ? _handleRecordButtonTap
+                      : null,
+                  isRecordingCurrentChannel:
+                      args.type == 'live' &&
+                      recordingChannelIds.contains(args.streamId),
                   progressReporter: (progress) {
                     final aioLookupId = args.metadata['aio_item_id'] as String?;
                     final existing = _appState.progressList.firstWhereOrNull(

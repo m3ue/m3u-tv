@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
@@ -45,11 +46,13 @@ class SettingsScreen extends StatefulWidget {
     this.locale,
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
+    this.comskipSettings,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
+  final ComskipSettings? comskipSettings;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -153,6 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         locale: widget.locale,
         onLocaleChanged: widget.onLocaleChanged,
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
+        comskipSettings: widget.comskipSettings,
       ),
     );
   }
@@ -304,7 +308,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
             width: double.infinity,
             child: AppButton(
               autofocus: true,
-              variant: AppButtonVariant.primary,
+              variant: AppButtonVariant.primaryInverted,
               label: 'Connect',
               onPressed: _handleConnect,
             ),
@@ -338,11 +342,13 @@ class _ConnectedView extends StatefulWidget {
     this.locale,
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
+    this.comskipSettings,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
+  final ComskipSettings? comskipSettings;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -681,6 +687,32 @@ class _ConnectedViewState extends State<_ConnectedView>
               builder: (context, _) => _ProxyPlaybackControls(
                 capability: auth!.proxy!,
                 settings: widget.proxyPlaybackSettings!,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // ── Commercial skipping ──────────────────────────────────────────────
+        if (widget.comskipSettings != null) ...[
+          _SettingsSection(
+            title: l.settingsComskip,
+            subtitle: l.settingsComskipSubtitle,
+            child: ListenableBuilder(
+              listenable: widget.comskipSettings!,
+              builder: (context, _) => Wrap(
+                spacing: 8,
+                children: [
+                  _IntervalChip(
+                    label: l.settingsComskipAutoSkip,
+                    isSelected: widget.comskipSettings!.autoSkipEnabled,
+                    onTap: () => unawaited(
+                      widget.comskipSettings!.setAutoSkipEnabled(
+                        enabled: !widget.comskipSettings!.autoSkipEnabled,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

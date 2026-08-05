@@ -163,6 +163,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get playerCommercialSkipped => 'Skipped commercial';
+
+  @override
+  String get playerSkipCommercial => 'Skip commercial';
+
+  @override
   String get searchHint => 'Search live TV, movies, and series...';
 
   @override
@@ -328,6 +334,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsProxyNoProfiles =>
       'No transcoding profiles available — streams use the direct proxy.';
+
+  @override
+  String get settingsComskip => 'Commercial Skipping';
+
+  @override
+  String get settingsComskipSubtitle =>
+      'Controls how the player reacts to commercial breaks detected in DVR recordings.';
+
+  @override
+  String get settingsComskipAutoSkip => 'Auto-skip commercials';
 
   @override
   String get settingsDisconnectTitle => 'Disconnect?';
@@ -703,4 +719,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => 'Could not delete recording';
+
+  @override
+  String get liveTvStopRecording => 'Stop Recording';
+
+  @override
+  String get playerRecordNowTooltip => 'Record current program';
+
+  @override
+  String get playerStopRecordingTooltip => 'Stop recording';
 }

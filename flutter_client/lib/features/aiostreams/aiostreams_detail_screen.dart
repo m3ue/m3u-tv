@@ -350,7 +350,7 @@ class _MovieBody extends StatelessWidget {
             width: double.infinity,
             child: AppButton(
               autofocus: true,
-              variant: AppButtonVariant.primary,
+              variant: AppButtonVariant.primaryInverted,
               icon: Icons.play_arrow,
               label: l.aiostreamsGetStreams,
               onPressed: isLoading ? null : onGetStreams,
@@ -359,7 +359,7 @@ class _MovieBody extends StatelessWidget {
         else
           AppButton(
             autofocus: true,
-            variant: AppButtonVariant.primary,
+            variant: AppButtonVariant.primaryInverted,
             icon: Icons.play_arrow,
             label: l.aiostreamsGetStreams,
             onPressed: isLoading ? null : onGetStreams,

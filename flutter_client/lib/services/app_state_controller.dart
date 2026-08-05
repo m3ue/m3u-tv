@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -47,6 +48,7 @@ class AppStateController extends ChangeNotifier {
     ReverbService? reverbService,
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
+    ComskipSettings? comskipSettings,
     PushNotificationService? pushNotificationService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
@@ -87,6 +89,7 @@ class AppStateController extends ChangeNotifier {
           aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
+      comskipSettings: comskipSettings ?? ComskipSettings(store: store),
       pushNotificationService:
           pushNotificationService ?? PushNotificationService(),
     );
@@ -110,6 +113,7 @@ class AppStateController extends ChangeNotifier {
     required this._reverbService,
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
+    required this.comskipSettings,
     required this._pushNotificationService,
   }) {
     favoritesService.onChanged = (streamId, {required favorited}) =>
@@ -143,6 +147,7 @@ class AppStateController extends ChangeNotifier {
   final ResumeService resumeService;
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
+  final ComskipSettings comskipSettings;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -295,6 +300,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     unawaited(traktService.init());
     unawaited(proxyPlaybackSettings.load());
+    unawaited(comskipSettings.load());
 
     final savedLocale = await secureStorage.read(_localeKey);
     if (savedLocale != null) _locale = Locale(savedLocale);

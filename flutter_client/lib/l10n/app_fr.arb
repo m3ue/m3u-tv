@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "Publicité ignorée",
+  "playerSkipCommercial": "Ignorer la publicité",
   "searchHint": "Rechercher Télévision en direct, films et séries…",
   "searchSectionLiveTv": "Télévision en direct",
   "searchSectionMovies": "Films",
@@ -127,6 +129,9 @@
   "settingsProxyProfileDefault": "Par défaut",
   "settingsProxyProfileDirect": "Direct (sans transcodage)",
   "settingsProxyNoProfiles": "Aucun profil de transcodage disponible — les flux utilisent le proxy direct.",
+  "settingsComskip": "Suppression des publicités",
+  "settingsComskipSubtitle": "Contrôle la réaction du lecteur aux coupures publicitaires détectées dans les enregistrements DVR.",
+  "settingsComskipAutoSkip": "Ignorer automatiquement les publicités",
   "settingsDisconnectTitle": "Se déconnecter ?",
   "settingsDisconnectBody": "Vous serez déconnecté et devrez saisir à nouveau vos identifiants pour vous reconnecter.",
   "settingsDisconnectConfirm": "Déconnecter",
@@ -358,5 +363,8 @@
   "dvrDeleteDismiss": "Conserver",
   "dvrDeleteConfirm": "Supprimer l'enregistrement",
   "dvrDeleteSuccess": "Enregistrement supprimé",
-  "dvrDeleteFailed": "Impossible de supprimer l'enregistrement"
+  "dvrDeleteFailed": "Impossible de supprimer l'enregistrement",
+  "liveTvStopRecording": "Arrêter l'enregistrement",
+  "playerRecordNowTooltip": "Enregistrer le programme en cours",
+  "playerStopRecordingTooltip": "Arrêter l'enregistrement"
 }
