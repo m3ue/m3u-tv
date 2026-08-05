@@ -562,8 +562,23 @@ class XtreamService {
     required String title,
     required DateTime startTime,
     required DateTime endTime,
+  }) => scheduleDvrFor(
+    _requireCredentials(),
+    channelId: channelId,
+    title: title,
+    startTime: startTime,
+    endTime: endTime,
+  );
+
+  Future<int> scheduleDvrFor(
+    UserCredentials credentials, {
+    required int channelId,
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
   }) async {
-    final response = await _request(
+    final response = await _requestWithCredentials(
+      credentials,
       'schedule_dvr',
       method: 'POST',
       body: {
@@ -594,8 +609,15 @@ class XtreamService {
   /// `{ success: true }` on success or HTTP 404 with `{ error }` if the
   /// recording is not found or no longer cancellable. Throws the standard
   /// request exception on failure so callers can surface the error message.
-  Future<void> cancelDvrRecording(String uuid) async {
-    final response = await _request(
+  Future<void> cancelDvrRecording(String uuid) =>
+      cancelDvrRecordingFor(_requireCredentials(), uuid);
+
+  Future<void> cancelDvrRecordingFor(
+    UserCredentials credentials,
+    String uuid,
+  ) async {
+    final response = await _requestWithCredentials(
+      credentials,
       'cancel_dvr_recording',
       method: 'POST',
       body: {'recording_id': uuid},
@@ -613,8 +635,15 @@ class XtreamService {
   /// Server returns `{ success: true }` on success or HTTP 404 with
   /// `{ error }` if the recording is not found or not in a deletable
   /// state. Throws the standard request exception on failure.
-  Future<void> deleteDvrRecording(String uuid) async {
-    final response = await _request(
+  Future<void> deleteDvrRecording(String uuid) =>
+      deleteDvrRecordingFor(_requireCredentials(), uuid);
+
+  Future<void> deleteDvrRecordingFor(
+    UserCredentials credentials,
+    String uuid,
+  ) async {
+    final response = await _requestWithCredentials(
+      credentials,
       'delete_dvr_recording',
       method: 'POST',
       body: {'recording_id': uuid},
@@ -794,9 +823,20 @@ class XtreamService {
     await _request('get_viewers'),
   ).map((item) => Viewer.fromJson(_asMap(item))).toList(growable: false);
 
-  Future<Viewer> createViewer(String name) async => Viewer.fromJson(
+  Future<Viewer> createViewer(String name) =>
+      createViewerFor(_requireCredentials(), name);
+
+  Future<Viewer> createViewerFor(
+    UserCredentials credentials,
+    String name,
+  ) async => Viewer.fromJson(
     _asMap(
-      await _request('create_viewer', method: 'POST', body: {'name': name}),
+      await _requestWithCredentials(
+        credentials,
+        'create_viewer',
+        method: 'POST',
+        body: {'name': name},
+      ),
     ),
   );
 

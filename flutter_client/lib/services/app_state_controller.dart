@@ -1609,7 +1609,12 @@ class AppStateController extends ChangeNotifier {
 
   Future<Viewer?> createViewer(String name) async {
     try {
-      final viewer = await xtreamService.createViewer(name);
+      final credentials = authNotifier.credentials;
+      if (credentials == null) return null;
+      final ownsWork = _captureMediaRequestOwnership(credentials);
+      if (!ownsWork()) return null;
+      final viewer = await xtreamService.createViewerFor(credentials, name);
+      if (!ownsWork()) return null;
       _viewers = [..._viewers, viewer];
       await switchViewer(viewer);
       return viewer;
@@ -1638,19 +1643,31 @@ class AppStateController extends ChangeNotifier {
   /// channel + start time; otherwise null (the scheduler tick may not have
   /// produced the row yet on slower servers).
   Future<DvrRecording?> scheduleDvr(Channel channel, EpgProgram program) async {
-    await xtreamService.scheduleDvr(
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Xtream credentials not configured');
+    }
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork()) return null;
+    await xtreamService.scheduleDvrFor(
+      credentials,
       channelId: channel.id,
       title: program.title,
       startTime: program.start,
       endTime: program.end,
     );
+    if (!ownsWork()) return null;
     try {
-      _dvrRecordings = await xtreamService.getDvrRecordings();
-      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
+      if (!ownsWork()) return null;
+      _dvrRecordings = recordings;
+      _recordingChannelIds = _extractRecordingChannelIds(recordings);
     } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return null;
       debugPrint('DVR: refresh after schedule failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
+    if (!ownsWork()) return null;
     notifyListeners();
     for (final recording in _dvrRecordings) {
       if (recording.channelId != channel.id) continue;
@@ -1678,15 +1695,24 @@ class AppStateController extends ChangeNotifier {
   /// detail fetch 404s (the row is already gone server-side for some other
   /// reason), drops it locally instead of leaving a stale pre-cancel row.
   Future<void> cancelDvrRecording(String uuid) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Xtream credentials not configured');
+    }
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork()) return;
     try {
-      await xtreamService.cancelDvrRecording(uuid);
+      await xtreamService.cancelDvrRecordingFor(credentials, uuid);
+      if (!ownsWork()) return;
     } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return;
       debugPrint('DVR: cancel failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       rethrow;
     }
     try {
-      final detail = await xtreamService.getDvrRecording(uuid);
+      final detail = await xtreamService.getDvrRecordingFor(credentials, uuid);
+      if (!ownsWork()) return;
       final next = [..._dvrRecordings];
       final index = next.indexWhere((recording) => recording.uuid == uuid);
       if (index >= 0) {
@@ -1696,22 +1722,33 @@ class AppStateController extends ChangeNotifier {
       }
       _dvrRecordings = next;
     } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return;
       debugPrint('DVR: refresh recording detail after cancel failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       _dvrRecordings = _dvrRecordings
           .where((recording) => recording.uuid != uuid)
           .toList(growable: false);
     }
+    if (!ownsWork()) return;
     _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
   /// Deletes a completed/failed/cancelled DVR recording and removes it from
   /// the local list. Same fail-safe: 404 still drops the row locally.
   Future<void> deleteDvrRecording(String uuid) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Xtream credentials not configured');
+    }
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork()) return;
     try {
-      await xtreamService.deleteDvrRecording(uuid);
+      await xtreamService.deleteDvrRecordingFor(credentials, uuid);
+      if (!ownsWork()) return;
     } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return;
       debugPrint('DVR: delete failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       rethrow;
@@ -1720,6 +1757,7 @@ class AppStateController extends ChangeNotifier {
         .where((recording) => recording.uuid != uuid)
         .toList(growable: false);
     _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
