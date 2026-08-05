@@ -43,6 +43,37 @@ void main() {
       );
     });
 
+    testWidgets('Home localizes saved Direct M3U refresh errors', (
+      tester,
+    ) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(),
+      );
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          sourceError: savedM3uRefreshErrorCode,
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(
+        find.text('Unable to refresh the saved Direct M3U source.'),
+        findsOneWidget,
+      );
+      expect(find.text(savedM3uRefreshErrorCode), findsNothing);
+    });
+
     testWidgets(
       'large desktop Home rows keep preview cards comfortably sized',
       (
@@ -1747,6 +1778,7 @@ class _TestApp extends StatefulWidget {
     this.systemUiPolicy,
     this.playbackOrchestratorBuilder,
     this.useProductionPlayer = false,
+    this.sourceError,
   });
 
   final DeviceType deviceType;
@@ -1755,6 +1787,7 @@ class _TestApp extends StatefulWidget {
   final SystemUiPolicy? systemUiPolicy;
   final PlaybackOrchestrator Function()? playbackOrchestratorBuilder;
   final bool useProductionPlayer;
+  final String? sourceError;
 
   @override
   State<_TestApp> createState() => _TestAppState();
@@ -1792,7 +1825,11 @@ class _TestAppState extends State<_TestApp> {
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      overrides: [overrideAppState(_appState)],
+      overrides: [
+        overrideAppState(_appState),
+        if (widget.sourceError != null)
+          sourceErrorProvider.overrideWith((_) => widget.sourceError),
+      ],
       child: MaterialApp.router(
         title: 'M3U TV Test',
         theme: ThemeData.dark(useMaterial3: true),

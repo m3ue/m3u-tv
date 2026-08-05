@@ -1837,7 +1837,11 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
           Text(l.homeConnectedSource(sourceLabel)),
           if (sourceError != null && sourceError.isNotEmpty) ...[
             const SizedBox(height: MediaBrowsingMetrics.chipGap),
-            _OfflineBanner(message: sourceError),
+            _OfflineBanner(
+              message: sourceError == savedM3uRefreshErrorCode
+                  ? l.settingsSavedM3uRefreshFailed
+                  : sourceError,
+            ),
           ],
           const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
