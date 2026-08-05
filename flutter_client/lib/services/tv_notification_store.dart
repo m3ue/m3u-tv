@@ -102,9 +102,10 @@ class TvNotificationStore {
 
   bool selectOwner({
     required String server,
+    required String accountPrincipal,
     required TvPlaylistSession session,
   }) {
-    final ownerKey = _notificationOwnerKey(server, session);
+    final ownerKey = _notificationOwnerKey(server, accountPrincipal, session);
     if (ownerKey == null) {
       clearOwner();
       return false;
@@ -407,16 +408,18 @@ class TvNotificationStore {
   Future<T> _mutate<T>(Future<T> Function() operation) =>
       _mutationQueue.run(operation);
 
-  static String _ownedKey(String key, String owner) => '${key}_v2_$owner';
+  static String _ownedKey(String key, String owner) => '${key}_v3_$owner';
 
   static String? _notificationOwnerKey(
     String server,
+    String accountPrincipal,
     TvPlaylistSession session,
   ) {
     final type = session.notifiableType.trim().toLowerCase();
     final uri = Uri.tryParse(server.trim());
     if (session.notifiableId <= 0 ||
         type.isEmpty ||
+        accountPrincipal.isEmpty ||
         uri == null ||
         !uri.hasScheme ||
         uri.host.isEmpty) {
@@ -433,7 +436,16 @@ class TvNotificationStore {
       path: path,
     );
     return sha256
-        .convert(utf8.encode('$source|$type|${session.notifiableId}'))
+        .convert(
+          utf8.encode(
+            jsonEncode(<Object>[
+              source.toString(),
+              type,
+              session.notifiableId,
+              accountPrincipal,
+            ]),
+          ),
+        )
         .toString();
   }
 }

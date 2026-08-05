@@ -757,6 +757,7 @@ class AppStateController extends ChangeNotifier {
     bool present = true,
     int? notificationGeneration,
   }) async {
+    final accountPrincipal = credentials.username;
     final ownsNotification = _captureNotificationOwnership(
       credentials: credentials,
       notificationGeneration: notificationGeneration,
@@ -768,6 +769,7 @@ class AppStateController extends ChangeNotifier {
     if (!ownsNotification()) return null;
     if (!notificationStore.selectOwner(
       server: credentials.server,
+      accountPrincipal: accountPrincipal,
       session: session,
     )) {
       _clearNotificationOwner();
@@ -1055,6 +1057,7 @@ class AppStateController extends ChangeNotifier {
       _pendingNotificationActivations.add(id);
       return;
     }
+    final accountPrincipal = credentials.username;
     final notificationGeneration = _notificationSessionGeneration.current;
     final ownsNotification = _captureNotificationOwnership(
       credentials: credentials,
@@ -1069,6 +1072,7 @@ class AppStateController extends ChangeNotifier {
       if (!ownsNotification()) return;
       if (!notificationStore.selectOwner(
         server: credentials.server,
+        accountPrincipal: accountPrincipal,
         session: session,
       )) {
         _clearNotificationOwner();
