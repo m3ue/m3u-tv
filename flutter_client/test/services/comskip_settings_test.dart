@@ -25,39 +25,45 @@ void main() {
       expect(settings.autoSkipEnabled, isTrue);
     });
 
-    test('round-trips a disabled preference through the persistent store', () async {
-      final dir = await Directory.systemTemp.createTemp('comskip_settings');
-      addTearDown(() => dir.delete(recursive: true));
-      final file = File('${dir.path}/store.json');
+    test(
+      'round-trips a disabled preference through the persistent store',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('comskip_settings');
+        addTearDown(() => dir.delete(recursive: true));
+        final file = File('${dir.path}/store.json');
 
-      final store = PersistentJsonStore(file: file);
-      final settings = ComskipSettings(store: store);
-      await settings.setAutoSkipEnabled(enabled: false);
+        final store = PersistentJsonStore(file: file);
+        final settings = ComskipSettings(store: store);
+        await settings.setAutoSkipEnabled(enabled: false);
 
-      final restored = ComskipSettings(
-        store: PersistentJsonStore(file: file),
-      );
-      await restored.load();
+        final restored = ComskipSettings(
+          store: PersistentJsonStore(file: file),
+        );
+        await restored.load();
 
-      expect(restored.autoSkipEnabled, isFalse);
-    });
+        expect(restored.autoSkipEnabled, isFalse);
+      },
+    );
 
-    test('round-trips a re-enabled preference through the persistent store', () async {
-      final dir = await Directory.systemTemp.createTemp('comskip_settings');
-      addTearDown(() => dir.delete(recursive: true));
-      final file = File('${dir.path}/store.json');
+    test(
+      'round-trips a re-enabled preference through the persistent store',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('comskip_settings');
+        addTearDown(() => dir.delete(recursive: true));
+        final file = File('${dir.path}/store.json');
 
-      final store = PersistentJsonStore(file: file);
-      final settings = ComskipSettings(store: store);
-      await settings.setAutoSkipEnabled(enabled: false);
-      await settings.setAutoSkipEnabled(enabled: true);
+        final store = PersistentJsonStore(file: file);
+        final settings = ComskipSettings(store: store);
+        await settings.setAutoSkipEnabled(enabled: false);
+        await settings.setAutoSkipEnabled(enabled: true);
 
-      final restored = ComskipSettings(
-        store: PersistentJsonStore(file: file),
-      );
-      await restored.load();
+        final restored = ComskipSettings(
+          store: PersistentJsonStore(file: file),
+        );
+        await restored.load();
 
-      expect(restored.autoSkipEnabled, isTrue);
-    });
+        expect(restored.autoSkipEnabled, isTrue);
+      },
+    );
   });
 }
