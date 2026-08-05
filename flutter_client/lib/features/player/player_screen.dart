@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/features/player/epg_overlay.dart';
+import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -108,6 +109,44 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
+  bool get _isSeries => widget.args.type == 'series';
+
+  String _nowPlayingBadgeLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return _isSeries ? l10n.playerNowPlayingSeries : l10n.playerNowPlayingMovie;
+  }
+
+  String _nowPlayingTitle() {
+    final seriesName = widget.args.metadata['series_name'] as String?;
+    if (_isSeries && seriesName != null && seriesName.isNotEmpty) {
+      return seriesName;
+    }
+    return widget.args.title;
+  }
+
+  String? _nowPlayingSubtitle(BuildContext context) {
+    if (!_isSeries) return null;
+    final season = widget.args.metadata['season_number'] as int?;
+    final episode = widget.args.metadata['episode_number'] as int?;
+    final episodeTitle = widget.args.metadata['episode_title'] as String?;
+
+    final parts = <String>[];
+    if (season != null && episode != null) {
+      parts.add(
+        AppLocalizations.of(
+          context,
+        ).playerNowPlayingSeasonEpisode(season, episode),
+      );
+    }
+    if (episodeTitle != null && episodeTitle.isNotEmpty) {
+      parts.add(episodeTitle);
+    }
+    return parts.isEmpty ? null : parts.join(' — ');
+  }
+
+  String? _nowPlayingDescription() {
+    return widget.args.metadata['plot'] as String?;
+  }
 
   @override
   void initState() {
@@ -311,6 +350,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _scheduleOverlayHide() {
     _overlayHideTimer?.cancel();
+    // While paused, keep the overlay up indefinitely - there's no reason to
+    // hide info the user is deliberately looking at. Playback resuming (or
+    // the initial load reaching `playing`) reschedules the timer below.
+    if (!_isPlaying) return;
     _overlayHideTimer = Timer(_overlayTimeout, () {
       if (!_disposed && mounted) {
         setState(() => _overlayVisible = false);
@@ -325,6 +368,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_disposed || !mounted) return;
 
     _loadingTimer?.cancel();
+
+    // Position ticks resend the current status on every update, so the
+    // overlay hide timer and Trakt scrobbling below only react to a genuine
+    // play/pause transition, not to every tick.
+    final wasPlaying = _isPlaying;
 
     setState(() {
       _status = state.status;
@@ -350,7 +398,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _errorMessage = null;
         if (!_isLive) _startPositionTimer();
         _traktScrobbleActive = true;
-        _scrobble('start');
+        // Position ticks resend `playing` many times a second - only
+        // scrobble 'start' on the actual transition into playback, not on
+        // every tick, or Trakt gets flooded and starts rate-limiting.
+        if (!wasPlaying) _scrobble('start');
       } else if (state.status == PlaybackStatus.paused ||
           state.status == PlaybackStatus.buffering) {
         if (state.status == PlaybackStatus.paused) {
@@ -368,6 +419,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _goBack();
       }
     });
+
+    // Only re-evaluate the hide timer on an actual play/pause transition:
+    // pausing cancels it (keeping the overlay up), resuming restarts the
+    // countdown fresh. Ignore same-status ticks (e.g. position updates)
+    // or the timer would never survive long enough to fire.
+    if (_isPlaying != wasPlaying && _overlayVisible) {
+      _scheduleOverlayHide();
+    }
 
     final backend = widget.orchestrator.activeBackend;
     if (backend == PlaybackBackend.serverTranscode) {
@@ -758,6 +817,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       currentTitle: _epgData!.current.title,
                       currentProgress: _epgData!.progress,
                       nextTitle: _epgData?.next?.title,
+                    ),
+                  ),
+
+                // "Now playing" overlay (VOD/series, including AIOStreams
+                // on-demand content, which reuses the same 'vod'/'series'
+                // types once resolved to a stream URL).
+                if (!_isLive && _overlayVisible)
+                  Positioned(
+                    top: 40,
+                    left: 104,
+                    width: 420,
+                    child: NowPlayingOverlay(
+                      badgeLabel: _nowPlayingBadgeLabel(context),
+                      title: _nowPlayingTitle(),
+                      subtitle: _nowPlayingSubtitle(context),
+                      description: _nowPlayingDescription(),
                     ),
                   ),
               ],

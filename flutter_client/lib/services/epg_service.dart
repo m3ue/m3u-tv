@@ -16,20 +16,28 @@ class EpgService extends ChangeNotifier {
 
   void loadPrograms(List<EpgProgram> programs) {
     _programsByChannel.clear();
-    _storePrograms(programs);
+    _storePrograms(programs, markFresh: true);
     _loadedAt = _clock();
     notifyListeners();
   }
 
-  void mergePrograms(List<EpgProgram> programs) {
-    final channelIds = programs
-        .map((program) => program.channelId)
-        .where((channelId) => channelId.isNotEmpty)
-        .toSet();
-    for (final channelId in channelIds) {
-      _programsByChannel.remove(channelId);
+  void mergePrograms(
+    List<EpgProgram> programs, {
+    Iterable<String>? channelIds,
+    bool replaceExisting = true,
+    bool markFresh = true,
+  }) {
+    if (replaceExisting) {
+      final replacedChannelIds =
+          channelIds ??
+          programs
+              .map((program) => program.channelId)
+              .where((channelId) => channelId.isNotEmpty);
+      for (final channelId in replacedChannelIds) {
+        _programsByChannel.remove(channelId);
+      }
     }
-    _storePrograms(programs);
+    _storePrograms(programs, markFresh: markFresh);
     _loadedAt = _clock();
     notifyListeners();
   }
@@ -61,16 +69,31 @@ class EpgService extends ChangeNotifier {
     return false;
   }
 
-  void _storePrograms(List<EpgProgram> programs) {
+  void _storePrograms(
+    List<EpgProgram> programs, {
+    required bool markFresh,
+  }) {
     for (final program in programs) {
-      _programsByChannel
-          .putIfAbsent(program.channelId, () => <EpgProgram>[])
-          .add(program);
+      final channelPrograms = _programsByChannel.putIfAbsent(
+        program.channelId,
+        () => <EpgProgram>[],
+      );
+      final existingIndex = channelPrograms.indexWhere(
+        (existing) =>
+            existing.start == program.start && existing.end == program.end,
+      );
+      if (existingIndex == -1) {
+        channelPrograms.add(program);
+      } else {
+        channelPrograms[existingIndex] = program;
+      }
     }
     for (final entry in _programsByChannel.entries) {
       entry.value.sort((a, b) => a.start.compareTo(b.start));
     }
-    markFetched(programs.map((program) => program.channelId));
+    if (markFresh) {
+      markFetched(programs.map((program) => program.channelId));
+    }
   }
 
   void loadBatch(Map<String, List<EpgProgram>> batch) {
@@ -126,5 +149,6 @@ class EpgService extends ChangeNotifier {
     _programsByChannel.clear();
     _fetchedAtByChannel.clear();
     _loadedAt = null;
+    notifyListeners();
   }
 }

@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 
 /// Track selector widget for audio and subtitle track selection.
 ///
@@ -24,6 +23,7 @@ class TrackSelector extends StatelessWidget {
   });
 
   static const double buttonWidth = 136;
+  static const double buttonHeight = 48;
   static const double controlsWidth = buttonWidth * 2 + 8;
 
   /// Available audio tracks.
@@ -54,18 +54,32 @@ class TrackSelector extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (audioTracks.isNotEmpty)
-          _TrackButton(
-            icon: Icons.audiotrack,
-            label: 'Audio',
-            onTap: () => _showAudioDialog(context),
+          SizedBox(
+            width: buttonWidth,
+            height: buttonHeight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AppButton(
+                icon: Icons.audiotrack,
+                label: 'Audio',
+                onPressed: () => _showAudioDialog(context),
+              ),
+            ),
           ),
         if (audioTracks.isNotEmpty && subtitleTracks.isNotEmpty)
           const SizedBox(width: 8),
         if (subtitleTracks.isNotEmpty)
-          _TrackButton(
-            icon: Icons.subtitles,
-            label: 'Subtitles',
-            onTap: () => _showSubtitleDialog(context),
+          SizedBox(
+            width: buttonWidth,
+            height: buttonHeight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AppButton(
+                icon: Icons.subtitles,
+                label: 'Subtitles',
+                onPressed: () => _showSubtitleDialog(context),
+              ),
+            ),
           ),
       ],
     );
@@ -165,64 +179,6 @@ class _TrackDialogList extends StatelessWidget {
           child: ListView(
             shrinkWrap: true,
             children: children,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrackButton extends StatelessWidget {
-  const _TrackButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
-      ],
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: TrackSelector.buttonWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white10,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 16, color: colorScheme.onSurface),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
       ),

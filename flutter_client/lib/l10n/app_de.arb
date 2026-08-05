@@ -53,6 +53,11 @@
     }
   },
   "catchupProgramReplayable": "Catchup-Wiedergabe verfügbar",
+  "epgPreviousDay": "Vorheriger Tag",
+  "epgNow": "Jetzt",
+  "epgNextDay": "Nächster Tag",
+  "epgChannels": "SENDER",
+  "epgNoData": "Keine EPG-Daten",
   "playerGoBack": "Zurück",
   "playerResumeWatching": "Weiterschauen",
   "playerContinue": "Fortsetzen",
@@ -68,6 +73,19 @@
   "playerResume": "Fortsetzen",
   "playerSkipPreviousTooltip": "Vorheriger Sender",
   "playerSkipNextTooltip": "Nächster Sender",
+  "playerNowPlayingMovie": "Film",
+  "playerNowPlayingSeries": "Serie",
+  "playerNowPlayingSeasonEpisode": "S{season} · F{episode}",
+  "@playerNowPlayingSeasonEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
   "searchHint": "Live-TV, Filme und Serien durchsuchen …",
   "searchSectionLiveTv": "Live-TV",
   "searchSectionMovies": "Filme",

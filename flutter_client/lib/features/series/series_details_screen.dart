@@ -206,6 +206,10 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             'thumbnail_url': episode.thumbnailUrl,
           if (episode.rating != null) 'rating': '${episode.rating}',
           if (episode.duration != null) 'duration': episode.duration,
+          if (episode.plot != null && episode.plot!.isNotEmpty)
+            'plot': episode.plot
+          else if (_seriesInfo?.series.plot != null)
+            'plot': _seriesInfo!.series.plot,
         },
       ),
     );

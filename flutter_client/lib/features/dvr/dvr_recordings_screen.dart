@@ -3,15 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-
-// M3 buttons and chips use StadiumBorder. A large radius makes the dpad
-// focus border match the pill/circular shape regardless of widget height.
-const _kStadiumEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
 
 class DvrRecordingsScreen extends StatelessWidget {
   const DvrRecordingsScreen({
@@ -341,17 +335,19 @@ class _CardTrailing extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (canDelete)
-          _DangerActionButton(
+          AppIconButton(
             tooltip: l10n.dvrDelete,
             icon: Icons.delete,
-            onTap: () => _confirmDelete(context, recording, deleteHandler),
+            variant: AppButtonVariant.destructive,
+            onPressed: () => _confirmDelete(context, recording, deleteHandler),
           ),
         if (canCancel) ...[
           if (canDelete) const SizedBox(width: 8),
-          _DangerActionButton(
+          AppIconButton(
             tooltip: l10n.dvrCancel,
             icon: Icons.close,
-            onTap: () => _confirmCancel(
+            variant: AppButtonVariant.destructive,
+            onPressed: () => _confirmCancel(
               context,
               recording,
               cancelHandler,
@@ -398,26 +394,26 @@ class _CardTrailing extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _DialogActionButton(
+                AppButton(
                   label: l10n.dvrStopBack,
-                  onSelect: () => Navigator.of(
+                  onPressed: () => Navigator.of(
                     dialogContext,
                   ).pop(_StopRecordingChoice.back),
                 ),
                 const SizedBox(width: 8),
-                _DialogActionButton(
+                AppButton(
                   label: l10n.dvrStopDelete,
-                  style: _DialogButtonStyle.destructive,
-                  onSelect: () => Navigator.of(
+                  variant: AppButtonVariant.destructive,
+                  onPressed: () => Navigator.of(
                     dialogContext,
                   ).pop(_StopRecordingChoice.delete),
                 ),
                 const SizedBox(width: 8),
-                _DialogActionButton(
+                AppButton(
                   label: l10n.dvrStopKeep,
-                  style: _DialogButtonStyle.primary,
+                  variant: AppButtonVariant.primary,
                   autofocus: true,
-                  onSelect: () => Navigator.of(
+                  onPressed: () => Navigator.of(
                     dialogContext,
                   ).pop(_StopRecordingChoice.keep),
                 ),
@@ -464,16 +460,16 @@ class _CardTrailing extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _DialogActionButton(
+                AppButton(
                   label: l10n.dvrDeleteDismiss,
                   autofocus: true,
-                  onSelect: () => Navigator.of(dialogContext).pop(false),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
                 ),
                 const SizedBox(width: 8),
-                _DialogActionButton(
+                AppButton(
                   label: l10n.dvrDeleteConfirm,
-                  style: _DialogButtonStyle.destructive,
-                  onSelect: () => Navigator.of(dialogContext).pop(true),
+                  variant: AppButtonVariant.destructive,
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
                 ),
               ],
             ),
@@ -504,85 +500,6 @@ class _CardTrailing extends StatelessWidget {
     } on Object catch (_) {
       messenger.showSnackBar(SnackBar(content: Text(failureMessage)));
     }
-  }
-}
-
-enum _DialogButtonStyle { tonal, primary, destructive }
-
-/// A filled dialog action button (never outline/ghost, per project
-/// convention), wrapped in [DpadFocusable] per the Material-button rule.
-class _DialogActionButton extends StatelessWidget {
-  const _DialogActionButton({
-    required this.label,
-    required this.onSelect,
-    this.style = _DialogButtonStyle.tonal,
-    this.autofocus = false,
-  });
-
-  final String label;
-  final VoidCallback onSelect;
-  final _DialogButtonStyle style;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final button = switch (style) {
-      _DialogButtonStyle.tonal => FilledButton.tonal(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      _DialogButtonStyle.primary => FilledButton(
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-      _DialogButtonStyle.destructive => FilledButton(
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.errorContainer,
-          foregroundColor: colorScheme.onErrorContainer,
-        ),
-        onPressed: onSelect,
-        child: Text(label),
-      ),
-    };
-    return DpadFocusable(
-      autofocus: autofocus,
-      effects: _kStadiumEffect,
-      onSelect: onSelect,
-      child: button,
-    );
-  }
-}
-
-class _DangerActionButton extends StatelessWidget {
-  const _DangerActionButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    // Material buttons wrap in plain DpadFocusable — the button provides its
-    // own ink/ripple. Filled (not outline/ghost) per project convention.
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: _kStadiumEffect,
-      child: IconButton.filledTonal(
-        tooltip: tooltip,
-        onPressed: onTap,
-        icon: Icon(icon),
-        style: IconButton.styleFrom(
-          backgroundColor: colorScheme.errorContainer,
-          foregroundColor: colorScheme.onErrorContainer,
-        ),
-      ),
-    );
   }
 }
 

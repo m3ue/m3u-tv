@@ -878,29 +878,62 @@ class XtreamService {
   Future<List<EpgProgram>> getEpgBatch(
     List<Channel> channels, {
     int limit = 8,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     if (channels.isEmpty) return const <EpgProgram>[];
+    final dates = <DateTime?>[null];
+    if (startDate != null) {
+      final firstDate = DateTime.utc(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      final lastDate = endDate == null
+          ? firstDate
+          : DateTime.utc(endDate.year, endDate.month, endDate.day);
+      if (lastDate.isBefore(firstDate)) {
+        throw ArgumentError.value(
+          endDate,
+          'endDate',
+          'Must not precede startDate',
+        );
+      }
+      dates
+        ..clear()
+        ..addAll([
+          for (
+            var date = firstDate;
+            !date.isAfter(lastDate);
+            date = date.add(const Duration(days: 1))
+          )
+            date,
+        ]);
+    }
     final programs = <EpgProgram>[];
     for (var start = 0; start < channels.length; start += _epgBatchSize) {
       final chunk = channels
           .skip(start)
           .take(_epgBatchSize)
           .toList(growable: false);
-      final response = await _request(
-        'get_epg_batch',
-        params: {
-          'stream_ids': chunk.map((channel) => '${channel.id}').join(','),
-          'limit': '$limit',
-        },
-      );
       final channelIdsByStream = <String, String>{
         for (final channel in chunk)
           '${channel.id}':
               channel.epgChannelId ?? channel.tvgName ?? channel.name,
       };
-      programs.addAll(
-        _parseEpgPrograms(response, channelIdsByStream: channelIdsByStream),
-      );
+      for (final date in dates) {
+        final response = await _request(
+          'get_epg_batch',
+          params: {
+            'stream_ids': chunk.map((channel) => '${channel.id}').join(','),
+            'limit': '$limit',
+            if (date != null) 'date': _formatEpgDate(date),
+          },
+        );
+        programs.addAll(
+          _parseEpgPrograms(response, channelIdsByStream: channelIdsByStream),
+        );
+      }
     }
     programs.sort((a, b) => a.start.compareTo(b.start));
     return programs;
@@ -1159,6 +1192,11 @@ String _formatTimeshiftStart(DateTime value) {
   final hour = twoDigits(value.hour);
   final minute = twoDigits(value.minute);
   return '$year-$month-$day:$hour-$minute';
+}
+
+String _formatEpgDate(DateTime value) {
+  String twoDigits(int number) => number.toString().padLeft(2, '0');
+  return '${value.year.toString().padLeft(4, '0')}-${twoDigits(value.month)}-${twoDigits(value.day)}';
 }
 
 String? _stringOrNull(Object? value) {

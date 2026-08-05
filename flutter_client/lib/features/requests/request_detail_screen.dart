@@ -8,60 +8,9 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-
-// M3 buttons use StadiumBorder — a large radius keeps the D-pad focus
-// border matching the pill shape regardless of the button's height. Mirrors
-// _kStadiumEffect in settings_screen.dart.
-const _kStadiumEffect = [
-  GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-];
-
-/// A [DpadFocusable] that also moves real D-pad/keyboard focus on mouse
-/// hover, so this button's gradient border follows the mouse the same way
-/// it follows the D-pad — plain [DpadFocusable] only reacts to actual
-/// focus, so a mouse hovering a sibling button never lit it up and an
-/// autofocused button kept its border until the next arrow-key press.
-class _HoverFocusButton extends StatefulWidget {
-  const _HoverFocusButton({
-    required this.child,
-    this.onSelect,
-    this.autofocus = false,
-  });
-
-  final Widget child;
-  final VoidCallback? onSelect;
-  final bool autofocus;
-
-  @override
-  State<_HoverFocusButton> createState() => _HoverFocusButtonState();
-}
-
-class _HoverFocusButtonState extends State<_HoverFocusButton> {
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => _focusNode.requestFocus(),
-      child: DpadFocusable(
-        focusNode: _focusNode,
-        autofocus: widget.autofocus,
-        onSelect: widget.onSelect,
-        effects: _kStadiumEffect,
-        child: widget.child,
-      ),
-    );
-  }
-}
 
 /// Detail screen for a single `request_search` result — mirrors
 /// VodDetailsScreen/AIOStreamsDetailScreen's backdrop layout (same metadata
@@ -182,11 +131,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
           padding: const EdgeInsets.all(8),
           child: DpadFocusable(
             onSelect: () => Navigator.of(context).maybePop(),
-            effects: const [
-              GradientBorderEffect(
-                borderRadius: BorderRadius.all(Radius.circular(50)),
-              ),
-            ],
+            effects: kStadiumFocusEffects,
             child: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () => Navigator.of(context).maybePop(),
@@ -460,19 +405,13 @@ class _Body extends StatelessWidget {
           : button;
     }
 
-    final selectAll = _HoverFocusButton(
-      onSelect: onSelectAllSeasons,
-      child: FilledButton.tonal(
-        onPressed: onSelectAllSeasons,
-        child: Text(l.requestsSelectAllSeasons),
-      ),
+    final selectAll = AppButton(
+      label: l.requestsSelectAllSeasons,
+      onPressed: onSelectAllSeasons,
     );
-    final clear = _HoverFocusButton(
-      onSelect: onClearAllSeasons,
-      child: FilledButton.tonal(
-        onPressed: onClearAllSeasons,
-        child: Text(l.requestsClearSeasons),
-      ),
+    final clear = AppButton(
+      label: l.requestsClearSeasons,
+      onPressed: onClearAllSeasons,
     );
 
     if (fullWidthButton) {
@@ -502,42 +441,29 @@ class _Body extends StatelessWidget {
 
   Widget _actionButton(AppLocalizations l, {required bool fullWidth}) {
     if (result.alreadyAvailable) {
-      return DpadFocusable(
-        effects: _kStadiumEffect,
-        child: FilledButton.tonalIcon(
-          onPressed: null,
-          icon: const Icon(Icons.check_circle_outline),
-          label: Text(l.requestsAlreadyAvailable),
-        ),
+      return AppButton(
+        icon: Icons.check_circle_outline,
+        label: l.requestsAlreadyAvailable,
+        onPressed: null,
       );
     }
     final request = existing;
     if (request != null) {
-      return DpadFocusable(
-        effects: _kStadiumEffect,
-        child: FilledButton.tonalIcon(
-          onPressed: null,
-          icon: const Icon(Icons.check),
-          label: Text(_statusLabel(l, request.status)),
-        ),
+      return AppButton(
+        icon: Icons.check,
+        label: _statusLabel(l, request.status),
+        onPressed: null,
       );
     }
     final noSeasonsSelected = _showSeasonPicker && selectedSeasons.isEmpty;
     final onPressed = isSubmitting || noSeasonsSelected ? null : onSubmit;
-    return _HoverFocusButton(
+    return AppButton(
       autofocus: true,
-      onSelect: onPressed,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: isSubmitting
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.add),
-        label: Text(l.requestsRequestButton),
-      ),
+      variant: AppButtonVariant.primary,
+      icon: Icons.add,
+      label: l.requestsRequestButton,
+      loading: isSubmitting,
+      onPressed: onPressed,
     );
   }
 

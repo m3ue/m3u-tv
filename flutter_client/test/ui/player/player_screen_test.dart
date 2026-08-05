@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
+import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/resume_prompt.dart';
@@ -1008,6 +1009,58 @@ void main() {
     });
   });
 
+  group('NowPlayingOverlay', () {
+    testWidgets('shows badge and title for a movie', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: NowPlayingOverlay(badgeLabel: 'Movie', title: 'Some Movie'),
+        ),
+      );
+      expect(find.text('Movie'), findsOneWidget);
+      expect(find.text('Some Movie'), findsOneWidget);
+    });
+
+    testWidgets('shows season/episode subtitle for series', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: NowPlayingOverlay(
+            badgeLabel: 'Series',
+            title: 'Some Show',
+            subtitle: 'S2 · E5 — Episode Title',
+          ),
+        ),
+      );
+      expect(find.text('Some Show'), findsOneWidget);
+      expect(find.text('S2 · E5 — Episode Title'), findsOneWidget);
+    });
+
+    testWidgets('shows description when present', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: NowPlayingOverlay(
+            badgeLabel: 'Movie',
+            title: 'Some Movie',
+            description: 'A thrilling adventure.',
+          ),
+        ),
+      );
+      expect(find.text('A thrilling adventure.'), findsOneWidget);
+    });
+
+    testWidgets('hides description when empty', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: NowPlayingOverlay(
+            badgeLabel: 'Movie',
+            title: 'Some Movie',
+            description: '',
+          ),
+        ),
+      );
+      expect(find.byType(NowPlayingOverlay), findsOneWidget);
+    });
+  });
+
   group('ResumePrompt', () {
     testWidgets('shows resume and start over options', (tester) async {
       await tester.pumpWidget(
@@ -1131,6 +1184,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/movie.mkv',
@@ -1171,6 +1225,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/movie.mkv',
@@ -1207,6 +1262,136 @@ void main() {
       expect(reports.single.durationSeconds, 600);
     });
 
+    testWidgets('keeps the overlay visible indefinitely while paused', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/movie.mkv',
+              title: 'Pause Fixture',
+              type: 'vod',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.playing,
+          duration: Duration(minutes: 10),
+        ),
+      );
+      await tester.pump();
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.paused,
+          duration: Duration(minutes: 10),
+        ),
+      );
+      await tester.pump();
+
+      // Overlay timeout is 8s - wait well past it while paused.
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.byType(NowPlayingOverlay), findsOneWidget);
+      expect(find.byType(PlaybackControls), findsOneWidget);
+
+      // Resuming playback restarts the countdown, so the overlay now hides.
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.playing,
+          duration: Duration(minutes: 10),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.byType(NowPlayingOverlay), findsNothing);
+      expect(find.byType(PlaybackControls), findsNothing);
+    });
+
+    testWidgets(
+      'still times out the overlay despite repeated playing position ticks',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/movie.mkv',
+                title: 'Tick Fixture',
+                type: 'vod',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+            duration: Duration(minutes: 10),
+          ),
+        );
+        await tester.pump();
+
+        // Simulate position-tick updates that resend `playing` every second,
+        // the way the real player adapters do - these must not keep
+        // re-arming the hide timer.
+        for (var i = 1; i <= 9; i++) {
+          await tester.pump(const Duration(seconds: 1));
+          adapter.emitState(
+            PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              duration: const Duration(minutes: 10),
+              position: Duration(seconds: i),
+            ),
+          );
+        }
+
+        expect(find.byType(NowPlayingOverlay), findsNothing);
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
     testWidgets(
       'preserves reported source aspect ratio for the video surface',
       (
@@ -1230,6 +1415,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             home: PlayerScreen(
               args: const PlayerArgs(
                 streamUrl: 'https://example.com/four-three.m3u8',
