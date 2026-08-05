@@ -74,16 +74,20 @@ class PlaybackControls extends StatelessWidget {
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
       verticalEdge: DpadEdgeBehavior.stop,
-      child: Container(
-        padding: const EdgeInsets.all(40),
+      child: ColoredBox(
         color: Colors.black26,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            _buildHeader(colorScheme),
-            const Spacer(),
-            _buildControlsBar(context, colorScheme),
-          ],
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildHeader(colorScheme),
+                const Spacer(),
+                _buildControlsBar(context, colorScheme),
+              ],
+            ),
+          ),
         ),
       ),
     );
