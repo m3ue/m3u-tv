@@ -235,23 +235,42 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<void> markAllNotificationsRead() async {
-    final unread = (await notificationStore.all()).where((n) => !n.isRead);
     final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsNotification = _captureNotificationOwnership(
+      credentials: credentials,
+      notificationGeneration: _notificationSessionGeneration.current,
+    );
+    if (!ownsNotification()) return;
+    final unread = (await notificationStore.all()).where((n) => !n.isRead);
+    if (!ownsNotification()) return;
     final ids = unread.map((n) => n.item.id).toList(growable: false);
-    await notificationStore.markAllRead();
-    await _refreshUnreadNotificationCount();
-    if (credentials != null) {
-      for (final id in ids) {
-        unawaited(
-          _tvNotificationService.markRead(credentials, id).catchError((_) {}),
-        );
-      }
+    await notificationStore.markAllReadIf(ownsNotification);
+    if (!ownsNotification()) return;
+    if (!await _refreshUnreadNotificationCount(
+      shouldCommit: ownsNotification,
+    )) {
+      return;
+    }
+    for (final id in ids) {
+      if (!ownsNotification()) return;
+      unawaited(
+        _tvNotificationService.markRead(credentials, id).catchError((_) {}),
+      );
     }
   }
 
   Future<void> setNotificationChannels(Set<String> channels) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsNotification = _captureNotificationOwnership(
+      credentials: credentials,
+      notificationGeneration: _notificationSessionGeneration.current,
+    );
+    if (!ownsNotification()) return;
     await notificationStore.setSubscribedChannels(channels);
-    await _refreshUnreadNotificationCount();
+    if (!ownsNotification()) return;
+    await _refreshUnreadNotificationCount(shouldCommit: ownsNotification);
   }
 
   final ViewerService viewerService;

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -27,6 +28,30 @@ const _accountB = UserCredentials(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'mark-all cannot pair account A IDs with account B credentials after its first await',
+    () async {
+      final auth = _MutableAuthNotifier(_accountA);
+      final api = _RecordingNotificationService();
+      final controller = AppStateController(
+        authNotifier: auth,
+        tvNotificationService: api,
+        tvNotificationStore: _SwitchingAllStore(
+          () => auth.current = _accountB,
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.markAllNotificationsRead();
+      await pumpEventQueue();
+
+      expect(
+        api.markCalls,
+        isNot(contains(const _MarkCall(_accountB, _notificationId))),
+      );
+    },
+  );
 
   final handoffs = <_Handoff>[
     _Handoff(
@@ -57,6 +82,28 @@ void main() {
   ];
 
   for (final handoff in handoffs) {
+    test(
+      'mark-all started by account A stops after ${handoff.name} during its first await',
+      () async {
+        final fixture = await _connectedFixture();
+        addTearDown(fixture.controller.dispose);
+        fixture.store.delayNextAll();
+
+        final staleMark = fixture.controller.markAllNotificationsRead();
+        await fixture.store.allStarted.future;
+
+        await handoff.run(fixture.controller);
+        fixture.store.selectLocalOwner(handoff.successorOwner);
+        fixture.store.releaseAll.complete();
+        await staleMark;
+        await pumpEventQueue();
+
+        expect(fixture.store.isRead(handoff.successorOwner), isFalse);
+        expect(fixture.controller.unreadNotificationCount, 0);
+        expect(fixture.api.markCalls, isEmpty);
+      },
+    );
+
     test(
       'delayed local mark for account A cannot mark ${handoff.name} with the same UUID',
       () async {
@@ -104,6 +151,97 @@ void main() {
       },
     );
   }
+
+  test(
+    'delayed mark-all for account A cannot mark account B with the same UUID',
+    () async {
+      final fixture = await _connectedFixture();
+      addTearDown(fixture.controller.dispose);
+      fixture.store.delayNextMarkAll();
+
+      final staleMark = fixture.controller.markAllNotificationsRead();
+      await fixture.store.markAllStarted.future;
+
+      expect(await fixture.controller.connectXtream(_accountB), isTrue);
+      fixture.store.selectLocalOwner('account-b');
+      fixture.store.releaseMarkAll.complete();
+      await staleMark;
+      await pumpEventQueue();
+
+      expect(fixture.store.isRead('account-b'), isFalse);
+      expect(fixture.controller.unreadNotificationCount, 0);
+      expect(fixture.api.markCalls, isEmpty);
+    },
+  );
+
+  test(
+    'delayed mark-all unread count cannot publish or send after account B takes ownership',
+    () async {
+      final fixture = await _connectedFixture();
+      addTearDown(fixture.controller.dispose);
+      fixture.store.delayNextUnreadCount(returning: 9);
+
+      final staleMark = fixture.controller.markAllNotificationsRead();
+      await fixture.store.unreadCountStarted.future;
+
+      expect(await fixture.controller.connectXtream(_accountB), isTrue);
+      fixture.store.selectLocalOwner('account-b');
+      fixture.store.releaseUnreadCount.complete();
+      await staleMark;
+      await pumpEventQueue();
+
+      expect(fixture.store.isRead('account-b'), isFalse);
+      expect(fixture.controller.unreadNotificationCount, 0);
+      expect(fixture.api.markCalls, isEmpty);
+    },
+  );
+
+  test(
+    'delayed channel unread count cannot publish after account B takes ownership',
+    () async {
+      final fixture = await _connectedFixture();
+      addTearDown(fixture.controller.dispose);
+      fixture.store.delayNextUnreadCount(returning: 9);
+
+      final staleUpdate = fixture.controller.setNotificationChannels({
+        'general',
+      });
+      await fixture.store.unreadCountStarted.future;
+
+      expect(await fixture.controller.connectXtream(_accountB), isTrue);
+      fixture.store.selectLocalOwner('account-b');
+      fixture.store.releaseUnreadCount.complete();
+      await staleUpdate;
+
+      expect(fixture.controller.unreadNotificationCount, 0);
+    },
+  );
+
+  test(
+    'current owner mark-all publishes and applies each effect once',
+    () async {
+      final fixture = await _connectedFixture();
+      addTearDown(fixture.controller.dispose);
+      fixture.store.resetEffectCounts();
+      var publications = 0;
+      void recordPublication() => publications += 1;
+      fixture.controller.addListener(recordPublication);
+      addTearDown(() => fixture.controller.removeListener(recordPublication));
+
+      await fixture.controller.markAllNotificationsRead();
+      await pumpEventQueue();
+
+      expect(fixture.store.isRead('account-a'), isTrue);
+      expect(fixture.store.allCalls, 1);
+      expect(fixture.store.localMarkAllMutations, 1);
+      expect(fixture.store.subscribedChannelsCalls, 1);
+      expect(fixture.store.unreadCountCalls, 1);
+      expect(publications, 1);
+      expect(fixture.api.markCalls, <_MarkCall>[
+        const _MarkCall(_accountA, _notificationId),
+      ]);
+    },
+  );
 
   test(
     'current owner marks locally and sends the same account A credentials',
@@ -186,13 +324,23 @@ class _DelayedNotificationStore extends TvNotificationStore {
   };
   String _localOwner = 'account-a';
   bool _delayMark = false;
+  bool _delayMarkAll = false;
+  bool _delayAll = false;
   bool _delayUnreadCount = false;
   bool _unreadCountDelayClaimed = false;
   int _delayedUnreadCount = 0;
   Completer<void> markStarted = Completer<void>();
   Completer<void> releaseMark = Completer<void>();
+  Completer<void> markAllStarted = Completer<void>();
+  Completer<void> releaseMarkAll = Completer<void>();
+  Completer<void> allStarted = Completer<void>();
+  Completer<void> releaseAll = Completer<void>();
   Completer<void> unreadCountStarted = Completer<void>();
   Completer<void> releaseUnreadCount = Completer<void>();
+  int allCalls = 0;
+  int localMarkAllMutations = 0;
+  int subscribedChannelsCalls = 0;
+  int unreadCountCalls = 0;
 
   void selectLocalOwner(String owner) {
     _localOwner = owner;
@@ -204,6 +352,25 @@ class _DelayedNotificationStore extends TvNotificationStore {
     _delayMark = true;
     markStarted = Completer<void>();
     releaseMark = Completer<void>();
+  }
+
+  void delayNextMarkAll() {
+    _delayMarkAll = true;
+    markAllStarted = Completer<void>();
+    releaseMarkAll = Completer<void>();
+  }
+
+  void delayNextAll() {
+    _delayAll = true;
+    allStarted = Completer<void>();
+    releaseAll = Completer<void>();
+  }
+
+  void resetEffectCounts() {
+    allCalls = 0;
+    localMarkAllMutations = 0;
+    subscribedChannelsCalls = 0;
+    unreadCountCalls = 0;
   }
 
   void delayNextUnreadCount({required int returning}) {
@@ -227,10 +394,55 @@ class _DelayedNotificationStore extends TvNotificationStore {
   }
 
   @override
-  Future<Set<String>> subscribedChannels() async => <String>{};
+  Future<List<StoredTvNotification>> all({Set<String>? channelFilter}) async {
+    allCalls += 1;
+    if (_delayAll) {
+      _delayAll = false;
+      allStarted.complete();
+      await releaseAll.future;
+    }
+    return <StoredTvNotification>[
+      StoredTvNotification(
+        item: const TvNotificationItem(
+          id: _notificationId,
+          channel: 'general',
+          title: 'Same UUID',
+          status: 'info',
+        ),
+        receivedAt: DateTime(2026),
+        isRead: _readByOwner[_localOwner]!,
+      ),
+    ];
+  }
+
+  @override
+  Future<void> markAllRead() => _markAllRead();
+
+  @override
+  Future<void> markAllReadIf(bool Function() shouldCommit) =>
+      _markAllRead(shouldCommit: shouldCommit);
+
+  Future<void> _markAllRead({bool Function()? shouldCommit}) async {
+    if (_delayMarkAll) {
+      _delayMarkAll = false;
+      markAllStarted.complete();
+      await releaseMarkAll.future;
+    }
+    if (shouldCommit?.call() ?? true) {
+      _readByOwner[_localOwner] = true;
+      localMarkAllMutations += 1;
+    }
+  }
+
+  @override
+  Future<Set<String>> subscribedChannels() async {
+    subscribedChannelsCalls += 1;
+    return <String>{};
+  }
 
   @override
   Future<int> unreadCount({Set<String>? channelFilter}) async {
+    unreadCountCalls += 1;
     if (_delayUnreadCount && !_unreadCountDelayClaimed) {
       _unreadCountDelayClaimed = true;
       unreadCountStarted.complete();
@@ -245,6 +457,42 @@ class _DelayedNotificationStore extends TvNotificationStore {
     List<TvNotificationItem> serverUnread, {
     bool Function()? shouldCommit,
   }) async => const <TvNotificationItem>[];
+}
+
+class _MutableAuthNotifier extends AuthNotifier {
+  _MutableAuthNotifier(this.current)
+    : super(
+        xtreamService: XtreamService(),
+        secureStorage: InMemorySecureStorage(),
+      );
+
+  UserCredentials? current;
+
+  @override
+  UserCredentials? get credentials => current;
+}
+
+class _SwitchingAllStore extends TvNotificationStore {
+  _SwitchingAllStore(this.onAll) : super(memory: <String, Object?>{});
+
+  final void Function() onAll;
+
+  @override
+  Future<List<StoredTvNotification>> all({Set<String>? channelFilter}) async {
+    onAll();
+    return <StoredTvNotification>[
+      StoredTvNotification(
+        item: const TvNotificationItem(
+          id: _notificationId,
+          channel: 'general',
+          title: 'Account A private notification',
+          status: 'info',
+        ),
+        receivedAt: DateTime(2026),
+        isRead: false,
+      ),
+    ];
+  }
 }
 
 class _NotificationTransport {

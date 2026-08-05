@@ -356,22 +356,30 @@ class TvNotificationStore {
     if (changed) await _write(owner, updated, shouldCommit: ownsMutation);
   });
 
-  Future<void> markAllRead() => _mutate(() async {
-    final owner = _ownerKey;
-    if (owner == null) return;
-    bool ownsMutation() => _ownerKey == owner;
-    final existing = await _allFor(owner);
-    if (!ownsMutation()) return;
-    if (existing.every((n) => n.isRead)) return;
-    final now = DateTime.now();
-    await _write(
-      owner,
-      existing
-          .map((n) => n.isRead ? n : n.copyWith(isRead: true, readAt: now))
-          .toList(growable: false),
-      shouldCommit: ownsMutation,
-    );
-  });
+  Future<void> markAllRead() => _markAllRead();
+
+  Future<void> markAllReadIf(bool Function() shouldCommit) =>
+      _markAllRead(shouldCommit: shouldCommit);
+
+  Future<void> _markAllRead({bool Function()? shouldCommit}) =>
+      _mutate(() async {
+        final owner = _ownerKey;
+        if (owner == null) return;
+        bool ownsMutation() =>
+            _ownerKey == owner && (shouldCommit?.call() ?? true);
+        if (!ownsMutation()) return;
+        final existing = await _allFor(owner);
+        if (!ownsMutation()) return;
+        if (existing.every((n) => n.isRead)) return;
+        final now = DateTime.now();
+        await _write(
+          owner,
+          existing
+              .map((n) => n.isRead ? n : n.copyWith(isRead: true, readAt: now))
+              .toList(growable: false),
+          shouldCommit: ownsMutation,
+        );
+      });
 
   Future<Object?> _read(String owner) async {
     final key = _ownedKey(_key, owner);
