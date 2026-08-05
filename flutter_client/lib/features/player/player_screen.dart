@@ -92,6 +92,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   ({double start, double end})? _activeComskipSegment;
   bool _showComskipSkippedBadge = false;
   Timer? _comskipBadgeTimer;
+  // Set while an auto-skip seek is in flight so orchestrator position
+  // reports that lag/oscillate behind the optimistic bump can't clobber
+  // _currentPosition backward into the segment. Cleared the moment the
+  // orchestrator genuinely reports a position at or past the target.
+  Duration? _pendingComskipSeekTarget;
+  // Safety net: if the orchestrator never confirms the seek (player stuck,
+  // decode failure, etc.), auto-clear after a few seconds so we don't hold
+  // _currentPosition hostage indefinitely and silently break future skips.
+  Timer? _pendingComskipSeekTimer;
 
   bool _overlayVisible = true;
 
@@ -354,16 +363,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
     if (autoSkip) {
-      final seekTarget = Duration(seconds: current.end.round());
+      // ceil() past the segment's actual end so sub-second EDL precision
+      // (e.g. end=2284.08) doesn't leave us inside the half-open interval
+      // after rounding to whole seconds. The same value is used for the
+      // optimistic bump and the real seek so they stay in lockstep.
+      final seekTargetMs = (current.end * 1000).ceil();
+      final seekTarget = Duration(milliseconds: seekTargetMs);
       // Optimistically bump the local position past the segment's end so the
       // very next tick no longer matches it — the manually-incremented
       // _currentPosition otherwise lags the orchestrator's true position
       // until onState confirms the seek asynchronously, which would
-      // re-match and re-fire on the next tick. This is the whole guard
-      // against a seek storm; there's deliberately no persistent
-      // already-skipped tracking, since that would (and did) suppress a
-      // legitimate re-skip on scrub-back, replay, or restart-from-0.
+      // re-match and re-fire on the next tick. _pendingComskipSeekTarget
+      // then prevents `_handleState` from clobbering the bump backward
+      // (the orchestrator's mid-seek position reports can lag/oscillate
+      // behind the optimistic value, which previously caused a re-fire
+      // loop). There's deliberately no persistent already-skipped tracking,
+      // since that would (and did) suppress a legitimate re-skip on
+      // scrub-back, replay, or restart-from-0.
       _currentPosition = seekTarget;
+      _pendingComskipSeekTarget = seekTarget;
+      _pendingComskipSeekTimer?.cancel();
+      _pendingComskipSeekTimer = Timer(const Duration(seconds: 5), () {
+        if (_disposed || !mounted) return;
+        // Real seek never confirmed — give up holding position hostage so
+        // future auto-skips aren't silently broken.
+        _pendingComskipSeekTarget = null;
+        _pendingComskipSeekTimer = null;
+      });
       unawaited(widget.orchestrator.seek(seekTarget));
       _flashComskipSkippedBadge();
     } else if (_activeComskipSegment?.end != current.end) {
@@ -434,6 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer?.cancel();
     _epgTimer?.cancel();
     _comskipBadgeTimer?.cancel();
+    _pendingComskipSeekTimer?.cancel();
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
@@ -516,9 +543,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // play/pause transition, not to every tick.
     final wasPlaying = _isPlaying;
 
+    // While a comskip auto-skip seek is in flight, ignore orchestrator
+    // position reports that would regress _currentPosition backward into
+    // the segment (orchestrator onState can lag/oscillate during the real
+    // seek's buffering). Accept state.position only once it's at or past
+    // the pending target — that proves the real seek genuinely caught up.
+    final pendingTarget = _pendingComskipSeekTarget;
+    final acceptedPosition = pendingTarget != null &&
+            state.position < pendingTarget
+        ? _currentPosition
+        : state.position;
+
     setState(() {
       _status = state.status;
-      _currentPosition = state.position;
+      _currentPosition = acceptedPosition;
       if (state.duration != null && state.duration! > Duration.zero) {
         _duration = state.duration!;
       }
@@ -561,6 +599,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _goBack();
       }
     });
+
+    // If the orchestrator genuinely caught up to (or past) the pending
+    // seek target, the real seek has landed — release the guard so the
+    // next segment / next scrub-back can fire normally.
+    if (pendingTarget != null && state.position >= pendingTarget) {
+      _pendingComskipSeekTarget = null;
+      _pendingComskipSeekTimer?.cancel();
+      _pendingComskipSeekTimer = null;
+    }
     _checkComskip();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
