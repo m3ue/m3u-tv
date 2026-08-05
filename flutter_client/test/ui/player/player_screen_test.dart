@@ -2240,7 +2240,7 @@ void main() {
       );
 
       testWidgets(
-        'auto-skip mode seeks past a segment once and does not re-trigger',
+        'auto-skip mode seeks past a segment and re-fires on re-entry',
         (tester) async {
           final adapter = FakePlayerAdapter(
             capabilities: PlaybackCapabilities.desktopLibmpv,
@@ -2289,6 +2289,10 @@ void main() {
             expect(adapter.seekCalls, [const Duration(seconds: 20)]);
             expect(find.text('Skipped commercial'), findsOneWidget);
 
+            // Re-entry into the same segment — must RE-fire seek. The
+            // mechanism is stateless: position is the source of truth.
+            // No persistent guard set suppresses repeat skips on
+            // user-initiated re-entry (scrub-back, restart, replay).
             adapter.emitState(
               const PlaybackState(
                 backend: PlaybackBackend.desktopLibmpv,
@@ -2299,8 +2303,10 @@ void main() {
             );
             await tester.pump();
 
-            // Still inside the same segment — must not seek a second time.
-            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+            expect(adapter.seekCalls, [
+              const Duration(seconds: 20),
+              const Duration(seconds: 20),
+            ]);
           }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
                 {'start': 10.0, 'end': 20.0},
               ])));
@@ -2467,7 +2473,7 @@ void main() {
       );
 
       testWidgets(
-        'does not re-trigger auto-skip when rewinding into an already-skipped segment',
+        're-fires auto-skip when user scrubs back into an already-skipped segment',
         (tester) async {
           final adapter = FakePlayerAdapter(
             capabilities: PlaybackCapabilities.desktopLibmpv,
@@ -2504,7 +2510,10 @@ void main() {
             await tester.pump();
             expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-            // Rewind back to 15 — still inside A — must NOT seek again.
+            // User scrubs back to 15s — still inside segment A — must
+            // RE-fire auto-skip. The mechanism is stateless: position is
+            // the source of truth, no persistent guard set. This matches
+            // the web reference _checkComskip behavior.
             adapter.emitState(
               const PlaybackState(
                 backend: PlaybackBackend.desktopLibmpv,
@@ -2514,7 +2523,10 @@ void main() {
               ),
             );
             await tester.pump();
-            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+            expect(adapter.seekCalls, [
+              const Duration(seconds: 20),
+              const Duration(seconds: 20),
+            ]);
 
             // Advance into segment B (30–40) — must auto-skip to 40.
             adapter.emitState(
@@ -2528,11 +2540,152 @@ void main() {
             await tester.pump();
             expect(adapter.seekCalls, [
               const Duration(seconds: 20),
+              const Duration(seconds: 20),
               const Duration(seconds: 40),
             ]);
           }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
                 {'start': 10.0, 'end': 20.0},
                 {'start': 30.0, 'end': 40.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        'does not fire auto-skip while seek is in flight (orchestrator confirms at segment end)',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            // Enter segment A (10–20) → auto-skip fires.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+            // Orchestrator confirms seek — position now AT segment end.
+            // _checkComskip reads _currentPosition=20, no segment matched,
+            // no extra seek. This is the optimistic-bump mechanism: the
+            // next [start, end) half-open interval check naturally
+            // evaluates false at t=20.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 20),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
+              ])));
+        },
+      );
+
+      testWidgets(
+        're-fires auto-skip on segment 1 after restart from position 0',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            // First playthrough: enter segment A (10–20) → auto-skip fires.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 12),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+            // Orchestrator confirms seek at 20s.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 20),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+
+            // User restarts from beginning — position now at 5s (outside).
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 5),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+            // Forward playback re-enters segment A — must auto-skip AGAIN.
+            adapter.emitState(
+              const PlaybackState(
+                backend: PlaybackBackend.desktopLibmpv,
+                status: PlaybackStatus.playing,
+                position: Duration(seconds: 15),
+                duration: Duration(minutes: 1),
+              ),
+            );
+            await tester.pump();
+            expect(adapter.seekCalls, [
+              const Duration(seconds: 20),
+              const Duration(seconds: 20),
+            ]);
+          }, createHttpClient: (_) => _FakeHttpClient(jsonEncode([
+                {'start': 10.0, 'end': 20.0},
               ])));
         },
       );

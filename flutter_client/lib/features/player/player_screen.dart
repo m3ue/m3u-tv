@@ -89,7 +89,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // Comskip (commercial-skip) state — only populated when args.metadata
   // carries an 'edl_url' (completed DVR recordings with comskip enabled).
   List<({double start, double end})> _comskipSegments = const [];
-  final Set<double> _autoSkippedSegmentEnds = {};
   ({double start, double end})? _activeComskipSegment;
   bool _showComskipSkippedBadge = false;
   Timer? _comskipBadgeTimer;
@@ -224,7 +223,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _epgData = null;
       _overlayVisible = true;
       _comskipSegments = const [];
-      _autoSkippedSegmentEnds.clear();
       _activeComskipSegment = null;
       _showComskipSkippedBadge = false;
     });
@@ -356,11 +354,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
     if (autoSkip) {
-      if (_autoSkippedSegmentEnds.contains(current.end)) return;
-      _autoSkippedSegmentEnds.add(current.end);
-      unawaited(
-        widget.orchestrator.seek(Duration(seconds: current.end.round())),
-      );
+      final seekTarget = Duration(seconds: current.end.round());
+      // Optimistically bump the local position past the segment's end so the
+      // very next tick no longer matches it — the manually-incremented
+      // _currentPosition otherwise lags the orchestrator's true position
+      // until onState confirms the seek asynchronously, which would
+      // re-match and re-fire on the next tick. This is the whole guard
+      // against a seek storm; there's deliberately no persistent
+      // already-skipped tracking, since that would (and did) suppress a
+      // legitimate re-skip on scrub-back, replay, or restart-from-0.
+      _currentPosition = seekTarget;
+      unawaited(widget.orchestrator.seek(seekTarget));
       _flashComskipSkippedBadge();
     } else if (_activeComskipSegment?.end != current.end) {
       setState(() => _activeComskipSegment = current);
