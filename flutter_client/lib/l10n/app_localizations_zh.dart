@@ -969,7 +969,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String showDeleteRuleConfirm(String title) {
-    return '删除 $title 的剧集规则？未来剧集将不会被录制。';
+    return '删除 $title 的剧集规则？未来剧集将不会被录制。已完成的录制不会被删除。';
   }
 
   @override

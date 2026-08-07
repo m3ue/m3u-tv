@@ -499,7 +499,7 @@
     }
   },
   "showDeleteRule": "删除剧集规则",
-  "showDeleteRuleConfirm": "删除 {title} 的剧集规则？未来剧集将不会被录制。",
+  "showDeleteRuleConfirm": "删除 {title} 的剧集规则？未来剧集将不会被录制。已完成的录制不会被删除。",
   "@showDeleteRuleConfirm": {
     "placeholders": {
       "title": {

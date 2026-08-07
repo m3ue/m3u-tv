@@ -988,7 +988,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String showDeleteRuleConfirm(String title) {
-    return 'Delete the series rule for $title? Future episodes will not be recorded.';
+    return 'Delete the series rule for $title? Future episodes will not be recorded. Recordings already made will not be deleted.';
   }
 
   @override

@@ -499,7 +499,7 @@
     }
   },
   "showDeleteRule": "Eliminar regla de serie",
-  "showDeleteRuleConfirm": "¿Eliminar la regla de serie para {title}? Los episodios futuros no se grabarán.",
+  "showDeleteRuleConfirm": "¿Eliminar la regla de serie para {title}? Los episodios futuros no se grabarán. Las grabaciones ya realizadas no se eliminarán.",
   "@showDeleteRuleConfirm": {
     "placeholders": {
       "title": {

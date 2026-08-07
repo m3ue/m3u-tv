@@ -499,7 +499,7 @@
     }
   },
   "showDeleteRule": "Serien-Regel löschen",
-  "showDeleteRuleConfirm": "Serien-Regel für {title} löschen? Zukünftige Folgen werden nicht aufgenommen",
+  "showDeleteRuleConfirm": "Serien-Regel für {title} löschen? Zukünftige Folgen werden nicht aufgenommen. Bereits vorhandene Aufnahmen werden nicht gelöscht.",
   "@showDeleteRuleConfirm": {
     "placeholders": {
       "title": {

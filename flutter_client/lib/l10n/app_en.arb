@@ -499,7 +499,7 @@
     }
   },
   "showDeleteRule": "Delete series rule",
-  "showDeleteRuleConfirm": "Delete the series rule for {title}? Future episodes will not be recorded.",
+  "showDeleteRuleConfirm": "Delete the series rule for {title}? Future episodes will not be recorded. Recordings already made will not be deleted.",
   "@showDeleteRuleConfirm": {
     "placeholders": {
       "title": {

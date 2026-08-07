@@ -1871,7 +1871,7 @@ abstract class AppLocalizations {
   /// No description provided for @showDeleteRuleConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Delete the series rule for {title}? Future episodes will not be recorded.'**
+  /// **'Delete the series rule for {title}? Future episodes will not be recorded. Recordings already made will not be deleted.'**
   String showDeleteRuleConfirm(String title);
 
   /// No description provided for @showSeriesRuleActive.
