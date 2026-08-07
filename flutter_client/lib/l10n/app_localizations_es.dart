@@ -847,4 +847,209 @@ class AppLocalizationsEs extends AppLocalizations {
   String dvrStorageRecordingCount(int count) {
     return '$count grabaciones';
   }
+
+  @override
+  String get dvrSeriesChannel => 'Canal';
+
+  @override
+  String get dvrSeriesStartEarly => 'Iniciar antes';
+
+  @override
+  String get dvrSeriesUseDefault => 'Predeterminado';
+
+  @override
+  String dvrEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodios',
+      one: '1 episodio',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrDeleteSeriesRule => 'Eliminar regla';
+
+  @override
+  String get dvrUpdateSeriesRuleFailed =>
+      'No se pudo actualizar la regla de serie';
+
+  @override
+  String get dvrSeriesSave => 'Guardar';
+
+  @override
+  String get dvrSeriesSecondsSuffix => 'seg';
+
+  @override
+  String get dvrSeriesMode => 'Modo de serie';
+
+  @override
+  String get dvrUpdateSeriesRuleSuccess => 'Regla de serie actualizada';
+
+  @override
+  String get dvrSeriesModeAll => 'Todos los episodios';
+
+  @override
+  String get dvrSeriesMatchModeStartsWith => 'Comienza con';
+
+  @override
+  String get dvrDeleteSeriesRuleConfirm => '¿Eliminar esta regla de serie?';
+
+  @override
+  String get dvrSeriesCancel => 'Cancelar';
+
+  @override
+  String get dvrDeleteSeriesRuleSuccess => 'Regla de serie eliminada';
+
+  @override
+  String get dvrSeriesRulesTitle => 'Reglas de series';
+
+  @override
+  String get dvrSeriesMatchModeContains => 'Contiene';
+
+  @override
+  String get dvrSeriesMatchModeExact => 'Exacto';
+
+  @override
+  String get dvrSeriesModeUseDefault => 'Predeterminado';
+
+  @override
+  String get dvrSeriesModeNewFlag => 'Solo nuevos';
+
+  @override
+  String get dvrDeleteSeriesRuleFailed =>
+      'No se pudo eliminar la regla de serie';
+
+  @override
+  String get dvrSeriesKeepLast => 'Mantener última';
+
+  @override
+  String get dvrSeriesModeUniqueSe => 'S-E único';
+
+  @override
+  String get dvrSeriesAnyChannel => 'Cualquier canal';
+
+  @override
+  String get dvrSeriesMatchMode => 'Modo de coincidencia';
+
+  @override
+  String get dvrSeriesEndLate => 'Terminar tarde';
+
+  @override
+  String get dvrSeriesOptions => 'Opciones';
+
+  @override
+  String get dvrSeriesAllEpisodesWarning =>
+      'Grabar todos los episodios en cualquier canal puede crear duplicados — usa Solo nuevos o S-E único para desduplicar.';
+
+  @override
+  String get dvrSeriesRulesEmpty => 'No hay reglas de series';
+
+  @override
+  String get dvrSeriesPriority => 'Prioridad';
+
+  @override
+  String get epgRecordSeries => 'Grabar serie';
+
+  @override
+  String epgRecordSeriesSuccess(String title) {
+    return 'Grabación de serie configurada para $title';
+  }
+
+  @override
+  String get epgRecordSeriesFailed =>
+      'No se pudo configurar la grabación de la serie';
+
+  @override
+  String get epgRecordSeriesDuplicate =>
+      'La grabación de la serie ya está configurada';
+
+  @override
+  String get navShows => 'Shows';
+
+  @override
+  String get showAiringNext => 'Próxima emisión';
+
+  @override
+  String get showAiringNone => 'No hay episodios próximos en la EPG';
+
+  @override
+  String showChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count canales',
+      one: '1 canal',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showDeleteRule => 'Eliminar regla de serie';
+
+  @override
+  String showDeleteRuleConfirm(String title) {
+    return '¿Eliminar la regla de serie para $title? Los episodios futuros no se grabarán.';
+  }
+
+  @override
+  String get showSeriesRuleActive => 'Regla de serie activa';
+
+  @override
+  String get showDetailTitle => 'Detalles del show';
+
+  @override
+  String showEpisodesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodios',
+      one: '1 episodio',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showRecordSeries => 'Grabar serie';
+
+  @override
+  String showRecordSeriesConfirm(String title, String channel) {
+    return '¿Grabar cada episodio de $title en $channel?';
+  }
+
+  @override
+  String showRecordSeriesFailed(String title) {
+    return 'No se pudo configurar la grabación de la serie para $title';
+  }
+
+  @override
+  String showRecordSeriesSuccess(String title) {
+    return 'Grabación de serie configurada para $title';
+  }
+
+  @override
+  String showRecordSeriesDuplicate(String title) {
+    return 'La grabación de la serie ya está configurada para $title';
+  }
+
+  @override
+  String get showsError => 'No se pudieron buscar shows';
+
+  @override
+  String get showsNoResults => 'Ningún show coincide con tu búsqueda';
+
+  @override
+  String get showsSearchError => 'Búsqueda fallida';
+
+  @override
+  String get showsSearchHint => 'Buscar shows por título';
+
+  @override
+  String get showsTitle => 'Shows';
+
+  @override
+  String showNotFound(String title) {
+    return 'Show «$title» no encontrado';
+  }
 }

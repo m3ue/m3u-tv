@@ -93,6 +93,45 @@ Future<bool?> showDeleteRecordingDialog(BuildContext context) {
   );
 }
 
+/// Confirmation dialog for deleting a DVR series rule. Mirrors the
+/// recording-delete dialog structurally, but anchors the title to the
+/// series rule's title so the user knows which rule they're about to lose.
+Future<bool?> showDeleteSeriesRuleDialog(
+  BuildContext context, {
+  required DvrSeriesRule rule,
+}) {
+  final l10n = AppLocalizations.of(context);
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(l10n.dvrDeleteSeriesRuleConfirm),
+      content: Text(l10n.showDeleteRuleConfirm(rule.seriesTitle)),
+      actions: [
+        DpadRegion(
+          memoryKey: 'dvr/delete-series-rule-dialog-actions',
+          child: OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            overflowSpacing: 8,
+            children: [
+              AppButton(
+                label: l10n.dvrDeleteDismiss,
+                autofocus: true,
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+              ),
+              AppButton(
+                label: l10n.showDeleteRule,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<void> runDvrActionWithFeedback(
   BuildContext context,
   Future<void> Function() action, {

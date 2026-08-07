@@ -825,4 +825,205 @@ class AppLocalizationsZh extends AppLocalizations {
   String dvrStorageRecordingCount(int count) {
     return '$count 个录制';
   }
+
+  @override
+  String get dvrSeriesChannel => '频道';
+
+  @override
+  String get dvrSeriesStartEarly => '提前开始';
+
+  @override
+  String get dvrSeriesUseDefault => '使用默认';
+
+  @override
+  String dvrEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+      one: '1 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrDeleteSeriesRule => '删除规则';
+
+  @override
+  String get dvrUpdateSeriesRuleFailed => '无法更新剧集规则';
+
+  @override
+  String get dvrSeriesSave => '保存';
+
+  @override
+  String get dvrSeriesSecondsSuffix => '秒';
+
+  @override
+  String get dvrSeriesMode => '剧集模式';
+
+  @override
+  String get dvrUpdateSeriesRuleSuccess => '剧集规则已更新';
+
+  @override
+  String get dvrSeriesModeAll => '全部剧集';
+
+  @override
+  String get dvrSeriesMatchModeStartsWith => '开头匹配';
+
+  @override
+  String get dvrDeleteSeriesRuleConfirm => '确定删除此剧集规则？';
+
+  @override
+  String get dvrSeriesCancel => '取消';
+
+  @override
+  String get dvrDeleteSeriesRuleSuccess => '剧集规则已删除';
+
+  @override
+  String get dvrSeriesRulesTitle => '剧集规则';
+
+  @override
+  String get dvrSeriesMatchModeContains => '包含';
+
+  @override
+  String get dvrSeriesMatchModeExact => '精确';
+
+  @override
+  String get dvrSeriesModeUseDefault => '使用默认';
+
+  @override
+  String get dvrSeriesModeNewFlag => '仅新增';
+
+  @override
+  String get dvrDeleteSeriesRuleFailed => '无法删除剧集规则';
+
+  @override
+  String get dvrSeriesKeepLast => '保留最后';
+
+  @override
+  String get dvrSeriesModeUniqueSe => '唯一S-E';
+
+  @override
+  String get dvrSeriesAnyChannel => '任意频道';
+
+  @override
+  String get dvrSeriesMatchMode => '匹配模式';
+
+  @override
+  String get dvrSeriesEndLate => '延迟结束';
+
+  @override
+  String get dvrSeriesOptions => '选项';
+
+  @override
+  String get dvrSeriesAllEpisodesWarning =>
+      '在任意频道录制全部剧集可能会产生重复——请使用仅新增或唯一S-E去重。';
+
+  @override
+  String get dvrSeriesRulesEmpty => '暂无剧集规则';
+
+  @override
+  String get dvrSeriesPriority => '优先级';
+
+  @override
+  String get epgRecordSeries => '录制整部剧集';
+
+  @override
+  String epgRecordSeriesSuccess(String title) {
+    return '已为 $title 设置整剧录制';
+  }
+
+  @override
+  String get epgRecordSeriesFailed => '无法设置整剧录制';
+
+  @override
+  String get epgRecordSeriesDuplicate => 'Series recording already set';
+
+  @override
+  String get navShows => '剧集';
+
+  @override
+  String get showAiringNext => '下次播出';
+
+  @override
+  String get showAiringNone => 'EPG 中暂无即将播出的剧集';
+
+  @override
+  String showChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个频道',
+      one: '1 个频道',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showDeleteRule => '删除剧集规则';
+
+  @override
+  String showDeleteRuleConfirm(String title) {
+    return '删除 $title 的剧集规则？未来剧集将不会被录制。';
+  }
+
+  @override
+  String get showSeriesRuleActive => '剧集规则已启用';
+
+  @override
+  String get showDetailTitle => '节目详情';
+
+  @override
+  String showEpisodesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+      one: '1 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showRecordSeries => '录制整部剧集';
+
+  @override
+  String showRecordSeriesConfirm(String title, String channel) {
+    return '在 $channel 录制 $title 的每一集？';
+  }
+
+  @override
+  String showRecordSeriesFailed(String title) {
+    return '无法为 $title 设置整剧录制';
+  }
+
+  @override
+  String showRecordSeriesSuccess(String title) {
+    return '已为 $title 设置整剧录制';
+  }
+
+  @override
+  String showRecordSeriesDuplicate(String title) {
+    return '已为 $title 设置过整剧录制';
+  }
+
+  @override
+  String get showsError => '无法搜索剧集';
+
+  @override
+  String get showsNoResults => '未找到匹配的剧集';
+
+  @override
+  String get showsSearchError => '搜索失败';
+
+  @override
+  String get showsSearchHint => '按标题搜索剧集';
+
+  @override
+  String get showsTitle => '剧集';
+
+  @override
+  String showNotFound(String title) {
+    return '未找到剧集“$title”';
+  }
 }

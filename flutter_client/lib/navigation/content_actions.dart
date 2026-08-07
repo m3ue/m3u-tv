@@ -19,6 +19,8 @@ class ContentActions extends InheritedWidget {
     required this.onSeriesSelect,
     required this.onProgressSelect,
     required this.onSidebarActivate,
+    required this.onRecordSeries,
+    required this.onDeleteSeriesRule,
     required this.buildTabScreen,
     required super.child,
   });
@@ -39,6 +41,32 @@ class ContentActions extends InheritedWidget {
 
   final void Function(Progress) onProgressSelect;
   final VoidCallback onSidebarActivate;
+
+  /// Creates a persistent DVR series rule for the given show. Wired by
+  /// AppShell against `XtreamService.createDvrSeriesRule`; the
+  /// `ShowDetailScreen` route passes it through to the screen so the Record
+  /// Series button has a target. Returns the outcome so the screen can
+  /// distinguish created / duplicate / failed.
+  ///
+  /// The options params ([DvrSeriesRuleOptions]) are threaded through from the
+  /// configure sheet (B5); nulls mean "use server default".
+  final Future<CreateDvrSeriesRuleOutcome> Function({
+    int? channelId,
+    required String title,
+    DvrMatchMode? matchMode,
+    DvrSeriesMode? seriesMode,
+    int? keepLast,
+    int? priority,
+    int? startEarlySeconds,
+    int? endLateSeconds,
+  })?
+  onRecordSeries;
+
+  /// Deletes a DVR series rule. Wired by AppShell against
+  /// `XtreamService.deleteDvrSeriesRule`; the `ShowDetailScreen` route passes
+  /// it through to the screen so the rule-active state can offer a delete
+  /// affordance without a separate round-trip to fetch the rule id.
+  final Future<void> Function(DvrSeriesRule rule)? onDeleteSeriesRule;
 
   /// Builds the full tab screen for the given routeName.
   /// Provided by AppShell so go_router branch builders don't need to import

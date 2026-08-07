@@ -123,6 +123,10 @@ final dvrStorageInfoProvider = Provider<DvrStorageInfo?>((ref) {
   return ref.watch(appStateControllerProvider).appState.dvrStorageInfo;
 });
 
+final dvrSeriesRulesProvider = Provider<List<DvrSeriesRule>>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrSeriesRules;
+});
+
 final recordingChannelIdsProvider = Provider<Set<int>>((ref) {
   return ref.watch(appStateControllerProvider).appState.recordingChannelIds;
 });

@@ -989,6 +989,315 @@ ContentType contentTypeFromWire(String value) => switch (value) {
   _ => ContentType.vod,
 };
 
+enum DvrSeriesMode { all, newFlag, uniqueSe }
+
+extension DvrSeriesModeWire on DvrSeriesMode {
+  String get wireValue => switch (this) {
+    DvrSeriesMode.all => 'all',
+    DvrSeriesMode.newFlag => 'new_flag',
+    DvrSeriesMode.uniqueSe => 'unique_se',
+  };
+}
+
+/// Parses `DvrSeriesMode` from its m3u-editor wire value. `null` falls back to
+/// `uniqueSe` — the server's column default (`dvr_setting.default_series_mode`).
+/// Tolerates the legacy `new_only` / `new` spellings that earlier client
+/// releases sent before the wire values were corrected.
+DvrSeriesMode dvrSeriesModeFromWire(String? value) {
+  switch (value) {
+    case 'all':
+      return DvrSeriesMode.all;
+    case 'new_flag':
+    case 'new_only':
+    case 'new':
+      return DvrSeriesMode.newFlag;
+    case 'unique_se':
+    case null:
+      return DvrSeriesMode.uniqueSe;
+    default:
+      return DvrSeriesMode.uniqueSe;
+  }
+}
+
+enum DvrMatchMode { contains, exact, startsWith, tmdb }
+
+extension DvrMatchModeWire on DvrMatchMode {
+  String get wireValue => switch (this) {
+    DvrMatchMode.contains => 'contains',
+    DvrMatchMode.exact => 'exact',
+    DvrMatchMode.startsWith => 'starts_with',
+    DvrMatchMode.tmdb => 'tmdb',
+  };
+}
+
+DvrMatchMode dvrMatchModeFromWire(String? value) {
+  switch (value) {
+    case 'exact':
+      return DvrMatchMode.exact;
+    case 'starts_with':
+      return DvrMatchMode.startsWith;
+    case 'tmdb':
+      return DvrMatchMode.tmdb;
+    case 'contains':
+    case null:
+      return DvrMatchMode.contains;
+    default:
+      return DvrMatchMode.contains;
+  }
+}
+
+class DvrSeriesRule {
+  const DvrSeriesRule({
+    required this.id,
+    required this.channelId,
+    this.channelName,
+    required this.seriesTitle,
+    required this.matchMode,
+    required this.seriesMode,
+    this.keepLast,
+    this.priority,
+    required this.enabled,
+    required this.enableComskip,
+    this.startEarlySeconds,
+    this.endLateSeconds,
+    this.createdAt,
+    this.updatedAt,
+    this.recordingCount = 0,
+  });
+
+  final int id;
+  final int channelId;
+  final String? channelName;
+  final String seriesTitle;
+  final DvrMatchMode matchMode;
+  final DvrSeriesMode seriesMode;
+  final int? keepLast;
+  final int? priority;
+  final bool enabled;
+  final bool enableComskip;
+  final int? startEarlySeconds;
+  final int? endLateSeconds;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final int recordingCount;
+
+  factory DvrSeriesRule.fromXtream(Map<String, Object?> json) {
+    int? asIntOrNull(Object? v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
+    bool asBool(Object? v) {
+      if (v is bool) return v;
+      if (v is num) return v != 0;
+      if (v is String) return v == '1' || v.toLowerCase() == 'true';
+      return false;
+    }
+
+    DateTime? asDate(Object? v) =>
+        v is String ? DateTime.tryParse(v)?.toUtc() : null;
+    return DvrSeriesRule(
+      id: asIntOrNull(json['id']) ?? 0,
+      channelId: asIntOrNull(json['channel_id']) ?? 0,
+      channelName: json['channel_name'] as String?,
+      seriesTitle: (json['series_title'] as String?) ?? '',
+      matchMode: dvrMatchModeFromWire(json['match_mode'] as String?),
+      seriesMode: dvrSeriesModeFromWire(json['series_mode'] as String?),
+      keepLast: asIntOrNull(json['keep_last']),
+      priority: asIntOrNull(json['priority']),
+      enabled: asBool(json['enabled']),
+      enableComskip: asBool(json['enable_comskip']),
+      startEarlySeconds: asIntOrNull(json['start_early_seconds']),
+      endLateSeconds: asIntOrNull(json['end_late_seconds']),
+      createdAt: asDate(json['created_at']),
+      updatedAt: asDate(json['updated_at']),
+      recordingCount: asIntOrNull(json['recording_count']) ?? 0,
+    );
+  }
+}
+
+/// The seven tunable options exposed by the series-rule configure sheet.
+/// All fields are nullable — null means "use server default / omit from request".
+/// Passed to `XtreamService.createDvrSeriesRule` via AppShell's
+/// `_createDvrSeriesRule` callback.
+class DvrSeriesRuleOptions {
+  const DvrSeriesRuleOptions({
+    this.channelId,
+    this.matchMode,
+    this.seriesMode,
+    this.keepLast,
+    this.priority,
+    this.startEarlySeconds,
+    this.endLateSeconds,
+  });
+
+  /// Pin to a specific channel; null means "any channel".
+  final int? channelId;
+
+  /// null = server default.
+  final DvrMatchMode? matchMode;
+
+  /// null = server default (unique_se on this server).
+  final DvrSeriesMode? seriesMode;
+
+  /// null = server default. 0 is valid and means "keep nothing".
+  final int? keepLast;
+
+  /// null = server default. Server default is typically 50.
+  final int? priority;
+
+  /// null = server default. Seconds to start recording early.
+  final int? startEarlySeconds;
+
+  /// null = server default. Seconds to end recording late.
+  final int? endLateSeconds;
+}
+
+class EpgShowChannel {
+  const EpgShowChannel({required this.channelId, this.channelName});
+
+  final int channelId;
+  final String? channelName;
+
+  factory EpgShowChannel.fromXtream(Map<String, Object?> json) {
+    int? asIntOrNull(Object? v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
+    return EpgShowChannel(
+      channelId: asIntOrNull(json['channel_id']) ?? 0,
+      channelName: json['channel_name'] as String?,
+    );
+  }
+}
+
+class EpgShowEpisode {
+  const EpgShowEpisode({
+    required this.channelId,
+    this.channelName,
+    required this.title,
+    required this.startTime,
+    required this.endTime,
+    this.season,
+    this.episode,
+    this.description,
+  });
+
+  final int channelId;
+  final String? channelName;
+  final String title;
+  final DateTime startTime;
+  final DateTime endTime;
+  final int? season;
+  final int? episode;
+  final String? description;
+
+  factory EpgShowEpisode.fromXtream(Map<String, Object?> json) {
+    int? asIntOrNull(Object? v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
+    DateTime parseDate(Object? v) => v is String
+        ? (DateTime.tryParse(v) ?? DateTime.now().toUtc())
+        : DateTime.now().toUtc();
+    return EpgShowEpisode(
+      channelId: asIntOrNull(json['channel_id']) ?? 0,
+      channelName: json['channel_name'] as String?,
+      title: (json['title'] as String?) ?? '',
+      startTime: parseDate(json['start_time']).toUtc(),
+      endTime: parseDate(json['end_time']).toUtc(),
+      season: asIntOrNull(json['season']),
+      episode: asIntOrNull(json['episode']),
+      description: json['description'] as String?,
+    );
+  }
+}
+
+class EpgShow {
+  const EpgShow({
+    required this.normalizedTitle,
+    required this.displayTitle,
+    required this.channelCount,
+    required this.channels,
+    required this.episodeCount,
+    this.nextAiringAt,
+    required this.recentEpisodes,
+    this.hasSeriesRule = false,
+    this.seriesRuleId,
+  });
+
+  final String normalizedTitle;
+  final String displayTitle;
+  final int channelCount;
+  final List<EpgShowChannel> channels;
+  final int episodeCount;
+  final DateTime? nextAiringAt;
+  final List<EpgShowEpisode> recentEpisodes;
+
+  /// True when a persistent DVR series rule already exists for this show
+  /// (mirrors `search_epg_shows.has_series_rule`). Surfaces the
+  /// "Series rule active" toggle state on the detail screen without a
+  /// separate `listDvrSeriesRules` round-trip.
+  final bool hasSeriesRule;
+
+  /// Server id of the existing series rule, when one was found. Lets the
+  /// detail screen delete the rule without asking the user to pick which
+  /// row. Null when [hasSeriesRule] is false.
+  final int? seriesRuleId;
+
+  factory EpgShow.fromXtream(Map<String, Object?> json) {
+    int asInt(Object? v, {int fallback = 0}) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? fallback;
+      return fallback;
+    }
+
+    int? asIntOrNull(Object? v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
+    DateTime? asDate(Object? v) =>
+        v is String ? DateTime.tryParse(v)?.toUtc() : null;
+    final channels = (json['channels'] as List?)
+            ?.whereType<Map<dynamic, dynamic>>()
+            .map((m) => EpgShowChannel.fromXtream(m.cast<String, Object?>()))
+            .toList() ??
+        const <EpgShowChannel>[];
+    final episodes = (json['recent_episodes'] as List?)
+            ?.whereType<Map<dynamic, dynamic>>()
+            .map((m) => EpgShowEpisode.fromXtream(m.cast<String, Object?>()))
+            .toList() ??
+        const <EpgShowEpisode>[];
+    return EpgShow(
+      normalizedTitle: (json['normalized_title'] as String?) ?? '',
+      displayTitle: (json['display_title'] as String?) ?? '',
+      channelCount: asInt(json['channel_count']),
+      channels: channels,
+      episodeCount: asInt(json['episode_count']),
+      nextAiringAt: asDate(json['next_airing_at']),
+      recentEpisodes: episodes,
+      hasSeriesRule: json['has_series_rule'] == true,
+      seriesRuleId: asIntOrNull(json['series_rule_id']),
+    );
+  }
+}
+
 List<Object?> _asList(Object? value) =>
     value is List ? value.cast<Object?>() : const <Object?>[];
 

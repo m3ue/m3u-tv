@@ -7,7 +7,9 @@ import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/requests/request_detail_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
+import 'package:m3u_tv/features/shows/show_detail_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -99,7 +101,53 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 3: VOD with nested details
+          // Branch 3: Shows (EPG series browse + per-show detail)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.shows,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(_tabScreen(context, RouteNames.shows)),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'details/:normalizedTitle',
+                    pageBuilder: (context, state) {
+                      final normalizedTitle =
+                          state.pathParameters['normalizedTitle'] ?? '';
+                      final extra = state.extra;
+                      final show = extra is EpgShow ? extra : null;
+                      if (show == null) {
+                        return NoTransitionPage(
+                          child: Scaffold(
+                            body: SafeArea(
+                              bottom: false,
+                              child: Center(
+                                child: Text(
+                                  AppLocalizations.of(context).showNotFound(
+                                    normalizedTitle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        ShowDetailScreen(
+                          show: show,
+                          onRecordSeries: actions.onRecordSeries,
+                          onDeleteSeriesRule: actions.onDeleteSeriesRule,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Branch 4: VOD with nested details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -148,7 +196,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 4: Series with nested details
+          // Branch 5: Series with nested details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -201,7 +249,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 5: AIOStreams with nested item detail
+          // Branch 6: AIOStreams with nested item detail
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -265,7 +313,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: DVR
+          // Branch 7: DVR
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -276,7 +324,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Requests with nested result details
+          // Branch 8: Requests with nested result details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -307,7 +355,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 8: Notifications
+          // Branch 9: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -320,7 +368,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 9: Settings
+          // Branch 10: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

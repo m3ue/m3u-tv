@@ -430,5 +430,132 @@
         "type": "int"
       }
     }
+  },
+  "dvrSeriesChannel": "Canal",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Iniciar antes",
+  "dvrSeriesUseDefault": "Predeterminado",
+  "dvrEpisodeCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
+  "dvrDeleteSeriesRule": "Eliminar regla",
+  "dvrUpdateSeriesRuleFailed": "No se pudo actualizar la regla de serie",
+  "dvrSeriesSave": "Guardar",
+  "dvrSeriesSecondsSuffix": "seg",
+  "dvrSeriesMode": "Modo de serie",
+  "dvrUpdateSeriesRuleSuccess": "Regla de serie actualizada",
+  "dvrSeriesModeAll": "Todos los episodios",
+  "dvrSeriesMatchModeStartsWith": "Comienza con",
+  "dvrDeleteSeriesRuleConfirm": "¿Eliminar esta regla de serie?",
+  "dvrSeriesCancel": "Cancelar",
+  "dvrDeleteSeriesRuleSuccess": "Regla de serie eliminada",
+  "dvrSeriesRulesTitle": "Reglas de series",
+  "dvrSeriesMatchModeContains": "Contiene",
+  "dvrSeriesMatchModeExact": "Exacto",
+  "dvrSeriesModeUseDefault": "Predeterminado",
+  "dvrSeriesModeNewFlag": "Solo nuevos",
+  "dvrDeleteSeriesRuleFailed": "No se pudo eliminar la regla de serie",
+  "dvrSeriesKeepLast": "Mantener última",
+  "dvrSeriesModeUniqueSe": "S-E único",
+  "dvrSeriesAnyChannel": "Cualquier canal",
+  "dvrSeriesMatchMode": "Modo de coincidencia",
+  "dvrSeriesEndLate": "Terminar tarde",
+  "dvrSeriesOptions": "Opciones",
+  "dvrSeriesAllEpisodesWarning": "Grabar todos los episodios en cualquier canal puede crear duplicados — usa Solo nuevos o S-E único para desduplicar.",
+  "dvrSeriesRulesEmpty": "No hay reglas de series",
+  "dvrSeriesPriority": "Prioridad",
+  "epgRecordSeries": "Grabar serie",
+  "epgRecordSeriesSuccess": "Grabación de serie configurada para {title}",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "No se pudo configurar la grabación de la serie",
+  "epgRecordSeriesDuplicate": "La grabación de la serie ya está configurada",
+  "navShows": "Shows",
+  "showAiringNext": "Próxima emisión",
+  "showAiringNone": "No hay episodios próximos en la EPG",
+  "showChannelCount": "{count, plural, =1{1 canal} other{{count} canales}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Eliminar regla de serie",
+  "showDeleteRuleConfirm": "¿Eliminar la regla de serie para {title}? Los episodios futuros no se grabarán.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Regla de serie activa",
+  "showDetailTitle": "Detalles del show",
+  "showEpisodesCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Grabar serie",
+  "showRecordSeriesConfirm": "¿Grabar cada episodio de {title} en {channel}?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "No se pudo configurar la grabación de la serie para {title}",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Grabación de serie configurada para {title}",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "La grabación de la serie ya está configurada para {title}",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "No se pudieron buscar shows",
+  "showsNoResults": "Ningún show coincide con tu búsqueda",
+  "showsSearchError": "Búsqueda fallida",
+  "showsSearchHint": "Buscar shows por título",
+  "showsTitle": "Shows",
+  "showNotFound": "Show «{title}» no encontrado",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
   }
 }

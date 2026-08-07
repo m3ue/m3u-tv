@@ -88,9 +88,11 @@ void main() {
 
         expect(find.text('Live News'), findsOneWidget);
         // The in-progress status word leads the meta line and carries a
-        // filled dot glyph prefix.
-        expect(find.textContaining('●'), findsOneWidget);
-        expect(find.textContaining('Recording'), findsOneWidget);
+        // filled dot glyph prefix. The exact "● Recording" string uniquely
+        // identifies the meta line (the DVR Recordings tab label also
+        // contains "Recording", so plain find.textContaining('Recording')
+        // would match both — see #177's tabbed layout).
+        expect(find.textContaining('● Recording'), findsOneWidget);
         // Channel name still follows as a normal meta segment.
         expect(find.textContaining('News 24'), findsOneWidget);
       },
@@ -550,6 +552,203 @@ void main() {
         expectedColor,
       );
     });
+
+    testWidgets(
+      'non-empty series rules + non-empty recordings render both tabs with no layout exception',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording(), _recordingNow()],
+            seriesRules: [_seriesRule()],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Recordings tab is the initial tab and renders its list.
+        expect(find.text('Evening Movie'), findsOneWidget);
+        expect(find.text('Live News'), findsOneWidget);
+
+        // No layout exception — the crash that hid all recordings.
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('switching to the Series Rules tab shows the rules', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_completedRecording()],
+          seriesRules: [_seriesRule()],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evening Movie'), findsOneWidget);
+      expect(find.text('Test Series Alpha'), findsNothing);
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Test Series Alpha'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Back to the Recordings tab keeps the recordings list intact.
+      await tester.tap(find.text('DVR Recordings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Evening Movie'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('series rule delete button invokes onDeleteSeriesRule', (
+      tester,
+    ) async {
+      DvrSeriesRule? deleted;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_completedRecording()],
+          seriesRules: [_seriesRule()],
+          onDeleteSeriesRule: (rule) async => deleted = rule,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+      expect(find.text('Test Series Alpha'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Delete series rule'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete this series rule?'), findsOneWidget);
+      await tester.tap(find.text('Delete series rule'));
+      await tester.pumpAndSettle();
+
+      expect(deleted, isNotNull);
+      expect(deleted!.id, 7);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('empty series rules list shows dvrSeriesRulesEmpty', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(recordings: [_completedRecording()]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evening Movie'), findsOneWidget);
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No series rules'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('tapping a series rule opens the edit sheet and does NOT delete', (
+      tester,
+    ) async {
+      DvrSeriesRule? deletedRule;
+      DvrSeriesRule? updatedRule;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_completedRecording()],
+          seriesRules: [_seriesRule()],
+          onDeleteSeriesRule: (rule) async => deletedRule = rule,
+          onUpdateSeriesRule: (rule, options) async {
+            updatedRule = rule;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+      expect(find.text('Test Series Alpha'), findsOneWidget);
+
+      // Tap the card body (not the delete icon) — this is the primary
+      // D-pad action and must edit, never delete.
+      await tester.tap(find.text('Test Series Alpha'));
+      await tester.pumpAndSettle();
+
+      expect(deletedRule, isNull, reason: 'plain tap must not delete');
+      expect(find.text('Options'), findsOneWidget, reason: 'edit sheet opens');
+      expect(updatedRule, isNull, reason: 'update fires only on Save');
+      expect(tester.takeException(), isNull);
+
+      // Dismiss the sheet without saving.
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(updatedRule, isNull);
+    });
+
+    testWidgets('saving the edit sheet calls onUpdateSeriesRule with the rule', (
+      tester,
+    ) async {
+      DvrSeriesRule? updatedRule;
+      DvrSeriesRuleOptions? updatedOptions;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_completedRecording()],
+          seriesRules: [_seriesRule()],
+          onUpdateSeriesRule: (rule, options) async {
+            updatedRule = rule;
+            updatedOptions = options;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Test Series Alpha'));
+      await tester.pumpAndSettle();
+
+      // Sheet pre-fills from the rule: seriesMode all, matchMode contains,
+      // keepLast null, priority null.
+      expect(find.text('Options'), findsOneWidget);
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(updatedRule, isNotNull);
+      expect(updatedRule!.id, 7);
+      expect(updatedOptions, isNotNull);
+      expect(updatedOptions!.channelId, 8);
+      expect(updatedOptions!.seriesMode, DvrSeriesMode.all);
+      expect(updatedOptions!.matchMode, DvrMatchMode.contains);
+      expect(updatedOptions!.keepLast, isNull);
+      expect(updatedOptions!.priority, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('long-pressing a series rule deletes it via the confirm dialog', (
+      tester,
+    ) async {
+      DvrSeriesRule? deletedRule;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: [_completedRecording()],
+          seriesRules: [_seriesRule()],
+          onDeleteSeriesRule: (rule) async => deletedRule = rule,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Series Rules'));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Test Series Alpha'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete this series rule?'), findsOneWidget);
+      await tester.tap(find.text('Delete series rule'));
+      await tester.pumpAndSettle();
+
+      expect(deletedRule, isNotNull);
+      expect(deletedRule!.id, 7);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 
@@ -561,6 +760,9 @@ class _TestApp extends StatelessWidget {
     this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
     this.storageInfo,
+    this.seriesRules = const <DvrSeriesRule>[],
+    this.onDeleteSeriesRule,
+    this.onUpdateSeriesRule,
   });
 
   final List<DvrRecording> recordings;
@@ -569,6 +771,10 @@ class _TestApp extends StatelessWidget {
   final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
   final DvrStorageInfo? storageInfo;
+  final List<DvrSeriesRule> seriesRules;
+  final Future<void> Function(DvrSeriesRule)? onDeleteSeriesRule;
+  final Future<void> Function(DvrSeriesRule, DvrSeriesRuleOptions)?
+  onUpdateSeriesRule;
 
   @override
   Widget build(BuildContext context) {
@@ -586,6 +792,9 @@ class _TestApp extends StatelessWidget {
           onCancelAndDeleteRecording: onCancelAndDeleteRecording,
           onDeleteRecording: onDeleteRecording,
           storageInfo: storageInfo,
+          seriesRules: seriesRules,
+          onDeleteSeriesRule: onDeleteSeriesRule,
+          onUpdateSeriesRule: onUpdateSeriesRule,
         ),
       ),
     );
@@ -652,4 +861,16 @@ DvrRecording _cancelledRecording() => DvrRecording(
   channelName: 'FX',
   scheduledStart: DateTime.utc(2026, 6, 20, 21),
   scheduledEnd: DateTime.utc(2026, 6, 20, 22),
+);
+
+DvrSeriesRule _seriesRule() => const DvrSeriesRule(
+  id: 7,
+  channelId: 8,
+  channelName: 'Channel Eight',
+  seriesTitle: 'Test Series Alpha',
+  matchMode: DvrMatchMode.contains,
+  seriesMode: DvrSeriesMode.all,
+  enabled: true,
+  enableComskip: false,
+  recordingCount: 3,
 );

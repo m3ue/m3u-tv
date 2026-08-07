@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/dvr_series_rule_sheet.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
-class DvrRecordingsScreen extends StatelessWidget {
+class DvrRecordingsScreen extends StatefulWidget {
   const DvrRecordingsScreen({
     super.key,
     required this.recordings,
@@ -20,6 +23,9 @@ class DvrRecordingsScreen extends StatelessWidget {
     this.onCancelRecording,
     this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
+    this.onDeleteSeriesRule,
+    this.onUpdateSeriesRule,
+    this.seriesRules = const <DvrSeriesRule>[],
     this.onSidebarActivate,
   });
 
@@ -31,12 +37,31 @@ class DvrRecordingsScreen extends StatelessWidget {
   final Future<void> Function(String uuid)? onCancelRecording;
   final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
+  final Future<void> Function(DvrSeriesRule)? onDeleteSeriesRule;
+  final Future<void> Function(DvrSeriesRule rule, DvrSeriesRuleOptions options)?
+  onUpdateSeriesRule;
+  final List<DvrSeriesRule> seriesRules;
   final VoidCallback? onSidebarActivate;
+
+  @override
+  State<DvrRecordingsScreen> createState() => _DvrRecordingsScreenState();
+}
+
+class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    if (!isConfigured) {
+    if (!widget.isConfigured) {
       return Scaffold(
         appBar: AppBar(title: Text(l10n.dvrRecordingsTitle)),
         body: Center(
@@ -49,37 +74,300 @@ class DvrRecordingsScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (storageInfo != null) ...[
-              _DvrStorageSummary(info: storageInfo!),
-              const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-            ],
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : recordings.isEmpty
-                  ? Center(
-                      child: Text(
-                        l10n.dvrNoRecordings,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    )
-                  : _RecordingList(
-                      recordings: recordings,
-                      onPlay: onPlay,
-                      onCancelRecording: onCancelRecording,
-                      onCancelAndDeleteRecording: onCancelAndDeleteRecording,
-                      onDeleteRecording: onDeleteRecording,
-                      onSidebarActivate: onSidebarActivate,
-                    ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DpadTabBar(
+            controller: _tabController,
+            tabs: [l10n.dvrRecordingsTitle, l10n.dvrSeriesRulesTitle],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(
+                    MediaBrowsingMetrics.pagePadding,
+                  ),
+                  child: _buildRecordingsTab(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(
+                    MediaBrowsingMetrics.pagePadding,
+                  ),
+                  child: _buildSeriesRulesTab(context),
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordingsTab(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.storageInfo != null) ...[
+          _DvrStorageSummary(info: widget.storageInfo!),
+          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
+        ],
+        Expanded(
+          child: widget.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : widget.recordings.isEmpty
+              ? Center(
+                  child: Text(
+                    l10n.dvrNoRecordings,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                )
+              : _RecordingList(
+                  recordings: widget.recordings,
+                  onPlay: widget.onPlay,
+                  onCancelRecording: widget.onCancelRecording,
+                  onCancelAndDeleteRecording: widget.onCancelAndDeleteRecording,
+                  onDeleteRecording: widget.onDeleteRecording,
+                  onSidebarActivate: widget.onSidebarActivate,
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeriesRulesTab(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (widget.seriesRules.isEmpty) {
+      return Center(
+        child: Text(
+          l10n.dvrSeriesRulesEmpty,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      );
+    }
+    return _SeriesRulesList(
+      rules: widget.seriesRules,
+      onDelete: widget.onDeleteSeriesRule,
+      onUpdate: widget.onUpdateSeriesRule,
+      onSidebarActivate: widget.onSidebarActivate,
+    );
+  }
+}
+
+class _SeriesRulesList extends StatelessWidget {
+  const _SeriesRulesList({
+    required this.rules,
+    this.onDelete,
+    this.onUpdate,
+    this.onSidebarActivate,
+  });
+
+  final List<DvrSeriesRule> rules;
+  final Future<void> Function(DvrSeriesRule)? onDelete;
+  final Future<void> Function(DvrSeriesRule rule, DvrSeriesRuleOptions options)?
+  onUpdate;
+  final VoidCallback? onSidebarActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadRegion(
+      memoryKey: 'dvr/series-rules',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) onSidebarActivate?.call();
+      },
+      child: ScrollbarListView(
+        itemCount: rules.length,
+        itemBuilder: (context, index) {
+          final rule = rules[index];
+          return Padding(
+            padding: const EdgeInsets.only(
+              bottom: MediaBrowsingMetrics.itemGap,
+            ),
+            child: _SeriesRuleCard(
+              rule: rule,
+              autofocus: index == 0,
+              onEdit: onUpdate == null
+                  ? null
+                  : () => _openEdit(context, rule),
+              onDelete: onDelete == null
+                  ? null
+                  : () => onDelete!(rule),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openEdit(BuildContext context, DvrSeriesRule rule) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final options = await showDvrSeriesRuleSheet(
+      context,
+      show: _showForRule(rule),
+      initialRule: rule,
+    );
+    if (options == null || !context.mounted) return;
+    try {
+      await onUpdate!(rule, options);
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.dvrUpdateSeriesRuleSuccess)),
+      );
+    } on Object {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.dvrUpdateSeriesRuleFailed)),
+      );
+    }
+  }
+
+  /// Builds a minimal EpgShow from the rule for the sheet's channel picker.
+  /// channelCount 1 keeps the picker hidden; the rule's channel is preserved
+  /// via the sheet's initialRule pre-fill, so this show is only a shape
+  /// requirement.
+  static EpgShow _showForRule(DvrSeriesRule rule) {
+    return EpgShow(
+      normalizedTitle: rule.seriesTitle,
+      displayTitle: rule.seriesTitle,
+      channelCount: 1,
+      channels: const [],
+      episodeCount: 0,
+      recentEpisodes: const [],
+    );
+  }
+}
+
+class _RuleBadge extends StatelessWidget {
+  const _RuleBadge({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _SeriesRuleCard extends StatelessWidget {
+  const _SeriesRuleCard({
+    required this.rule,
+    this.onEdit,
+    this.onDelete,
+    this.autofocus = false,
+  });
+
+  final DvrSeriesRule rule;
+  final Future<void> Function()? onEdit;
+  final Future<void> Function()? onDelete;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onEdit,
+      // Deleting is a destructive, irreversible action (it cascades to the
+      // rule's recordings) — never the primary tap. Plain tap edits the
+      // options; delete lives on long-press and the visible delete button,
+      // both guarded by the confirm dialog.
+      onLongTap: onDelete == null
+          ? null
+          : () => _confirmDelete(context, rule, onDelete!),
+      borderRadius: BorderRadius.circular(12),
+      color: theme.colorScheme.surfaceContainerHigh,
+      child: Padding(
+        padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.fiber_manual_record,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: MediaBrowsingMetrics.contentPadding),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rule.seriesTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  if (rule.channelName != null)
+                    Text(
+                      rule.channelName!,
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      _RuleBadge(label: l10n.dvrEpisodeCount(rule.recordingCount)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: MediaBrowsingMetrics.contentPadding),
+            if (onDelete != null)
+              AppIconButton(
+                tooltip: l10n.showDeleteRule,
+                icon: Icons.delete,
+                variant: AppButtonVariant.destructive,
+                onPressed: () => _confirmDelete(context, rule, onDelete!),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    DvrSeriesRule rule,
+    Future<void> Function() action,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDeleteSeriesRuleDialog(context, rule: rule);
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await runDvrActionWithFeedback(
+      context,
+      action,
+      successMessage: l10n.dvrDeleteSeriesRuleSuccess,
+      failureMessage: l10n.dvrDeleteSeriesRuleFailed,
     );
   }
 }

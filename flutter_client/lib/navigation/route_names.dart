@@ -1,6 +1,6 @@
 /// Route name constants matching the current RN navigation structure.
 ///
-/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR,
+/// Main tab/sidebar routes: Home, Search, LiveTV, Shows, VOD, Series, DVR,
 /// Requests, Notifications, Settings.
 /// Modal/overlay routes: Player, Details, SeriesDetails, ViewerSelection.
 class RouteNames {
@@ -10,6 +10,7 @@ class RouteNames {
   static const String home = '/home';
   static const String search = '/search';
   static const String liveTv = '/live-tv';
+  static const String shows = '/shows';
   static const String vod = '/vod';
   static const String series = '/series';
   static const String aiostreams = '/aiostreams';
@@ -33,6 +34,7 @@ class RouteNames {
     home,
     search,
     liveTv,
+    shows,
     vod,
     series,
     aiostreams,
@@ -43,11 +45,12 @@ class RouteNames {
   ];
 
   /// How many leading [mainRoutes] the mobile bottom nav shows directly.
-  static const int mobilePrimaryCount = 5;
+  static const int mobilePrimaryCount = 6;
 
   // Nested detail route path templates
   static const String vodDetailsPath = '/vod/details/:vodId';
   static const String seriesDetailsPath = '/series/details/:seriesId';
+  static const String showsDetailsPath = '/shows/details/:normalizedTitle';
   static const String aiostreamsDetailsPath =
       '/aiostreams/details/:integrationId/:type/:id';
   static const String aiostreamsSearchPath = '/aiostreams/search';
@@ -59,6 +62,10 @@ class RouteNames {
 
   /// Builds a path to a series details screen for deep linking.
   static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
+
+  /// Builds a path to an EPG show detail screen for a normalized title.
+  static String showDetailsFor(String normalizedTitle) =>
+      '/shows/details/$normalizedTitle';
 
   /// Builds a path to an AIOStreams item detail screen.
   static String aiostreamsDetailsFor(
@@ -79,6 +86,7 @@ class RouteNames {
     home: 'Home',
     search: 'Search',
     liveTv: 'Live TV',
+    shows: 'Shows',
     vod: 'Movies',
     series: 'Series',
     aiostreams: 'AIOStreams',

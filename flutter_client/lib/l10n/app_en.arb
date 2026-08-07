@@ -430,5 +430,132 @@
         "type": "int"
       }
     }
+  },
+  "dvrSeriesChannel": "Channel",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Start early",
+  "dvrSeriesUseDefault": "Use default",
+  "dvrEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "dvrDeleteSeriesRule": "Delete rule",
+  "dvrUpdateSeriesRuleFailed": "Could not update series rule",
+  "dvrSeriesSave": "Save",
+  "dvrSeriesSecondsSuffix": "sec",
+  "dvrSeriesMode": "Series mode",
+  "dvrUpdateSeriesRuleSuccess": "Series rule updated",
+  "dvrSeriesModeAll": "All episodes",
+  "dvrSeriesMatchModeStartsWith": "Starts with",
+  "dvrDeleteSeriesRuleConfirm": "Delete this series rule?",
+  "dvrSeriesCancel": "Cancel",
+  "dvrDeleteSeriesRuleSuccess": "Series rule deleted",
+  "dvrSeriesRulesTitle": "Series Rules",
+  "dvrSeriesMatchModeContains": "Contains",
+  "dvrSeriesMatchModeExact": "Exact",
+  "dvrSeriesModeUseDefault": "Use default",
+  "dvrSeriesModeNewFlag": "New only",
+  "dvrDeleteSeriesRuleFailed": "Could not delete series rule",
+  "dvrSeriesKeepLast": "Keep last",
+  "dvrSeriesModeUniqueSe": "Unique S-E",
+  "dvrSeriesAnyChannel": "Any channel",
+  "dvrSeriesMatchMode": "Match mode",
+  "dvrSeriesEndLate": "End late",
+  "dvrSeriesOptions": "Options",
+  "dvrSeriesAllEpisodesWarning": "Recording all episodes on any channel may create duplicates — use New only or Unique S-E to deduplicate.",
+  "dvrSeriesRulesEmpty": "No series rules",
+  "dvrSeriesPriority": "Priority",
+  "epgRecordSeries": "Record Series",
+  "epgRecordSeriesSuccess": "Series recording set for {title}",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "Could not set series recording",
+  "epgRecordSeriesDuplicate": "Series recording already set",
+  "navShows": "Shows",
+  "showAiringNext": "Next airing",
+  "showAiringNone": "No upcoming episodes in EPG",
+  "showChannelCount": "{count, plural, =1{1 channel} other{{count} channels}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Delete series rule",
+  "showDeleteRuleConfirm": "Delete the series rule for {title}? Future episodes will not be recorded.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Series rule active",
+  "showDetailTitle": "Show details",
+  "showEpisodesCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Record Series",
+  "showRecordSeriesConfirm": "Record every episode of {title} on {channel}?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "Could not set series recording for {title}",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Series recording set for {title}",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "Series recording already set for {title}",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "Could not search shows",
+  "showsNoResults": "No shows match your search",
+  "showsSearchError": "Search failed",
+  "showsSearchHint": "Search shows by title",
+  "showsTitle": "Shows",
+  "showNotFound": "Show \"{title}\" not found",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
   }
 }

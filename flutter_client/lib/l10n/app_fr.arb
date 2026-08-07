@@ -430,5 +430,132 @@
         "type": "int"
       }
     }
+  },
+  "dvrSeriesChannel": "Chaîne",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Démarrer en avance",
+  "dvrSeriesUseDefault": "Par défaut",
+  "dvrEpisodeCount": "{count, plural, =1{1 épisode} other{{count} épisodes}}",
+  "dvrDeleteSeriesRule": "Supprimer la règle",
+  "dvrUpdateSeriesRuleFailed": "Impossible de mettre à jour la règle de série",
+  "dvrSeriesSave": "Enregistrer",
+  "dvrSeriesSecondsSuffix": "sec",
+  "dvrSeriesMode": "Mode série",
+  "dvrUpdateSeriesRuleSuccess": "Règle de série mise à jour",
+  "dvrSeriesModeAll": "Tous les épisodes",
+  "dvrSeriesMatchModeStartsWith": "Commence par",
+  "dvrDeleteSeriesRuleConfirm": "Supprimer cette règle de série ?",
+  "dvrSeriesCancel": "Annuler",
+  "dvrDeleteSeriesRuleSuccess": "Règle de série supprimée",
+  "dvrSeriesRulesTitle": "Règles de séries",
+  "dvrSeriesMatchModeContains": "Contient",
+  "dvrSeriesMatchModeExact": "Exact",
+  "dvrSeriesModeUseDefault": "Par défaut",
+  "dvrSeriesModeNewFlag": "Nouveaux uniquement",
+  "dvrDeleteSeriesRuleFailed": "Impossible de supprimer la règle de série",
+  "dvrSeriesKeepLast": "Garder dernière",
+  "dvrSeriesModeUniqueSe": "S-E unique",
+  "dvrSeriesAnyChannel": "N'importe quelle chaîne",
+  "dvrSeriesMatchMode": "Mode de correspondance",
+  "dvrSeriesEndLate": "Fin tard",
+  "dvrSeriesOptions": "Options",
+  "dvrSeriesAllEpisodesWarning": "Enregistrer tous les épisodes sur n'importe quelle chaîne peut créer des doublons — utilisez Nouveaux uniquement ou S-E unique pour dédupliquer.",
+  "dvrSeriesRulesEmpty": "Aucune règle de série",
+  "dvrSeriesPriority": "Priorité",
+  "epgRecordSeries": "Enregistrer la série",
+  "epgRecordSeriesSuccess": "Enregistrement de série activé pour {title}",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "Impossible d'activer l'enregistrement de la série",
+  "epgRecordSeriesDuplicate": "Enregistrement de série déjà activé",
+  "navShows": "Shows",
+  "showAiringNext": "Prochaine diffusion",
+  "showAiringNone": "Aucun épisode à venir dans l'EPG",
+  "showChannelCount": "{count, plural, =1{1 chaîne} other{{count} chaînes}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Supprimer la règle de série",
+  "showDeleteRuleConfirm": "Supprimer la règle de série pour {title} ? Les futurs épisodes ne seront pas enregistrés.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Règle de série active",
+  "showDetailTitle": "Détails du show",
+  "showEpisodesCount": "{count, plural, =1{1 épisode} other{{count} épisodes}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Enregistrer la série",
+  "showRecordSeriesConfirm": "Enregistrer chaque épisode de {title} sur {channel} ?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "Impossible d'activer l'enregistrement de la série pour {title}",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Enregistrement de série activé pour {title}",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "Enregistrement de série déjà activé pour {title}",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "Impossible de rechercher des shows",
+  "showsNoResults": "Aucun show ne correspond à votre recherche",
+  "showsSearchError": "Échec de la recherche",
+  "showsSearchHint": "Rechercher des shows par titre",
+  "showsTitle": "Shows",
+  "showNotFound": "Show « {title} » introuvable",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
   }
 }
