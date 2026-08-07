@@ -870,6 +870,18 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  /// Lets a descendant enter/exit the same immersive full-screen state as
+  /// `_pushDetail(fullScreen: true)` — sidebar hidden, bottom nav hidden —
+  /// without going through a go_router push itself. Needed for screens
+  /// like the DVR series-rule Options page, which is opened via a plain
+  /// `Navigator.push` (not a route) from a tab that isn't already
+  /// immersive (the Series Rules tab, unlike Show Detail).
+  void _enterFullScreenDetail() => setState(() => _fullScreenDetailDepth++);
+
+  void _exitFullScreenDetail() {
+    if (mounted) setState(() => _fullScreenDetailDepth--);
+  }
+
   void _openProgress(Progress progress) {
     if (progress.contentType == ContentType.vod) {
       final item = _appState.vodItems.firstWhereOrNull(
@@ -1035,6 +1047,8 @@ class AppShellState extends ConsumerState<AppShell>
             onUpdateSeriesRule: _updateDvrSeriesRule,
             onSearchShows: _searchEpgShows,
             onOpenShowDetail: _openShow,
+            onEnterFullScreenDetail: _enterFullScreenDetail,
+            onExitFullScreenDetail: _exitFullScreenDetail,
             onSidebarActivate: _activateSidebar,
           );
         },

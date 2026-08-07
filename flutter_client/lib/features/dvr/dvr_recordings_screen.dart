@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
 import 'package:m3u_tv/features/shows/shows_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -9,7 +10,6 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
-import 'package:m3u_tv/shared/dvr_series_rule_sheet.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -30,6 +30,8 @@ class DvrRecordingsScreen extends StatefulWidget {
     this.onSidebarActivate,
     this.onSearchShows,
     this.onOpenShowDetail,
+    this.onEnterFullScreenDetail,
+    this.onExitFullScreenDetail,
   });
 
   final List<DvrRecording> recordings;
@@ -55,6 +57,16 @@ class DvrRecordingsScreen extends StatefulWidget {
   /// opening a show from the Shows tab gets the same immersive, nav-hiding
   /// push as VOD/Series/AIOStreams detail. See [ShowsScreen.onShowSelect].
   final void Function(EpgShow show)? onOpenShowDetail;
+
+  /// Wired from AppShell to `AppShell._enterFullScreenDetail`/
+  /// `_exitFullScreenDetail`. The Series Rules tab opens the DVR Options
+  /// screen via a plain `Navigator.push`, not a go_router route, so it
+  /// doesn't get the immersive sidebar/bottom-nav-hiding treatment for
+  /// free the way `onOpenShowDetail`'s route push does — these let
+  /// `_openEdit` opt into the same state manually for the duration of
+  /// that push.
+  final VoidCallback? onEnterFullScreenDetail;
+  final VoidCallback? onExitFullScreenDetail;
 
   @override
   State<DvrRecordingsScreen> createState() => _DvrRecordingsScreenState();
@@ -202,6 +214,8 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
       onDelete: widget.onDeleteSeriesRule,
       onUpdate: widget.onUpdateSeriesRule,
       onSidebarActivate: widget.onSidebarActivate,
+      onEnterFullScreenDetail: widget.onEnterFullScreenDetail,
+      onExitFullScreenDetail: widget.onExitFullScreenDetail,
     );
   }
 
@@ -223,6 +237,8 @@ class _SeriesRulesList extends StatelessWidget {
     this.onDelete,
     this.onUpdate,
     this.onSidebarActivate,
+    this.onEnterFullScreenDetail,
+    this.onExitFullScreenDetail,
   });
 
   final List<DvrSeriesRule> rules;
@@ -230,6 +246,8 @@ class _SeriesRulesList extends StatelessWidget {
   final Future<void> Function(DvrSeriesRule rule, DvrSeriesRuleOptions options)?
   onUpdate;
   final VoidCallback? onSidebarActivate;
+  final VoidCallback? onEnterFullScreenDetail;
+  final VoidCallback? onExitFullScreenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -262,11 +280,17 @@ class _SeriesRulesList extends StatelessWidget {
   Future<void> _openEdit(BuildContext context, DvrSeriesRule rule) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final options = await showDvrSeriesRuleSheet(
-      context,
-      show: _showForRule(rule),
-      initialRule: rule,
-    );
+    onEnterFullScreenDetail?.call();
+    final DvrSeriesRuleOptions? options;
+    try {
+      options = await openDvrSeriesRuleOptions(
+        context,
+        show: _showForRule(rule),
+        initialRule: rule,
+      );
+    } finally {
+      onExitFullScreenDetail?.call();
+    }
     if (options == null || !context.mounted) return;
     try {
       await onUpdate!(rule, options);

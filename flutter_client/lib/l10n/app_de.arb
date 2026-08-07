@@ -465,6 +465,14 @@
   "dvrSeriesMatchMode": "Übereinstimmungsmodus",
   "dvrSeriesEndLate": "Spät beenden",
   "dvrSeriesOptions": "Optionen",
+  "dvrSeriesOptionsFor": "Optionen: {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "dvrSeriesAllEpisodesWarning": "Aufnahme aller Folgen auf jedem Sender kann Duplikate erzeugen — Nutze „Neue nur\" oder „Eindeutige S-E\" zum Deduplizieren.",
   "dvrSeriesRulesEmpty": "Keine Serien-Regeln",
   "dvrSeriesPriority": "Priorität",

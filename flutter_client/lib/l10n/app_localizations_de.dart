@@ -940,6 +940,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dvrSeriesOptions => 'Optionen';
 
   @override
+  String dvrSeriesOptionsFor(String title) {
+    return 'Optionen: $title';
+  }
+
+  @override
   String get dvrSeriesAllEpisodesWarning =>
       'Aufnahme aller Folgen auf jedem Sender kann Duplikate erzeugen — Nutze „Neue nur\" oder „Eindeutige S-E\" zum Deduplizieren.';
 

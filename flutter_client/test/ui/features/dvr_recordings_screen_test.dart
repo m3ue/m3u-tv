@@ -676,15 +676,15 @@ void main() {
 
         expect(deletedRule, isNull, reason: 'plain tap must not delete');
         expect(
-          find.text('Options'),
+          find.text('Options: Test Series Alpha'),
           findsOneWidget,
           reason: 'edit sheet opens',
         );
         expect(updatedRule, isNull, reason: 'update fires only on Save');
         expect(tester.takeException(), isNull);
 
-        // Dismiss the sheet without saving.
-        await tester.tap(find.byIcon(Icons.close));
+        // Dismiss the options screen without saving.
+        await tester.tap(find.byIcon(Icons.arrow_back));
         await tester.pumpAndSettle();
         expect(updatedRule, isNull);
       },
@@ -716,7 +716,7 @@ void main() {
 
         // Sheet pre-fills from the rule: seriesMode all, matchMode contains,
         // keepLast null, priority null.
-        expect(find.text('Options'), findsOneWidget);
+        expect(find.text('Options: Test Series Alpha'), findsOneWidget);
 
         await tester.tap(find.text('Save'));
         await tester.pumpAndSettle();

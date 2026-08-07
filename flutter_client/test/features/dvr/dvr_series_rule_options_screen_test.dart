@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/dvr_series_rule_sheet.dart';
 
-/// Builds a minimal MaterialApp wrapper with l10n + ProviderScope.
-Widget buildSheetApp(Widget sheet) {
+/// Builds a minimal MaterialApp wrapper with l10n + ProviderScope, with a
+/// button that pushes the options screen via [openDvrSeriesRuleOptions].
+Widget buildOptionsApp(WidgetBuilder pushButtonBuilder) {
   return ProviderScope(
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(body: sheet),
+      home: Scaffold(body: Builder(builder: pushButtonBuilder)),
     ),
   );
 }
@@ -73,7 +74,7 @@ EpgShow buildShowSingleChannel() {
 }
 
 /// Fixture EpgShow with channelCount > 1 but NO episode matches nextAiringAt,
-/// so _nextAiringChannelId returns null (falls back to "any channel").
+/// so nextAiringChannelId returns null (falls back to "any channel").
 EpgShow buildShowNoMatchingNextAiring() {
   return EpgShow(
     normalizedTitle: 'No Match Show',
@@ -100,18 +101,18 @@ EpgShow buildShowNoMatchingNextAiring() {
 
 void main() {
   // ─────────────────────────────────────────────────────────────────────────────
-  // Test 3 — Sheet omit-to-inherit defaults
+  // Test 3 — Screen omit-to-inherit defaults
   // ─────────────────────────────────────────────────────────────────────────────
   ///
-  /// Documents the sheet's default state at initState:
-  ///   _selectedChannelId   = _nextAiringChannelId(show)  → may be null
+  /// Documents the screen's default state at initState:
+  ///   _selectedChannelId   = nextAiringChannelId(show)   → may be null
   ///   _selectedSeriesMode  = null                        → omit
   ///   _selectedMatchMode   = DvrMatchMode.contains       → explicitly set
   ///   _keepLastController  = empty                       → null (omit)
   ///   _priorityController  = blank (hint '50')            → null (omit)
   ///   _startEarlyController = empty                      → null (omit)
   ///   _endLateController   = empty                       → null (omit)
-  group('Test 3 — Sheet omit-to-inherit defaults', () {
+  group('Test 3 — Screen omit-to-inherit defaults', () {
     testWidgets(
       'Save without touching any control returns correct omit/default values',
       (
@@ -123,37 +124,33 @@ void main() {
         DvrSeriesRuleOptions? result;
 
         await tester.pumpWidget(
-          buildSheetApp(
-            Builder(
-              builder: (context) => ElevatedButton(
-                onPressed: () async {
-                  result = await showDvrSeriesRuleSheet(
-                    context,
-                    show: testShow,
-                  );
-                },
-                child: const Text('Open Sheet'),
-              ),
+          buildOptionsApp(
+            (context) => ElevatedButton(
+              onPressed: () async {
+                result = await openDvrSeriesRuleOptions(
+                  context,
+                  show: testShow,
+                );
+              },
+              child: const Text('Open Options'),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Open the sheet.
-        await tester.tap(find.text('Open Sheet'));
+        await tester.tap(find.text('Open Options'));
         await tester.pumpAndSettle();
 
-        // Tap Save.
-        // The Save button label is 'Save' in English (dvrSeriesSave).
-        // Find l10n from a widget inside the sheet (the sheet is the modal).
-        final sheetContext = tester.element(find.byType(Scaffold).last);
-        final l10n = AppLocalizations.of(sheetContext);
+        final screenContext = tester.element(
+          find.byType(DvrSeriesRuleOptionsScreen),
+        );
+        final l10n = AppLocalizations.of(screenContext);
         await tester.tap(find.text(l10n.dvrSeriesSave));
         await tester.pumpAndSettle();
 
         expect(result, isNotNull);
 
-        // channelId: no episode matched nextAiringAt → _nextAiringChannelId returned null.
+        // channelId: no episode matched nextAiringAt → nextAiringChannelId returned null.
         expect(
           result!.channelId,
           isNull,
@@ -171,31 +168,24 @@ void main() {
         expect(
           result!.matchMode,
           equals(DvrMatchMode.contains),
-          reason: 'matchMode should be DvrMatchMode.contains (sheet default)',
+          reason: 'matchMode should be DvrMatchMode.contains (screen default)',
         );
 
-        // keepLast: empty controller → null (omit).
         expect(
           result!.keepLast,
           isNull,
           reason: 'keepLast should be null (empty field)',
         );
-
-        // priority: blank controller → null (omit, server default shown as hint).
         expect(
           result!.priority,
           isNull,
           reason: 'priority should be null (omit)',
         );
-
-        // startEarlySeconds: empty controller → null (omit).
         expect(
           result!.startEarlySeconds,
           isNull,
           reason: 'startEarlySeconds should be null',
         );
-
-        // endLateSeconds: empty controller → null (omit).
         expect(
           result!.endLateSeconds,
           isNull,
@@ -215,24 +205,24 @@ void main() {
       final testShow = buildShowSingleChannel();
 
       await tester.pumpWidget(
-        buildSheetApp(
-          Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () async {
-                await showDvrSeriesRuleSheet(context, show: testShow);
-              },
-              child: const Text('Open Sheet'),
-            ),
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              await openDvrSeriesRuleOptions(context, show: testShow);
+            },
+            child: const Text('Open Options'),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Open Sheet'));
+      await tester.tap(find.text('Open Options'));
       await tester.pumpAndSettle();
 
-      final sheetContext = tester.element(find.byType(Scaffold).last);
-      final l10n = AppLocalizations.of(sheetContext);
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
 
       // "Any channel" pill must not appear (picker is hidden).
       expect(
@@ -256,35 +246,37 @@ void main() {
 
     testWidgets(
       'channelId defaults to the next-airing episode channel when matched',
-      (tester) async {
+      (
+        tester,
+      ) async {
         // Show: 2 channels, one episode with startTime == nextAiringAt on channel 2.
         final testShow = buildShowWithNextAiring();
 
         DvrSeriesRuleOptions? result;
 
         await tester.pumpWidget(
-          buildSheetApp(
-            Builder(
-              builder: (context) => ElevatedButton(
-                onPressed: () async {
-                  result = await showDvrSeriesRuleSheet(
-                    context,
-                    show: testShow,
-                  );
-                },
-                child: const Text('Open Sheet'),
-              ),
+          buildOptionsApp(
+            (context) => ElevatedButton(
+              onPressed: () async {
+                result = await openDvrSeriesRuleOptions(
+                  context,
+                  show: testShow,
+                );
+              },
+              child: const Text('Open Options'),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Open Sheet'));
+        await tester.tap(find.text('Open Options'));
         await tester.pumpAndSettle();
 
         // Tap Save without changing anything.
-        final sheetContext = tester.element(find.byType(Scaffold).last);
-        final l10n = AppLocalizations.of(sheetContext);
+        final screenContext = tester.element(
+          find.byType(DvrSeriesRuleOptionsScreen),
+        );
+        final l10n = AppLocalizations.of(screenContext);
         await tester.tap(find.text(l10n.dvrSeriesSave));
         await tester.pumpAndSettle();
 
@@ -302,7 +294,7 @@ void main() {
   // ─────────────────────────────────────────────────────────────────────────────
   // Test 17 — Edit mode pre-fill from an existing DvrSeriesRule
   // ─────────────────────────────────────────────────────────────────────────────
-  group('Test 17 — Sheet edit mode pre-fills from an existing rule', () {
+  group('Test 17 — Screen edit mode pre-fills from an existing rule', () {
     testWidgets('save returns the rule fields pre-filled, not defaults', (
       tester,
     ) async {
@@ -324,28 +316,28 @@ void main() {
       DvrSeriesRuleOptions? result;
 
       await tester.pumpWidget(
-        buildSheetApp(
-          Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () async {
-                result = await showDvrSeriesRuleSheet(
-                  context,
-                  show: buildShowNoMatchingNextAiring(),
-                  initialRule: rule,
-                );
-              },
-              child: const Text('Open Sheet'),
-            ),
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowNoMatchingNextAiring(),
+                initialRule: rule,
+              );
+            },
+            child: const Text('Open Options'),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Open Sheet'));
+      await tester.tap(find.text('Open Options'));
       await tester.pumpAndSettle();
 
-      final sheetContext = tester.element(find.byType(Scaffold).last);
-      final l10n = AppLocalizations.of(sheetContext);
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
       await tester.tap(find.text(l10n.dvrSeriesSave));
       await tester.pumpAndSettle();
 

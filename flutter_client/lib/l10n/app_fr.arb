@@ -465,6 +465,14 @@
   "dvrSeriesMatchMode": "Mode de correspondance",
   "dvrSeriesEndLate": "Fin tard",
   "dvrSeriesOptions": "Options",
+  "dvrSeriesOptionsFor": "Options : {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "dvrSeriesAllEpisodesWarning": "Enregistrer tous les épisodes sur n'importe quelle chaîne peut créer des doublons — utilisez Nouveaux uniquement ou S-E unique pour dédupliquer.",
   "dvrSeriesRulesEmpty": "Aucune règle de série",
   "dvrSeriesPriority": "Priorité",

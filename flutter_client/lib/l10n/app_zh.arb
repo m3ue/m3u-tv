@@ -465,6 +465,14 @@
   "dvrSeriesMatchMode": "匹配模式",
   "dvrSeriesEndLate": "延迟结束",
   "dvrSeriesOptions": "选项",
+  "dvrSeriesOptionsFor": "选项：{title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "dvrSeriesAllEpisodesWarning": "在任意频道录制全部剧集可能会产生重复——请使用仅新增或唯一S-E去重。",
   "dvrSeriesRulesEmpty": "暂无剧集规则",
   "dvrSeriesPriority": "优先级",

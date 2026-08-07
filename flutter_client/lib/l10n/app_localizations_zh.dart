@@ -916,6 +916,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dvrSeriesOptions => '选项';
 
   @override
+  String dvrSeriesOptionsFor(String title) {
+    return '选项：$title';
+  }
+
+  @override
   String get dvrSeriesAllEpisodesWarning =>
       '在任意频道录制全部剧集可能会产生重复——请使用仅新增或唯一S-E去重。';
 

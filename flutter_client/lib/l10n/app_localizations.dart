@@ -1790,6 +1790,12 @@ abstract class AppLocalizations {
   /// **'Options'**
   String get dvrSeriesOptions;
 
+  /// No description provided for @dvrSeriesOptionsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Options: {title}'**
+  String dvrSeriesOptionsFor(String title);
+
   /// No description provided for @dvrSeriesAllEpisodesWarning.
   ///
   /// In en, this message translates to:

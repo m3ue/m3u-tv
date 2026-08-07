@@ -294,6 +294,10 @@ class ScrollableCategoryBar extends StatefulWidget {
     required this.selectedId,
     required this.onSelected,
     this.leading,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: MediaBrowsingMetrics.contentPadding,
+      vertical: 8,
+    ),
     super.key,
   });
 
@@ -301,6 +305,12 @@ class ScrollableCategoryBar extends StatefulWidget {
   final String selectedId;
   final ValueChanged<String> onSelected;
   final Widget? leading;
+
+  /// Defaults to the bar's own edge inset (for full-bleed use on Series/VOD
+  /// browse screens). Pass a zero-horizontal padding when embedding the bar
+  /// inside a page that already applies its own horizontal padding, so the
+  /// bar lines up flush with sibling form fields instead of doubling up.
+  final EdgeInsets padding;
 
   @override
   State<ScrollableCategoryBar> createState() => _ScrollableCategoryBarState();
@@ -338,10 +348,7 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: MediaBrowsingMetrics.contentPadding,
-        vertical: 8,
-      ),
+      padding: widget.padding,
       child: Row(
         children: [
           if (widget.leading != null) ...[

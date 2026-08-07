@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -9,7 +10,6 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
-import 'package:m3u_tv/shared/dvr_series_rule_sheet.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Detail screen for a single EPG show. Receives the [EpgShow] as the route
@@ -126,8 +126,8 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
     }
   }
 
-  Future<void> _openOptionsSheet() async {
-    final options = await showDvrSeriesRuleSheet(context, show: widget.show);
+  Future<void> _openOptionsScreen() async {
+    final options = await openDvrSeriesRuleOptions(context, show: widget.show);
     if (options == null || !mounted) return;
     // channelId is null for "any channel" — pass through so the key is
     // omitted on the request (matches the sheet's "any channel" selection).
@@ -224,7 +224,7 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
               onRecordSeries: () => _recordSeries(
                 channelId: nextAiringChannelId(widget.show),
               ),
-              onOpenOptions: _openOptionsSheet,
+              onOpenOptions: _openOptionsScreen,
               onDeleteRule: existingRule == null
                   ? null
                   : () => _confirmAndDelete(existingRule),

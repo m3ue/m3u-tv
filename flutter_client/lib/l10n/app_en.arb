@@ -465,6 +465,14 @@
   "dvrSeriesMatchMode": "Match mode",
   "dvrSeriesEndLate": "End late",
   "dvrSeriesOptions": "Options",
+  "dvrSeriesOptionsFor": "Options: {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "dvrSeriesAllEpisodesWarning": "Recording all episodes on any channel may create duplicates — use New only or Unique S-E to deduplicate.",
   "dvrSeriesRulesEmpty": "No series rules",
   "dvrSeriesPriority": "Priority",
