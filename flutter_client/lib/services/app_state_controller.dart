@@ -1135,6 +1135,26 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refreshes the cached DVR recordings list from `get_dvr_recordings`.
+  ///
+  /// Series rules can produce a matching `DvrRecording` synchronously (see
+  /// [scheduleDvr]'s doc comment for the same server-side behaviour on
+  /// one-shot recordings), so the UI agent should call this after a
+  /// successful `createDvrSeriesRule` / `updateDvrSeriesRule` round-trip —
+  /// not just after [setDvrSeriesRules] — or a newly matched recording
+  /// won't show up in the Recordings tab until the next full reload.
+  Future<void> refreshDvrRecordings() async {
+    try {
+      _dvrRecordings = await xtreamService.getDvrRecordings();
+      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: refresh recordings failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return;
+    }
+    notifyListeners();
+  }
+
   Future<void> clearAndRefresh() async {
     _isLoadingContent = true;
     _error = null;
@@ -1427,9 +1447,23 @@ class AppStateController extends ChangeNotifier {
       final seriesCategories = results[2] as List<Category>;
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
-      final dvrRecordings = results[6] as List<DvrRecording>;
-      final dvrSeriesRules = results[7] as List<DvrSeriesRule>;
+      final fetchedDvrRecordings = results[6] as List<DvrRecording>;
+      final fetchedDvrSeriesRules = results[7] as List<DvrSeriesRule>;
       final mediaRequests = results[9] as List<MediaRequestSummary>;
+      // Keep local DVR state if the server returned nothing (e.g. sync lag
+      // or a transient failure swallowed by the catchError above) — mirrors
+      // the progress-list guard below. Without this, a single flaky
+      // list_dvr_series_rules/get_dvr_recordings round-trip on reload wipes
+      // rules/recordings the editor still has, even though nothing changed
+      // server-side.
+      final dvrRecordings =
+          fetchedDvrRecordings.isEmpty && _dvrRecordings.isNotEmpty
+          ? _dvrRecordings
+          : fetchedDvrRecordings;
+      final dvrSeriesRules =
+          fetchedDvrSeriesRules.isEmpty && _dvrSeriesRules.isNotEmpty
+          ? _dvrSeriesRules
+          : fetchedDvrSeriesRules;
 
       final activeViewer = await viewerService.resolveActiveViewer(
         viewers,

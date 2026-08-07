@@ -710,6 +710,11 @@ class AppShellState extends ConsumerState<AppShell>
       );
       final rules = await _appState.xtreamService.listDvrSeriesRules();
       _appState.setDvrSeriesRules(rules);
+      // The rule's `created` hook may have already matched and scheduled a
+      // recording server-side (see AppStateController.refreshDvrRecordings
+      // doc comment) — refresh so it shows up in the Recordings tab without
+      // waiting for the next full app reload.
+      unawaited(_appState.refreshDvrRecordings());
       return id == 0
           ? CreateDvrSeriesRuleOutcome.failed
           : CreateDvrSeriesRuleOutcome.created;
@@ -758,6 +763,7 @@ class AppShellState extends ConsumerState<AppShell>
     );
     final rules = await _appState.xtreamService.listDvrSeriesRules();
     _appState.setDvrSeriesRules(rules);
+    unawaited(_appState.refreshDvrRecordings());
   }
 
   /// Proxies the Shows screen's search through the foundation-agent-owned
