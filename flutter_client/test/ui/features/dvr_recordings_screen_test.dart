@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
 void main() {
@@ -749,6 +750,85 @@ void main() {
       expect(deletedRule!.id, 7);
       expect(tester.takeException(), isNull);
     });
+
+    // -------------------------------------------------------------------------
+    // Series-recording-config: Shows tab (third DVR tab) — Tests 1–3
+    // -------------------------------------------------------------------------
+
+    testWidgets(
+      'DVR screen renders three tabs (Recordings, Series Rules, Shows)',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(recordings: [_completedRecording()]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('DVR Recordings'), findsOneWidget);
+        expect(find.text('Series Rules'), findsOneWidget);
+        expect(find.text('Shows'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'switching to the Shows tab renders without a layout exception',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(recordings: [_completedRecording()]),
+        );
+        await tester.pumpAndSettle();
+
+        // Initial tab is Recordings — confirm no exception before switching.
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.text('Shows'));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Shows search field does not hold focus while the Recordings tab is '
+      'selected',
+      (tester) async {
+        // _TestApp provides the three Riverpod overrides (isConfigured,
+        // isBootstrapping, dvrSeriesRules) that ShowsScreen needs to render
+        // its search field. Without those, the field wouldn't be in the tree.
+        await tester.pumpWidget(
+          _TestApp(recordings: [_completedRecording()]),
+        );
+        await tester.pumpAndSettle();
+
+        // Force the Shows tab to build by switching to it first. TabBarView
+        // is lazy, so on initial render with Recordings selected the third
+        // tab may not be in the tree, which would make a pure "no focus at
+        // start" check vacuous. Switching to Shows + back exercises the
+        // listener in both directions.
+        await tester.tap(find.text('Shows'));
+        await tester.pumpAndSettle();
+        // The listener must hand focus to the search field once the tab is
+        // active — this is the post-fix behavior.
+        expect(
+          FocusManager.instance.primaryFocus?.debugLabel,
+          'dvr/shows-search',
+          reason:
+              'switching to the Shows tab must move focus to the search field',
+        );
+
+        // Switch back to Recordings. Focus must NOT remain stolen on the
+        // shows search field — that's the regression we're guarding.
+        await tester.tap(find.text('DVR Recordings'));
+        await tester.pumpAndSettle();
+        expect(
+          FocusManager.instance.primaryFocus?.debugLabel,
+          isNot('dvr/shows-search'),
+          reason:
+              'switching back to Recordings must not leave focus stuck on '
+              'the shows search field',
+        );
+      },
+    );
   });
 }
 
@@ -779,6 +859,17 @@ class _TestApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
+      // ShowsScreen (third DVR tab) watches three Riverpod providers that
+      // derive from `appStateControllerProvider`. Recordings/SeriesRules
+      // tabs don't read those, so older tests didn't trip the
+      // unimplemented-error guard. Override the derived providers here so
+      // tests that exercise the Shows tab don't have to wire up a full
+      // AppStateController.
+      overrides: [
+        isConfiguredProvider.overrideWith((_) => true),
+        isBootstrappingProvider.overrideWith((_) => false),
+        dvrSeriesRulesProvider.overrideWith((_) => const <DvrSeriesRule>[]),
+      ],
       child: MaterialApp(
         theme: ThemeData.dark(useMaterial3: true),
         localizationsDelegates: AppLocalizations.localizationsDelegates,

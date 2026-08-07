@@ -101,53 +101,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 3: Shows (EPG series browse + per-show detail)
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RouteNames.shows,
-                pageBuilder: (context, state) => NoTransitionPage(
-                  child: _withGradient(_tabScreen(context, RouteNames.shows)),
-                ),
-                routes: [
-                  GoRoute(
-                    path: 'details/:normalizedTitle',
-                    pageBuilder: (context, state) {
-                      final normalizedTitle =
-                          state.pathParameters['normalizedTitle'] ?? '';
-                      final extra = state.extra;
-                      final show = extra is EpgShow ? extra : null;
-                      if (show == null) {
-                        return NoTransitionPage(
-                          child: Scaffold(
-                            body: SafeArea(
-                              bottom: false,
-                              child: Center(
-                                child: Text(
-                                  AppLocalizations.of(context).showNotFound(
-                                    normalizedTitle,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      final actions = ContentActions.of(context);
-                      return _slidePage(
-                        ShowDetailScreen(
-                          show: show,
-                          onRecordSeries: actions.onRecordSeries,
-                          onDeleteSeriesRule: actions.onDeleteSeriesRule,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // Branch 4: VOD with nested details
+          // Branch 3: VOD with nested details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -196,7 +150,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 5: Series with nested details
+          // Branch 4: Series with nested details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -249,7 +203,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: AIOStreams with nested item detail
+          // Branch 5: AIOStreams with nested item detail
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -313,7 +267,9 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: DVR
+          // Branch 6: DVR with nested show-detail (Shows is now a tab on
+          // DvrRecordingsScreen, not a top-level sidebar destination, so
+          // /dvr/shows/:normalizedTitle lives under this branch).
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -321,10 +277,45 @@ GoRouter createGoRouter({
                 pageBuilder: (context, state) => NoTransitionPage(
                   child: _withGradient(_tabScreen(context, RouteNames.dvr)),
                 ),
+                routes: [
+                  GoRoute(
+                    path: RouteNames.showsDetailsPath,
+                    pageBuilder: (context, state) {
+                      final normalizedTitle =
+                          state.pathParameters['normalizedTitle'] ?? '';
+                      final extra = state.extra;
+                      final show = extra is EpgShow ? extra : null;
+                      if (show == null) {
+                        return NoTransitionPage(
+                          child: Scaffold(
+                            body: SafeArea(
+                              bottom: false,
+                              child: Center(
+                                child: Text(
+                                  AppLocalizations.of(context).showNotFound(
+                                    normalizedTitle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        ShowDetailScreen(
+                          show: show,
+                          onRecordSeries: actions.onRecordSeries,
+                          onDeleteSeriesRule: actions.onDeleteSeriesRule,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
-          // Branch 8: Requests with nested result details
+          // Branch 7: Requests with nested result details
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -355,7 +346,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 9: Notifications
+          // Branch 8: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -368,7 +359,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 10: Settings
+          // Branch 9: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

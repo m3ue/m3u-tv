@@ -18,7 +18,6 @@ import 'package:m3u_tv/features/requests/request_screen.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
-import 'package:m3u_tv/features/shows/shows_screen.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -79,7 +78,6 @@ String _routeLabel(BuildContext context, String route) {
     RouteNames.home => l.navHome,
     RouteNames.search => l.navSearch,
     RouteNames.liveTv => l.navLiveTv,
-    RouteNames.shows => l.navShows,
     RouteNames.vod => l.navVod,
     RouteNames.series => l.navSeries,
     RouteNames.aiostreams => l.navAioStreams,
@@ -973,10 +971,6 @@ class AppShellState extends ConsumerState<AppShell>
           title: program.title,
         ),
       ),
-      RouteNames.shows => ShowsScreen(
-        onSearch: _searchEpgShows,
-        onSidebarActivate: _activateSidebar,
-      ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
         favoritesService: _appState.vodFavoritesService,
@@ -1029,6 +1023,7 @@ class AppShellState extends ConsumerState<AppShell>
             seriesRules: ref.watch(dvrSeriesRulesProvider),
             onDeleteSeriesRule: _deleteDvrSeriesRule,
             onUpdateSeriesRule: _updateDvrSeriesRule,
+            onSearchShows: _searchEpgShows,
             onSidebarActivate: _activateSidebar,
           );
         },
@@ -1525,7 +1520,6 @@ class AppShellState extends ConsumerState<AppShell>
     RouteNames.home => Icons.home,
     RouteNames.search => Icons.search,
     RouteNames.liveTv => Icons.live_tv,
-    RouteNames.shows => Icons.tv_outlined,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
     RouteNames.aiostreams => Icons.subscriptions,

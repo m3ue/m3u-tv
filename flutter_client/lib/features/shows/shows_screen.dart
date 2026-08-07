@@ -21,10 +21,18 @@ class ShowsScreen extends ConsumerStatefulWidget {
     super.key,
     required this.onSearch,
     this.onSidebarActivate,
+    this.searchFocusNode,
   });
 
   final Future<List<EpgShow>> Function(String query) onSearch;
   final VoidCallback? onSidebarActivate;
+
+  /// When provided, the search field attaches to this [FocusNode] instead
+  /// of auto-focusing on first build. Lets the parent (e.g. DvrRecordingsScreen)
+  /// hand focus to the search field only when its tab is actually selected
+  /// — TabBarView builds every child up front, so a plain `autofocus: true`
+  /// would steal focus from whichever tab the user landed on.
+  final FocusNode? searchFocusNode;
 
   @override
   ConsumerState<ShowsScreen> createState() => _ShowsScreenState();
@@ -132,7 +140,8 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
               child: InlineMediaSearchField(
                 query: _query,
                 hintText: l10n.showsSearchHint,
-                autofocus: true,
+                autofocus: widget.searchFocusNode == null,
+                focusNode: widget.searchFocusNode,
                 onChanged: _onQueryChanged,
               ),
             ),

@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:m3u_tv/features/shows/shows_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -27,6 +28,7 @@ class DvrRecordingsScreen extends StatefulWidget {
     this.onUpdateSeriesRule,
     this.seriesRules = const <DvrSeriesRule>[],
     this.onSidebarActivate,
+    this.onSearchShows,
   });
 
   final List<DvrRecording> recordings;
@@ -43,18 +45,47 @@ class DvrRecordingsScreen extends StatefulWidget {
   final List<DvrSeriesRule> seriesRules;
   final VoidCallback? onSidebarActivate;
 
+  /// Wired from AppShell against `XtreamService.searchEpgShows`. Powers the
+  /// Shows tab (third DVR tab). Defaults to returning an empty list so
+  /// callers in tests / previews can render the screen without a backend.
+  final Future<List<EpgShow>> Function(String query)? onSearchShows;
+
   @override
   State<DvrRecordingsScreen> createState() => _DvrRecordingsScreenState();
 }
 
 class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
     with SingleTickerProviderStateMixin {
+  // 0 = Recordings, 1 = Series Rules, 2 = Shows. The Shows tab's search
+  // field attaches to [_showsSearchFocus] so we can hand focus to it only
+  // when the tab is selected — TabBarView builds every child up front, so
+  // a plain autofocus on the field would steal focus from whichever tab
+  // the user actually opened on.
+  static const int _showsTabIndex = 2;
+
   late final TabController _tabController =
-      TabController(length: 2, vsync: this);
+      TabController(length: 3, vsync: this);
+  final FocusNode _showsSearchFocus = FocusNode(debugLabel: 'dvr/shows-search');
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController.addListener(_handleTabChange);
+  }
+
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging || _tabController.index != _showsTabIndex) {
+      return;
+    }
+    _showsSearchFocus.requestFocus();
+  }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController
+      ..removeListener(_handleTabChange)
+      ..dispose();
+    _showsSearchFocus.dispose();
     super.dispose();
   }
 
@@ -79,7 +110,11 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
         children: [
           DpadTabBar(
             controller: _tabController,
-            tabs: [l10n.dvrRecordingsTitle, l10n.dvrSeriesRulesTitle],
+            tabs: [
+              l10n.dvrRecordingsTitle,
+              l10n.dvrSeriesRulesTitle,
+              l10n.navShows,
+            ],
           ),
           Expanded(
             child: TabBarView(
@@ -96,6 +131,12 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
                     MediaBrowsingMetrics.pagePadding,
                   ),
                   child: _buildSeriesRulesTab(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(
+                    MediaBrowsingMetrics.pagePadding,
+                  ),
+                  child: _buildShowsTab(context),
                 ),
               ],
             ),
@@ -154,7 +195,17 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
       onSidebarActivate: widget.onSidebarActivate,
     );
   }
+
+  Widget _buildShowsTab(BuildContext context) {
+    return ShowsScreen(
+      onSearch: widget.onSearchShows ?? _emptyShowsSearch,
+      searchFocusNode: _showsSearchFocus,
+      onSidebarActivate: widget.onSidebarActivate,
+    );
+  }
 }
+
+Future<List<EpgShow>> _emptyShowsSearch(String query) async => <EpgShow>[];
 
 class _SeriesRulesList extends StatelessWidget {
   const _SeriesRulesList({

@@ -1,8 +1,13 @@
 /// Route name constants matching the current RN navigation structure.
 ///
-/// Main tab/sidebar routes: Home, Search, LiveTV, Shows, VOD, Series, DVR,
+/// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR,
 /// Requests, Notifications, Settings.
 /// Modal/overlay routes: Player, Details, SeriesDetails, ViewerSelection.
+///
+/// `Shows` (EPG series browse + per-show detail) is no longer a top-level
+/// sidebar destination — it now lives as a nested route under `DVR` and a
+/// third tab on `DvrRecordingsScreen`. Deep-link helpers under
+/// [showsDetailsPath] / [showDetailsFor] therefore build paths under `/dvr`.
 class RouteNames {
   RouteNames._();
 
@@ -10,7 +15,6 @@ class RouteNames {
   static const String home = '/home';
   static const String search = '/search';
   static const String liveTv = '/live-tv';
-  static const String shows = '/shows';
   static const String vod = '/vod';
   static const String series = '/series';
   static const String aiostreams = '/aiostreams';
@@ -34,7 +38,6 @@ class RouteNames {
     home,
     search,
     liveTv,
-    shows,
     vod,
     series,
     aiostreams,
@@ -45,12 +48,12 @@ class RouteNames {
   ];
 
   /// How many leading [mainRoutes] the mobile bottom nav shows directly.
-  static const int mobilePrimaryCount = 6;
+  static const int mobilePrimaryCount = 5;
 
   // Nested detail route path templates
   static const String vodDetailsPath = '/vod/details/:vodId';
   static const String seriesDetailsPath = '/series/details/:seriesId';
-  static const String showsDetailsPath = '/shows/details/:normalizedTitle';
+  static const String showsDetailsPath = 'shows/:normalizedTitle';
   static const String aiostreamsDetailsPath =
       '/aiostreams/details/:integrationId/:type/:id';
   static const String aiostreamsSearchPath = '/aiostreams/search';
@@ -64,8 +67,10 @@ class RouteNames {
   static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
 
   /// Builds a path to an EPG show detail screen for a normalized title.
+  /// Nested under `/dvr` because Shows now lives as a DVR sub-route and a
+  /// third DVR tab, not as a standalone sidebar destination.
   static String showDetailsFor(String normalizedTitle) =>
-      '/shows/details/$normalizedTitle';
+      '/dvr/shows/$normalizedTitle';
 
   /// Builds a path to an AIOStreams item detail screen.
   static String aiostreamsDetailsFor(
@@ -86,7 +91,6 @@ class RouteNames {
     home: 'Home',
     search: 'Search',
     liveTv: 'Live TV',
-    shows: 'Shows',
     vod: 'Movies',
     series: 'Series',
     aiostreams: 'AIOStreams',
