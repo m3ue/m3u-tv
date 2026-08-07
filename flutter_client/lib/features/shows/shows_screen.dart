@@ -112,46 +112,38 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
     ref.watch(dvrSeriesRulesProvider);
 
     if (isBootstrapping) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.showsTitle)),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (!isConfigured) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.showsTitle)),
-        body: Center(
-          child: Text(
-            l10n.appNotConfigured,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+      return Center(
+        child: Text(
+          l10n.appNotConfigured,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
       );
     }
 
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: MediaBrowsingMetrics.contentPadding,
-              ),
-              child: InlineMediaSearchField(
-                query: _query,
-                hintText: l10n.showsSearchHint,
-                autofocus: widget.searchFocusNode == null,
-                focusNode: widget.searchFocusNode,
-                onChanged: _onQueryChanged,
-              ),
-            ),
-            Expanded(child: _buildBody(l10n)),
-          ],
+    // ShowsScreen is embedded as DVR tab content — the host (DvrRecordingsScreen)
+    // already supplies the Scaffold, tab bar, and page padding, so this returns
+    // bare content rather than wrapping it in another Scaffold/pagePadding.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            bottom: MediaBrowsingMetrics.contentPadding,
+          ),
+          child: InlineMediaSearchField(
+            query: _query,
+            hintText: l10n.showsSearchHint,
+            autofocus: widget.searchFocusNode == null,
+            focusNode: widget.searchFocusNode,
+            onChanged: _onQueryChanged,
+          ),
         ),
-      ),
+        Expanded(child: _buildBody(l10n)),
+      ],
     );
   }
 
