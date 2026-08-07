@@ -937,7 +937,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get epgRecordSeriesFailed => '无法设置整剧录制';
 
   @override
-  String get epgRecordSeriesDuplicate => 'Series recording already set';
+  String get epgRecordSeriesDuplicate => '整剧录制已设置';
 
   @override
   String get navShows => '剧集';

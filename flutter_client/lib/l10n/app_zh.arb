@@ -478,6 +478,7 @@
     }
   },
   "epgRecordSeriesFailed": "无法设置整剧录制",
+  "epgRecordSeriesDuplicate": "整剧录制已设置",
   "navShows": "剧集",
   "showAiringNext": "下次播出",
   "showAiringNone": "EPG 中暂无即将播出的剧集",

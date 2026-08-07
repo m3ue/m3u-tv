@@ -222,13 +222,18 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _ModePill<DvrSeriesMode?>(
-                          label: l10n.dvrSeriesModeUseDefault,
-                          value: null,
-                          selectedValue: _selectedSeriesMode,
-                          onSelect: (v) =>
-                              setState(() => _selectedSeriesMode = v),
-                        ),
+                        // "Use Default" only makes sense on create: update_dvr_series_rule
+                        // omits absent fields to mean "leave unchanged", so there is no way
+                        // to tell the server "reset this field to the DVR default" once a
+                        // rule already has an explicit series_mode stored.
+                        if (widget.initialRule == null)
+                          _ModePill<DvrSeriesMode?>(
+                            label: l10n.dvrSeriesModeUseDefault,
+                            value: null,
+                            selectedValue: _selectedSeriesMode,
+                            onSelect: (v) =>
+                                setState(() => _selectedSeriesMode = v),
+                          ),
                         _ModePill<DvrSeriesMode?>(
                           label: l10n.dvrSeriesModeAll,
                           value: DvrSeriesMode.all,

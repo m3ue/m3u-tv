@@ -357,17 +357,33 @@ class _Header extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  FilledButton.icon(
-                    onPressed: isSubmitting ? null : onRecordSeries,
-                    icon: const Icon(Icons.fiber_manual_record),
-                    label: Text(
-                      isSubmitting ? '...' : l10n.showRecordSeries,
+                  DpadFocusable(
+                    onSelect: isSubmitting ? null : onRecordSeries,
+                    effects: const [
+                      GradientBorderEffect(
+                        borderRadius: BorderRadius.all(Radius.circular(50)),
+                      ),
+                    ],
+                    child: FilledButton.icon(
+                      onPressed: isSubmitting ? null : onRecordSeries,
+                      icon: const Icon(Icons.fiber_manual_record),
+                      label: Text(
+                        isSubmitting ? '...' : l10n.showRecordSeries,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton.tonal(
-                    onPressed: isSubmitting ? null : onOpenOptions,
-                    child: Text(l10n.dvrSeriesOptions),
+                  DpadFocusable(
+                    onSelect: isSubmitting ? null : onOpenOptions,
+                    effects: const [
+                      GradientBorderEffect(
+                        borderRadius: BorderRadius.all(Radius.circular(50)),
+                      ),
+                    ],
+                    child: FilledButton.tonal(
+                      onPressed: isSubmitting ? null : onOpenOptions,
+                      child: Text(l10n.dvrSeriesOptions),
+                    ),
                   ),
                 ],
               ),
