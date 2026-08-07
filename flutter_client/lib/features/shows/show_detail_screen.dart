@@ -1,4 +1,3 @@
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +6,10 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_series_rule_sheet.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Detail screen for a single EPG show. Receives the [EpgShow] as the route
@@ -200,18 +199,10 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
         leadingWidth: 56,
         leading: Padding(
           padding: const EdgeInsets.all(8),
-          child: DpadFocusable(
-            onSelect: () => context.pop(),
-            effects: const [
-              GradientBorderEffect(
-                borderRadius: BorderRadius.all(Radius.circular(50)),
-              ),
-            ],
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            ),
+          child: AppIconButton(
+            icon: Icons.arrow_back,
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: () => context.pop(),
           ),
         ),
       ),
@@ -331,59 +322,31 @@ class _Header extends StatelessWidget {
             if (hasRule) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  ruleLabel,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: AppBadge(label: ruleLabel),
               ),
               if (onDeleteRule != null)
-                DpadFocusable(
-                  onSelect: onDeleteRule,
-                  effects: const [
-                    GradientBorderEffect(
-                      borderRadius: BorderRadius.all(Radius.circular(50)),
-                    ),
-                  ],
-                  child: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: deleteTooltip,
-                    onPressed: onDeleteRule,
-                  ),
+                AppIconButton(
+                  icon: Icons.delete_outline,
+                  tooltip: deleteTooltip,
+                  variant: AppButtonVariant.destructive,
+                  onPressed: onDeleteRule,
                 ),
             ] else if (hasDvr)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DpadFocusable(
-                    onSelect: isSubmitting ? null : onRecordSeries,
-                    effects: const [
-                      GradientBorderEffect(
-                        borderRadius: BorderRadius.all(Radius.circular(50)),
-                      ),
-                    ],
-                    child: FilledButton.icon(
-                      onPressed: isSubmitting ? null : onRecordSeries,
-                      icon: const Icon(Icons.fiber_manual_record),
-                      label: Text(
-                        isSubmitting ? '...' : l10n.showRecordSeries,
-                      ),
-                    ),
+                  AppButton(
+                    label: l10n.showRecordSeries,
+                    icon: Icons.fiber_manual_record,
+                    variant: AppButtonVariant.primaryInverted,
+                    autofocus: true,
+                    loading: isSubmitting,
+                    onPressed: onRecordSeries,
                   ),
                   const SizedBox(width: 8),
-                  DpadFocusable(
-                    onSelect: isSubmitting ? null : onOpenOptions,
-                    effects: const [
-                      GradientBorderEffect(
-                        borderRadius: BorderRadius.all(Radius.circular(50)),
-                      ),
-                    ],
-                    child: FilledButton.tonal(
-                      onPressed: isSubmitting ? null : onOpenOptions,
-                      child: Text(l10n.dvrSeriesOptions),
-                    ),
+                  AppButton(
+                    label: l10n.dvrSeriesOptions,
+                    onPressed: isSubmitting ? null : onOpenOptions,
                   ),
                 ],
               ),

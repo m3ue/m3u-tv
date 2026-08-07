@@ -289,30 +289,6 @@ class _SeriesRulesList extends StatelessWidget {
   }
 }
 
-class _RuleBadge extends StatelessWidget {
-  const _RuleBadge({required this.label});
-  final String label;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: scheme.onPrimaryContainer,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
 class _SeriesRuleCard extends StatelessWidget {
   const _SeriesRuleCard({
     required this.rule,
@@ -384,7 +360,7 @@ class _SeriesRuleCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 4,
                     children: [
-                      _RuleBadge(
+                      AppBadge(
                         label: l10n.dvrEpisodeCount(rule.recordingCount),
                       ),
                     ],

@@ -157,14 +157,10 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                   style: theme.textTheme.titleLarge,
                 ),
               ),
-              DpadFocusable(
-                onSelect: () => Navigator.of(context).pop(),
-                effects: kStadiumFocusEffects,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                ),
+              AppIconButton(
+                icon: Icons.close,
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
@@ -297,52 +293,66 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                   const SizedBox(height: 16),
 
                   // ── Numeric fields row ─────────────────────────────────
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Keep last
-                      Expanded(
-                        child: _NumberField(
-                          label: l10n.dvrSeriesKeepLast,
-                          hint: l10n.dvrSeriesUseDefault,
-                          controller: _keepLastController,
+                  // Grouped in its own DpadRegion like every other section
+                  // above — without one, these fields sit outside any
+                  // region's candidate set and d-pad down/up navigation
+                  // from the match-mode pills to the action row can skip
+                  // over them instead of landing here.
+                  DpadRegion(
+                    memoryKey: 'dvr-series-rule-sheet/numeric-fields',
+                    horizontalEdge: DpadEdgeBehavior.stop,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Keep last
+                            Expanded(
+                              child: _NumberField(
+                                label: l10n.dvrSeriesKeepLast,
+                                hint: l10n.dvrSeriesUseDefault,
+                                controller: _keepLastController,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Priority
+                            Expanded(
+                              child: _NumberField(
+                                label: l10n.dvrSeriesPriority,
+                                hint: '50',
+                                controller: _priorityController,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Priority
-                      Expanded(
-                        child: _NumberField(
-                          label: l10n.dvrSeriesPriority,
-                          hint: '50',
-                          controller: _priorityController,
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Start early
+                            Expanded(
+                              child: _NumberField(
+                                label: l10n.dvrSeriesStartEarly,
+                                hint: l10n.dvrSeriesUseDefault,
+                                controller: _startEarlyController,
+                                suffix: l10n.dvrSeriesSecondsSuffix,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // End late
+                            Expanded(
+                              child: _NumberField(
+                                label: l10n.dvrSeriesEndLate,
+                                hint: l10n.dvrSeriesUseDefault,
+                                controller: _endLateController,
+                                suffix: l10n.dvrSeriesSecondsSuffix,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Start early
-                      Expanded(
-                        child: _NumberField(
-                          label: l10n.dvrSeriesStartEarly,
-                          hint: l10n.dvrSeriesUseDefault,
-                          controller: _startEarlyController,
-                          suffix: l10n.dvrSeriesSecondsSuffix,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // End late
-                      Expanded(
-                        child: _NumberField(
-                          label: l10n.dvrSeriesEndLate,
-                          hint: l10n.dvrSeriesUseDefault,
-                          controller: _endLateController,
-                          suffix: l10n.dvrSeriesSecondsSuffix,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
                   // ── Inline warning ─────────────────────────────────────
