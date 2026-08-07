@@ -18,8 +18,8 @@ void main() {
       expect(
         source.contains(r'"Show "$normalizedTitle" not found"'),
         isFalse,
-            reason:
-                r'show-details route must not regress to the raw "Show $title not found" literal (B4 bug)',
+        reason:
+            r'show-details route must not regress to the raw "Show $title not found" literal (B4 bug)',
       );
       expect(
         source,

@@ -63,8 +63,10 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
   // the user actually opened on.
   static const int _showsTabIndex = 2;
 
-  late final TabController _tabController =
-      TabController(length: 3, vsync: this);
+  late final TabController _tabController = TabController(
+    length: 3,
+    vsync: this,
+  );
   final FocusNode _showsSearchFocus = FocusNode(debugLabel: 'dvr/shows-search');
 
   @override
@@ -74,7 +76,8 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
   }
 
   void _handleTabChange() {
-    if (_tabController.indexIsChanging || _tabController.index != _showsTabIndex) {
+    if (_tabController.indexIsChanging ||
+        _tabController.index != _showsTabIndex) {
       return;
     }
     _showsSearchFocus.requestFocus();
@@ -240,12 +243,8 @@ class _SeriesRulesList extends StatelessWidget {
             child: _SeriesRuleCard(
               rule: rule,
               autofocus: index == 0,
-              onEdit: onUpdate == null
-                  ? null
-                  : () => _openEdit(context, rule),
-              onDelete: onDelete == null
-                  ? null
-                  : () => onDelete!(rule),
+              onEdit: onUpdate == null ? null : () => _openEdit(context, rule),
+              onDelete: onDelete == null ? null : () => onDelete!(rule),
             ),
           );
         },
@@ -385,7 +384,9 @@ class _SeriesRuleCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 4,
                     children: [
-                      _RuleBadge(label: l10n.dvrEpisodeCount(rule.recordingCount)),
+                      _RuleBadge(
+                        label: l10n.dvrEpisodeCount(rule.recordingCount),
+                      ),
                     ],
                   ),
                 ],

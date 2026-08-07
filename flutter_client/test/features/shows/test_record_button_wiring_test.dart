@@ -50,26 +50,27 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: ShowDetailScreen(
               show: testShow,
-              onRecordSeries: ({
-                channelId,
-                required title,
-                matchMode,
-                seriesMode,
-                keepLast,
-                priority,
-                startEarlySeconds,
-                endLateSeconds,
-              }) async {
-                capturedChannelId = channelId;
-                capturedTitle = title;
-                capturedMatchMode = matchMode;
-                capturedSeriesMode = seriesMode;
-                capturedKeepLast = keepLast;
-                capturedPriority = priority;
-                capturedStartEarly = startEarlySeconds;
-                capturedEndLate = endLateSeconds;
-                return CreateDvrSeriesRuleOutcome.created;
-              },
+              onRecordSeries:
+                  ({
+                    channelId,
+                    required title,
+                    matchMode,
+                    seriesMode,
+                    keepLast,
+                    priority,
+                    startEarlySeconds,
+                    endLateSeconds,
+                  }) async {
+                    capturedChannelId = channelId;
+                    capturedTitle = title;
+                    capturedMatchMode = matchMode;
+                    capturedSeriesMode = seriesMode;
+                    capturedKeepLast = keepLast;
+                    capturedPriority = priority;
+                    capturedStartEarly = startEarlySeconds;
+                    capturedEndLate = endLateSeconds;
+                    return CreateDvrSeriesRuleOutcome.created;
+                  },
               onDeleteSeriesRule: (_) async {},
             ),
           ),
@@ -121,19 +122,20 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: ShowDetailScreen(
               show: testShow,
-              onRecordSeries: ({
-                channelId,
-                required title,
-                matchMode,
-                seriesMode,
-                keepLast,
-                priority,
-                startEarlySeconds,
-                endLateSeconds,
-              }) async {
-                capturedChannelId = channelId;
-                return CreateDvrSeriesRuleOutcome.created;
-              },
+              onRecordSeries:
+                  ({
+                    channelId,
+                    required title,
+                    matchMode,
+                    seriesMode,
+                    keepLast,
+                    priority,
+                    startEarlySeconds,
+                    endLateSeconds,
+                  }) async {
+                    capturedChannelId = channelId;
+                    return CreateDvrSeriesRuleOutcome.created;
+                  },
               onDeleteSeriesRule: (_) async {},
             ),
           ),
@@ -158,7 +160,8 @@ void main() {
       expect(
         capturedChannelId,
         isNull,
-        reason: 'any-channel (null) must pass through, not pin to first channel',
+        reason:
+            'any-channel (null) must pass through, not pin to first channel',
       );
     },
   );

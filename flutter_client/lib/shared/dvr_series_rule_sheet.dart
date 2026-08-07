@@ -197,8 +197,11 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                           // Per-channel pills
                           for (final channel in show.channels)
                             _ChannelPill(
-                              label: channel.channelName ?? 'Ch ${channel.channelId}',
-                              isSelected: _selectedChannelId == channel.channelId,
+                              label:
+                                  channel.channelName ??
+                                  'Ch ${channel.channelId}',
+                              isSelected:
+                                  _selectedChannelId == channel.channelId,
                               onSelect: () => setState(
                                 () => _selectedChannelId = channel.channelId,
                               ),
@@ -223,25 +226,29 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                           label: l10n.dvrSeriesModeUseDefault,
                           value: null,
                           selectedValue: _selectedSeriesMode,
-                          onSelect: (v) => setState(() => _selectedSeriesMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedSeriesMode = v),
                         ),
                         _ModePill<DvrSeriesMode?>(
                           label: l10n.dvrSeriesModeAll,
                           value: DvrSeriesMode.all,
                           selectedValue: _selectedSeriesMode,
-                          onSelect: (v) => setState(() => _selectedSeriesMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedSeriesMode = v),
                         ),
                         _ModePill<DvrSeriesMode?>(
                           label: l10n.dvrSeriesModeNewFlag,
                           value: DvrSeriesMode.newFlag,
                           selectedValue: _selectedSeriesMode,
-                          onSelect: (v) => setState(() => _selectedSeriesMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedSeriesMode = v),
                         ),
                         _ModePill<DvrSeriesMode?>(
                           label: l10n.dvrSeriesModeUniqueSe,
                           value: DvrSeriesMode.uniqueSe,
                           selectedValue: _selectedSeriesMode,
-                          onSelect: (v) => setState(() => _selectedSeriesMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedSeriesMode = v),
                         ),
                       ],
                     ),
@@ -262,19 +269,22 @@ class _DvrSeriesRuleSheetState extends State<_DvrSeriesRuleSheet> {
                           label: l10n.dvrSeriesMatchModeContains,
                           value: DvrMatchMode.contains,
                           selectedValue: _selectedMatchMode,
-                          onSelect: (v) => setState(() => _selectedMatchMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedMatchMode = v),
                         ),
                         _ModePill<DvrMatchMode>(
                           label: l10n.dvrSeriesMatchModeExact,
                           value: DvrMatchMode.exact,
                           selectedValue: _selectedMatchMode,
-                          onSelect: (v) => setState(() => _selectedMatchMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedMatchMode = v),
                         ),
                         _ModePill<DvrMatchMode>(
                           label: l10n.dvrSeriesMatchModeStartsWith,
                           value: DvrMatchMode.startsWith,
                           selectedValue: _selectedMatchMode,
-                          onSelect: (v) => setState(() => _selectedMatchMode = v),
+                          onSelect: (v) =>
+                              setState(() => _selectedMatchMode = v),
                         ),
                       ],
                     ),

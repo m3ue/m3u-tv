@@ -112,62 +112,97 @@ void main() {
   ///   _startEarlyController = empty                      → null (omit)
   ///   _endLateController   = empty                       → null (omit)
   group('Test 3 — Sheet omit-to-inherit defaults', () {
-    testWidgets('Save without touching any control returns correct omit/default values', (
-      tester,
-    ) async {
-      // Show with 2 channels but NO episode matching nextAiringAt → channelId=null (any).
-      final testShow = buildShowNoMatchingNextAiring();
+    testWidgets(
+      'Save without touching any control returns correct omit/default values',
+      (
+        tester,
+      ) async {
+        // Show with 2 channels but NO episode matching nextAiringAt → channelId=null (any).
+        final testShow = buildShowNoMatchingNextAiring();
 
-      DvrSeriesRuleOptions? result;
+        DvrSeriesRuleOptions? result;
 
-      await tester.pumpWidget(buildSheetApp(
-        Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () async {
-              result = await showDvrSeriesRuleSheet(context, show: testShow);
-            },
-            child: const Text('Open Sheet'),
+        await tester.pumpWidget(
+          buildSheetApp(
+            Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await showDvrSeriesRuleSheet(
+                    context,
+                    show: testShow,
+                  );
+                },
+                child: const Text('Open Sheet'),
+              ),
+            ),
           ),
-        ),
-      ));
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Open the sheet.
-      await tester.tap(find.text('Open Sheet'));
-      await tester.pumpAndSettle();
+        // Open the sheet.
+        await tester.tap(find.text('Open Sheet'));
+        await tester.pumpAndSettle();
 
-      // Tap Save.
-      // The Save button label is 'Save' in English (dvrSeriesSave).
-      // Find l10n from a widget inside the sheet (the sheet is the modal).
-      final sheetContext = tester.element(find.byType(Scaffold).last);
-      final l10n = AppLocalizations.of(sheetContext);
-      await tester.tap(find.text(l10n.dvrSeriesSave));
-      await tester.pumpAndSettle();
+        // Tap Save.
+        // The Save button label is 'Save' in English (dvrSeriesSave).
+        // Find l10n from a widget inside the sheet (the sheet is the modal).
+        final sheetContext = tester.element(find.byType(Scaffold).last);
+        final l10n = AppLocalizations.of(sheetContext);
+        await tester.tap(find.text(l10n.dvrSeriesSave));
+        await tester.pumpAndSettle();
 
-      expect(result, isNotNull);
+        expect(result, isNotNull);
 
-      // channelId: no episode matched nextAiringAt → _nextAiringChannelId returned null.
-      expect(result!.channelId, isNull, reason: 'channelId should be null (any channel)');
+        // channelId: no episode matched nextAiringAt → _nextAiringChannelId returned null.
+        expect(
+          result!.channelId,
+          isNull,
+          reason: 'channelId should be null (any channel)',
+        );
 
-      // seriesMode: null init → omit.
-      expect(result!.seriesMode, isNull, reason: 'seriesMode should be null (omit)');
+        // seriesMode: null init → omit.
+        expect(
+          result!.seriesMode,
+          isNull,
+          reason: 'seriesMode should be null (omit)',
+        );
 
-      // matchMode: explicitly set to DvrMatchMode.contains (NOT null/omit).
-      expect(result!.matchMode, equals(DvrMatchMode.contains),
-          reason: 'matchMode should be DvrMatchMode.contains (sheet default)');
+        // matchMode: explicitly set to DvrMatchMode.contains (NOT null/omit).
+        expect(
+          result!.matchMode,
+          equals(DvrMatchMode.contains),
+          reason: 'matchMode should be DvrMatchMode.contains (sheet default)',
+        );
 
-      // keepLast: empty controller → null (omit).
-      expect(result!.keepLast, isNull, reason: 'keepLast should be null (empty field)');
+        // keepLast: empty controller → null (omit).
+        expect(
+          result!.keepLast,
+          isNull,
+          reason: 'keepLast should be null (empty field)',
+        );
 
-      // priority: blank controller → null (omit, server default shown as hint).
-      expect(result!.priority, isNull, reason: 'priority should be null (omit)');
+        // priority: blank controller → null (omit, server default shown as hint).
+        expect(
+          result!.priority,
+          isNull,
+          reason: 'priority should be null (omit)',
+        );
 
-      // startEarlySeconds: empty controller → null (omit).
-      expect(result!.startEarlySeconds, isNull, reason: 'startEarlySeconds should be null');
+        // startEarlySeconds: empty controller → null (omit).
+        expect(
+          result!.startEarlySeconds,
+          isNull,
+          reason: 'startEarlySeconds should be null',
+        );
 
-      // endLateSeconds: empty controller → null (omit).
-      expect(result!.endLateSeconds, isNull, reason: 'endLateSeconds should be null');
-    });
+        // endLateSeconds: empty controller → null (omit).
+        expect(
+          result!.endLateSeconds,
+          isNull,
+          reason: 'endLateSeconds should be null',
+        );
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -179,16 +214,18 @@ void main() {
     ) async {
       final testShow = buildShowSingleChannel();
 
-      await tester.pumpWidget(buildSheetApp(
-        Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () async {
-              await showDvrSeriesRuleSheet(context, show: testShow);
-            },
-            child: const Text('Open Sheet'),
+      await tester.pumpWidget(
+        buildSheetApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                await showDvrSeriesRuleSheet(context, show: testShow);
+              },
+              child: const Text('Open Sheet'),
+            ),
           ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Open Sheet'));
@@ -198,51 +235,68 @@ void main() {
       final l10n = AppLocalizations.of(sheetContext);
 
       // "Any channel" pill must not appear (picker is hidden).
-      expect(find.text(l10n.dvrSeriesAnyChannel), findsNothing,
-          reason: 'Any channel pill should not appear when channelCount == 1');
+      expect(
+        find.text(l10n.dvrSeriesAnyChannel),
+        findsNothing,
+        reason: 'Any channel pill should not appear when channelCount == 1',
+      );
 
       // The channel section header must not appear.
-      expect(find.text(l10n.dvrSeriesChannel), findsNothing,
-          reason: 'Channel section header should not appear when channelCount == 1');
+      expect(
+        find.text(l10n.dvrSeriesChannel),
+        findsNothing,
+        reason:
+            'Channel section header should not appear when channelCount == 1',
+      );
 
       // Other sections must still be present.
       expect(find.text(l10n.dvrSeriesMode), findsOneWidget);
       expect(find.text(l10n.dvrSeriesMatchMode), findsOneWidget);
     });
 
-    testWidgets('channelId defaults to the next-airing episode channel when matched',
-        (tester) async {
-      // Show: 2 channels, one episode with startTime == nextAiringAt on channel 2.
-      final testShow = buildShowWithNextAiring();
+    testWidgets(
+      'channelId defaults to the next-airing episode channel when matched',
+      (tester) async {
+        // Show: 2 channels, one episode with startTime == nextAiringAt on channel 2.
+        final testShow = buildShowWithNextAiring();
 
-      DvrSeriesRuleOptions? result;
+        DvrSeriesRuleOptions? result;
 
-      await tester.pumpWidget(buildSheetApp(
-        Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () async {
-              result = await showDvrSeriesRuleSheet(context, show: testShow);
-            },
-            child: const Text('Open Sheet'),
+        await tester.pumpWidget(
+          buildSheetApp(
+            Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await showDvrSeriesRuleSheet(
+                    context,
+                    show: testShow,
+                  );
+                },
+                child: const Text('Open Sheet'),
+              ),
+            ),
           ),
-        ),
-      ));
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Open Sheet'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Open Sheet'));
+        await tester.pumpAndSettle();
 
-      // Tap Save without changing anything.
-      final sheetContext = tester.element(find.byType(Scaffold).last);
-      final l10n = AppLocalizations.of(sheetContext);
-      await tester.tap(find.text(l10n.dvrSeriesSave));
-      await tester.pumpAndSettle();
+        // Tap Save without changing anything.
+        final sheetContext = tester.element(find.byType(Scaffold).last);
+        final l10n = AppLocalizations.of(sheetContext);
+        await tester.tap(find.text(l10n.dvrSeriesSave));
+        await tester.pumpAndSettle();
 
-      expect(result, isNotNull);
-      // The next-airing episode is on channel 2.
-      expect(result!.channelId, equals(2),
-          reason: "channelId should be 2 (the next-airing episode's channel)");
-    });
+        expect(result, isNotNull);
+        // The next-airing episode is on channel 2.
+        expect(
+          result!.channelId,
+          equals(2),
+          reason: "channelId should be 2 (the next-airing episode's channel)",
+        );
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -269,20 +323,22 @@ void main() {
 
       DvrSeriesRuleOptions? result;
 
-      await tester.pumpWidget(buildSheetApp(
-        Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () async {
-              result = await showDvrSeriesRuleSheet(
-                context,
-                show: buildShowNoMatchingNextAiring(),
-                initialRule: rule,
-              );
-            },
-            child: const Text('Open Sheet'),
+      await tester.pumpWidget(
+        buildSheetApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                result = await showDvrSeriesRuleSheet(
+                  context,
+                  show: buildShowNoMatchingNextAiring(),
+                  initialRule: rule,
+                );
+              },
+              child: const Text('Open Sheet'),
+            ),
           ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Open Sheet'));
@@ -294,12 +350,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, isNotNull);
-      expect(result!.channelId, equals(8),
-          reason: 'edit mode pre-fills the rule channel');
-      expect(result!.seriesMode, equals(DvrSeriesMode.newFlag),
-          reason: 'edit mode pre-fills the rule series mode');
-      expect(result!.matchMode, equals(DvrMatchMode.exact),
-          reason: 'edit mode pre-fills the rule match mode');
+      expect(
+        result!.channelId,
+        equals(8),
+        reason: 'edit mode pre-fills the rule channel',
+      );
+      expect(
+        result!.seriesMode,
+        equals(DvrSeriesMode.newFlag),
+        reason: 'edit mode pre-fills the rule series mode',
+      );
+      expect(
+        result!.matchMode,
+        equals(DvrMatchMode.exact),
+        reason: 'edit mode pre-fills the rule match mode',
+      );
       expect(result!.keepLast, equals(4));
       expect(result!.priority, equals(70));
       expect(result!.startEarlySeconds, equals(120));

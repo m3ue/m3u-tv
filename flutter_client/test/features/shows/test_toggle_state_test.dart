@@ -55,17 +55,17 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: ShowDetailScreen(
               show: testShow,
-              onRecordSeries: ({
-                channelId,
-                required title,
-                matchMode,
-                seriesMode,
-                keepLast,
-                priority,
-                startEarlySeconds,
-                endLateSeconds,
-              }) async =>
-                  CreateDvrSeriesRuleOutcome.created,
+              onRecordSeries:
+                  ({
+                    channelId,
+                    required title,
+                    matchMode,
+                    seriesMode,
+                    keepLast,
+                    priority,
+                    startEarlySeconds,
+                    endLateSeconds,
+                  }) async => CreateDvrSeriesRuleOutcome.created,
               onDeleteSeriesRule: (_) async {},
             ),
           ),
@@ -124,17 +124,17 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: ShowDetailScreen(
               show: testShow,
-              onRecordSeries: ({
-                channelId,
-                required title,
-                matchMode,
-                seriesMode,
-                keepLast,
-                priority,
-                startEarlySeconds,
-                endLateSeconds,
-              }) async =>
-                  CreateDvrSeriesRuleOutcome.created,
+              onRecordSeries:
+                  ({
+                    channelId,
+                    required title,
+                    matchMode,
+                    seriesMode,
+                    keepLast,
+                    priority,
+                    startEarlySeconds,
+                    endLateSeconds,
+                  }) async => CreateDvrSeriesRuleOutcome.created,
               onDeleteSeriesRule: (_) async {},
             ),
           ),

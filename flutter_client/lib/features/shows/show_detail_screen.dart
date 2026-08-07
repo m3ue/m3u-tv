@@ -102,12 +102,15 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
       );
       if (!mounted) return;
       final message = switch (outcome) {
-        CreateDvrSeriesRuleOutcome.created =>
-          l10n.showRecordSeriesSuccess(widget.show.displayTitle),
-        CreateDvrSeriesRuleOutcome.duplicate =>
-          l10n.showRecordSeriesDuplicate(widget.show.displayTitle),
-        CreateDvrSeriesRuleOutcome.failed =>
-          l10n.showRecordSeriesFailed(widget.show.displayTitle),
+        CreateDvrSeriesRuleOutcome.created => l10n.showRecordSeriesSuccess(
+          widget.show.displayTitle,
+        ),
+        CreateDvrSeriesRuleOutcome.duplicate => l10n.showRecordSeriesDuplicate(
+          widget.show.displayTitle,
+        ),
+        CreateDvrSeriesRuleOutcome.failed => l10n.showRecordSeriesFailed(
+          widget.show.displayTitle,
+        ),
       };
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } on Object catch (error) {
@@ -174,9 +177,11 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
     final l10n = AppLocalizations.of(context);
     final localized = Localizations.localeOf(context).toLanguageTag();
     final show = widget.show;
-    final channelNames = show.channels.map((c) => c.channelName).toList(
-      growable: false,
-    );
+    final channelNames = show.channels
+        .map((c) => c.channelName)
+        .toList(
+          growable: false,
+        );
     final channelsLabel = channelNames.join(' · ');
     final nextAiring = show.nextAiringAt;
     final nextAiringLabel = nextAiring == null
@@ -381,9 +386,9 @@ class _EpisodeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final timeLabel = DateFormat.yMMMd(localeTag)
-        .add_jm()
-        .format(episode.startTime.toLocal());
+    final timeLabel = DateFormat.yMMMd(
+      localeTag,
+    ).add_jm().format(episode.startTime.toLocal());
 
     return DpadInkWell(
       borderRadius: BorderRadius.circular(8),

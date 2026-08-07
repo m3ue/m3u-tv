@@ -1068,7 +1068,8 @@ class XtreamService {
     } on XtreamHttpException catch (error) {
       if (error.statusCode != 409) rethrow;
       final body = error.bodyJson;
-      final ruleId = body is Map &&
+      final ruleId =
+          body is Map &&
               body['rule_id'] is num &&
               (body['duplicate'] == true || body['rule_id'] != null)
           ? (body['rule_id'] as num).toInt()
@@ -1145,9 +1146,9 @@ class XtreamService {
       'search_epg_shows',
       params: {'q': trimmed},
     );
-    return _asList(response)
-        .map((item) => EpgShow.fromXtream(_asMap(item)))
-        .toList(growable: false);
+    return _asList(
+      response,
+    ).map((item) => EpgShow.fromXtream(_asMap(item))).toList(growable: false);
   }
 
   Future<List<Category>> _categories(String action) async {

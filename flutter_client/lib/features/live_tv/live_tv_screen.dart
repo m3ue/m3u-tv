@@ -295,8 +295,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           final outcome = await widget.onRecordSeries!(channel, program);
           if (!context.mounted) return;
           final message = switch (outcome) {
-            CreateDvrSeriesRuleOutcome.created =>
-              l10n.epgRecordSeriesSuccess(program.title),
+            CreateDvrSeriesRuleOutcome.created => l10n.epgRecordSeriesSuccess(
+              program.title,
+            ),
             CreateDvrSeriesRuleOutcome.duplicate =>
               l10n.epgRecordSeriesDuplicate,
             CreateDvrSeriesRuleOutcome.failed => l10n.epgRecordSeriesFailed,

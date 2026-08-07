@@ -64,7 +64,10 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
       });
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 350), () => _runSearch(trimmed));
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runSearch(trimmed),
+    );
   }
 
   Future<void> _runSearch(String trimmed) async {

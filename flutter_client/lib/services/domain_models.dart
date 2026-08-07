@@ -1274,12 +1274,14 @@ class EpgShow {
 
     DateTime? asDate(Object? v) =>
         v is String ? DateTime.tryParse(v)?.toUtc() : null;
-    final channels = (json['channels'] as List?)
+    final channels =
+        (json['channels'] as List?)
             ?.whereType<Map<dynamic, dynamic>>()
             .map((m) => EpgShowChannel.fromXtream(m.cast<String, Object?>()))
             .toList() ??
         const <EpgShowChannel>[];
-    final episodes = (json['recent_episodes'] as List?)
+    final episodes =
+        (json['recent_episodes'] as List?)
             ?.whereType<Map<dynamic, dynamic>>()
             .map((m) => EpgShowEpisode.fromXtream(m.cast<String, Object?>()))
             .toList() ??
