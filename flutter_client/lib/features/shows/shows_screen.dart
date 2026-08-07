@@ -22,10 +22,18 @@ class ShowsScreen extends ConsumerStatefulWidget {
     required this.onSearch,
     this.onSidebarActivate,
     this.searchFocusNode,
+    this.onShowSelect,
   });
 
   final Future<List<EpgShow>> Function(String query) onSearch;
   final VoidCallback? onSidebarActivate;
+
+  /// Wired from AppShell so opening a show pushes through
+  /// `AppShell._pushDetail(..., fullScreen: true)` — the same immersive,
+  /// nav-hiding push used by VOD/Series/AIOStreams detail. Falls back to a
+  /// plain `context.push` (no immersive treatment) when absent, e.g. in
+  /// tests that render `ShowsScreen` without the full AppShell above it.
+  final void Function(EpgShow show)? onShowSelect;
 
   /// When provided, the search field attaches to this [FocusNode] instead
   /// of auto-focusing on first build. Lets the parent (e.g. DvrRecordingsScreen)
@@ -93,6 +101,10 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
   }
 
   void _openShow(EpgShow show) {
+    if (widget.onShowSelect != null) {
+      widget.onShowSelect!(show);
+      return;
+    }
     unawaited(
       context.push(
         RouteNames.showDetailsFor(show.normalizedTitle),

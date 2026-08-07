@@ -860,6 +860,16 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  void _openShow(EpgShow show) {
+    unawaited(
+      _pushDetail(
+        RouteNames.showDetailsFor(show.normalizedTitle),
+        extra: show,
+        fullScreen: true,
+      ),
+    );
+  }
+
   void _openProgress(Progress progress) {
     if (progress.contentType == ContentType.vod) {
       final item = _appState.vodItems.firstWhereOrNull(
@@ -1024,6 +1034,7 @@ class AppShellState extends ConsumerState<AppShell>
             onDeleteSeriesRule: _deleteDvrSeriesRule,
             onUpdateSeriesRule: _updateDvrSeriesRule,
             onSearchShows: _searchEpgShows,
+            onOpenShowDetail: _openShow,
             onSidebarActivate: _activateSidebar,
           );
         },

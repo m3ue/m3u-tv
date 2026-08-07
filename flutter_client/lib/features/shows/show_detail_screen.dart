@@ -284,73 +284,108 @@ class _Header extends StatelessWidget {
   final VoidCallback onOpenOptions;
   final VoidCallback? onDeleteRule;
 
+  // Below this width the title + action buttons no longer fit on one row —
+  // on a phone, forcing them into a Row starves the title's Expanded column
+  // down to a sliver, wrapping every word onto its own line.
+  static const double _narrowBreakpoint = 420;
+
+  Widget? _buildActions(AppLocalizations l10n) {
+    if (hasRule) {
+      return Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          AppBadge(label: ruleLabel),
+          if (onDeleteRule != null)
+            AppIconButton(
+              icon: Icons.delete_outline,
+              tooltip: deleteTooltip,
+              variant: AppButtonVariant.destructive,
+              onPressed: onDeleteRule,
+            ),
+        ],
+      );
+    }
+    if (hasDvr) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          AppButton(
+            label: l10n.showRecordSeries,
+            icon: Icons.fiber_manual_record,
+            variant: AppButtonVariant.primaryInverted,
+            autofocus: true,
+            loading: isSubmitting,
+            onPressed: onRecordSeries,
+          ),
+          AppButton(
+            label: l10n.dvrSeriesOptions,
+            onPressed: isSubmitting ? null : onOpenOptions,
+          ),
+        ],
+      );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
+    final titleColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.showChannelCount(channelsCount),
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          l10n.showEpisodesCount(episodeCount),
+          style: theme.textTheme.bodyMedium,
+        ),
+      ],
+    );
+    final actions = _buildActions(l10n);
+
     return Card(
       color: theme.colorScheme.surfaceContainerHigh,
       child: Padding(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < _narrowBreakpoint) {
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.showChannelCount(channelsCount),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.showEpisodesCount(episodeCount),
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  titleColumn,
+                  if (actions != null) ...[
+                    const SizedBox(height: MediaBrowsingMetrics.contentPadding),
+                    actions,
+                  ],
                 ],
-              ),
-            ),
-            const SizedBox(width: MediaBrowsingMetrics.contentPadding),
-            if (hasRule) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: AppBadge(label: ruleLabel),
-              ),
-              if (onDeleteRule != null)
-                AppIconButton(
-                  icon: Icons.delete_outline,
-                  tooltip: deleteTooltip,
-                  variant: AppButtonVariant.destructive,
-                  onPressed: onDeleteRule,
-                ),
-            ] else if (hasDvr)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppButton(
-                    label: l10n.showRecordSeries,
-                    icon: Icons.fiber_manual_record,
-                    variant: AppButtonVariant.primaryInverted,
-                    autofocus: true,
-                    loading: isSubmitting,
-                    onPressed: onRecordSeries,
-                  ),
-                  const SizedBox(width: 8),
-                  AppButton(
-                    label: l10n.dvrSeriesOptions,
-                    onPressed: isSubmitting ? null : onOpenOptions,
-                  ),
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: titleColumn),
+                if (actions != null) ...[
+                  const SizedBox(width: MediaBrowsingMetrics.contentPadding),
+                  actions,
                 ],
-              ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );

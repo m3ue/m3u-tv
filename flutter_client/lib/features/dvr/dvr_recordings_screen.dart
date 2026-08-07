@@ -29,6 +29,7 @@ class DvrRecordingsScreen extends StatefulWidget {
     this.seriesRules = const <DvrSeriesRule>[],
     this.onSidebarActivate,
     this.onSearchShows,
+    this.onOpenShowDetail,
   });
 
   final List<DvrRecording> recordings;
@@ -49,6 +50,11 @@ class DvrRecordingsScreen extends StatefulWidget {
   /// Shows tab (third DVR tab). Defaults to returning an empty list so
   /// callers in tests / previews can render the screen without a backend.
   final Future<List<EpgShow>> Function(String query)? onSearchShows;
+
+  /// Wired from AppShell to `AppShell._pushDetail(..., fullScreen: true)` so
+  /// opening a show from the Shows tab gets the same immersive, nav-hiding
+  /// push as VOD/Series/AIOStreams detail. See [ShowsScreen.onShowSelect].
+  final void Function(EpgShow show)? onOpenShowDetail;
 
   @override
   State<DvrRecordingsScreen> createState() => _DvrRecordingsScreenState();
@@ -204,6 +210,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
       onSearch: widget.onSearchShows ?? _emptyShowsSearch,
       searchFocusNode: _showsSearchFocus,
       onSidebarActivate: widget.onSidebarActivate,
+      onShowSelect: widget.onOpenShowDetail,
     );
   }
 }

@@ -1,10 +1,25 @@
+import 'dart:io' show Platform;
+
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+
+/// Mirrors the tvOS/Android-TV detection in `device_type_resolver.dart`
+/// (`Platform.operatingSystem == 'tvos'` / `NavigationMode.directional`),
+/// duplicated narrowly here rather than importing `app_shell.dart`'s
+/// `DeviceType`/`shouldUseSidebar` — that file imports this one transitively
+/// (via `dvr_recordings_screen.dart`), so importing it back would cycle.
+bool _isRemoteDrivenEnvironment(BuildContext context) {
+  if (!kIsWeb && Platform.operatingSystem == 'tvos') {
+    return true;
+  }
+  return MediaQuery.maybeNavigationModeOf(context) == NavigationMode.directional;
+}
 
 /// Shows the series-rule configure sheet anchored to the given context.
 /// Returns the picked [DvrSeriesRuleOptions] on Save, or null if the user
@@ -28,10 +43,25 @@ Future<DvrSeriesRuleOptions?> showDvrSeriesRuleSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (sheetContext) => _DvrSeriesRuleSheet(
-      show: show,
-      initialRule: initialRule,
-    ),
+    builder: (sheetContext) {
+      final content = _DvrSeriesRuleSheet(show: show, initialRule: initialRule);
+      if (!_isRemoteDrivenEnvironment(sheetContext)) {
+        return content;
+      }
+      // On a remote-driven device there's no real on-screen keyboard, but
+      // d-pad-hopping focus between the four numeric fields still opens and
+      // closes a text-input platform connection per field. Some platforms
+      // report transient view-inset changes for that, and a modal bottom
+      // sheet reactively resizes for insets by default — which reads as the
+      // whole sheet flickering/redrawing on every field hop. Stripping
+      // insets here only on TV/tvOS keeps real keyboard-avoidance intact for
+      // touch devices, where it's needed.
+      return MediaQuery.removeViewInsets(
+        context: sheetContext,
+        removeBottom: true,
+        child: content,
+      );
+    },
   );
 }
 
@@ -528,41 +558,21 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 40,
-          child: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(signed: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
-            ],
-            decoration: InputDecoration(
-              hintText: hint,
-              suffixText: suffix,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
+    // Matches the standard input look used elsewhere (e.g. the Settings
+    // viewer-name field): labelText inside the decoration, plain
+    // OutlineInputBorder, no isDense/custom height/custom radius.
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(signed: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
       ],
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        suffixText: suffix,
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 }
