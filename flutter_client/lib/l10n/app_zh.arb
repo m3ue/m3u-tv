@@ -444,6 +444,7 @@
   "dvrSeriesUseDefault": "使用默认",
   "dvrEpisodeCount": "{count, plural, =1{1 集} other{{count} 集}}",
   "dvrDeleteSeriesRule": "删除规则",
+  "dvrEditSeriesRule": "编辑规则",
   "dvrUpdateSeriesRuleFailed": "无法更新剧集规则",
   "dvrSeriesSave": "保存",
   "dvrSeriesSecondsSuffix": "秒",

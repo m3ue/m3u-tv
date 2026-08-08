@@ -393,6 +393,104 @@ void main() {
       },
     );
 
+    group('inline row actions (desktop/TV)', () {
+      testWidgets(
+        'completed recording starts collapsed to just the more button',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: [_completedRecording()],
+              onDeleteRecording: (_) async {},
+              navigationMode: NavigationMode.directional,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byIcon(Icons.more_vert), findsOneWidget);
+          expect(find.byIcon(Icons.play_arrow), findsNothing);
+          expect(find.byIcon(Icons.delete), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'selecting the more button expands actions inline, no floating menu',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: [_completedRecording()],
+              onDeleteRecording: (_) async {},
+              navigationMode: NavigationMode.directional,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.more_vert));
+          await tester.pumpAndSettle();
+
+          // Actions render as inline icon buttons, not MenuItemButtons in a
+          // floating MenuAnchor overlay.
+          expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+          expect(find.byIcon(Icons.check), findsOneWidget);
+          expect(find.byIcon(Icons.delete), findsOneWidget);
+          expect(find.byType(MenuItemButton), findsNothing);
+          expect(find.byIcon(Icons.close), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'more button is reachable via D-pad right, not just direct click',
+        (tester) async {
+          // Regression test: RowActionMenu's inline presentation used to wrap
+          // its actions in a nested DpadRegion, which excluded them from the
+          // enclosing list region's candidate set. With the list region's
+          // horizontalEdge set to `stop`, arrow-right from the row's autofocused
+          // content had nothing to land on and consumed the key press instead
+          // of reaching the more button - reachable only by direct click/tap.
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: [_completedRecording()],
+              onDeleteRecording: (_) async {},
+              navigationMode: NavigationMode.directional,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+          await tester.sendKeyEvent(LogicalKeyboardKey.select);
+          await tester.pumpAndSettle();
+
+          expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+          expect(find.byIcon(Icons.close), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'tapping an expanded action fires it and collapses the row back',
+        (tester) async {
+          DvrRecording? played;
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: [_completedRecording()],
+              onDeleteRecording: (_) async {},
+              onPlay: (_) => played = _completedRecording(),
+              navigationMode: NavigationMode.directional,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.more_vert));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.play_arrow));
+          await tester.pumpAndSettle();
+
+          expect(played, isNotNull);
+          expect(find.byIcon(Icons.play_arrow), findsNothing);
+          expect(find.byIcon(Icons.more_vert), findsOneWidget);
+        },
+      );
+    });
+
     testWidgets(
       '"Back" on the stop-recording dialog invokes no callback',
       (tester) async {
@@ -601,33 +699,62 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('series rule delete button invokes onDeleteSeriesRule', (
-      tester,
-    ) async {
-      DvrSeriesRule? deleted;
-      await tester.pumpWidget(
-        _TestApp(
-          recordings: [_completedRecording()],
-          seriesRules: [_seriesRule()],
-          onDeleteSeriesRule: (rule) async => deleted = rule,
-        ),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'series rule overflow offers Edit rule, Select, and Delete rule',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            seriesRules: [_seriesRule()],
+            onDeleteSeriesRule: (_) async {},
+            onUpdateSeriesRule: (_, _) async {},
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Series Rules'));
-      await tester.pumpAndSettle();
-      expect(find.text('Test Series Alpha'), findsOneWidget);
+        await tester.tap(find.text('Series Rules'));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Delete series rule'));
-      await tester.pumpAndSettle();
-      expect(find.text('Delete this series rule?'), findsOneWidget);
-      await tester.tap(find.text('Delete series rule'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
 
-      expect(deleted, isNotNull);
-      expect(deleted!.id, 7);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('Edit rule'), findsOneWidget);
+        expect(find.text('Select'), findsOneWidget);
+        expect(find.text('Delete rule'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'series rule overflow Delete rule shows confirmation and invokes onDeleteSeriesRule',
+      (tester) async {
+        DvrSeriesRule? deleted;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            seriesRules: [_seriesRule()],
+            onDeleteSeriesRule: (rule) async => deleted = rule,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Series Rules'));
+        await tester.pumpAndSettle();
+        expect(find.text('Test Series Alpha'), findsOneWidget);
+
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete rule'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Delete this series rule?'), findsOneWidget);
+        await tester.tap(find.text('Delete series rule'));
+        await tester.pumpAndSettle();
+
+        expect(deleted, isNotNull);
+        expect(deleted!.id, 7);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('empty series rules list shows dvrSeriesRulesEmpty', (
       tester,
@@ -647,7 +774,7 @@ void main() {
     });
 
     testWidgets(
-      'tapping a series rule opens the edit sheet and does NOT delete',
+      'selecting Edit rule opens the edit sheet and does NOT delete',
       (
         tester,
       ) async {
@@ -669,12 +796,18 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Test Series Alpha'), findsOneWidget);
 
-        // Tap the card body (not the delete icon) — this is the primary
-        // D-pad action and must edit, never delete.
+        // A plain tap on the row no longer does anything - edit/delete are
+        // reached only through the row's context menu, same as Recordings.
         await tester.tap(find.text('Test Series Alpha'));
         await tester.pumpAndSettle();
+        expect(find.text('Options: Test Series Alpha'), findsNothing);
 
-        expect(deletedRule, isNull, reason: 'plain tap must not delete');
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Edit rule'));
+        await tester.pumpAndSettle();
+
+        expect(deletedRule, isNull, reason: 'edit must not delete');
         expect(
           find.text('Options: Test Series Alpha'),
           findsOneWidget,
@@ -711,7 +844,9 @@ void main() {
 
         await tester.tap(find.text('Series Rules'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Test Series Alpha'));
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Edit rule'));
         await tester.pumpAndSettle();
 
         // Sheet pre-fills from the rule: seriesMode all, matchMode contains,
@@ -734,16 +869,12 @@ void main() {
     );
 
     testWidgets(
-      'long-pressing a series rule deletes it via the confirm dialog',
-      (
-        tester,
-      ) async {
-        DvrSeriesRule? deletedRule;
+      'long-press on a series rule enters select mode and morphs the tile',
+      (tester) async {
         await tester.pumpWidget(
           _TestApp(
             recordings: [_completedRecording()],
-            seriesRules: [_seriesRule()],
-            onDeleteSeriesRule: (rule) async => deletedRule = rule,
+            seriesRules: [_seriesRule(), _secondSeriesRule()],
           ),
         );
         await tester.pumpAndSettle();
@@ -754,13 +885,66 @@ void main() {
         await tester.longPress(find.text('Test Series Alpha'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Delete this series rule?'), findsOneWidget);
-        await tester.tap(find.text('Delete series rule'));
+        expect(find.text('1 item selected'), findsOneWidget);
+        expect(find.byIcon(Icons.check_box), findsOneWidget);
+        expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'series rule overflow Select enters select mode and shows the action bar',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            seriesRules: [_seriesRule()],
+          ),
+        );
         await tester.pumpAndSettle();
 
-        expect(deletedRule, isNotNull);
-        expect(deletedRule!.id, 7);
-        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Series Rules'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Select'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('1 item selected'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'bulk Delete from the series rules action bar calls delete for each selected',
+      (tester) async {
+        final deleted = <int>[];
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: [_completedRecording()],
+            seriesRules: [_seriesRule(), _secondSeriesRule()],
+            onDeleteSeriesRule: (rule) async {
+              deleted.add(rule.id);
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Series Rules'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.more_vert).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Select'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Test Series Beta'));
+        await tester.pumpAndSettle();
+        expect(find.text('2 items selected'), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+        await tester.pumpAndSettle();
+
+        expect(deleted.toSet(), <int>{7, 12});
       },
     );
 
@@ -856,6 +1040,7 @@ class _TestApp extends StatelessWidget {
     this.seriesRules = const <DvrSeriesRule>[],
     this.onDeleteSeriesRule,
     this.onUpdateSeriesRule,
+    this.navigationMode,
   });
 
   final List<DvrRecording> recordings;
@@ -868,6 +1053,12 @@ class _TestApp extends StatelessWidget {
   final Future<void> Function(DvrSeriesRule)? onDeleteSeriesRule;
   final Future<void> Function(DvrSeriesRule, DvrSeriesRuleOptions)?
   onUpdateSeriesRule;
+
+  /// Forces `NavigationMode.directional`, which `_useInlineRowActions`
+  /// (dvr_recordings_screen.dart) treats as TV - the same signal
+  /// `deviceTypeForView` uses. Lets tests exercise the inline expand-in-
+  /// place row actions without needing a real tvOS/desktop platform.
+  final NavigationMode? navigationMode;
 
   @override
   Widget build(BuildContext context) {
@@ -887,6 +1078,14 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) {
+          final mode = navigationMode;
+          if (mode == null) return child!;
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(navigationMode: mode),
+            child: child!,
+          );
+        },
         home: DvrRecordingsScreen(
           recordings: recordings,
           isLoading: false,
@@ -977,4 +1176,16 @@ DvrSeriesRule _seriesRule() => const DvrSeriesRule(
   enabled: true,
   enableComskip: false,
   recordingCount: 3,
+);
+
+DvrSeriesRule _secondSeriesRule() => const DvrSeriesRule(
+  id: 12,
+  channelId: 9,
+  channelName: 'Channel Nine',
+  seriesTitle: 'Test Series Beta',
+  matchMode: DvrMatchMode.contains,
+  seriesMode: DvrSeriesMode.all,
+  enabled: true,
+  enableComskip: false,
+  recordingCount: 1,
 );

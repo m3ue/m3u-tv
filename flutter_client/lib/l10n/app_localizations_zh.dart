@@ -853,6 +853,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dvrDeleteSeriesRule => '删除规则';
 
   @override
+  String get dvrEditSeriesRule => '编辑规则';
+
+  @override
   String get dvrUpdateSeriesRuleFailed => '无法更新剧集规则';
 
   @override

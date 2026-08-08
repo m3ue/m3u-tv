@@ -444,6 +444,7 @@
   "dvrSeriesUseDefault": "Use default",
   "dvrEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
   "dvrDeleteSeriesRule": "Delete rule",
+  "dvrEditSeriesRule": "Edit rule",
   "dvrUpdateSeriesRuleFailed": "Could not update series rule",
   "dvrSeriesSave": "Save",
   "dvrSeriesSecondsSuffix": "sec",

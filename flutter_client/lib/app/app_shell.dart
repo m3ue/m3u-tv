@@ -1050,6 +1050,7 @@ class AppShellState extends ConsumerState<AppShell>
             recordings: _appState.dvrRecordings,
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
+            useInlineRowActions: shouldUseSidebar(widget.deviceType),
             storageInfo: ref.watch(dvrStorageInfoProvider),
             onPlay: _openPlayerDirect,
             onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),

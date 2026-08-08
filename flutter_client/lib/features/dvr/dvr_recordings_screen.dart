@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
@@ -10,8 +13,35 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/row_action_menu.dart';
+
+/// Fallback for detecting the expand-in-place row actions (desktop/TV) vs.
+/// the tap-to-open overflow menu (touch/mobile), used only when
+/// [DvrRecordingsScreen.useInlineRowActions] isn't supplied (previews,
+/// tests). The real app always passes it explicitly from `AppShell`, which
+/// resolves `DeviceType` via `resolveDeviceType`/`shouldUseSidebar` -
+/// including the Android-TV `nativeTelevisionHint` case this local check
+/// can't see, since it isn't threaded through `MediaQuery`/`Platform`.
+///
+/// Mirrors the tv-or-desktop split `device_type_resolver.dart`'s
+/// `deviceTypeForView` computes, duplicated narrowly here rather than
+/// importing `app_shell.dart`'s `DeviceType`/`shouldUseSidebar` - that file
+/// imports this one transitively (via this screen), so importing it back
+/// would cycle. Same precedent as `_isRemoteDrivenEnvironment` in
+/// `dvr_series_rule_options_screen.dart`.
+bool _useInlineRowActions(BuildContext context) {
+  if (!kIsWeb && Platform.operatingSystem == 'tvos') return true;
+  if (MediaQuery.maybeNavigationModeOf(context) == NavigationMode.directional) {
+    return true;
+  }
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.linux ||
+    TargetPlatform.macOS ||
+    TargetPlatform.windows => true,
+    _ => false,
+  };
+}
 
 class DvrRecordingsScreen extends StatefulWidget {
   const DvrRecordingsScreen({
@@ -32,6 +62,7 @@ class DvrRecordingsScreen extends StatefulWidget {
     this.onOpenShowDetail,
     this.onEnterFullScreenDetail,
     this.onExitFullScreenDetail,
+    this.useInlineRowActions,
   });
 
   final List<DvrRecording> recordings;
@@ -67,6 +98,13 @@ class DvrRecordingsScreen extends StatefulWidget {
   /// that push.
   final VoidCallback? onEnterFullScreenDetail;
   final VoidCallback? onExitFullScreenDetail;
+
+  /// Whether row actions (Recordings/Series Rules) should render as
+  /// expand-in-place D-pad-focusable buttons (desktop/TV) instead of a
+  /// tap-to-open overflow menu (touch/mobile). `AppShell` always passes
+  /// this from its already-resolved `DeviceType`; when omitted (previews,
+  /// tests) it falls back to [_useInlineRowActions]'s local heuristic.
+  final bool? useInlineRowActions;
 
   @override
   State<DvrRecordingsScreen> createState() => _DvrRecordingsScreenState();
@@ -113,6 +151,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final inline = widget.useInlineRowActions ?? _useInlineRowActions(context);
     if (!widget.isConfigured) {
       return Scaffold(
         appBar: AppBar(title: Text(l10n.dvrRecordingsTitle)),
@@ -145,13 +184,13 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
                   padding: const EdgeInsets.all(
                     MediaBrowsingMetrics.pagePadding,
                   ),
-                  child: _buildRecordingsTab(context),
+                  child: _buildRecordingsTab(context, inline),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(
                     MediaBrowsingMetrics.pagePadding,
                   ),
-                  child: _buildSeriesRulesTab(context),
+                  child: _buildSeriesRulesTab(context, inline),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(
@@ -167,7 +206,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
     );
   }
 
-  Widget _buildRecordingsTab(BuildContext context) {
+  Widget _buildRecordingsTab(BuildContext context, bool inline) {
     final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,13 +232,14 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
                   onCancelAndDeleteRecording: widget.onCancelAndDeleteRecording,
                   onDeleteRecording: widget.onDeleteRecording,
                   onSidebarActivate: widget.onSidebarActivate,
+                  inline: inline,
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildSeriesRulesTab(BuildContext context) {
+  Widget _buildSeriesRulesTab(BuildContext context, bool inline) {
     final l10n = AppLocalizations.of(context);
     if (widget.seriesRules.isEmpty) {
       return Center(
@@ -216,6 +256,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
       onSidebarActivate: widget.onSidebarActivate,
       onEnterFullScreenDetail: widget.onEnterFullScreenDetail,
       onExitFullScreenDetail: widget.onExitFullScreenDetail,
+      inline: inline,
     );
   }
 
@@ -231,9 +272,10 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
 
 Future<List<EpgShow>> _emptyShowsSearch(String query) async => <EpgShow>[];
 
-class _SeriesRulesList extends StatelessWidget {
+class _SeriesRulesList extends StatefulWidget {
   const _SeriesRulesList({
     required this.rules,
+    required this.inline,
     this.onDelete,
     this.onUpdate,
     this.onSidebarActivate,
@@ -242,6 +284,7 @@ class _SeriesRulesList extends StatelessWidget {
   });
 
   final List<DvrSeriesRule> rules;
+  final bool inline;
   final Future<void> Function(DvrSeriesRule)? onDelete;
   final Future<void> Function(DvrSeriesRule rule, DvrSeriesRuleOptions options)?
   onUpdate;
@@ -250,37 +293,34 @@ class _SeriesRulesList extends StatelessWidget {
   final VoidCallback? onExitFullScreenDetail;
 
   @override
-  Widget build(BuildContext context) {
-    return DpadRegion(
-      memoryKey: 'dvr/series-rules',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) onSidebarActivate?.call();
-      },
-      child: ScrollbarListView(
-        itemCount: rules.length,
-        itemBuilder: (context, index) {
-          final rule = rules[index];
-          return Padding(
-            padding: const EdgeInsets.only(
-              bottom: MediaBrowsingMetrics.itemGap,
-            ),
-            child: _SeriesRuleCard(
-              rule: rule,
-              autofocus: index == 0,
-              onEdit: onUpdate == null ? null : () => _openEdit(context, rule),
-              onDelete: onDelete == null ? null : () => onDelete!(rule),
-            ),
-          );
-        },
-      ),
-    );
+  State<_SeriesRulesList> createState() => _SeriesRulesListState();
+}
+
+class _SeriesRulesListState extends State<_SeriesRulesList> {
+  final Set<int> _selectedIds = <int>{};
+
+  bool get _selectMode => _selectedIds.isNotEmpty;
+
+  void _toggleSelection(int id) {
+    setState(() {
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
+    });
+  }
+
+  void _enterSelectMode(int id) {
+    setState(() {
+      _selectedIds.add(id);
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(_selectedIds.clear);
   }
 
   Future<void> _openEdit(BuildContext context, DvrSeriesRule rule) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    onEnterFullScreenDetail?.call();
+    widget.onEnterFullScreenDetail?.call();
     final DvrSeriesRuleOptions? options;
     try {
       options = await openDvrSeriesRuleOptions(
@@ -289,11 +329,11 @@ class _SeriesRulesList extends StatelessWidget {
         initialRule: rule,
       );
     } finally {
-      onExitFullScreenDetail?.call();
+      widget.onExitFullScreenDetail?.call();
     }
     if (options == null || !context.mounted) return;
     try {
-      await onUpdate!(rule, options);
+      await widget.onUpdate!(rule, options);
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.dvrUpdateSeriesRuleSuccess)),
       );
@@ -302,6 +342,34 @@ class _SeriesRulesList extends StatelessWidget {
         SnackBar(content: Text(l10n.dvrUpdateSeriesRuleFailed)),
       );
     }
+  }
+
+  Future<void> _confirmDeleteSingle(
+    BuildContext context,
+    DvrSeriesRule rule,
+  ) async {
+    final delete = widget.onDelete;
+    if (delete == null) return;
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDeleteSeriesRuleDialog(context, rule: rule);
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await runDvrActionWithFeedback(
+      context,
+      () => delete(rule),
+      successMessage: l10n.dvrDeleteSeriesRuleSuccess,
+      failureMessage: l10n.dvrDeleteSeriesRuleFailed,
+    );
+  }
+
+  Future<void> _deleteSelected() async {
+    final delete = widget.onDelete;
+    if (delete == null) return;
+    final selected = widget.rules.where((r) => _selectedIds.contains(r.id));
+    for (final rule in selected) {
+      await delete(rule);
+    }
+    _exitSelectMode();
   }
 
   /// Builds a minimal EpgShow from the rule for the sheet's channel picker.
@@ -318,115 +386,193 @@ class _SeriesRulesList extends StatelessWidget {
       recentEpisodes: const [],
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: DpadRegion(
+            memoryKey: 'dvr/series-rules',
+            horizontalEdge: DpadEdgeBehavior.stop,
+            onEdge: (direction) {
+              if (direction == TraversalDirection.left) {
+                widget.onSidebarActivate?.call();
+              }
+            },
+            child: ScrollbarListView(
+              itemCount: widget.rules.length,
+              itemBuilder: (context, index) {
+                final rule = widget.rules[index];
+                final selected = _selectedIds.contains(rule.id);
+                return Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: MediaBrowsingMetrics.itemGap,
+                  ),
+                  child: _SeriesRuleCard(
+                    rule: rule,
+                    autofocus: index == 0,
+                    inline: widget.inline,
+                    selectMode: _selectMode,
+                    selected: selected,
+                    onTap: _selectMode ? () => _toggleSelection(rule.id) : null,
+                    onLongTap: () => _enterSelectMode(rule.id),
+                    onEdit: widget.onUpdate == null
+                        ? null
+                        : () => _openEdit(context, rule),
+                    onDelete: widget.onDelete == null
+                        ? null
+                        : () => _confirmDeleteSingle(context, rule),
+                    onSelect: !_selectMode
+                        ? () => _enterSelectMode(rule.id)
+                        : null,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (_selectMode)
+          _SelectionActionBar(
+            count: _selectedIds.length,
+            onExit: _exitSelectMode,
+            onDelete: widget.onDelete != null ? _deleteSelected : null,
+          ),
+      ],
+    );
+  }
 }
 
 class _SeriesRuleCard extends StatelessWidget {
   const _SeriesRuleCard({
     required this.rule,
+    required this.autofocus,
+    required this.inline,
+    required this.selectMode,
+    required this.selected,
+    required this.onTap,
+    required this.onLongTap,
     this.onEdit,
     this.onDelete,
-    this.autofocus = false,
+    this.onSelect,
   });
 
   final DvrSeriesRule rule;
-  final Future<void> Function()? onEdit;
-  final Future<void> Function()? onDelete;
   final bool autofocus;
+  final bool inline;
+  final bool selectMode;
+  final bool selected;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    return DpadInkWell(
-      autofocus: autofocus,
-      onTap: onEdit,
-      // Deleting is a destructive, irreversible action (it cascades to the
-      // rule's recordings) — never the primary tap. Plain tap edits the
-      // options; delete lives on long-press and the visible delete button,
-      // both guarded by the confirm dialog.
-      onLongTap: onDelete == null
-          ? null
-          : () => _confirmDelete(context, rule, onDelete!),
-      borderRadius: BorderRadius.circular(12),
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: Padding(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.fiber_manual_record,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: MediaBrowsingMetrics.contentPadding),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    rule.seriesTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (rule.channelName != null)
-                    Text(
-                      rule.channelName!,
-                      style: theme.textTheme.bodyMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      AppBadge(
-                        label: l10n.dvrEpisodeCount(rule.recordingCount),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: MediaBrowsingMetrics.contentPadding),
-            if (onDelete != null)
-              AppIconButton(
-                tooltip: l10n.showDeleteRule,
-                icon: Icons.delete,
-                variant: AppButtonVariant.destructive,
-                onPressed: () => _confirmDelete(context, rule, onDelete!),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+    final canSelect = onSelect != null;
+    final hasMenu = onEdit != null || canSelect || onDelete != null;
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    DvrSeriesRule rule,
-    Future<void> Function() action,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDeleteSeriesRuleDialog(context, rule: rule);
-    if (confirmed != true) return;
-    if (!context.mounted) return;
-    await runDvrActionWithFeedback(
-      context,
-      action,
-      successMessage: l10n.dvrDeleteSeriesRuleSuccess,
-      failureMessage: l10n.dvrDeleteSeriesRuleFailed,
+    return Material(
+      color: theme.colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: DpadInkWell(
+              autofocus: autofocus,
+              onTap: onTap,
+              onLongTap: onLongTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(
+                  MediaBrowsingMetrics.contentPadding,
+                ),
+                child: Row(
+                  children: [
+                    _LeadingTile(
+                      icon: Icons.fiber_manual_record,
+                      selected: selected,
+                      selectMode: selectMode,
+                      tileColor: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: MediaBrowsingMetrics.contentPadding),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            rule.seriesTitle,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          if (rule.channelName != null)
+                            Text(
+                              rule.channelName!,
+                              style: theme.textTheme.bodyMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              AppBadge(
+                                label: l10n.dvrEpisodeCount(
+                                  rule.recordingCount,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (hasMenu)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Center(
+                child: RowActionMenu(
+                  moreLabel: l10n.dvrMoreActions,
+                  inline: inline,
+                  actions: [
+                    if (onEdit != null)
+                      RowAction(
+                        icon: Icons.edit,
+                        label: l10n.dvrEditSeriesRule,
+                        onPressed: onEdit!,
+                      ),
+                    if (onSelect != null)
+                      RowAction(
+                        icon: Icons.check,
+                        label: l10n.dvrSelect,
+                        onPressed: onSelect!,
+                      ),
+                    if (onDelete != null)
+                      RowAction(
+                        icon: Icons.delete,
+                        label: l10n.dvrDeleteSeriesRule,
+                        onPressed: onDelete!,
+                        type: RowActionType.danger,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -574,6 +720,7 @@ class _RecordingList extends ConsumerStatefulWidget {
   const _RecordingList({
     required this.recordings,
     required this.onPlay,
+    required this.inline,
     this.onCancelRecording,
     this.onCancelAndDeleteRecording,
     this.onDeleteRecording,
@@ -582,6 +729,7 @@ class _RecordingList extends ConsumerStatefulWidget {
 
   final List<DvrRecording> recordings;
   final void Function(PlayerArgs args) onPlay;
+  final bool inline;
   final Future<void> Function(String uuid)? onCancelRecording;
   final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
   final Future<void> Function(String uuid)? onDeleteRecording;
@@ -708,6 +856,7 @@ class _RecordingListState extends ConsumerState<_RecordingList> {
                   child: _RecordingCard(
                     recording: recording,
                     autofocus: index == 0,
+                    inline: widget.inline,
                     selectMode: _selectMode,
                     selected: selected,
                     onTap: _selectMode
@@ -747,6 +896,7 @@ class _RecordingCard extends StatelessWidget {
   const _RecordingCard({
     required this.recording,
     required this.autofocus,
+    required this.inline,
     required this.selectMode,
     required this.selected,
     required this.onTap,
@@ -759,6 +909,7 @@ class _RecordingCard extends StatelessWidget {
 
   final DvrRecording recording;
   final bool autofocus;
+  final bool inline;
   final bool selectMode;
   final bool selected;
   final VoidCallback? onTap;
@@ -804,7 +955,7 @@ class _RecordingCard extends StatelessWidget {
                   child: Row(
                     children: [
                       _LeadingTile(
-                        recording: recording,
+                        icon: _recordingStatusIcon(recording.status),
                         selected: selected,
                         selectMode: selectMode,
                         tileColor: statusColor,
@@ -838,14 +989,39 @@ class _RecordingCard extends StatelessWidget {
             ),
             if (hasMenu)
               Padding(
-                padding: const EdgeInsets.only(left: 8, right: 4),
+                padding: const EdgeInsets.only(left: 8),
                 child: Center(
-                  child: _OverflowMenu(
-                    tooltip: AppLocalizations.of(context).dvrMoreActions,
-                    onPlay: onPlay,
-                    onStop: onStop,
-                    onDelete: onDelete,
-                    onSelect: onSelect,
+                  child: RowActionMenu(
+                    moreLabel: AppLocalizations.of(context).dvrMoreActions,
+                    inline: inline,
+                    actions: [
+                      if (onPlay != null)
+                        RowAction(
+                          icon: Icons.play_arrow,
+                          label: AppLocalizations.of(context).dvrPlay,
+                          onPressed: onPlay!,
+                        ),
+                      if (onSelect != null)
+                        RowAction(
+                          icon: Icons.check,
+                          label: AppLocalizations.of(context).dvrSelect,
+                          onPressed: onSelect!,
+                        ),
+                      if (onStop != null)
+                        RowAction(
+                          icon: Icons.stop,
+                          label: AppLocalizations.of(context).dvrStop,
+                          onPressed: onStop!,
+                          type: RowActionType.danger,
+                        ),
+                      if (onDelete != null)
+                        RowAction(
+                          icon: Icons.delete,
+                          label: AppLocalizations.of(context).dvrDelete,
+                          onPressed: onDelete!,
+                          type: RowActionType.danger,
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -869,15 +1045,19 @@ class _RecordingCard extends StatelessWidget {
   }
 }
 
+/// Shared leading icon tile for both Recordings and Series Rules rows -
+/// either the row's status/kind icon, or (in select mode) a checkbox.
+/// [icon] is resolved by the caller since each row type derives it
+/// differently (recording status vs. a fixed series-rule glyph).
 class _LeadingTile extends StatelessWidget {
   const _LeadingTile({
-    required this.recording,
+    required this.icon,
     required this.selected,
     required this.selectMode,
     required this.tileColor,
   });
 
-  final DvrRecording recording;
+  final IconData icon;
   final bool selected;
   final bool selectMode;
   final Color tileColor;
@@ -908,16 +1088,6 @@ class _LeadingTile extends StatelessWidget {
       );
     }
 
-    final icon = switch (recording.status) {
-      DvrRecordingStatus.recording => Icons.fiber_manual_record,
-      DvrRecordingStatus.postProcessing => Icons.sync,
-      DvrRecordingStatus.completed => Icons.check_circle,
-      DvrRecordingStatus.scheduled => Icons.schedule,
-      DvrRecordingStatus.failed => Icons.error,
-      DvrRecordingStatus.cancelled => Icons.cancel,
-      DvrRecordingStatus.deleted => Icons.delete,
-      DvrRecordingStatus.unknown => Icons.radio_button_unchecked,
-    };
     return Container(
       width: _size,
       height: _size,
@@ -928,6 +1098,19 @@ class _LeadingTile extends StatelessWidget {
       child: Icon(icon, color: tileColor),
     );
   }
+}
+
+IconData _recordingStatusIcon(DvrRecordingStatus status) {
+  return switch (status) {
+    DvrRecordingStatus.recording => Icons.fiber_manual_record,
+    DvrRecordingStatus.postProcessing => Icons.sync,
+    DvrRecordingStatus.completed => Icons.check_circle,
+    DvrRecordingStatus.scheduled => Icons.schedule,
+    DvrRecordingStatus.failed => Icons.error,
+    DvrRecordingStatus.cancelled => Icons.cancel,
+    DvrRecordingStatus.deleted => Icons.delete,
+    DvrRecordingStatus.unknown => Icons.radio_button_unchecked,
+  };
 }
 
 class _MetaLine extends StatelessWidget {
@@ -1039,90 +1222,6 @@ class _MetaLine extends StatelessWidget {
   }
 }
 
-class _OverflowMenu extends StatefulWidget {
-  const _OverflowMenu({
-    required this.tooltip,
-    this.onPlay,
-    this.onStop,
-    this.onDelete,
-    this.onSelect,
-  });
-
-  final String tooltip;
-  final VoidCallback? onPlay;
-  final VoidCallback? onStop;
-  final VoidCallback? onDelete;
-  final VoidCallback? onSelect;
-
-  @override
-  State<_OverflowMenu> createState() => _OverflowMenuState();
-}
-
-class _OverflowMenuState extends State<_OverflowMenu> {
-  static const _menuEffects = <DpadEffect>[
-    GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
-  ];
-  static const _menuWidth = 180.0;
-  static const _menuStyle = MenuStyle(
-    minimumSize: WidgetStatePropertyAll(Size(_menuWidth, 0)),
-  );
-
-  final MenuController _controller = MenuController();
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _open() => _controller.open();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final items = <Widget>[
-      if (widget.onPlay != null)
-        _menuItem(text: l10n.dvrPlay, onPressed: widget.onPlay!),
-      if (widget.onSelect != null)
-        _menuItem(text: l10n.dvrSelect, onPressed: widget.onSelect!),
-      if (widget.onStop != null)
-        _menuItem(text: l10n.dvrStop, onPressed: widget.onStop!),
-      if (widget.onDelete != null)
-        _menuItem(text: l10n.dvrDelete, onPressed: widget.onDelete!),
-    ];
-
-    return DpadFocusable(
-      focusNode: _focusNode,
-      onSelect: _open,
-      effects: _menuEffects,
-      child: MenuAnchor(
-        controller: _controller,
-        style: _menuStyle,
-        menuChildren: items,
-        child: IconButton(
-          tooltip: widget.tooltip,
-          onPressed: _open,
-          icon: const Icon(Icons.more_vert),
-        ),
-      ),
-    );
-  }
-
-  Widget _menuItem({required String text, required VoidCallback onPressed}) {
-    return SizedBox(
-      width: _menuWidth,
-      child: MenuItemButton(
-        onPressed: () {
-          _controller.close();
-          onPressed();
-        },
-        child: Text(text),
-      ),
-    );
-  }
-}
-
 class _SelectionActionBar extends StatelessWidget {
   const _SelectionActionBar({
     required this.count,
@@ -1150,10 +1249,14 @@ class _SelectionActionBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              IconButton(
-                tooltip: l10n.dvrExitSelection,
-                onPressed: onExit,
-                icon: const Icon(Icons.close),
+              DpadFocusable(
+                onSelect: onExit,
+                effects: kStadiumFocusEffects,
+                child: IconButton(
+                  tooltip: l10n.dvrExitSelection,
+                  onPressed: onExit,
+                  icon: const Icon(Icons.close),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1165,10 +1268,11 @@ class _SelectionActionBar extends StatelessWidget {
                 ),
               ),
               if (onDelete != null)
-                FilledButton.icon(
+                AppButton(
+                  label: l10n.dvrDelete,
+                  icon: Icons.delete,
+                  variant: AppButtonVariant.destructive,
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete),
-                  label: Text(l10n.dvrDelete),
                 ),
             ],
           ),
