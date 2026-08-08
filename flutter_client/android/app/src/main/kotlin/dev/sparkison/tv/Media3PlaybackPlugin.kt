@@ -314,15 +314,15 @@ class Media3PlaybackPlugin(
                     state.surfaceProducer.setSize(videoSize.width, videoSize.height)
                     state.lastVideoWidth = videoSize.width
                     state.lastVideoHeight = videoSize.height
+                    val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
+                    val player = state.player
+                    emit(
+                        type = if (player.isPlaying) "playing" else "ready",
+                        positionMs = player.currentPosition,
+                        durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                        videoAspectRatio = aspectRatio.toDouble(),
+                    )
                 }
-                val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
-                val player = state.player
-                emit(
-                    type = if (player.isPlaying) "playing" else "ready",
-                    positionMs = player.currentPosition,
-                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
-                    videoAspectRatio = aspectRatio.toDouble(),
-                )
             }
         }
 

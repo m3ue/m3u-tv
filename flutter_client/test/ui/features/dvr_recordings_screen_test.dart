@@ -428,12 +428,13 @@ void main() {
           await tester.pumpAndSettle();
 
           // Actions render as inline icon buttons, not MenuItemButtons in a
-          // floating MenuAnchor overlay.
+          // floating MenuAnchor overlay. The trigger stays the same "more"
+          // icon (just rotated) rather than swapping to a close icon.
           expect(find.byIcon(Icons.play_arrow), findsOneWidget);
           expect(find.byIcon(Icons.check), findsOneWidget);
           expect(find.byIcon(Icons.delete), findsOneWidget);
           expect(find.byType(MenuItemButton), findsNothing);
-          expect(find.byIcon(Icons.close), findsOneWidget);
+          expect(find.byIcon(Icons.more_vert), findsOneWidget);
         },
       );
 
@@ -461,7 +462,49 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-          expect(find.byIcon(Icons.close), findsOneWidget);
+          expect(find.byIcon(Icons.more_vert), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'select mode docks a rail beside the list, reachable via D-pad '
+        'right regardless of scroll position, instead of a bottom bar',
+        (tester) async {
+          // Regression test: a bottom action bar only exists after the last
+          // row, so reaching it with a d-pad means holding Down through
+          // every row above it - fine for a touch scroll, a real barrier on
+          // a long list navigated one focus stop at a time. On TV/desktop
+          // this docks a rail beside the list instead, one Right press away
+          // from whichever row currently has focus.
+          final deleted = <String>[];
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: [_completedRecording()],
+              onDeleteRecording: (uuid) async => deleted.add(uuid),
+              navigationMode: NavigationMode.directional,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.longPress(find.text('Evening Movie'));
+          await tester.pumpAndSettle();
+
+          // The rail shows a compact count (with the full sentence as a
+          // tooltip), not the bottom bar's inline sentence.
+          expect(find.text('1'), findsOneWidget);
+          expect(find.text('1 item selected'), findsNothing);
+          expect(find.byTooltip('1 item selected'), findsOneWidget);
+
+          // Per-row actions are hidden while selecting, freeing the row's
+          // right edge so D-pad right reaches the rail instead.
+          expect(find.byIcon(Icons.more_vert), findsNothing);
+
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+          await tester.sendKeyEvent(LogicalKeyboardKey.select);
+          await tester.pumpAndSettle();
+
+          expect(deleted, ['rec-1']);
         },
       );
 

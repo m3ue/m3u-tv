@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
@@ -32,11 +34,12 @@ class RowAction {
 /// * **Compact** (`inline: false` - touch/mobile): a single "more" button
 ///   that opens a [MenuAnchor] dropdown, as before. Touch can reach a
 ///   floating menu fine, so this stays the space-efficient choice there.
-/// * **Inline** (`inline: true` - desktop/TV): the "more" button toggles a
-///   row of icon buttons that grow out to its left in place (animated via
-///   [AnimatedSize], collapsing again once focus leaves the row or an
-///   action fires). Every action becomes directly d-pad-focusable - the
-///   whole reason this presentation exists, since a [MenuAnchor]'s overlay
+/// * **Inline** (`inline: true` - desktop/TV): the "more" button (which
+///   rotates a quarter turn rather than swapping icons) toggles a row of
+///   icon buttons that slide and fade out to its left in a staggered
+///   sequence, collapsing again once focus leaves the row or an action
+///   fires. Every action becomes directly d-pad-focusable - the whole
+///   reason this presentation exists, since a [MenuAnchor]'s overlay
 ///   content isn't reliably d-pad-navigable (see the comment on
 ///   `_useInlineRowActions` in `dvr_recordings_screen.dart` for how callers
 ///   are expected to detect TV/desktop correctly, including Android TV).
@@ -62,7 +65,8 @@ class RowActionMenu extends StatefulWidget {
   State<RowActionMenu> createState() => _RowActionMenuState();
 }
 
-class _RowActionMenuState extends State<RowActionMenu> {
+class _RowActionMenuState extends State<RowActionMenu>
+    with SingleTickerProviderStateMixin {
   static const _menuEffects = <DpadEffect>[
     GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
   ];
@@ -70,13 +74,44 @@ class _RowActionMenuState extends State<RowActionMenu> {
   static const _menuStyle = MenuStyle(
     minimumSize: WidgetStatePropertyAll(Size(_menuWidth, 0)),
   );
-  static const _expandDuration = Duration(milliseconds: 220);
+  static const _expandDuration = Duration(milliseconds: 320);
+  // Matches AppIconButton's fixed 56x56 footprint plus the 8px gap each
+  // action is padded with below, so the reserved space can be computed
+  // without measuring - it's what lets the reveal grow without clipping
+  // (see _buildInline).
+  static const _actionSlotWidth = 64.0;
+  static const _actionRowHeight = 56.0;
+  // Fraction of the timeline each later action's own slide/fade is offset
+  // by, so they visibly follow one another instead of moving in lockstep.
+  static const _staggerStep = 0.12;
+  // How much of the timeline a single action's slide/fade animates over.
+  static const _itemSpan = 0.6;
   // Keeps the trigger clear of a list's scrollbar track, which reserves
   // this much space at the edge even while its thumb is hidden.
   static const _trailingPadding = 16.0;
 
   final MenuController _menuController = MenuController();
+  late final AnimationController _expandController;
   bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Constructed eagerly (not lazily via `late final = ...`): the compact
+    // (touch) presentation never calls into inline-only code, so a lazy
+    // initializer wouldn't run until `dispose()` first touched the field -
+    // by then the element is deactivated and creating the ticker crashes.
+    _expandController = AnimationController(
+      vsync: this,
+      duration: _expandDuration,
+    );
+  }
+
+  @override
+  void dispose() {
+    _expandController.dispose();
+    super.dispose();
+  }
 
   void _toggleMenu() {
     if (_menuController.isOpen) {
@@ -86,10 +121,32 @@ class _RowActionMenuState extends State<RowActionMenu> {
     }
   }
 
-  void _toggleExpanded() => setState(() => _expanded = !_expanded);
+  void _toggleExpanded() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      unawaited(_expandController.forward());
+    } else {
+      unawaited(_expandController.reverse());
+    }
+  }
 
   void _collapse() {
-    if (_expanded) setState(() => _expanded = false);
+    if (_expanded) {
+      setState(() => _expanded = false);
+      unawaited(_expandController.reverse());
+    }
+  }
+
+  /// Eased 0..1 progress for action [index]'s own slide/fade, offset by
+  /// [_staggerStep] per index so they reveal in sequence rather than all at
+  /// once.
+  double _actionProgress(int index) {
+    final start = (index * _staggerStep).clamp(0.0, 1.0 - _itemSpan);
+    final raw = ((_expandController.value - start) / _itemSpan).clamp(
+      0.0,
+      1.0,
+    );
+    return Curves.easeOutCubic.transform(raw);
   }
 
   @override
@@ -159,42 +216,107 @@ class _RowActionMenuState extends State<RowActionMenu> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ClipRect(
-            child: AnimatedSize(
-              duration: _expandDuration,
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.centerRight,
-              child: _expanded
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final action in widget.actions)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: AppIconButton(
-                              icon: action.icon,
-                              tooltip: action.label,
-                              variant: action.isDanger
-                                  ? AppButtonVariant.destructive
-                                  : AppButtonVariant.tonal,
+          AnimatedBuilder(
+            animation: _expandController,
+            builder: (context, _) {
+              if (_expandController.value == 0) {
+                return const SizedBox.shrink();
+              }
+              final reservedWidth =
+                  Curves.easeOutCubic.transform(_expandController.value) *
+                  widget.actions.length *
+                  _actionSlotWidth;
+              return SizedBox(
+                width: reservedWidth,
+                height: _actionRowHeight,
+                // No ClipRect: each action slides/fades in on its own
+                // timeline below, so it's never visually chopped by a
+                // growing box edge the way wiping the whole row in via
+                // AnimatedSize used to look. Stack lets the not-yet-fully-
+                // grown box's Positioned children overflow its bounds
+                // instead of clipping to them.
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (var i = 0; i < widget.actions.length; i++)
+                            _InlineAction(
+                              action: widget.actions[i],
+                              progress: _actionProgress(i),
                               onPressed: () {
                                 _collapse();
-                                action.onPressed();
+                                widget.actions[i].onPressed();
                               },
                             ),
-                          ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          AnimatedRotation(
+            turns: _expanded ? 0.25 : 0,
+            duration: _expandDuration,
+            curve: Curves.easeOutCubic,
+            child: AppIconButton(
+              autofocus: widget.autofocus,
+              icon: Icons.more_vert,
+              tooltip: widget.moreLabel,
+              onPressed: _toggleExpanded,
             ),
           ),
-          AppIconButton(
-            autofocus: widget.autofocus,
-            icon: _expanded ? Icons.close : Icons.more_vert,
-            tooltip: widget.moreLabel,
-            onPressed: _toggleExpanded,
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// One action inside the inline row's expanded reveal - slides in from
+/// behind the trigger button while fading in, per [progress] (0 hidden, 1
+/// fully in place).
+class _InlineAction extends StatelessWidget {
+  const _InlineAction({
+    required this.action,
+    required this.progress,
+    required this.onPressed,
+  });
+
+  final RowAction action;
+  final double progress;
+  final VoidCallback onPressed;
+
+  // Starting slide offset, in logical pixels - how far right of its final
+  // position an action starts before easing in.
+  static const _slideDistance = 20.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Opacity(
+        opacity: progress,
+        child: Transform.translate(
+          offset: Offset((1 - progress) * _slideDistance, 0),
+          child: IgnorePointer(
+            ignoring: progress < 1,
+            child: AppIconButton(
+              icon: action.icon,
+              tooltip: action.label,
+              variant: action.isDanger
+                  ? AppButtonVariant.destructive
+                  : AppButtonVariant.tonal,
+              onPressed: onPressed,
+            ),
+          ),
+        ),
       ),
     );
   }

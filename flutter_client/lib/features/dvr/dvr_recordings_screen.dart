@@ -298,8 +298,17 @@ class _SeriesRulesList extends StatefulWidget {
 
 class _SeriesRulesListState extends State<_SeriesRulesList> {
   final Set<int> _selectedIds = <int>{};
+  final FocusNode _railFocusNode = FocusNode(
+    debugLabel: 'dvr/series-rules-rail-entry',
+  );
 
   bool get _selectMode => _selectedIds.isNotEmpty;
+
+  @override
+  void dispose() {
+    _railFocusNode.dispose();
+    super.dispose();
+  }
 
   void _toggleSelection(int id) {
     setState(() {
@@ -389,54 +398,74 @@ class _SeriesRulesListState extends State<_SeriesRulesList> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: DpadRegion(
-            memoryKey: 'dvr/series-rules',
-            horizontalEdge: DpadEdgeBehavior.stop,
-            onEdge: (direction) {
-              if (direction == TraversalDirection.left) {
-                widget.onSidebarActivate?.call();
-              }
-            },
-            child: ScrollbarListView(
-              itemCount: widget.rules.length,
-              itemBuilder: (context, index) {
-                final rule = widget.rules[index];
-                final selected = _selectedIds.contains(rule.id);
-                return Padding(
-                  padding: const EdgeInsets.only(
-                    bottom: MediaBrowsingMetrics.itemGap,
+          child: Column(
+            children: [
+              Expanded(
+                child: DpadRegion(
+                  memoryKey: 'dvr/series-rules',
+                  horizontalEdge: DpadEdgeBehavior.stop,
+                  onEdge: (direction) {
+                    if (direction == TraversalDirection.left) {
+                      widget.onSidebarActivate?.call();
+                    } else if (direction == TraversalDirection.right &&
+                        widget.inline &&
+                        _selectMode) {
+                      _railFocusNode.requestFocus();
+                    }
+                  },
+                  child: ScrollbarListView(
+                    itemCount: widget.rules.length,
+                    itemBuilder: (context, index) {
+                      final rule = widget.rules[index];
+                      final selected = _selectedIds.contains(rule.id);
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: MediaBrowsingMetrics.itemGap,
+                        ),
+                        child: _SeriesRuleCard(
+                          rule: rule,
+                          autofocus: index == 0,
+                          inline: widget.inline,
+                          selectMode: _selectMode,
+                          selected: selected,
+                          onTap: _selectMode
+                              ? () => _toggleSelection(rule.id)
+                              : null,
+                          onLongTap: () => _enterSelectMode(rule.id),
+                          onEdit: widget.onUpdate == null
+                              ? null
+                              : () => _openEdit(context, rule),
+                          onDelete: widget.onDelete == null
+                              ? null
+                              : () => _confirmDeleteSingle(context, rule),
+                          onSelect: !_selectMode
+                              ? () => _enterSelectMode(rule.id)
+                              : null,
+                        ),
+                      );
+                    },
                   ),
-                  child: _SeriesRuleCard(
-                    rule: rule,
-                    autofocus: index == 0,
-                    inline: widget.inline,
-                    selectMode: _selectMode,
-                    selected: selected,
-                    onTap: _selectMode ? () => _toggleSelection(rule.id) : null,
-                    onLongTap: () => _enterSelectMode(rule.id),
-                    onEdit: widget.onUpdate == null
-                        ? null
-                        : () => _openEdit(context, rule),
-                    onDelete: widget.onDelete == null
-                        ? null
-                        : () => _confirmDeleteSingle(context, rule),
-                    onSelect: !_selectMode
-                        ? () => _enterSelectMode(rule.id)
-                        : null,
-                  ),
-                );
-              },
-            ),
+                ),
+              ),
+              if (_selectMode && !widget.inline)
+                _SelectionActionBar(
+                  count: _selectedIds.length,
+                  onExit: _exitSelectMode,
+                  onDelete: widget.onDelete != null ? _deleteSelected : null,
+                ),
+            ],
           ),
         ),
-        if (_selectMode)
-          _SelectionActionBar(
+        if (_selectMode && widget.inline)
+          _SelectionRail(
             count: _selectedIds.length,
             onExit: _exitSelectMode,
             onDelete: widget.onDelete != null ? _deleteSelected : null,
+            focusNode: _railFocusNode,
           ),
       ],
     );
@@ -473,7 +502,10 @@ class _SeriesRuleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final canSelect = onSelect != null;
-    final hasMenu = onEdit != null || canSelect || onDelete != null;
+    // Hidden while selecting: bulk actions live in the selection rail/bar
+    // instead, freeing the row's right edge for d-pad traversal to reach it.
+    final hasMenu =
+        !selectMode && (onEdit != null || canSelect || onDelete != null);
 
     return Material(
       color: theme.colorScheme.surfaceContainerHigh,
@@ -741,8 +773,17 @@ class _RecordingList extends ConsumerStatefulWidget {
 
 class _RecordingListState extends ConsumerState<_RecordingList> {
   final Set<String> _selectedUuids = <String>{};
+  final FocusNode _railFocusNode = FocusNode(
+    debugLabel: 'dvr/recordings-rail-entry',
+  );
 
   bool get _selectMode => _selectedUuids.isNotEmpty;
+
+  @override
+  void dispose() {
+    _railFocusNode.dispose();
+    super.dispose();
+  }
 
   void _toggleSelection(String uuid) {
     setState(() {
@@ -824,68 +865,92 @@ class _RecordingListState extends ConsumerState<_RecordingList> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: DpadRegion(
-            memoryKey: 'dvr/recordings',
-            horizontalEdge: DpadEdgeBehavior.stop,
-            onEdge: (direction) {
-              if (direction == TraversalDirection.left) {
-                widget.onSidebarActivate?.call();
-              }
-            },
-            child: ScrollbarListView(
-              itemCount: widget.recordings.length,
-              itemBuilder: (context, index) {
-                final recording = widget.recordings[index];
-                final selected = _selectedUuids.contains(recording.uuid);
-                final canStop =
-                    widget.onCancelRecording != null &&
-                    (recording.status == DvrRecordingStatus.scheduled ||
-                        recording.status == DvrRecordingStatus.recording);
-                final canDelete =
-                    widget.onDeleteRecording != null &&
-                    (recording.status == DvrRecordingStatus.completed ||
-                        recording.status == DvrRecordingStatus.failed ||
-                        recording.status == DvrRecordingStatus.cancelled);
-                return Padding(
-                  padding: const EdgeInsets.only(
-                    bottom: MediaBrowsingMetrics.itemGap,
+          child: Column(
+            children: [
+              Expanded(
+                child: DpadRegion(
+                  memoryKey: 'dvr/recordings',
+                  horizontalEdge: DpadEdgeBehavior.stop,
+                  onEdge: (direction) {
+                    if (direction == TraversalDirection.left) {
+                      widget.onSidebarActivate?.call();
+                    } else if (direction == TraversalDirection.right &&
+                        widget.inline &&
+                        _selectMode) {
+                      _railFocusNode.requestFocus();
+                    }
+                  },
+                  child: ScrollbarListView(
+                    itemCount: widget.recordings.length,
+                    itemBuilder: (context, index) {
+                      final recording = widget.recordings[index];
+                      final selected = _selectedUuids.contains(
+                        recording.uuid,
+                      );
+                      final canStop =
+                          widget.onCancelRecording != null &&
+                          (recording.status == DvrRecordingStatus.scheduled ||
+                              recording.status == DvrRecordingStatus.recording);
+                      final canDelete =
+                          widget.onDeleteRecording != null &&
+                          (recording.status == DvrRecordingStatus.completed ||
+                              recording.status == DvrRecordingStatus.failed ||
+                              recording.status == DvrRecordingStatus.cancelled);
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: MediaBrowsingMetrics.itemGap,
+                        ),
+                        child: _RecordingCard(
+                          recording: recording,
+                          autofocus: index == 0,
+                          inline: widget.inline,
+                          selectMode: _selectMode,
+                          selected: selected,
+                          onTap: _selectMode
+                              ? () => _toggleSelection(recording.uuid)
+                              : recording.isPlayable
+                              ? () => _openRecording(recording)
+                              : null,
+                          onLongTap: () => _enterSelectMode(recording.uuid),
+                          onPlay: recording.isPlayable
+                              ? () => _openRecording(recording)
+                              : null,
+                          onStop: canStop
+                              ? () => _confirmStop(recording)
+                              : null,
+                          onDelete: canDelete
+                              ? () => _confirmDeleteSingle(recording)
+                              : null,
+                          onSelect: !_selectMode
+                              ? () => _enterSelectMode(recording.uuid)
+                              : null,
+                        ),
+                      );
+                    },
                   ),
-                  child: _RecordingCard(
-                    recording: recording,
-                    autofocus: index == 0,
-                    inline: widget.inline,
-                    selectMode: _selectMode,
-                    selected: selected,
-                    onTap: _selectMode
-                        ? () => _toggleSelection(recording.uuid)
-                        : recording.isPlayable
-                        ? () => _openRecording(recording)
-                        : null,
-                    onLongTap: () => _enterSelectMode(recording.uuid),
-                    onPlay: recording.isPlayable
-                        ? () => _openRecording(recording)
-                        : null,
-                    onStop: canStop ? () => _confirmStop(recording) : null,
-                    onDelete: canDelete
-                        ? () => _confirmDeleteSingle(recording)
-                        : null,
-                    onSelect: !_selectMode
-                        ? () => _enterSelectMode(recording.uuid)
-                        : null,
-                  ),
-                );
-              },
-            ),
+                ),
+              ),
+              if (_selectMode && !widget.inline)
+                _SelectionActionBar(
+                  count: _selectedUuids.length,
+                  onExit: _exitSelectMode,
+                  onDelete: widget.onDeleteRecording != null
+                      ? _deleteSelected
+                      : null,
+                ),
+            ],
           ),
         ),
-        if (_selectMode)
-          _SelectionActionBar(
+        if (_selectMode && widget.inline)
+          _SelectionRail(
             count: _selectedUuids.length,
             onExit: _exitSelectMode,
             onDelete: widget.onDeleteRecording != null ? _deleteSelected : null,
+            focusNode: _railFocusNode,
           ),
       ],
     );
@@ -929,8 +994,11 @@ class _RecordingCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final statusColor = _statusColor(colorScheme);
     final canSelect = onSelect != null;
+    // Hidden while selecting: bulk actions live in the selection rail/bar
+    // instead, freeing the row's right edge for d-pad traversal to reach it.
     final hasMenu =
-        onPlay != null || canSelect || onStop != null || onDelete != null;
+        !selectMode &&
+        (onPlay != null || canSelect || onStop != null || onDelete != null);
 
     return SizedBox(
       height: _rowHeight,
@@ -1273,6 +1341,84 @@ class _SelectionActionBar extends StatelessWidget {
                   icon: Icons.delete,
                   variant: AppButtonVariant.destructive,
                   onPressed: onDelete,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// TV/desktop counterpart to [_SelectionActionBar]: a rail docked to the
+/// list's right edge instead of a bar below it. A bottom bar only exists
+/// after the last row, so reaching it with a d-pad means holding Down
+/// through every row above it first - fine for a short touch scroll, a
+/// real barrier on a long list navigated one focus stop at a time. Docking
+/// beside the list instead means it's always exactly one Right press away
+/// from whichever row currently has focus, regardless of scroll position.
+/// The enclosing list's `DpadRegion.onEdge` forwards a Right press at its
+/// horizontal edge to [focusNode] (the rail's entry point); Left back out
+/// of the rail is plain [DpadRegion] cross-region traversal, which restores
+/// whichever row was last focused.
+class _SelectionRail extends StatelessWidget {
+  const _SelectionRail({
+    required this.count,
+    required this.onExit,
+    required this.focusNode,
+    this.onDelete,
+  });
+
+  final int count;
+  final VoidCallback onExit;
+  final VoidCallback? onDelete;
+  final FocusNode focusNode;
+
+  static const double _railWidth = 88;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: DpadRegion(
+        debugLabel: 'dvr/selection-rail',
+        verticalEdge: DpadEdgeBehavior.stop,
+        child: Container(
+          width: _railWidth,
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AppIconButton(
+                icon: Icons.close,
+                tooltip: l10n.dvrExitSelection,
+                onPressed: onExit,
+                focusNode: onDelete == null ? focusNode : null,
+              ),
+              const SizedBox(height: 20),
+              Tooltip(
+                message: l10n.dvrSelectedCount(count),
+                child: Text(
+                  '$count',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (onDelete != null)
+                AppIconButton(
+                  icon: Icons.delete,
+                  tooltip: l10n.dvrDelete,
+                  variant: AppButtonVariant.destructive,
+                  onPressed: onDelete,
+                  focusNode: focusNode,
                 ),
             ],
           ),
