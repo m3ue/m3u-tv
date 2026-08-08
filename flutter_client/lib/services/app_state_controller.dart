@@ -408,10 +408,13 @@ class AppStateController extends ChangeNotifier {
   Future<bool> switchToM3u({
     required String playlistText,
     String name = 'Direct M3U',
+    bool recoverFromInvalidSource = false,
   }) async {
-    _isLoadingContent = true;
-    _error = null;
-    notifyListeners();
+    if (!recoverFromInvalidSource) {
+      _isLoadingContent = true;
+      _error = null;
+      notifyListeners();
+    }
 
     try {
       final playlist = m3uParser.parse(playlistText);
@@ -457,7 +460,9 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
       return true;
     } on M3UParseException catch (error) {
-      _error = 'M3U parse error: ${error.message}';
+      _error = recoverFromInvalidSource
+          ? savedM3uRefreshErrorCode
+          : 'M3U parse error: ${error.message}';
       _isLoadingContent = false;
       notifyListeners();
       return false;
@@ -1878,7 +1883,11 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await switchToM3u(playlistText: playlist, name: name);
+    await switchToM3u(
+      playlistText: playlist,
+      name: name,
+      recoverFromInvalidSource: recoverFromInvalidSource,
+    );
   }
 
   Future<AppSourceType> _readSavedSourceType() async {

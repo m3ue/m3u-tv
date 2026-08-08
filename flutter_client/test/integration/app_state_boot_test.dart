@@ -563,6 +563,52 @@ void main() {
     }
 
     test(
+      'clearAndRefresh localizes malformed saved Direct M3U playlist errors',
+      () async {
+        final storage = InMemorySecureStorage();
+        var xtreamRequestCount = 0;
+        final controller = _controller(
+          storage: storage,
+          transport: (request) async {
+            xtreamRequestCount += 1;
+            throw StateError('Xtream transport should not be called');
+          },
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          await controller.switchToM3u(
+            playlistText:
+                '#EXTM3U\n#EXTINF:-1 group-title="News",Original Channel\nhttps://streams.example/original.m3u8',
+          ),
+          isTrue,
+        );
+        final originalChannels = controller.channels;
+        await storage.write(
+          'm3ue_tv_source',
+          jsonEncode(<String, String>{
+            'type': 'm3u',
+            'name': 'Saved Playlist',
+            'playlist': 'persisted-secret is not a playlist',
+          }),
+        );
+        var notificationCount = 0;
+        controller.addListener(() => notificationCount += 1);
+
+        await expectLater(controller.clearAndRefresh(), completes);
+
+        expect(controller.sourceType, AppSourceType.m3u);
+        expect(controller.channels, same(originalChannels));
+        expect(controller.channels.single.name, 'Original Channel');
+        expect(controller.error, savedM3uRefreshErrorCode);
+        expect(controller.error, isNot(contains('persisted-secret')));
+        expect(controller.isLoadingContent, isFalse);
+        expect(notificationCount, 2);
+        expect(xtreamRequestCount, 0);
+      },
+    );
+
+    test(
       'production defaults persist state across controller instances',
       () async {
         final directory = await io.Directory.systemTemp.createTemp(
