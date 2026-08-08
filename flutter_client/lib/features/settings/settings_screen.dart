@@ -7,6 +7,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
@@ -28,6 +29,7 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.authNotifier,
     required this.traktService,
+    this.devicePairingService,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -51,6 +53,7 @@ class SettingsScreen extends StatefulWidget {
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final DevicePairingService? devicePairingService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final Viewer? activeViewer;
@@ -132,6 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _localizedSourceError(context, _connectionError) ??
               sourceError ??
               widget.authNotifier.error,
+          devicePairingService: widget.devicePairingService,
         ),
       );
     }
@@ -203,17 +207,20 @@ class _ConnectionFormBody extends StatefulWidget {
     required this.onConnect,
     this.initialValues,
     this.error,
+    this.devicePairingService,
   });
 
   final Future<void> Function(UserCredentials credentials) onConnect;
   final UserCredentials? initialValues;
   final String? error;
+  final DevicePairingService? devicePairingService;
 
   @override
   State<_ConnectionFormBody> createState() => _ConnectionFormBodyState();
 }
 
-class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
+class _ConnectionFormBodyState extends State<_ConnectionFormBody>
+    with SingleTickerProviderStateMixin {
   late final _serverController = TextEditingController(
     text: widget.initialValues?.server,
   );
@@ -223,14 +230,36 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
   late final _passwordController = TextEditingController(
     text: widget.initialValues?.password,
   );
+  late final TabController _tabController;
   String? _validationError;
+  bool _pairing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    widget.devicePairingService?.addListener(_onPairingChanged);
+  }
 
   @override
   void dispose() {
+    widget.devicePairingService?.removeListener(_onPairingChanged);
     _serverController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  void _onPairingChanged() {
+    final service = widget.devicePairingService;
+    if (service == null) return;
+    if (service.status == DevicePairingStatus.approved) {
+      final result = service.result;
+      if (result != null) unawaited(widget.onConnect(result));
+      return;
+    }
+    setState(() {});
   }
 
   void _handleConnect() {
@@ -239,7 +268,11 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
     final password = _passwordController.text;
 
     if (server.isEmpty || username.isEmpty || password.isEmpty) {
-      setState(() => _validationError = 'Please fill in all fields');
+      setState(
+        () => _validationError = AppLocalizations.of(
+          context,
+        ).settingsFillAllFields,
+      );
       return;
     }
     setState(() => _validationError = null);
@@ -250,71 +283,451 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody> {
     );
   }
 
+  void _handlePairWithCode() {
+    final server = _serverController.text.trim();
+    if (server.isEmpty) {
+      setState(
+        () => _validationError = AppLocalizations.of(
+          context,
+        ).pairingEnterServerFirst,
+      );
+      return;
+    }
+    setState(() {
+      _validationError = null;
+      _pairing = true;
+    });
+    unawaited(widget.devicePairingService!.start(server));
+  }
+
+  void _cancelPairing() {
+    widget.devicePairingService?.cancel();
+    setState(() => _pairing = false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final service = widget.devicePairingService;
+    if (_pairing &&
+        service != null &&
+        service.status != DevicePairingStatus.idle) {
+      return DpadRegion(
+        memoryKey: 'device-pairing',
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: _DevicePairingBody(
+            service: service,
+            onCancel: _cancelPairing,
+          ),
+        ),
+      );
+    }
+
     final theme = Theme.of(context);
     final displayError = _validationError ?? widget.error;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Connection Settings', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            'Enter your Xtream codes details',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    if (service == null) {
+      // No pairing service available — a single manual sign-in form, same
+      // as before device pairing existed.
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l.settingsConnectionSettings,
+              style: theme.textTheme.headlineMedium,
             ),
-          ),
-          const SizedBox(height: 24),
-          if (displayError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                displayError,
-                style: TextStyle(color: theme.colorScheme.error),
+            const SizedBox(height: 8),
+            Text(
+              l.settingsConnectionSettingsSubtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          TextFormField(
-            controller: _serverController,
-            decoration: const InputDecoration(
-              labelText: 'Server URL',
-              hintText: 'http://example.com:8080',
+            const SizedBox(height: 24),
+            _buildError(theme, displayError),
+            ..._buildSignInFields(l, autofocusServer: true),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        DpadTabBar(
+          controller: _tabController,
+          tabs: [l.settingsTabPair, l.settingsTabSignIn],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      l.settingsConnectionSettings,
+                      style: theme.textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l.settingsPairTabSubtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildError(theme, displayError),
+                    TextFormField(
+                      controller: _serverController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: l.settingsServerUrl,
+                        hintText: 'example.com:8080',
+                      ),
+                      autocorrect: false,
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handlePairWithCode(),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: AppButton(
+                        variant: AppButtonVariant.primaryInverted,
+                        icon: Icons.qr_code,
+                        label: l.settingsPairWithCode,
+                        onPressed: _handlePairWithCode,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      l.settingsConnectionSettings,
+                      style: theme.textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l.settingsConnectionSettingsSubtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildError(theme, displayError),
+                    ..._buildSignInFields(l, autofocusServer: false),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildError(ThemeData theme, String? displayError) {
+    if (displayError == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        displayError,
+        style: TextStyle(color: theme.colorScheme.error),
+      ),
+    );
+  }
+
+  List<Widget> _buildSignInFields(
+    AppLocalizations l, {
+    required bool autofocusServer,
+  }) {
+    return [
+      TextFormField(
+        controller: _serverController,
+        autofocus: autofocusServer,
+        decoration: InputDecoration(
+          labelText: l.settingsServerUrl,
+          hintText: 'example.com:8080',
+        ),
+        autocorrect: false,
+        keyboardType: TextInputType.url,
+        textInputAction: TextInputAction.next,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _usernameController,
+        decoration: InputDecoration(labelText: l.settingsUsername),
+        autocorrect: false,
+        textInputAction: TextInputAction.next,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _passwordController,
+        decoration: InputDecoration(labelText: l.settingsPassword),
+        obscureText: true,
+        autocorrect: false,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => _handleConnect(),
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: AppButton(
+          variant: AppButtonVariant.primaryInverted,
+          label: l.settingsConnect,
+          onPressed: _handleConnect,
+        ),
+      ),
+    ];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Device pairing (Trakt-style device code flow against the user's own server)
+// ---------------------------------------------------------------------------
+
+class _DevicePairingBody extends StatelessWidget {
+  const _DevicePairingBody({required this.service, required this.onCancel});
+
+  final DevicePairingService service;
+  final VoidCallback onCancel;
+
+  static Widget get _logo =>
+      SvgPicture.asset('assets/icons/editor-logo.svg', height: 40);
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    final Widget body;
+    if (service.status == DevicePairingStatus.error) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l.pairingErrorGeneric, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 16),
+          AppButton(autofocus: true, label: l.cancel, onPressed: onCancel),
+        ],
+      );
+    } else {
+      final pending = service.pending;
+      final uri = pending?.verificationUri ?? '';
+      final userCode = pending?.userCode ?? '––––––';
+
+      body = LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth >= 600
+            ? _DevicePairingWide(
+                uri: uri,
+                userCode: userCode,
+                onCancel: onCancel,
+              )
+            : _DevicePairingNarrow(
+                uri: uri,
+                userCode: userCode,
+                onCancel: onCancel,
+              ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [_logo, const SizedBox(height: 16), body],
+        ),
+      ),
+    );
+  }
+}
+
+class _DevicePairingWide extends StatelessWidget {
+  const _DevicePairingWide({
+    required this.uri,
+    required this.userCode,
+    required this.onCancel,
+  });
+
+  final String uri;
+  final String userCode;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _DevicePairingInstructions(uri: uri, userCode: userCode),
+        ),
+        const SizedBox(width: 24),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: QrImageView(
+                data: uri.isEmpty ? ' ' : uri,
+                size: 140,
+                backgroundColor: Colors.white,
+              ),
             ),
-            autocorrect: false,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _usernameController,
-            decoration: const InputDecoration(labelText: 'Username'),
-            autocorrect: false,
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'Password'),
-            obscureText: true,
-            autocorrect: false,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _handleConnect(),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 6),
+            Text(
+              AppLocalizations.of(context).pairingScanQr,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            AppButton(
+              autofocus: true,
+              label: AppLocalizations.of(context).cancel,
+              onPressed: onCancel,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DevicePairingNarrow extends StatelessWidget {
+  const _DevicePairingNarrow({
+    required this.uri,
+    required this.userCode,
+    required this.onCancel,
+  });
+
+  final String uri;
+  final String userCode;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DevicePairingInstructions(
+          uri: uri,
+          userCode: userCode,
+          uriTappable: true,
+        ),
+        const SizedBox(height: 20),
+        if (uri.isNotEmpty)
           SizedBox(
             width: double.infinity,
             child: AppButton(
-              autofocus: true,
-              variant: AppButtonVariant.primaryInverted,
-              label: 'Connect',
-              onPressed: _handleConnect,
+              icon: Icons.open_in_new,
+              label: AppLocalizations.of(context).pairingOpenBrowser,
+              onPressed: () => launchUrl(
+                Uri.parse(uri),
+                mode: LaunchMode.externalApplication,
+              ),
             ),
           ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: AppButton(
+            label: AppLocalizations.of(context).cancel,
+            onPressed: onCancel,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DevicePairingInstructions extends StatelessWidget {
+  const _DevicePairingInstructions({
+    required this.uri,
+    required this.userCode,
+    this.uriTappable = false,
+  });
+
+  final String uri;
+  final String userCode;
+  final bool uriTappable;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+    final uriStyle = theme.textTheme.titleMedium?.copyWith(
+      color: theme.colorScheme.primary,
+      fontWeight: FontWeight.bold,
+      decoration: uriTappable ? TextDecoration.underline : null,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (uri.isNotEmpty) ...[
+          Text(l.pairingPendingGoTo, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          if (uriTappable)
+            GestureDetector(
+              onTap: () => launchUrl(
+                Uri.parse(uri),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: Text(uri, style: uriStyle),
+            )
+          else
+            Text(uri, style: uriStyle),
+          const SizedBox(height: 16),
         ],
-      ),
+        Text(l.pairingPendingEnterCode, style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            userCode,
+            style: theme.textTheme.displaySmall?.copyWith(
+              color: theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                l.pairingPendingWaiting,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -427,18 +840,9 @@ class _ConnectedViewState extends State<_ConnectedView>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: Text(
-            AppLocalizations.of(context).settingsTitle,
-            style: theme.textTheme.headlineMedium,
-          ),
-        ),
         DpadTabBar(
           controller: _tabController,
           tabs: [
@@ -693,24 +1097,38 @@ class _ConnectedViewState extends State<_ConnectedView>
           const SizedBox(height: 20),
         ],
 
-        // ── Commercial skipping ──────────────────────────────────────────────
+        // ── DVR ──────────────────────────────────────────────────────────────
         if (widget.comskipSettings != null) ...[
           _SettingsSection(
-            title: l.settingsComskip,
-            subtitle: l.settingsComskipSubtitle,
+            title: l.settingsDvr,
+            subtitle: l.settingsDvrSubtitle,
             child: ListenableBuilder(
               listenable: widget.comskipSettings!,
-              builder: (context, _) => Wrap(
-                spacing: 8,
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _IntervalChip(
-                    label: l.settingsComskipAutoSkip,
-                    isSelected: widget.comskipSettings!.autoSkipEnabled,
-                    onTap: () => unawaited(
-                      widget.comskipSettings!.setAutoSkipEnabled(
-                        enabled: !widget.comskipSettings!.autoSkipEnabled,
-                      ),
+                  Text(l.settingsComskip, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    l.settingsComskipSubtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _IntervalChip(
+                        label: l.settingsComskipAutoSkip,
+                        isSelected: widget.comskipSettings!.autoSkipEnabled,
+                        onTap: () => unawaited(
+                          widget.comskipSettings!.setAutoSkipEnabled(
+                            enabled: !widget.comskipSettings!.autoSkipEnabled,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

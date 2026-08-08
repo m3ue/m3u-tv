@@ -336,6 +336,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'No transcoding profiles available — streams use the direct proxy.';
 
   @override
+  String get settingsDvr => 'DVR';
+
+  @override
+  String get settingsDvrSubtitle => 'Settings for recorded content playback.';
+
+  @override
   String get settingsComskip => 'Commercial Skipping';
 
   @override
@@ -380,6 +386,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAppScanQr => 'Scan to open on your phone';
+
+  @override
+  String get settingsFillAllFields => 'Please fill in all fields';
+
+  @override
+  String get settingsConnectionSettings => 'Connection Settings';
+
+  @override
+  String get settingsConnectionSettingsSubtitle =>
+      'Enter your Xtream codes details';
+
+  @override
+  String get settingsServerUrl => 'Server URL';
+
+  @override
+  String get settingsUsername => 'Username';
+
+  @override
+  String get settingsPassword => 'Password';
+
+  @override
+  String get settingsConnect => 'Connect';
+
+  @override
+  String get settingsPairWithCode => 'Pair with code';
+
+  @override
+  String get settingsTabPair => 'Pair';
+
+  @override
+  String get settingsTabSignIn => 'Sign In';
+
+  @override
+  String get settingsPairTabSubtitle =>
+      'Enter your server address, then pair this TV using a code.';
+
+  @override
+  String get pairingEnterServerFirst => 'Enter your server URL first';
+
+  @override
+  String get pairingErrorGeneric =>
+      'Pairing failed or the code expired. Please try again.';
+
+  @override
+  String get pairingScanQr => 'Scan to open the pairing page on your phone';
+
+  @override
+  String get pairingOpenBrowser => 'Open in browser';
+
+  @override
+  String get pairingPendingGoTo => 'On your phone or computer, go to:';
+
+  @override
+  String get pairingPendingEnterCode => 'Then enter this code:';
+
+  @override
+  String get pairingPendingWaiting => 'Waiting for approval…';
 
   @override
   String get homeContinueWatching => 'Continue Watching';
@@ -728,4 +791,267 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerStopRecordingTooltip => 'Stop recording';
+
+  @override
+  String get dvrMoreActions => 'More actions';
+
+  @override
+  String get dvrPlay => 'Play';
+
+  @override
+  String get dvrSelect => 'Select';
+
+  @override
+  String get dvrStop => 'Stop';
+
+  @override
+  String get dvrStatusRecording => 'Recording';
+
+  @override
+  String get dvrStatusScheduled => 'Scheduled';
+
+  @override
+  String get dvrStatusFailed => 'Failed';
+
+  @override
+  String get dvrExitSelection => 'Exit selection';
+
+  @override
+  String dvrSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items selected',
+      one: '1 item selected',
+      zero: 'No items selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrStorageTitle => 'DVR Storage';
+
+  @override
+  String get dvrStorageUnlimited => 'Unlimited';
+
+  @override
+  String dvrStorageUsedUnlimited(String used) {
+    return '$used used';
+  }
+
+  @override
+  String dvrStorageUsedWithQuota(String used, String quota) {
+    return '$used of $quota used';
+  }
+
+  @override
+  String dvrStorageRecordingCount(int count) {
+    return '$count recordings';
+  }
+
+  @override
+  String get dvrSeriesChannel => 'Channel';
+
+  @override
+  String get dvrSeriesStartEarly => 'Start early';
+
+  @override
+  String get dvrSeriesUseDefault => 'Use default';
+
+  @override
+  String dvrEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodes',
+      one: '1 episode',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrDeleteSeriesRule => 'Delete rule';
+
+  @override
+  String get dvrUpdateSeriesRuleFailed => 'Could not update series rule';
+
+  @override
+  String get dvrSeriesSave => 'Save';
+
+  @override
+  String get dvrSeriesSecondsSuffix => 'sec';
+
+  @override
+  String get dvrSeriesMode => 'Series mode';
+
+  @override
+  String get dvrUpdateSeriesRuleSuccess => 'Series rule updated';
+
+  @override
+  String get dvrSeriesModeAll => 'All episodes';
+
+  @override
+  String get dvrSeriesMatchModeStartsWith => 'Starts with';
+
+  @override
+  String get dvrDeleteSeriesRuleConfirm => 'Delete this series rule?';
+
+  @override
+  String get dvrSeriesCancel => 'Cancel';
+
+  @override
+  String get dvrDeleteSeriesRuleSuccess => 'Series rule deleted';
+
+  @override
+  String get dvrSeriesRulesTitle => 'Series Rules';
+
+  @override
+  String get dvrSeriesMatchModeContains => 'Contains';
+
+  @override
+  String get dvrSeriesMatchModeExact => 'Exact';
+
+  @override
+  String get dvrSeriesModeUseDefault => 'Use default';
+
+  @override
+  String get dvrSeriesModeNewFlag => 'New only';
+
+  @override
+  String get dvrDeleteSeriesRuleFailed => 'Could not delete series rule';
+
+  @override
+  String get dvrSeriesKeepLast => 'Keep last';
+
+  @override
+  String get dvrSeriesModeUniqueSe => 'Unique S-E';
+
+  @override
+  String get dvrSeriesAnyChannel => 'Any channel';
+
+  @override
+  String get dvrSeriesMatchMode => 'Match mode';
+
+  @override
+  String get dvrSeriesEndLate => 'End late';
+
+  @override
+  String get dvrSeriesOptions => 'Options';
+
+  @override
+  String dvrSeriesOptionsFor(String title) {
+    return 'Options: $title';
+  }
+
+  @override
+  String get dvrSeriesAllEpisodesWarning =>
+      'Recording all episodes on any channel may create duplicates — use New only or Unique S-E to deduplicate.';
+
+  @override
+  String get dvrSeriesRulesEmpty => 'No series rules';
+
+  @override
+  String get dvrSeriesPriority => 'Priority';
+
+  @override
+  String get epgRecordSeries => 'Record Series';
+
+  @override
+  String epgRecordSeriesSuccess(String title) {
+    return 'Series recording set for $title';
+  }
+
+  @override
+  String get epgRecordSeriesFailed => 'Could not set series recording';
+
+  @override
+  String get epgRecordSeriesDuplicate => 'Series recording already set';
+
+  @override
+  String get navShows => 'Shows';
+
+  @override
+  String get showAiringNext => 'Next airing';
+
+  @override
+  String get showAiringNone => 'No upcoming episodes in EPG';
+
+  @override
+  String showChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count channels',
+      one: '1 channel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showDeleteRule => 'Delete series rule';
+
+  @override
+  String showDeleteRuleConfirm(String title) {
+    return 'Delete the series rule for $title? Future episodes will not be recorded. Recordings already made will not be deleted.';
+  }
+
+  @override
+  String get showSeriesRuleActive => 'Series rule active';
+
+  @override
+  String get showDetailTitle => 'Show details';
+
+  @override
+  String showEpisodesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodes',
+      one: '1 episode',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showRecordSeries => 'Record Series';
+
+  @override
+  String showRecordSeriesConfirm(String title, String channel) {
+    return 'Record every episode of $title on $channel?';
+  }
+
+  @override
+  String showRecordSeriesFailed(String title) {
+    return 'Could not set series recording for $title';
+  }
+
+  @override
+  String showRecordSeriesSuccess(String title) {
+    return 'Series recording set for $title';
+  }
+
+  @override
+  String showRecordSeriesDuplicate(String title) {
+    return 'Series recording already set for $title';
+  }
+
+  @override
+  String get showsError => 'Could not search shows';
+
+  @override
+  String get showsNoResults => 'No shows match your search';
+
+  @override
+  String get showsSearchError => 'Search failed';
+
+  @override
+  String get showsSearchHint => 'Search shows by title';
+
+  @override
+  String get showsTitle => 'Shows';
+
+  @override
+  String showNotFound(String title) {
+    return 'Show \"$title\" not found';
+  }
 }

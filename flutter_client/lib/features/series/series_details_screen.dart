@@ -9,6 +9,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class SeriesDetailsScreen extends StatefulWidget {
     this.coverUrl,
     this.onPlay,
     this.progressList = const [],
+    this.onSidebarActivate,
   });
 
   final int seriesId;
@@ -31,6 +33,7 @@ class SeriesDetailsScreen extends StatefulWidget {
   final XtreamService xtreamService;
   final void Function(PlayerArgs)? onPlay;
   final List<Progress> progressList;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -50,27 +53,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.seriesName),
-        automaticallyImplyLeading: false,
-        leadingWidth: 56,
-        leading: Padding(
-          padding: const EdgeInsets.all(8),
-          child: DpadFocusable(
-            onSelect: () => Navigator.of(context).maybePop(),
-            effects: const [
-              GradientBorderEffect(
-                borderRadius: BorderRadius.all(Radius.circular(50)),
-              ),
-            ],
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-        ),
-      ),
+    return ItemDetailScaffold(
+      title: widget.seriesName,
+      onSidebarActivate: widget.onSidebarActivate,
       body: FutureBuilder<SeriesInfo>(
         future: _future,
         builder: (context, snapshot) {
@@ -95,7 +80,6 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           }
           return _SeriesDetailsBody(
             info: info,
-            seriesId: widget.seriesId,
             selectedSeason: _selectedSeason,
             progressList: widget.progressList,
             onSeasonSelected: (season) =>
@@ -117,13 +101,10 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             width: 220,
             child: AspectRatio(
               aspectRatio: 0.68,
-              child: Hero(
-                tag: 'series_poster_${widget.seriesId}',
-                child: ResilientMediaImage(
-                  imageUrl: widget.coverUrl,
-                  fallbackIcon: Icons.tv,
-                  borderRadius: 16,
-                ),
+              child: ResilientMediaImage(
+                imageUrl: widget.coverUrl,
+                fallbackIcon: Icons.tv,
+                borderRadius: 16,
               ),
             ),
           ),
@@ -159,17 +140,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               Positioned(
                 left: 16,
                 bottom: 16,
-                child: Hero(
-                  tag: 'series_poster_${widget.seriesId}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: ResilientMediaImage(
-                      imageUrl: widget.coverUrl,
-                      fallbackIcon: Icons.tv,
-                      width: 100,
-                      height: 148,
-                      borderRadius: 0,
-                    ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: ResilientMediaImage(
+                    imageUrl: widget.coverUrl,
+                    fallbackIcon: Icons.tv,
+                    width: 100,
+                    height: 148,
+                    borderRadius: 0,
                   ),
                 ),
               ),
@@ -219,7 +197,6 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 class _SeriesDetailsBody extends StatelessWidget {
   const _SeriesDetailsBody({
     required this.info,
-    required this.seriesId,
     required this.selectedSeason,
     required this.progressList,
     required this.onSeasonSelected,
@@ -227,11 +204,6 @@ class _SeriesDetailsBody extends StatelessWidget {
   });
 
   final SeriesInfo info;
-
-  /// The series ID from the navigation argument — used for Hero tags so they
-  /// remain consistent with the list card regardless of what info.series.id
-  /// the API returns.
-  final int seriesId;
   final int? selectedSeason;
   final List<Progress> progressList;
   final ValueChanged<int> onSeasonSelected;
@@ -276,13 +248,10 @@ class _SeriesDetailsBody extends StatelessWidget {
             width: 220,
             child: AspectRatio(
               aspectRatio: 0.68,
-              child: Hero(
-                tag: 'series_poster_$seriesId',
-                child: ResilientMediaImage(
-                  imageUrl: info.series.coverUrl,
-                  fallbackIcon: Icons.tv,
-                  borderRadius: 16,
-                ),
+              child: ResilientMediaImage(
+                imageUrl: info.series.coverUrl,
+                fallbackIcon: Icons.tv,
+                borderRadius: 16,
               ),
             ),
           ),
@@ -427,17 +396,14 @@ class _SeriesDetailsBody extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Hero(
-                      tag: 'series_poster_$seriesId',
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: ResilientMediaImage(
-                          imageUrl: cover,
-                          fallbackIcon: Icons.tv,
-                          width: 100,
-                          height: 148,
-                          borderRadius: 0,
-                        ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ResilientMediaImage(
+                        imageUrl: cover,
+                        fallbackIcon: Icons.tv,
+                        width: 100,
+                        height: 148,
+                        borderRadius: 0,
                       ),
                     ),
                     const SizedBox(width: 12),

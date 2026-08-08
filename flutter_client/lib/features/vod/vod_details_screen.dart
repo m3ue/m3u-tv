@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
-import 'package:m3u_tv/shared/app_button.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart';
+import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class VodDetailsScreen extends StatefulWidget {
@@ -18,12 +17,14 @@ class VodDetailsScreen extends StatefulWidget {
     this.xtreamService,
     this.progressList = const [],
     this.onPlay,
+    this.onSidebarActivate,
   });
 
   final VodItem item;
   final XtreamService? xtreamService;
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<VodDetailsScreen> createState() => _VodDetailsScreenState();
@@ -36,27 +37,9 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.item.name),
-        automaticallyImplyLeading: false,
-        leadingWidth: 56,
-        leading: Padding(
-          padding: const EdgeInsets.all(8),
-          child: DpadFocusable(
-            onSelect: () => Navigator.of(context).maybePop(),
-            effects: const [
-              GradientBorderEffect(
-                borderRadius: BorderRadius.all(Radius.circular(50)),
-              ),
-            ],
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-        ),
-      ),
+    return ItemDetailScaffold(
+      title: widget.item.name,
+      onSidebarActivate: widget.onSidebarActivate,
       body: _future == null
           ? _VodDetailsBody(
               item: widget.item,
@@ -139,14 +122,11 @@ class _VodDetailsBody extends StatelessWidget {
             width: 220,
             child: AspectRatio(
               aspectRatio: 0.68,
-              child: Hero(
-                tag: 'vod_poster_${item.id}',
-                child: ResilientMediaImage(
-                  imageUrl: details.coverUrl,
-                  fallbackIcon: Icons.movie,
-                  borderRadius: MediaBrowsingMetrics.cardRadius,
-                  fallbackTitle: details.name,
-                ),
+              child: ResilientMediaImage(
+                imageUrl: details.coverUrl,
+                fallbackIcon: Icons.movie,
+                borderRadius: MediaBrowsingMetrics.cardRadius,
+                fallbackTitle: details.name,
               ),
             ),
           ),
@@ -161,7 +141,7 @@ class _VodDetailsBody extends StatelessWidget {
     );
 
     // Always use the backdrop Stack layout so the poster stays bottom-aligned
-    // before and after the backdrop URL loads in, preventing a Hero position jump.
+    // before and after the backdrop URL loads in, avoiding a layout jump.
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -223,23 +203,20 @@ class _VodDetailsBody extends StatelessWidget {
                   ),
                 ),
               ),
-              // Always show the poster thumbnail at the same position so the
-              // Hero destination is stable before and after the backdrop loads.
+              // Always show the poster thumbnail at the same position so it
+              // stays stable before and after the backdrop loads.
               Positioned(
                 left: 16,
                 bottom: 16,
-                child: Hero(
-                  tag: 'vod_poster_${item.id}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ResilientMediaImage(
-                      imageUrl: details.coverUrl,
-                      fallbackIcon: Icons.movie,
-                      width: 80,
-                      height: 118,
-                      borderRadius: 0,
-                      fallbackTitle: details.name,
-                    ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: ResilientMediaImage(
+                    imageUrl: details.coverUrl,
+                    fallbackIcon: Icons.movie,
+                    width: 80,
+                    height: 118,
+                    borderRadius: 0,
+                    fallbackTitle: details.name,
                   ),
                 ),
               ),
@@ -270,69 +247,28 @@ class _VodDetailsBody extends StatelessWidget {
     bool fullWidthButton = false,
   }) {
     final l = AppLocalizations.of(context);
-    final progressValue = _progressValue(progress);
     final buttonLabel = progress == null ? l.vodPlayMovie : l.vodContinueMovie;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(details.name, style: theme.textTheme.headlineMedium),
-        const SizedBox(height: MediaBrowsingMetrics.itemGap),
-        Wrap(
-          spacing: MediaBrowsingMetrics.itemGap,
-          runSpacing: MediaBrowsingMetrics.chipGap,
-          children: [
-            if (details.year != null) _MetadataChip(label: details.year!),
-            if (details.genre != null) _MetadataChip(label: details.genre!),
-            if (details.duration != null)
-              _MetadataChip(label: details.duration!),
-            if (details.rating != null)
-              _MetadataChip(label: '★ ${details.rating}'),
-            if (details.containerExtension != null)
-              _MetadataChip(label: details.containerExtension!.toUpperCase()),
-          ],
-        ),
-        const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-        if (fullWidthButton)
-          SizedBox(
-            width: double.infinity,
-            child: AppButton(
-              autofocus: true,
-              variant: AppButtonVariant.primaryInverted,
-              icon: Icons.play_arrow,
-              label: buttonLabel,
-              onPressed: () => _play(details, progress),
-            ),
-          )
-        else
-          AppButton(
-            autofocus: true,
-            variant: AppButtonVariant.primaryInverted,
-            icon: Icons.play_arrow,
-            label: buttonLabel,
-            onPressed: () => _play(details, progress),
-          ),
-        if (progressValue != null) ...[
-          const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          LinearProgressIndicator(value: progressValue, minHeight: 4),
-        ],
-        const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-        if (isLoading) ...[
-          const LinearProgressIndicator(),
-          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-        ],
-        Text(
-          details.plot ?? 'No synopsis available.',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (details.director != null || details.cast != null) ...[
-          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-          if (details.director != null)
-            _CreditLine(label: 'Director', value: details.director!),
-          if (details.cast != null)
-            _CreditLine(label: 'Cast', value: details.cast!),
-        ],
+    return ItemMetaInfo(
+      name: details.name,
+      chips: [
+        if (details.year != null) details.year!,
+        if (details.genre != null) details.genre!,
+        if (details.duration != null) details.duration!,
+        if (details.rating != null) '★ ${details.rating}',
+        if (details.containerExtension != null)
+          details.containerExtension!.toUpperCase(),
+      ],
+      buttonLabel: buttonLabel,
+      onPlay: () => _play(details, progress),
+      fullWidthButton: fullWidthButton,
+      progressValue: _progressValue(progress),
+      isLoading: isLoading,
+      plot: details.plot ?? 'No synopsis available.',
+      credits: [
+        if (details.director != null)
+          MetaCreditLine(label: 'Director', value: details.director!),
+        if (details.cast != null)
+          MetaCreditLine(label: 'Cast', value: details.cast!),
       ],
     );
   }
@@ -386,51 +322,6 @@ class _ResolvedVodDetails {
   String? get containerExtension =>
       _notEmpty(info?.containerExtension) ?? item.containerExtension;
   int? get tmdbId => info?.tmdbId;
-}
-
-class _CreditLine extends StatelessWidget {
-  const _CreditLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: MediaBrowsingMetrics.chipGap),
-      child: RichText(
-        text: TextSpan(
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            TextSpan(text: value),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MetadataChip extends StatelessWidget {
-  const _MetadataChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Chip(
-      label: Text(label),
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      side: BorderSide(color: colorScheme.outlineVariant),
-    );
-  }
 }
 
 String? _notEmpty(String? value) {

@@ -354,3 +354,31 @@ class AppIconButton extends StatelessWidget {
     );
   }
 }
+
+/// Small pill badge for a status/count label (e.g. "3 episodes", "Series
+/// rule active") — the one non-button "chip" look shared across screens.
+class AppBadge extends StatelessWidget {
+  const AppBadge({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}

@@ -7,7 +7,9 @@ import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/requests/request_detail_screen.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
+import 'package:m3u_tv/features/shows/show_detail_screen.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -15,22 +17,10 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-
-const BoxDecoration _kGradientBg = BoxDecoration(
-  gradient: LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF1a1528),
-      Color(0xFF09090b),
-      Color(0xFF09090b),
-    ],
-    stops: [0.0, 0.45, 1.0],
-  ),
-);
+import 'package:m3u_tv/shared/app_background.dart';
 
 Widget _withGradient(Widget screen) => DecoratedBox(
-  decoration: _kGradientBg,
+  decoration: kAppGradientBg,
   child: SafeArea(bottom: false, child: screen),
 );
 
@@ -150,6 +140,7 @@ GoRouter createGoRouter({
                             xtreamService: actions.xtreamService,
                             onPlay: actions.onOpenPlayer,
                             progressList: actions.progressList,
+                            onSidebarActivate: actions.onSidebarActivate,
                           ),
                         ),
                       );
@@ -202,6 +193,7 @@ GoRouter createGoRouter({
                             xtreamService: actions.xtreamService,
                             onPlay: actions.onOpenPlayer,
                             progressList: actions.progressList,
+                            onSidebarActivate: actions.onSidebarActivate,
                           ),
                         ),
                       );
@@ -275,7 +267,9 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: DVR
+          // Branch 6: DVR with nested show-detail (Shows is now a tab on
+          // DvrRecordingsScreen, not a top-level sidebar destination, so
+          // /dvr/shows/:normalizedTitle lives under this branch).
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -283,6 +277,41 @@ GoRouter createGoRouter({
                 pageBuilder: (context, state) => NoTransitionPage(
                   child: _withGradient(_tabScreen(context, RouteNames.dvr)),
                 ),
+                routes: [
+                  GoRoute(
+                    path: RouteNames.showsDetailsPath,
+                    pageBuilder: (context, state) {
+                      final normalizedTitle =
+                          state.pathParameters['normalizedTitle'] ?? '';
+                      final extra = state.extra;
+                      final show = extra is EpgShow ? extra : null;
+                      if (show == null) {
+                        return NoTransitionPage(
+                          child: Scaffold(
+                            body: SafeArea(
+                              bottom: false,
+                              child: Center(
+                                child: Text(
+                                  AppLocalizations.of(context).showNotFound(
+                                    normalizedTitle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      final actions = ContentActions.of(context);
+                      return _slidePage(
+                        ShowDetailScreen(
+                          show: show,
+                          onRecordSeries: actions.onRecordSeries,
+                          onDeleteSeriesRule: actions.onDeleteSeriesRule,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

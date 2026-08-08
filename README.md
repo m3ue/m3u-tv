@@ -221,7 +221,7 @@ Here's how you can join the party:
 
 ## License
 
-> m3u editor is licensed under **CC BY-NC-SA 4.0**:
+> m3u tv is licensed under **CC BY-NC-SA 4.0**:
 
 - **BY**: Give credit where credit's due.
 - **NC**: No commercial use.

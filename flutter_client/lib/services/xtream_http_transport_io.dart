@@ -68,6 +68,7 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
       method: request.method,
       uri: uri,
       serverMessage: _serverMessage(body),
+      bodyJson: body,
     );
   }
   return body;

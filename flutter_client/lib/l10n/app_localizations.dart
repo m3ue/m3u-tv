@@ -716,6 +716,18 @@ abstract class AppLocalizations {
   /// **'No transcoding profiles available — streams use the direct proxy.'**
   String get settingsProxyNoProfiles;
 
+  /// No description provided for @settingsDvr.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR'**
+  String get settingsDvr;
+
+  /// No description provided for @settingsDvrSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings for recorded content playback.'**
+  String get settingsDvrSubtitle;
+
   /// No description provided for @settingsComskip.
   ///
   /// In en, this message translates to:
@@ -799,6 +811,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scan to open on your phone'**
   String get settingsAppScanQr;
+
+  /// No description provided for @settingsFillAllFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in all fields'**
+  String get settingsFillAllFields;
+
+  /// No description provided for @settingsConnectionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Settings'**
+  String get settingsConnectionSettings;
+
+  /// No description provided for @settingsConnectionSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your Xtream codes details'**
+  String get settingsConnectionSettingsSubtitle;
+
+  /// No description provided for @settingsServerUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get settingsServerUrl;
+
+  /// No description provided for @settingsUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get settingsUsername;
+
+  /// No description provided for @settingsPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get settingsPassword;
+
+  /// No description provided for @settingsConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get settingsConnect;
+
+  /// No description provided for @settingsPairWithCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair with code'**
+  String get settingsPairWithCode;
+
+  /// No description provided for @settingsTabPair.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair'**
+  String get settingsTabPair;
+
+  /// No description provided for @settingsTabSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get settingsTabSignIn;
+
+  /// No description provided for @settingsPairTabSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your server address, then pair this TV using a code.'**
+  String get settingsPairTabSubtitle;
+
+  /// No description provided for @pairingEnterServerFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your server URL first'**
+  String get pairingEnterServerFirst;
+
+  /// No description provided for @pairingErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing failed or the code expired. Please try again.'**
+  String get pairingErrorGeneric;
+
+  /// No description provided for @pairingScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to open the pairing page on your phone'**
+  String get pairingScanQr;
+
+  /// No description provided for @pairingOpenBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get pairingOpenBrowser;
+
+  /// No description provided for @pairingPendingGoTo.
+  ///
+  /// In en, this message translates to:
+  /// **'On your phone or computer, go to:'**
+  String get pairingPendingGoTo;
+
+  /// No description provided for @pairingPendingEnterCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Then enter this code:'**
+  String get pairingPendingEnterCode;
+
+  /// No description provided for @pairingPendingWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval…'**
+  String get pairingPendingWaiting;
 
   /// No description provided for @homeContinueWatching.
   ///
@@ -1429,6 +1549,420 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop recording'**
   String get playerStopRecordingTooltip;
+
+  /// No description provided for @dvrMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get dvrMoreActions;
+
+  /// No description provided for @dvrPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get dvrPlay;
+
+  /// No description provided for @dvrSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get dvrSelect;
+
+  /// No description provided for @dvrStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get dvrStop;
+
+  /// No description provided for @dvrStatusRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get dvrStatusRecording;
+
+  /// No description provided for @dvrStatusScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get dvrStatusScheduled;
+
+  /// No description provided for @dvrStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get dvrStatusFailed;
+
+  /// No description provided for @dvrExitSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit selection'**
+  String get dvrExitSelection;
+
+  /// No description provided for @dvrSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items selected} one{1 item selected} other{{count} items selected}}'**
+  String dvrSelectedCount(int count);
+
+  /// No description provided for @dvrStorageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR Storage'**
+  String get dvrStorageTitle;
+
+  /// No description provided for @dvrStorageUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get dvrStorageUnlimited;
+
+  /// No description provided for @dvrStorageUsedUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} used'**
+  String dvrStorageUsedUnlimited(String used);
+
+  /// No description provided for @dvrStorageUsedWithQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {quota} used'**
+  String dvrStorageUsedWithQuota(String used, String quota);
+
+  /// No description provided for @dvrStorageRecordingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} recordings'**
+  String dvrStorageRecordingCount(int count);
+
+  /// No description provided for @dvrSeriesChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel'**
+  String get dvrSeriesChannel;
+
+  /// No description provided for @dvrSeriesStartEarly.
+  ///
+  /// In en, this message translates to:
+  /// **'Start early'**
+  String get dvrSeriesStartEarly;
+
+  /// No description provided for @dvrSeriesUseDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get dvrSeriesUseDefault;
+
+  /// No description provided for @dvrEpisodeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 episode} other{{count} episodes}}'**
+  String dvrEpisodeCount(int count);
+
+  /// No description provided for @dvrDeleteSeriesRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete rule'**
+  String get dvrDeleteSeriesRule;
+
+  /// No description provided for @dvrUpdateSeriesRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update series rule'**
+  String get dvrUpdateSeriesRuleFailed;
+
+  /// No description provided for @dvrSeriesSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get dvrSeriesSave;
+
+  /// No description provided for @dvrSeriesSecondsSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'sec'**
+  String get dvrSeriesSecondsSuffix;
+
+  /// No description provided for @dvrSeriesMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Series mode'**
+  String get dvrSeriesMode;
+
+  /// No description provided for @dvrUpdateSeriesRuleSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Series rule updated'**
+  String get dvrUpdateSeriesRuleSuccess;
+
+  /// No description provided for @dvrSeriesModeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All episodes'**
+  String get dvrSeriesModeAll;
+
+  /// No description provided for @dvrSeriesMatchModeStartsWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts with'**
+  String get dvrSeriesMatchModeStartsWith;
+
+  /// No description provided for @dvrDeleteSeriesRuleConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this series rule?'**
+  String get dvrDeleteSeriesRuleConfirm;
+
+  /// No description provided for @dvrSeriesCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get dvrSeriesCancel;
+
+  /// No description provided for @dvrDeleteSeriesRuleSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Series rule deleted'**
+  String get dvrDeleteSeriesRuleSuccess;
+
+  /// No description provided for @dvrSeriesRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Series Rules'**
+  String get dvrSeriesRulesTitle;
+
+  /// No description provided for @dvrSeriesMatchModeContains.
+  ///
+  /// In en, this message translates to:
+  /// **'Contains'**
+  String get dvrSeriesMatchModeContains;
+
+  /// No description provided for @dvrSeriesMatchModeExact.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact'**
+  String get dvrSeriesMatchModeExact;
+
+  /// No description provided for @dvrSeriesModeUseDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get dvrSeriesModeUseDefault;
+
+  /// No description provided for @dvrSeriesModeNewFlag.
+  ///
+  /// In en, this message translates to:
+  /// **'New only'**
+  String get dvrSeriesModeNewFlag;
+
+  /// No description provided for @dvrDeleteSeriesRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete series rule'**
+  String get dvrDeleteSeriesRuleFailed;
+
+  /// No description provided for @dvrSeriesKeepLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep last'**
+  String get dvrSeriesKeepLast;
+
+  /// No description provided for @dvrSeriesModeUniqueSe.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique S-E'**
+  String get dvrSeriesModeUniqueSe;
+
+  /// No description provided for @dvrSeriesAnyChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Any channel'**
+  String get dvrSeriesAnyChannel;
+
+  /// No description provided for @dvrSeriesMatchMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Match mode'**
+  String get dvrSeriesMatchMode;
+
+  /// No description provided for @dvrSeriesEndLate.
+  ///
+  /// In en, this message translates to:
+  /// **'End late'**
+  String get dvrSeriesEndLate;
+
+  /// No description provided for @dvrSeriesOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get dvrSeriesOptions;
+
+  /// No description provided for @dvrSeriesOptionsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Options: {title}'**
+  String dvrSeriesOptionsFor(String title);
+
+  /// No description provided for @dvrSeriesAllEpisodesWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording all episodes on any channel may create duplicates — use New only or Unique S-E to deduplicate.'**
+  String get dvrSeriesAllEpisodesWarning;
+
+  /// No description provided for @dvrSeriesRulesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No series rules'**
+  String get dvrSeriesRulesEmpty;
+
+  /// No description provided for @dvrSeriesPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get dvrSeriesPriority;
+
+  /// No description provided for @epgRecordSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Series'**
+  String get epgRecordSeries;
+
+  /// No description provided for @epgRecordSeriesSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Series recording set for {title}'**
+  String epgRecordSeriesSuccess(String title);
+
+  /// No description provided for @epgRecordSeriesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not set series recording'**
+  String get epgRecordSeriesFailed;
+
+  /// No description provided for @epgRecordSeriesDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Series recording already set'**
+  String get epgRecordSeriesDuplicate;
+
+  /// No description provided for @navShows.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows'**
+  String get navShows;
+
+  /// No description provided for @showAiringNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next airing'**
+  String get showAiringNext;
+
+  /// No description provided for @showAiringNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No upcoming episodes in EPG'**
+  String get showAiringNone;
+
+  /// No description provided for @showChannelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 channel} other{{count} channels}}'**
+  String showChannelCount(int count);
+
+  /// No description provided for @showDeleteRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete series rule'**
+  String get showDeleteRule;
+
+  /// No description provided for @showDeleteRuleConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the series rule for {title}? Future episodes will not be recorded. Recordings already made will not be deleted.'**
+  String showDeleteRuleConfirm(String title);
+
+  /// No description provided for @showSeriesRuleActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Series rule active'**
+  String get showSeriesRuleActive;
+
+  /// No description provided for @showDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show details'**
+  String get showDetailTitle;
+
+  /// No description provided for @showEpisodesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 episode} other{{count} episodes}}'**
+  String showEpisodesCount(int count);
+
+  /// No description provided for @showRecordSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Series'**
+  String get showRecordSeries;
+
+  /// No description provided for @showRecordSeriesConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Record every episode of {title} on {channel}?'**
+  String showRecordSeriesConfirm(String title, String channel);
+
+  /// No description provided for @showRecordSeriesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not set series recording for {title}'**
+  String showRecordSeriesFailed(String title);
+
+  /// No description provided for @showRecordSeriesSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Series recording set for {title}'**
+  String showRecordSeriesSuccess(String title);
+
+  /// No description provided for @showRecordSeriesDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Series recording already set for {title}'**
+  String showRecordSeriesDuplicate(String title);
+
+  /// No description provided for @showsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search shows'**
+  String get showsError;
+
+  /// No description provided for @showsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No shows match your search'**
+  String get showsNoResults;
+
+  /// No description provided for @showsSearchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Search failed'**
+  String get showsSearchError;
+
+  /// No description provided for @showsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search shows by title'**
+  String get showsSearchHint;
+
+  /// No description provided for @showsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shows'**
+  String get showsTitle;
+
+  /// No description provided for @showNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Show \"{title}\" not found'**
+  String showNotFound(String title);
 }
 
 class _AppLocalizationsDelegate

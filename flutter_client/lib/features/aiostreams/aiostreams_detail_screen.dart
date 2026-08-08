@@ -9,9 +9,10 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart';
+import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class AIOStreamsDetailScreen extends StatefulWidget {
@@ -121,67 +122,41 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DpadRegion(
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.item.name),
-          automaticallyImplyLeading: false,
-          leadingWidth: 56,
-          leading: Padding(
-            padding: const EdgeInsets.all(8),
-            child: DpadFocusable(
-              onSelect: () => Navigator.of(context).maybePop(),
-              effects: const [
-                GradientBorderEffect(
-                  borderRadius: BorderRadius.all(Radius.circular(50)),
-                ),
-              ],
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
-            ),
-          ),
-        ),
-        body: FutureBuilder<AIOStreamsItem?>(
-          future: _metaFuture,
-          builder: (context, snapshot) {
-            final item = snapshot.data ?? widget.item;
-            final isLoading = snapshot.connectionState != ConnectionState.done;
-            if (_isSeries) {
-              if (isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              return _SeriesBody(
-                item: item,
-                appStateController: widget.appStateController,
-                onEpisodeSelected: (video) => _openStreamPicker(
-                  item: item,
-                  type: 'series',
-                  id: video.id,
-                  title: video.title.isNotEmpty ? video.title : item.name,
-                  video: video,
-                ),
-              );
+    return ItemDetailScaffold(
+      title: widget.item.name,
+      onSidebarActivate: widget.onSidebarActivate,
+      body: FutureBuilder<AIOStreamsItem?>(
+        future: _metaFuture,
+        builder: (context, snapshot) {
+          final item = snapshot.data ?? widget.item;
+          final isLoading = snapshot.connectionState != ConnectionState.done;
+          if (_isSeries) {
+            if (isLoading) {
+              return const Center(child: CircularProgressIndicator());
             }
-            return _MovieBody(
+            return _SeriesBody(
               item: item,
-              isLoading: isLoading,
-              onGetStreams: () => _openStreamPicker(
+              appStateController: widget.appStateController,
+              onEpisodeSelected: (video) => _openStreamPicker(
                 item: item,
-                type: 'movie',
-                id: item.id,
-                title: item.name,
+                type: 'series',
+                id: video.id,
+                title: video.title.isNotEmpty ? video.title : item.name,
+                video: video,
               ),
             );
-          },
-        ),
+          }
+          return _MovieBody(
+            item: item,
+            isLoading: isLoading,
+            onGetStreams: () => _openStreamPicker(
+              item: item,
+              type: 'movie',
+              id: item.id,
+              title: item.name,
+            ),
+          );
+        },
       ),
     );
   }
@@ -329,54 +304,18 @@ class _MovieBody extends StatelessWidget {
     bool fullWidthButton = false,
   }) {
     final l = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(item.name, style: theme.textTheme.headlineMedium),
-        const SizedBox(height: MediaBrowsingMetrics.itemGap),
-        Wrap(
-          spacing: MediaBrowsingMetrics.itemGap,
-          runSpacing: MediaBrowsingMetrics.chipGap,
-          children: [
-            if (item.year != null) _MetadataChip(label: item.year!),
-            if (item.imdbRating != null)
-              _MetadataChip(label: '★ ${item.imdbRating}'),
-            ...item.genres.take(3).map((g) => _MetadataChip(label: g)),
-          ],
-        ),
-        const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-        if (fullWidthButton)
-          SizedBox(
-            width: double.infinity,
-            child: AppButton(
-              autofocus: true,
-              variant: AppButtonVariant.primaryInverted,
-              icon: Icons.play_arrow,
-              label: l.aiostreamsGetStreams,
-              onPressed: isLoading ? null : onGetStreams,
-            ),
-          )
-        else
-          AppButton(
-            autofocus: true,
-            variant: AppButtonVariant.primaryInverted,
-            icon: Icons.play_arrow,
-            label: l.aiostreamsGetStreams,
-            onPressed: isLoading ? null : onGetStreams,
-          ),
-        const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-        if (isLoading) ...[
-          const LinearProgressIndicator(),
-          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-        ],
-        if (item.description != null && item.description!.isNotEmpty)
-          Text(
-            item.description!,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+    return ItemMetaInfo(
+      name: item.name,
+      chips: [
+        if (item.year != null) item.year!,
+        if (item.imdbRating != null) '★ ${item.imdbRating}',
+        ...item.genres.take(3),
       ],
+      buttonLabel: l.aiostreamsGetStreams,
+      onPlay: onGetStreams,
+      fullWidthButton: fullWidthButton,
+      isLoading: isLoading,
+      plot: item.description,
     );
   }
 }
@@ -1200,26 +1139,6 @@ class _AIOStreamsStreamPickerSheetState
           ],
         ),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Shared chip widget (mirrors _MetadataChip in vod_details_screen.dart)
-// ---------------------------------------------------------------------------
-
-class _MetadataChip extends StatelessWidget {
-  const _MetadataChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Chip(
-      label: Text(label),
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      side: BorderSide(color: colorScheme.outlineVariant),
     );
   }
 }

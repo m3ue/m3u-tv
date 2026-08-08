@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +31,28 @@ import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
+import 'package:window_manager/window_manager.dart';
+
+/// Height of the hidden-titlebar drag strip on macOS desktop — keeps the
+/// window draggable and clears the floating traffic-light buttons, which
+/// content would otherwise render underneath (see main.dart's
+/// TitleBarStyle.hidden setup). Painted solid with the app's background
+/// color rather than transparent.
+const double _kMacTitlebarInset = 28;
+
+/// Duration for the sidebar-hide/content-expand transition when a
+/// full-screen detail route (VOD/series/AIOStreams item) pushes or pops —
+/// matched to _slidePage's default CustomTransitionPage duration in
+/// go_router_config.dart so both animations read as one motion.
+const Duration _kFullScreenDetailTransition = Duration(milliseconds: 300);
+
+bool get _isMacDesktopWindow => Platform.isMacOS;
 
 /// Device type enum matching the RN useDeviceType hook.
 enum DeviceType { tv, desktop, tablet, phone }
@@ -100,6 +119,13 @@ class AppShell extends ConsumerStatefulWidget {
 class AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   bool _sidebarActive = false;
+
+  // Counter rather than a bool: nested detail scaffolds (e.g. a Requests
+  // detail pushed from within a modal flow) can overlap briefly during a
+  // route transition, so "active" is any depth > 0 rather than the last
+  // writer winning.
+  int _fullScreenDetailDepth = 0;
+  bool get _fullScreenDetailActive => _fullScreenDetailDepth > 0;
   late final AppStateController _appState;
   late final bool _ownsAppState;
   late final SystemUiPolicy _systemUiPolicy;
@@ -342,6 +368,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _activateSidebar() {
+    if (_fullScreenDetailActive) return;
     setState(() {
       _sidebarActive = true;
     });
@@ -649,6 +676,102 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
+  /// Calls the foundation-agent-owned `XtreamService.createDvrSeriesRule`
+  /// and refreshes the cached series rules list so the DVR screen's new
+  /// "Series Rules" section reflects the addition immediately.
+  ///
+  /// Returns a [CreateDvrSeriesRuleOutcome] so the UI can tell
+  /// "rule created" / "duplicate of existing rule" / "failed" apart and
+  /// show the right SnackBar without losing the A3-409 distinction that
+  /// `XtreamService.createDvrSeriesRule` throws as
+  /// `DvrSeriesRuleExistsException`. The `on Object { return false; }`
+  /// blanket from earlier releases would have collapsed the duplicate case
+  /// into a generic failure — B2 surfaces it instead.
+  Future<CreateDvrSeriesRuleOutcome> _createDvrSeriesRule({
+    int? channelId,
+    required String title,
+    DvrMatchMode? matchMode,
+    DvrSeriesMode? seriesMode,
+    int? keepLast,
+    int? priority,
+    int? startEarlySeconds,
+    int? endLateSeconds,
+  }) async {
+    try {
+      final id = await _appState.xtreamService.createDvrSeriesRule(
+        channelId: channelId,
+        title: title,
+        matchMode: matchMode,
+        seriesMode: seriesMode,
+        keepLast: keepLast,
+        priority: priority,
+        startEarlySeconds: startEarlySeconds,
+        endLateSeconds: endLateSeconds,
+      );
+      final rules = await _appState.xtreamService.listDvrSeriesRules();
+      _appState.setDvrSeriesRules(rules);
+      // The rule's `created` hook may have already matched and scheduled a
+      // recording server-side (see AppStateController.refreshDvrRecordings
+      // doc comment) — refresh so it shows up in the Recordings tab without
+      // waiting for the next full app reload.
+      unawaited(_appState.refreshDvrRecordings());
+      return id == 0
+          ? CreateDvrSeriesRuleOutcome.failed
+          : CreateDvrSeriesRuleOutcome.created;
+    } on DvrSeriesRuleExistsException {
+      try {
+        final rules = await _appState.xtreamService.listDvrSeriesRules();
+        _appState.setDvrSeriesRules(rules);
+      } on Object catch (error, stackTrace) {
+        debugPrint('DVR: refresh after duplicate create failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      return CreateDvrSeriesRuleOutcome.duplicate;
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: create series rule failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return CreateDvrSeriesRuleOutcome.failed;
+    }
+  }
+
+  /// Deletes a DVR series rule and refreshes the cached list. Foundation
+  /// agent owns `XtreamService.deleteDvrSeriesRule` and
+  /// `AppStateController.setDvrSeriesRules`.
+  Future<void> _deleteDvrSeriesRule(DvrSeriesRule rule) async {
+    await _appState.xtreamService.deleteDvrSeriesRule(rule.id);
+    final rules = await _appState.xtreamService.listDvrSeriesRules();
+    _appState.setDvrSeriesRules(rules);
+  }
+
+  /// Updates an existing DVR series rule in place (never delete-and-recreate —
+  /// deleting cascades to the rule's recordings and would destroy history) and
+  /// refreshes the cached list. `updateDvrSeriesRule` applies only the fields
+  /// the sheet returned; absent fields keep their current server values.
+  Future<void> _updateDvrSeriesRule(
+    DvrSeriesRule rule,
+    DvrSeriesRuleOptions options,
+  ) async {
+    await _appState.xtreamService.updateDvrSeriesRule(
+      ruleId: rule.id,
+      channelId: options.channelId,
+      matchMode: options.matchMode,
+      seriesMode: options.seriesMode,
+      keepLast: options.keepLast,
+      priority: options.priority,
+      startEarlySeconds: options.startEarlySeconds,
+      endLateSeconds: options.endLateSeconds,
+    );
+    final rules = await _appState.xtreamService.listDvrSeriesRules();
+    _appState.setDvrSeriesRules(rules);
+    unawaited(_appState.refreshDvrRecordings());
+  }
+
+  /// Proxies the Shows screen's search through the foundation-agent-owned
+  /// `XtreamService.searchEpgShows`.
+  Future<List<EpgShow>> _searchEpgShows(String query) {
+    return _appState.xtreamService.searchEpgShows(query);
+  }
+
   /// Stops a scheduled or in-progress recording and deletes the row from the
   /// editor — the "Delete recording" choice on the Recordings screen's stop
   /// dialog (see DvrRecordingsScreen._confirmCancel). m3u-editor's
@@ -673,11 +796,34 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
-  Future<void> _pushDetail(String path, {Object? extra}) async {
+  /// Pushes a detail route. When [fullScreen] is true, the sidebar-hide
+  /// transition is tied directly to this call's own push/pop — flipped
+  /// synchronously right before `context.push` and unwound in `finally`
+  /// once that same push's route is gone — rather than to the pushed
+  /// widget's own init/dispose lifecycle. A widget can only announce itself
+  /// after it already exists, which is inherently a frame (or more) behind
+  /// the moment navigation was requested; doing it here instead means the
+  /// AppShell layout animation and the route's own transition start on the
+  /// same frame in both directions, which is what makes it read as one
+  /// smooth motion instead of a layout snap partway through the slide.
+  Future<void> _pushDetail(
+    String path, {
+    Object? extra,
+    bool fullScreen = false,
+  }) async {
     await Future<void>.microtask(() {});
     final savedFocus = FocusManager.instance.primaryFocus;
-    // ignore: use_build_context_synchronously
-    await context.push(path, extra: extra);
+    if (fullScreen) {
+      setState(() => _fullScreenDetailDepth++);
+    }
+    try {
+      // ignore: use_build_context_synchronously
+      await context.push(path, extra: extra);
+    } finally {
+      if (fullScreen && mounted) {
+        setState(() => _fullScreenDetailDepth--);
+      }
+    }
     if (mounted) {
       if (savedFocus != null && savedFocus.canRequestFocus) {
         savedFocus.requestFocus();
@@ -688,7 +834,13 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _openVod(VodItem item) {
-    unawaited(_pushDetail(RouteNames.vodDetailsFor(item.id), extra: item));
+    unawaited(
+      _pushDetail(
+        RouteNames.vodDetailsFor(item.id),
+        extra: item,
+        fullScreen: true,
+      ),
+    );
   }
 
   void _openRequestResult(ContentRequestSearchResult result) {
@@ -706,8 +858,40 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _openSeries(Series series) {
     unawaited(
-      _pushDetail(RouteNames.seriesDetailsFor(series.id), extra: series),
+      _pushDetail(
+        RouteNames.seriesDetailsFor(series.id),
+        extra: series,
+        fullScreen: true,
+      ),
     );
+  }
+
+  void _openAioSearch() {
+    unawaited(
+      _pushDetail(RouteNames.aiostreamsSearchPath, fullScreen: true),
+    );
+  }
+
+  void _openShow(EpgShow show) {
+    unawaited(
+      _pushDetail(
+        RouteNames.showDetailsFor(show.normalizedTitle),
+        extra: show,
+        fullScreen: true,
+      ),
+    );
+  }
+
+  /// Lets a descendant enter/exit the same immersive full-screen state as
+  /// `_pushDetail(fullScreen: true)` — sidebar hidden, bottom nav hidden —
+  /// without going through a go_router push itself. Needed for screens
+  /// like the DVR series-rule Options page, which is opened via a plain
+  /// `Navigator.push` (not a route) from a tab that isn't already
+  /// immersive (the Series Rules tab, unlike Show Detail).
+  void _enterFullScreenDetail() => setState(() => _fullScreenDetailDepth++);
+
+  void _exitFullScreenDetail() {
+    if (mounted) setState(() => _fullScreenDetailDepth--);
   }
 
   void _openProgress(Progress progress) {
@@ -793,6 +977,7 @@ class AppShellState extends ConsumerState<AppShell>
               item.id,
             ),
             extra: item,
+            fullScreen: true,
           ),
         ),
         onSidebarActivate: _activateSidebar,
@@ -815,6 +1000,10 @@ class AppShellState extends ConsumerState<AppShell>
         onEnsureEpg: _appState.ensureEpgForChannels,
         onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
         onCancelAndDeleteRecording: _cancelAndDeleteRecording,
+        onRecordSeries: (channel, program) => _createDvrSeriesRule(
+          channelId: channel.id,
+          title: program.title,
+        ),
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
@@ -839,9 +1028,11 @@ class AppShellState extends ConsumerState<AppShell>
                 item.id,
               ),
               extra: item,
+              fullScreen: true,
             ),
           ),
           onPlay: _openPlayerFromActions,
+          onSearchSelect: _openAioSearch,
           favoritesService: _appState.aioFavoritesService,
           progressList: _appState.progressList,
           onSidebarActivate: _activateSidebar,
@@ -859,10 +1050,18 @@ class AppShellState extends ConsumerState<AppShell>
             recordings: _appState.dvrRecordings,
             isLoading: _appState.isLoadingContent,
             isConfigured: _appState.isConfigured,
+            storageInfo: ref.watch(dvrStorageInfoProvider),
             onPlay: _openPlayerDirect,
             onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
             onCancelAndDeleteRecording: _cancelAndDeleteRecording,
             onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
+            seriesRules: ref.watch(dvrSeriesRulesProvider),
+            onDeleteSeriesRule: _deleteDvrSeriesRule,
+            onUpdateSeriesRule: _updateDvrSeriesRule,
+            onSearchShows: _searchEpgShows,
+            onOpenShowDetail: _openShow,
+            onEnterFullScreenDetail: _enterFullScreenDetail,
+            onExitFullScreenDetail: _exitFullScreenDetail,
             onSidebarActivate: _activateSidebar,
           );
         },
@@ -903,6 +1102,7 @@ class AppShellState extends ConsumerState<AppShell>
           epgRefreshInterval: _appState.epgRefreshInterval,
           epgRefreshOptions: AppStateController.epgRefreshOptions,
           traktService: _appState.traktService,
+          devicePairingService: _appState.devicePairingService,
           onConnect: _appState.connectXtream,
           onDisconnect: () => unawaited(_appState.disconnect()),
           onSwitchViewer: (viewer) => unawaited(_appState.switchViewer(viewer)),
@@ -939,6 +1139,8 @@ class AppShellState extends ConsumerState<AppShell>
       onSeriesSelect: _openSeries,
       onProgressSelect: _openProgress,
       onSidebarActivate: _activateSidebar,
+      onRecordSeries: _createDvrSeriesRule,
+      onDeleteSeriesRule: _deleteDvrSeriesRule,
       buildTabScreen: _buildTabScreen,
       child: FocusScope(
         node: _contentFocusNode,
@@ -964,6 +1166,7 @@ class AppShellState extends ConsumerState<AppShell>
             if (event is KeyDownEvent &&
                 event.logicalKey == LogicalKeyboardKey.arrowLeft &&
                 useSidebar &&
+                !_fullScreenDetailActive &&
                 !_contentFocusNode.hasFocus) {
               _activateSidebar();
               return KeyEventResult.handled;
@@ -1177,41 +1380,84 @@ class AppShellState extends ConsumerState<AppShell>
             return Scaffold(body: contentShell);
           }
 
+          final macTitlebarInset = _isMacDesktopWindow
+              ? _kMacTitlebarInset
+              : 0.0;
+          final fullScreenDetail = _fullScreenDetailActive;
+
+          // The sidebar physically slides off-screen to the left and the
+          // content pane's left edge animates out to meet it, both on the
+          // same AnimatedPositioned duration/curve — timed to start the
+          // instant `_pushDetail(..., fullScreen: true)` flips this state
+          // (before the route push/pop even begins), so this motion and the
+          // detail route's own slide transition (_slidePage in
+          // go_router_config.dart) run concurrently as one movement instead
+          // of a hard layout snap competing with an already-running page
+          // transition.
+          final sidebar = AnimatedPositioned(
+            duration: _kFullScreenDetailTransition,
+            curve: Curves.easeInOut,
+            top: macTitlebarInset,
+            // Clears the sidebar's widest (expanded, 200px) state regardless
+            // of whether it was expanded or collapsed when hidden.
+            left: fullScreenDetail ? -220 : 0,
+            bottom: 0,
+            child: IgnorePointer(
+              ignoring: fullScreenDetail,
+              child: NavigationSidebar(
+                currentIndex: _currentIndex,
+                routes: routes,
+                sidebarActive: _sidebarActive,
+                focusNodes: _sidebarFocusNodes,
+                scopeNode: _sidebarScopeNode,
+                unreadNotificationCount: unreadCount,
+                onNavigate: _navigateTo,
+                onActivateSidebar: _activateSidebar,
+                onDeactivateSidebar: _deactivateSidebar,
+              ),
+            ),
+          );
+
+          final content = AnimatedPositioned(
+            duration: _kFullScreenDetailTransition,
+            curve: Curves.easeInOut,
+            top: macTitlebarInset,
+            left: fullScreenDetail ? 0 : 64,
+            right: 0,
+            bottom: 0,
+            child: DpadRegion(
+              memoryKey: 'content',
+              horizontalEdge: DpadEdgeBehavior.stop,
+              onEdge: (direction) {
+                if (!fullScreenDetail && direction == TraversalDirection.left) {
+                  _activateSidebar();
+                }
+              },
+              child: contentShell,
+            ),
+          );
+
           return Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
             body: Stack(
               children: [
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 64),
-                    child: DpadRegion(
-                      memoryKey: 'content',
-                      horizontalEdge: DpadEdgeBehavior.stop,
-                      onEdge: (direction) {
-                        if (direction == TraversalDirection.left) {
-                          _activateSidebar();
-                        }
-                      },
-                      child: contentShell,
+                const Positioned.fill(
+                  child: DecoratedBox(decoration: kAppGradientBg),
+                ),
+                content,
+                sidebar,
+                if (_isMacDesktopWindow)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: _kMacTitlebarInset,
+                    child: DragToMoveArea(
+                      // App background color (matches _slidePage/app_background.dart)
+                      // rather than pure black.
+                      child: ColoredBox(color: Color(0xFF09090b)),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  child: NavigationSidebar(
-                    currentIndex: _currentIndex,
-                    routes: routes,
-                    sidebarActive: _sidebarActive,
-                    focusNodes: _sidebarFocusNodes,
-                    scopeNode: _sidebarScopeNode,
-                    unreadNotificationCount: unreadCount,
-                    onNavigate: _navigateTo,
-                    onActivateSidebar: _activateSidebar,
-                    onDeactivateSidebar: _deactivateSidebar,
-                  ),
-                ),
               ],
             ),
           );
@@ -1240,32 +1486,36 @@ class AppShellState extends ConsumerState<AppShell>
 
     return Scaffold(
       body: contentShell,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: displayedIndex,
-        onTap: (index) => index == moreTabIndex
-            ? _showMoreSheet(overflowRoutes, primaryCount, unreadCount)
-            : _navigateTo(index),
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        items: [
-          ...routes.take(primaryCount).map((route) {
-            return BottomNavigationBarItem(
-              icon: Icon(_routeIcon(route)),
-              label: _routeLabel(context, route),
-            );
-          }),
-          if (overflowRoutes.isNotEmpty)
-            BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: overflowUnread > 0,
-                label: Text('$overflowUnread'),
-                child: const Icon(Icons.more_vert),
-              ),
-              label: AppLocalizations.of(context).navMore,
+      bottomNavigationBar: _fullScreenDetailActive
+          ? null
+          : BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: displayedIndex,
+              onTap: (index) => index == moreTabIndex
+                  ? _showMoreSheet(overflowRoutes, primaryCount, unreadCount)
+                  : _navigateTo(index),
+              selectedItemColor: Theme.of(context).colorScheme.primary,
+              unselectedItemColor: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant,
+              items: [
+                ...routes.take(primaryCount).map((route) {
+                  return BottomNavigationBarItem(
+                    icon: Icon(_routeIcon(route)),
+                    label: _routeLabel(context, route),
+                  );
+                }),
+                if (overflowRoutes.isNotEmpty)
+                  BottomNavigationBarItem(
+                    icon: Badge(
+                      isLabelVisible: overflowUnread > 0,
+                      label: Text('$overflowUnread'),
+                      child: const Icon(Icons.more_vert),
+                    ),
+                    label: AppLocalizations.of(context).navMore,
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
@@ -1360,14 +1610,16 @@ class NavigationSidebar extends StatelessWidget {
         width: width,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHigh,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(2, 0),
-            ),
-          ],
+          color: expanded ? theme.colorScheme.surface : Colors.transparent,
+          boxShadow: expanded
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(2, 0),
+                  ),
+                ]
+              : null,
         ),
         child: FocusScope(
           node: scopeNode,
@@ -1412,12 +1664,7 @@ class NavigationSidebar extends StatelessWidget {
                   ),
                 ),
               ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               ...List.generate(routes.length, (index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1744,7 +1991,6 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
     final seriesList = ref.watch(seriesListProvider);
     final epgService = ref.watch(epgServiceProvider);
     final dvrRecordings = ref.watch(dvrRecordingsProvider);
-    final sourceLabel = ref.watch(sourceLabelProvider);
     final sourceError = ref.watch(sourceErrorProvider);
     final hasDvrFeature = ref.watch(hasDvrFeatureProvider);
 
@@ -1755,7 +2001,10 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
     if (!isConfigured) {
       return Scaffold(
         body: Center(
-          child: Text(AppLocalizations.of(context).appNotConfigured),
+          child: Text(
+            AppLocalizations.of(context).appNotConfigured,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
         ),
       );
     }
@@ -1820,7 +2069,6 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
               fallbackIcon: Icons.movie,
               fallbackTitle: item.name,
               isFavorite: _favoriteVodIds.contains(item.id),
-              heroTag: 'vod_poster_${item.id}',
               onTap: () => widget.onVodSelect(item),
               onLongTap: () async {
                 await _vodFavoritesService.toggle(item.id);
@@ -1846,7 +2094,6 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
               fallbackIcon: Icons.tv,
               fallbackTitle: series.name,
               isFavorite: _favoriteSeriesIds.contains(series.id),
-              heroTag: 'series_poster_${series.id}',
               onTap: () => widget.onSeriesSelect(series),
               onLongTap: () async {
                 await _seriesFavoritesService.toggle(series.id);
@@ -1876,21 +2123,14 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
         children: [
-          Text(
-            AppLocalizations.of(context).navHome,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          Text(l.homeConnectedSource(sourceLabel)),
           if (sourceError != null && sourceError.isNotEmpty) ...[
-            const SizedBox(height: MediaBrowsingMetrics.chipGap),
             _OfflineBanner(
               message: sourceError == savedM3uRefreshErrorCode
                   ? l.settingsSavedM3uRefreshFailed
                   : sourceError,
             ),
+            const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           ],
-          const SizedBox(height: MediaBrowsingMetrics.pagePadding),
           if (continueWatchingItems.isNotEmpty) continueWatchingSection,
           liveSection,
           moviesSection,

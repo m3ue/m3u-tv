@@ -129,6 +129,8 @@
   "settingsProxyProfileDefault": "Standard",
   "settingsProxyProfileDirect": "Direkt (ohne Transkodierung)",
   "settingsProxyNoProfiles": "Keine Transkodierungsprofile verfügbar — Streams nutzen den direkten Proxy.",
+  "settingsDvr": "DVR",
+  "settingsDvrSubtitle": "Einstellungen für die Wiedergabe aufgenommener Inhalte.",
   "settingsComskip": "Werbeerkennung",
   "settingsComskipSubtitle": "Legt fest, wie der Player auf erkannte Werbeunterbrechungen in DVR-Aufnahmen reagiert.",
   "settingsComskipAutoSkip": "Werbung automatisch überspringen",
@@ -150,6 +152,24 @@
   },
   "settingsAppViewRelease": "Release ansehen",
   "settingsAppScanQr": "Scannen, um auf deinem Handy zu öffnen",
+  "settingsFillAllFields": "Bitte fülle alle Felder aus",
+  "settingsConnectionSettings": "Verbindungseinstellungen",
+  "settingsConnectionSettingsSubtitle": "Gib deine Xtream-Codes-Daten ein",
+  "settingsServerUrl": "Server-URL",
+  "settingsUsername": "Benutzername",
+  "settingsPassword": "Passwort",
+  "settingsConnect": "Verbinden",
+  "settingsPairWithCode": "Mit Code koppeln",
+  "settingsTabPair": "Koppeln",
+  "settingsTabSignIn": "Anmelden",
+  "settingsPairTabSubtitle": "Gib deine Serveradresse ein und koppele diesen Fernseher dann mit einem Code.",
+  "pairingEnterServerFirst": "Gib zuerst deine Server-URL ein",
+  "pairingErrorGeneric": "Kopplung fehlgeschlagen oder der Code ist abgelaufen. Bitte versuche es erneut.",
+  "pairingScanQr": "Scanne, um die Kopplungsseite auf deinem Handy zu öffnen",
+  "pairingOpenBrowser": "Im Browser öffnen",
+  "pairingPendingGoTo": "Gehe auf deinem Telefon oder Computer zu:",
+  "pairingPendingEnterCode": "Gib dann diesen Code ein:",
+  "pairingPendingWaiting": "Warte auf Bestätigung…",
   "settingsContentCache": "Inhaltscache",
   "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",
   "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",
@@ -366,5 +386,185 @@
   "dvrDeleteFailed": "Aufnahme konnte nicht gelöscht werden",
   "liveTvStopRecording": "Aufnahme stoppen",
   "playerRecordNowTooltip": "Aktuelle Sendung aufnehmen",
-  "playerStopRecordingTooltip": "Aufnahme stoppen"
+  "playerStopRecordingTooltip": "Aufnahme stoppen",
+  "dvrMoreActions": "Weitere Aktionen",
+  "dvrPlay": "Abspielen",
+  "dvrSelect": "Auswählen",
+  "dvrStop": "Stoppen",
+  "dvrStatusRecording": "Aufnahme läuft",
+  "dvrStatusScheduled": "Geplant",
+  "dvrStatusFailed": "Fehlgeschlagen",
+  "dvrExitSelection": "Auswahl beenden",
+  "dvrSelectedCount": "{count, plural, =0{Keine Elemente ausgewählt} one{1 Element ausgewählt} other{{count} Elemente ausgewählt}}",
+  "@dvrSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrStorageTitle": "DVR-Speicher",
+  "dvrStorageUnlimited": "Unbegrenzt",
+  "dvrStorageUsedUnlimited": "{used} belegt",
+  "@dvrStorageUsedUnlimited": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageUsedWithQuota": "{used} von {quota} belegt",
+  "@dvrStorageUsedWithQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageRecordingCount": "{count} Aufnahmen",
+  "@dvrStorageRecordingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesChannel": "Sender",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Früh starten",
+  "dvrSeriesUseDefault": "Standard",
+  "dvrEpisodeCount": "{count, plural, =1{1 Folge} other{{count} Folgen}}",
+  "dvrDeleteSeriesRule": "Regel löschen",
+  "dvrUpdateSeriesRuleFailed": "Serien-Regel konnte nicht aktualisiert werden",
+  "dvrSeriesSave": "Speichern",
+  "dvrSeriesSecondsSuffix": "Sek",
+  "dvrSeriesMode": "Serienmodus",
+  "dvrUpdateSeriesRuleSuccess": "Serien-Regel aktualisiert",
+  "dvrSeriesModeAll": "Alle Episoden",
+  "dvrSeriesMatchModeStartsWith": "Beginnt mit",
+  "dvrDeleteSeriesRuleConfirm": "Diese Serien-Regel löschen?",
+  "dvrSeriesCancel": "Abbrechen",
+  "dvrDeleteSeriesRuleSuccess": "Serien-Regel gelöscht",
+  "dvrSeriesRulesTitle": "Serien-Regeln",
+  "dvrSeriesMatchModeContains": "Enthält",
+  "dvrSeriesMatchModeExact": "Genau",
+  "dvrSeriesModeUseDefault": "Standard",
+  "dvrSeriesModeNewFlag": "Nur Neue",
+  "dvrDeleteSeriesRuleFailed": "Serien-Regel konnte nicht gelöscht werden",
+  "dvrSeriesKeepLast": "Letzte behalten",
+  "dvrSeriesModeUniqueSe": "Eindeutige S-E",
+  "dvrSeriesAnyChannel": "Beliebiger Sender",
+  "dvrSeriesMatchMode": "Übereinstimmungsmodus",
+  "dvrSeriesEndLate": "Spät beenden",
+  "dvrSeriesOptions": "Optionen",
+  "dvrSeriesOptionsFor": "Optionen: {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSeriesAllEpisodesWarning": "Aufnahme aller Folgen auf jedem Sender kann Duplikate erzeugen — Nutze „Neue nur\" oder „Eindeutige S-E\" zum Deduplizieren.",
+  "dvrSeriesRulesEmpty": "Keine Serien-Regeln",
+  "dvrSeriesPriority": "Priorität",
+  "epgRecordSeries": "Serie aufnehmen",
+  "epgRecordSeriesSuccess": "Serienaufnahme für {title} aktiviert",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "Serienaufnahme konnte nicht aktiviert werden",
+  "epgRecordSeriesDuplicate": "Serienaufnahme bereits aktiv",
+  "navShows": "Shows",
+  "showAiringNext": "Nächste Ausstrahlung",
+  "showAiringNone": "Keine kommenden Folgen im EPG",
+  "showChannelCount": "{count, plural, =1{1 Sender} other{{count} Sender}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Serien-Regel löschen",
+  "showDeleteRuleConfirm": "Serien-Regel für {title} löschen? Zukünftige Folgen werden nicht aufgenommen. Bereits vorhandene Aufnahmen werden nicht gelöscht.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Serien-Regel aktiv",
+  "showDetailTitle": "Show-Details",
+  "showEpisodesCount": "{count, plural, =1{1 Folge} other{{count} Folgen}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Serie aufnehmen",
+  "showRecordSeriesConfirm": "Jede Folge von {title} auf {channel} aufnehmen?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "Serienaufnahme für {title} konnte nicht aktiviert werden",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Serienaufnahme für {title} aktiviert",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "Serienaufnahme für {title} bereits aktiv",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "Shows konnten nicht durchsucht werden",
+  "showsNoResults": "Keine Shows entsprechen deiner Suche",
+  "showsSearchError": "Suche fehlgeschlagen",
+  "showsSearchHint": "Shows nach Titel suchen",
+  "showsTitle": "Shows",
+  "showNotFound": "Show „{title}\" nicht gefunden",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

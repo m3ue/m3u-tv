@@ -9,6 +9,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -36,6 +37,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onEnsureEpg,
     this.onCancelRecording,
     this.onCancelAndDeleteRecording,
+    this.onRecordSeries,
   });
 
   final FavoritesService favoritesService;
@@ -50,6 +52,17 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   final void Function(Channel, EpgProgram)? onScheduleProgram;
   final Future<void> Function(String uuid)? onCancelRecording;
   final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
+
+  /// Wired by AppShell against `XtreamService.createDvrSeriesRule`. Receives
+  /// the long-pressed channel and the program whose title should be matched
+  /// by the new series rule. Returns the outcome so the caller can
+  /// distinguish created / duplicate / failed instead of collapsing every
+  /// non-success into a generic failure SnackBar.
+  final Future<CreateDvrSeriesRuleOutcome> Function(
+    Channel channel,
+    EpgProgram program,
+  )?
+  onRecordSeries;
 
   /// Requests EPG data for the given channels be fetched (lazily, debounced)
   /// if not already fresh. Called per-item as the visible list/grid builds,
@@ -183,6 +196,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final hasRecord = activeRecording != null
         ? widget.onCancelRecording != null
         : recordableProgram != null && widget.onScheduleProgram != null;
+    final hasSeriesRule =
+        recordableProgram != null && widget.onRecordSeries != null;
     final isFavorite = _favoriteIds.contains(channel.id);
 
     final action = await showDialog<_ChannelContextAction>(
@@ -222,12 +237,22 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
                       dialogContext,
                     ).pop(_ChannelContextAction.record),
                   ),
+                if (hasSeriesRule)
+                  _ContextMenuOption(
+                    icon: Icons.fiber_new,
+                    label: AppLocalizations.of(dialogContext).epgRecordSeries,
+                    subtitle: recordableProgram.title,
+                    autofocus: !hasRecord,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_ChannelContextAction.recordSeries),
+                  ),
                 _ContextMenuOption(
                   icon: isFavorite ? Icons.star : Icons.star_border,
                   label: isFavorite
                       ? AppLocalizations.of(dialogContext).liveTvRemoveFavorite
                       : AppLocalizations.of(dialogContext).liveTvFavorite,
-                  autofocus: !hasRecord,
+                  autofocus: !hasRecord && !hasSeriesRule,
                   onTap: () => Navigator.of(
                     dialogContext,
                   ).pop(_ChannelContextAction.toggleFavorite),
@@ -260,6 +285,29 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           if (program != null) {
             widget.onScheduleProgram?.call(channel, program);
           }
+        }
+      case _ChannelContextAction.recordSeries:
+        final program = recordableProgram;
+        if (program == null || widget.onRecordSeries == null) return;
+        final messenger = ScaffoldMessenger.of(context);
+        final l10n = AppLocalizations.of(context);
+        try {
+          final outcome = await widget.onRecordSeries!(channel, program);
+          if (!context.mounted) return;
+          final message = switch (outcome) {
+            CreateDvrSeriesRuleOutcome.created => l10n.epgRecordSeriesSuccess(
+              program.title,
+            ),
+            CreateDvrSeriesRuleOutcome.duplicate =>
+              l10n.epgRecordSeriesDuplicate,
+            CreateDvrSeriesRuleOutcome.failed => l10n.epgRecordSeriesFailed,
+          };
+          messenger.showSnackBar(SnackBar(content: Text(message)));
+        } on Object catch (_) {
+          if (!context.mounted) return;
+          messenger.showSnackBar(
+            SnackBar(content: Text(l10n.epgRecordSeriesFailed)),
+          );
         }
       case _ChannelContextAction.toggleFavorite:
         await _toggleFavorite(channel);
@@ -487,7 +535,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   }
 }
 
-enum _ChannelContextAction { record, toggleFavorite }
+enum _ChannelContextAction { record, recordSeries, toggleFavorite }
 
 class _ContextMenuOption extends StatelessWidget {
   const _ContextMenuOption({

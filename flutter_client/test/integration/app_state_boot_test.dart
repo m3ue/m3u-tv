@@ -273,7 +273,6 @@ void main() {
           _visibleText(tester),
           contains('Server is currently unavailable.'),
         );
-        expect(_visibleText(tester), contains('Connected source: Xtream'));
         expect(
           _visibleText(tester),
           isNot(contains('Please connect to your service in Settings')),
@@ -330,7 +329,6 @@ void main() {
 
         expect(controller.sourceType, AppSourceType.xtream);
         expect(controller.isBootstrapping, isFalse);
-        expect(_visibleText(tester), contains('Connected source: Xtream'));
         expect(controller.liveCategories.single.name, 'News');
         expect(controller.channels.single.name, 'BBC One');
         expect(controller.vodItems.single.name, 'Big Buck Bunny');
@@ -1127,6 +1125,99 @@ void main() {
         'Provider B guide',
       );
     });
+  });
+
+  group('DVR storage refresh', () {
+    const credentials = UserCredentials(
+      server: 'https://fixture.example',
+      username: 'fixture-user',
+      password: 'fixture-password',
+    );
+
+    _FakeXtreamTransport withDvrFeature(_FakeXtreamTransport base) {
+      return base.withResponse('auth', <String, Object?>{
+        'user_info': <String, Object?>{'auth': 1, 'status': 'Active'},
+        'm3u_editor': <String, Object?>{
+          'version': '0.10.0',
+          'features': <String>['dvr'],
+        },
+      });
+    }
+
+    test(
+      'populates dvrStorageInfo from a server that supports get_dvr_storage',
+      () async {
+        final fixture =
+            withDvrFeature(
+              _FakeXtreamTransport.success(),
+            ).withResponse('get_dvr_storage', <String, Object?>{
+              'used_bytes': 2147483648,
+              'quota_bytes': 4294967296,
+              'percent_used': 50.0,
+              'recording_count': 4,
+              'scope': 'account',
+            });
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: fixture.call,
+        );
+
+        expect(await controller.connectXtream(credentials), isTrue);
+        expect(controller.hasDvrFeature, isTrue);
+
+        await controller.refreshDvrStorage();
+
+        expect(controller.dvrStorageInfo?.usedBytes, 2147483648);
+        expect(controller.dvrStorageInfo?.quotaBytes, 4294967296);
+        expect(controller.dvrStorageInfo?.recordingCount, 4);
+      },
+    );
+
+    test(
+      'clears dvrStorageInfo when an older server has no get_dvr_storage action',
+      () async {
+        // No `get_dvr_storage` stub, so the fixture throws StateError for it
+        // — mirroring an older m3u-editor server that 404s the action.
+        final fixture = withDvrFeature(_FakeXtreamTransport.success());
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: fixture.call,
+        );
+
+        expect(await controller.connectXtream(credentials), isTrue);
+        expect(controller.hasDvrFeature, isTrue);
+
+        await controller.refreshDvrStorage();
+
+        expect(controller.dvrStorageInfo, isNull);
+      },
+    );
+
+    test(
+      'does not call get_dvr_storage when the dvr feature is not advertised',
+      () async {
+        final base = _FakeXtreamTransport.success();
+        final calledActions = <String>[];
+        Future<Object?> spyingTransport(XtreamRequest request) async {
+          calledActions.add(request.action ?? 'auth');
+          return base.call(request);
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: spyingTransport,
+        );
+
+        expect(await controller.connectXtream(credentials), isTrue);
+        expect(controller.hasDvrFeature, isFalse);
+        calledActions.clear();
+
+        await controller.refreshDvrStorage();
+
+        expect(calledActions, isEmpty);
+        expect(controller.dvrStorageInfo, isNull);
+      },
+    );
   });
 }
 
