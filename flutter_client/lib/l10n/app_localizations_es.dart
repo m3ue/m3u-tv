@@ -396,6 +396,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ingresa los datos de tu Xtream Codes';
 
   @override
+  String get settingsConnectionSettingsHelp =>
+      'Usa los datos de conexión Xtream de la lista de reproducción de m3u-editor, no tu inicio de sesión web de m3u-editor. Necesitas la URL del servidor, el nombre de usuario Xtream y la contraseña Xtream.';
+
+  @override
   String get settingsServerUrl => 'URL del servidor';
 
   @override

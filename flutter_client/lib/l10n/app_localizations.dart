@@ -824,6 +824,12 @@ abstract class AppLocalizations {
   /// **'Enter your Xtream codes details'**
   String get settingsConnectionSettingsSubtitle;
 
+  /// No description provided for @settingsConnectionSettingsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the playlist Xtream connection details from m3u-editor, not your m3u-editor web login. You need the server URL, Xtream username and Xtream password.'**
+  String get settingsConnectionSettingsHelp;
+
   /// No description provided for @settingsServerUrl.
   ///
   /// In en, this message translates to:

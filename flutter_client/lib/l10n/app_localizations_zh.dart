@@ -386,6 +386,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsConnectionSettingsSubtitle => '输入您的 Xtream Codes 信息';
 
   @override
+  String get settingsConnectionSettingsHelp =>
+      '请使用 m3u-editor 播放列表的 Xtream 连接信息，而不是 m3u-editor 网页登录账号。您需要服务器地址、Xtream 用户名和 Xtream 密码。';
+
+  @override
   String get settingsServerUrl => '服务器地址';
 
   @override
