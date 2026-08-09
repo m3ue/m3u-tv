@@ -4,11 +4,22 @@ import 'dart:io';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 
 class PersistentJsonStore {
-  PersistentJsonStore({File? file}) : _file = file ?? File(_defaultPath());
+  PersistentJsonStore({File? file}) : this._(file ?? File(_defaultPath()));
+
+  PersistentJsonStore._(File file)
+    : _file = file,
+      _state = _states.putIfAbsent(
+        file.absolute.path,
+        _PersistentJsonStoreState.new,
+      );
 
   final File _file;
-  Map<String, Object?>? _cache;
-  final SerialQueue _writeQueue = SerialQueue();
+  final _PersistentJsonStoreState _state;
+  static final Map<String, _PersistentJsonStoreState> _states = {};
+
+  Map<String, Object?>? get _cache => _state.cache;
+  set _cache(Map<String, Object?>? value) => _state.cache = value;
+  SerialQueue get _writeQueue => _state.writeQueue;
 
   Future<Object?> read(String key) async {
     await _writeQueue.drained;
@@ -34,23 +45,52 @@ class PersistentJsonStore {
     final previousBytes = await _file.exists()
         ? await _file.readAsBytes()
         : null;
-    final data = Map<String, Object?>.from(await _readAllUnlocked())
-      ..[key] = value;
+    final previous = Map<String, Object?>.from(await _readAllUnlocked());
+    final hadPreviousValue = previous.containsKey(key);
+    final previousValue = previous[key];
+    final data = Map<String, Object?>.from(previous)..[key] = value;
+    final candidateBytes = utf8.encode(jsonEncode(data));
     await _writeStaging(data);
     try {
       if (!shouldCommit()) return false;
       await _commitStaging(data);
       Future<void> restorePrevious() async {
-        _cache = previousCache;
-        if (previousBytes == null) {
+        final currentBytes = await _file.exists()
+            ? await _file.readAsBytes()
+            : null;
+        if (_sameBytes(currentBytes, candidateBytes)) {
+          _cache = previousCache;
+          if (previousBytes == null) {
+            try {
+              await _file.delete();
+            } on PathNotFoundException {
+              return;
+            }
+          } else {
+            await _stagingFile.writeAsBytes(previousBytes, flush: true);
+            await _stagingFile.rename(_file.path);
+          }
+          return;
+        }
+
+        final current = currentBytes == null || currentBytes.isEmpty
+            ? <String, Object?>{}
+            : (jsonDecode(utf8.decode(currentBytes)) as Map)
+                  .cast<String, Object?>();
+        if (hadPreviousValue) {
+          current[key] = previousValue;
+        } else {
+          current.remove(key);
+        }
+        if (current.isEmpty && previousBytes == null) {
+          _cache = current;
           try {
             await _file.delete();
           } on PathNotFoundException {
             return;
           }
         } else {
-          await _stagingFile.writeAsBytes(previousBytes, flush: true);
-          await _stagingFile.rename(_file.path);
+          await _writeAll(current);
         }
       }
 
@@ -156,6 +196,14 @@ class PersistentJsonStore {
 
   File get _stagingFile => File('${_file.path}.tmp');
 
+  static bool _sameBytes(List<int>? first, List<int> second) {
+    if (first == null || first.length != second.length) return false;
+    for (var index = 0; index < first.length; index += 1) {
+      if (first[index] != second[index]) return false;
+    }
+    return true;
+  }
+
   static String _defaultPath() {
     final env = Platform.environment;
     final base = switch (Platform.operatingSystem) {
@@ -170,4 +218,9 @@ class PersistentJsonStore {
     };
     return '$base/m3u_tv/app_state.json';
   }
+}
+
+class _PersistentJsonStoreState {
+  Map<String, Object?>? cache;
+  final SerialQueue writeQueue = SerialQueue();
 }

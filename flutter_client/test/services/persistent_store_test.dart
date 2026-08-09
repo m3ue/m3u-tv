@@ -65,6 +65,58 @@ void main() {
     );
   });
 
+  test('stale rollback preserves an unrelated concurrent commit', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'm3u-tv-write-if-concurrent-commit-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final stateFile = File('${directory.path}/app_state.json');
+    final store = PersistentJsonStore(file: stateFile);
+    await store.write('owner', 'account-a');
+    var ownershipChecks = 0;
+
+    final accepted = await store.writeIf('owner', 'account-b', () {
+      ownershipChecks += 1;
+      if (ownershipChecks < 3) return true;
+      final concurrent = (jsonDecode(stateFile.readAsStringSync()) as Map)
+          .cast<String, Object?>();
+      concurrent['account-a-notification'] = 'read';
+      stateFile.writeAsStringSync(jsonEncode(concurrent), flush: true);
+      return false;
+    });
+
+    expect(accepted, isFalse);
+    expect(
+      await PersistentJsonStore(file: stateFile).snapshot(),
+      <String, Object?>{
+        'owner': 'account-a',
+        'account-a-notification': 'read',
+      },
+    );
+  });
+
+  test('same-file instances preserve each other writes', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'm3u-tv-same-file-stores-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final stateFile = File('${directory.path}/app_state.json');
+    final first = PersistentJsonStore(file: stateFile);
+    final second = PersistentJsonStore(file: stateFile);
+    expect(await second.snapshot(), isEmpty);
+
+    await first.write('account-a-notification', 'read');
+    await second.write('account-a-channels', <String>['dvr']);
+
+    expect(
+      await PersistentJsonStore(file: stateFile).snapshot(),
+      <String, Object?>{
+        'account-a-notification': 'read',
+        'account-a-channels': <Object?>['dvr'],
+      },
+    );
+  });
+
   test('rejected writeIf never publishes candidate bytes', () async {
     final directory = await Directory.systemTemp.createTemp(
       'm3u-tv-write-if-',
