@@ -1034,4 +1034,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String showNotFound(String title) {
     return '未找到剧集“$title”';
   }
+
+  @override
+  String get settingsView => '视图';
+
+  @override
+  String get settingsLiveTvLayout => '直播电视布局';
+
+  @override
+  String get settingsLiveTvLayoutList => '列表';
+
+  @override
+  String get settingsLiveTvLayoutGrid => '网格';
+
+  @override
+  String get settingsLiveTvLayoutTimeline => '时间线';
+
+  @override
+  String get settingsEpgStartView => '节目单起始时间';
+
+  @override
+  String get settingsEpgStartViewCurrentTime => '当前时间';
+
+  @override
+  String get settingsEpgStartViewPrimeTime => '黄金时段';
 }

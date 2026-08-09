@@ -566,5 +566,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "Affichage",
+  "settingsLiveTvLayout": "Mise en page TV en direct",
+  "settingsLiveTvLayoutList": "Liste",
+  "settingsLiveTvLayoutGrid": "Grille",
+  "settingsLiveTvLayoutTimeline": "Chronologie",
+  "settingsEpgStartView": "Le guide démarre à",
+  "settingsEpgStartViewCurrentTime": "Heure actuelle",
+  "settingsEpgStartViewPrimeTime": "Prime time"
 }

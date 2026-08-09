@@ -1963,6 +1963,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show \"{title}\" not found'**
   String showNotFound(String title);
+
+  /// No description provided for @settingsView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get settingsView;
+
+  /// No description provided for @settingsLiveTvLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Live TV layout'**
+  String get settingsLiveTvLayout;
+
+  /// No description provided for @settingsLiveTvLayoutList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get settingsLiveTvLayoutList;
+
+  /// No description provided for @settingsLiveTvLayoutGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get settingsLiveTvLayoutGrid;
+
+  /// No description provided for @settingsLiveTvLayoutTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get settingsLiveTvLayoutTimeline;
+
+  /// No description provided for @settingsEpgStartView.
+  ///
+  /// In en, this message translates to:
+  /// **'EPG starts at'**
+  String get settingsEpgStartView;
+
+  /// No description provided for @settingsEpgStartViewCurrentTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Current time'**
+  String get settingsEpgStartViewCurrentTime;
+
+  /// No description provided for @settingsEpgStartViewPrimeTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Prime time'**
+  String get settingsEpgStartViewPrimeTime;
 }
 
 class _AppLocalizationsDelegate

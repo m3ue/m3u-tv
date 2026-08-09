@@ -559,12 +559,20 @@
   "showsSearchError": "Suche fehlgeschlagen",
   "showsSearchHint": "Shows nach Titel suchen",
   "showsTitle": "Shows",
-  "showNotFound": "Show „{title}\" nicht gefunden",
+  "showNotFound": "Show \"{title}\" nicht gefunden",
   "@showNotFound": {
     "placeholders": {
       "title": {
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "Ansicht",
+  "settingsLiveTvLayout": "Live-TV-Layout",
+  "settingsLiveTvLayoutList": "Liste",
+  "settingsLiveTvLayoutGrid": "Raster",
+  "settingsLiveTvLayoutTimeline": "Zeitleiste",
+  "settingsEpgStartView": "EPG startet um",
+  "settingsEpgStartViewCurrentTime": "Aktuelle Uhrzeit",
+  "settingsEpgStartViewPrimeTime": "Prime Time"
 }

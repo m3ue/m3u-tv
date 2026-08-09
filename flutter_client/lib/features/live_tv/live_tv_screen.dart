@@ -9,6 +9,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
@@ -30,6 +31,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     super.key,
     required this.favoritesService,
     required this.onChannelSelect,
+    this.viewSettingsService,
     this.onChannelContextChanged,
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
@@ -41,6 +43,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   });
 
   final FavoritesService favoritesService;
+  final ViewSettingsService? viewSettingsService;
   final void Function(Channel) onChannelSelect;
 
   /// Called with the filtered channel list (category/favorites/search) right
@@ -80,6 +83,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   Set<int> _favoriteIds = {};
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
+  EpgStartView _epgStartView = EpgStartView.currentTime;
 
   @override
   void initState() {
@@ -100,17 +104,32 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
   Future<void> _initCategory() async {
     final lastCat = await widget.favoritesService.getLastCategory();
-    final lastMode = await widget.favoritesService.getLastViewMode();
-    if (mounted) {
-      setState(() {
-        _selectedCategory = lastCat;
-        if (lastMode != null) {
-          _viewMode = _ViewMode.values.firstWhere(
-            (m) => m.name == lastMode,
-            orElse: () => _ViewMode.list,
-          );
-        }
-      });
+    final viewSettings = widget.viewSettingsService;
+    if (viewSettings != null) {
+      final results = await Future.wait([
+        viewSettings.liveTvLayout(),
+        viewSettings.epgStartView(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _selectedCategory = lastCat;
+          _viewMode = _layoutToViewMode(results[0] as LiveTvLayout);
+          _epgStartView = results[1] as EpgStartView;
+        });
+      }
+    } else {
+      final lastMode = await widget.favoritesService.getLastViewMode();
+      if (mounted) {
+        setState(() {
+          _selectedCategory = lastCat;
+          if (lastMode != null) {
+            _viewMode = _ViewMode.values.firstWhere(
+              (m) => m.name == lastMode,
+              orElse: () => _ViewMode.list,
+            );
+          }
+        });
+      }
     }
     await _loadFavorites();
   }
@@ -144,6 +163,18 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         )
         .toList(growable: false);
   }
+
+  static _ViewMode _layoutToViewMode(LiveTvLayout layout) => switch (layout) {
+    LiveTvLayout.list => _ViewMode.list,
+    LiveTvLayout.grid => _ViewMode.logoGrid,
+    LiveTvLayout.timeline => _ViewMode.epgGrid,
+  };
+
+  static LiveTvLayout _viewModeToLayout(_ViewMode mode) => switch (mode) {
+    _ViewMode.list => LiveTvLayout.list,
+    _ViewMode.logoGrid => LiveTvLayout.grid,
+    _ViewMode.epgGrid => LiveTvLayout.timeline,
+  };
 
   List<CategoryTabData> _categoryTabs(List<Category> categories) {
     return [
@@ -414,7 +445,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             _ViewMode.epgGrid => _ViewMode.list,
           };
           setState(() => _viewMode = next);
-          unawaited(widget.favoritesService.setLastViewMode(next.name));
+          final viewSettings = widget.viewSettingsService;
+          if (viewSettings != null) {
+            unawaited(viewSettings.setLiveTvLayout(_viewModeToLayout(next)));
+          } else {
+            unawaited(widget.favoritesService.setLastViewMode(next.name));
+          }
         },
         tooltip: switch (_viewMode) {
           _ViewMode.list => 'Logo grid',
@@ -477,6 +513,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         channels: channels,
         epgService: epgService,
         recordingChannelIds: recordingChannelIds,
+        epgStartView: _epgStartView,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);

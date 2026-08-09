@@ -566,5 +566,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "Vista",
+  "settingsLiveTvLayout": "Diseño de TV en vivo",
+  "settingsLiveTvLayoutList": "Lista",
+  "settingsLiveTvLayoutGrid": "Cuadrícula",
+  "settingsLiveTvLayoutTimeline": "Línea temporal",
+  "settingsEpgStartView": "La guía empieza a las",
+  "settingsEpgStartViewCurrentTime": "Hora actual",
+  "settingsEpgStartViewPrimeTime": "Horario estelar"
 }

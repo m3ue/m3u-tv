@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -44,6 +45,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
     this.comskipSettings,
+    this.viewSettingsService,
   });
 
   final AuthNotifier authNotifier;
@@ -51,6 +53,7 @@ class SettingsScreen extends StatefulWidget {
   final DevicePairingService? devicePairingService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
+  final ViewSettingsService? viewSettingsService;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -155,6 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onLocaleChanged: widget.onLocaleChanged,
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
         comskipSettings: widget.comskipSettings,
+        viewSettingsService: widget.viewSettingsService,
       ),
     );
   }
@@ -750,12 +754,14 @@ class _ConnectedView extends StatefulWidget {
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
     this.comskipSettings,
+    this.viewSettingsService,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
+  final ViewSettingsService? viewSettingsService;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -911,6 +917,11 @@ class _ConnectedViewState extends State<_ConnectedView>
           ),
         ),
         const SizedBox(height: 20),
+
+        // ── View ──────────────────────────────────────────────────────────────
+        if (widget.viewSettingsService != null)
+          _ViewSettingsSection(service: widget.viewSettingsService!),
+        if (widget.viewSettingsService != null) const SizedBox(height: 20),
 
         // ── App ─────────────────────────────────────────────────────────────
         _SettingsSection(
@@ -2033,6 +2044,105 @@ class _ProxyProfilePicker extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ViewSettingsSection extends StatefulWidget {
+  const _ViewSettingsSection({required this.service});
+
+  final ViewSettingsService service;
+
+  @override
+  State<_ViewSettingsSection> createState() => _ViewSettingsSectionState();
+}
+
+class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
+  LiveTvLayout _liveTvLayout = LiveTvLayout.list;
+  EpgStartView _epgStartView = EpgStartView.currentTime;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.service.addListener(_refresh);
+    unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    widget.service.removeListener(_refresh);
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final layout = await widget.service.liveTvLayout();
+    final startView = await widget.service.epgStartView();
+    if (!mounted) return;
+    setState(() {
+      _liveTvLayout = layout;
+      _epgStartView = startView;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _SettingsSection(
+      title: l.settingsView,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l.settingsLiveTvLayout,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _IntervalChip(
+                label: l.settingsLiveTvLayoutList,
+                isSelected: _liveTvLayout == LiveTvLayout.list,
+                onTap: () => widget.service.setLiveTvLayout(LiveTvLayout.list),
+              ),
+              _IntervalChip(
+                label: l.settingsLiveTvLayoutGrid,
+                isSelected: _liveTvLayout == LiveTvLayout.grid,
+                onTap: () => widget.service.setLiveTvLayout(LiveTvLayout.grid),
+              ),
+              _IntervalChip(
+                label: l.settingsLiveTvLayoutTimeline,
+                isSelected: _liveTvLayout == LiveTvLayout.timeline,
+                onTap: () =>
+                    widget.service.setLiveTvLayout(LiveTvLayout.timeline),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            l.settingsEpgStartView,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _IntervalChip(
+                label: l.settingsEpgStartViewCurrentTime,
+                isSelected: _epgStartView == EpgStartView.currentTime,
+                onTap: () =>
+                    widget.service.setEpgStartView(EpgStartView.currentTime),
+              ),
+              _IntervalChip(
+                label: l.settingsEpgStartViewPrimeTime,
+                isSelected: _epgStartView == EpgStartView.primeTime,
+                onTap: () =>
+                    widget.service.setEpgStartView(EpgStartView.primeTime),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

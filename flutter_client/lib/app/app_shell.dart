@@ -991,6 +991,7 @@ class AppShellState extends ConsumerState<AppShell>
       ),
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
+        viewSettingsService: _appState.viewSettingsService,
         onChannelSelect: _openChannel,
         onChannelContextChanged: _setChannelContext,
         onCatchupProgramSelect: _openCatchupProgram,
@@ -1114,6 +1115,7 @@ class AppShellState extends ConsumerState<AppShell>
           onConnected: () => _navigateTo(0),
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
+          viewSettingsService: _appState.viewSettingsService,
           proxyPlaybackSettings: _appState.proxyPlaybackSettings,
           comskipSettings: _appState.comskipSettings,
         ),

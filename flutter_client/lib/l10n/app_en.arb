@@ -566,5 +566,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "View",
+  "settingsLiveTvLayout": "Live TV layout",
+  "settingsLiveTvLayoutList": "List",
+  "settingsLiveTvLayoutGrid": "Grid",
+  "settingsLiveTvLayoutTimeline": "Timeline",
+  "settingsEpgStartView": "EPG starts at",
+  "settingsEpgStartViewCurrentTime": "Current time",
+  "settingsEpgStartViewPrimeTime": "Prime time"
 }

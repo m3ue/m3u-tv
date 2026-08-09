@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
@@ -43,6 +44,7 @@ class TimelineEpgView extends StatefulWidget {
     this.windowHours = 24,
     this.futureDays = 7,
     this.clock = DateTime.now,
+    this.epgStartView = EpgStartView.currentTime,
   });
 
   final List<Channel> channels;
@@ -66,6 +68,7 @@ class TimelineEpgView extends StatefulWidget {
   final int windowHours;
   final int futureDays;
   final Clock clock;
+  final EpgStartView epgStartView;
 
   @override
   State<TimelineEpgView> createState() => _TimelineEpgViewState();
@@ -95,7 +98,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
     _rowHCtrls = _makeRowCtrls(widget.channels.length);
     _leftVCtrl.addListener(_onLeftV);
     _rightVCtrl.addListener(_onRightV);
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToNow);
+    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
   }
 
   void _initWindow() {
@@ -107,7 +110,28 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       widget.windowHours,
     );
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
-    _nowOffset = _computeNowOffset();
+    _nowOffset = _computeStartOffset();
+  }
+
+  double _computeStartOffset() {
+    final now = widget.clock();
+    final anchor = switch (widget.epgStartView) {
+      EpgStartView.primeTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        20,
+      ),
+      EpgStartView.currentTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        now.hour,
+        now.minute,
+      ),
+    };
+    final offset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
+    return math.max(0, offset - 80.0).toDouble();
   }
 
   double _computeNowOffset() {
@@ -138,6 +162,15 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
     for (final c in [_headerHCtrl, ..._rowHCtrls]) {
       if (c.hasClients) {
         c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent));
+      }
+    }
+  }
+
+  void _scrollToStart(_) {
+    if (!mounted) return;
+    for (final c in [_headerHCtrl, ..._rowHCtrls]) {
+      if (c.hasClients) {
+        c.jumpTo(_nowOffset.clamp(0.0, c.position.maxScrollExtent));
       }
     }
   }

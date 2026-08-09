@@ -566,5 +566,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "视图",
+  "settingsLiveTvLayout": "直播电视布局",
+  "settingsLiveTvLayoutList": "列表",
+  "settingsLiveTvLayoutGrid": "网格",
+  "settingsLiveTvLayoutTimeline": "时间线",
+  "settingsEpgStartView": "节目单起始时间",
+  "settingsEpgStartViewCurrentTime": "当前时间",
+  "settingsEpgStartViewPrimeTime": "黄金时段"
 }
