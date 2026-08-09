@@ -321,7 +321,6 @@ void main() {
       await tester.tap(_sidebarText('DVR'));
       await _pumpAppFrame(tester);
 
-      expect(find.text('DVR Recordings'), findsOneWidget);
       expect(find.text('Route Recording'), findsOneWidget);
     });
 

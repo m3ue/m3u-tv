@@ -310,15 +310,19 @@ class Media3PlaybackPlugin(
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             val state = playerState ?: return
             if (videoSize.width > 0 && videoSize.height > 0) {
-                state.surfaceProducer.setSize(videoSize.width, videoSize.height)
-                val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
-                val player = state.player
-                emit(
-                    type = if (player.isPlaying) "playing" else "ready",
-                    positionMs = player.currentPosition,
-                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
-                    videoAspectRatio = aspectRatio.toDouble(),
-                )
+                if (state.lastVideoWidth != videoSize.width || state.lastVideoHeight != videoSize.height) {
+                    state.surfaceProducer.setSize(videoSize.width, videoSize.height)
+                    state.lastVideoWidth = videoSize.width
+                    state.lastVideoHeight = videoSize.height
+                    val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
+                    val player = state.player
+                    emit(
+                        type = if (player.isPlaying) "playing" else "ready",
+                        positionMs = player.currentPosition,
+                        durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                        videoAspectRatio = aspectRatio.toDouble(),
+                    )
+                }
             }
         }
 
@@ -369,6 +373,8 @@ class Media3PlaybackPlugin(
         val textureId: Long,
         val uri: String,
         var retriedHlsAsProgressive: Boolean = false,
+        var lastVideoWidth: Int = 0,
+        var lastVideoHeight: Int = 0,
     ) {
         fun retryAsTs(error: PlaybackException): Boolean {
             if (retriedHlsAsProgressive || !error.looksLikeFormatMismatch()) {

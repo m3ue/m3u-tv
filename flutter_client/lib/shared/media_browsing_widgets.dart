@@ -58,11 +58,17 @@ class InlineMediaSearchField extends StatefulWidget {
 
 class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   late final TextEditingController _controller;
+  FocusNode? _internalFocusNode;
+  bool _focused = false;
+
+  FocusNode get _focusNode =>
+      widget.focusNode ?? (_internalFocusNode ??= FocusNode());
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.query);
+    _focusNode.addListener(_handleFocusChange);
   }
 
   @override
@@ -74,12 +80,24 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
         selection: TextSelection.collapsed(offset: widget.query.length),
       );
     }
+    if (oldWidget.focusNode != widget.focusNode) {
+      (oldWidget.focusNode ?? _internalFocusNode)?.removeListener(
+        _handleFocusChange,
+      );
+      _focusNode.addListener(_handleFocusChange);
+    }
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _internalFocusNode?.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted) setState(() => _focused = _focusNode.hasFocus);
   }
 
   void _clear() {
@@ -90,28 +108,58 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return TextField(
-      controller: _controller,
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      textInputAction: widget.textInputAction,
-      decoration: InputDecoration(
-        hintText: widget.hintText,
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: widget.query.isEmpty
-            ? null
-            : IconButton(
-                tooltip: 'Clear search',
-                icon: const Icon(Icons.clear),
-                onPressed: _clear,
-              ),
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHigh,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+    const radius = BorderRadius.all(
+      Radius.circular(MediaBrowsingMetrics.cardRadius),
+    );
+    const noBorder = OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide.none,
+    );
+    return Stack(
+      children: [
+        TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          autofocus: widget.autofocus,
+          textInputAction: widget.textInputAction,
+          decoration: InputDecoration(
+            hintText: widget.hintText,
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: widget.query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: const Icon(Icons.clear),
+                    onPressed: _clear,
+                  ),
+            filled: true,
+            fillColor: colorScheme.surfaceContainerHigh,
+            border: noBorder,
+            enabledBorder: noBorder,
+            focusedBorder: noBorder,
+          ),
+          onChanged: widget.onChanged,
         ),
-      ),
-      onChanged: widget.onChanged,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _focused ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 150),
+              child: CustomPaint(
+                painter: GradientBorderPainter(
+                  borderRadius: radius,
+                  width: 2.5,
+                  gradient: LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [colorScheme.primary, colorScheme.secondary],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -246,6 +294,10 @@ class ScrollableCategoryBar extends StatefulWidget {
     required this.selectedId,
     required this.onSelected,
     this.leading,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: MediaBrowsingMetrics.contentPadding,
+      vertical: 8,
+    ),
     super.key,
   });
 
@@ -253,6 +305,12 @@ class ScrollableCategoryBar extends StatefulWidget {
   final String selectedId;
   final ValueChanged<String> onSelected;
   final Widget? leading;
+
+  /// Defaults to the bar's own edge inset (for full-bleed use on Series/VOD
+  /// browse screens). Pass a zero-horizontal padding when embedding the bar
+  /// inside a page that already applies its own horizontal padding, so the
+  /// bar lines up flush with sibling form fields instead of doubling up.
+  final EdgeInsets padding;
 
   @override
   State<ScrollableCategoryBar> createState() => _ScrollableCategoryBarState();
@@ -290,10 +348,7 @@ class _ScrollableCategoryBarState extends State<ScrollableCategoryBar> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: MediaBrowsingMetrics.contentPadding,
-        vertical: 8,
-      ),
+      padding: widget.padding,
       child: Row(
         children: [
           if (widget.leading != null) ...[
@@ -483,7 +538,6 @@ class MediaPreviewItem {
     this.progressFraction,
     this.overlayBadges = const <String>[],
     this.overlayLabel,
-    this.heroTag,
   });
 
   final String title;
@@ -507,10 +561,6 @@ class MediaPreviewItem {
 
   /// Optional label shown left-aligned opposite the overlay badges.
   final String? overlayLabel;
-
-  /// Optional Hero tag used to animate the poster image when navigating to a
-  /// detail screen. Only applied when [MediaPreviewCard] is in poster style.
-  final Object? heroTag;
 }
 
 class MediaPreviewSection extends StatefulWidget {
@@ -873,8 +923,7 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
   ) {
     final item = widget.item;
     final posterStyle = widget.posterStyle;
-    final heroTag = posterStyle ? item.heroTag : null;
-    Widget mediaImage = ResilientMediaImage(
+    final mediaImage = ResilientMediaImage(
       imageUrl: item.imageUrl,
       fallbackIcon: item.fallbackIcon,
       fit: item.imageFit,
@@ -883,9 +932,6 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
       backgroundColor: item.imageBackgroundColor,
       borderRadius: 0,
     );
-    if (heroTag != null) {
-      mediaImage = Hero(tag: heroTag, child: mediaImage);
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

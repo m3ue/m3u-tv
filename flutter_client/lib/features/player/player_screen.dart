@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io' show HttpClient, HttpStatus;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
@@ -8,15 +10,18 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
@@ -32,13 +37,17 @@ class PlayerScreen extends StatefulWidget {
     required this.orchestrator,
     required this.epgService,
     this.xtreamService,
+    this.comskipSettings,
     this.progressReporter,
     this.traktService,
+    this.wakelockController = const PlatformWakelockController(),
     this.viewerId = '',
     this.onClose,
     this.onPlaybackFailure,
     this.onNextChannel,
     this.onPreviousChannel,
+    this.onRecordProgram,
+    this.isRecordingCurrentChannel = false,
     super.key,
   });
 
@@ -46,13 +55,17 @@ class PlayerScreen extends StatefulWidget {
   final PlaybackOrchestrator orchestrator;
   final EpgService epgService;
   final XtreamService? xtreamService;
+  final ComskipSettings? comskipSettings;
   final void Function(Progress progress)? progressReporter;
   final TraktService? traktService;
+  final WakelockController wakelockController;
   final String viewerId;
   final VoidCallback? onClose;
   final VoidCallback? onPlaybackFailure;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
+  final void Function(EpgProgram program)? onRecordProgram;
+  final bool isRecordingCurrentChannel;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -79,6 +92,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isSubtitleTrackSelectionKnown = false;
 
   EpgCurrentNext? _epgData;
+
+  // Comskip (commercial-skip) state — only populated when args.metadata
+  // carries an 'edl_url' (completed DVR recordings with comskip enabled).
+  List<({double start, double end})> _comskipSegments = const [];
+  ({double start, double end})? _activeComskipSegment;
+  bool _showComskipSkippedBadge = false;
+  Timer? _comskipBadgeTimer;
+  // Set while an auto-skip seek is in flight so orchestrator position
+  // reports that lag/oscillate behind the optimistic bump can't clobber
+  // _currentPosition backward into the segment. Cleared the moment the
+  // orchestrator genuinely reports a position at or past the target.
+  Duration? _pendingComskipSeekTarget;
+  // Safety net: if the orchestrator never confirms the seek (player stuck,
+  // decode failure, etc.), auto-clear after a few seconds so we don't hold
+  // _currentPosition hostage indefinitely and silently break future skips.
+  Timer? _pendingComskipSeekTimer;
 
   bool _overlayVisible = true;
 
@@ -151,6 +180,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Screen must stay on for the entire time the player route is active,
+    // not just while actively playing — e.g. staying paused on an overlay
+    // shouldn't let the screen sleep. Enabled here, disabled in dispose().
+    unawaited(widget.wakelockController.enable());
     // Steal focus from the content area (autofocus won't do this if another
     // widget already holds focus when the player opens via the AppShell Stack).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -170,6 +203,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+    unawaited(_initComskip(widget.args));
   }
 
   // Live-TV skip-previous/skip-next replaces `args` on an already-mounted
@@ -192,6 +226,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _epgTimer?.cancel();
     _epgFetch = null;
+    _comskipBadgeTimer?.cancel();
 
     setState(() {
       _status = PlaybackStatus.idle;
@@ -207,11 +242,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _selectedSubtitleTrackId = null;
       _epgData = null;
       _overlayVisible = true;
+      _comskipSegments = const [];
+      _activeComskipSegment = null;
+      _showComskipSkippedBadge = false;
     });
 
     _openSource(widget.args);
     _startLoadingTimeout();
     _scheduleOverlayHide();
+    unawaited(_initComskip(widget.args));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
     });
@@ -241,12 +280,163 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ? _duration
             : next;
       });
+      _checkComskip();
     });
   }
 
   void _stopPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = null;
+  }
+
+  // ── Comskip (commercial-skip) ──────────────────────────────────────────
+
+  /// Fetches the comskip EDL segment list for completed DVR recordings.
+  /// Fire-and-forget: an older server, a recording with comskip disabled, or
+  /// any fetch failure just leaves [_comskipSegments] empty, so the rest of
+  /// the player behaves exactly as if this recording had no EDL at all.
+  Future<void> _initComskip(PlayerArgs args) async {
+    final edlUrl = args.metadata['edl_url'] as String?;
+    if (edlUrl == null || edlUrl.isEmpty) return;
+
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(_resolveEdlUri(Uri.parse(edlUrl)));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
+      if (response.statusCode != HttpStatus.ok) return;
+      final body = await utf8.decodeStream(response);
+      final decoded = jsonDecode(body);
+      if (decoded is! List) return;
+
+      final segments = decoded
+          .whereType<Map<String, Object?>>()
+          .map((segment) {
+            final start = segment['start'];
+            final end = segment['end'];
+            if (start is! num || end is! num) return null;
+            return (start: start.toDouble(), end: end.toDouble());
+          })
+          .whereType<({double start, double end})>()
+          .toList(growable: false);
+
+      if (!mounted || !identical(args, widget.args)) return;
+      setState(() => _comskipSegments = segments);
+    } on Object catch (error) {
+      debugPrint('Comskip: failed to fetch EDL: $error');
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Rewrites a localhost/127.0.0.1 EDL host to the connected Xtream server's
+  /// real scheme/host/port. The m3u-editor backend occasionally returns an
+  /// edl_url pointing at its own loopback (e.g. `http://localhost/dvr/...`)
+  /// instead of the public host, which makes the client hit the user's own
+  /// machine. Only rewrites when the parsed host is loopback AND we have
+  /// configured credentials; otherwise returns the input unchanged so the
+  /// existing failure path runs untouched.
+  Uri _resolveEdlUri(Uri edlUri) {
+    final host = edlUri.host.toLowerCase();
+    if (host != 'localhost' && host != '127.0.0.1') return edlUri;
+    final server = widget.xtreamService?.credentials?.server;
+    if (server == null) return edlUri;
+    final serverUri = Uri.tryParse(server);
+    if (serverUri == null) return edlUri;
+    return edlUri.replace(
+      scheme: serverUri.scheme,
+      host: serverUri.host,
+      port: serverUri.port,
+    );
+  }
+
+  /// Checks whether the current playback position has entered a commercial
+  /// segment and reacts per the user's auto-skip/prompt preference. Called
+  /// after every position update, mirroring the web player's
+  /// timeupdate-driven `_checkComskip`.
+  void _checkComskip() {
+    if (_comskipSegments.isEmpty || _disposed || !mounted) return;
+
+    final positionSeconds = _currentPosition.inMilliseconds / 1000.0;
+    ({double start, double end})? current;
+    for (final segment in _comskipSegments) {
+      if (positionSeconds >= segment.start && positionSeconds < segment.end) {
+        current = segment;
+        break;
+      }
+    }
+
+    if (current == null) {
+      if (_activeComskipSegment != null) {
+        setState(() => _activeComskipSegment = null);
+      }
+      return;
+    }
+
+    final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
+    if (autoSkip) {
+      _fireComskipSeek(current);
+      _flashComskipSkippedBadge();
+    } else if (_activeComskipSegment?.end != current.end) {
+      setState(() => _activeComskipSegment = current);
+    }
+  }
+
+  /// Seeks past the end of a commercial segment using sub-second EDL
+  /// precision, with the optimistic `_currentPosition` bump and
+  /// `_pendingComskipSeekTarget` guard required to keep the seek-storm
+  /// regression from coming back. Shared by the auto-skip branch above
+  /// and the prompt-mode confirm button so the two paths can't drift
+  /// out of sync again (which previously left the prompt flickering).
+  void _fireComskipSeek(({double start, double end}) segment) {
+    // ceil() past the segment's actual end so sub-second EDL precision
+    // (e.g. end=2284.08) doesn't leave us inside the half-open interval
+    // after rounding to whole seconds. The same value is used for the
+    // optimistic bump and the real seek so they stay in lockstep.
+    final seekTargetMs = (segment.end * 1000).ceil();
+    final seekTarget = Duration(milliseconds: seekTargetMs);
+    // Optimistically bump the local position past the segment's end so
+    // the very next tick no longer matches it — the manually-incremented
+    // _currentPosition otherwise lags the orchestrator's true position
+    // until onState confirms the seek asynchronously, which would
+    // re-match and re-fire on the next tick. _pendingComskipSeekTarget
+    // then prevents `_handleState` from clobbering the bump backward
+    // (the orchestrator's mid-seek position reports can lag/oscillate
+    // behind the optimistic value, which previously caused a re-fire
+    // loop). There's deliberately no persistent already-skipped
+    // tracking, since that would (and did) suppress a legitimate
+    // re-skip on scrub-back, replay, or restart-from-0.
+    _currentPosition = seekTarget;
+    _pendingComskipSeekTarget = seekTarget;
+    _pendingComskipSeekTimer?.cancel();
+    _pendingComskipSeekTimer = Timer(const Duration(seconds: 5), () {
+      if (_disposed || !mounted) return;
+      // Real seek never confirmed — give up holding position hostage so
+      // future comskip seeks aren't silently broken.
+      _pendingComskipSeekTarget = null;
+      _pendingComskipSeekTimer = null;
+    });
+    unawaited(widget.orchestrator.seek(seekTarget));
+  }
+
+  void _flashComskipSkippedBadge() {
+    _comskipBadgeTimer?.cancel();
+    setState(() => _showComskipSkippedBadge = true);
+    _comskipBadgeTimer = Timer(const Duration(seconds: 3), () {
+      if (!_disposed && mounted) {
+        setState(() => _showComskipSkippedBadge = false);
+      }
+    });
+  }
+
+  /// Confirms the prompt-mode skip control, jumping to the active segment's
+  /// end the same way auto-skip would.
+  void _confirmComskipSkip() {
+    final segment = _activeComskipSegment;
+    if (segment == null) return;
+    _fireComskipSeek(segment);
+    setState(() => _activeComskipSegment = null);
   }
 
   void _scrobble(String action) => _scrobbleFor(widget.args, action);
@@ -292,11 +482,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _positionTimer?.cancel();
     _epgTimer?.cancel();
+    _comskipBadgeTimer?.cancel();
+    _pendingComskipSeekTimer?.cancel();
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
     unawaited(_stateSubscription?.cancel());
     unawaited(_errorSubscription?.cancel());
+    unawaited(widget.wakelockController.disable());
     unawaited(widget.orchestrator.stop());
     super.dispose();
   }
@@ -374,9 +567,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // play/pause transition, not to every tick.
     final wasPlaying = _isPlaying;
 
+    // While a comskip auto-skip seek is in flight, ignore orchestrator
+    // position reports that would regress _currentPosition backward into
+    // the segment (orchestrator onState can lag/oscillate during the real
+    // seek's buffering). Accept state.position only once it's at or past
+    // the pending target — that proves the real seek genuinely caught up.
+    final pendingTarget = _pendingComskipSeekTarget;
+    final acceptedPosition =
+        pendingTarget != null && state.position < pendingTarget
+        ? _currentPosition
+        : state.position;
+
     setState(() {
       _status = state.status;
-      _currentPosition = state.position;
+      _currentPosition = acceptedPosition;
       if (state.duration != null && state.duration! > Duration.zero) {
         _duration = state.duration!;
       }
@@ -419,6 +623,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _goBack();
       }
     });
+
+    // If the orchestrator genuinely caught up to (or past) the pending
+    // seek target, the real seek has landed — release the guard so the
+    // next segment / next scrub-back can fire normally.
+    if (pendingTarget != null && state.position >= pendingTarget) {
+      _pendingComskipSeekTarget = null;
+      _pendingComskipSeekTimer?.cancel();
+      _pendingComskipSeekTimer = null;
+    }
+    _checkComskip();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
     // pausing cancels it (keeping the overlay up), resuming restarts the
@@ -593,6 +807,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _seekTo(Duration position) {
     if (!_canSeek) return;
+    // A manual seek always supersedes any in-flight comskip seek — the
+    // user's deliberate new position should never be guarded by the
+    // auto-skip's pending target. Without this, the orchestrator's
+    // confirmation of the manual seek (which may briefly report a
+    // position before the auto-skip's target during the real seek's
+    // buffering) would be rejected as a stale regression and the
+    // player would hold _currentPosition at the auto-skip's target
+    // until the 5s safety-net timer cleared the guard.
+    _pendingComskipSeekTarget = null;
+    _pendingComskipSeekTimer?.cancel();
+    _pendingComskipSeekTimer = null;
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
@@ -686,169 +911,238 @@ class _PlayerScreenState extends State<PlayerScreen> {
               }
               return KeyEventResult.ignored;
             },
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _VideoSurface(
-                    textureId: widget.orchestrator.activeTextureId,
-                    aspectRatio: _videoAspectRatio,
-                  ),
-                ),
+            child: Builder(
+              builder: (context) {
+                // TV/tablet layouts get the fixed 104px left inset that
+                // clears the sidebar rail plus a generous top margin; narrow
+                // portrait phones have no sidebar to clear and a much
+                // smaller viewport, so the same fixed offsets push the
+                // overlay's fixed 420px width off the right edge and its
+                // top edge under the status bar/notch.
+                final mediaQuery = MediaQuery.of(context);
+                final isCompact = mediaQuery.size.width < 600;
+                final overlayLeft = isCompact ? 16.0 : 104.0;
+                // On compact/portrait layouts the back button lives in
+                // PlaybackControls' own top-left corner (40px padding + a
+                // ~44px circular hit target); the overlay must clear that
+                // whole row instead of overlapping it.
+                final overlayTop =
+                    mediaQuery.padding.top + (isCompact ? 96.0 : 40.0);
+                final overlayWidth = isCompact
+                    ? mediaQuery.size.width - overlayLeft * 2
+                    : 420.0;
 
-                if (widget.orchestrator.activeSubtitleController != null)
-                  Positioned.fill(
-                    child: mkv.SubtitleView(
-                      controller: widget.orchestrator.activeSubtitleController!,
-                      configuration: const mkv.SubtitleViewConfiguration(),
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _VideoSurface(
+                        textureId: widget.orchestrator.activeTextureId,
+                        aspectRatio: _videoAspectRatio,
+                      ),
                     ),
-                  ),
 
-                // Loading indicator
-                if (_status == PlaybackStatus.loading && _errorMessage == null)
-                  const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: Colors.white),
-                        SizedBox(height: 12),
-                        Text(
-                          'Loading stream...',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                    if (widget.orchestrator.activeSubtitleController != null)
+                      Positioned.fill(
+                        child: mkv.SubtitleView(
+                          controller:
+                              widget.orchestrator.activeSubtitleController!,
+                          configuration: const mkv.SubtitleViewConfiguration(),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                // Error display
-                if (_errorMessage != null)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Playback error',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
+                    // Loading indicator
+                    if (_status == PlaybackStatus.loading &&
+                        _errorMessage == null)
+                      const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(color: Colors.white),
+                            SizedBox(height: 12),
+                            Text(
+                              'Loading stream...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                            maxLines: 6,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 24),
-                          DpadFocusable(
-                            focusNode: _errorButtonFocusNode,
-                            onSelect: _goBack,
-                            effects: const [
-                              GradientBorderEffect(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(50),
+                          ],
+                        ),
+                      ),
+
+                    // Error display
+                    if (_errorMessage != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Playback error',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 6,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 24),
+                              DpadFocusable(
+                                focusNode: _errorButtonFocusNode,
+                                onSelect: _goBack,
+                                effects: const [
+                                  GradientBorderEffect(
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(50),
+                                    ),
+                                  ),
+                                ],
+                                child: FilledButton.icon(
+                                  onPressed: _goBack,
+                                  icon: const Icon(Icons.arrow_back),
+                                  label: Text(
+                                    AppLocalizations.of(context).playerGoBack,
+                                  ),
                                 ),
                               ),
                             ],
-                            child: FilledButton.icon(
-                              onPressed: _goBack,
-                              icon: const Icon(Icons.arrow_back),
-                              label: Text(
-                                AppLocalizations.of(context).playerGoBack,
-                              ),
-                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
 
-                // Playback controls overlay
-                if (_overlayVisible && _errorMessage == null)
-                  PlaybackControls(
-                    isPlaying: _isPlaying,
-                    isLive: _isLive,
-                    canSeek: _canSeek,
-                    currentPosition: _currentPosition,
-                    duration: _duration,
-                    onPlayPause: _togglePlayPause,
-                    onSeek: _seekTo,
-                    onBack: _goBack,
-                    audioTracks: _audioTracks,
-                    subtitleTracks: _subtitleTracks,
-                    selectedAudioTrackId: _selectedAudioTrackId,
-                    selectedSubtitleTrackId: _selectedSubtitleTrackId,
-                    isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
-                    isSubtitleTrackSelectionKnown:
-                        _isSubtitleTrackSelectionKnown,
-                    onAudioTrackSelected: _handleAudioTrackSelected,
-                    onSubtitleTrackSelected: _handleSubtitleTrackSelected,
-                    fallbackReason: _showPlaybackDiagnostics
-                        ? _fallbackReason
-                        : null,
-                    playPauseFocusNode: _controlsFocusNode,
-                    onNextChannel: widget.onNextChannel,
-                    onPreviousChannel: widget.onPreviousChannel,
-                  ),
+                    // Playback controls overlay
+                    if (_overlayVisible && _errorMessage == null)
+                      PlaybackControls(
+                        isPlaying: _isPlaying,
+                        isLive: _isLive,
+                        canSeek: _canSeek,
+                        currentPosition: _currentPosition,
+                        duration: _duration,
+                        onPlayPause: _togglePlayPause,
+                        onSeek: _seekTo,
+                        onBack: _goBack,
+                        audioTracks: _audioTracks,
+                        subtitleTracks: _subtitleTracks,
+                        selectedAudioTrackId: _selectedAudioTrackId,
+                        selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                        isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
+                        isSubtitleTrackSelectionKnown:
+                            _isSubtitleTrackSelectionKnown,
+                        onAudioTrackSelected: _handleAudioTrackSelected,
+                        onSubtitleTrackSelected: _handleSubtitleTrackSelected,
+                        fallbackReason: _showPlaybackDiagnostics
+                            ? _fallbackReason
+                            : null,
+                        playPauseFocusNode: _controlsFocusNode,
+                        onNextChannel: widget.onNextChannel,
+                        onPreviousChannel: widget.onPreviousChannel,
+                        onRecordNow:
+                            (_isLive &&
+                                widget.onRecordProgram != null &&
+                                _epgData?.current != null)
+                            ? () => widget.onRecordProgram!(_epgData!.current)
+                            : null,
+                        isRecording: widget.isRecordingCurrentChannel,
+                      ),
 
-                if (_showPlaybackDiagnostics &&
-                    _overlayVisible &&
-                    _errorMessage == null)
-                  Positioned(
-                    top: 40,
-                    right: 40,
-                    child: _PlaybackDiagnosticsPanel(
-                      activeBackend: widget.orchestrator.activeBackend,
-                      diagnostics: widget.orchestrator.diagnostics,
-                    ),
-                  ),
+                    if (_showPlaybackDiagnostics &&
+                        _overlayVisible &&
+                        _errorMessage == null)
+                      Positioned(
+                        top: 40,
+                        right: 40,
+                        child: _PlaybackDiagnosticsPanel(
+                          activeBackend: widget.orchestrator.activeBackend,
+                          diagnostics: widget.orchestrator.diagnostics,
+                        ),
+                      ),
 
-                // Hidden overlay tap area
-                if (!_overlayVisible && _errorMessage == null)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _showOverlay,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
+                    // Hidden overlay tap area
+                    if (!_overlayVisible && _errorMessage == null)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _showOverlay,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
 
-                // EPG overlay (live only)
-                if (_isLive && _epgData != null && _overlayVisible)
-                  Positioned(
-                    top: 40,
-                    left: 104,
-                    width: 420,
-                    child: EpgOverlay(
-                      currentTitle: _epgData!.current.title,
-                      currentProgress: _epgData!.progress,
-                      nextTitle: _epgData?.next?.title,
-                    ),
-                  ),
+                    // EPG overlay (live only)
+                    if (_isLive && _epgData != null && _overlayVisible)
+                      Positioned(
+                        top: overlayTop,
+                        left: overlayLeft,
+                        width: overlayWidth,
+                        child: EpgOverlay(
+                          currentTitle: _epgData!.current.title,
+                          currentProgress: _epgData!.progress,
+                          nextTitle: _epgData?.next?.title,
+                        ),
+                      ),
 
-                // "Now playing" overlay (VOD/series, including AIOStreams
-                // on-demand content, which reuses the same 'vod'/'series'
-                // types once resolved to a stream URL).
-                if (!_isLive && _overlayVisible)
-                  Positioned(
-                    top: 40,
-                    left: 104,
-                    width: 420,
-                    child: NowPlayingOverlay(
-                      badgeLabel: _nowPlayingBadgeLabel(context),
-                      title: _nowPlayingTitle(),
-                      subtitle: _nowPlayingSubtitle(context),
-                      description: _nowPlayingDescription(),
-                    ),
-                  ),
-              ],
+                    // "Now playing" overlay (VOD/series, including AIOStreams
+                    // on-demand content, which reuses the same 'vod'/'series'
+                    // types once resolved to a stream URL).
+                    if (!_isLive && _overlayVisible)
+                      Positioned(
+                        top: overlayTop,
+                        left: overlayLeft,
+                        width: overlayWidth,
+                        child: NowPlayingOverlay(
+                          badgeLabel: _nowPlayingBadgeLabel(context),
+                          title: _nowPlayingTitle(),
+                          subtitle: _nowPlayingSubtitle(context),
+                          description: _nowPlayingDescription(),
+                        ),
+                      ),
+
+                    // Comskip: brief auto-skip indicator (DVR recordings only)
+                    if (_showComskipSkippedBadge)
+                      Positioned(
+                        top: 40,
+                        left: 40,
+                        child: _ComskipSkippedBadge(
+                          label: AppLocalizations.of(
+                            context,
+                          ).playerCommercialSkipped,
+                        ),
+                      ),
+
+                    // Comskip: confirm-to-skip prompt (auto-skip disabled)
+                    if (_activeComskipSegment != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 140,
+                        child: Center(
+                          child: _ComskipSkipPrompt(
+                            label: AppLocalizations.of(
+                              context,
+                            ).playerSkipCommercial,
+                            onSkip: _confirmComskipSkip,
+                            // Only steal focus when the controls overlay is
+                            // hidden (nothing else is being actively
+                            // navigated). If the user is mid-interaction
+                            // with visible controls, let the prompt appear
+                            // without yanking focus away from them.
+                            autofocus: !_overlayVisible,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -1109,6 +1403,83 @@ class FallbackReasonBadge extends StatelessWidget {
           color: Colors.white,
           fontSize: 11,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// Brief, non-interactive indicator shown when a commercial segment was
+/// auto-skipped. Self-dismisses via [_PlayerScreenState._flashComskipSkippedBadge].
+class _ComskipSkippedBadge extends StatelessWidget {
+  const _ComskipSkippedBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.fast_forward, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirm-to-skip control shown while playback is inside a commercial
+/// segment and auto-skip is disabled. Hides itself once the play-head
+/// exits the segment — see [_PlayerScreenState._checkComskip].
+class _ComskipSkipPrompt extends StatelessWidget {
+  const _ComskipSkipPrompt({
+    required this.label,
+    required this.onSkip,
+    required this.autofocus,
+  });
+
+  final String label;
+  final VoidCallback onSkip;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onSkip,
+      borderRadius: BorderRadius.circular(50),
+      color: Colors.black.withValues(alpha: 0.75),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.fast_forward, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

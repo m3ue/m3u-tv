@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "Anuncio omitido",
+  "playerSkipCommercial": "Omitir anuncio",
   "searchHint": "Buscar Televisión en vivo, cine y series…",
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",
@@ -126,6 +128,11 @@
   "settingsProxyProfileDefault": "Predeterminado",
   "settingsProxyProfileDirect": "Directo (sin transcodificación)",
   "settingsProxyNoProfiles": "No hay perfiles de transcodificación disponibles; las transmisiones usan el proxy directo.",
+  "settingsDvr": "DVR",
+  "settingsDvrSubtitle": "Ajustes para la reproducción de contenido grabado.",
+  "settingsComskip": "Omisión de anuncios",
+  "settingsComskipSubtitle": "Controla cómo reacciona el reproductor a los anuncios detectados en las grabaciones DVR.",
+  "settingsComskipAutoSkip": "Omitir anuncios automáticamente",
   "settingsDisconnectTitle": "¿Desconectar?",
   "settingsDisconnectBody": "Se cerrará tu sesión y deberás volver a introducir tus credenciales para reconectarte.",
   "settingsDisconnectConfirm": "Desconectar",
@@ -144,6 +151,24 @@
   },
   "settingsAppViewRelease": "Ver versión",
   "settingsAppScanQr": "Escanear para abrir en tu teléfono",
+  "settingsFillAllFields": "Por favor completa todos los campos",
+  "settingsConnectionSettings": "Configuración de conexión",
+  "settingsConnectionSettingsSubtitle": "Ingresa los datos de tu Xtream Codes",
+  "settingsServerUrl": "URL del servidor",
+  "settingsUsername": "Usuario",
+  "settingsPassword": "Contraseña",
+  "settingsConnect": "Conectar",
+  "settingsPairWithCode": "Vincular con código",
+  "settingsTabPair": "Vincular",
+  "settingsTabSignIn": "Iniciar sesión",
+  "settingsPairTabSubtitle": "Introduce la dirección de tu servidor y luego vincula este televisor con un código.",
+  "pairingEnterServerFirst": "Ingresa primero la URL de tu servidor",
+  "pairingErrorGeneric": "La vinculación falló o el código expiró. Inténtalo de nuevo.",
+  "pairingScanQr": "Escanea para abrir la página de vinculación en tu teléfono",
+  "pairingOpenBrowser": "Abrir en el navegador",
+  "pairingPendingGoTo": "En tu teléfono u ordenador, ve a:",
+  "pairingPendingEnterCode": "Luego ingresa este código:",
+  "pairingPendingWaiting": "Esperando aprobación…",
   "settingsContentCache": "Caché de contenido",
   "settingsCacheSubtitle": "El contenido en caché carga al instante. Los datos se actualizan automáticamente en segundo plano.",
   "settingsEpgRefreshInterval": "Intervalo de actualización de EPG",
@@ -357,5 +382,189 @@
   "dvrDeleteDismiss": "Mantener",
   "dvrDeleteConfirm": "Eliminar grabación",
   "dvrDeleteSuccess": "Grabación eliminada",
-  "dvrDeleteFailed": "No se pudo eliminar la grabación"
+  "dvrDeleteFailed": "No se pudo eliminar la grabación",
+  "liveTvStopRecording": "Detener grabación",
+  "playerRecordNowTooltip": "Grabar programa actual",
+  "playerStopRecordingTooltip": "Detener grabación",
+  "dvrMoreActions": "Más acciones",
+  "dvrPlay": "Reproducir",
+  "dvrSelect": "Seleccionar",
+  "dvrStop": "Detener",
+  "dvrStatusRecording": "Grabando",
+  "dvrStatusScheduled": "Programada",
+  "dvrStatusFailed": "Fallida",
+  "dvrExitSelection": "Salir de la selección",
+  "dvrSelectedCount": "{count, plural, =0{Ningún elemento seleccionado} one{1 elemento seleccionado} other{{count} elementos seleccionados}}",
+  "@dvrSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrStorageTitle": "Almacenamiento DVR",
+  "dvrStorageUnlimited": "Ilimitado",
+  "dvrStorageUsedUnlimited": "{used} utilizado",
+  "@dvrStorageUsedUnlimited": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageUsedWithQuota": "{used} de {quota} utilizado",
+  "@dvrStorageUsedWithQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageRecordingCount": "{count} grabaciones",
+  "@dvrStorageRecordingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesChannel": "Canal",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Iniciar antes",
+  "dvrSeriesUseDefault": "Predeterminado",
+  "dvrEpisodeCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
+  "dvrDeleteSeriesRule": "Eliminar regla",
+  "dvrEditSeriesRule": "Editar regla",
+  "dvrUpdateSeriesRuleFailed": "No se pudo actualizar la regla de serie",
+  "dvrSeriesSave": "Guardar",
+  "dvrSeriesSecondsSuffix": "seg",
+  "dvrSeriesMode": "Modo de serie",
+  "dvrUpdateSeriesRuleSuccess": "Regla de serie actualizada",
+  "dvrSeriesModeAll": "Todos los episodios",
+  "dvrSeriesMatchModeStartsWith": "Comienza con",
+  "dvrDeleteSeriesRuleConfirm": "¿Eliminar esta regla de serie?",
+  "dvrSeriesCancel": "Cancelar",
+  "dvrDeleteSeriesRuleSuccess": "Regla de serie eliminada",
+  "dvrSeriesRulesTitle": "Reglas de series",
+  "dvrSeriesMatchModeContains": "Contiene",
+  "dvrSeriesMatchModeExact": "Exacto",
+  "dvrSeriesModeUseDefault": "Predeterminado",
+  "dvrSeriesModeNewFlag": "Solo nuevos",
+  "dvrDeleteSeriesRuleFailed": "No se pudo eliminar la regla de serie",
+  "dvrSeriesKeepLast": "Mantener última",
+  "dvrSeriesModeUniqueSe": "S-E único",
+  "dvrSeriesAnyChannel": "Cualquier canal",
+  "dvrSeriesMatchMode": "Modo de coincidencia",
+  "dvrSeriesEndLate": "Terminar tarde",
+  "dvrSeriesOptions": "Opciones",
+  "dvrSeriesOptionsFor": "Opciones: {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSeriesAllEpisodesWarning": "Grabar todos los episodios en cualquier canal puede crear duplicados — usa Solo nuevos o S-E único para desduplicar.",
+  "dvrSeriesRulesEmpty": "No hay reglas de series",
+  "dvrSeriesPriority": "Prioridad",
+  "epgRecordSeries": "Grabar serie",
+  "epgRecordSeriesSuccess": "Grabación de serie configurada para {title}",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "No se pudo configurar la grabación de la serie",
+  "epgRecordSeriesDuplicate": "La grabación de la serie ya está configurada",
+  "navShows": "Shows",
+  "showAiringNext": "Próxima emisión",
+  "showAiringNone": "No hay episodios próximos en la EPG",
+  "showChannelCount": "{count, plural, =1{1 canal} other{{count} canales}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Eliminar regla de serie",
+  "showDeleteRuleConfirm": "¿Eliminar la regla de serie para {title}? Los episodios futuros no se grabarán. Las grabaciones ya realizadas no se eliminarán.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Regla de serie activa",
+  "showDetailTitle": "Detalles del show",
+  "showEpisodesCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Grabar serie",
+  "showRecordSeriesConfirm": "¿Grabar cada episodio de {title} en {channel}?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "No se pudo configurar la grabación de la serie para {title}",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Grabación de serie configurada para {title}",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "La grabación de la serie ya está configurada para {title}",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "No se pudieron buscar shows",
+  "showsNoResults": "Ningún show coincide con tu búsqueda",
+  "showsSearchError": "Búsqueda fallida",
+  "showsSearchHint": "Buscar shows por título",
+  "showsTitle": "Shows",
+  "showNotFound": "Show «{title}» no encontrado",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -10,6 +10,8 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -54,7 +56,9 @@ class AppStateController extends ChangeNotifier {
     ReverbService? reverbService,
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
+    ComskipSettings? comskipSettings,
     PushNotificationService? pushNotificationService,
+    DevicePairingService? devicePairingService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -86,6 +90,7 @@ class AppStateController extends ChangeNotifier {
       epgService: epgService ?? EpgService(),
       m3uParser: m3uParser ?? M3UParser(),
       traktService: TraktService(storage: resolvedSecureStorage),
+      devicePairingService: devicePairingService ?? DevicePairingService(),
       tvNotificationService: tvNotificationService ?? TvNotificationService(),
       notificationStore:
           tvNotificationStore ?? TvNotificationStore(store: store),
@@ -94,6 +99,7 @@ class AppStateController extends ChangeNotifier {
           aioFavoritesService ?? AIOStreamsFavoritesService(store: store),
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
+      comskipSettings: comskipSettings ?? ComskipSettings(store: store),
       pushNotificationService:
           pushNotificationService ?? PushNotificationService(),
     );
@@ -112,11 +118,13 @@ class AppStateController extends ChangeNotifier {
     required this.epgService,
     required this.m3uParser,
     required this.traktService,
+    required this.devicePairingService,
     required this._tvNotificationService,
     required this.notificationStore,
     required this._reverbService,
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
+    required this.comskipSettings,
     required this._pushNotificationService,
   }) {
     epgService.cacheTtl = cacheService.refreshInterval;
@@ -159,6 +167,7 @@ class AppStateController extends ChangeNotifier {
   final ResumeService resumeService;
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
+  final ComskipSettings comskipSettings;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -277,6 +286,7 @@ class AppStateController extends ChangeNotifier {
   final EpgService epgService;
   final M3UParser m3uParser;
   final TraktService traktService;
+  final DevicePairingService devicePairingService;
 
   AppSourceType _sourceType = AppSourceType.none;
   bool _isBootstrapping = false;
@@ -292,7 +302,9 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> _vodItems = const <VodItem>[];
   List<Series> _seriesList = const <Series>[];
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
+  DvrStorageInfo? _dvrStorageInfo;
   Set<int> _recordingChannelIds = const <int>{};
+  List<DvrSeriesRule> _dvrSeriesRules = const <DvrSeriesRule>[];
   List<MediaRequestSummary> _mediaRequests = const <MediaRequestSummary>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
@@ -325,7 +337,9 @@ class AppStateController extends ChangeNotifier {
   List<VodItem> get vodItems => _vodItems;
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
+  DvrStorageInfo? get dvrStorageInfo => _dvrStorageInfo;
   Set<int> get recordingChannelIds => _recordingChannelIds;
+  List<DvrSeriesRule> get dvrSeriesRules => _dvrSeriesRules;
   List<Progress> get progressList => _progressList;
   List<MediaRequestSummary> get mediaRequests => _mediaRequests;
   bool get hasDvrFeature =>
@@ -362,6 +376,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     unawaited(traktService.init());
     unawaited(proxyPlaybackSettings.load());
+    unawaited(comskipSettings.load());
 
     final savedLocale = await secureStorage.read(_localeKey);
     if (savedLocale != null) _locale = Locale(savedLocale);
@@ -676,7 +691,9 @@ class AppStateController extends ChangeNotifier {
       _vodItems = const <VodItem>[];
       _seriesList = const <Series>[];
       _dvrRecordings = const <DvrRecording>[];
+      _dvrStorageInfo = null;
       _recordingChannelIds = const <int>{};
+      _dvrSeriesRules = const <DvrSeriesRule>[];
       _mediaRequests = const <MediaRequestSummary>[];
       _activeViewer = const Viewer(
         id: 0,
@@ -1584,7 +1601,9 @@ class AppStateController extends ChangeNotifier {
     _vodItems = const <VodItem>[];
     _seriesList = const <Series>[];
     _dvrRecordings = const <DvrRecording>[];
+    _dvrStorageInfo = null;
     _recordingChannelIds = const <int>{};
+    _dvrSeriesRules = const <DvrSeriesRule>[];
     _mediaRequests = const <MediaRequestSummary>[];
     _progressList = const <Progress>[];
     _error = null;
@@ -1609,6 +1628,35 @@ class AppStateController extends ChangeNotifier {
       await secureStorage.delete(_localeKey);
     } else {
       await secureStorage.write(_localeKey, locale.languageCode);
+    }
+    notifyListeners();
+  }
+
+  /// Replaces the cached series recording rules and notifies listeners.
+  /// The UI agent is responsible for calling this after a successful
+  /// `listDvrSeriesRules` / `createDvrSeriesRule` / `deleteDvrSeriesRule`
+  /// round-trip from the server.
+  void setDvrSeriesRules(List<DvrSeriesRule> rules) {
+    _dvrSeriesRules = rules;
+    notifyListeners();
+  }
+
+  /// Refreshes the cached DVR recordings list from `get_dvr_recordings`.
+  ///
+  /// Series rules can produce a matching `DvrRecording` synchronously (see
+  /// [scheduleDvr]'s doc comment for the same server-side behaviour on
+  /// one-shot recordings), so the UI agent should call this after a
+  /// successful `createDvrSeriesRule` / `updateDvrSeriesRule` round-trip —
+  /// not just after [setDvrSeriesRules] — or a newly matched recording
+  /// won't show up in the Recordings tab until the next full reload.
+  Future<void> refreshDvrRecordings() async {
+    try {
+      _dvrRecordings = await xtreamService.getDvrRecordings();
+      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+    } on Object catch (error, stackTrace) {
+      debugPrint('DVR: refresh recordings failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return;
     }
     notifyListeners();
   }
@@ -1726,6 +1774,7 @@ class AppStateController extends ChangeNotifier {
     }
     if (!ownsWork()) return null;
     notifyListeners();
+    unawaited(refreshDvrStorage());
     for (final recording in _dvrRecordings) {
       if (recording.channelId != channel.id) continue;
       final start = recording.scheduledStart;
@@ -1816,6 +1865,7 @@ class AppStateController extends ChangeNotifier {
     _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
     if (!ownsWork()) return;
     notifyListeners();
+    unawaited(refreshDvrStorage());
   }
 
   /// Lightweight poll for which channels are currently recording, used to
@@ -1851,6 +1901,21 @@ class AppStateController extends ChangeNotifier {
     } on Object catch (error) {
       debugPrint('DVR: refresh active recordings failed: $error');
     }
+  }
+
+  /// Refreshes DVR storage usage against quota via `get_dvr_storage`.
+  /// Older m3u-editor servers without this action fail the request, which
+  /// we treat as "unsupported" — the storage display just stays hidden
+  /// rather than surfacing an error.
+  Future<void> refreshDvrStorage() async {
+    if (!hasDvrFeature) return;
+    try {
+      _dvrStorageInfo = await xtreamService.getDvrStorage();
+    } on Object catch (error) {
+      debugPrint('DVR: refresh storage failed: $error');
+      _dvrStorageInfo = null;
+    }
+    notifyListeners();
   }
 
   /// Searches guest-enabled Arr integrations via `request_search`. Thin
@@ -1985,6 +2050,11 @@ class AppStateController extends ChangeNotifier {
               (Object _) => const <DvrRecording>[],
             )
           : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
+      final seriesRulesFuture = hasDvrFeature
+          ? xtreamService.listDvrSeriesRules().catchError(
+              (Object _) => const <DvrSeriesRule>[],
+            )
+          : Future<List<DvrSeriesRule>>.value(const <DvrSeriesRule>[]);
       final mediaRequestsFuture = hasRequestsFeature
           ? xtreamService.getMediaRequests().catchError(
               (Object _) => const <MediaRequestSummary>[],
@@ -2002,20 +2072,36 @@ class AppStateController extends ChangeNotifier {
         vodItemsFuture,
         seriesFuture,
         recordingsFuture,
+        seriesRulesFuture,
         viewersFuture,
         mediaRequestsFuture,
       ]);
       if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
 
-      final viewers = results[7] as List<Viewer>;
+      final viewers = results[8] as List<Viewer>;
       final channels = results[3] as List<Channel>;
       final liveCategories = results[0] as List<Category>;
       final vodCategories = results[1] as List<Category>;
       final seriesCategories = results[2] as List<Category>;
       final vodItems = results[4] as List<VodItem>;
       final seriesList = results[5] as List<Series>;
-      final dvrRecordings = results[6] as List<DvrRecording>;
-      final mediaRequests = results[8] as List<MediaRequestSummary>;
+      final fetchedDvrRecordings = results[6] as List<DvrRecording>;
+      final fetchedDvrSeriesRules = results[7] as List<DvrSeriesRule>;
+      final mediaRequests = results[9] as List<MediaRequestSummary>;
+      // Keep local DVR state if the server returned nothing (e.g. sync lag
+      // or a transient failure swallowed by the catchError above) — mirrors
+      // the progress-list guard below. Without this, a single flaky
+      // list_dvr_series_rules/get_dvr_recordings round-trip on reload wipes
+      // rules/recordings the editor still has, even though nothing changed
+      // server-side.
+      final dvrRecordings =
+          fetchedDvrRecordings.isEmpty && _dvrRecordings.isNotEmpty
+          ? _dvrRecordings
+          : fetchedDvrRecordings;
+      final dvrSeriesRules =
+          fetchedDvrSeriesRules.isEmpty && _dvrSeriesRules.isNotEmpty
+          ? _dvrSeriesRules
+          : fetchedDvrSeriesRules;
 
       final activeViewer = await viewerService.resolveActiveViewer(
         viewers,
@@ -2078,6 +2164,7 @@ class AppStateController extends ChangeNotifier {
             }
           }
 
+
           final viewerGeneration = _viewerOperationGeneration.advance();
           final replacingXtreamSource =
               invalidateEpgFreshness && _sourceType == AppSourceType.xtream;
@@ -2121,6 +2208,7 @@ class AppStateController extends ChangeNotifier {
           _seriesList = seriesList;
           _dvrRecordings = dvrRecordings;
           _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
+          _dvrSeriesRules = dvrSeriesRules;
           _mediaRequests = mediaRequests;
           _viewers = viewers;
           _activeViewer = activeViewer;
@@ -2128,6 +2216,7 @@ class AppStateController extends ChangeNotifier {
           _error = null;
           if (clearCache) aiostreamsApiService.clearCache();
           notifyListeners();
+          unawaited(refreshDvrStorage());
           if (activeViewer != null) {
             if (!replacingXtreamSource) {
               unawaited(
@@ -2237,12 +2326,25 @@ class AppStateController extends ChangeNotifier {
     _vodItems = vodItems;
     _seriesList = seriesList;
     _dvrRecordings = const <DvrRecording>[];
+    _dvrStorageInfo = null;
     _recordingChannelIds = const <int>{};
+    _dvrSeriesRules = const <DvrSeriesRule>[];
     _mediaRequests = const <MediaRequestSummary>[];
     _viewers = viewers;
     _activeViewer = activeViewer;
     _progressList = progress;
     _error = null;
+    final currentViewer = _activeViewer;
+    if (currentViewer != null) {
+      unawaited(
+        _syncFavoritesForActiveViewer(
+          currentViewer,
+          sourceGeneration: _sourceOperationGeneration.current,
+          viewerGeneration: _viewerOperationGeneration.current,
+        ),
+      );
+    }
+    unawaited(refreshDvrStorage());
     return true;
   }
 

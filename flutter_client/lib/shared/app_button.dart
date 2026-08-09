@@ -27,9 +27,10 @@ const _kPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 12);
 /// it, which is what keeps transport controls visually level with each other.
 const _kIconButtonSize = Size(56, 56);
 
-enum AppButtonVariant { primary, tonal, destructive }
+enum AppButtonVariant { primary, primaryInverted, tonal, destructive }
 
 const _kBlack = Color(0xFF09090b);
+const _kWhite = Color(0xFFfafafa);
 
 /// `tonal` reads as the "default/secondary" action next to a `destructive`
 /// sibling (e.g. Back vs. Delete recording) — muted further below
@@ -45,10 +46,18 @@ const _kTonalBorderAlpha = 0.12;
 /// [ButtonStyle.elevation] since `primary` renders as an [ElevatedButton] —
 /// the drop shadow gives it more visual weight than the flat `tonal`/
 /// `destructive` variants.
-ButtonStyle _primaryGradientStyle(ButtonStyle base) {
+///
+/// `primaryInverted` swaps to a white fill with black foreground — for the
+/// hero play/resume action on detail screens, which sits over a poster/
+/// backdrop image that's frequently near-black itself and swallows the
+/// default black button.
+ButtonStyle _primaryGradientStyle(ButtonStyle base, {bool inverted = false}) {
+  final fill = inverted ? _kWhite : _kBlack;
   return base.copyWith(
     backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
-    foregroundColor: const WidgetStatePropertyAll(Colors.white),
+    foregroundColor: WidgetStatePropertyAll(
+      inverted ? _kBlack : Colors.white,
+    ),
     // Focus/hover is already shown via the gradient DpadFocusable border —
     // Material's own hover/press state layer on top of the background just
     // fights with it (background looks like it's flickering between
@@ -64,10 +73,7 @@ ButtonStyle _primaryGradientStyle(ButtonStyle base) {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              _kBlack,
-              if (dimmed) _kBlack.withValues(alpha: 0.5) else _kBlack,
-            ],
+            colors: [fill, if (dimmed) fill.withValues(alpha: 0.5) else fill],
           ),
         ),
         child: child,
@@ -198,12 +204,19 @@ class AppButton extends StatelessWidget {
         tint: colorScheme.error,
       ),
       AppButtonVariant.primary => _primaryGradientStyle(baseStyle),
+      AppButtonVariant.primaryInverted => _primaryGradientStyle(
+        baseStyle,
+        inverted: true,
+      ),
       AppButtonVariant.tonal => _ghostStyle(
         baseStyle,
         backgroundAlpha: _kTonalBackgroundAlpha,
         borderAlpha: _kTonalBorderAlpha,
       ),
     };
+    final isPrimary =
+        variant == AppButtonVariant.primary ||
+        variant == AppButtonVariant.primaryInverted;
 
     final effectiveOnPressed = loading ? null : onPressed;
 
@@ -214,16 +227,18 @@ class AppButton extends StatelessWidget {
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: variant == AppButtonVariant.destructive
-              ? colorScheme.error
-              : null,
+          color: switch (variant) {
+            AppButtonVariant.destructive => colorScheme.error,
+            AppButtonVariant.primaryInverted => _kBlack,
+            AppButtonVariant.primary || AppButtonVariant.tonal => null,
+          },
         ),
       );
-      button = variant == AppButtonVariant.primary
+      button = isPrimary
           ? ElevatedButton(style: style, onPressed: null, child: child)
           : FilledButton.tonal(style: style, onPressed: null, child: child);
     } else if (icon == null) {
-      button = variant == AppButtonVariant.primary
+      button = isPrimary
           ? ElevatedButton(
               style: style,
               onPressed: effectiveOnPressed,
@@ -235,7 +250,7 @@ class AppButton extends StatelessWidget {
               child: Text(label),
             );
     } else {
-      button = variant == AppButtonVariant.primary
+      button = isPrimary
           ? ElevatedButton.icon(
               style: style,
               onPressed: effectiveOnPressed,
@@ -290,6 +305,10 @@ class AppIconButton extends StatelessWidget {
         tint: colorScheme.error,
       ),
       AppButtonVariant.primary => _primaryGradientStyle(baseStyle),
+      AppButtonVariant.primaryInverted => _primaryGradientStyle(
+        baseStyle,
+        inverted: true,
+      ),
       AppButtonVariant.tonal => _ghostStyle(
         baseStyle,
         backgroundAlpha: _kTonalBackgroundAlpha,
@@ -298,7 +317,8 @@ class AppIconButton extends StatelessWidget {
     };
 
     Widget rawButton;
-    if (variant == AppButtonVariant.primary) {
+    if (variant == AppButtonVariant.primary ||
+        variant == AppButtonVariant.primaryInverted) {
       // No IconButton variant renders elevated — use a plain ElevatedButton
       // with an icon child instead, matching AppButton's primary treatment.
       final elevatedButton = ElevatedButton(
@@ -331,6 +351,34 @@ class AppIconButton extends StatelessWidget {
       focusNode: focusNode,
       onSelect: onPressed,
       child: button,
+    );
+  }
+}
+
+/// Small pill badge for a status/count label (e.g. "3 episodes", "Series
+/// rule active") — the one non-button "chip" look shared across screens.
+class AppBadge extends StatelessWidget {
+  const AppBadge({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "已跳过广告",
+  "playerSkipCommercial": "跳过广告",
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",
@@ -126,6 +128,11 @@
   "settingsProxyProfileDefault": "默认",
   "settingsProxyProfileDirect": "直连（不转码）",
   "settingsProxyNoProfiles": "没有可用的转码配置——将使用直连代理播放。",
+  "settingsDvr": "DVR",
+  "settingsDvrSubtitle": "录制内容播放设置。",
+  "settingsComskip": "广告跳过",
+  "settingsComskipSubtitle": "控制播放器在录制内容中检测到广告时的处理方式。",
+  "settingsComskipAutoSkip": "自动跳过广告",
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",
@@ -144,6 +151,24 @@
   },
   "settingsAppViewRelease": "查看版本",
   "settingsAppScanQr": "扫描以在手机上打开",
+  "settingsFillAllFields": "请填写所有字段",
+  "settingsConnectionSettings": "连接设置",
+  "settingsConnectionSettingsSubtitle": "输入您的 Xtream Codes 信息",
+  "settingsServerUrl": "服务器地址",
+  "settingsUsername": "用户名",
+  "settingsPassword": "密码",
+  "settingsConnect": "连接",
+  "settingsPairWithCode": "使用代码配对",
+  "settingsTabPair": "配对",
+  "settingsTabSignIn": "登录",
+  "settingsPairTabSubtitle": "输入您的服务器地址，然后使用代码配对此电视。",
+  "pairingEnterServerFirst": "请先输入您的服务器地址",
+  "pairingErrorGeneric": "配对失败或代码已过期，请重试。",
+  "pairingScanQr": "扫描以在手机上打开配对页面",
+  "pairingOpenBrowser": "在浏览器中打开",
+  "pairingPendingGoTo": "在您的手机或电脑上，访问：",
+  "pairingPendingEnterCode": "然后输入此代码：",
+  "pairingPendingWaiting": "等待批准…",
   "settingsContentCache": "内容缓存",
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",
   "settingsEpgRefreshInterval": "EPG 刷新间隔",
@@ -357,5 +382,189 @@
   "dvrDeleteDismiss": "保留",
   "dvrDeleteConfirm": "删除录制",
   "dvrDeleteSuccess": "录制已删除",
-  "dvrDeleteFailed": "无法删除录制"
+  "dvrDeleteFailed": "无法删除录制",
+  "liveTvStopRecording": "停止录制",
+  "playerRecordNowTooltip": "录制当前节目",
+  "playerStopRecordingTooltip": "停止录制",
+  "dvrMoreActions": "更多操作",
+  "dvrPlay": "播放",
+  "dvrSelect": "选择",
+  "dvrStop": "停止",
+  "dvrStatusRecording": "正在录制",
+  "dvrStatusScheduled": "已计划",
+  "dvrStatusFailed": "失败",
+  "dvrExitSelection": "退出选择",
+  "dvrSelectedCount": "{count, plural, =0{未选择任何项目} other{已选择 {count} 项}}",
+  "@dvrSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrStorageTitle": "DVR 存储",
+  "dvrStorageUnlimited": "无限",
+  "dvrStorageUsedUnlimited": "已使用 {used}",
+  "@dvrStorageUsedUnlimited": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageUsedWithQuota": "已使用 {used}，共 {quota}",
+  "@dvrStorageUsedWithQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageRecordingCount": "{count} 个录制",
+  "@dvrStorageRecordingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesChannel": "频道",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "提前开始",
+  "dvrSeriesUseDefault": "使用默认",
+  "dvrEpisodeCount": "{count, plural, =1{1 集} other{{count} 集}}",
+  "dvrDeleteSeriesRule": "删除规则",
+  "dvrEditSeriesRule": "编辑规则",
+  "dvrUpdateSeriesRuleFailed": "无法更新剧集规则",
+  "dvrSeriesSave": "保存",
+  "dvrSeriesSecondsSuffix": "秒",
+  "dvrSeriesMode": "剧集模式",
+  "dvrUpdateSeriesRuleSuccess": "剧集规则已更新",
+  "dvrSeriesModeAll": "全部剧集",
+  "dvrSeriesMatchModeStartsWith": "开头匹配",
+  "dvrDeleteSeriesRuleConfirm": "确定删除此剧集规则？",
+  "dvrSeriesCancel": "取消",
+  "dvrDeleteSeriesRuleSuccess": "剧集规则已删除",
+  "dvrSeriesRulesTitle": "剧集规则",
+  "dvrSeriesMatchModeContains": "包含",
+  "dvrSeriesMatchModeExact": "精确",
+  "dvrSeriesModeUseDefault": "使用默认",
+  "dvrSeriesModeNewFlag": "仅新增",
+  "dvrDeleteSeriesRuleFailed": "无法删除剧集规则",
+  "dvrSeriesKeepLast": "保留最后",
+  "dvrSeriesModeUniqueSe": "唯一S-E",
+  "dvrSeriesAnyChannel": "任意频道",
+  "dvrSeriesMatchMode": "匹配模式",
+  "dvrSeriesEndLate": "延迟结束",
+  "dvrSeriesOptions": "选项",
+  "dvrSeriesOptionsFor": "选项：{title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSeriesAllEpisodesWarning": "在任意频道录制全部剧集可能会产生重复——请使用仅新增或唯一S-E去重。",
+  "dvrSeriesRulesEmpty": "暂无剧集规则",
+  "dvrSeriesPriority": "优先级",
+  "epgRecordSeries": "录制整部剧集",
+  "epgRecordSeriesSuccess": "已为 {title} 设置整剧录制",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "无法设置整剧录制",
+  "epgRecordSeriesDuplicate": "整剧录制已设置",
+  "navShows": "剧集",
+  "showAiringNext": "下次播出",
+  "showAiringNone": "EPG 中暂无即将播出的剧集",
+  "showChannelCount": "{count, plural, =1{1 个频道} other{{count} 个频道}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "删除剧集规则",
+  "showDeleteRuleConfirm": "删除 {title} 的剧集规则？未来剧集将不会被录制。已完成的录制不会被删除。",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "剧集规则已启用",
+  "showDetailTitle": "节目详情",
+  "showEpisodesCount": "{count, plural, =1{1 集} other{{count} 集}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "录制整部剧集",
+  "showRecordSeriesConfirm": "在 {channel} 录制 {title} 的每一集？",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "无法为 {title} 设置整剧录制",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "已为 {title} 设置整剧录制",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "已为 {title} 设置过整剧录制",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "无法搜索剧集",
+  "showsNoResults": "未找到匹配的剧集",
+  "showsSearchError": "搜索失败",
+  "showsSearchHint": "按标题搜索剧集",
+  "showsTitle": "剧集",
+  "showNotFound": "未找到剧集“{title}”",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

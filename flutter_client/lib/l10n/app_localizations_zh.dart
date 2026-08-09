@@ -163,6 +163,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get playerCommercialSkipped => '已跳过广告';
+
+  @override
+  String get playerSkipCommercial => '跳过广告';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override
@@ -321,6 +327,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProxyNoProfiles => '没有可用的转码配置——将使用直连代理播放。';
 
   @override
+  String get settingsDvr => 'DVR';
+
+  @override
+  String get settingsDvrSubtitle => '录制内容播放设置。';
+
+  @override
+  String get settingsComskip => '广告跳过';
+
+  @override
+  String get settingsComskipSubtitle => '控制播放器在录制内容中检测到广告时的处理方式。';
+
+  @override
+  String get settingsComskipAutoSkip => '自动跳过广告';
+
+  @override
   String get settingsDisconnectTitle => '断开连接？';
 
   @override
@@ -354,6 +375,60 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAppScanQr => '扫描以在手机上打开';
+
+  @override
+  String get settingsFillAllFields => '请填写所有字段';
+
+  @override
+  String get settingsConnectionSettings => '连接设置';
+
+  @override
+  String get settingsConnectionSettingsSubtitle => '输入您的 Xtream Codes 信息';
+
+  @override
+  String get settingsServerUrl => '服务器地址';
+
+  @override
+  String get settingsUsername => '用户名';
+
+  @override
+  String get settingsPassword => '密码';
+
+  @override
+  String get settingsConnect => '连接';
+
+  @override
+  String get settingsPairWithCode => '使用代码配对';
+
+  @override
+  String get settingsTabPair => '配对';
+
+  @override
+  String get settingsTabSignIn => '登录';
+
+  @override
+  String get settingsPairTabSubtitle => '输入您的服务器地址，然后使用代码配对此电视。';
+
+  @override
+  String get pairingEnterServerFirst => '请先输入您的服务器地址';
+
+  @override
+  String get pairingErrorGeneric => '配对失败或代码已过期，请重试。';
+
+  @override
+  String get pairingScanQr => '扫描以在手机上打开配对页面';
+
+  @override
+  String get pairingOpenBrowser => '在浏览器中打开';
+
+  @override
+  String get pairingPendingGoTo => '在您的手机或电脑上，访问：';
+
+  @override
+  String get pairingPendingEnterCode => '然后输入此代码：';
+
+  @override
+  String get pairingPendingWaiting => '等待批准…';
 
   @override
   String get homeContinueWatching => '继续观看';
@@ -685,4 +760,278 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dvrDeleteFailed => '无法删除录制';
+
+  @override
+  String get liveTvStopRecording => '停止录制';
+
+  @override
+  String get playerRecordNowTooltip => '录制当前节目';
+
+  @override
+  String get playerStopRecordingTooltip => '停止录制';
+
+  @override
+  String get dvrMoreActions => '更多操作';
+
+  @override
+  String get dvrPlay => '播放';
+
+  @override
+  String get dvrSelect => '选择';
+
+  @override
+  String get dvrStop => '停止';
+
+  @override
+  String get dvrStatusRecording => '正在录制';
+
+  @override
+  String get dvrStatusScheduled => '已计划';
+
+  @override
+  String get dvrStatusFailed => '失败';
+
+  @override
+  String get dvrExitSelection => '退出选择';
+
+  @override
+  String dvrSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已选择 $count 项',
+      zero: '未选择任何项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrStorageTitle => 'DVR 存储';
+
+  @override
+  String get dvrStorageUnlimited => '无限';
+
+  @override
+  String dvrStorageUsedUnlimited(String used) {
+    return '已使用 $used';
+  }
+
+  @override
+  String dvrStorageUsedWithQuota(String used, String quota) {
+    return '已使用 $used，共 $quota';
+  }
+
+  @override
+  String dvrStorageRecordingCount(int count) {
+    return '$count 个录制';
+  }
+
+  @override
+  String get dvrSeriesChannel => '频道';
+
+  @override
+  String get dvrSeriesStartEarly => '提前开始';
+
+  @override
+  String get dvrSeriesUseDefault => '使用默认';
+
+  @override
+  String dvrEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+      one: '1 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dvrDeleteSeriesRule => '删除规则';
+
+  @override
+  String get dvrEditSeriesRule => '编辑规则';
+
+  @override
+  String get dvrUpdateSeriesRuleFailed => '无法更新剧集规则';
+
+  @override
+  String get dvrSeriesSave => '保存';
+
+  @override
+  String get dvrSeriesSecondsSuffix => '秒';
+
+  @override
+  String get dvrSeriesMode => '剧集模式';
+
+  @override
+  String get dvrUpdateSeriesRuleSuccess => '剧集规则已更新';
+
+  @override
+  String get dvrSeriesModeAll => '全部剧集';
+
+  @override
+  String get dvrSeriesMatchModeStartsWith => '开头匹配';
+
+  @override
+  String get dvrDeleteSeriesRuleConfirm => '确定删除此剧集规则？';
+
+  @override
+  String get dvrSeriesCancel => '取消';
+
+  @override
+  String get dvrDeleteSeriesRuleSuccess => '剧集规则已删除';
+
+  @override
+  String get dvrSeriesRulesTitle => '剧集规则';
+
+  @override
+  String get dvrSeriesMatchModeContains => '包含';
+
+  @override
+  String get dvrSeriesMatchModeExact => '精确';
+
+  @override
+  String get dvrSeriesModeUseDefault => '使用默认';
+
+  @override
+  String get dvrSeriesModeNewFlag => '仅新增';
+
+  @override
+  String get dvrDeleteSeriesRuleFailed => '无法删除剧集规则';
+
+  @override
+  String get dvrSeriesKeepLast => '保留最后';
+
+  @override
+  String get dvrSeriesModeUniqueSe => '唯一S-E';
+
+  @override
+  String get dvrSeriesAnyChannel => '任意频道';
+
+  @override
+  String get dvrSeriesMatchMode => '匹配模式';
+
+  @override
+  String get dvrSeriesEndLate => '延迟结束';
+
+  @override
+  String get dvrSeriesOptions => '选项';
+
+  @override
+  String dvrSeriesOptionsFor(String title) {
+    return '选项：$title';
+  }
+
+  @override
+  String get dvrSeriesAllEpisodesWarning =>
+      '在任意频道录制全部剧集可能会产生重复——请使用仅新增或唯一S-E去重。';
+
+  @override
+  String get dvrSeriesRulesEmpty => '暂无剧集规则';
+
+  @override
+  String get dvrSeriesPriority => '优先级';
+
+  @override
+  String get epgRecordSeries => '录制整部剧集';
+
+  @override
+  String epgRecordSeriesSuccess(String title) {
+    return '已为 $title 设置整剧录制';
+  }
+
+  @override
+  String get epgRecordSeriesFailed => '无法设置整剧录制';
+
+  @override
+  String get epgRecordSeriesDuplicate => '整剧录制已设置';
+
+  @override
+  String get navShows => '剧集';
+
+  @override
+  String get showAiringNext => '下次播出';
+
+  @override
+  String get showAiringNone => 'EPG 中暂无即将播出的剧集';
+
+  @override
+  String showChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个频道',
+      one: '1 个频道',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showDeleteRule => '删除剧集规则';
+
+  @override
+  String showDeleteRuleConfirm(String title) {
+    return '删除 $title 的剧集规则？未来剧集将不会被录制。已完成的录制不会被删除。';
+  }
+
+  @override
+  String get showSeriesRuleActive => '剧集规则已启用';
+
+  @override
+  String get showDetailTitle => '节目详情';
+
+  @override
+  String showEpisodesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+      one: '1 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showRecordSeries => '录制整部剧集';
+
+  @override
+  String showRecordSeriesConfirm(String title, String channel) {
+    return '在 $channel 录制 $title 的每一集？';
+  }
+
+  @override
+  String showRecordSeriesFailed(String title) {
+    return '无法为 $title 设置整剧录制';
+  }
+
+  @override
+  String showRecordSeriesSuccess(String title) {
+    return '已为 $title 设置整剧录制';
+  }
+
+  @override
+  String showRecordSeriesDuplicate(String title) {
+    return '已为 $title 设置过整剧录制';
+  }
+
+  @override
+  String get showsError => '无法搜索剧集';
+
+  @override
+  String get showsNoResults => '未找到匹配的剧集';
+
+  @override
+  String get showsSearchError => '搜索失败';
+
+  @override
+  String get showsSearchHint => '按标题搜索剧集';
+
+  @override
+  String get showsTitle => '剧集';
+
+  @override
+  String showNotFound(String title) {
+    return '未找到剧集“$title”';
+  }
 }

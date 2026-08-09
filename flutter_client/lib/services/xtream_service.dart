@@ -31,6 +31,7 @@ class XtreamHttpException implements Exception {
     required this.uri,
     this.reasonPhrase,
     this.serverMessage,
+    this.bodyJson,
   });
 
   final int statusCode;
@@ -38,6 +39,14 @@ class XtreamHttpException implements Exception {
   final Uri uri;
   final String? reasonPhrase;
   final String? serverMessage;
+
+  /// Parsed JSON body of the error response, when the server replied with a
+  /// parseable body and `statusCode >= 400`. Null when the body was empty,
+  /// non-JSON (e.g. an HTML error page), or when no body was parsed. Callers
+  /// that need typed fields (e.g. `create_dvr_series_rule`'s 409 `rule_id`)
+  /// should key off `statusCode` first and treat `bodyJson` as a best-effort
+  /// enrichment — never trust its shape.
+  final Object? bodyJson;
 
   @override
   String toString() {
@@ -112,6 +121,40 @@ class XtreamDvrScheduleException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Thrown by `XtreamService.createDvrSeriesRule` when the server rejects a
+/// `create_dvr_series_rule` call because a series rule for the same
+/// normalized title already exists on this playlist/DVR setting (the A3
+/// duplicate guard — HTTP 409). Carries the existing rule's id when the
+/// server returned one, so the caller can flip straight to the "rule exists"
+/// state instead of asking the user to confirm another create.
+class DvrSeriesRuleExistsException implements Exception {
+  const DvrSeriesRuleExistsException(this.message, {this.ruleId});
+
+  final String message;
+  final int? ruleId;
+
+  @override
+  String toString() => message;
+}
+
+/// Outcome of `XtreamService.createDvrSeriesRule`, surfaced by the AppShell
+/// wrapper that owns the refresh-rules-on-mutation pattern. The UI layers
+/// (`ShowDetailScreen`, `LiveTvScreen`) branch on this rather than the raw
+/// exception so duplicate vs failed stays distinguishable all the way to the
+/// SnackBar.
+enum CreateDvrSeriesRuleOutcome {
+  /// Rule was created on the server.
+  created,
+
+  /// Server rejected the create as a duplicate of an existing rule
+  /// (HTTP 409). The local rules cache has been refreshed so the UI can
+  /// show the existing-rule state.
+  duplicate,
+
+  /// Create failed for any other reason (network, auth, unknown 4xx/5xx).
+  failed,
 }
 
 /// Thrown when an m3u-editor `request_*` action returns its documented error
@@ -546,6 +589,15 @@ class XtreamService {
       params: {'recording_id': uuid},
     );
     return DvrRecording.fromXtream(_asMap(response));
+  }
+
+  /// Fetches DVR storage usage against quota via m3u-editor's
+  /// `get_dvr_storage` action. Older servers without this action will
+  /// return an error response, which callers should treat as "unsupported"
+  /// and hide the feature rather than surfacing an error.
+  Future<DvrStorageInfo> getDvrStorage() async {
+    final response = await _request('get_dvr_storage');
+    return DvrStorageInfo.fromXtream(_asMap(response));
   }
 
   /// Schedules a one-shot DVR recording on m3u-editor's `schedule_dvr` action.
@@ -1107,6 +1159,138 @@ class XtreamService {
   String getSeriesStreamUrl(String episodeId, [String extension = 'mp4']) {
     final c = _requireCredentials();
     return '${c.server}/series/${c.username}/${c.password}/$episodeId.$extension';
+  }
+
+  /// Creates a persistent series recording rule on m3u-editor's
+  /// `create_dvr_series_rule` action.
+  ///
+  /// Returns the new rule's integer id, or `0` if the response did not include
+  /// one (treat as failure — callers should fall back to refreshing the rule
+  /// list before deciding whether the create succeeded).
+  ///
+  /// All optional parameters follow **omit-to-inherit**: when a value is
+  /// null the corresponding query key is dropped entirely so the server can
+  /// fall back to `dvr_setting.default_*` instead of overriding the user's
+  /// DVR settings with a guessed default.
+  ///
+  /// Throws [DvrSeriesRuleExistsException] (carrying the existing rule id
+  /// when the server included it) on the A3 duplicate-guard 409. Throws
+  /// any other [XtreamHttpException] unchanged.
+  Future<int> createDvrSeriesRule({
+    int? channelId,
+    required String title,
+    DvrMatchMode? matchMode,
+    DvrSeriesMode? seriesMode,
+    int? keepLast,
+    int? priority,
+    int? startEarlySeconds,
+    int? endLateSeconds,
+  }) async {
+    final params = <String, String>{
+      'title': title,
+      if (channelId != null) 'channel_id': '$channelId',
+      if (matchMode != null) 'match_mode': matchMode.wireValue,
+      if (seriesMode != null) 'series_mode': seriesMode.wireValue,
+      if (keepLast != null) 'keep_last': '$keepLast',
+      if (priority != null) 'priority': '$priority',
+      if (startEarlySeconds != null)
+        'start_early_seconds': '$startEarlySeconds',
+      if (endLateSeconds != null) 'end_late_seconds': '$endLateSeconds',
+    };
+    try {
+      final response = await _request(
+        'create_dvr_series_rule',
+        params: params,
+      );
+      final map = _asMap(response);
+      final id = map['rule_id'];
+      if (id is num) return id.toInt();
+      if (id is String) return int.tryParse(id) ?? 0;
+      return 0;
+    } on XtreamHttpException catch (error) {
+      if (error.statusCode != 409) rethrow;
+      final body = error.bodyJson;
+      final ruleId =
+          body is Map &&
+              body['rule_id'] is num &&
+              (body['duplicate'] == true || body['rule_id'] != null)
+          ? (body['rule_id'] as num).toInt()
+          : null;
+      throw DvrSeriesRuleExistsException(
+        error.serverMessage ?? 'Series rule already exists',
+        ruleId: ruleId,
+      );
+    }
+  }
+
+  /// Lists every active series recording rule for the current playlist via
+  /// m3u-editor's `list_dvr_series_rules` action.
+  Future<List<DvrSeriesRule>> listDvrSeriesRules() async {
+    final response = await _request('list_dvr_series_rules');
+    return _asList(response)
+        .map((item) => DvrSeriesRule.fromXtream(_asMap(item)))
+        .toList(growable: false);
+  }
+
+  /// Deletes a series recording rule by integer id via m3u-editor's
+  /// `delete_dvr_series_rule` action.
+  Future<void> deleteDvrSeriesRule(int id) async {
+    await _request(
+      'delete_dvr_series_rule',
+      params: {'rule_id': '$id'},
+    );
+  }
+
+  /// Updates an existing series recording rule via m3u-editor's
+  /// `update_dvr_series_rule` action.
+  ///
+  /// Omit-to-inherit ON UPDATE differs from create: absent fields keep their
+  /// current value (they are never nulled out). Only fields the caller passes
+  /// here are sent. [channelId] is special — null means "any channel", so it is
+  /// always sent (as an empty value) to distinguish an explicit switch to
+  /// any-channel from "leave unchanged".
+  Future<void> updateDvrSeriesRule({
+    required int ruleId,
+    int? channelId,
+    DvrMatchMode? matchMode,
+    DvrSeriesMode? seriesMode,
+    int? keepLast,
+    int? priority,
+    int? startEarlySeconds,
+    int? endLateSeconds,
+  }) async {
+    final params = <String, String>{
+      'rule_id': '$ruleId',
+      if (channelId == null) 'channel_id': '' else 'channel_id': '$channelId',
+      if (matchMode != null) 'match_mode': matchMode.wireValue,
+      if (seriesMode != null) 'series_mode': seriesMode.wireValue,
+      if (keepLast != null) 'keep_last': '$keepLast',
+      if (priority != null) 'priority': '$priority',
+      if (startEarlySeconds != null)
+        'start_early_seconds': '$startEarlySeconds',
+      if (endLateSeconds != null) 'end_late_seconds': '$endLateSeconds',
+    };
+    await _request(
+      'update_dvr_series_rule',
+      params: params,
+    );
+  }
+
+  /// Searches EPG shows across the playlist's mapped channels via
+  /// m3u-editor's `search_epg_shows` action. Returns shows grouped by
+  /// normalized title, sorted by next-airing-first. Queries shorter than
+  /// two characters short-circuit to an empty list rather than hitting the
+  /// server.
+  Future<List<EpgShow>> searchEpgShows(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) return const <EpgShow>[];
+    final response = await _request(
+      'search_epg_shows',
+      params: {'q': trimmed},
+    );
+    return _asList(
+      response,
+    ).map((item) => EpgShow.fromXtream(_asMap(item))).toList(growable: false);
   }
 
   Future<List<Category>> _categories(String action) async {

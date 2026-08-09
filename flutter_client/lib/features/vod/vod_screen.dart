@@ -245,13 +245,10 @@ class _VodCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Hero(
-                  tag: 'vod_poster_${item.id}',
-                  child: ResilientMediaImage(
-                    imageUrl: item.logoUrl,
-                    fallbackIcon: Icons.movie,
-                    borderRadius: 0,
-                  ),
+                child: ResilientMediaImage(
+                  imageUrl: item.logoUrl,
+                  fallbackIcon: Icons.movie,
+                  borderRadius: 0,
                 ),
               ),
               // Title + rating

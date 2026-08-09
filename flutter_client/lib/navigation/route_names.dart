@@ -3,6 +3,11 @@
 /// Main tab/sidebar routes: Home, Search, LiveTV, VOD, Series, DVR,
 /// Requests, Notifications, Settings.
 /// Modal/overlay routes: Player, Details, SeriesDetails, ViewerSelection.
+///
+/// `Shows` (EPG series browse + per-show detail) is no longer a top-level
+/// sidebar destination — it now lives as a nested route under `DVR` and a
+/// third tab on `DvrRecordingsScreen`. Deep-link helpers under
+/// [showsDetailsPath] / [showDetailsFor] therefore build paths under `/dvr`.
 class RouteNames {
   RouteNames._();
 
@@ -48,6 +53,7 @@ class RouteNames {
   // Nested detail route path templates
   static const String vodDetailsPath = '/vod/details/:vodId';
   static const String seriesDetailsPath = '/series/details/:seriesId';
+  static const String showsDetailsPath = 'shows/:normalizedTitle';
   static const String aiostreamsDetailsPath =
       '/aiostreams/details/:integrationId/:type/:id';
   static const String aiostreamsSearchPath = '/aiostreams/search';
@@ -59,6 +65,12 @@ class RouteNames {
 
   /// Builds a path to a series details screen for deep linking.
   static String seriesDetailsFor(int seriesId) => '/series/details/$seriesId';
+
+  /// Builds a path to an EPG show detail screen for a normalized title.
+  /// Nested under `/dvr` because Shows now lives as a DVR sub-route and a
+  /// third DVR tab, not as a standalone sidebar destination.
+  static String showDetailsFor(String normalizedTitle) =>
+      '/dvr/shows/$normalizedTitle';
 
   /// Builds a path to an AIOStreams item detail screen.
   static String aiostreamsDetailsFor(

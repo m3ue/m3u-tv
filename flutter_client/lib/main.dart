@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:m3u_tv/app/app_shell.dart' show shouldUseSidebar;
+import 'package:m3u_tv/app/app_shell.dart' show DeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -20,6 +20,7 @@ import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,9 @@ Future<void> main() async {
   // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
   if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
     MediaKit.ensureInitialized();
+  }
+  if (!kIsWeb && Platform.isMacOS) {
+    await _configureMacOSWindow();
   }
   final appState = await _buildAppState();
   final nativeTelevisionHint = await resolveNativeTelevisionHint();
@@ -45,6 +49,24 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+/// Hides the native titlebar and lets app content extend under the traffic
+/// lights (macOS "hidden inline titlebar" look). AppShell paints the app's
+/// background color (0xFF09090b) into a DragToMoveArea + top inset for
+/// macOS desktop so the window stays draggable, the titlebar reads as a
+/// solid bar, and the sidebar logo doesn't sit under the traffic lights.
+Future<void> _configureMacOSWindow() async {
+  await windowManager.ensureInitialized();
+  const windowOptions = WindowOptions(
+    titleBarStyle: TitleBarStyle.hidden,
+    windowButtonVisibility: true,
+  );
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.setTitle('');
+    await windowManager.show();
+    await windowManager.focus();
+  });
 }
 
 /// Push is mobile-only: TV builds (Android TV, tvOS) rely on the existing
@@ -193,7 +215,10 @@ class _MyAppState extends State<MyApp> {
                   }
                 }
               : null,
-          child: child ?? const SizedBox.shrink(),
+          child: _TvZoom(
+            deviceType: deviceType,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       theme: ThemeData(
@@ -245,6 +270,42 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: ThemeMode.dark,
+    );
+  }
+}
+
+/// Renders the app on a smaller virtual canvas and stretches it to fill the
+/// real screen, so text/icons/nav read clearly from a couch-length distance.
+/// TV-only: on the couch, physical viewing distance is far larger than a
+/// desktop/tablet/phone, so the same logical layout reads too small.
+class _TvZoom extends StatelessWidget {
+  const _TvZoom({required this.deviceType, required this.child});
+
+  static const double _scale = 1.6;
+
+  final DeviceType deviceType;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (deviceType != DeviceType.tv) return child;
+
+    final mediaQuery = MediaQuery.of(context);
+    final realSize = mediaQuery.size;
+    final virtualSize = realSize / _scale;
+
+    return SizedBox.fromSize(
+      size: realSize,
+      child: FittedBox(
+        fit: BoxFit.fill,
+        child: SizedBox.fromSize(
+          size: virtualSize,
+          child: MediaQuery(
+            data: mediaQuery.copyWith(size: virtualSize),
+            child: child,
+          ),
+        ),
+      ),
     );
   }
 }

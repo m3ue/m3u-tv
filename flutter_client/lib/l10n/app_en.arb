@@ -86,6 +86,8 @@
       }
     }
   },
+  "playerCommercialSkipped": "Skipped commercial",
+  "playerSkipCommercial": "Skip commercial",
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
@@ -151,6 +153,11 @@
   "settingsProxyProfileDefault": "Default",
   "settingsProxyProfileDirect": "Direct (no transcoding)",
   "settingsProxyNoProfiles": "No transcoding profiles available — streams use the direct proxy.",
+  "settingsDvr": "DVR",
+  "settingsDvrSubtitle": "Settings for recorded content playback.",
+  "settingsComskip": "Commercial Skipping",
+  "settingsComskipSubtitle": "Controls how the player reacts to commercial breaks detected in DVR recordings.",
+  "settingsComskipAutoSkip": "Auto-skip commercials",
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",
@@ -169,6 +176,24 @@
   },
   "settingsAppViewRelease": "View release",
   "settingsAppScanQr": "Scan to open on your phone",
+  "settingsFillAllFields": "Please fill in all fields",
+  "settingsConnectionSettings": "Connection Settings",
+  "settingsConnectionSettingsSubtitle": "Enter your Xtream codes details",
+  "settingsServerUrl": "Server URL",
+  "settingsUsername": "Username",
+  "settingsPassword": "Password",
+  "settingsConnect": "Connect",
+  "settingsPairWithCode": "Pair with code",
+  "settingsTabPair": "Pair",
+  "settingsTabSignIn": "Sign In",
+  "settingsPairTabSubtitle": "Enter your server address, then pair this TV using a code.",
+  "pairingEnterServerFirst": "Enter your server URL first",
+  "pairingErrorGeneric": "Pairing failed or the code expired. Please try again.",
+  "pairingScanQr": "Scan to open the pairing page on your phone",
+  "pairingOpenBrowser": "Open in browser",
+  "pairingPendingGoTo": "On your phone or computer, go to:",
+  "pairingPendingEnterCode": "Then enter this code:",
+  "pairingPendingWaiting": "Waiting for approval…",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
   "homeNoLiveTv": "No Live TV available",
@@ -357,5 +382,189 @@
   "dvrDeleteDismiss": "Keep",
   "dvrDeleteConfirm": "Delete recording",
   "dvrDeleteSuccess": "Recording deleted",
-  "dvrDeleteFailed": "Could not delete recording"
+  "dvrDeleteFailed": "Could not delete recording",
+  "liveTvStopRecording": "Stop Recording",
+  "playerRecordNowTooltip": "Record current program",
+  "playerStopRecordingTooltip": "Stop recording",
+  "dvrMoreActions": "More actions",
+  "dvrPlay": "Play",
+  "dvrSelect": "Select",
+  "dvrStop": "Stop",
+  "dvrStatusRecording": "Recording",
+  "dvrStatusScheduled": "Scheduled",
+  "dvrStatusFailed": "Failed",
+  "dvrExitSelection": "Exit selection",
+  "dvrSelectedCount": "{count, plural, =0{No items selected} one{1 item selected} other{{count} items selected}}",
+  "@dvrSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrStorageTitle": "DVR Storage",
+  "dvrStorageUnlimited": "Unlimited",
+  "dvrStorageUsedUnlimited": "{used} used",
+  "@dvrStorageUsedUnlimited": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageUsedWithQuota": "{used} of {quota} used",
+  "@dvrStorageUsedWithQuota": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "quota": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrStorageRecordingCount": "{count} recordings",
+  "@dvrStorageRecordingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesChannel": "Channel",
+  "@dvrEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrSeriesStartEarly": "Start early",
+  "dvrSeriesUseDefault": "Use default",
+  "dvrEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "dvrDeleteSeriesRule": "Delete rule",
+  "dvrEditSeriesRule": "Edit rule",
+  "dvrUpdateSeriesRuleFailed": "Could not update series rule",
+  "dvrSeriesSave": "Save",
+  "dvrSeriesSecondsSuffix": "sec",
+  "dvrSeriesMode": "Series mode",
+  "dvrUpdateSeriesRuleSuccess": "Series rule updated",
+  "dvrSeriesModeAll": "All episodes",
+  "dvrSeriesMatchModeStartsWith": "Starts with",
+  "dvrDeleteSeriesRuleConfirm": "Delete this series rule?",
+  "dvrSeriesCancel": "Cancel",
+  "dvrDeleteSeriesRuleSuccess": "Series rule deleted",
+  "dvrSeriesRulesTitle": "Series Rules",
+  "dvrSeriesMatchModeContains": "Contains",
+  "dvrSeriesMatchModeExact": "Exact",
+  "dvrSeriesModeUseDefault": "Use default",
+  "dvrSeriesModeNewFlag": "New only",
+  "dvrDeleteSeriesRuleFailed": "Could not delete series rule",
+  "dvrSeriesKeepLast": "Keep last",
+  "dvrSeriesModeUniqueSe": "Unique S-E",
+  "dvrSeriesAnyChannel": "Any channel",
+  "dvrSeriesMatchMode": "Match mode",
+  "dvrSeriesEndLate": "End late",
+  "dvrSeriesOptions": "Options",
+  "dvrSeriesOptionsFor": "Options: {title}",
+  "@dvrSeriesOptionsFor": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSeriesAllEpisodesWarning": "Recording all episodes on any channel may create duplicates — use New only or Unique S-E to deduplicate.",
+  "dvrSeriesRulesEmpty": "No series rules",
+  "dvrSeriesPriority": "Priority",
+  "epgRecordSeries": "Record Series",
+  "epgRecordSeriesSuccess": "Series recording set for {title}",
+  "@epgRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "epgRecordSeriesFailed": "Could not set series recording",
+  "epgRecordSeriesDuplicate": "Series recording already set",
+  "navShows": "Shows",
+  "showAiringNext": "Next airing",
+  "showAiringNone": "No upcoming episodes in EPG",
+  "showChannelCount": "{count, plural, =1{1 channel} other{{count} channels}}",
+  "@showChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showDeleteRule": "Delete series rule",
+  "showDeleteRuleConfirm": "Delete the series rule for {title}? Future episodes will not be recorded. Recordings already made will not be deleted.",
+  "@showDeleteRuleConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showSeriesRuleActive": "Series rule active",
+  "showDetailTitle": "Show details",
+  "showEpisodesCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "@showEpisodesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showRecordSeries": "Record Series",
+  "showRecordSeriesConfirm": "Record every episode of {title} on {channel}?",
+  "@showRecordSeriesConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesFailed": "Could not set series recording for {title}",
+  "@showRecordSeriesFailed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesSuccess": "Series recording set for {title}",
+  "@showRecordSeriesSuccess": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showRecordSeriesDuplicate": "Series recording already set for {title}",
+  "@showRecordSeriesDuplicate": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "showsError": "Could not search shows",
+  "showsNoResults": "No shows match your search",
+  "showsSearchError": "Search failed",
+  "showsSearchHint": "Search shows by title",
+  "showsTitle": "Shows",
+  "showNotFound": "Show \"{title}\" not found",
+  "@showNotFound": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

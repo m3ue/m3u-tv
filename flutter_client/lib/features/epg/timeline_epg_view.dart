@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/recording_dot.dart';
 
 typedef CatchupProgramSelect =
     void Function(Channel channel, EpgProgram program);
@@ -37,6 +38,8 @@ class TimelineEpgView extends StatefulWidget {
     required this.onChannelSelect,
     this.onCatchupProgramSelect,
     this.onEnsureEpg,
+    this.onChannelLongPress,
+    this.recordingChannelIds = const <int>{},
     this.windowHours = 24,
     this.futureDays = 7,
     this.clock = DateTime.now,
@@ -50,6 +53,14 @@ class TimelineEpgView extends StatefulWidget {
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
   /// already fresh. Called per-row as the visible timeline builds.
   final EnsureEpg? onEnsureEpg;
+
+  /// Opens the channel's context menu (favorite/record) for the pressed
+  /// block — same long-press action available in the list/grid views, for
+  /// parity. The program passed is whichever block was pressed (past,
+  /// current, or future); the caller decides whether it's still schedulable.
+  final CatchupProgramSelect? onChannelLongPress;
+
+  final Set<int> recordingChannelIds;
 
   /// How many hours the selected-day window spans (default 24).
   final int windowHours;
@@ -273,8 +284,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                         controller: _leftVCtrl,
                         itemCount: widget.channels.length,
                         itemExtent: _kRowH,
-                        itemBuilder: (_, i) =>
-                            _ChannelCell(channel: widget.channels[i]),
+                        itemBuilder: (_, i) => _ChannelCell(
+                          channel: widget.channels[i],
+                          isRecording: widget.recordingChannelIds.contains(
+                            widget.channels[i].id,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -398,6 +413,14 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                       }
                                       widget.onChannelSelect(channel);
                                     },
+                                    onLongPress:
+                                        widget.onChannelLongPress == null
+                                        ? null
+                                        : (program) =>
+                                              widget.onChannelLongPress!(
+                                                channel,
+                                                program,
+                                              ),
                                   ),
                                 ),
                               );
@@ -551,8 +574,9 @@ class _DayControls extends StatelessWidget {
 }
 
 class _ChannelCell extends StatelessWidget {
-  const _ChannelCell({required this.channel});
+  const _ChannelCell({required this.channel, this.isRecording = false});
   final Channel channel;
+  final bool isRecording;
 
   @override
   Widget build(BuildContext context) {
@@ -579,6 +603,10 @@ class _ChannelCell extends StatelessWidget {
           else
             const Icon(Icons.tv, size: 28),
           const SizedBox(width: 6),
+          if (isRecording) ...[
+            RecordingDot(color: colorScheme.error),
+            const SizedBox(width: 4),
+          ],
           Expanded(
             child: Text(
               channel.name,
@@ -685,6 +713,7 @@ class _ProgramsRow extends StatelessWidget {
     required this.onTap,
     required this.catchupRetentionDays,
     required this.now,
+    this.onLongPress,
   });
 
   final List<EpgProgram> programs;
@@ -696,6 +725,9 @@ class _ProgramsRow extends StatelessWidget {
   final void Function(EpgProgram program) onTap;
   final int catchupRetentionDays;
   final DateTime now;
+
+  /// Opens the favorite/record context menu for the pressed block.
+  final void Function(EpgProgram program)? onLongPress;
 
   bool showCatchupIcon(EpgProgram program) =>
       _canReplay(catchupRetentionDays, program, now);
@@ -743,6 +775,7 @@ class _ProgramsRow extends StatelessWidget {
               'timeline-program-${p.channelId}-${p.start.toIso8601String()}',
             ),
             onTap: () => onTap(p),
+            onLongTap: onLongPress == null ? null : () => onLongPress!(p),
             borderRadius: BorderRadius.circular(6),
             child: Container(
               decoration: BoxDecoration(

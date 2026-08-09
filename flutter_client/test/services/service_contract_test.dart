@@ -604,6 +604,77 @@ void main() {
     );
 
     test(
+      'updateDvrSeriesRule sends only present keys and always sends channel_id',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'update_dvr_series_rule': <String, Object?>{'success': true},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.updateDvrSeriesRule(
+          ruleId: 37,
+          matchMode: DvrMatchMode.exact,
+          seriesMode: DvrSeriesMode.newFlag,
+        );
+
+        final request = transport.requests.last;
+        expect(request.action, 'update_dvr_series_rule');
+        // channel_id always present: blank for any-channel (null).
+        expect(request.params['channel_id'], '');
+        expect(request.params['match_mode'], 'exact');
+        expect(request.params['series_mode'], 'new_flag');
+        // Absent (unspecified) fields are NOT sent.
+        expect(request.params.containsKey('keep_last'), isFalse);
+        expect(request.params.containsKey('priority'), isFalse);
+        expect(
+          request.params.containsKey('start_early_seconds'),
+          isFalse,
+        );
+        expect(request.params.containsKey('end_late_seconds'), isFalse);
+      },
+    );
+
+    test(
+      'updateDvrSeriesRule sends a pinned channel id when non-null',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'update_dvr_series_rule': <String, Object?>{'success': true},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.updateDvrSeriesRule(
+          ruleId: 37,
+          channelId: 72,
+          keepLast: 5,
+          priority: 80,
+        );
+
+        final request = transport.requests.last;
+        expect(request.params['channel_id'], '72');
+        expect(request.params['keep_last'], '5');
+        expect(request.params['priority'], '80');
+        expect(request.params.containsKey('match_mode'), isFalse);
+        expect(request.params.containsKey('series_mode'), isFalse);
+      },
+    );
+
+    test(
       'expired credentials return typed auth error without cache corruption',
       () async {
         final cache = CacheService(memory: <String, Object?>{});

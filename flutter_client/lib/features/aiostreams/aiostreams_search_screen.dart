@@ -244,11 +244,11 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
       );
     }
     return GridView.builder(
-      padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+      padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 160,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+        mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+        crossAxisSpacing: MediaBrowsingMetrics.itemGap,
         childAspectRatio: 2 / 3,
       ),
       itemCount: results.length,

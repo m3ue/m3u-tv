@@ -7,6 +7,7 @@ import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -629,6 +630,130 @@ void main() {
       expect(find.text('Active Viewer'), findsOneWidget);
       expect(find.text('Admin'), findsWidgets);
     });
+
+    testWidgets(
+      'hides "Pair with code" when no devicePairingService is supplied',
+      (tester) async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(_settingsApp(notifier));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Pair with code'), findsNothing);
+      },
+    );
+
+    testWidgets('shows validation error when pairing with an empty server', (
+      tester,
+    ) async {
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+      final pairingService = DevicePairingService();
+      addTearDown(pairingService.dispose);
+
+      await tester.pumpWidget(
+        _settingsApp(notifier, devicePairingService: pairingService),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Pair with code'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter your server URL first'), findsOneWidget);
+    });
+
+    testWidgets('shows the pairing code once pairing starts', (tester) async {
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+      final transport = _FakeDevicePairingTransport([
+        const DevicePairingResponse(200, <String, Object?>{
+          'device_code': 'DEVICE-CODE',
+          'user_code': 'ABCD-1234',
+          'verification_uri': 'http://x.com/device-pairing?code=ABCD-1234',
+          'interval': 3600,
+          'expires_in': 600,
+        }),
+      ]);
+      final pairingService = DevicePairingService(transport: transport.call);
+
+      await tester.pumpWidget(
+        _settingsApp(notifier, devicePairingService: pairingService),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'x.com');
+      await tester.tap(find.text('Pair with code'));
+      // Use pump instead of pumpAndSettle because the pending pairing view
+      // shows a CircularProgressIndicator with infinite animation.
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('ABCD-1234'), findsOneWidget);
+
+      // Dispose synchronously within the test body (not via addTearDown) so
+      // the scheduled poll Timer is cancelled before flutter_test's
+      // pending-timer invariant check runs.
+      pairingService.dispose();
+    });
+
+    testWidgets('connects automatically once pairing is approved', (
+      tester,
+    ) async {
+      final transport = _FakeTransport({
+        'auth': _xtreamAuth(auth: 1),
+        'get_live_categories': <Map<String, Object?>>[],
+        'get_vod_categories': <Map<String, Object?>>[],
+        'get_series_categories': <Map<String, Object?>>[],
+      });
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: transport.call),
+        secureStorage: InMemorySecureStorage(),
+      );
+      final pairingTransport = _FakeDevicePairingTransport([
+        const DevicePairingResponse(200, <String, Object?>{
+          'device_code': 'DEVICE-CODE',
+          'user_code': 'ABCD-1234',
+          'verification_uri': 'http://x.com/device-pairing?code=ABCD-1234',
+          'interval': 3600,
+          'expires_in': 600,
+        }),
+        const DevicePairingResponse(200, <String, Object?>{
+          'status': 'approved',
+          'username': 'u',
+          'password': 'p',
+        }),
+      ]);
+      final pairingService = DevicePairingService(
+        transport: pairingTransport.call,
+      );
+
+      await tester.pumpWidget(
+        _settingsApp(notifier, devicePairingService: pairingService),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'x.com');
+      await tester.tap(find.text('Pair with code'));
+      // Use pump instead of pumpAndSettle: both the pending pairing view and
+      // the post-approval connecting screen show an infinitely-animating
+      // CircularProgressIndicator.
+      await tester.pump();
+      await tester.pump();
+
+      await pairingService.pollForTesting('http://x.com');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      pairingService.dispose();
+
+      expect(notifier.isConfigured, isTrue);
+    });
   });
 
   // --- ViewerSelector widget ---
@@ -869,6 +994,7 @@ Widget _settingsApp(
   bool? isConfiguredOverride,
   VoidCallback? onClearCache,
   VoidCallback? onDisconnect,
+  DevicePairingService? devicePairingService,
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
@@ -878,6 +1004,7 @@ Widget _settingsApp(
       body: SettingsScreen(
         authNotifier: notifier,
         traktService: TraktService(storage: InMemorySecureStorage()),
+        devicePairingService: devicePairingService,
         activeViewer: activeViewer,
         sourceError: sourceError,
         isConfiguredOverride: isConfiguredOverride,
@@ -886,4 +1013,17 @@ Widget _settingsApp(
       ),
     ),
   );
+}
+
+class _FakeDevicePairingTransport {
+  _FakeDevicePairingTransport(this._responses);
+
+  final List<DevicePairingResponse> _responses;
+
+  Future<DevicePairingResponse> call(DevicePairingRequest request) async {
+    if (_responses.isEmpty) {
+      return const DevicePairingResponse(500, <String, Object?>{});
+    }
+    return _responses.removeAt(0);
+  }
 }
