@@ -600,6 +600,16 @@ class XtreamService {
     return DvrStorageInfo.fromXtream(_asMap(response));
   }
 
+  Future<DvrStorageInfo> getDvrStorageFor(
+    UserCredentials credentials,
+  ) async {
+    final response = await _requestWithCredentials(
+      credentials,
+      'get_dvr_storage',
+    );
+    return DvrStorageInfo.fromXtream(_asMap(response));
+  }
+
   /// Schedules a one-shot DVR recording on m3u-editor's `schedule_dvr` action.
   ///
   /// The m3u-editor endpoint responds with an envelope:

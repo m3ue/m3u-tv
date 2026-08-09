@@ -169,6 +169,30 @@ void main() {
       expect(controller.dvrSeriesRules.single.seriesTitle, 'Account B series');
     },
   );
+
+  test(
+    'delayed account A storage refresh cannot publish usage into account B',
+    () async {
+      final transport = _DvrMutationTransport();
+      final controller = _controller(transport);
+      addTearDown(controller.dispose);
+
+      expect(await controller.connectXtream(_accountA), isTrue);
+      transport.delayNextAccountAStorageRead = true;
+      final staleRefresh = controller.refreshDvrStorage();
+      await transport.accountAStorageRefreshStarted.future;
+
+      expect(await controller.connectXtream(_accountB), isTrue);
+      await pumpEventQueue();
+      expect(controller.dvrStorageInfo?.usedBytes, 222);
+
+      transport.releaseAccountAStorageRefresh.complete();
+      await staleRefresh;
+
+      expect(controller.authNotifier.credentials, _accountB);
+      expect(controller.dvrStorageInfo?.usedBytes, 222);
+    },
+  );
 }
 
 AppStateController _controller(_DvrMutationTransport transport) {
@@ -198,10 +222,13 @@ AppStateController _controller(_DvrMutationTransport transport) {
 class _DvrMutationTransport {
   bool delayNextAccountARecordingRead = false;
   bool delayNextAccountASeriesRuleRead = false;
+  bool delayNextAccountAStorageRead = false;
   final accountARefreshStarted = Completer<void>();
   final releaseAccountARefresh = Completer<void>();
   final accountASeriesRuleRefreshStarted = Completer<void>();
   final releaseAccountASeriesRuleRefresh = Completer<void>();
+  final accountAStorageRefreshStarted = Completer<void>();
+  final releaseAccountAStorageRefresh = Completer<void>();
   final scheduleStarted = Completer<void>();
   final releaseSchedule = Completer<void>();
   final cancelDetailStarted = Completer<void>();
@@ -266,6 +293,19 @@ class _DvrMutationTransport {
             'enable_comskip': false,
           },
         ];
+      case 'get_dvr_storage':
+        if (username == _accountA.username && delayNextAccountAStorageRead) {
+          delayNextAccountAStorageRead = false;
+          accountAStorageRefreshStarted.complete();
+          await releaseAccountAStorageRefresh.future;
+        }
+        return <String, Object?>{
+          'used_bytes': username == _accountA.username ? 111 : 222,
+          'quota_bytes': 1000,
+          'percent_used': username == _accountA.username ? 11.1 : 22.2,
+          'recording_count': username == _accountA.username ? 1 : 2,
+          'scope': 'account',
+        };
       case 'schedule_dvr':
         scheduleUsers.add(username);
         scheduleStarted.complete();

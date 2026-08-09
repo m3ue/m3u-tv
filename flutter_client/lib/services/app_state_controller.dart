@@ -1929,13 +1929,21 @@ class AppStateController extends ChangeNotifier {
   /// we treat as "unsupported" — the storage display just stays hidden
   /// rather than surfacing an error.
   Future<void> refreshDvrStorage() async {
-    if (!hasDvrFeature) return;
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork() || !hasDvrFeature) return;
     try {
-      _dvrStorageInfo = await xtreamService.getDvrStorage();
+      final storageInfo = await xtreamService.getDvrStorageFor(credentials);
+      if (!ownsWork()) return;
+      _dvrStorageInfo = storageInfo;
     } on Object catch (error) {
+      if (!ownsWork()) return;
       debugPrint('DVR: refresh storage failed: $error');
+      if (!ownsWork()) return;
       _dvrStorageInfo = null;
     }
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
