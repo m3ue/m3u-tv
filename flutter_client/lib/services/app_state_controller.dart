@@ -193,6 +193,7 @@ class AppStateController extends ChangeNotifier {
   final Generation _sourceRollbackGeneration = Generation();
   final Generation _viewerOperationGeneration = Generation();
   final SerialQueue _sourceReplacementQueue = SerialQueue();
+  final Set<Future<void>> _backgroundPersistence = <Future<void>>{};
   int _sourceReplacementOwners = 0;
   int _unreadNotificationCount = 0;
 
@@ -206,6 +207,23 @@ class AppStateController extends ChangeNotifier {
       _notificationActivationController.stream;
 
   int get unreadNotificationCount => _unreadNotificationCount;
+
+  void _runBackgroundPersistence(Future<Object?> operation) {
+    late final Future<void> tracked;
+    tracked = operation
+        .then<void>((_) {})
+        .whenComplete(
+          () => _backgroundPersistence.remove(tracked),
+        );
+    _backgroundPersistence.add(tracked);
+    unawaited(tracked);
+  }
+
+  Future<void> drainBackgroundPersistence() async {
+    while (_backgroundPersistence.isNotEmpty) {
+      await Future.wait(_backgroundPersistence.toList(growable: false));
+    }
+  }
 
   Future<bool> _refreshUnreadNotificationCount({
     bool Function()? shouldCommit,
@@ -409,14 +427,14 @@ class AppStateController extends ChangeNotifier {
           final activeViewer = _activeViewer;
           final viewerGeneration = _viewerOperationGeneration.current;
           if (activeViewer != null) {
-            unawaited(
+            _runBackgroundPersistence(
               _syncFavoritesForActiveViewer(
                 activeViewer,
                 sourceGeneration: sourceGeneration,
                 viewerGeneration: viewerGeneration,
               ),
             );
-            unawaited(
+            _runBackgroundPersistence(
               _refreshRecentlyWatchedForActiveViewer(
                 activeViewer,
                 sourceGeneration: sourceGeneration,
@@ -424,14 +442,14 @@ class AppStateController extends ChangeNotifier {
               ),
             );
           }
-          unawaited(
+          _runBackgroundPersistence(
             _replaceWithXtreamContent(
               clearCache: false,
               sourceGeneration: sourceGeneration,
             ),
           );
           _pushRegistrationSuspended = false;
-          unawaited(
+          _runBackgroundPersistence(
             _connectTvNotifications(credentials, notificationGeneration),
           );
           unawaited(_registerPushToken(credentials));
@@ -443,7 +461,7 @@ class AppStateController extends ChangeNotifier {
         );
         if (loaded) {
           _pushRegistrationSuspended = false;
-          unawaited(
+          _runBackgroundPersistence(
             _connectTvNotifications(credentials, notificationGeneration),
           );
           unawaited(_registerPushToken(credentials));
@@ -603,7 +621,9 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
     }
     if (loaded && isCurrent) {
-      unawaited(_connectTvNotifications(credentials, notificationGeneration));
+      _runBackgroundPersistence(
+        _connectTvNotifications(credentials, notificationGeneration),
+      );
       await _registerPushToken(credentials);
     }
     return loaded && isCurrent;
@@ -971,7 +991,7 @@ class AppStateController extends ChangeNotifier {
 
   void _onPushNotification(TvNotificationItem item) {
     final ownsNotification = _captureNotificationOwnership();
-    unawaited(
+    _runBackgroundPersistence(
       receiveTvNotification(item, shouldCommit: ownsNotification),
     );
   }
@@ -1724,7 +1744,7 @@ class AppStateController extends ChangeNotifier {
     if (!isCurrent()) return;
     _progressList = progress;
     notifyListeners();
-    unawaited(
+    _runBackgroundPersistence(
       _syncFavoritesForActiveViewer(
         viewer,
         sourceGeneration: sourceGeneration,
@@ -2247,7 +2267,7 @@ class AppStateController extends ChangeNotifier {
           unawaited(refreshDvrStorage());
           if (activeViewer != null) {
             if (!replacingXtreamSource) {
-              unawaited(
+              _runBackgroundPersistence(
                 _syncFavoritesForActiveViewer(
                   activeViewer,
                   sourceGeneration: sourceGeneration,
@@ -2255,7 +2275,7 @@ class AppStateController extends ChangeNotifier {
                 ),
               );
             }
-            unawaited(
+            _runBackgroundPersistence(
               _refreshRecentlyWatchedForActiveViewer(
                 activeViewer,
                 sourceGeneration: sourceGeneration,
@@ -2364,7 +2384,7 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     final currentViewer = _activeViewer;
     if (currentViewer != null) {
-      unawaited(
+      _runBackgroundPersistence(
         _syncFavoritesForActiveViewer(
           currentViewer,
           sourceGeneration: _sourceOperationGeneration.current,

@@ -1333,10 +1333,7 @@ void main() {
         final directory = await Directory.systemTemp.createTemp(
           'm3u-tv-stale-cache-success-',
         );
-        addTearDown(() async {
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-          await directory.delete(recursive: true);
-        });
+        addTearDown(() => directory.delete(recursive: true));
         final stateFile = File('${directory.path}/state.json');
         final store = _BlockingSourceCacheStore(file: stateFile);
         final transport = _ThreeSourceXtreamTransport();
@@ -1345,7 +1342,10 @@ void main() {
           secureStorage: FileSecureStorage(store: store),
           transport: transport.call,
         );
-        addTearDown(fixture.controller.dispose);
+        addTearDown(() async {
+          fixture.controller.dispose();
+          await fixture.controller.drainBackgroundPersistence();
+        });
         expect(
           await fixture.controller.connectXtream(_firstCredentials),
           isTrue,
@@ -1403,13 +1403,30 @@ void main() {
         expect(persistedSource['type'], 'xtream');
 
         await Future<void>.delayed(const Duration(milliseconds: 100));
+        final restartedStore = _BlockingFavoritesStore(file: stateFile);
         final restarted = AppStateController(
-          persistentStore: PersistentJsonStore(file: stateFile),
+          persistentStore: restartedStore,
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
         );
-        addTearDown(restarted.dispose);
-        await restarted.boot();
+        addTearDown(() async {
+          restarted.dispose();
+          await restarted.drainBackgroundPersistence();
+        });
+        final restartedBoot = restarted.boot();
+        await restartedStore.favoritesWriteStarted.future;
+        var bootCompleted = false;
+        unawaited(restartedBoot.then((_) => bootCompleted = true));
+        await pumpEventQueue();
+        expect(bootCompleted, isTrue);
+        var persistenceDrained = false;
+        final persistenceDrain = restarted.drainBackgroundPersistence();
+        unawaited(persistenceDrain.then((_) => persistenceDrained = true));
+        await pumpEventQueue();
+        expect(persistenceDrained, isFalse);
+        restartedStore.releaseFavoritesWrite.complete();
+        await persistenceDrain;
+        await restartedBoot;
         expect(restarted.authNotifier.credentials?.username, 'third');
         expect(restarted.sourceType, AppSourceType.xtream);
         expect(restarted.channels.single.name, 'Server C Channel');
@@ -2774,6 +2791,26 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
       secondCachePersisted.complete();
       await releaseSecondCache.future;
     }
+  }
+}
+
+class _BlockingFavoritesStore extends PersistentJsonStore {
+  _BlockingFavoritesStore({required super.file});
+
+  final Completer<void> favoritesWriteStarted = Completer<void>();
+  final Completer<void> releaseFavoritesWrite = Completer<void>();
+
+  @override
+  Future<bool> writeIf(
+    String key,
+    Object? value,
+    bool Function() shouldCommit,
+  ) async {
+    if (key == 'm3ue_favorites' && !favoritesWriteStarted.isCompleted) {
+      favoritesWriteStarted.complete();
+      await releaseFavoritesWrite.future;
+    }
+    return super.writeIf(key, value, shouldCommit);
   }
 }
 
