@@ -30,12 +30,41 @@ class PersistentJsonStore {
     bool Function() shouldCommit,
   ) => _writeQueue.run(() async {
     if (!shouldCommit()) return false;
+    final previousCache = _cache;
+    final previousBytes = await _file.exists()
+        ? await _file.readAsBytes()
+        : null;
     final data = Map<String, Object?>.from(await _readAllUnlocked())
       ..[key] = value;
     await _writeStaging(data);
     try {
       if (!shouldCommit()) return false;
       await _commitStaging(data);
+      Future<void> restorePrevious() async {
+        _cache = previousCache;
+        if (previousBytes == null) {
+          try {
+            await _file.delete();
+          } on PathNotFoundException {
+            return;
+          }
+        } else {
+          await _stagingFile.writeAsBytes(previousBytes, flush: true);
+          await _stagingFile.rename(_file.path);
+        }
+      }
+
+      bool stillOwnsCommit;
+      try {
+        stillOwnsCommit = shouldCommit();
+      } catch (_) {
+        await restorePrevious();
+        rethrow;
+      }
+      if (!stillOwnsCommit) {
+        await restorePrevious();
+        return false;
+      }
       return true;
     } finally {
       await _deleteStaging();

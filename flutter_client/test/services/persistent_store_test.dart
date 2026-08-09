@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,63 @@ import 'package:m3u_tv/services/persistent_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('ownership loss during commit restores existing state', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'm3u-tv-write-if-commit-rollback-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final stateFile = File('${directory.path}/app_state.json');
+    final store = PersistentJsonStore(file: stateFile);
+    await stateFile.writeAsString('{\n  "owner": "account-a"\n}\n');
+    expect(await store.read('owner'), 'account-a');
+    final previousBytes = await stateFile.readAsBytes();
+    var current = true;
+    var ownershipChecks = 0;
+
+    final accepted = await store.writeIf('owner', 'account-b', () {
+      ownershipChecks += 1;
+      if (ownershipChecks == 2) {
+        scheduleMicrotask(() => current = false);
+      }
+      return current;
+    });
+
+    expect(
+      (accepted: accepted, current: current, cached: await store.read('owner')),
+      (accepted: false, current: false, cached: 'account-a'),
+    );
+    expect(await stateFile.readAsBytes(), previousBytes);
+  });
+
+  test('ownership loss during first commit restores file absence', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'm3u-tv-write-if-first-commit-rollback-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final stateFile = File('${directory.path}/app_state.json');
+    final store = PersistentJsonStore(file: stateFile);
+    var current = true;
+    var ownershipChecks = 0;
+
+    final accepted = await store.writeIf('owner', 'account-b', () {
+      ownershipChecks += 1;
+      if (ownershipChecks == 2) {
+        scheduleMicrotask(() => current = false);
+      }
+      return current;
+    });
+
+    expect(
+      (
+        accepted: accepted,
+        current: current,
+        cached: await store.read('owner'),
+        fileExists: await stateFile.exists(),
+      ),
+      (accepted: false, current: false, cached: null, fileExists: false),
+    );
+  });
 
   test('rejected writeIf never publishes candidate bytes', () async {
     final directory = await Directory.systemTemp.createTemp(
