@@ -1076,6 +1076,7 @@ class AppShellState extends ConsumerState<AppShell>
             );
           }
           return RequestScreen(
+            key: ValueKey(_appState.mediaRequestOwner),
             isConfigured: _appState.isConfigured,
             onSearch: _appState.searchContentRequests,
             onResultSelect: _openRequestResult,

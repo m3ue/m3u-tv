@@ -1169,6 +1169,73 @@ https://streams.example/live/bbc-one.m3u8
   });
 
   group('Local state services', () {
+    test('persistent store replaces a key set in one operation', () async {
+      final file = io.File(
+        '${io.Directory.systemTemp.path}/m3u_tv_store_replace_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+      final store = PersistentJsonStore(file: file);
+      await store.write('keep', 'value');
+      await store.write('cache-a', 'old-a');
+      await store.write('cache-b', 'old-b');
+
+      await store.replaceWhere(
+        (key) => key.startsWith('cache-'),
+        <String, Object?>{'cache-c': 'new-c'},
+      );
+
+      expect(
+        await PersistentJsonStore(file: file).snapshot(),
+        <String, Object?>{
+          'keep': 'value',
+          'cache-c': 'new-c',
+        },
+      );
+    });
+
+    test(
+      'failed persistent replacement leaves the prior snapshot intact',
+      () async {
+        final root = await io.Directory.systemTemp.createTemp(
+          'm3u_tv_store_replace_failure_',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final directory = io.Directory('${root.path}/store');
+        final backup = io.Directory('${root.path}/backup');
+        final file = io.File('${directory.path}/state.json');
+        final store = PersistentJsonStore(file: file);
+        await store.write('keep', 'value');
+        await store.write('cache-a', 'old-a');
+        await directory.rename(backup.path);
+        final blocker = io.File(directory.path);
+        await blocker.writeAsString('blocked');
+
+        await expectLater(
+          store.replaceWhere(
+            (key) => key.startsWith('cache-'),
+            <String, Object?>{'cache-b': 'new-b'},
+          ),
+          throwsA(isA<io.FileSystemException>()),
+        );
+        expect(await store.snapshot(), <String, Object?>{
+          'keep': 'value',
+          'cache-a': 'old-a',
+        });
+
+        await blocker.delete();
+        await backup.rename(directory.path);
+        expect(
+          await PersistentJsonStore(file: file).snapshot(),
+          <String, Object?>{
+            'keep': 'value',
+            'cache-a': 'old-a',
+          },
+        );
+      },
+    );
+
     test('cache preserves channel catchup metadata', () async {
       final file = io.File(
         '${io.Directory.systemTemp.path}/m3u_tv_cache_catchup_${DateTime.now().microsecondsSinceEpoch}.json',

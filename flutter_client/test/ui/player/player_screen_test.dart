@@ -1684,6 +1684,185 @@ void main() {
       expect(requests.last.params, {'stream_id': '101', 'limit': '4'});
     });
 
+    testWidgets('short EPG failures retry after backoff when guide is stale', (
+      tester,
+    ) async {
+      var now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final epgService =
+          EpgService(
+            clock: () => now,
+            cacheTtl: const Duration(hours: 1),
+          )..loadPrograms(<EpgProgram>[
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Loaded News',
+              description: '',
+              start: now.subtract(const Duration(minutes: 10)),
+              end: now.add(const Duration(hours: 3)),
+            ),
+          ]);
+      now = now.add(const Duration(hours: 1));
+      var shortEpgRequests = 0;
+      final xtreamService = XtreamService(
+        transport: (request) async {
+          if (request.action == null) {
+            return {
+              'user_info': {'auth': 1, 'status': 'Active'},
+              'm3u_editor': {'version': 'fixture'},
+            };
+          }
+          if (request.action == 'get_short_epg') {
+            shortEpgRequests += 1;
+            throw StateError('temporary EPG outage');
+          }
+          return <String, Object?>{};
+        },
+      );
+      await xtreamService.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'EPG Retry Fixture',
+              type: 'live',
+              streamId: 101,
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: epgService,
+            xtreamService: xtreamService,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Loaded News'), findsOneWidget);
+      expect(shortEpgRequests, 1);
+
+      now = now.add(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 30));
+      expect(shortEpgRequests, 1);
+
+      now = now.add(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 30));
+      expect(shortEpgRequests, 2);
+    });
+
+    testWidgets('successful empty short EPG response clears stale guide', (
+      tester,
+    ) async {
+      var now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final epgService = EpgService(clock: () => now)
+        ..loadPrograms(<EpgProgram>[
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Stale News',
+            description: '',
+            start: now.subtract(const Duration(minutes: 10)),
+            end: now.add(const Duration(hours: 2)),
+          ),
+        ]);
+      now = now.add(const Duration(minutes: 30));
+      expect(epgService.lookup('bbc.one')?.current.title, 'Stale News');
+      var shortEpgRequests = 0;
+      final xtreamService = XtreamService(
+        transport: (request) async {
+          if (request.action == null) {
+            return {
+              'user_info': {'auth': 1, 'status': 'Active'},
+              'm3u_editor': {'version': 'fixture'},
+            };
+          }
+          if (request.action == 'get_short_epg') {
+            shortEpgRequests += 1;
+            return <String, Object?>{'epg_listings': <Object?>[]};
+          }
+          return <String, Object?>{};
+        },
+      );
+      await xtreamService.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'Empty EPG Fixture',
+              type: 'live',
+              streamId: 101,
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: epgService,
+            xtreamService: xtreamService,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(shortEpgRequests, 1);
+      expect(epgService.lookup('bbc.one'), isNull);
+      expect(find.text('Stale News'), findsNothing);
+
+      now = now.add(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 30));
+
+      expect(shortEpgRequests, 1);
+    });
+
     final trackSelectorSystems =
         <
           ({

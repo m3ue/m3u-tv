@@ -10,6 +10,13 @@ class CacheEntry<T> {
   final bool isStale;
 }
 
+class CacheSnapshot {
+  const CacheSnapshot._(this._memory, this._persisted);
+
+  final Map<String, Object?> _memory;
+  final Map<String, Object?> _persisted;
+}
+
 class CacheService {
   CacheService({
     Map<String, Object?>? memory,
@@ -45,6 +52,53 @@ class CacheService {
       data: value.data as T,
       isStale: DateTime.now().difference(value.timestamp) > refreshInterval,
     );
+  }
+
+  Future<CacheSnapshot> snapshot() async {
+    final memory = Map<String, Object?>.fromEntries(
+      _memory.entries.where((entry) => entry.key.startsWith('m3ue_cache_')),
+    );
+    final persisted = Map<String, Object?>.from(
+      await _store?.snapshot() ?? const <String, Object?>{},
+    )..removeWhere((key, _) => !key.startsWith('m3ue_cache_'));
+    return CacheSnapshot._(memory, persisted);
+  }
+
+  Future<void> replace(Map<String, Object?> values) async {
+    final timestamp = DateTime.now();
+    final memory = <String, Object?>{};
+    final persisted = <String, Object?>{};
+    for (final entry in values.entries) {
+      final key = 'm3ue_cache_${entry.key}';
+      memory[key] = _StampedValue<Object?>(entry.value, timestamp);
+      final encoded = _encodeCacheData(entry.key, entry.value);
+      if (encoded != null) {
+        persisted[key] = <String, Object?>{
+          'timestamp': timestamp.toIso8601String(),
+          'data': encoded,
+        };
+      }
+    }
+    await _store?.replaceWhere(
+      (key) => key.startsWith('m3ue_cache_'),
+      persisted,
+    );
+    _memory
+      ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
+      ..addAll(memory);
+  }
+
+  Future<void> restore(CacheSnapshot snapshot) async {
+    final store = _store;
+    if (store != null) {
+      await store.replaceWhere(
+        (key) => key.startsWith('m3ue_cache_'),
+        snapshot._persisted,
+      );
+    }
+    _memory
+      ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
+      ..addAll(snapshot._memory);
   }
 
   Future<void> clear() async {

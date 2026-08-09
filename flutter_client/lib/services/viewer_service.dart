@@ -26,6 +26,7 @@ class ViewerService {
   Future<Viewer?> resolveActiveViewer(
     List<Viewer> viewers, {
     String? loginKey,
+    bool persist = true,
   }) async {
     if (viewers.isEmpty) return null;
     final key = _keyFor(loginKey);
@@ -38,7 +39,7 @@ class ViewerService {
         saved ??
         viewers.where((viewer) => viewer.isAdmin).firstOrNull ??
         viewers.first;
-    await setActiveViewer(active, loginKey: loginKey);
+    if (persist) await setActiveViewer(active, loginKey: loginKey);
     return active;
   }
 
