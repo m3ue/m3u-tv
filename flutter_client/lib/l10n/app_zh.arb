@@ -154,6 +154,7 @@
   "settingsFillAllFields": "请填写所有字段",
   "settingsConnectionSettings": "连接设置",
   "settingsConnectionSettingsSubtitle": "输入您的 Xtream Codes 信息",
+  "settingsConnectionSettingsHelp": "请使用 m3u-editor 播放列表的 Xtream 连接信息，而不是 m3u-editor 网页登录账号。您需要服务器地址、Xtream 用户名和 Xtream 密码。",
   "settingsServerUrl": "服务器地址",
   "settingsUsername": "用户名",
   "settingsPassword": "密码",

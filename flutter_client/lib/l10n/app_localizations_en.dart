@@ -394,6 +394,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter your Xtream codes details';
 
   @override
+  String get settingsConnectionSettingsHelp =>
+      'Use the playlist Xtream connection details from m3u-editor, not your m3u-editor web login. You need the server URL, Xtream username and Xtream password.';
+
+  @override
   String get settingsServerUrl => 'Server URL';
 
   @override

@@ -154,6 +154,7 @@
   "settingsFillAllFields": "Bitte fülle alle Felder aus",
   "settingsConnectionSettings": "Verbindungseinstellungen",
   "settingsConnectionSettingsSubtitle": "Gib deine Xtream-Codes-Daten ein",
+  "settingsConnectionSettingsHelp": "Verwende die Xtream-Verbindungsdaten der Playlist aus m3u-editor, nicht deinen m3u-editor-Web-Login. Du benoetigst die Server-URL, den Xtream-Benutzernamen und das Xtream-Passwort.",
   "settingsServerUrl": "Server-URL",
   "settingsUsername": "Benutzername",
   "settingsPassword": "Passwort",

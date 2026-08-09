@@ -342,6 +342,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
             ),
             const SizedBox(height: 24),
             _buildError(theme, displayError),
+            _buildCredentialHelp(theme, l),
             ..._buildSignInFields(l, autofocusServer: true),
           ],
         ),
@@ -419,6 +420,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
                     ),
                     const SizedBox(height: 24),
                     _buildError(theme, displayError),
+                    _buildCredentialHelp(theme, l),
                     ..._buildSignInFields(l, autofocusServer: false),
                   ],
                 ),
@@ -437,6 +439,18 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
       child: Text(
         displayError,
         style: TextStyle(color: theme.colorScheme.error),
+      ),
+    );
+  }
+
+  Widget _buildCredentialHelp(ThemeData theme, AppLocalizations l) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        l.settingsConnectionSettingsHelp,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }

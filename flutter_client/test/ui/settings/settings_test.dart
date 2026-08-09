@@ -444,6 +444,112 @@ void main() {
   // --- SettingsScreen widget ---
 
   group('SettingsScreen', () {
+    testWidgets(
+      'shows credential guidance on disconnected first-launch compact viewport',
+      (tester) async {
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.physicalSize = const Size(400, 800);
+        tester.view.devicePixelRatio = 1.0;
+
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(_settingsApp(notifier));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows credential guidance on disconnected TV-sized viewport',
+      (tester) async {
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.physicalSize = const Size(1920, 1080);
+        tester.view.devicePixelRatio = 1.0;
+
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(_settingsApp(notifier));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows credential guidance on disconnected Settings sign-in tab',
+      (tester) async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+        final pairingService = DevicePairingService();
+        addTearDown(pairingService.dispose);
+
+        await tester.pumpWidget(
+          _settingsApp(notifier, devicePairingService: pairingService),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Sign In'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'does not show setup guidance when connected or in outage mode',
+      (tester) async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(
+          _settingsApp(
+            notifier,
+            isConfiguredOverride: true,
+            sourceError: 'Server is currently unavailable.',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server is currently unavailable.'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('shows connection form when not configured', (tester) async {
       final notifier = AuthNotifier(
         xtreamService: XtreamService(transport: _FakeTransport({}).call),
