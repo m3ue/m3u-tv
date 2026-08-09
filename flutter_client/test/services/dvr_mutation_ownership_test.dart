@@ -20,7 +20,7 @@ const _accountA = UserCredentials(
   password: 'secret-a',
 );
 const _accountB = UserCredentials(
-  server: 'https://account-b.example',
+  server: 'https://account-a.example',
   username: 'account-b',
   password: 'secret-b',
 );
@@ -122,6 +122,53 @@ void main() {
       expect(notifications, 0);
     },
   );
+
+  test(
+    'delayed account A full refresh cannot publish recordings into account B',
+    () async {
+      final transport = _DvrMutationTransport();
+      final controller = _controller(transport);
+      addTearDown(controller.dispose);
+
+      expect(await controller.connectXtream(_accountA), isTrue);
+      transport.delayNextAccountARecordingRead = true;
+      final staleRefresh = controller.refreshDvrRecordings();
+      await transport.accountARefreshStarted.future;
+
+      expect(await controller.connectXtream(_accountB), isTrue);
+      expect(controller.dvrRecordings.single.title, 'Account B recording');
+
+      transport.releaseAccountARefresh.complete();
+      await staleRefresh;
+
+      expect(controller.authNotifier.credentials, _accountB);
+      expect(controller.dvrRecordings.single.title, 'Account B recording');
+      expect(controller.recordingChannelIds, <int>{202});
+    },
+  );
+
+  test(
+    'delayed account A series refresh cannot publish rules into account B',
+    () async {
+      final transport = _DvrMutationTransport();
+      final controller = _controller(transport);
+      addTearDown(controller.dispose);
+
+      expect(await controller.connectXtream(_accountA), isTrue);
+      transport.delayNextAccountASeriesRuleRead = true;
+      final staleRefresh = controller.refreshDvrSeriesRules();
+      await transport.accountASeriesRuleRefreshStarted.future;
+
+      expect(await controller.connectXtream(_accountB), isTrue);
+      expect(controller.dvrSeriesRules.single.seriesTitle, 'Account B series');
+
+      transport.releaseAccountASeriesRuleRefresh.complete();
+      await staleRefresh;
+
+      expect(controller.authNotifier.credentials, _accountB);
+      expect(controller.dvrSeriesRules.single.seriesTitle, 'Account B series');
+    },
+  );
 }
 
 AppStateController _controller(_DvrMutationTransport transport) {
@@ -149,6 +196,12 @@ AppStateController _controller(_DvrMutationTransport transport) {
 }
 
 class _DvrMutationTransport {
+  bool delayNextAccountARecordingRead = false;
+  bool delayNextAccountASeriesRuleRead = false;
+  final accountARefreshStarted = Completer<void>();
+  final releaseAccountARefresh = Completer<void>();
+  final accountASeriesRuleRefreshStarted = Completer<void>();
+  final releaseAccountASeriesRuleRefresh = Completer<void>();
   final scheduleStarted = Completer<void>();
   final releaseSchedule = Completer<void>();
   final cancelDetailStarted = Completer<void>();
@@ -181,6 +234,11 @@ class _DvrMutationTransport {
       case 'get_viewers':
         return const <Object?>[];
       case 'get_dvr_recordings':
+        if (username == _accountA.username && delayNextAccountARecordingRead) {
+          delayNextAccountARecordingRead = false;
+          accountARefreshStarted.complete();
+          await releaseAccountARefresh.future;
+        }
         return <Map<String, Object?>>[
           _recording(
             title: username == _accountA.username
@@ -188,6 +246,25 @@ class _DvrMutationTransport {
                 : 'Account B recording',
             channelId: username == _accountA.username ? 101 : 202,
           ),
+        ];
+      case 'list_dvr_series_rules':
+        if (username == _accountA.username && delayNextAccountASeriesRuleRead) {
+          delayNextAccountASeriesRuleRead = false;
+          accountASeriesRuleRefreshStarted.complete();
+          await releaseAccountASeriesRuleRefresh.future;
+        }
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'id': username == _accountA.username ? 1 : 2,
+            'channel_id': username == _accountA.username ? 101 : 202,
+            'series_title': username == _accountA.username
+                ? 'Account A series'
+                : 'Account B series',
+            'match_mode': 'contains',
+            'series_mode': 'all',
+            'enabled': true,
+            'enable_comskip': false,
+          },
         ];
       case 'schedule_dvr':
         scheduleUsers.add(username);

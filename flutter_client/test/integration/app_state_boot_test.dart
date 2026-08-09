@@ -1413,6 +1413,145 @@ void main() {
     });
 
     test(
+      'dated EPG range is not fresh after clock rollback and a failed fetch',
+      () async {
+        var now = DateTime.utc(2026, 7, 30, 12);
+        final fixture = _FakeXtreamTransport.success();
+        var rangedRequests = 0;
+        final secondRangedRequest = Completer<void>();
+        Future<Object?> transport(XtreamRequest request) async {
+          if (request.action != 'get_epg_batch') return fixture.call(request);
+          if (request.params['date'] == null) return <String, Object?>{};
+          rangedRequests += 1;
+          if (rangedRequests == 2) secondRangedRequest.complete();
+          return _epgResponse('Dated guide', now);
+        }
+
+        final epgService = EpgService(clock: () => now);
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          epgService: epgService,
+        );
+        addTearDown(controller.dispose);
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://fixture.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+
+        final firstRangePublished = Completer<void>();
+        void onEpgChanged() {
+          final channel = controller.channels.single;
+          if (!firstRangePublished.isCompleted &&
+              epgService
+                  .programsForChannel(channel)
+                  .any((program) => program.title == 'Dated guide')) {
+            firstRangePublished.complete();
+          }
+        }
+
+        epgService.addListener(onEpgChanged);
+        addTearDown(() => epgService.removeListener(onEpgChanged));
+        final date = DateTime.utc(2026, 7, 30);
+        controller.ensureEpgForChannels(
+          controller.channels,
+          startDate: date,
+          endDate: date,
+        );
+        await firstRangePublished.future.timeout(const Duration(seconds: 5));
+        expect(rangedRequests, 1);
+
+        epgService.markFetchFailed(<String>['bbc.one:2026-07-30:2026-07-30']);
+        now = now.subtract(const Duration(minutes: 1));
+        controller.ensureEpgForChannels(
+          controller.channels,
+          startDate: date,
+          endDate: date,
+        );
+        await secondRangedRequest.future.timeout(const Duration(seconds: 5));
+
+        expect(rangedRequests, 2);
+      },
+    );
+
+    test('dated EPG range uses the configured freshness TTL', () async {
+      var now = DateTime.utc(2026, 7, 30, 12);
+      final fixture = _FakeXtreamTransport.success();
+      var rangedRequests = 0;
+      final secondRangedRequest = Completer<void>();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action != 'get_epg_batch') return fixture.call(request);
+        if (request.params['date'] == null) return <String, Object?>{};
+        rangedRequests += 1;
+        if (rangedRequests == 2) secondRangedRequest.complete();
+        return _epgResponse('Dated guide', now);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+        epgService: EpgService(clock: () => now),
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.connectXtream(
+          const UserCredentials(
+            server: 'https://fixture.example',
+            username: 'fixture-user',
+            password: 'fixture-password',
+          ),
+        ),
+        isTrue,
+      );
+      await controller.setEpgRefreshInterval(const Duration(minutes: 1));
+
+      final firstRangePublished = Completer<void>();
+      void onEpgChanged() {
+        final channel = controller.channels.single;
+        if (!firstRangePublished.isCompleted &&
+            controller.epgService
+                .programsForChannel(channel)
+                .any((program) => program.title == 'Dated guide')) {
+          firstRangePublished.complete();
+        }
+      }
+
+      controller.epgService.addListener(onEpgChanged);
+      addTearDown(
+        () => controller.epgService.removeListener(onEpgChanged),
+      );
+      final date = DateTime.utc(2026, 7, 30);
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await firstRangePublished.future.timeout(const Duration(seconds: 5));
+      now = now.add(const Duration(minutes: 1));
+      expect(
+        controller.epgService.shouldFetchData(
+          'bbc.one:2026-07-30:2026-07-30',
+        ),
+        isTrue,
+      );
+
+      controller.ensureEpgForChannels(
+        controller.channels,
+        startDate: date,
+        endDate: date,
+      );
+      await secondRangedRequest.future.timeout(const Duration(seconds: 5));
+
+      expect(rangedRequests, 2);
+    });
+
+    test(
       'adjacent EPG ranges deduplicate only the overlapping program',
       () async {
         final fixture = _FakeXtreamTransport.success();

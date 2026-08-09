@@ -1632,12 +1632,22 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Replaces the cached series recording rules and notifies listeners.
-  /// The UI agent is responsible for calling this after a successful
-  /// `listDvrSeriesRules` / `createDvrSeriesRule` / `deleteDvrSeriesRule`
-  /// round-trip from the server.
-  void setDvrSeriesRules(List<DvrSeriesRule> rules) {
-    _dvrSeriesRules = rules;
+  Future<void> refreshDvrSeriesRules() async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork()) return;
+    try {
+      final rules = await xtreamService.listDvrSeriesRulesFor(credentials);
+      if (!ownsWork()) return;
+      _dvrSeriesRules = rules;
+    } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return;
+      debugPrint('DVR: refresh series rules failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
@@ -1646,18 +1656,29 @@ class AppStateController extends ChangeNotifier {
   /// Series rules can produce a matching `DvrRecording` synchronously (see
   /// [scheduleDvr]'s doc comment for the same server-side behaviour on
   /// one-shot recordings), so the UI agent should call this after a
-  /// successful `createDvrSeriesRule` / `updateDvrSeriesRule` round-trip —
-  /// not just after [setDvrSeriesRules] — or a newly matched recording
-  /// won't show up in the Recordings tab until the next full reload.
+  /// successful `createDvrSeriesRule` / `updateDvrSeriesRule` round-trip, not
+  /// just after [refreshDvrSeriesRules]. Otherwise, a newly matched recording
+  /// will not show up in the Recordings tab until the next full reload.
   Future<void> refreshDvrRecordings() async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    final ownsWork = _captureDvrOwnership(credentials);
+    if (!ownsWork()) return;
     try {
-      _dvrRecordings = await xtreamService.getDvrRecordings();
-      _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
+      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
+      if (!ownsWork()) return;
+      final recordingChannelIds = _extractRecordingChannelIds(recordings);
+      if (!ownsWork()) return;
+      _dvrRecordings = recordings;
+      if (!ownsWork()) return;
+      _recordingChannelIds = recordingChannelIds;
     } on Object catch (error, stackTrace) {
+      if (!ownsWork()) return;
       debugPrint('DVR: refresh recordings failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       return;
     }
+    if (!ownsWork()) return;
     notifyListeners();
   }
 
@@ -2698,13 +2719,14 @@ class AppStateController extends ChangeNotifier {
     final key = '$channelId:$rangeKey';
     final fetchedAt = _fetchedEpgRanges[key];
     if (fetchedAt == null) return false;
-    if (DateTime.now().difference(fetchedAt) < epgService.cacheTtl) return true;
+    final elapsed = epgService.now.difference(fetchedAt);
+    if (!elapsed.isNegative && elapsed < epgService.cacheTtl) return true;
     _fetchedEpgRanges.remove(key);
     return false;
   }
 
   void _markEpgRangeFetched(List<Channel> channels, String rangeKey) {
-    final now = DateTime.now();
+    final now = epgService.now;
     for (final channel in channels) {
       _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
     }

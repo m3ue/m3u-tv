@@ -1225,8 +1225,16 @@ class XtreamService {
 
   /// Lists every active series recording rule for the current playlist via
   /// m3u-editor's `list_dvr_series_rules` action.
-  Future<List<DvrSeriesRule>> listDvrSeriesRules() async {
-    final response = await _request('list_dvr_series_rules');
+  Future<List<DvrSeriesRule>> listDvrSeriesRules() async =>
+      listDvrSeriesRulesFor(_requireCredentials());
+
+  Future<List<DvrSeriesRule>> listDvrSeriesRulesFor(
+    UserCredentials credentials,
+  ) async {
+    final response = await _requestWithCredentials(
+      credentials,
+      'list_dvr_series_rules',
+    );
     return _asList(response)
         .map((item) => DvrSeriesRule.fromXtream(_asMap(item)))
         .toList(growable: false);

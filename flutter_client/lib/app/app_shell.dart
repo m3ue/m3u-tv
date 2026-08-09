@@ -708,8 +708,7 @@ class AppShellState extends ConsumerState<AppShell>
         startEarlySeconds: startEarlySeconds,
         endLateSeconds: endLateSeconds,
       );
-      final rules = await _appState.xtreamService.listDvrSeriesRules();
-      _appState.setDvrSeriesRules(rules);
+      await _appState.refreshDvrSeriesRules();
       // The rule's `created` hook may have already matched and scheduled a
       // recording server-side (see AppStateController.refreshDvrRecordings
       // doc comment) — refresh so it shows up in the Recordings tab without
@@ -720,8 +719,7 @@ class AppShellState extends ConsumerState<AppShell>
           : CreateDvrSeriesRuleOutcome.created;
     } on DvrSeriesRuleExistsException {
       try {
-        final rules = await _appState.xtreamService.listDvrSeriesRules();
-        _appState.setDvrSeriesRules(rules);
+        await _appState.refreshDvrSeriesRules();
       } on Object catch (error, stackTrace) {
         debugPrint('DVR: refresh after duplicate create failed: $error');
         debugPrintStack(stackTrace: stackTrace);
@@ -734,13 +732,10 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
-  /// Deletes a DVR series rule and refreshes the cached list. Foundation
-  /// agent owns `XtreamService.deleteDvrSeriesRule` and
-  /// `AppStateController.setDvrSeriesRules`.
+  /// Deletes a DVR series rule and refreshes the cached list.
   Future<void> _deleteDvrSeriesRule(DvrSeriesRule rule) async {
     await _appState.xtreamService.deleteDvrSeriesRule(rule.id);
-    final rules = await _appState.xtreamService.listDvrSeriesRules();
-    _appState.setDvrSeriesRules(rules);
+    await _appState.refreshDvrSeriesRules();
   }
 
   /// Updates an existing DVR series rule in place (never delete-and-recreate —
@@ -761,8 +756,7 @@ class AppShellState extends ConsumerState<AppShell>
       startEarlySeconds: options.startEarlySeconds,
       endLateSeconds: options.endLateSeconds,
     );
-    final rules = await _appState.xtreamService.listDvrSeriesRules();
-    _appState.setDvrSeriesRules(rules);
+    await _appState.refreshDvrSeriesRules();
     unawaited(_appState.refreshDvrRecordings());
   }
 
