@@ -96,8 +96,7 @@ class ReverbService {
   }
 
   Future<void> _connectOnce(int connectionGeneration) async {
-    if (_disposed ||
-        _connectionGeneration.isStale(connectionGeneration)) {
+    if (_disposed || _connectionGeneration.isStale(connectionGeneration)) {
       return;
     }
 
