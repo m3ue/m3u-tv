@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
@@ -371,8 +372,8 @@ class XtreamService {
   UserCredentials? _credentials;
   tz.Location _serverLocation = tz.UTC;
   bool _isM3UEditor = false;
-  int _sessionGeneration = 0;
-  int _authenticationGeneration = 0;
+  final Generation _sessionGeneration = Generation();
+  final Generation _authenticationGeneration = Generation();
   int _liveCategoryCacheSuppressions = 0;
 
   bool get isConfigured => _credentials != null;
@@ -393,13 +394,13 @@ class XtreamService {
     _credentials = snapshot._credentials;
     _serverLocation = snapshot._serverLocation;
     _isM3UEditor = snapshot._isM3UEditor;
-    _sessionGeneration += 1;
-    _authenticationGeneration += 1;
+    _sessionGeneration.advance();
+    _authenticationGeneration.advance();
   }
 
   Future<XtreamAuthResponse> authenticate(UserCredentials credentials) async {
-    final authenticationGeneration = ++_authenticationGeneration;
-    _sessionGeneration += 1;
+    final authenticationGeneration = _authenticationGeneration.advance();
+    _sessionGeneration.advance();
     final normalized = credentials.normalized();
     final response = await _requestWithCredentials(
       normalized,
@@ -466,7 +467,7 @@ class XtreamService {
       proxy: proxy,
       requests: requests,
     );
-    if (authenticationGeneration == _authenticationGeneration) {
+    if (!_authenticationGeneration.isStale(authenticationGeneration)) {
       _credentials = normalized;
       _isM3UEditor = true;
       _serverLocation = serverLocation;
@@ -478,8 +479,8 @@ class XtreamService {
     _credentials = null;
     _isM3UEditor = false;
     _serverLocation = tz.UTC;
-    _sessionGeneration += 1;
-    _authenticationGeneration += 1;
+    _sessionGeneration.advance();
+    _authenticationGeneration.advance();
   }
 
   Future<List<Category>> getLiveCategories() async =>
@@ -1312,14 +1313,14 @@ class XtreamService {
   }
 
   Future<List<Category>> _categories(String action) async {
-    final sessionGeneration = _sessionGeneration;
+    final sessionGeneration = _sessionGeneration.current;
     final response = await _request(action);
     final categories = _asList(
       response,
     ).map((item) => Category.fromXtream(_asMap(item))).toList(growable: false);
     if (_liveCategoryCacheSuppressions == 0 &&
         action == 'get_live_categories' &&
-        sessionGeneration == _sessionGeneration) {
+        !_sessionGeneration.isStale(sessionGeneration)) {
       await _cache?.set('liveCategories', categories);
     }
     return categories;

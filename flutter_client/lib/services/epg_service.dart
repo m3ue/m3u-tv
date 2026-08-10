@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
 typedef Clock = DateTime Function();
@@ -22,7 +23,7 @@ class EpgService extends ChangeNotifier {
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};
   final Map<String, DateTime> _failedAtByChannel = <String, DateTime>{};
   final Set<String> _fetchesInFlight = <String>{};
-  int _sourceGeneration = 0;
+  final Generation _sourceGeneration = Generation();
   DateTime? _loadedAt;
 
   void loadPrograms(List<EpgProgram> programs) {
@@ -58,7 +59,8 @@ class EpgService extends ChangeNotifier {
     List<EpgProgram> programs, {
     int? sourceGeneration,
   }) {
-    if (sourceGeneration != null && sourceGeneration != _sourceGeneration) {
+    if (sourceGeneration != null &&
+        _sourceGeneration.isStale(sourceGeneration)) {
       return;
     }
     markFetched(channelIds);
@@ -86,14 +88,15 @@ class EpgService extends ChangeNotifier {
     _fetchesInFlight.addAll(
       channelIds.where((channelId) => channelId.isNotEmpty),
     );
-    return _sourceGeneration;
+    return _sourceGeneration.current;
   }
 
   void markFetchFailed(
     Iterable<String> channelIds, {
     int? sourceGeneration,
   }) {
-    if (sourceGeneration != null && sourceGeneration != _sourceGeneration) {
+    if (sourceGeneration != null &&
+        _sourceGeneration.isStale(sourceGeneration)) {
       return;
     }
     final now = _clock();
@@ -105,7 +108,7 @@ class EpgService extends ChangeNotifier {
   }
 
   void invalidateSourceFetchState() {
-    _sourceGeneration += 1;
+    _sourceGeneration.advance();
     _fetchedAtByChannel.clear();
     _failedAtByChannel.clear();
     _fetchesInFlight.clear();

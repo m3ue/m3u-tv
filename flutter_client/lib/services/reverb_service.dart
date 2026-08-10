@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -44,7 +45,7 @@ class ReverbService {
   bool _connected = false;
   bool _hasConnectedBefore = false;
   int _retryDelay = 2;
-  int _connectionGeneration = 0;
+  final Generation _connectionGeneration = Generation();
   int _activityTimeoutSeconds = 30;
 
   static const int _maxRetryDelay = 60;
@@ -64,7 +65,7 @@ class ReverbService {
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
     void Function()? onConnected,
   }) async {
-    final connectionGeneration = ++_connectionGeneration;
+    final connectionGeneration = _connectionGeneration.advance();
     final previousSubscription = _sub;
     final previousSocket = _ws;
     _idleTimer?.cancel();
@@ -90,19 +91,22 @@ class ReverbService {
     _retryDelay = 2;
     await previousSubscription?.cancel();
     await previousSocket?.sink.close();
-    if (connectionGeneration != _connectionGeneration) return;
+    if (_connectionGeneration.isStale(connectionGeneration)) return;
     await _connectOnce(connectionGeneration);
   }
 
   Future<void> _connectOnce(int connectionGeneration) async {
-    if (_disposed || connectionGeneration != _connectionGeneration) return;
+    if (_disposed ||
+        _connectionGeneration.isStale(connectionGeneration)) {
+      return;
+    }
 
     final session = _session;
     final creds = _credentials;
 
     try {
       final socket = _channelFactory(session.reverb.wsUri);
-      if (connectionGeneration != _connectionGeneration) {
+      if (_connectionGeneration.isStale(connectionGeneration)) {
         await socket.sink.close();
         return;
       }
@@ -141,7 +145,7 @@ class ReverbService {
     int connectionGeneration,
     WebSocketChannel socket,
   ) {
-    if (connectionGeneration != _connectionGeneration ||
+    if (_connectionGeneration.isStale(connectionGeneration) ||
         !identical(_ws, socket)) {
       return;
     }
@@ -159,7 +163,7 @@ class ReverbService {
   /// never reported as closed (e.g. after a laptop sleep/wake or a dropped
   /// Wi-Fi hop) — force a reconnect rather than waiting on it forever.
   void _sendPing(int connectionGeneration, WebSocketChannel socket) {
-    if (connectionGeneration != _connectionGeneration ||
+    if (_connectionGeneration.isStale(connectionGeneration) ||
         !identical(_ws, socket)) {
       return;
     }
@@ -178,7 +182,7 @@ class ReverbService {
     int connectionGeneration,
     WebSocketChannel socket,
   ) {
-    if (connectionGeneration != _connectionGeneration ||
+    if (_connectionGeneration.isStale(connectionGeneration) ||
         !identical(_ws, socket)) {
       return;
     }
@@ -262,7 +266,7 @@ class ReverbService {
         socketId: socketId,
         channelName: channelName,
       );
-      if (connectionGeneration != _connectionGeneration ||
+      if (_connectionGeneration.isStale(connectionGeneration) ||
           !identical(_ws, socket)) {
         return;
       }
@@ -285,7 +289,7 @@ class ReverbService {
     int connectionGeneration, [
     WebSocketChannel? socket,
   ]) {
-    if (connectionGeneration != _connectionGeneration ||
+    if (_connectionGeneration.isStale(connectionGeneration) ||
         (socket != null && !identical(_ws, socket))) {
       return;
     }
@@ -302,11 +306,11 @@ class ReverbService {
     _reconnectTimer = Timer(Duration(seconds: _retryDelay), () {
       if (_disposed ||
           _paused ||
-          connectionGeneration != _connectionGeneration) {
+          _connectionGeneration.isStale(connectionGeneration)) {
         return;
       }
       _retryDelay = (_retryDelay * 2).clamp(2, _maxRetryDelay);
-      unawaited(_connectOnce(++_connectionGeneration));
+      unawaited(_connectOnce(_connectionGeneration.advance()));
     });
   }
 
@@ -316,7 +320,7 @@ class ReverbService {
   /// [resume] rather than being permanently disabled.
   Future<void> pause() async {
     if (_disposed) return;
-    _connectionGeneration += 1;
+    _connectionGeneration.advance();
     _paused = true;
     _idleTimer?.cancel();
     _idleTimer = null;
@@ -340,12 +344,12 @@ class ReverbService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _retryDelay = 2;
-    await _connectOnce(++_connectionGeneration);
+    await _connectOnce(_connectionGeneration.advance());
   }
 
   /// Disconnects and prevents any further reconnect attempts.
   Future<void> disconnect() async {
-    _connectionGeneration += 1;
+    _connectionGeneration.advance();
     _disposed = true;
     _paused = false;
     _idleTimer?.cancel();
