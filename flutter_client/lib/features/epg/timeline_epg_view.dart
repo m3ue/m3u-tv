@@ -248,6 +248,10 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       }
       _rowHCtrls = _makeRowCtrls(widget.channels.length);
     }
+    if (widget.epgStartView != old.epgStartView) {
+      _initWindow();
+      WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
+    }
     final today = _dateOnly(widget.clock());
     final earliest = _offsetDate(today, -_maxCatchupDays);
     final latest = _offsetDate(today, widget.futureDays);

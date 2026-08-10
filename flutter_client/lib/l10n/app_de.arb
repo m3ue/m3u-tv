@@ -559,7 +559,7 @@
   "showsSearchError": "Suche fehlgeschlagen",
   "showsSearchHint": "Shows nach Titel suchen",
   "showsTitle": "Shows",
-  "showNotFound": "Show \"{title}\" nicht gefunden",
+  "showNotFound": "Show „{title}\" nicht gefunden",
   "@showNotFound": {
     "placeholders": {
       "title": {

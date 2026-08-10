@@ -89,13 +89,52 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   void initState() {
     super.initState();
     widget.favoritesService.addListener(_onFavoritesChanged);
+    _attachViewSettingsListener();
     unawaited(_initCategory());
+  }
+
+  @override
+  void didUpdateWidget(covariant LiveTvScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewSettingsService != widget.viewSettingsService) {
+      _detachViewSettingsListener(oldWidget.viewSettingsService);
+      _attachViewSettingsListener();
+      unawaited(_reloadViewSettings());
+    }
   }
 
   @override
   void dispose() {
     widget.favoritesService.removeListener(_onFavoritesChanged);
+    _detachViewSettingsListener(widget.viewSettingsService);
     super.dispose();
+  }
+
+  void _attachViewSettingsListener() {
+    widget.viewSettingsService?.addListener(_onViewSettingsChanged);
+  }
+
+  void _detachViewSettingsListener(ViewSettingsService? service) {
+    service?.removeListener(_onViewSettingsChanged);
+  }
+
+  void _onViewSettingsChanged() {
+    unawaited(_reloadViewSettings());
+  }
+
+  Future<void> _reloadViewSettings() async {
+    final viewSettings = widget.viewSettingsService;
+    if (viewSettings == null) return;
+    final results = await Future.wait([
+      viewSettings.liveTvLayout(),
+      viewSettings.epgStartView(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _viewMode = _layoutToViewMode(results[0] as LiveTvLayout);
+        _epgStartView = results[1] as EpgStartView;
+      });
+    }
   }
 
   void _onFavoritesChanged() {
@@ -106,15 +145,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final lastCat = await widget.favoritesService.getLastCategory();
     final viewSettings = widget.viewSettingsService;
     if (viewSettings != null) {
-      final results = await Future.wait([
-        viewSettings.liveTvLayout(),
-        viewSettings.epgStartView(),
-      ]);
+      await _reloadViewSettings();
       if (mounted) {
         setState(() {
           _selectedCategory = lastCat;
-          _viewMode = _layoutToViewMode(results[0] as LiveTvLayout);
-          _epgStartView = results[1] as EpgStartView;
         });
       }
     } else {

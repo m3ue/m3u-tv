@@ -1057,7 +1057,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String showNotFound(String title) {
-    return 'Show \"$title\" nicht gefunden';
+    return 'Show „$title\" nicht gefunden';
   }
 
   @override
