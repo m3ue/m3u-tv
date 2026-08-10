@@ -70,11 +70,17 @@ class TimelineEpgView extends StatefulWidget {
   /// every block, so the widget renders identically to the pre-#185
   /// version when no resolver is supplied. The caller (typically the
   /// EPG screen with the matching-logic index in scope) is responsible
-  /// for mapping a [DvrRecording] / series-rule record to each
-  /// [EpgProgram].
-  final EpgRecordingState Function(EpgProgram program) recordingStateFor;
+  /// for mapping a recording to each programme.
+  ///
+  /// Takes the [Channel] as well as the [EpgProgram] because the two carry
+  /// different notions of "channel id": [EpgProgram.channelId] is the EPG
+  /// (tvg) identifier, whereas a recording references the channel's database
+  /// id. Only the row's [Channel] has the latter, so the resolver needs both
+  /// to line a recording up with a block.
+  final EpgRecordingState Function(Channel channel, EpgProgram program)
+  recordingStateFor;
 
-  static EpgRecordingState _noRecordingState(EpgProgram _) =>
+  static EpgRecordingState _noRecordingState(Channel _, EpgProgram _) =>
       EpgRecordingState.none;
 
   /// How many hours the selected-day window spans (default 24).
@@ -411,7 +417,12 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     rowHeight: _kRowH,
                                     catchupRetentionDays: catchupRetentionDays,
                                     now: now,
-                                    recordingStateFor: widget.recordingStateFor,
+                                    // Curry the row's channel in: _ProgramsRow
+                                    // only sees programmes, but resolving a
+                                    // recording needs the channel's database
+                                    // id, which lives on the Channel.
+                                    recordingStateFor: (program) => widget
+                                        .recordingStateFor(channel, program),
                                     onTap: (program) {
                                       final canReplay = _canReplay(
                                         catchupRetentionDays,

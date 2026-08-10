@@ -49,7 +49,10 @@ void main() {
             epgService: epgService,
             onChannelSelect: (_) {},
             clock: () => now,
-            recordingStateFor: recordingStateFor,
+            // These cases vary by programme only, so drop the channel the
+            // widget now supplies and keep the per-programme resolvers below
+            // unchanged.
+            recordingStateFor: (_, program) => recordingStateFor(program),
           ),
         ),
       ),
