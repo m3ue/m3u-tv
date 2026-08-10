@@ -123,6 +123,11 @@ class TvNotificationStore {
     _serverChannelsCache = null;
   }
 
+  /// True while [owner] is still the current owner and [shouldCommit] (if
+  /// given) still agrees the caller may write.
+  bool _ownsMutation(String owner, [bool Function()? shouldCommit]) =>
+      _ownerKey == owner && (shouldCommit?.call() ?? true);
+
   /// The set of channel names the user wants to receive. Empty means all.
   Future<Set<String>> subscribedChannels() async {
     final owner = _ownerKey;
@@ -142,7 +147,7 @@ class TvNotificationStore {
   Future<void> setSubscribedChannels(Set<String> channels) => _mutate(() async {
     final owner = _ownerKey;
     if (owner == null) return;
-    bool ownsMutation() => _ownerKey == owner;
+    bool ownsMutation() => _ownsMutation(owner);
     final encoded = channels.toList(growable: false);
     final key = _ownedKey(_channelsKey, owner);
     final store = _store;
@@ -180,7 +185,7 @@ class TvNotificationStore {
   }) async {
     final owner = _ownerKey;
     if (owner == null) return;
-    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    bool ownsMutation() => _ownsMutation(owner, shouldCommit);
     final encoded = channels
         .map((c) => {'name': c.name, 'label': c.label})
         .toList(growable: false);
@@ -263,7 +268,7 @@ class TvNotificationStore {
   }) => _mutate(() async {
     final owner = _ownerKey;
     if (owner == null) return const <TvNotificationItem>[];
-    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    bool ownsMutation() => _ownsMutation(owner, shouldCommit);
     if (!ownsMutation()) {
       return const <TvNotificationItem>[];
     }
@@ -310,7 +315,7 @@ class TvNotificationStore {
   }) => _mutate(() async {
     final owner = _ownerKey;
     if (owner == null) return false;
-    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    bool ownsMutation() => _ownsMutation(owner, shouldCommit);
     if (!ownsMutation()) return false;
     final existing = await _allFor(owner);
     if (!ownsMutation()) return false;
@@ -341,7 +346,7 @@ class TvNotificationStore {
   }) => _mutate(() async {
     final owner = _ownerKey;
     if (owner == null) return;
-    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    bool ownsMutation() => _ownsMutation(owner, shouldCommit);
     if (!ownsMutation()) return;
     final existing = await _allFor(owner);
     if (!ownsMutation()) return;
@@ -366,8 +371,7 @@ class TvNotificationStore {
       _mutate(() async {
         final owner = _ownerKey;
         if (owner == null) return;
-        bool ownsMutation() =>
-            _ownerKey == owner && (shouldCommit?.call() ?? true);
+        bool ownsMutation() => _ownsMutation(owner, shouldCommit);
         if (!ownsMutation()) return;
         final existing = await _allFor(owner);
         if (!ownsMutation()) return;
@@ -392,7 +396,7 @@ class TvNotificationStore {
     List<StoredTvNotification> notifications, {
     bool Function()? shouldCommit,
   }) async {
-    bool ownsMutation() => _ownerKey == owner && (shouldCommit?.call() ?? true);
+    bool ownsMutation() => _ownsMutation(owner, shouldCommit);
     if (!ownsMutation()) return false;
     final encoded = notifications.map((n) => n.toJson()).toList();
     final key = _ownedKey(_key, owner);
