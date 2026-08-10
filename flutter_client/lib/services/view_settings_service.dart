@@ -37,15 +37,14 @@ enum EpgStartView {
 class ViewSettingsService extends ChangeNotifier {
   ViewSettingsService({
     Map<String, Object?>? memory,
-    PersistentJsonStore? store,
-  }) : _memory = memory ?? <String, Object?>{},
-       _store = store;
+    this.store,
+  }) : _memory = memory ?? <String, Object?>{};
 
   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
 
   final Map<String, Object?> _memory;
-  final PersistentJsonStore? _store;
+  final PersistentJsonStore? store;
 
   Future<LiveTvLayout> liveTvLayout() async {
     final raw = await _read(liveTvLayoutKey);
@@ -76,11 +75,13 @@ class ViewSettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Object?> _read(String key) async =>
-      _store == null ? _memory[key] : _store.read(key);
+  Future<Object?> _read(String key) async {
+    final store = this.store;
+    return store == null ? _memory[key] : store.read(key);
+  }
 
   Future<void> _write(String key, Object? value) async {
     _memory[key] = value;
-    await _store?.write(key, value);
+    await store?.write(key, value);
   }
 }
