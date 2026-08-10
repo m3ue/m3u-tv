@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
 typedef Clock = DateTime Function();
@@ -8,9 +9,10 @@ class EpgService extends ChangeNotifier {
     : _clock = clock ?? DateTime.now;
 
   final Clock _clock;
-  final Duration cacheTtl;
+  static const retryBackoff = Duration(minutes: 1);
+  Duration cacheTtl;
 
-  /// The service's notion of "now" — the injected [Clock] in tests, real
+  /// The service's notion of "now": the injected [Clock] in tests, real
   /// wall-clock time otherwise. Callers that need to reason about EPG
   /// program timing (e.g. "is this program still in the future") should use
   /// this instead of `DateTime.now()` directly, so they stay consistent with
@@ -19,6 +21,9 @@ class EpgService extends ChangeNotifier {
   final Map<String, List<EpgProgram>> _programsByChannel =
       <String, List<EpgProgram>>{};
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};
+  final Map<String, DateTime> _failedAtByChannel = <String, DateTime>{};
+  final Set<String> _fetchesInFlight = <String>{};
+  final Generation _sourceGeneration = Generation();
   DateTime? _loadedAt;
 
   void loadPrograms(List<EpgProgram> programs) {
@@ -49,6 +54,23 @@ class EpgService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applySuccessfulResponse(
+    Iterable<String> channelIds,
+    List<EpgProgram> programs, {
+    int? sourceGeneration,
+  }) {
+    if (sourceGeneration != null &&
+        _sourceGeneration.isStale(sourceGeneration)) {
+      return;
+    }
+    markFetched(channelIds);
+    mergePrograms(
+      programs,
+      channelIds: channelIds,
+      markFresh: false,
+    );
+  }
+
   /// Marks [channelIds] as freshly fetched even if the batch returned no
   /// programs for them, so [hasFreshDataForChannel] doesn't keep re-requesting
   /// channels that simply have no EPG data upstream.
@@ -57,7 +79,39 @@ class EpgService extends ChangeNotifier {
     for (final channelId in channelIds) {
       if (channelId.isEmpty) continue;
       _fetchedAtByChannel[channelId] = now;
+      _failedAtByChannel.remove(channelId);
+      _fetchesInFlight.remove(channelId);
     }
+  }
+
+  int markFetchStarted(Iterable<String> channelIds) {
+    _fetchesInFlight.addAll(
+      channelIds.where((channelId) => channelId.isNotEmpty),
+    );
+    return _sourceGeneration.current;
+  }
+
+  void markFetchFailed(
+    Iterable<String> channelIds, {
+    int? sourceGeneration,
+  }) {
+    if (sourceGeneration != null &&
+        _sourceGeneration.isStale(sourceGeneration)) {
+      return;
+    }
+    final now = _clock();
+    for (final channelId in channelIds) {
+      if (channelId.isEmpty) continue;
+      _fetchesInFlight.remove(channelId);
+      _failedAtByChannel[channelId] = now;
+    }
+  }
+
+  void invalidateSourceFetchState() {
+    _sourceGeneration.advance();
+    _fetchedAtByChannel.clear();
+    _failedAtByChannel.clear();
+    _fetchesInFlight.clear();
   }
 
   /// Whether any of [channel]'s known identifiers have been fetched within
@@ -74,6 +128,33 @@ class EpgService extends ChangeNotifier {
       }
     }
     return false;
+  }
+
+  bool shouldFetchDataForChannel(Channel channel) {
+    final ids = <String?>[channel.epgChannelId, channel.tvgName, channel.name];
+    return _shouldFetchData(ids);
+  }
+
+  bool shouldFetchData(String channelId) =>
+      _shouldFetchData(<String>[channelId]);
+
+  bool _shouldFetchData(Iterable<String?> ids) {
+    final now = _clock();
+    for (final id in ids) {
+      if (id == null || id.isEmpty) continue;
+      if (_fetchesInFlight.contains(id)) return false;
+      final failedAt = _failedAtByChannel[id];
+      if (failedAt != null) {
+        final elapsed = now.difference(failedAt);
+        if (!elapsed.isNegative && elapsed < retryBackoff) return false;
+        continue;
+      }
+      final fetchedAt = _fetchedAtByChannel[id];
+      if (fetchedAt != null && now.difference(fetchedAt) < cacheTtl) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _storePrograms(
@@ -155,6 +236,8 @@ class EpgService extends ChangeNotifier {
   void clear() {
     _programsByChannel.clear();
     _fetchedAtByChannel.clear();
+    _failedAtByChannel.clear();
+    _fetchesInFlight.clear();
     _loadedAt = null;
     notifyListeners();
   }

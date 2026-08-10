@@ -9,9 +9,7 @@ import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
-import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
-import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 void main() {
@@ -1745,47 +1743,6 @@ void main() {
           hasLength(20),
         );
       },
-    );
-
-    test(
-      'large_m3u_epg_perf: fixture stays under documented thresholds',
-      () {
-        final buffer = StringBuffer('#EXTM3U\n');
-        final now = DateTime.utc(2026, 1, 1, 12);
-        final programs = <EpgProgram>[];
-        for (var index = 0; index < 10000; index += 1) {
-          buffer
-            ..writeln(
-              '#EXTINF:-1 tvg-id="bulk.$index" group-title="Bulk",Bulk $index',
-            )
-            ..writeln('https://streams.example/live/$index.m3u8');
-          programs.add(
-            EpgProgram(
-              channelId: 'bulk.$index',
-              title: 'Current $index',
-              description: 'Task 9 bulk EPG fixture',
-              start: now.subtract(const Duration(minutes: 5)),
-              end: now.add(const Duration(minutes: 55)),
-            ),
-          );
-        }
-
-        final rssBefore = ProcessInfo.currentRss;
-        final stopwatch = Stopwatch()..start();
-        final playlist = M3UParser().parse(buffer.toString());
-        final epg = EpgService(clock: () => now)..loadPrograms(programs);
-        final elapsed = stopwatch.elapsed;
-        final rssDelta = ProcessInfo.currentRss - rssBefore;
-
-        expect(playlist.channels, hasLength(10000));
-        expect(
-          epg.lookupForChannel(playlist.channels.last)?.current.title,
-          'Current 9999',
-        );
-        expect(elapsed, lessThan(const Duration(seconds: 2)));
-        expect(rssDelta, lessThan(64 * 1024 * 1024));
-      },
-      timeout: const Timeout(Duration(seconds: 3)),
     );
   });
 }

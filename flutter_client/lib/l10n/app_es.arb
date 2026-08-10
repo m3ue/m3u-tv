@@ -156,6 +156,7 @@
   "settingsFillAllFields": "Por favor completa todos los campos",
   "settingsConnectionSettings": "Configuración de conexión",
   "settingsConnectionSettingsSubtitle": "Ingresa los datos de tu Xtream Codes",
+  "settingsConnectionSettingsHelp": "Usa los datos de conexión Xtream de la lista de reproducción de m3u-editor, no tu inicio de sesión web de m3u-editor. Necesitas la URL del servidor, el nombre de usuario Xtream y la contraseña Xtream.",
   "settingsServerUrl": "URL del servidor",
   "settingsUsername": "Usuario",
   "settingsPassword": "Contraseña",
@@ -568,5 +569,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsView": "Vista",
+  "settingsLiveTvLayout": "Diseño de TV en vivo",
+  "settingsLiveTvLayoutList": "Lista",
+  "settingsLiveTvLayoutGrid": "Cuadrícula",
+  "settingsLiveTvLayoutTimeline": "Línea temporal",
+  "settingsEpgStartView": "La guía empieza a las",
+  "settingsEpgStartViewCurrentTime": "Hora actual",
+  "settingsEpgStartViewPrimeTime": "Horario estelar"
 }

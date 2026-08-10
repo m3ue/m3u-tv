@@ -392,6 +392,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsConnectionSettingsSubtitle => '输入您的 Xtream Codes 信息';
 
   @override
+  String get settingsConnectionSettingsHelp =>
+      '请使用 m3u-editor 播放列表的 Xtream 连接信息，而不是 m3u-editor 网页登录账号。您需要服务器地址、Xtream 用户名和 Xtream 密码。';
+
+  @override
   String get settingsServerUrl => '服务器地址';
 
   @override
@@ -1040,4 +1044,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String showNotFound(String title) {
     return '未找到剧集“$title”';
   }
+
+  @override
+  String get settingsView => '视图';
+
+  @override
+  String get settingsLiveTvLayout => '直播电视布局';
+
+  @override
+  String get settingsLiveTvLayoutList => '列表';
+
+  @override
+  String get settingsLiveTvLayoutGrid => '网格';
+
+  @override
+  String get settingsLiveTvLayoutTimeline => '时间线';
+
+  @override
+  String get settingsEpgStartView => '节目单起始时间';
+
+  @override
+  String get settingsEpgStartViewCurrentTime => '当前时间';
+
+  @override
+  String get settingsEpgStartViewPrimeTime => '黄金时段';
 }

@@ -84,6 +84,7 @@ void main() {
 
     test('concurrent duplicate receipts report one insertion', () async {
       final store = TvNotificationStore(memory: <String, Object?>{});
+      _selectFixtureOwner(store);
       final item = _item(id: _notificationId, channel: 'general');
 
       final inserted = await Future.wait<bool>(<Future<bool>>[
@@ -98,6 +99,7 @@ void main() {
     test('restores the admin-only flag from persisted notifications', () async {
       final memory = <String, Object?>{};
       final store = TvNotificationStore(memory: memory);
+      _selectFixtureOwner(store);
       await store.add(
         const TvNotificationItem(
           id: _notificationId,
@@ -108,10 +110,158 @@ void main() {
         ),
       );
 
-      final restored = await TvNotificationStore(memory: memory).all();
+      final restarted = TvNotificationStore(memory: memory);
+      _selectFixtureOwner(restarted);
+      final restored = await restarted.all();
 
       expect(restored.single.item.adminOnly, isTrue);
     });
+
+    test('legacy unowned notification data fails closed', () async {
+      final store = TvNotificationStore(
+        memory: <String, Object?>{
+          'm3ue_tv_notifications': <Map<String, Object?>>[
+            <String, Object?>{
+              'id': _notificationId,
+              'channel': 'general',
+              'title': 'Legacy private title',
+              'body': 'Legacy private body',
+              'status': 'warning',
+              'admin_only': true,
+              'received_at': DateTime.now().toIso8601String(),
+              'is_read': false,
+            },
+          ],
+          'm3ue_tv_notification_channels': <String>['general'],
+          'm3ue_tv_server_channels': <Map<String, Object?>>[
+            <String, Object?>{'name': 'general', 'label': 'General'},
+          ],
+        },
+      );
+      _selectFixtureOwner(store);
+
+      expect(await store.all(), isEmpty);
+      expect(await store.subscribedChannels(), isEmpty);
+      expect(await store.knownChannels(), isEmpty);
+    });
+
+    test(
+      'same-server accounts with the same playlist identity stay isolated',
+      () async {
+        final memory = <String, Object?>{};
+        final accountAStore = TvNotificationStore(memory: memory);
+        final accountA = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'account-a',
+              title: 'Account A private notification',
+            ),
+          ]),
+          store: accountAStore,
+        );
+        addTearDown(accountA.dispose);
+
+        await accountA.reconcileNotifications();
+        await accountAStore.setSubscribedChannels(<String>{'account-a'});
+        await accountAStore.setServerChannels(const <TvNotificationChannel>[
+          TvNotificationChannel(name: 'account-a', label: 'Account A'),
+        ]);
+
+        final accountBStore = TvNotificationStore(memory: memory);
+        final accountB = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'account-b',
+              title: 'Account B private notification',
+            ),
+          ]),
+          store: accountBStore,
+          credentials: _otherCredentials,
+        );
+        addTearDown(accountB.dispose);
+
+        await accountB.reconcileNotifications();
+
+        expect(
+          (await accountBStore.all()).single.item.title,
+          'Account B private notification',
+        );
+        expect(await accountBStore.subscribedChannels(), isEmpty);
+        expect(
+          (await accountBStore.knownChannels()).map((channel) => channel.name),
+          <String>['account-b'],
+        );
+        await accountBStore.setSubscribedChannels(<String>{'account-b'});
+        await accountBStore.setServerChannels(const <TvNotificationChannel>[
+          TvNotificationChannel(name: 'account-b', label: 'Account B'),
+        ]);
+
+        const rotatedCredentials = UserCredentials(
+          server: 'https://fixture.invalid',
+          username: 'requester-one',
+          password: 'rotated-private-value',
+        );
+        final restoredStore = TvNotificationStore(memory: memory);
+        final restoredAccountA = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'account-a',
+              title: 'Account A private notification',
+            ),
+          ]),
+          store: restoredStore,
+          credentials: rotatedCredentials,
+        );
+        addTearDown(restoredAccountA.dispose);
+
+        await restoredAccountA.reconcileNotifications();
+
+        expect(
+          (await restoredStore.all()).single.item.title,
+          'Account A private notification',
+        );
+        expect(await restoredStore.subscribedChannels(), <String>{'account-a'});
+        expect(
+          (await restoredStore.knownChannels()).map((channel) => channel.name),
+          <String>['account-a'],
+        );
+        expect(memory.toString(), isNot(contains(_credentials.password)));
+        expect(memory.toString(), isNot(contains(rotatedCredentials.password)));
+
+        final restoredAccountBStore = TvNotificationStore(memory: memory);
+        final restoredAccountB = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'account-b',
+              title: 'Account B private notification',
+            ),
+          ]),
+          store: restoredAccountBStore,
+          credentials: _otherCredentials,
+        );
+        addTearDown(restoredAccountB.dispose);
+
+        await restoredAccountB.reconcileNotifications();
+
+        expect(
+          (await restoredAccountBStore.all()).single.item.title,
+          'Account B private notification',
+        );
+        expect(await restoredAccountBStore.subscribedChannels(), <String>{
+          'account-b',
+        });
+        expect(
+          (await restoredAccountBStore.knownChannels()).map(
+            (channel) => channel.name,
+          ),
+          <String>['account-b'],
+        );
+      },
+    );
   });
 
   group('notification activation', () {
@@ -388,6 +538,46 @@ void main() {
       expect(await requester.notificationStore.all(), hasLength(1));
       expect(await other.notificationStore.all(), isEmpty);
     });
+
+    test(
+      'activation store ownership includes the same-server account',
+      () async {
+        final memory = <String, Object?>{};
+        final accountAStore = TvNotificationStore(memory: memory);
+        final accountA = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'general',
+              title: 'Account A activation',
+            ),
+          ]),
+          store: accountAStore,
+        );
+        final accountBStore = TvNotificationStore(memory: memory);
+        final accountB = _controller(
+          _FakeTvNotificationService(<TvNotificationItem>[
+            _item(
+              id: _notificationId,
+              channel: 'general',
+              title: 'Account B activation',
+            ),
+          ]),
+          store: accountBStore,
+          credentials: _otherCredentials,
+        );
+        addTearDown(accountA.dispose);
+        addTearDown(accountB.dispose);
+
+        await accountA.handleNotificationActivation(_notificationId);
+        await accountB.handleNotificationActivation(_notificationId);
+
+        expect(
+          (await accountBStore.all()).single.item.title,
+          'Account B activation',
+        );
+      },
+    );
   });
 }
 
@@ -403,14 +593,17 @@ const _otherCredentials = UserCredentials(
   password: 'other-private-value',
 );
 
-TvNotificationItem _item({required String id, required String channel}) =>
-    TvNotificationItem(
-      id: id,
-      channel: channel,
-      title: 'Authoritative title',
-      body: 'Authoritative body',
-      status: 'info',
-    );
+TvNotificationItem _item({
+  required String id,
+  required String channel,
+  String title = 'Authoritative title',
+}) => TvNotificationItem(
+  id: id,
+  channel: channel,
+  title: title,
+  body: 'Authoritative body',
+  status: 'info',
+);
 
 AppStateController _controller(
   _FakeTvNotificationService api, {
@@ -477,4 +670,26 @@ class _FakeTvNotificationService extends TvNotificationService {
       unread,
     );
   }
+}
+
+void _selectFixtureOwner(TvNotificationStore store) {
+  expect(
+    store.selectOwner(
+      server: _credentials.server,
+      accountPrincipal: _credentials.username,
+      session: const TvPlaylistSession(
+        notifiableId: 1,
+        notifiableType: 'playlist',
+        isAdmin: false,
+        channelName: '',
+        reverb: ReverbConfig(
+          host: 'fixture.invalid',
+          port: 443,
+          scheme: 'wss',
+          appKey: '',
+        ),
+      ),
+    ),
+    isTrue,
+  );
 }

@@ -15,10 +15,24 @@ class ResumeService {
   final PersistentJsonStore? _store;
   final Duration promptThreshold;
 
-  Future<void> save(Progress progress) async {
+  Future<bool> save(
+    Progress progress, {
+    bool Function()? shouldCommit,
+  }) async {
     final key = _keyForProgress(progress);
+    if (shouldCommit != null) {
+      final store = _store;
+      if (store != null &&
+          !await store.writeIf(key, progress.toJson(), shouldCommit)) {
+        return false;
+      }
+      if (!shouldCommit()) return false;
+      _memory[key] = progress;
+      return true;
+    }
     _memory[key] = progress;
     await _store?.write(key, progress.toJson());
+    return true;
   }
 
   Future<Progress?> load(

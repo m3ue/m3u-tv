@@ -1,12 +1,19 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 void main() {
   group('LiveTvScreen', () {
@@ -342,7 +349,313 @@ void main() {
         expect(find.byKey(const Key('recording-dot')), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'bootstrap layout mapping loads list, grid and timeline correctly',
+      (tester) async {
+        for (final layout in LiveTvLayout.values) {
+          final service = ViewSettingsService(memory: <String, Object?>{});
+          await service.setLiveTvLayout(layout);
+
+          await tester.pumpWidget(
+            _TestApp(
+              channels: testChannels,
+              categories: testCategories,
+              viewSettingsService: service,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          switch (layout) {
+            case LiveTvLayout.list:
+              expect(
+                find.byKey(const ValueKey('timeline-previous-day')),
+                findsNothing,
+              );
+            case LiveTvLayout.grid:
+              expect(find.byType(ScrollbarGridView), findsOneWidget);
+            case LiveTvLayout.timeline:
+              expect(
+                find.byKey(const ValueKey('timeline-previous-day')),
+                findsOneWidget,
+              );
+          }
+        }
+      },
+    );
+
+    testWidgets(
+      'migrates legacy favorites-service layout into a fresh view settings service',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.setLastViewMode('epgGrid');
+        final service = ViewSettingsService(memory: <String, Object?>{});
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            favoritesService: favoritesService,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        expect(await service.liveTvLayout(), LiveTvLayout.timeline);
+      },
+    );
+
+    testWidgets(
+      'replacement view settings service is picked up while screen is mounted',
+      (tester) async {
+        final firstService = ViewSettingsService(memory: <String, Object?>{});
+        await firstService.setLiveTvLayout(LiveTvLayout.list);
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: firstService,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsNothing,
+        );
+
+        final secondService = ViewSettingsService(memory: <String, Object?>{});
+        await secondService.setLiveTvLayout(LiveTvLayout.timeline);
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: secondService,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'retained screen updates view mode when view settings change while mounted',
+      (tester) async {
+        final service = ViewSettingsService(memory: <String, Object?>{});
+        await service.setLiveTvLayout(LiveTvLayout.list);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // List view renders channel rows; timeline day controls are absent.
+        expect(find.text('BBC One'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsNothing,
+        );
+
+        await service.setLiveTvLayout(LiveTvLayout.timeline);
+        await tester.pumpAndSettle();
+
+        // Timeline view renders day controls instead of list rows.
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'retained screen updates EPG start view when settings change while mounted',
+      (tester) async {
+        final service = ViewSettingsService(memory: <String, Object?>{});
+        await service.setLiveTvLayout(LiveTvLayout.timeline);
+        await service.setEpgStartView(EpgStartView.currentTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final currentOffset = _timelineHorizontalOffset(tester);
+
+        await service.setEpgStartView(EpgStartView.primeTime);
+        await tester.pumpAndSettle();
+
+        final primeOffset = _timelineHorizontalOffset(tester);
+        expect(primeOffset, isNot(currentOffset));
+      },
+    );
+    testWidgets('stale reload from replaced service is ignored', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp(
+          'live_tv_view_settings',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+
+        final firstFile = File('${dir.path}/service_a.json');
+        final secondFile = File('${dir.path}/service_b.json');
+
+        final slowStoreA = _SlowPersistentJsonStore(
+          file: firstFile,
+          readDelay: const Duration(milliseconds: 100),
+        );
+        final serviceA = ViewSettingsService(store: slowStoreA);
+        await serviceA.setLiveTvLayout(LiveTvLayout.list);
+        await serviceA.setEpgStartView(EpgStartView.currentTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: serviceA,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final storeB = PersistentJsonStore(file: secondFile);
+        final serviceB = ViewSettingsService(store: storeB);
+        await serviceB.setLiveTvLayout(LiveTvLayout.timeline);
+        await serviceB.setEpgStartView(EpgStartView.primeTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: serviceB,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        final primeOffset = _timelineHorizontalOffset(tester);
+
+        // Let service A's delayed read finish after B has already won.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        expect(_timelineHorizontalOffset(tester), primeOffset);
+      });
+    });
+
+    testWidgets('stale reload after rapid view settings updates is ignored', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp(
+          'live_tv_view_settings',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+
+        final slowStore = _SlowPersistentJsonStore(
+          file: File('${dir.path}/store.json'),
+        );
+        final service = ViewSettingsService(store: slowStore);
+        await service.setLiveTvLayout(LiveTvLayout.list);
+        await service.setEpgStartView(EpgStartView.currentTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Queue two rapid changes while reads are held; only the latest wins.
+        slowStore.holdReads();
+        final firstLayout = service.setLiveTvLayout(LiveTvLayout.grid);
+        final secondLayout = service.setLiveTvLayout(LiveTvLayout.timeline);
+        final firstEpg = service.setEpgStartView(EpgStartView.primeTime);
+        await Future.wait([firstLayout, secondLayout, firstEpg]);
+        slowStore.releaseReads();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+      });
+    });
   });
+}
+
+class _SlowPersistentJsonStore extends PersistentJsonStore {
+  _SlowPersistentJsonStore({
+    required super.file,
+    this.readDelay = Duration.zero,
+  });
+
+  final Duration readDelay;
+  final _pending = <Completer<void>>[];
+  var _hold = false;
+
+  void holdReads() => _hold = true;
+
+  void releaseReads() {
+    _hold = false;
+    for (final completer in _pending) {
+      completer.complete();
+    }
+    _pending.clear();
+  }
+
+  @override
+  Future<Object?> read(String key) async {
+    if (_hold) {
+      final completer = Completer<void>();
+      _pending.add(completer);
+      await completer.future;
+    }
+    if (readDelay > Duration.zero) {
+      await Future<void>.delayed(readDelay);
+    }
+    return super.read(key);
+  }
+}
+
+Scrollable _timelineHorizontalOffsetRow(WidgetTester tester) {
+  return tester.widget<Scrollable>(
+    find
+        .descendant(
+          of: find.byType(TimelineEpgView),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+          ),
+        )
+        .first,
+  );
+}
+
+double _timelineHorizontalOffset(WidgetTester tester) {
+  return _timelineHorizontalOffsetRow(tester).controller!.offset;
 }
 
 class _TestApp extends StatelessWidget {
@@ -352,6 +665,7 @@ class _TestApp extends StatelessWidget {
     this.isLoading = false,
     this.isConfigured = true,
     this.favoritesService,
+    this.viewSettingsService,
     this.epgService,
     this.onChannelSelect,
     this.onChannelContextChanged,
@@ -364,6 +678,7 @@ class _TestApp extends StatelessWidget {
   final bool isLoading;
   final bool isConfigured;
   final FavoritesService? favoritesService;
+  final ViewSettingsService? viewSettingsService;
   final EpgService? epgService;
   final void Function(Channel)? onChannelSelect;
   final void Function(List<Channel>)? onChannelContextChanged;
@@ -395,6 +710,7 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         home: LiveTvScreen(
           favoritesService: favoritesService ?? FavoritesService(),
+          viewSettingsService: viewSettingsService,
           onChannelSelect: onChannelSelect ?? (_) {},
           onChannelContextChanged: onChannelContextChanged,
           onScheduleProgram: onScheduleProgram,

@@ -331,12 +331,28 @@ GoRouter createGoRouter({
                     pageBuilder: (context, state) {
                       final result = state.extra! as ContentRequestSearchResult;
                       final actions = ContentActions.of(context);
+                      final requestOwner = actions.appState.mediaRequestOwner;
                       return _slidePage(
                         ListenableBuilder(
                           listenable: actions.appState,
                           builder: (ctx, _) => RequestDetailScreen(
                             result: result,
-                            onSubmit: actions.appState.submitContentRequest,
+                            isOwnerCurrent:
+                                actions.appState.mediaRequestOwner ==
+                                requestOwner,
+                            onSubmit:
+                                ({
+                                  required type,
+                                  required integrationId,
+                                  required externalId,
+                                  seasons,
+                                }) => actions.appState.submitContentRequest(
+                                  type: type,
+                                  integrationId: integrationId,
+                                  externalId: externalId,
+                                  seasons: seasons,
+                                  requestOwner: requestOwner,
+                                ),
                           ),
                         ),
                       );

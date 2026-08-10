@@ -21,6 +21,7 @@ class RequestDetailScreen extends ConsumerStatefulWidget {
     super.key,
     required this.result,
     required this.onSubmit,
+    this.isOwnerCurrent = true,
   });
 
   final ContentRequestSearchResult result;
@@ -31,6 +32,7 @@ class RequestDetailScreen extends ConsumerStatefulWidget {
     List<int>? seasons,
   })
   onSubmit;
+  final bool isOwnerCurrent;
 
   @override
   ConsumerState<RequestDetailScreen> createState() =>
@@ -75,6 +77,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
   }
 
   Future<void> _submit() async {
+    if (!widget.isOwnerCurrent) return;
     final l = AppLocalizations.of(context);
     final result = widget.result;
     setState(() => _isSubmitting = true);
@@ -110,6 +113,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isOwnerCurrent) return const SizedBox.shrink();
     final myRequests = ref.watch(mediaRequestsProvider);
     final existing = myRequests
         .where(

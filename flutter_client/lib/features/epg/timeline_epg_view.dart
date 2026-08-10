@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
@@ -46,6 +47,7 @@ class TimelineEpgView extends StatefulWidget {
     this.windowHours = 24,
     this.futureDays = 7,
     this.clock = DateTime.now,
+    this.epgStartView = EpgStartView.currentTime,
   });
 
   final List<Channel> channels;
@@ -87,6 +89,7 @@ class TimelineEpgView extends StatefulWidget {
   final int windowHours;
   final int futureDays;
   final Clock clock;
+  final EpgStartView epgStartView;
 
   @override
   State<TimelineEpgView> createState() => _TimelineEpgViewState();
@@ -116,7 +119,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
     _rowHCtrls = _makeRowCtrls(widget.channels.length);
     _leftVCtrl.addListener(_onLeftV);
     _rightVCtrl.addListener(_onRightV);
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToNow);
+    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
   }
 
   void _initWindow() {
@@ -128,37 +131,44 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
       widget.windowHours,
     );
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
-    _nowOffset = _computeNowOffset();
+    _nowOffset = _computeStartOffset();
   }
 
-  double _computeNowOffset() {
+  double _computeStartOffset() {
     final now = widget.clock();
-    final anchor = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      now.hour,
-      now.minute,
-    );
-    final nowOffset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
-    return math.max(0, nowOffset - 80.0).toDouble();
+    final anchor = switch (widget.epgStartView) {
+      EpgStartView.primeTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        20,
+      ),
+      EpgStartView.currentTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        now.hour,
+        now.minute,
+      ),
+    };
+    final offset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
+    return math.max(0, offset - 80.0).toDouble();
   }
 
   // Rows are built lazily by ListView.builder as they scroll into view, so a
-  // row's ScrollController may attach long after the "now" jump below has
-  // already run. Baking the target into initialScrollOffset means a
-  // late-attaching row still lands on the current time instead of 12am.
+  // row's ScrollController may attach long after the scroll-to-start jump
+  // below has already run. Baking the target into initialScrollOffset means
+  // a late-attaching row still lands on the right offset instead of 12am.
   List<ScrollController> _makeRowCtrls(int count) => List.generate(
     count,
     (_) => ScrollController(initialScrollOffset: _nowOffset),
   );
 
-  void _scrollToNow(_) {
+  void _scrollToStart(_) {
     if (!mounted) return;
-    final target = _computeNowOffset();
     for (final c in [_headerHCtrl, ..._rowHCtrls]) {
       if (c.hasClients) {
-        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent));
+        c.jumpTo(_nowOffset.clamp(0.0, c.position.maxScrollExtent));
       }
     }
   }
@@ -194,7 +204,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
         _initWindow();
       });
     }
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToNow);
+    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
   }
 
   void _onLeftV() {
@@ -235,6 +245,10 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
         c.dispose();
       }
       _rowHCtrls = _makeRowCtrls(widget.channels.length);
+    }
+    if (widget.epgStartView != old.epgStartView) {
+      _initWindow();
+      WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
     }
     final today = _dateOnly(widget.clock());
     final earliest = _offsetDate(today, -_maxCatchupDays);

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -44,6 +45,7 @@ class ReverbService {
   bool _connected = false;
   bool _hasConnectedBefore = false;
   int _retryDelay = 2;
+  final Generation _connectionGeneration = Generation();
   int _activityTimeoutSeconds = 30;
 
   static const int _maxRetryDelay = 60;
@@ -63,6 +65,18 @@ class ReverbService {
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
     void Function()? onConnected,
   }) async {
+    final connectionGeneration = _connectionGeneration.advance();
+    final previousSubscription = _sub;
+    final previousSocket = _ws;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _pongTimer?.cancel();
+    _pongTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _sub = null;
+    _ws = null;
+    _connected = false;
     _session = session;
     _credentials = credentials;
     _subscribedChannels = subscribedChannels;
@@ -75,31 +89,47 @@ class ReverbService {
     _paused = false;
     _hasConnectedBefore = true;
     _retryDelay = 2;
-    await _connectOnce();
+    await previousSubscription?.cancel();
+    await previousSocket?.sink.close();
+    if (_connectionGeneration.isStale(connectionGeneration)) return;
+    await _connectOnce(connectionGeneration);
   }
 
-  Future<void> _connectOnce() async {
-    if (_disposed) return;
+  Future<void> _connectOnce(int connectionGeneration) async {
+    if (_disposed || _connectionGeneration.isStale(connectionGeneration)) {
+      return;
+    }
 
     final session = _session;
     final creds = _credentials;
 
     try {
-      _ws = _channelFactory(session.reverb.wsUri);
+      final socket = _channelFactory(session.reverb.wsUri);
+      if (_connectionGeneration.isStale(connectionGeneration)) {
+        await socket.sink.close();
+        return;
+      }
+      _ws = socket;
       _connected = false;
 
-      _sub = _ws!.stream.listen(
+      _sub = socket.stream.listen(
         (raw) {
-          _onMessage(raw as String, session, creds);
-          _resetIdleTimer();
+          _onMessage(
+            raw as String,
+            session,
+            creds,
+            connectionGeneration,
+            socket,
+          );
+          _resetIdleTimer(connectionGeneration, socket);
         },
-        onError: (_) => _scheduleReconnect(),
-        onDone: _scheduleReconnect,
+        onError: (_) => _scheduleReconnect(connectionGeneration, socket),
+        onDone: () => _scheduleReconnect(connectionGeneration, socket),
         cancelOnError: true,
       );
-      _resetIdleTimer();
+      _resetIdleTimer(connectionGeneration, socket);
     } on Object catch (_) {
-      _scheduleReconnect();
+      _scheduleReconnect(connectionGeneration);
     }
   }
 
@@ -110,23 +140,37 @@ class ReverbService {
   /// how long they may go without a message before they're expected to ping.
   /// If nothing at all arrives within that window — not even the server's own
   /// keep-alive — [_sendPing] probes the connection explicitly.
-  void _resetIdleTimer() {
+  void _resetIdleTimer(
+    int connectionGeneration,
+    WebSocketChannel socket,
+  ) {
+    if (_connectionGeneration.isStale(connectionGeneration) ||
+        !identical(_ws, socket)) {
+      return;
+    }
     _pongTimer?.cancel();
     _pongTimer = null;
     _idleTimer?.cancel();
-    _idleTimer = Timer(Duration(seconds: _activityTimeoutSeconds), _sendPing);
+    _idleTimer = Timer(
+      Duration(seconds: _activityTimeoutSeconds),
+      () => _sendPing(connectionGeneration, socket),
+    );
   }
 
   /// Probes a silent connection. If nothing (not even a reply to this ping)
   /// arrives within the grace period, the socket is a zombie the transport
   /// never reported as closed (e.g. after a laptop sleep/wake or a dropped
   /// Wi-Fi hop) — force a reconnect rather than waiting on it forever.
-  void _sendPing() {
-    _send({'event': 'pusher:ping', 'data': {}});
+  void _sendPing(int connectionGeneration, WebSocketChannel socket) {
+    if (_connectionGeneration.isStale(connectionGeneration) ||
+        !identical(_ws, socket)) {
+      return;
+    }
+    _send(socket, {'event': 'pusher:ping', 'data': {}});
     _pongTimer?.cancel();
     _pongTimer = Timer(
       const Duration(seconds: _pongGraceSeconds),
-      _scheduleReconnect,
+      () => _scheduleReconnect(connectionGeneration, socket),
     );
   }
 
@@ -134,7 +178,13 @@ class ReverbService {
     String raw,
     TvPlaylistSession session,
     UserCredentials creds,
+    int connectionGeneration,
+    WebSocketChannel socket,
   ) {
+    if (_connectionGeneration.isStale(connectionGeneration) ||
+        !identical(_ws, socket)) {
+      return;
+    }
     final Map<String, Object?> msg;
     try {
       msg = (jsonDecode(raw) as Map).cast<String, Object?>();
@@ -153,11 +203,19 @@ class ReverbService {
           _activityTimeoutSeconds = activityTimeout;
         }
         if (socketId.isNotEmpty) {
-          unawaited(_authenticate(session, creds, socketId));
+          unawaited(
+            _authenticate(
+              session,
+              creds,
+              socketId,
+              connectionGeneration,
+              socket,
+            ),
+          );
         }
 
       case 'pusher:ping':
-        _send({'event': 'pusher:pong', 'data': {}});
+        _send(socket, {'event': 'pusher:pong', 'data': {}});
 
       case 'pusher_internal:subscription_succeeded':
         _connected = true;
@@ -197,6 +255,8 @@ class ReverbService {
     TvPlaylistSession session,
     UserCredentials creds,
     String socketId,
+    int connectionGeneration,
+    WebSocketChannel socket,
   ) async {
     final channelName = session.channelName;
     try {
@@ -205,22 +265,33 @@ class ReverbService {
         socketId: socketId,
         channelName: channelName,
       );
-      _send({
+      if (_connectionGeneration.isStale(connectionGeneration) ||
+          !identical(_ws, socket)) {
+        return;
+      }
+      _send(socket, {
         'event': 'pusher:subscribe',
         'data': {'auth': auth, 'channel': channelName},
       });
     } on Object catch (_) {
-      _scheduleReconnect();
+      _scheduleReconnect(connectionGeneration, socket);
     }
   }
 
-  void _send(Map<String, Object?> payload) {
+  void _send(WebSocketChannel socket, Map<String, Object?> payload) {
     try {
-      _ws?.sink.add(jsonEncode(payload));
+      socket.sink.add(jsonEncode(payload));
     } on Object catch (_) {}
   }
 
-  void _scheduleReconnect() {
+  void _scheduleReconnect(
+    int connectionGeneration, [
+    WebSocketChannel? socket,
+  ]) {
+    if (_connectionGeneration.isStale(connectionGeneration) ||
+        (socket != null && !identical(_ws, socket))) {
+      return;
+    }
     _idleTimer?.cancel();
     _idleTimer = null;
     _pongTimer?.cancel();
@@ -232,9 +303,13 @@ class ReverbService {
     if (_disposed || _paused) return;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(seconds: _retryDelay), () {
-      if (_disposed || _paused) return;
+      if (_disposed ||
+          _paused ||
+          _connectionGeneration.isStale(connectionGeneration)) {
+        return;
+      }
       _retryDelay = (_retryDelay * 2).clamp(2, _maxRetryDelay);
-      unawaited(_connectOnce());
+      unawaited(_connectOnce(_connectionGeneration.advance()));
     });
   }
 
@@ -244,6 +319,7 @@ class ReverbService {
   /// [resume] rather than being permanently disabled.
   Future<void> pause() async {
     if (_disposed) return;
+    _connectionGeneration.advance();
     _paused = true;
     _idleTimer?.cancel();
     _idleTimer = null;
@@ -267,11 +343,12 @@ class ReverbService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _retryDelay = 2;
-    await _connectOnce();
+    await _connectOnce(_connectionGeneration.advance());
   }
 
   /// Disconnects and prevents any further reconnect attempts.
   Future<void> disconnect() async {
+    _connectionGeneration.advance();
     _disposed = true;
     _paused = false;
     _idleTimer?.cancel();

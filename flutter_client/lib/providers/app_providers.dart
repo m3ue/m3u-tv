@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart'
     show TvNotificationItem;
 import 'package:m3u_tv/services/tv_notification_store.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart' show RequestsCapability;
 
 // ---------------------------------------------------------------------------
@@ -178,8 +179,14 @@ final notificationStoreProvider = Provider<TvNotificationStore>((ref) {
 // Exposes the live notification broadcast stream so screens can subscribe
 // directly in initState — bypasses Riverpod change-detection timing issues
 // with ChangeNotifierProvider when the widget hasn't been built yet.
-final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>((
-  ref,
-) {
-  return ref.read(appStateControllerProvider).appState.tvNotifications;
+final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>(
+  (ref) {
+    return ref.read(appStateControllerProvider).appState.tvNotifications;
+  },
+);
+
+/// Exposes the persisted view settings service so settings and feature screens
+/// can read and update layout preferences without touching credentials.
+final viewSettingsServiceProvider = Provider<ViewSettingsService>((ref) {
+  return ref.read(appStateControllerProvider).appState.viewSettingsService;
 });

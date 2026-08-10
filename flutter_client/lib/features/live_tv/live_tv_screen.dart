@@ -10,6 +10,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
@@ -31,6 +32,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     super.key,
     required this.favoritesService,
     required this.onChannelSelect,
+    this.viewSettingsService,
     this.onChannelContextChanged,
     this.onCatchupProgramSelect,
     this.onSidebarActivate,
@@ -42,6 +44,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   });
 
   final FavoritesService favoritesService;
+  final ViewSettingsService? viewSettingsService;
   final void Function(Channel) onChannelSelect;
 
   /// Called with the filtered channel list (category/favorites/search) right
@@ -81,18 +84,72 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   Set<int> _favoriteIds = {};
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
+  EpgStartView _epgStartView = EpgStartView.currentTime;
+  int _viewSettingsGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     widget.favoritesService.addListener(_onFavoritesChanged);
+    _attachViewSettingsListener();
     unawaited(_initCategory());
+  }
+
+  @override
+  void didUpdateWidget(covariant LiveTvScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewSettingsService != widget.viewSettingsService) {
+      _viewSettingsGeneration++;
+      _detachViewSettingsListener(oldWidget.viewSettingsService);
+      _attachViewSettingsListener();
+      unawaited(_reloadViewSettings());
+    }
   }
 
   @override
   void dispose() {
     widget.favoritesService.removeListener(_onFavoritesChanged);
+    _detachViewSettingsListener(widget.viewSettingsService);
     super.dispose();
+  }
+
+  void _attachViewSettingsListener() {
+    widget.viewSettingsService?.addListener(_onViewSettingsChanged);
+  }
+
+  void _detachViewSettingsListener(ViewSettingsService? service) {
+    service?.removeListener(_onViewSettingsChanged);
+  }
+
+  void _onViewSettingsChanged() {
+    _viewSettingsGeneration++;
+    unawaited(_reloadViewSettings());
+  }
+
+  Future<void> _reloadViewSettings() async {
+    final generation = _viewSettingsGeneration;
+    final loaded = await _loadViewSettings();
+    if (loaded == null || !mounted || generation != _viewSettingsGeneration) {
+      return;
+    }
+    setState(() {
+      _viewMode = _layoutToViewMode(loaded.layout);
+      _epgStartView = loaded.epgStartView;
+    });
+  }
+
+  Future<({LiveTvLayout layout, EpgStartView epgStartView})?>
+  _loadViewSettings() async {
+    final viewSettings = widget.viewSettingsService;
+    if (viewSettings == null) return null;
+    final results = await Future.wait([
+      viewSettings.liveTvLayout(),
+      viewSettings.epgStartView(),
+    ]);
+    return (
+      layout: results[0] as LiveTvLayout,
+      epgStartView: results[1] as EpgStartView,
+    );
   }
 
   void _onFavoritesChanged() {
@@ -101,17 +158,42 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
   Future<void> _initCategory() async {
     final lastCat = await widget.favoritesService.getLastCategory();
-    final lastMode = await widget.favoritesService.getLastViewMode();
-    if (mounted) {
-      setState(() {
-        _selectedCategory = lastCat;
-        if (lastMode != null) {
-          _viewMode = _ViewMode.values.firstWhere(
-            (m) => m.name == lastMode,
+    final viewSettings = widget.viewSettingsService;
+    if (viewSettings != null) {
+      if (!await viewSettings.hasLiveTvLayout()) {
+        final legacyMode = await widget.favoritesService.getLastViewMode();
+        if (legacyMode != null) {
+          final legacyViewMode = _ViewMode.values.firstWhere(
+            (m) => m.name == legacyMode,
             orElse: () => _ViewMode.list,
           );
+          await viewSettings.setLiveTvLayout(_viewModeToLayout(legacyViewMode));
         }
-      });
+      }
+      final generation = _viewSettingsGeneration;
+      final loaded = await _loadViewSettings();
+      if (mounted && generation == _viewSettingsGeneration) {
+        setState(() {
+          _selectedCategory = lastCat;
+          if (loaded != null) {
+            _viewMode = _layoutToViewMode(loaded.layout);
+            _epgStartView = loaded.epgStartView;
+          }
+        });
+      }
+    } else {
+      final lastMode = await widget.favoritesService.getLastViewMode();
+      if (mounted) {
+        setState(() {
+          _selectedCategory = lastCat;
+          if (lastMode != null) {
+            _viewMode = _ViewMode.values.firstWhere(
+              (m) => m.name == lastMode,
+              orElse: () => _ViewMode.list,
+            );
+          }
+        });
+      }
     }
     await _loadFavorites();
   }
@@ -145,6 +227,18 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         )
         .toList(growable: false);
   }
+
+  static _ViewMode _layoutToViewMode(LiveTvLayout layout) => switch (layout) {
+    LiveTvLayout.list => _ViewMode.list,
+    LiveTvLayout.grid => _ViewMode.logoGrid,
+    LiveTvLayout.timeline => _ViewMode.epgGrid,
+  };
+
+  static LiveTvLayout _viewModeToLayout(_ViewMode mode) => switch (mode) {
+    _ViewMode.list => LiveTvLayout.list,
+    _ViewMode.logoGrid => LiveTvLayout.grid,
+    _ViewMode.epgGrid => LiveTvLayout.timeline,
+  };
 
   List<CategoryTabData> _categoryTabs(List<Category> categories) {
     return [
@@ -421,7 +515,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
             _ViewMode.epgGrid => _ViewMode.list,
           };
           setState(() => _viewMode = next);
-          unawaited(widget.favoritesService.setLastViewMode(next.name));
+          final viewSettings = widget.viewSettingsService;
+          if (viewSettings != null) {
+            unawaited(viewSettings.setLiveTvLayout(_viewModeToLayout(next)));
+          } else {
+            unawaited(widget.favoritesService.setLastViewMode(next.name));
+          }
         },
         tooltip: switch (_viewMode) {
           _ViewMode.list => 'Logo grid',
@@ -490,6 +589,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           programStart: program.start,
           programEnd: program.end,
         ),
+        epgStartView: _epgStartView,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);

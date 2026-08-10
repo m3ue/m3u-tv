@@ -33,6 +33,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -708,8 +709,7 @@ class AppShellState extends ConsumerState<AppShell>
         startEarlySeconds: startEarlySeconds,
         endLateSeconds: endLateSeconds,
       );
-      final rules = await _appState.xtreamService.listDvrSeriesRules();
-      _appState.setDvrSeriesRules(rules);
+      await _appState.refreshDvrSeriesRules();
       // The rule's `created` hook may have already matched and scheduled a
       // recording server-side (see AppStateController.refreshDvrRecordings
       // doc comment) — refresh so it shows up in the Recordings tab without
@@ -720,8 +720,7 @@ class AppShellState extends ConsumerState<AppShell>
           : CreateDvrSeriesRuleOutcome.created;
     } on DvrSeriesRuleExistsException {
       try {
-        final rules = await _appState.xtreamService.listDvrSeriesRules();
-        _appState.setDvrSeriesRules(rules);
+        await _appState.refreshDvrSeriesRules();
       } on Object catch (error, stackTrace) {
         debugPrint('DVR: refresh after duplicate create failed: $error');
         debugPrintStack(stackTrace: stackTrace);
@@ -734,13 +733,10 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
-  /// Deletes a DVR series rule and refreshes the cached list. Foundation
-  /// agent owns `XtreamService.deleteDvrSeriesRule` and
-  /// `AppStateController.setDvrSeriesRules`.
+  /// Deletes a DVR series rule and refreshes the cached list.
   Future<void> _deleteDvrSeriesRule(DvrSeriesRule rule) async {
     await _appState.xtreamService.deleteDvrSeriesRule(rule.id);
-    final rules = await _appState.xtreamService.listDvrSeriesRules();
-    _appState.setDvrSeriesRules(rules);
+    await _appState.refreshDvrSeriesRules();
   }
 
   /// Updates an existing DVR series rule in place (never delete-and-recreate —
@@ -761,8 +757,7 @@ class AppShellState extends ConsumerState<AppShell>
       startEarlySeconds: options.startEarlySeconds,
       endLateSeconds: options.endLateSeconds,
     );
-    final rules = await _appState.xtreamService.listDvrSeriesRules();
-    _appState.setDvrSeriesRules(rules);
+    await _appState.refreshDvrSeriesRules();
     unawaited(_appState.refreshDvrRecordings());
   }
 
@@ -991,6 +986,7 @@ class AppShellState extends ConsumerState<AppShell>
       ),
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
+        viewSettingsService: _appState.viewSettingsService,
         onChannelSelect: _openChannel,
         onChannelContextChanged: _setChannelContext,
         onCatchupProgramSelect: _openCatchupProgram,
@@ -1076,6 +1072,7 @@ class AppShellState extends ConsumerState<AppShell>
             );
           }
           return RequestScreen(
+            key: ValueKey(_appState.mediaRequestOwner),
             isConfigured: _appState.isConfigured,
             onSearch: _appState.searchContentRequests,
             onResultSelect: _openRequestResult,
@@ -1114,6 +1111,7 @@ class AppShellState extends ConsumerState<AppShell>
           onConnected: () => _navigateTo(0),
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),
+          viewSettingsService: _appState.viewSettingsService,
           proxyPlaybackSettings: _appState.proxyPlaybackSettings,
           comskipSettings: _appState.comskipSettings,
         ),
@@ -1890,27 +1888,7 @@ class _OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.cloud_off, color: theme.colorScheme.onErrorContainer),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return AppCallout(message: message, variant: AppCalloutVariant.error);
   }
 }
 

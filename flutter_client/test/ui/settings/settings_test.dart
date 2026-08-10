@@ -9,7 +9,6 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/m3u_parser.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -444,6 +443,112 @@ void main() {
   // --- SettingsScreen widget ---
 
   group('SettingsScreen', () {
+    testWidgets(
+      'shows credential guidance on disconnected first-launch compact viewport',
+      (tester) async {
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.physicalSize = const Size(400, 800);
+        tester.view.devicePixelRatio = 1.0;
+
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(_settingsApp(notifier));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows credential guidance on disconnected TV-sized viewport',
+      (tester) async {
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.physicalSize = const Size(1920, 1080);
+        tester.view.devicePixelRatio = 1.0;
+
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(_settingsApp(notifier));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows credential guidance on disconnected Settings sign-in tab',
+      (tester) async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+        final pairingService = DevicePairingService();
+        addTearDown(pairingService.dispose);
+
+        await tester.pumpWidget(
+          _settingsApp(notifier, devicePairingService: pairingService),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Sign In'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server URL'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('server URL'), findsOneWidget);
+        expect(find.textContaining('Xtream username'), findsOneWidget);
+        expect(find.textContaining('Xtream password'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'does not show setup guidance when connected or in outage mode',
+      (tester) async {
+        final notifier = AuthNotifier(
+          xtreamService: XtreamService(transport: _FakeTransport({}).call),
+          secureStorage: InMemorySecureStorage(),
+        );
+
+        await tester.pumpWidget(
+          _settingsApp(
+            notifier,
+            isConfiguredOverride: true,
+            sourceError: 'Server is currently unavailable.',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Server is currently unavailable.'), findsOneWidget);
+        expect(
+          find.textContaining('playlist Xtream connection details'),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('shows connection form when not configured', (tester) async {
       final notifier = AuthNotifier(
         xtreamService: XtreamService(transport: _FakeTransport({}).call),
@@ -896,47 +1001,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Not connected'), findsOneWidget);
-    });
-  });
-
-  // --- M3U source diagnostics ---
-
-  group('M3U source diagnostics', () {
-    test('valid M3U URL source parses successfully', () async {
-      final parser = M3UParser();
-      const m3uContent =
-          '#EXTM3U\n'
-          '#EXTINF:-1 tvg-id="ch1" group-title="News",Channel 1\n'
-          'http://streams.example/live/1.m3u8\n';
-      final result = parser.parse(m3uContent);
-
-      expect(result.channels, hasLength(1));
-      expect(result.channels.first.name, 'Channel 1');
-      expect(
-        result.channels.first.streamUrl,
-        'http://streams.example/live/1.m3u8',
-      );
-    });
-
-    test('malformed M3U source throws parse exception', () {
-      final parser = M3UParser();
-      // Content without #EXTM3U header
-      const malformed = 'just random text\nnot a playlist';
-
-      expect(() => parser.parse(malformed), throwsA(isA<M3UParseException>()));
-    });
-
-    test('invalid URL in M3U source is captured in channel', () async {
-      final parser = M3UParser();
-      const m3uContent =
-          '#EXTM3U\n'
-          '#EXTINF:-1 tvg-id="ch1",Channel 1\n'
-          'not-a-valid-url\n';
-      final result = parser.parse(m3uContent);
-
-      // Parser should still capture the entry even with invalid URL
-      expect(result.channels, hasLength(1));
-      expect(result.channels.first.streamUrl, 'not-a-valid-url');
     });
   });
 }

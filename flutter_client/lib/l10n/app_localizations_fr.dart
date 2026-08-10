@@ -402,6 +402,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Entrez vos identifiants Xtream Codes';
 
   @override
+  String get settingsConnectionSettingsHelp =>
+      'Utilisez les informations de connexion Xtream de la playlist m3u-editor, pas votre connexion web m3u-editor. Vous avez besoin de l\'URL du serveur, du nom d\'utilisateur Xtream et du mot de passe Xtream.';
+
+  @override
   String get settingsServerUrl => 'URL du serveur';
 
   @override
@@ -1069,4 +1073,28 @@ class AppLocalizationsFr extends AppLocalizations {
   String showNotFound(String title) {
     return 'Show « $title » introuvable';
   }
+
+  @override
+  String get settingsView => 'Affichage';
+
+  @override
+  String get settingsLiveTvLayout => 'Mise en page TV en direct';
+
+  @override
+  String get settingsLiveTvLayoutList => 'Liste';
+
+  @override
+  String get settingsLiveTvLayoutGrid => 'Grille';
+
+  @override
+  String get settingsLiveTvLayoutTimeline => 'Chronologie';
+
+  @override
+  String get settingsEpgStartView => 'Le guide démarre à';
+
+  @override
+  String get settingsEpgStartViewCurrentTime => 'Heure actuelle';
+
+  @override
+  String get settingsEpgStartViewPrimeTime => 'Prime time';
 }

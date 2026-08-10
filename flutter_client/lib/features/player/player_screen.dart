@@ -722,21 +722,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_isLive || widget.args.epgChannelId == null) return;
     final channelId = widget.args.epgChannelId!;
     final result = widget.epgService.lookup(channelId);
-    if (result != null) {
-      if (mounted) {
-        setState(() => _epgData = result);
-      }
-      return;
-    }
-
-    if (mounted) {
-      setState(() => _epgData = result);
-    }
+    if (mounted) setState(() => _epgData = result);
 
     final streamId = widget.args.streamId;
     final xtreamService = widget.xtreamService;
-    if (streamId == null || xtreamService == null || _epgFetch != null) return;
+    if (streamId == null ||
+        xtreamService == null ||
+        _epgFetch != null ||
+        !widget.epgService.shouldFetchData(channelId)) {
+      return;
+    }
 
+    final sourceGeneration = widget.epgService.markFetchStarted(<String>[
+      channelId,
+    ]);
     final fetch = xtreamService.getShortEpg(
       streamId,
       channelId: channelId,
@@ -745,18 +744,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgFetch = fetch;
     try {
       final programs = await fetch;
+      widget.epgService.applySuccessfulResponse(
+        <String>[channelId],
+        programs,
+        sourceGeneration: sourceGeneration,
+      );
       // The player may have switched to a different channel while this was
       // in flight (didUpdateWidget cancels the timer but can't cancel this
       // future) — don't let a stale response overwrite the new channel's EPG.
       if (_disposed || !mounted || widget.args.epgChannelId != channelId) {
         return;
       }
-      widget.epgService.mergePrograms(programs);
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
         setState(() => _epgData = refreshed);
       }
     } on Object catch (_) {
+      widget.epgService.markFetchFailed(
+        <String>[channelId],
+        sourceGeneration: sourceGeneration,
+      );
       if (_disposed || !mounted) return;
     } finally {
       if (identical(_epgFetch, fetch)) {

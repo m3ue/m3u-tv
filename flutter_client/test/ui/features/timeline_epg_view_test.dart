@@ -6,6 +6,7 @@ import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 void main() {
@@ -1046,6 +1047,117 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      're-initializes horizontal scroll offset when epgStartView prop changes',
+      (tester) async {
+        final now = DateTime(2026, 7, 31, 14, 30);
+        var currentView = EpgStartView.currentTime;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                    ),
+                  ],
+                  epgService: EpgService(clock: () => now),
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                  epgStartView: currentView,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final currentOffset = _horizontalScrollOffset(tester);
+
+        currentView = EpgStartView.primeTime;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [
+                    Channel(
+                      id: 101,
+                      name: 'BBC One',
+                      streamUrl: 'https://streams.example/live/101.m3u8',
+                    ),
+                  ],
+                  epgService: EpgService(clock: () => now),
+                  onChannelSelect: (_) {},
+                  clock: () => now,
+                  epgStartView: currentView,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final primeOffset = _horizontalScrollOffset(tester);
+        expect(primeOffset, isNot(currentOffset));
+      },
+    );
+
+    testWidgets('day navigation keeps the prime-time scroll offset', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 14, 30);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: const [
+                  Channel(
+                    id: 101,
+                    name: 'BBC One',
+                    streamUrl: 'https://streams.example/live/101.m3u8',
+                  ),
+                ],
+                epgService: EpgService(clock: () => now),
+                onChannelSelect: (_) {},
+                clock: () => now,
+                epgStartView: EpgStartView.primeTime,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final initialOffset = _horizontalScrollOffset(tester);
+
+      await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+      await tester.pumpAndSettle();
+
+      final nextDayOffset = _horizontalScrollOffset(tester);
+      expect(nextDayOffset, initialOffset);
+    });
   });
 }
 
@@ -1053,4 +1165,15 @@ DpadFocusable _dateControlFocusable(WidgetTester tester, ValueKey<String> key) {
   return tester.widget<DpadFocusable>(
     find.descendant(of: find.byKey(key), matching: find.byType(DpadFocusable)),
   );
+}
+
+double _horizontalScrollOffset(WidgetTester tester) {
+  final scrollable = tester.widget<Scrollable>(
+    find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axis == Axis.horizontal,
+        )
+        .first,
+  );
+  return scrollable.controller!.offset;
 }
