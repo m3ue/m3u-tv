@@ -28,18 +28,37 @@ extension ConditionalSecureStorageWrite on SecureStorage {
     if (storage is FileSecureStorage) {
       return storage.writeIf(key, value, shouldCommit);
     }
-    if (!shouldCommit()) return false;
-    final previous = await read(key);
-    if (!shouldCommit()) return false;
-    await write(key, value);
-    if (shouldCommit()) return true;
-    if (previous == null) {
-      await delete(key);
-    } else {
-      await write(key, previous);
-    }
-    return false;
+    return writeStringIfCurrent(
+      shouldCommit: shouldCommit,
+      read: () => read(key),
+      write: (v) => write(key, v),
+      delete: () => delete(key),
+      value: value,
+    );
   }
+}
+
+/// Writes [value], but rolls back to whatever was previously stored if
+/// [shouldCommit] is rejected either before the write or right after it
+/// (e.g. ownership changed while the write was in flight).
+Future<bool> writeStringIfCurrent({
+  required bool Function() shouldCommit,
+  required Future<String?> Function() read,
+  required Future<void> Function(String value) write,
+  required Future<void> Function() delete,
+  required String value,
+}) async {
+  if (!shouldCommit()) return false;
+  final previous = await read();
+  if (!shouldCommit()) return false;
+  await write(value);
+  if (shouldCommit()) return true;
+  if (previous == null) {
+    await delete();
+  } else {
+    await write(previous);
+  }
+  return false;
 }
 
 /// In-memory secure storage for tests. Does NOT log or expose stored values
@@ -102,19 +121,15 @@ class FlutterSecureStorageAdapter implements SecureStorage {
     String key,
     String value,
     bool Function() shouldCommit,
-  ) => _queueFor(key).run(() async {
-    if (!shouldCommit()) return false;
-    final previous = await _storage.read(key: key);
-    if (!shouldCommit()) return false;
-    await _storage.write(key: key, value: value);
-    if (shouldCommit()) return true;
-    if (previous == null) {
-      await _storage.delete(key: key);
-    } else {
-      await _storage.write(key: key, value: previous);
-    }
-    return false;
-  });
+  ) => _queueFor(key).run(
+    () => writeStringIfCurrent(
+      shouldCommit: shouldCommit,
+      read: () => _storage.read(key: key),
+      write: (v) => _storage.write(key: key, value: v),
+      delete: () => _storage.delete(key: key),
+      value: value,
+    ),
+  );
 
   @override
   Future<void> delete(String key) => _queueFor(key).run(
