@@ -50,7 +50,7 @@ class PersistentJsonStore {
     final previousValue = previous[key];
     final data = Map<String, Object?>.from(previous)..[key] = value;
     final candidateBytes = utf8.encode(jsonEncode(data));
-    await _writeStaging(data);
+    await _writeStaging(candidateBytes);
     try {
       if (!shouldCommit()) return false;
       await _commitStaging(data);
@@ -168,7 +168,7 @@ class PersistentJsonStore {
   }
 
   Future<void> _writeAll(Map<String, Object?> data) async {
-    await _writeStaging(data);
+    await _writeStaging(utf8.encode(jsonEncode(data)));
     try {
       await _commitStaging(data);
     } finally {
@@ -176,9 +176,9 @@ class PersistentJsonStore {
     }
   }
 
-  Future<void> _writeStaging(Map<String, Object?> data) async {
+  Future<void> _writeStaging(List<int> bytes) async {
     await _file.parent.create(recursive: true);
-    await _stagingFile.writeAsString(jsonEncode(data), flush: true);
+    await _stagingFile.writeAsBytes(bytes, flush: true);
   }
 
   Future<void> _commitStaging(Map<String, Object?> data) async {

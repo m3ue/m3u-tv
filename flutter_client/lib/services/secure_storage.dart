@@ -80,15 +80,21 @@ class FlutterSecureStorageAdapter implements SecureStorage {
   FlutterSecureStorageAdapter() : _storage = const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
-  final SerialQueue _queue = SerialQueue();
+
+  /// One queue per key so operations on unrelated keys don't serialize
+  /// behind each other — only same-key ordering needs to be guaranteed.
+  final Map<String, SerialQueue> _queues = {};
+
+  SerialQueue _queueFor(String key) =>
+      _queues.putIfAbsent(key, SerialQueue.new);
 
   @override
-  Future<String?> read(String key) => _queue.run(
+  Future<String?> read(String key) => _queueFor(key).run(
     () => _storage.read(key: key),
   );
 
   @override
-  Future<void> write(String key, String value) => _queue.run(
+  Future<void> write(String key, String value) => _queueFor(key).run(
     () => _storage.write(key: key, value: value),
   );
 
@@ -96,7 +102,7 @@ class FlutterSecureStorageAdapter implements SecureStorage {
     String key,
     String value,
     bool Function() shouldCommit,
-  ) => _queue.run(() async {
+  ) => _queueFor(key).run(() async {
     if (!shouldCommit()) return false;
     final previous = await _storage.read(key: key);
     if (!shouldCommit()) return false;
@@ -111,7 +117,7 @@ class FlutterSecureStorageAdapter implements SecureStorage {
   });
 
   @override
-  Future<void> delete(String key) => _queue.run(
+  Future<void> delete(String key) => _queueFor(key).run(
     () => _storage.delete(key: key),
   );
 }
