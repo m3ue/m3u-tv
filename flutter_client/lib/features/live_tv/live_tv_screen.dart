@@ -84,6 +84,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  int _viewSettingsGeneration = 0;
 
   @override
   void initState() {
@@ -97,6 +98,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   void didUpdateWidget(covariant LiveTvScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.viewSettingsService != widget.viewSettingsService) {
+      _viewSettingsGeneration++;
       _detachViewSettingsListener(oldWidget.viewSettingsService);
       _attachViewSettingsListener();
       unawaited(_reloadViewSettings());
@@ -119,22 +121,23 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   }
 
   void _onViewSettingsChanged() {
+    _viewSettingsGeneration++;
     unawaited(_reloadViewSettings());
   }
 
   Future<void> _reloadViewSettings() async {
     final viewSettings = widget.viewSettingsService;
     if (viewSettings == null) return;
+    final generation = _viewSettingsGeneration;
     final results = await Future.wait([
       viewSettings.liveTvLayout(),
       viewSettings.epgStartView(),
     ]);
-    if (mounted) {
-      setState(() {
-        _viewMode = _layoutToViewMode(results[0] as LiveTvLayout);
-        _epgStartView = results[1] as EpgStartView;
-      });
-    }
+    if (!mounted || generation != _viewSettingsGeneration) return;
+    setState(() {
+      _viewMode = _layoutToViewMode(results[0] as LiveTvLayout);
+      _epgStartView = results[1] as EpgStartView;
+    });
   }
 
   void _onFavoritesChanged() {

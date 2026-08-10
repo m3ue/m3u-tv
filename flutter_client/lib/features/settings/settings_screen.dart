@@ -918,12 +918,10 @@ class _ConnectedViewState extends State<_ConnectedView>
         ),
         const SizedBox(height: 20),
 
-        // ── View ──────────────────────────────────────────────────────────────
         if (widget.viewSettingsService != null)
           _ViewSettingsSection(service: widget.viewSettingsService!),
         if (widget.viewSettingsService != null) const SizedBox(height: 20),
 
-        // ── App ─────────────────────────────────────────────────────────────
         _SettingsSection(
           title: l.settingsApp,
           child: const _AppVersionCard(),

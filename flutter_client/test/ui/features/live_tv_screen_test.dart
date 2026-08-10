@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +11,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -473,7 +477,143 @@ void main() {
         expect(primeOffset, isNot(currentOffset));
       },
     );
+    testWidgets('stale reload from replaced service is ignored', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp(
+          'live_tv_view_settings',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+
+        final firstFile = File('${dir.path}/service_a.json');
+        final secondFile = File('${dir.path}/service_b.json');
+
+        final slowStoreA = _SlowPersistentJsonStore(
+          file: firstFile,
+          readDelay: const Duration(milliseconds: 100),
+        );
+        final serviceA = ViewSettingsService(store: slowStoreA);
+        await serviceA.setLiveTvLayout(LiveTvLayout.list);
+        await serviceA.setEpgStartView(EpgStartView.currentTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: serviceA,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final storeB = PersistentJsonStore(file: secondFile);
+        final serviceB = ViewSettingsService(store: storeB);
+        await serviceB.setLiveTvLayout(LiveTvLayout.timeline);
+        await serviceB.setEpgStartView(EpgStartView.primeTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: serviceB,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        final primeOffset = _timelineHorizontalOffset(tester);
+
+        // Let service A's delayed read finish after B has already won.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        expect(_timelineHorizontalOffset(tester), primeOffset);
+      });
+    });
+
+    testWidgets('stale reload after rapid view settings updates is ignored', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp(
+          'live_tv_view_settings',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+
+        final slowStore = _SlowPersistentJsonStore(
+          file: File('${dir.path}/store.json'),
+        );
+        final service = ViewSettingsService(store: slowStore);
+        await service.setLiveTvLayout(LiveTvLayout.list);
+        await service.setEpgStartView(EpgStartView.currentTime);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Queue two rapid changes while reads are held; only the latest wins.
+        slowStore.holdReads();
+        final firstLayout = service.setLiveTvLayout(LiveTvLayout.grid);
+        final secondLayout = service.setLiveTvLayout(LiveTvLayout.timeline);
+        final firstEpg = service.setEpgStartView(EpgStartView.primeTime);
+        await Future.wait([firstLayout, secondLayout, firstEpg]);
+        slowStore.releaseReads();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+      });
+    });
   });
+}
+
+class _SlowPersistentJsonStore extends PersistentJsonStore {
+  _SlowPersistentJsonStore({
+    required super.file,
+    this.readDelay = Duration.zero,
+  });
+
+  final Duration readDelay;
+  final _pending = <Completer<void>>[];
+  var _hold = false;
+
+  void holdReads() => _hold = true;
+
+  void releaseReads() {
+    _hold = false;
+    for (final completer in _pending) {
+      completer.complete();
+    }
+    _pending.clear();
+  }
+
+  @override
+  Future<Object?> read(String key) async {
+    if (_hold) {
+      final completer = Completer<void>();
+      _pending.add(completer);
+      await completer.future;
+    }
+    if (readDelay > Duration.zero) {
+      await Future<void>.delayed(readDelay);
+    }
+    return super.read(key);
+  }
 }
 
 Scrollable _timelineHorizontalOffsetRow(WidgetTester tester) {
