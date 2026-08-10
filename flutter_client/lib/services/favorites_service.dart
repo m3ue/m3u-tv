@@ -50,9 +50,9 @@ class FavoritesService extends ChangeNotifier {
     final ids = await all();
     ids.add(streamId);
     if (!await _writeIf(_favoritesKey, ids.toList()..sort(), shouldCommit)) {
-      return true;
+      return false;
     }
-    if (!shouldCommit()) return true;
+    if (!shouldCommit()) return false;
     notifyListeners();
     if (shouldCommit()) onChanged?.call(streamId, favorited: true);
     return true;
@@ -72,9 +72,9 @@ class FavoritesService extends ChangeNotifier {
     final ids = await all();
     ids.remove(streamId);
     if (!await _writeIf(_favoritesKey, ids.toList()..sort(), shouldCommit)) {
-      return false;
+      return true;
     }
-    if (!shouldCommit()) return false;
+    if (!shouldCommit()) return true;
     notifyListeners();
     if (shouldCommit()) onChanged?.call(streamId, favorited: false);
     return false;

@@ -103,54 +103,59 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   Future<bool> isFavorite(String itemId) async =>
       (await _all()).containsKey(itemId);
 
-  Future<void> add(AIOStreamsFavoriteItem item) {
+  Future<bool> add(AIOStreamsFavoriteItem item) {
     final shouldCommit = captureMutationOwnership?.call();
     return _mutationQueue.run(() => _add(item, shouldCommit: shouldCommit));
   }
 
-  Future<void> _add(
+  Future<bool> _add(
     AIOStreamsFavoriteItem item, {
     AIOStreamsMutationOwnership? shouldCommit,
   }) async {
     final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
     cache[item.id] = item;
-    if (!await _persist(cache, shouldCommit: shouldCommit)) return;
-    if (shouldCommit != null && !shouldCommit()) return;
+    if (!await _persist(cache, shouldCommit: shouldCommit)) return false;
+    if (shouldCommit != null && !shouldCommit()) return false;
     _cache = cache;
     notifyListeners();
     onAdded?.call(item);
+    return true;
   }
 
-  Future<void> remove(String itemId) {
+  Future<bool> remove(String itemId) {
     final shouldCommit = captureMutationOwnership?.call();
     return _mutationQueue.run(
       () => _remove(itemId, shouldCommit: shouldCommit),
     );
   }
 
-  Future<void> _remove(
+  Future<bool> _remove(
     String itemId, {
     AIOStreamsMutationOwnership? shouldCommit,
   }) async {
     final cache = Map<String, AIOStreamsFavoriteItem>.of(
       await _all(),
     )..remove(itemId);
-    if (!await _persist(cache, shouldCommit: shouldCommit)) return;
-    if (shouldCommit != null && !shouldCommit()) return;
+    if (!await _persist(cache, shouldCommit: shouldCommit)) return false;
+    if (shouldCommit != null && !shouldCommit()) return false;
     _cache = cache;
     notifyListeners();
     onRemoved?.call(itemId);
+    return true;
   }
 
+  /// Returns the item's new favorited state, or its unchanged prior state if
+  /// the mutation was rejected by [captureMutationOwnership] (e.g. the
+  /// viewer/source switched mid-toggle).
   Future<bool> toggle(AIOStreamsFavoriteItem item) {
     final shouldCommit = captureMutationOwnership?.call();
     return _mutationQueue.run(() async {
-      if ((await _all()).containsKey(item.id)) {
-        await _remove(item.id, shouldCommit: shouldCommit);
-        return false;
+      final wasFavorite = (await _all()).containsKey(item.id);
+      if (wasFavorite) {
+        final removed = await _remove(item.id, shouldCommit: shouldCommit);
+        return !removed;
       } else {
-        await _add(item, shouldCommit: shouldCommit);
-        return true;
+        return _add(item, shouldCommit: shouldCommit);
       }
     });
   }
