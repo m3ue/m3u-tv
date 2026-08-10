@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
 typedef CatchupProgramSelect =
@@ -814,6 +815,9 @@ class _ProgramsRow extends StatelessWidget {
       final borderColor = isCurrent
           ? colorScheme.primary.withValues(alpha: 0.6)
           : colorScheme.outline.withValues(alpha: 0.25);
+      final recordingState = recordingStateFor(p);
+      final hasCatchup = showCatchupIcon(p);
+      final hasRecording = recordingState != EpgRecordingState.none;
       blocks.add(
         Positioned(
           left: left + 1,
@@ -834,68 +838,49 @@ class _ProgramsRow extends StatelessWidget {
                 border: Border.all(color: borderColor),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Builder(
-                builder: (context) {
-                  final recordingState = recordingStateFor(p);
-                  final hasCatchup = showCatchupIcon(p);
-                  final hasRecording = recordingState != EpgRecordingState.none;
-                  return Stack(
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.only(
-                          left: hasRecording ? 18 : 0,
-                          right: hasCatchup ? 22 : 0,
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: hasRecording ? 18 : 0,
+                      right: hasCatchup ? 22 : 0,
+                    ),
+                    child: Text(
+                      p.title,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: fgColor,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasRecording)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: ProgramRecordingIndicator(state: recordingState),
+                    ),
+                  if (hasCatchup)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: EpgIconPill(
+                        color: colorScheme.tertiaryContainer,
+                        borderColor: colorScheme.tertiary.withValues(
+                          alpha: 0.55,
                         ),
-                        child: Text(
-                          p.title,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: fgColor,
-                                fontWeight: isCurrent
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: Icon(
+                          Icons.replay_rounded,
+                          size: 10,
+                          color: colorScheme.onTertiaryContainer,
+                          semanticLabel: l10n.catchupProgramReplayable,
                         ),
                       ),
-                      if (hasRecording)
-                        Positioned(
-                          left: 0,
-                          top: 0,
-                          child: ProgramRecordingIndicator(
-                            state: recordingState,
-                          ),
-                        ),
-                      if (hasCatchup)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 3,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: colorScheme.tertiary.withValues(
-                                  alpha: 0.55,
-                                ),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.replay_rounded,
-                              size: 10,
-                              color: colorScheme.onTertiaryContainer,
-                              semanticLabel: l10n.catchupProgramReplayable,
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                    ),
+                ],
               ),
             ),
           ),

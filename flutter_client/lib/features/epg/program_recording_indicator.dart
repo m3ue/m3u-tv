@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/features/epg/epg_recording_state.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/shared/epg_icon_pill.dart';
 
 /// Per-programme recording badge drawn on an EPG timeline grid block (see
 /// #185). Returns a zero-sized widget for [EpgRecordingState.none] so it can
@@ -55,13 +56,9 @@ class ProgramRecordingIndicator extends StatelessWidget {
 
     return Semantics(
       label: semanticLabel,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-        decoration: BoxDecoration(
-          color: containerColor,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: borderColor),
-        ),
+      child: EpgIconPill(
+        color: containerColor,
+        borderColor: borderColor,
         child: Icon(icon, size: 10, color: iconColor),
       ),
     );

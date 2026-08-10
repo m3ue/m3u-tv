@@ -420,11 +420,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final categories = ref.watch(liveCategoriesProvider);
     final epgService = ref.watch(epgServiceProvider);
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
-    // Built once per rebuild and queried per programme block, so the grid
-    // never scans the recordings list per block.
-    final recordingIndex = EpgRecordingIndex.fromRecordings(
-      ref.watch(dvrRecordingsProvider),
-    );
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -464,7 +459,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
                       filtered,
                       epgService,
                       recordingChannelIds,
-                      recordingIndex,
+                      EpgRecordingIndex.fromRecordings(
+                        ref.watch(dvrRecordingsProvider),
+                      ),
                     ),
                     _ViewMode.logoGrid => _buildGridView(
                       filtered,
