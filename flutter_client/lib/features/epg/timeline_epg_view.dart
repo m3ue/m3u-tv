@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:m3u_tv/features/epg/epg_recording_state.dart';
+import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
@@ -40,6 +42,7 @@ class TimelineEpgView extends StatefulWidget {
     this.onEnsureEpg,
     this.onChannelLongPress,
     this.recordingChannelIds = const <int>{},
+    this.recordingStateFor = _noRecordingState,
     this.windowHours = 24,
     this.futureDays = 7,
     this.clock = DateTime.now,
@@ -61,6 +64,18 @@ class TimelineEpgView extends StatefulWidget {
   final CatchupProgramSelect? onChannelLongPress;
 
   final Set<int> recordingChannelIds;
+
+  /// Resolves which per-programme recording indicator (if any) should be
+  /// drawn on a given EPG block. Defaults to [EpgRecordingState.none] for
+  /// every block, so the widget renders identically to the pre-#185
+  /// version when no resolver is supplied. The caller (typically the
+  /// EPG screen with the matching-logic index in scope) is responsible
+  /// for mapping a [DvrRecording] / series-rule record to each
+  /// [EpgProgram].
+  final EpgRecordingState Function(EpgProgram program) recordingStateFor;
+
+  static EpgRecordingState _noRecordingState(EpgProgram _) =>
+      EpgRecordingState.none;
 
   /// How many hours the selected-day window spans (default 24).
   final int windowHours;
@@ -396,6 +411,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     rowHeight: _kRowH,
                                     catchupRetentionDays: catchupRetentionDays,
                                     now: now,
+                                    recordingStateFor: widget.recordingStateFor,
                                     onTap: (program) {
                                       final canReplay = _canReplay(
                                         catchupRetentionDays,
@@ -714,6 +730,7 @@ class _ProgramsRow extends StatelessWidget {
     required this.catchupRetentionDays,
     required this.now,
     this.onLongPress,
+    this.recordingStateFor = _noRecordingState,
   });
 
   final List<EpgProgram> programs;
@@ -728,6 +745,14 @@ class _ProgramsRow extends StatelessWidget {
 
   /// Opens the favorite/record context menu for the pressed block.
   final void Function(EpgProgram program)? onLongPress;
+
+  /// Resolves the per-programme recording indicator for a block. Defaults
+  /// to [EpgRecordingState.none], which renders no badge and is visually
+  /// identical to the pre-#185 layout.
+  final EpgRecordingState Function(EpgProgram program) recordingStateFor;
+
+  static EpgRecordingState _noRecordingState(EpgProgram _) =>
+      EpgRecordingState.none;
 
   bool showCatchupIcon(EpgProgram program) =>
       _canReplay(catchupRetentionDays, program, now);
@@ -784,49 +809,68 @@ class _ProgramsRow extends StatelessWidget {
                 border: Border.all(color: borderColor),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      right: showCatchupIcon(p) ? 22 : 0,
-                    ),
-                    child: Text(
-                      p.title,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: fgColor,
-                        fontWeight: isCurrent
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (showCatchupIcon(p))
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 3,
-                          vertical: 1,
+              child: Builder(
+                builder: (context) {
+                  final recordingState = recordingStateFor(p);
+                  final hasCatchup = showCatchupIcon(p);
+                  final hasRecording = recordingState != EpgRecordingState.none;
+                  return Stack(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(
+                          left: hasRecording ? 18 : 0,
+                          right: hasCatchup ? 22 : 0,
                         ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.tertiaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: colorScheme.tertiary.withValues(alpha: 0.55),
+                        child: Text(
+                          p.title,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: fgColor,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasRecording)
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          child: ProgramRecordingIndicator(
+                            state: recordingState,
                           ),
                         ),
-                        child: Icon(
-                          Icons.replay_rounded,
-                          size: 10,
-                          color: colorScheme.onTertiaryContainer,
-                          semanticLabel: l10n.catchupProgramReplayable,
+                      if (hasCatchup)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: colorScheme.tertiary.withValues(
+                                  alpha: 0.55,
+                                ),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.replay_rounded,
+                              size: 10,
+                              color: colorScheme.onTertiaryContainer,
+                              semanticLabel: l10n.catchupProgramReplayable,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           ),

@@ -58,6 +58,8 @@
   "epgNextDay": "Jour suivant",
   "epgChannels": "CHAÎNES",
   "epgNoData": "Aucune donnée EPG",
+  "epgProgramScheduledToRecord": "Programmé pour enregistrement",
+  "epgProgramCurrentlyRecording": "En cours d'enregistrement",
   "playerGoBack": "Retour",
   "playerResumeWatching": "Reprendre la lecture",
   "playerContinue": "Continuer",

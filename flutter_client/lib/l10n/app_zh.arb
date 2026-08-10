@@ -58,6 +58,8 @@
   "epgNextDay": "后一天",
   "epgChannels": "频道",
   "epgNoData": "暂无 EPG 数据",
+  "epgProgramScheduledToRecord": "已计划录制",
+  "epgProgramCurrentlyRecording": "正在录制",
   "playerGoBack": "返回",
   "playerResumeWatching": "继续观看",
   "playerContinue": "继续",

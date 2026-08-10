@@ -126,6 +126,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get epgNoData => '暂无 EPG 数据';
 
   @override
+  String get epgProgramScheduledToRecord => '已计划录制';
+
+  @override
+  String get epgProgramCurrentlyRecording => '正在录制';
+
+  @override
   String get playerGoBack => '返回';
 
   @override

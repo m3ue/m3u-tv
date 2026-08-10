@@ -126,6 +126,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get epgNoData => 'No hay datos de EPG';
 
   @override
+  String get epgProgramScheduledToRecord => 'Programado para grabar';
+
+  @override
+  String get epgProgramCurrentlyRecording => 'Grabando ahora';
+
+  @override
   String get playerGoBack => 'Volver';
 
   @override

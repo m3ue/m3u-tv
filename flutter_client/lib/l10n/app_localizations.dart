@@ -326,6 +326,18 @@ abstract class AppLocalizations {
   /// **'No EPG data'**
   String get epgNoData;
 
+  /// No description provided for @epgProgramScheduledToRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled to record'**
+  String get epgProgramScheduledToRecord;
+
+  /// No description provided for @epgProgramCurrentlyRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently recording'**
+  String get epgProgramCurrentlyRecording;
+
   /// No description provided for @playerGoBack.
   ///
   /// In en, this message translates to:

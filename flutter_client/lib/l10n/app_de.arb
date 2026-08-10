@@ -58,6 +58,8 @@
   "epgNextDay": "Nächster Tag",
   "epgChannels": "SENDER",
   "epgNoData": "Keine EPG-Daten",
+  "epgProgramScheduledToRecord": "Aufnahme geplant",
+  "epgProgramCurrentlyRecording": "Wird aufgenommen",
   "playerGoBack": "Zurück",
   "playerResumeWatching": "Weiterschauen",
   "playerContinue": "Fortsetzen",
