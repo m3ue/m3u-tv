@@ -385,6 +385,31 @@ void main() {
     );
 
     testWidgets(
+      'migrates legacy favorites-service layout into a fresh view settings service',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.setLastViewMode('epgGrid');
+        final service = ViewSettingsService(memory: <String, Object?>{});
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            favoritesService: favoritesService,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('timeline-previous-day')),
+          findsOneWidget,
+        );
+        expect(await service.liveTvLayout(), LiveTvLayout.timeline);
+      },
+    );
+
+    testWidgets(
       'replacement view settings service is picked up while screen is mounted',
       (tester) async {
         final firstService = ViewSettingsService(memory: <String, Object?>{});

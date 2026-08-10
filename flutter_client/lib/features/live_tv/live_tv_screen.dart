@@ -148,6 +148,16 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final lastCat = await widget.favoritesService.getLastCategory();
     final viewSettings = widget.viewSettingsService;
     if (viewSettings != null) {
+      if (!await viewSettings.hasLiveTvLayout()) {
+        final legacyMode = await widget.favoritesService.getLastViewMode();
+        if (legacyMode != null) {
+          final legacyViewMode = _ViewMode.values.firstWhere(
+            (m) => m.name == legacyMode,
+            orElse: () => _ViewMode.list,
+          );
+          await viewSettings.setLiveTvLayout(_viewModeToLayout(legacyViewMode));
+        }
+      }
       await _reloadViewSettings();
       if (mounted) {
         setState(() {

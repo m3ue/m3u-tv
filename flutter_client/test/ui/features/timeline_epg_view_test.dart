@@ -1117,6 +1117,47 @@ void main() {
         expect(primeOffset, isNot(currentOffset));
       },
     );
+
+    testWidgets('day navigation keeps the prime-time scroll offset', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 14, 30);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 300,
+              child: TimelineEpgView(
+                channels: const [
+                  Channel(
+                    id: 101,
+                    name: 'BBC One',
+                    streamUrl: 'https://streams.example/live/101.m3u8',
+                  ),
+                ],
+                epgService: EpgService(clock: () => now),
+                onChannelSelect: (_) {},
+                clock: () => now,
+                epgStartView: EpgStartView.primeTime,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final initialOffset = _horizontalScrollOffset(tester);
+
+      await tester.tap(find.byKey(const ValueKey('timeline-next-day')));
+      await tester.pumpAndSettle();
+
+      final nextDayOffset = _horizontalScrollOffset(tester);
+      expect(nextDayOffset, initialOffset);
+    });
   });
 }
 

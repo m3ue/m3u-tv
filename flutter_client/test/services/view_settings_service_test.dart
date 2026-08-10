@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 
 void main() {
@@ -60,5 +63,31 @@ void main() {
       expect(service.liveTvLayoutSync, LiveTvLayout.timeline);
       expect(service.epgStartViewSync, EpgStartView.primeTime);
     });
+
+    test(
+      'sync getters reflect values loaded from disk via the async getters',
+      () async {
+        final dir = await Directory.systemTemp.createTemp(
+          'view_settings_service',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+        final file = File('${dir.path}/view_settings.json');
+
+        final writer = ViewSettingsService(
+          store: PersistentJsonStore(file: file),
+        );
+        await writer.setLiveTvLayout(LiveTvLayout.grid);
+        await writer.setEpgStartView(EpgStartView.primeTime);
+
+        final reader = ViewSettingsService(
+          store: PersistentJsonStore(file: file),
+        );
+        expect(await reader.liveTvLayout(), LiveTvLayout.grid);
+        expect(await reader.epgStartView(), EpgStartView.primeTime);
+
+        expect(reader.liveTvLayoutSync, LiveTvLayout.grid);
+        expect(reader.epgStartViewSync, EpgStartView.primeTime);
+      },
+    );
   });
 }

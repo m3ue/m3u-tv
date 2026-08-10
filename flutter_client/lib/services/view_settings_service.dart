@@ -51,6 +51,12 @@ class ViewSettingsService extends ChangeNotifier {
     return LiveTvLayout.fromValue(raw as String?);
   }
 
+  /// Whether a Live TV layout has ever been persisted via this service.
+  /// Used to gate one-time migration of the legacy per-viewer layout
+  /// preference into this shared store.
+  Future<bool> hasLiveTvLayout() async =>
+      (await _read(liveTvLayoutKey)) != null;
+
   /// Synchronous access to the in-memory cached layout. Use after the service
   /// has been loaded or when a [notifyListeners] rebuild is imminent.
   LiveTvLayout get liveTvLayoutSync =>
@@ -77,7 +83,10 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<Object?> _read(String key) async {
     final store = this.store;
-    return store == null ? _memory[key] : store.read(key);
+    if (store == null) return _memory[key];
+    final value = await store.read(key);
+    _memory[key] = value;
+    return value;
   }
 
   Future<void> _write(String key, Object? value) async {

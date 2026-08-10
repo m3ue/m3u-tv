@@ -134,37 +134,14 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
     return math.max(0, offset - 80.0).toDouble();
   }
 
-  double _computeNowOffset() {
-    final now = widget.clock();
-    final anchor = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      now.hour,
-      now.minute,
-    );
-    final nowOffset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
-    return math.max(0, nowOffset - 80.0).toDouble();
-  }
-
   // Rows are built lazily by ListView.builder as they scroll into view, so a
-  // row's ScrollController may attach long after the "now" jump below has
-  // already run. Baking the target into initialScrollOffset means a
-  // late-attaching row still lands on the current time instead of 12am.
+  // row's ScrollController may attach long after the scroll-to-start jump
+  // below has already run. Baking the target into initialScrollOffset means
+  // a late-attaching row still lands on the right offset instead of 12am.
   List<ScrollController> _makeRowCtrls(int count) => List.generate(
     count,
     (_) => ScrollController(initialScrollOffset: _nowOffset),
   );
-
-  void _scrollToNow(_) {
-    if (!mounted) return;
-    final target = _computeNowOffset();
-    for (final c in [_headerHCtrl, ..._rowHCtrls]) {
-      if (c.hasClients) {
-        c.jumpTo(target.clamp(0.0, c.position.maxScrollExtent));
-      }
-    }
-  }
 
   void _scrollToStart(_) {
     if (!mounted) return;
@@ -206,7 +183,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
         _initWindow();
       });
     }
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToNow);
+    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
   }
 
   void _onLeftV() {
