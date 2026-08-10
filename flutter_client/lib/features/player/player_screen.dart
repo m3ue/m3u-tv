@@ -722,13 +722,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_isLive || widget.args.epgChannelId == null) return;
     final channelId = widget.args.epgChannelId!;
     final result = widget.epgService.lookup(channelId);
-    if (result != null) {
-      if (mounted) {
-        setState(() => _epgData = result);
-      }
-    } else if (mounted) {
-      setState(() => _epgData = result);
-    }
+    if (mounted) setState(() => _epgData = result);
 
     final streamId = widget.args.streamId;
     final xtreamService = widget.xtreamService;

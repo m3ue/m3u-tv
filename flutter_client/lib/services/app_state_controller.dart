@@ -336,6 +336,12 @@ class AppStateController extends ChangeNotifier {
   DateTime? _pendingEpgStartDate;
   DateTime? _pendingEpgEndDate;
   String _activeEpgRangeKey = '';
+  // Deliberately separate from epgService's own source-generation counter:
+  // this one invalidates in-flight per-range/channel-batch fetches (bumped
+  // on every guide range navigation, not just a full source reset), while
+  // epgService's tracks whether the entire EPG source has been swapped.
+  // The two must both advance together in _resetEpgSession — a reset path
+  // that bumps only one would let a stale fetch write into the new source.
   int _epgRequestGeneration = 0;
   static const _epgPrimeCount = 60;
   static const _epgFetchDebounceDelay = Duration(milliseconds: 250);
