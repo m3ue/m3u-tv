@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
@@ -42,6 +43,11 @@ class DpadInkWell extends StatefulWidget {
   final double? scrollPadding;
   final Clip clipBehavior;
 
+  /// Count of [HardwareKeyboard] global handlers this class currently has
+  /// registered and not yet released. Exposed for leak-detection tests.
+  @visibleForTesting
+  static int debugActiveGlobalHandlers = 0;
+
   @override
   State<DpadInkWell> createState() => _DpadInkWellState();
 }
@@ -50,16 +56,92 @@ class _DpadInkWellState extends State<DpadInkWell> {
   final FocusNode _focusNode = FocusNode();
   bool _hovered = false;
 
+  // The long-select menu opens at the threshold mid-hold. A freshly-mounted
+  // autofocused child inside that menu must NOT act on the select button
+  // the user is still physically holding: Android TV's auto-repeat delivers
+  // fresh `KeyDownEvent`s (not `KeyRepeatEvent`, which the dpad package
+  // swallows) to the newly focused widget, and a child with `onLongSelect`
+  // wired would see its 500ms timer re-armed on every repeat.
+  //
+  // On mount, we sample `HardwareKeyboard.logicalKeysPressed` and arm a
+  // global handler ONLY if a select key is already held. The handler
+  // disarms itself on the next select KeyUp. Widgets mounted with no key
+  // held are never armed, so a blanket ignore-window does not regress
+  // normal D-pad taps.
+  bool _ignoreSelect = false;
+  bool _guardChecked = false;
+  bool _handlerRegistered = false;
+  DpadKeySet? _cachedKeySet;
+
   @override
   void dispose() {
+    if (_handlerRegistered) {
+      HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+      _handlerRegistered = false;
+      DpadInkWell.debugActiveGlobalHandlers--;
+    }
     _focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_guardChecked) return;
+    _guardChecked = true;
+    final keys = Dpad.keySetOf(context);
+    _cachedKeySet = keys;
+    final selectHeld = HardwareKeyboard.instance.logicalKeysPressed.any(
+      keys.isSelect,
+    );
+    if (selectHeld) {
+      _ignoreSelect = true;
+      HardwareKeyboard.instance.addHandler(_onGlobalKey);
+      _handlerRegistered = true;
+      DpadInkWell.debugActiveGlobalHandlers++;
+    }
+  }
+
+  bool _onGlobalKey(KeyEvent event) {
+    final keys = _cachedKeySet;
+    if (event is KeyUpEvent &&
+        keys != null &&
+        keys.isSelect(event.logicalKey)) {
+      _ignoreSelect = false;
+      if (_handlerRegistered) {
+        HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+        _handlerRegistered = false;
+        DpadInkWell.debugActiveGlobalHandlers--;
+      }
+    }
+    // Always let the event continue to propagate; this is a guard, not a
+    // consumer.
+    return false;
   }
 
   void _onTap() {
     if (!widget.enabled) return;
     _focusNode.requestFocus();
     widget.onTap?.call();
+  }
+
+  void _onDpadSelect() {
+    if (_ignoreSelect) return;
+    _onTap();
+  }
+
+  void _onDpadLongSelect() {
+    if (_ignoreSelect) return;
+    final onLongTap = widget.onLongTap;
+    if (onLongTap == null) return;
+    // Fire synchronously. The dpad package invokes onLongSelect from a Timer
+    // callback, never from build, so opening a route here is safe.
+    // addPostFrameCallback is NOT safe here: it registers a callback but does
+    // not schedule a frame, so on a real device the menu sat queued until the
+    // key release triggered the next rebuild — the "menu only opens on
+    // release" bug. Widget tests miss this because pump() forces frames.
+    _focusNode.requestFocus();
+    onLongTap();
   }
 
   bool get _isInteractive =>
@@ -92,8 +174,8 @@ class _DpadInkWellState extends State<DpadInkWell> {
       onExit: (_) => _setHovered(false),
       child: DpadFocusable(
         focusNode: _focusNode,
-        onSelect: widget.onTap == null ? null : _onTap,
-        onLongSelect: widget.onLongTap,
+        onSelect: widget.onTap == null ? null : _onDpadSelect,
+        onLongSelect: widget.onLongTap == null ? null : _onDpadLongSelect,
         enabled: widget.enabled,
         // InkWell handles touch taps; DpadFocusable.onSelect handles D-pad key
         // events. The default tapToSelect: true wraps the child in a
@@ -102,15 +184,17 @@ class _DpadInkWellState extends State<DpadInkWell> {
         // DpadScroll.ensureVisible that can interrupt a fling with an
         // animateTo() counter-animation.
         tapToSelect: false,
-        builder: (context, state, child) => DpadEffect.wrap(
-          context,
-          effects,
-          DpadFocusState(
-            focused: state.focused || _hovered,
-            pressed: state.pressed,
-          ),
-          child,
-        ),
+        builder: (context, state, child) {
+          return DpadEffect.wrap(
+            context,
+            effects,
+            DpadFocusState(
+              focused: state.focused || _hovered,
+              pressed: state.pressed,
+            ),
+            child,
+          );
+        },
         autofocus: widget.autofocus,
         entry: widget.entry,
         scrollPadding: widget.scrollPadding,
@@ -119,6 +203,9 @@ class _DpadInkWellState extends State<DpadInkWell> {
           borderRadius: widget.borderRadius,
           clipBehavior: widget.clipBehavior,
           child: InkWell(
+            // Touch path is intentionally NOT guarded — the guard exists
+            // for inherited D-pad holds from a parent long-press, not for
+            // touch input.
             onTap: widget.enabled && widget.onTap != null ? _onTap : null,
             onLongPress: widget.enabled ? widget.onLongTap : null,
             borderRadius: widget.borderRadius,
