@@ -63,15 +63,21 @@ class _DpadInkWellState extends State<DpadInkWell> {
   // swallows) to the newly focused widget, and a child with `onLongSelect`
   // wired would see its 500ms timer re-armed on every repeat.
   //
-  // On mount, we sample `HardwareKeyboard.logicalKeysPressed` and arm a
-  // global handler ONLY if a select key is already held. The handler
-  // disarms itself on the next select KeyUp. Widgets mounted with no key
-  // held are never armed, so a blanket ignore-window does not regress
-  // normal D-pad taps.
-  bool _ignoreSelect = false;
+  // Only the autofocused item inside the newly-built menu can ever receive
+  // that routed phantom KeyDownEvent, so only it needs to arm the guard.
+  // On mount, we sample the specific select key(s) already held (not just
+  // "a select key is held") and arm a global handler that clears each held
+  // key on its own KeyUp. The guard disarms only once none of the keys held
+  // at mount are still down, so an unrelated select-mapped key (e.g. a
+  // keyboard Enter pressed alongside a held remote select button) can't
+  // prematurely disarm it. Widgets mounted with no key held are never
+  // armed, so a blanket ignore-window does not regress normal D-pad taps.
+  Set<LogicalKeyboardKey> _heldSelectKeys = const {};
   bool _guardChecked = false;
   bool _handlerRegistered = false;
   DpadKeySet? _cachedKeySet;
+
+  bool get _ignoreSelect => _heldSelectKeys.isNotEmpty;
 
   @override
   void dispose() {
@@ -89,13 +95,16 @@ class _DpadInkWellState extends State<DpadInkWell> {
     super.didChangeDependencies();
     if (_guardChecked) return;
     _guardChecked = true;
+    // Only the autofocused item in a freshly-built menu can receive the
+    // routed phantom KeyDownEvent, so only it needs the guard armed.
+    if (!widget.autofocus) return;
     final keys = Dpad.keySetOf(context);
     _cachedKeySet = keys;
-    final selectHeld = HardwareKeyboard.instance.logicalKeysPressed.any(
+    final heldSelectKeys = HardwareKeyboard.instance.logicalKeysPressed.where(
       keys.isSelect,
     );
-    if (selectHeld) {
-      _ignoreSelect = true;
+    if (heldSelectKeys.isNotEmpty) {
+      _heldSelectKeys = heldSelectKeys.toSet();
       HardwareKeyboard.instance.addHandler(_onGlobalKey);
       _handlerRegistered = true;
       DpadInkWell.debugActiveGlobalHandlers++;
@@ -106,13 +115,13 @@ class _DpadInkWellState extends State<DpadInkWell> {
     final keys = _cachedKeySet;
     if (event is KeyUpEvent &&
         keys != null &&
-        keys.isSelect(event.logicalKey)) {
-      _ignoreSelect = false;
-      if (_handlerRegistered) {
-        HardwareKeyboard.instance.removeHandler(_onGlobalKey);
-        _handlerRegistered = false;
-        DpadInkWell.debugActiveGlobalHandlers--;
-      }
+        keys.isSelect(event.logicalKey) &&
+        _heldSelectKeys.remove(event.logicalKey) &&
+        _heldSelectKeys.isEmpty &&
+        _handlerRegistered) {
+      HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+      _handlerRegistered = false;
+      DpadInkWell.debugActiveGlobalHandlers--;
     }
     // Always let the event continue to propagate; this is a guard, not a
     // consumer.

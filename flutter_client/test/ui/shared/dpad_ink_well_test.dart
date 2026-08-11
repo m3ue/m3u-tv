@@ -236,6 +236,49 @@ void main() {
         );
       });
 
+      testWidgets(
+        'd2) an unrelated select-mapped key press/release does not disarm '
+        'the guard while the originally-held key is still down',
+        (tester) async {
+          var innerTapCount = 0;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: _LongPressMenuHost(
+                innerTapRecorder: () => innerTapCount++,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+          await tester.pump(const Duration(milliseconds: 600));
+          await tester.pumpAndSettle();
+          expect(find.text('Inner'), findsOneWidget);
+
+          // A different select-mapped key (e.g. a connected keyboard's
+          // Enter) is pressed and released while select is still held.
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+
+          // The originally-held select key is still down; auto-repeat must
+          // still be ignored.
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+          await tester.pumpAndSettle();
+          expect(
+            innerTapCount,
+            0,
+            reason:
+                'an unrelated select-mapped key up must not disarm the '
+                'guard while the original held key is still down',
+          );
+
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+          await tester.pumpAndSettle();
+        },
+      );
+
       testWidgets('e) touch long press still fires onLongTap at threshold', (
         tester,
       ) async {
@@ -281,6 +324,7 @@ void main() {
             home: Scaffold(
               body: Center(
                 child: DpadInkWell(
+                  autofocus: true,
                   onTap: () {},
                   borderRadius: BorderRadius.circular(8),
                   child: const SizedBox(width: 160, height: 72),
