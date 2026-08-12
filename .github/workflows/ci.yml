@@ -208,7 +208,7 @@ jobs:
             find build/macos -name "*.app" | head -10
             exit 1
           fi
-          EXE="$APP/Contents/MacOS/m3u_tv"
+          EXE="$APP/Contents/MacOS/$(basename "$APP" .app)"
           test -x "$EXE"
           MPV_FRAMEWORK=$(find "$APP/Contents/Frameworks" -iname "*mpv*" -maxdepth 2 | head -1)
           if [ -z "$MPV_FRAMEWORK" ]; then
