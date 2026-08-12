@@ -519,7 +519,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     try {
       await widget.orchestrator.open(source);
       if (_disposed || !mounted || source.isLive) return;
-      if (source.startPosition > Duration.zero) {
+      // open() doesn't throw on failure - it reports the real error via
+      // onError (see _handleError) and leaves no active backend. Seeking
+      // here regardless would throw a generic StateError that overwrites
+      // that already-displayed, more useful error message.
+      if (widget.orchestrator.activeBackend != null &&
+          source.startPosition > Duration.zero) {
         await widget.orchestrator.seek(source.startPosition);
       }
     } on Object catch (error) {

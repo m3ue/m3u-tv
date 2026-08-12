@@ -26,6 +26,7 @@ jobs:
           filters: |
             desktop:
               - 'flutter_client/linux/**'
+              - 'flutter_client/macos/**'
               - 'flutter_client/windows/**'
               - 'flutter_client/lib/**'
               - 'flutter_client/pubspec.yaml'
@@ -164,3 +165,59 @@ jobs:
               throw "Required Windows bundle file is empty: $Path"
             }
           }
+
+  build-macos-native:
+    name: Build macOS runner (verify only)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        run: cd macos && pod install --repo-update
+
+      - name: Resolve Swift Package dependencies
+        run: xcodebuild -resolvePackageDependencies -workspace macos/Runner.xcworkspace -scheme Runner
+
+      - name: Build macOS app (unsigned)
+        env:
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
+        run: flutter build macos --release
+
+      - name: Verify macOS bundle and libmpv linkage
+        run: |
+          APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: .app not found - listing build/macos/:"
+            find build/macos -name "*.app" | head -10
+            exit 1
+          fi
+          EXE="$APP/Contents/MacOS/m3u_tv"
+          test -x "$EXE"
+          MPV_FRAMEWORK=$(find "$APP/Contents/Frameworks" -iname "*mpv*" -maxdepth 2 | head -1)
+          if [ -z "$MPV_FRAMEWORK" ]; then
+            echo "ERROR: no MPVKit/mpv framework found in $APP/Contents/Frameworks"
+            find "$APP/Contents/Frameworks" -maxdepth 2
+            exit 1
+          fi
+          echo "Found mpv framework: $MPV_FRAMEWORK"
+          if otool -L "$EXE" | grep -qi 'not found'; then
+            otool -L "$EXE"
+            exit 1
+          fi

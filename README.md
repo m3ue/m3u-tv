@@ -23,8 +23,7 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 | Android TV | Supported — ExoPlayer via Media3 |
 | Android / iOS / iPadOS | Supported |
 | Apple TV (tvOS) | Supported — AVKit backend via [flutter-tvos](https://github.com/fluttertv/flutter-tvos) |
-| Desktop (Linux / Windows) | Supported — custom in-process libmpv backend |
-| Desktop (macOS) | Supported — media_kit (AVFoundation-backed); libmpv is not planned for this platform |
+| Desktop (Linux / Windows / macOS) | Supported — custom in-process libmpv backend |
 
 ## Tech Stack
 

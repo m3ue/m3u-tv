@@ -16,8 +16,7 @@ This matrix defines the Flutter rewrite playback contract before any native plug
 | --- | --- | --- | --- | --- |
 | Android / Android TV | Android ExoPlayer for common HLS, MPEG-TS, and MP4 streams. | Android MPV fallback for broader containers, advanced codecs, external subtitles, and advanced subtitle formats. | Yes: server-transcoded HLS output when direct/native backends reject unsupported media. | Android TV UI must keep D-pad widgets unchanged while adapter selection changes. |
 | tvOS / iOS Apple path | None — MPVKit is not planned. GPL-3.0 is incompatible with App Store distribution for this app, a firm decision rather than a review gate. | AVKit, the permanent primary backend for platform-native HLS/MP4 playback. | Yes: server-transcoded HLS output when AVKit cannot satisfy the source. | AVKit is narrower than MPVKit (no ASS subtitles or arbitrary containers) and that gap is accepted, not planned to be closed via MPVKit. macOS is not part of this path — see the Desktop Flutter row. |
-| Desktop Flutter (Linux/Windows) | libmpv direct backend via `DesktopLibmpvBackend`. | No external-player fallback is exposed as a contract backend; future platform-native fallback must get its own capability row before use. | Yes: server-transcoded HLS output when libmpv is unavailable or policy rejects the source. | Retired Electron mpv takeover and external launch are behavior references only. |
-| Desktop Flutter (macOS) | media_kit (AVFoundation-backed) via `MediaKitDesktopAdapter`, registered under the `desktopMediaKit` backend key. Not libmpv. | No external-player fallback is exposed as a contract backend. | Yes: server-transcoded HLS output when media_kit cannot satisfy the source. | A native in-process libmpv backend was prototyped and reverted (media_kit already worked correctly); libmpv on macOS is not planned. |
+| Desktop Flutter (Linux/Windows/macOS) | libmpv direct backend via `DesktopLibmpvBackend`, registered under the `desktopLibmpv` backend key on all three desktop platforms. | No external-player fallback is exposed as a contract backend; future platform-native fallback must get its own capability row before use. | Yes: server-transcoded HLS output when libmpv is unavailable or policy rejects the source. | Retired Electron mpv takeover and external launch are behavior references only. macOS bundles the MPVKit framework rather than dlopening a system libmpv (Linux) or bundling a plain DLL (Windows); `MediaKitDesktopAdapter`/`desktopMediaKit` is no longer selected on any platform and is pending removal. |
 | Server Transcode | N/A. | N/A. | HLS playback URL produced by m3u-editor/server transcode contract. | This backend normalizes playback but does not expose direct stream or embedded-track capabilities. |
 
 ## Capability flags by backend
@@ -30,8 +29,7 @@ Legend: Yes means guaranteed by the adapter contract for that backend. No means 
 | Android MPV fallback | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | live-seek |
 | Apple Media Kit (iOS fallback) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | live-seek |
 | Apple AVKit fallback | Yes | Yes | No | Yes | No | Yes | Yes | No | No | Yes | Yes | No | mpeg-ts, advanced-codecs, external-subtitles, advanced-subtitle-formats, live-seek |
-| Desktop libmpv (Linux/Windows) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | live-seek |
-| Desktop Media Kit (macOS) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | live-seek |
+| Desktop libmpv (Linux/Windows/macOS) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | live-seek |
 | Server transcode fallback | No | Yes | No | No | No | No | No | No | No | No | Yes | No | direct-streams, mpeg-ts, mp4, advanced-codecs, audio-track-selection, subtitle-track-selection, embedded-subtitles, external-subtitles, advanced-subtitle-formats, playback-speed, live-seek |
 
 ## UI transparency requirement

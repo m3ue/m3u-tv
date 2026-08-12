@@ -27,8 +27,13 @@ Future<void> main() async {
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
-  // MediaKit (libmpv) is used on desktop and iOS. tvOS uses AVKit exclusively.
-  if (!kIsWeb && !Platform.isAndroid && Platform.operatingSystem != 'tvos') {
+  // MediaKit (libmpv) is only used on iOS via MediaKitIosAdapter now.
+  // Desktop platforms (Linux/Windows/macOS) all use the native
+  // DesktopLibmpvBackend instead, which links its own separate libmpv build
+  // (see macos/Runner/desktop_libmpv_backend.mm) - initializing MediaKit's
+  // bundled libmpv/FFmpeg there too would load two independent copies of
+  // FFmpeg into the same process for no reason.
+  if (!kIsWeb && Platform.operatingSystem == 'ios') {
     MediaKit.ensureInitialized();
   }
   if (!kIsWeb && Platform.isMacOS) {

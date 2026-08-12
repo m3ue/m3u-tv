@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
-import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
 import 'package:m3u_tv/playback/media_kit_ios_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
@@ -135,24 +134,22 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     }
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
-    // Use the in-process C++ libmpv backend (`linux/desktop_libmpv_backend.cc`,
-    // `windows/runner/desktop_libmpv_backend.cpp`) rather than `media_kit_video`
-    // on Linux/Windows. The `media_kit_video` plugin's H/W render path requires
-    // a current EGL context on the platform thread; starting with Flutter 3.38
-    // the EGL context lives exclusively on the raster thread, so
-    // `eglGetCurrentDisplay()` returns `EGL_NO_DISPLAY` and playback falls back
-    // to software texture upload (media-kit/media-kit#1404). The in-process
-    // libmpv backend uses `MPV_RENDER_API_TYPE_SW` with `FlPixelBufferTexture`
-    // and `hwdec=auto-safe`, sidestepping the EGL dependency entirely while
-    // keeping hardware video decode. macOS renders through Metal, not EGL, so
-    // it never hits #1404 and stays on `MediaKitDesktopAdapter` (media_kit) —
-    // a native libmpv backend was prototyped there and reverted since
-    // media_kit already worked correctly; it is not planned for macOS.
-    if (Platform.isMacOS) {
-      adapters[PlaybackBackend.desktopMediaKit] = MediaKitDesktopAdapter();
-    } else {
-      adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
-    }
+    // Use the in-process libmpv backend (`linux/desktop_libmpv_backend.cc`,
+    // `windows/runner/desktop_libmpv_backend.cpp`,
+    // `macos/Runner/desktop_libmpv_backend.mm`) on all desktop platforms
+    // rather than `media_kit_video`. The `media_kit_video` plugin's H/W
+    // render path requires a current EGL context on the platform thread;
+    // starting with Flutter 3.38 the EGL context lives exclusively on the
+    // raster thread, so `eglGetCurrentDisplay()` returns `EGL_NO_DISPLAY` and
+    // playback falls back to software texture upload
+    // (media-kit/media-kit#1404). The in-process libmpv backend uses
+    // `MPV_RENDER_API_TYPE_SW` with a pixel-buffer texture and
+    // `hwdec=auto-safe`, sidestepping the EGL dependency entirely while
+    // keeping hardware video decode. macOS never hit #1404 (it renders
+    // through Metal, not EGL) but now uses the same libmpv backend for
+    // consistency across all three desktop platforms, bundling MPVKit
+    // instead of relying on the system-provided libmpv Linux uses.
+    adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
   }
 
   return PlaybackOrchestrator(

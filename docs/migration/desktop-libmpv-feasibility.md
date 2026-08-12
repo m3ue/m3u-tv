@@ -1,6 +1,6 @@
 # Desktop libmpv Feasibility
 
-Task 7 proves the Flutter desktop path without Electron, external mpv windows, or reparented player processes. The spike adds a `m3u_tv/desktop_libmpv` native method channel on Linux and Windows plus a Dart `DesktopLibmpvBackend` adapter in `flutter_client/lib/playback/desktop_libmpv_backend.dart`. A native macOS implementation was later prototyped and reverted — see "macOS: not planned" below.
+Task 7 proves the Flutter desktop path without Electron, external mpv windows, or reparented player processes. The spike adds a `m3u_tv/desktop_libmpv` native method channel on Linux and Windows plus a Dart `DesktopLibmpvBackend` adapter in `flutter_client/lib/playback/desktop_libmpv_backend.dart`. A native macOS implementation was later prototyped and reverted, and then reinstated once the earlier revert rationale was found to be based on a networking-related misdiagnosis rather than a defect in the approach itself — see "macOS" below.
 
 ## Result matrix
 
@@ -9,7 +9,7 @@ Task 7 proves the Flutter desktop path without Electron, external mpv windows, o
 | Linux Wayland | Active (custom backend) | Flutter GTK window with owned in-process render path | Wayland display handle + libmpv `MPV_RENDER_API_TYPE_SW` + `FlPixelBufferTexture`; `hwdec=auto-safe` | Server-transcode if `libmpv.so.2` unavailable on the host |
 | Linux X11 | Active (custom backend) | Same Flutter GTK window path | X11 display handle + libmpv `MPV_RENDER_API_TYPE_SW` + `FlPixelBufferTexture`; `hwdec=auto-safe` | Server-transcode if `libmpv.so.2` unavailable on the host |
 | Windows | Active (custom backend) | Runner-owned Win32 `HWND` | libmpv render API + RGBA pixel buffer texture (D3D11/ANGLE/OpenGL); `hwdec=auto-safe` | Server-transcode until `mpv-2.dll` bundle is present |
-| macOS | Not planned | media_kit (AVFoundation-backed) via `MediaKitDesktopAdapter` | `media_kit_video` (Metal) | Server-transcode |
+| macOS | Active (custom backend) | Runner-owned `NSWindow`/Flutter texture registrar | libmpv `MPV_RENDER_API_TYPE_SW` (MPVKit) + pixel-buffer `FlutterTexture`; `hwdec=auto-safe` | Server-transcode if the bundled MPVKit framework fails to load |
 
 Executor evidence:
 
@@ -59,9 +59,22 @@ Bundle steps:
 2. Copy `mpv-2.dll` and dependent DLLs into the Flutter Windows install bundle next to `m3u_tv.exe`.
 3. Keep the runner method channel probe in CI; a missing `mpv-2.dll` is a FAIL and must choose server-transcode fallback.
 
-## macOS: not planned
+## macOS packaging
 
-A native in-process libmpv backend for macOS (MPVKit XCFramework via SPM, `MPV_RENDER_API_TYPE_SW` + `FlutterTexture`/`CVPixelBuffer`, mirroring the Linux/Windows shape) was fully implemented and hands-on tested. It worked, but reimplemented — with more bugs along the way (duration detection, scrubbing, a 900% CPU spike from `force-seekable=yes` full-stream probing) — most of what `media_kit_video`'s macOS build already provides out of the box via its own bundled libmpv. Testing confirmed `media_kit_video` on macOS does not hit the EGL bug described below (EGL is a Linux/Windows-only rendering concern there; macOS uses Metal), so there was no upstream bug to route around on this platform in the first place. The custom backend was reverted; macOS stays on `MediaKitDesktopAdapter` (media_kit) indefinitely unless a concrete, reproducible macOS-specific problem justifies revisiting it.
+A native in-process libmpv backend for macOS (MPVKit, `MPV_RENDER_API_TYPE_SW` + `FlutterTexture`/`CVPixelBuffer`, mirroring the Linux/Windows shape) was first prototyped and hands-on tested, then reverted: it reimplemented most of what `media_kit_video`'s macOS build already provides via its own bundled libmpv, and testing at the time attributed a handful of bugs (duration detection, scrubbing, a 900% CPU spike from `force-seekable=yes` full-stream probing) to the custom backend itself. That diagnosis was later found to be wrong — the underlying issue was a networking error unrelated to the libmpv approach, not a defect in the backend. macOS never hit the EGL bug described below (EGL is a Linux/Windows-only rendering concern; macOS uses Metal), but for consistency across all three desktop platforms and since `m3u-tv` is not distributed through the Mac App Store (removing any GPL-3.0/App-Store-compatibility concern for MPVKit), macOS now uses the same in-process `DesktopLibmpvBackend` as Linux and Windows via `macos/Runner/desktop_libmpv_backend.mm`, bundling MPVKit directly into the `.app` (unlike Linux, which dlopens the system-installed libmpv).
+
+MPVKit's macOS build is only available via **Swift Package Manager** (`https://github.com/mpvkit/MPVKit`, pinned to `1.0.0`), not CocoaPods — the CocoaPods `MPVKit` pod on trunk only ships iOS/tvOS binary slices and fails `pod install` outright on a macOS target. The SPM package's binary product is named `MPVKit`, but its headers are exposed through a separate `Libmpv` module (`#import <Libmpv/mpv/client.h>` / `<Libmpv/mpv/render.h>`) whose actual embedded framework is `Contents/Frameworks/Mpv.framework` (nested inside a `Libmpv.framework` wrapper directory — an upstream MPVKit packaging quirk, not something introduced here). This required bumping the macOS deployment target from 10.15 to 12.0 in `macos/Podfile:1` and every `MACOSX_DEPLOYMENT_TARGET` in `project.pbxproj` (MPVKit's `Package.swift` requires `.macOS(.v12)`). `force-seekable=yes` was deliberately not re-added; re-test before adding it if duration/seek behavior needs it.
+
+Required binaries beside the app executable:
+
+- `Contents/Frameworks/Mpv.framework`, resolved via Swift Package Manager (`Package.resolved` checked in under `macos/Runner.xcworkspace/xcshareddata/swiftpm/` and `macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/`) rather than CocoaPods.
+- Its bundled FFmpeg/libass/etc. dependencies, shipped as part of the same framework.
+
+Bundle steps:
+
+1. `xcodebuild -resolvePackageDependencies` (or the equivalent resolution `flutter build macos` triggers automatically via its underlying `xcodebuild` invocation) fetches and checks out the pinned MPVKit SPM package.
+2. `flutter build macos --release` produces the `.app` with `Mpv.framework` already embedded via the Runner target's package product dependency.
+3. The existing macOS codesign step (`.github/workflows/release.yml` `build-macos` job) already signs every `.framework`/`.dylib` it finds in the bundle, so no separate signing step is needed for MPVKit specifically — but CI verifies the framework's presence before signing (see "Verify macOS bundle and libmpv linkage" in that job, which matches on `*mpv*` case-insensitively to catch the `Mpv.framework`/`Libmpv.framework` naming quirk).
 
 ## Test command
 
@@ -80,9 +93,9 @@ PATH=/tmp/opencode/bin:/usr/bin:/bin:/tmp/flutter/bin /tmp/flutter/bin/flutter t
 
 The equivalent command reached the next host prerequisite failure: missing `gtk+-3.0`. Once GTK dev files and libmpv runtime are installed, the same test should either play the fixture HLS in-process or report a server-transcode fallback decision from the native probe.
 
-## Current status (2026-07-16)
+## Current status (2026-08-12)
 
-The in-process custom backend is wired into the desktop orchestrator path for Linux and Windows (`lib/navigation/app_router.dart`, `Platform.isMacOS ? MediaKitDesktopAdapter() : DesktopLibmpvBackend()`). macOS uses `MediaKitDesktopAdapter` intentionally and permanently — see "macOS: not planned" above.
+The in-process custom backend is wired into the desktop orchestrator path for all three desktop platforms (`lib/navigation/app_router.dart` unconditionally sets `adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend()` for `PlaybackPlatform.desktop`). `MediaKitDesktopAdapter` is no longer selected anywhere; the class and its `media_kit`/`media_kit_video`/`media_kit_libs_macos_video` dependencies remain in the codebase pending a follow-up cleanup once the macOS libmpv backend is verified in production.
 
 ### Why the swap
 
@@ -106,6 +119,5 @@ The in-process custom backend is wired into the desktop orchestrator path for Li
 
   Both failures are stale test expectations, not runtime defects. They are tracked here instead of fixed because the production path now routes through this backend and the underlying behavior is the intended design.
 
-- **macOS intentionally has no in-process custom backend.** `Platform.isMacOS` uses `MediaKitDesktopAdapter`, which is not subject to the #1404 EGL bug (macOS renders through Metal). See "macOS: not planned" above for the prototype-and-revert history.
 - **Subtitle rendering is not exposed by `DesktopLibmpvBackend`** (it does not implement `SubtitleControllerProvider`). `PlaybackOrchestrator.activeSubtitleController` returns `null` for the desktop backend path, so `SubtitleView`-based rendering does not appear on Linux/Windows. This matches the prior design (`docs/migration/desktop-libmpv-feasibility.md` predates this requirement) but should be revisited if external subtitles need to be added.
 - **libmpv is loaded from the system package**, not bundled. The host needs `libmpv.so.2` (or `.1`/`.so`) on `LD_LIBRARY_PATH` or in `/usr/lib`. This is fine for distro installs and most developer machines, but portable AppImage/snap/flatpak bundles will need to vendor libmpv alongside the binary per the original `Bundle steps` section above.

@@ -540,6 +540,14 @@ jobs:
       - name: Install CocoaPods dependencies
         run: cd macos && pod install --repo-update
 
+      - name: Resolve Swift Package dependencies
+        # MPVKit (macOS libmpv backend) is vendored via SPM, not CocoaPods -
+        # the CocoaPods MPVKit pod has no macOS binary slices. Resolve
+        # separately for a clearer failure than a generic xcodebuild error if
+        # the pinned package (see macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved)
+        # can't be fetched.
+        run: xcodebuild -resolvePackageDependencies -workspace macos/Runner.xcworkspace -scheme Runner
+
       - name: Build macOS app (unsigned)
         # Sign separately after build so we control the identity and entitlements.
         env:
@@ -549,6 +557,32 @@ jobs:
           FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
         run: |
           flutter build macos --release
+
+      - name: Verify macOS bundle and libmpv linkage
+        # Bundled MPVKit is GPL-3.0 - accepted for direct-to-GitHub DMG
+        # distribution since this app is not published through the Mac App
+        # Store. See docs/release/license-notices-checklist.md.
+        run: |
+          APP=$(find build/macos -name "*.app" -path "*/Release/*" | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: .app not found - listing build/macos/:"
+            find build/macos -name "*.app" | head -10
+            exit 1
+          fi
+          EXE="$APP/Contents/MacOS/m3u_tv"
+          test -x "$EXE"
+          MPV_FRAMEWORK=$(find "$APP/Contents/Frameworks" -iname "*mpv*" -maxdepth 2 | head -1)
+          if [ -z "$MPV_FRAMEWORK" ]; then
+            echo "ERROR: no MPVKit/mpv framework found in $APP/Contents/Frameworks - the DesktopLibmpvBackend adapter will fail to load at runtime."
+            find "$APP/Contents/Frameworks" -maxdepth 2
+            exit 1
+          fi
+          echo "Found mpv framework: $MPV_FRAMEWORK"
+          if otool -L "$EXE" | grep -qi 'not found'; then
+            echo "ERROR: unresolved dynamic dependency in $EXE"
+            otool -L "$EXE"
+            exit 1
+          fi
 
       - name: Sign app bundle
         # Notarization requires: Developer ID Application cert, Hardened Runtime

@@ -27,45 +27,45 @@ This document records the third-party dependency license notices that must be in
 ## Desktop Playback Dependencies (Future-Gated)
 
 ### mpv / libmpv
-- **Scope**: Linux and Windows desktop in-process playback.
+- **Scope**: Linux, Windows, and macOS desktop in-process playback. macOS bundles the MPVKit framework (see below) rather than the system/dlopen'd libmpv Linux uses or the plain DLL Windows bundles.
 - **License**: LGPL-2.1+ (libmpv client library). The mpv core contains GPL-2.0+ components.
 - **Notice requirement**: If libmpv is linked dynamically, include LGPL notices and provide a written offer for the source if distributing binaries. If linked statically or if GPL-only components are included, the entire artifact may become GPL-derived.
-- **Status**: Future-gated for Android; active for Linux/Windows desktop only where libmpv is packaged.
-- **Gate**: Do not ship GPL-only binaries or GPL-derived code in a store/direct-download artifact unless the release owner explicitly accepts GPL distribution obligations and records that decision in release evidence.
+- **Status**: Future-gated for Android; active for Linux/Windows/macOS desktop where libmpv is packaged.
+- **Gate**: Do not ship GPL-only binaries or GPL-derived code in a store/direct-download artifact unless the release owner explicitly accepts GPL distribution obligations and records that decision in release evidence. On macOS, MPVKit itself is GPL-3.0 (see "MPVKit" below) — accepted for this app's direct-to-GitHub DMG distribution, since it is not published through the Mac App Store.
 
 ### FFmpeg
-- **Scope**: Bundled with libmpv on Linux/Windows desktop.
+- **Scope**: Bundled with libmpv on Linux/Windows desktop, and with MPVKit on macOS.
 - **License**: LGPL-2.1+ or GPL-2.0+ depending on build configuration (codecs, filters, and protocols enabled).
 - **Notice requirement**: Include FFmpeg license notices. If using GPL-enabled FFmpeg build, the same GPL policy as mpv applies.
-- **Status**: Desktop-only, bundled as part of libmpv runtime.
+- **Status**: Desktop-only, bundled as part of the libmpv/MPVKit runtime.
 - **Gate**: Verify the exact FFmpeg build flags and license before distribution. GPL-enabled FFmpeg makes the artifact GPL-derived.
 
 ### libass
-- **Scope**: Subtitle rendering in libmpv.
+- **Scope**: Subtitle rendering in libmpv/MPVKit.
 - **License**: ISC / BSD-style (libass itself). Some dependencies may have different licenses.
 - **Notice requirement**: Include libass license notices in bundled desktop artifacts.
-- **Status**: Desktop-only, bundled with libmpv.
+- **Status**: Desktop-only, bundled with libmpv/MPVKit.
 - **Gate**: Verify libass and its dependency notices are present.
 
 ## Apple Playback Dependencies
 
 ### AVKit / AVPlayer
-- **Scope**: iOS, iPadOS, and tvOS playback (permanent primary backend, not a fallback pending MPVKit approval). macOS uses media_kit instead — see the Desktop Playback Dependencies section.
+- **Scope**: iOS, iPadOS, and tvOS playback (permanent primary backend, not a fallback pending MPVKit approval). macOS uses a native libmpv/MPVKit backend instead — see the Desktop Playback Dependencies section.
 - **License**: Apple proprietary framework; no additional third-party notice required beyond Apple standard terms.
 - **Status**: Safe, permanent path for iOS/iPadOS/tvOS.
 - **Gate**: No additional license gate beyond standard Apple distribution terms.
 
-### MPVKit (Not planned, iOS/tvOS)
-- **Scope**: Broad-codec playback via MPVKit framework. Not planned for iOS/tvOS — GPL-3.0 is incompatible with App Store distribution for this app, a firm decision rather than a pending review gate. Not planned for macOS either — macOS stays on media_kit/AVKit; a native libmpv backend was prototyped and reverted there.
-- **License**: GPL/LGPL (same as mpv/libmpv).
-- **Status**: Not planned. This section is kept only as reference in case the decision is ever revisited.
-- **Gate**: Do not ship MPVKit in a store artifact without explicit GPL acceptance and license review evidence.
+### MPVKit
+- **Scope**: Broad-codec playback via the MPVKit framework, bundled into the macOS desktop `.app` (see Desktop Playback Dependencies → mpv / libmpv). **Not planned for iOS/tvOS** — GPL-3.0 is incompatible with Apple App Store distribution for this app, a firm decision rather than a pending review gate.
+- **License**: GPL-3.0.
+- **Status**: Active on macOS desktop only. Distribution is direct-to-GitHub-Release DMG, not the Mac App Store, so the GPL-3.0/App-Store-incompatibility concern that previously blocked this on macOS as well does not apply; the GPL Policy Gate below has been explicitly accepted for the macOS desktop artifact.
+- **Gate**: Do not ship MPVKit in an App Store artifact (iOS/tvOS/Mac App Store) without explicit GPL acceptance and license review evidence — none is planned for those. macOS direct-download DMG distribution is the accepted GPL path; see GPL Policy Gate below.
 
 ## GPL Policy Gate
 
 - **Rule**: Do not ship GPL-only binaries, GPL-derived code, or Plezy reference code in a store/direct-download artifact unless the release owner explicitly accepts the GPL distribution obligations and records that decision in release evidence.
-- **Scope**: This applies to mpv core, GPL-enabled FFmpeg builds, and any statically linked GPL components.
-- **Safe path**: Media3/ExoPlayer on Android, AVKit on Apple, and dynamically linked LGPL libmpv on desktop (with proper notices and source offer) are the safe default paths.
+- **Scope**: This applies to mpv core, GPL-enabled FFmpeg builds, MPVKit (GPL-3.0), and any statically linked GPL components.
+- **Safe path**: Media3/ExoPlayer on Android and AVKit on iOS/iPadOS/tvOS are the safe default paths for those platforms (no store-compatibility question). Desktop (Linux/Windows/macOS) ships GPL-inclusive libmpv/MPVKit builds via direct-to-GitHub DMG/ZIP distribution — not any app store — which is the accepted path for this app's GPL Policy Gate decision.
 - **Evidence requirement**: Any release that includes GPL components must have a signed-off license review document saved with the artifact evidence.
 
 ## Release Artifact Checklist
@@ -83,5 +83,5 @@ Before any store or sideload release, verify:
 ## Honest Blockers
 
 - License notice generation and review are not automated in this repository. Each platform release must manually verify the generated notices before distribution.
-- Desktop Linux/Windows release artifacts cannot be built or validated on this host due to missing toolchain and runtime dependencies. License notice validation for desktop must happen on the target platform build host.
+- Desktop Linux/Windows/macOS release artifacts cannot be built or validated on this host due to missing toolchain and runtime dependencies. License notice validation for desktop must happen on the target platform build host.
 - Apple platform release artifacts require Xcode and macOS host validation.

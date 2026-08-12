@@ -65,8 +65,6 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.2):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - media_kit_libs_macos_video (1.0.4):
-    - FlutterMacOS
   - media_kit_video (0.0.1):
     - FlutterMacOS
   - nanopb (3.30910.0):
@@ -95,7 +93,6 @@ DEPENDENCIES:
   - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
   - flutter_secure_storage_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - media_kit_libs_macos_video (from `Flutter/ephemeral/.symlinks/plugins/media_kit_libs_macos_video/macos`)
   - media_kit_video (from `Flutter/ephemeral/.symlinks/plugins/media_kit_video/macos`)
   - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
@@ -127,8 +124,6 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin
   FlutterMacOS:
     :path: Flutter/ephemeral
-  media_kit_libs_macos_video:
-    :path: Flutter/ephemeral/.symlinks/plugins/media_kit_libs_macos_video/macos
   media_kit_video:
     :path: Flutter/ephemeral/.symlinks/plugins/media_kit_video/macos
   package_info_plus:
@@ -146,28 +141,27 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Firebase: e8400c058702940d53f31fc0653e4e7a06332326
-  firebase_core: 0e7f6bce042ff613c2b497e6af4a5f901d855675
-  firebase_messaging: 5f817fe5f8dabddaadafa6e94fd7f216b0413654
+  firebase_core: e8b60facc016cf2a8fe661b9f673d3e78cce8f82
+  firebase_messaging: 099b5d66e39eb1be87ff26e5471cd34fd23c556d
   FirebaseCore: 52d4512296984a44a8c8870c6494870fc7aeee2f
   FirebaseCoreInternal: 3b310521b34a51ce3a6c605e4618b9aef8f6c112
   FirebaseInstallations: bd8e80f51d4c8bdc6c872011dede0b800c5b49ea
   FirebaseMessaging: 313d69fe6529c8846813d1660b65d7d38bc16954
-  flutter_local_notifications: 14e285ca39907db50704f7f46c9ab7a526bd7ead
-  flutter_secure_storage_darwin: 79a377dfb00a246ccab2c64fe79d4d78c89e0fbc
+  flutter_local_notifications: 1fc7ffb10a83d6a2eeeeddb152d43f1944b0aad0
+  flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
-  media_kit_libs_macos_video: b3e2bbec2eef97c285f2b1baa7963c67c753fb82
-  media_kit_video: c75b07f14d59706c775778e4dd47dd027de8d1e5
+  media_kit_video: 28d7d27611c7769a2464eb7621c37386a61dcc9a
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  package_info_plus: 12f1c5c2cfe8727ca46cbd0b26677728972d9a5b
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
-  screen_retriever_macos: 038d3f7b34a779b06f536842003e41e8ec1fb4b7
-  sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
-  url_launcher_macos: 175a54c831f4375a6cf895875f716ee5af3888ce
-  wakelock_plus: 9d63063ffb7af1c215209769067c57103bde719d
-  window_manager: e25faf20d88283a0d46e7b1a759d07261ca27575
+  screen_retriever_macos: c5508cc3c66ff0d4db650480cf0ab691e220d933
+  sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
+  wakelock_plus: 917609be14d812ddd9e9528876538b2263aaa03b
+  window_manager: b729e31d38fb04905235df9ea896128991cad99e
 
-PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+PODFILE CHECKSUM: 66e6f3145dd4ef70c4a20649834d2b2816f67124
 
 COCOAPODS: 1.16.2
