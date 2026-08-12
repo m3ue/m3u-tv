@@ -170,7 +170,12 @@ Object? _decodeCacheData(String key, Object? raw) {
               epgChannelId: _nullableString(json['epg_channel_id']),
               tvgName: _nullableString(json['tvg_name']),
               catchupSupported: _asBool(json['catchup_supported']),
-              catchupDays: _asIntOrNull(json['catchup_days']),
+              catchupDays: json.containsKey('catchup_days')
+                  ? _positiveIntOrNull(json['catchup_days']) ?? 0
+                  : null,
+              catchupRetentionHours: json.containsKey('catchup_retention_hours')
+                  ? _positiveIntOrNull(json['catchup_retention_hours']) ?? 0
+                  : null,
               catchupSource: _nullableString(json['catchup_source']),
             );
           })
@@ -221,6 +226,8 @@ Map<String, Object?> _channelToJson(Channel channel) => <String, Object?>{
   if (channel.tvgName != null) 'tvg_name': channel.tvgName,
   if (channel.catchupSupported) 'catchup_supported': channel.catchupSupported,
   if (channel.catchupDays != null) 'catchup_days': channel.catchupDays,
+  if (channel.catchupRetentionHours != null)
+    'catchup_retention_hours': channel.catchupRetentionHours,
   if (channel.catchupSource != null) 'catchup_source': channel.catchupSource,
 };
 
@@ -253,6 +260,11 @@ int? _asIntOrNull(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse('$value');
+}
+
+int? _positiveIntOrNull(Object? value) {
+  final parsed = _asIntOrNull(value);
+  return parsed != null && parsed > 0 ? parsed : null;
 }
 
 double? _asDouble(Object? value) =>

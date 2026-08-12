@@ -139,7 +139,11 @@ class _EpgScreenState extends State<EpgScreen> {
                           ),
                           if (channel.catchupSupported) ...[
                             const SizedBox(width: 6),
-                            CatchupBadge(days: channel.catchupDays),
+                            CatchupBadge(
+                              days: channel.catchupDays == 0
+                                  ? null
+                                  : channel.catchupDays,
+                            ),
                           ],
                         ],
                       ),
@@ -246,7 +250,11 @@ class _EpgScreenState extends State<EpgScreen> {
                     ),
                     if (channel.catchupSupported) ...[
                       const SizedBox(height: 4),
-                      CatchupBadge(days: channel.catchupDays),
+                      CatchupBadge(
+                        days: channel.catchupDays == 0
+                            ? null
+                            : channel.catchupDays,
+                      ),
                     ],
                     if (epg != null) ...[
                       const SizedBox(height: 4),

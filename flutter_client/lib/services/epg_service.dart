@@ -46,6 +46,44 @@ class EpgService extends ChangeNotifier {
     return !program.start.isBefore(earliest);
   }
 
+  static bool canReplayForChannel(
+    Channel channel,
+    EpgProgram program,
+    DateTime now,
+  ) => canReplayForRetention(
+    catchupSupported: channel.catchupSupported,
+    catchupDays: channel.catchupDays,
+    catchupRetentionHours: channel.catchupRetentionHours,
+    program: program,
+    now: now,
+  );
+
+  static bool canReplayForRetention({
+    required bool catchupSupported,
+    required int? catchupDays,
+    required int? catchupRetentionHours,
+    required EpgProgram program,
+    required DateTime now,
+  }) {
+    final retentionHours = catchupRetentionHours;
+    if (retentionHours != null) {
+      return catchupSupported &&
+          retentionHours > 0 &&
+          program.end.isBefore(now) &&
+          !program.start.isBefore(
+            now.subtract(Duration(hours: retentionHours)),
+          );
+    }
+    return canReplay(
+      effectiveCatchupRetentionDays(
+        catchupSupported,
+        catchupDays,
+      ),
+      program,
+      now,
+    );
+  }
+
   final Clock _clock;
   static const retryBackoff = Duration(minutes: 1);
   Duration cacheTtl;
@@ -274,14 +312,9 @@ class EpgService extends ChangeNotifier {
   /// Returns [channel]'s replayable catchup programs, most-recent-first.
   /// Empty if the channel doesn't support catchup or none currently qualify.
   List<EpgProgram> catchupProgramsForChannel(Channel channel) {
-    final retentionDays = effectiveCatchupRetentionDays(
-      channel.catchupSupported,
-      channel.catchupDays,
-    );
-    if (retentionDays <= 0) return const <EpgProgram>[];
     final programs = programsForChannel(
       channel,
-    ).where((p) => canReplay(retentionDays, p, now)).toList();
+    ).where((p) => canReplayForChannel(channel, p, now)).toList();
     return programs.reversed.toList();
   }
 

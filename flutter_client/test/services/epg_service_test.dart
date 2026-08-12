@@ -10,6 +10,7 @@ void main() {
   Channel channel({
     bool catchupSupported = true,
     int? catchupDays,
+    int? catchupRetentionHours,
     String name = 'Test Channel',
   }) => Channel(
     id: 1,
@@ -17,6 +18,7 @@ void main() {
     streamUrl: 'https://streams.example/live/1.m3u8',
     catchupSupported: catchupSupported,
     catchupDays: catchupDays,
+    catchupRetentionHours: catchupRetentionHours,
   );
 
   EpgProgram program(
@@ -106,6 +108,29 @@ void main() {
       final results = service.catchupProgramsForChannel(ch);
       expect(results, hasLength(1));
       expect(results.single.start, earliest);
+    });
+
+    test('uses precise hour retention when it is available', () {
+      final service = serviceAt(fixedNow);
+      final ch = channel(catchupDays: 7, catchupRetentionHours: 4);
+      final expired = program(
+        ch.name,
+        title: 'Expired',
+        start: fixedNow.subtract(const Duration(hours: 5)),
+        end: fixedNow.subtract(const Duration(hours: 4)),
+      );
+      final available = program(
+        ch.name,
+        title: 'Available',
+        start: fixedNow.subtract(const Duration(hours: 3)),
+        end: fixedNow.subtract(const Duration(hours: 2)),
+      );
+      service.loadPrograms([expired, available]);
+
+      expect(
+        service.catchupProgramsForChannel(ch).map((p) => p.title),
+        ['Available'],
+      );
     });
 
     test(

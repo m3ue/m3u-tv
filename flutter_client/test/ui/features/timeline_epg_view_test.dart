@@ -589,6 +589,136 @@ void main() {
     });
 
     testWidgets(
+      'partial hourly retention replays exactly without exposing a prior day',
+      (tester) async {
+        final now = DateTime(2026, 7, 31, 12);
+        const channel = Channel(
+          id: 101,
+          name: 'Four Hour Archive',
+          streamUrl: 'https://streams.example/live/101.m3u8',
+          epgChannelId: 'four-hours',
+          catchupSupported: true,
+          catchupRetentionHours: 4,
+        );
+        const unsupportedChannel = Channel(
+          id: 102,
+          name: 'Unsupported Archive',
+          streamUrl: 'https://streams.example/live/102.m3u8',
+          epgChannelId: 'unsupported-hours',
+          catchupRetentionHours: 4,
+        );
+        final replayable = EpgProgram(
+          channelId: 'four-hours',
+          title: 'At Hourly Cutoff',
+          description: 'Replayable fixture',
+          start: DateTime(2026, 7, 31, 8),
+          end: DateTime(2026, 7, 31, 11),
+        );
+        final expired = EpgProgram(
+          channelId: 'four-hours',
+          title: 'Outside Four Hours',
+          description: 'Expired fixture',
+          start: DateTime(2026, 7, 31, 6),
+          end: DateTime(2026, 7, 31, 7),
+        );
+        final unsupported = EpgProgram(
+          channelId: 'unsupported-hours',
+          title: 'No Catchup Support',
+          description: 'Unavailable fixture',
+          start: DateTime(2026, 7, 31, 9),
+          end: DateTime(2026, 7, 31, 10),
+        );
+        final requestedDates = <DateTime>[];
+        final replayedPrograms = <EpgProgram>[];
+        final selectedChannels = <Channel>[];
+        final epg = EpgService(clock: () => now)
+          ..loadPrograms([replayable, expired, unsupported]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 300,
+                child: TimelineEpgView(
+                  channels: const [channel, unsupportedChannel],
+                  epgService: epg,
+                  onChannelSelect: selectedChannels.add,
+                  onCatchupProgramSelect: (_, program) {
+                    replayedPrograms.add(program);
+                  },
+                  onEnsureEpg: (_, {startDate, endDate}) {
+                    requestedDates.add(startDate!);
+                  },
+                  clock: () => now,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          _dateControlFocusable(
+            tester,
+            const ValueKey('timeline-previous-day'),
+          ).enabled,
+          isFalse,
+        );
+        await tester.tap(find.byKey(const ValueKey('timeline-previous-day')));
+        await tester.pump();
+        expect(find.text('Jul 31, 2026'), findsOneWidget);
+        expect(requestedDates, everyElement(DateTime(2026, 7, 31)));
+
+        final replayableBlock = find.byKey(
+          ValueKey(
+            'timeline-program-${replayable.channelId}-${replayable.start.toIso8601String()}',
+          ),
+        );
+        final expiredBlock = find.byKey(
+          ValueKey(
+            'timeline-program-${expired.channelId}-${expired.start.toIso8601String()}',
+          ),
+        );
+        final unsupportedBlock = find.byKey(
+          ValueKey(
+            'timeline-program-${unsupported.channelId}-${unsupported.start.toIso8601String()}',
+          ),
+        );
+        expect(
+          find.descendant(
+            of: replayableBlock,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: expiredBlock,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: unsupportedBlock,
+            matching: find.byIcon(Icons.replay_rounded),
+          ),
+          findsNothing,
+        );
+
+        tester.widget<DpadInkWell>(replayableBlock).onTap?.call();
+        tester.widget<DpadInkWell>(expiredBlock).onTap?.call();
+        tester.widget<DpadInkWell>(unsupportedBlock).onTap?.call();
+        expect(replayedPrograms, [replayable]);
+        expect(selectedChannels, [channel, unsupportedChannel]);
+      },
+    );
+
+    testWidgets(
       'spring-forward navigation and window keep calendar boundaries',
       (tester) async {
         final now = DateTime(2026, 3, 30, 12);

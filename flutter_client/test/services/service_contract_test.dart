@@ -205,7 +205,7 @@ void main() {
       expect(transport.lastHeaders['X-M3UE-Client'], 'm3u-tv');
     });
 
-    test('live streams parse Xtream catchup metadata', () async {
+    test('live streams preserve Xtream archive duration in hours', () async {
       final service = XtreamService(
         transport: FakeXtreamTransport({
           'auth': xtreamAuth(auth: 1),
@@ -213,9 +213,24 @@ void main() {
             {
               ...liveStream(101, 'BBC One', '10', 'bbc.one'),
               'tv_archive': 1,
-              'tv_archive_duration': '7',
+              'tv_archive_duration': '4',
             },
-            liveStream(102, 'BBC Two', '10', 'bbc.two'),
+            {
+              ...liveStream(102, 'BBC Two', '10', 'bbc.two'),
+              'tv_archive': 1,
+              'tv_archive_duration': '24',
+            },
+            {
+              ...liveStream(103, 'BBC Three', '10', 'bbc.three'),
+              'tv_archive': 1,
+              'tv_archive_duration': '48',
+            },
+            {
+              ...liveStream(104, 'BBC Four', '10', 'bbc.four'),
+              'tv_archive': 1,
+              'tv_archive_duration': '168',
+            },
+            liveStream(105, 'BBC Five', '10', 'bbc.five'),
           ],
         }).call,
       );
@@ -230,9 +245,72 @@ void main() {
       final channels = await service.getLiveStreams();
 
       expect(channels.first.catchupSupported, isTrue);
-      expect(channels.first.catchupDays, 7);
+      expect(channels.map((channel) => channel.catchupRetentionHours), [
+        4,
+        24,
+        48,
+        168,
+        isNull,
+      ]);
+      expect(channels.map((channel) => channel.catchupDays), [
+        0,
+        1,
+        2,
+        7,
+        isNull,
+      ]);
       expect(channels.last.catchupSupported, isFalse);
-      expect(channels.last.catchupDays, isNull);
+    });
+
+    test('live streams retain direct M3U catchup day semantics', () {
+      final underscore = Channel.fromXtream(const {
+        'stream_id': 101,
+        'name': 'Underscore Days',
+        'tv_archive': 1,
+        'catchup_days': '7',
+      }, 'https://streams.example/live/101.m3u8');
+      final hyphen = Channel.fromXtream(const {
+        'stream_id': 102,
+        'name': 'Hyphen Days',
+        'tv_archive': 1,
+        'catchup-days': '2',
+      }, 'https://streams.example/live/102.m3u8');
+
+      expect(underscore.catchupDays, 7);
+      expect(underscore.catchupRetentionHours, isNull);
+      expect(hyphen.catchupDays, 2);
+      expect(hyphen.catchupRetentionHours, isNull);
+    });
+
+    test('live streams fail closed for invalid catchup retention metadata', () {
+      final invalidHours = Channel.fromXtream(const {
+        'stream_id': 101,
+        'name': 'Invalid Hours',
+        'tv_archive': 1,
+        'tv_archive_duration': 'bad',
+      }, 'https://streams.example/live/101.m3u8');
+      final unavailableHours = Channel.fromXtream(const {
+        'stream_id': 102,
+        'name': 'Unavailable Hours',
+        'tv_archive': 1,
+      }, 'https://streams.example/live/102.m3u8');
+      final zeroDays = Channel.fromXtream(const {
+        'stream_id': 103,
+        'name': 'Zero Days',
+        'tv_archive': 1,
+        'catchup_days': 0,
+      }, 'https://streams.example/live/102.m3u8');
+      final negativeDays = Channel.fromXtream(const {
+        'stream_id': 104,
+        'name': 'Negative Days',
+        'tv_archive': 1,
+        'catchup-days': -1,
+      }, 'https://streams.example/live/103.m3u8');
+
+      expect(invalidHours.catchupRetentionHours, 0);
+      expect(unavailableHours.catchupRetentionHours, 0);
+      expect(zeroDays.catchupDays, 0);
+      expect(negativeDays.catchupDays, 0);
     });
 
     test('builds Xtream catchup timeshift URL from program window', () async {
@@ -1106,7 +1184,7 @@ void main() {
       },
     );
 
-    test('cache preserves channel catchup metadata', () async {
+    test('cache preserves precise channel catchup retention metadata', () async {
       final file = io.File(
         '${io.Directory.systemTemp.path}/m3u_tv_cache_catchup_${DateTime.now().microsecondsSinceEpoch}.json',
       );
@@ -1121,7 +1199,7 @@ void main() {
           name: 'BBC One',
           streamUrl: 'https://streams.example/live/bbc-one.m3u8',
           catchupSupported: true,
-          catchupDays: 7,
+          catchupRetentionHours: 168,
           catchupSource: 'https://archive.example/{utc}/{duration}',
         ),
       ]);
@@ -1131,11 +1209,41 @@ void main() {
       ).get<List<Channel>>('liveStreams');
 
       expect(restored?.data.single.catchupSupported, isTrue);
-      expect(restored?.data.single.catchupDays, 7);
+      expect(restored?.data.single.catchupRetentionHours, 168);
+      expect(restored?.data.single.catchupDays, isNull);
       expect(
         restored?.data.single.catchupSource,
         'https://archive.example/{utc}/{duration}',
       );
+    });
+
+    test('cache reads legacy catchup_days as days', () async {
+      final file = io.File(
+        '${io.Directory.systemTemp.path}/m3u_tv_cache_legacy_catchup_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+      final store = PersistentJsonStore(file: file);
+      await store.write('m3ue_cache_liveStreams', <String, Object?>{
+        'timestamp': DateTime.now().toIso8601String(),
+        'data': [
+          {
+            'stream_id': 101,
+            'name': 'BBC One',
+            'stream_url': 'https://streams.example/live/bbc-one.m3u8',
+            'catchup_supported': true,
+            'catchup_days': 7,
+          },
+        ],
+      });
+
+      final restored = await CacheService(store: store).get<List<Channel>>(
+        'liveStreams',
+      );
+
+      expect(restored?.data.single.catchupDays, 7);
+      expect(restored?.data.single.catchupRetentionHours, isNull);
     });
 
     test('favorites add and remove channel ids', () async {

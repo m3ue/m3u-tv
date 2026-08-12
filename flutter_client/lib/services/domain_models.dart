@@ -72,6 +72,7 @@ class Channel {
     this.headers = const {},
     this.catchupSupported = false,
     this.catchupDays,
+    this.catchupRetentionHours,
     this.catchupSource,
   });
 
@@ -86,15 +87,24 @@ class Channel {
   final Map<String, String> headers;
   final bool catchupSupported;
   final int? catchupDays;
+  final int? catchupRetentionHours;
   final String? catchupSource;
 
   factory Channel.fromXtream(Map<String, Object?> json, String streamUrl) {
     final catchupSource = _asNullableString(json['catchup_source']);
-    final catchupDays = _asIntOrNull(
-      json['tv_archive_duration'] ??
-          json['catchup_days'] ??
-          json['catchup-days'],
-    );
+    final hasCatchupDays =
+        json.containsKey('catchup_days') || json.containsKey('catchup-days');
+    final catchupRetentionHours =
+        !hasCatchupDays &&
+            (json.containsKey('tv_archive_duration') ||
+                _asBool(json['tv_archive']))
+        ? _positiveIntOrNull(json['tv_archive_duration']) ?? 0
+        : null;
+    final catchupDays = hasCatchupDays
+        ? _positiveIntOrNull(json['catchup_days'] ?? json['catchup-days']) ?? 0
+        : catchupRetentionHours == null
+        ? null
+        : catchupRetentionHours ~/ Duration.hoursPerDay;
     final catchupType = _asNullableString(json['catchup']);
     final hasCatchupType = catchupType != null && catchupType != '0';
     final catchupSupported =
@@ -108,6 +118,7 @@ class Channel {
       epgChannelId: _asNullableString(json['epg_channel_id']),
       catchupSupported: catchupSupported,
       catchupDays: catchupDays,
+      catchupRetentionHours: catchupRetentionHours,
       catchupSource: catchupSource,
     );
   }
@@ -1314,6 +1325,11 @@ int? _asIntOrNull(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse('$value');
+}
+
+int? _positiveIntOrNull(Object? value) {
+  final parsed = _asIntOrNull(value);
+  return parsed != null && parsed > 0 ? parsed : null;
 }
 
 double? _asDoubleOrNull(Object? value) {

@@ -179,14 +179,25 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
   DateTime _offsetDate(DateTime value, int days) =>
       DateTime(value.year, value.month, value.day + days);
 
-  int get _maxCatchupDays => widget.channels
-      .map(
-        (channel) => EpgService.effectiveCatchupRetentionDays(
-          channel.catchupSupported,
-          channel.catchupDays,
-        ),
-      )
-      .fold(0, math.max);
+  int _catchupNavigationDays(Channel channel) {
+    final retentionHours = channel.catchupRetentionHours;
+    if (retentionHours != null) {
+      return channel.catchupSupported && retentionHours > 0
+          ? retentionHours ~/ Duration.hoursPerDay
+          : 0;
+    }
+    return EpgService.effectiveCatchupRetentionDays(
+      channel.catchupSupported,
+      channel.catchupDays,
+    );
+  }
+
+  int get _maxCatchupDays =>
+      widget.channels.map(_catchupNavigationDays).fold(0, math.max);
+
+  bool _canReplay(Channel channel, EpgProgram program, DateTime now) {
+    return EpgService.canReplayForChannel(channel, program, now);
+  }
 
   void _selectDate(DateTime date) {
     final today = _dateOnly(widget.clock());
@@ -430,6 +441,9 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     totalWidth: _totalW,
                                     rowHeight: _kRowH,
                                     catchupRetentionDays: catchupRetentionDays,
+                                    catchupRetentionHours:
+                                        channel.catchupRetentionHours,
+                                    catchupSupported: channel.catchupSupported,
                                     now: now,
                                     // Curry the row's channel in: _ProgramsRow
                                     // only sees programmes, but resolving a
@@ -438,8 +452,8 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     recordingStateFor: (program) => widget
                                         .recordingStateFor(channel, program),
                                     onTap: (program) {
-                                      final canReplay = EpgService.canReplay(
-                                        catchupRetentionDays,
+                                      final canReplay = _canReplay(
+                                        channel,
                                         program,
                                         widget.clock(),
                                       );
@@ -658,7 +672,9 @@ class _ChannelCell extends StatelessWidget {
           ),
           if (channel.catchupSupported) ...[
             const SizedBox(width: 4),
-            CatchupBadge(days: channel.catchupDays),
+            CatchupBadge(
+              days: channel.catchupDays == 0 ? null : channel.catchupDays,
+            ),
           ],
         ],
       ),
@@ -753,6 +769,8 @@ class _ProgramsRow extends StatelessWidget {
     required this.rowHeight,
     required this.onTap,
     required this.catchupRetentionDays,
+    this.catchupRetentionHours,
+    required this.catchupSupported,
     required this.now,
     this.onLongPress,
     this.recordingStateFor = _noRecordingState,
@@ -766,6 +784,8 @@ class _ProgramsRow extends StatelessWidget {
   final double rowHeight;
   final void Function(EpgProgram program) onTap;
   final int catchupRetentionDays;
+  final int? catchupRetentionHours;
+  final bool catchupSupported;
   final DateTime now;
 
   /// Opens the favorite/record context menu for the pressed block.
@@ -779,8 +799,15 @@ class _ProgramsRow extends StatelessWidget {
   static EpgRecordingState _noRecordingState(EpgProgram _) =>
       EpgRecordingState.none;
 
-  bool showCatchupIcon(EpgProgram program) =>
-      EpgService.canReplay(catchupRetentionDays, program, now);
+  bool showCatchupIcon(EpgProgram program) {
+    return EpgService.canReplayForRetention(
+      catchupSupported: catchupSupported,
+      catchupDays: catchupRetentionDays,
+      catchupRetentionHours: catchupRetentionHours,
+      program: program,
+      now: now,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -199,6 +199,32 @@ void main() {
       expect(find.byIcon(Icons.replay_rounded), findsOneWidget);
       expect(find.text('7d'), findsOneWidget);
     });
+
+    testWidgets('hourly catchup retention does not display zero days', (
+      tester,
+    ) async {
+      const channelsWithHourlyCatchup = [
+        Channel(
+          id: 1,
+          name: 'BBC One',
+          streamUrl: 'http://example.com/1.m3u8',
+          epgChannelId: 'bbc.one',
+          catchupSupported: true,
+          catchupRetentionHours: 4,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        _TestApp(
+          channels: channelsWithHourlyCatchup,
+          epgService: epgService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.replay_rounded), findsOneWidget);
+      expect(find.text('0d'), findsNothing);
+    });
   });
 }
 
