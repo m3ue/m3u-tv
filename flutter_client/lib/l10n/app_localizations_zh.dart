@@ -106,6 +106,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get catchupShowsEmpty => '暂无可回看节目';
 
   @override
+  String get liveTvAddMultiview => '添加到多画面';
+
+  @override
+  String get liveTvRemoveMultiview => '从多画面移除';
+
+  @override
+  String get liveTvMultiviewFull => '多画面已满（最多 9 路）';
+
+  @override
+  String liveTvMultiviewCount(int count) {
+    return '多画面 · $count';
+  }
+
+  @override
+  String get multiviewTitle => '多画面';
+
+  @override
+  String get multiviewEmpty => '暂无频道——在直播列表中长按频道并选择“添加到多画面”';
+
+  @override
+  String get multiviewMove => '移动';
+
+  @override
+  String get multiviewMakeFeatured => '设为主画面';
+
+  @override
+  String get multiviewPictureInPicture => '画中画';
+
+  @override
+  String get multiviewBackToGrid => '返回网格';
+
+  @override
+  String get multiviewRemove => '从多画面移除';
+
+  @override
   String get catchupBadgeAvailable => '可回看';
 
   @override

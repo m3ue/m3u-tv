@@ -45,6 +45,24 @@
   "liveTvRemoveFavorite": "Aus Favoriten entfernen",
   "liveTvCatchupShows": "Catchup-Sendungen",
   "catchupShowsEmpty": "Keine Catchup-Sendungen verfügbar",
+  "liveTvAddMultiview": "Zu Multiview hinzufügen",
+  "liveTvRemoveMultiview": "Aus Multiview entfernen",
+  "liveTvMultiviewFull": "Multiview ist voll (max. 9 Streams)",
+  "liveTvMultiviewCount": "Multiview · {count}",
+  "@liveTvMultiviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiviewTitle": "Multiview",
+  "multiviewEmpty": "Keine Streams — Kanal in Live TV lange drücken und „Zu Multiview hinzufügen“ wählen",
+  "multiviewMove": "Verschieben",
+  "multiviewMakeFeatured": "Hervorheben",
+  "multiviewPictureInPicture": "Bild-in-Bild",
+  "multiviewBackToGrid": "Zurück zum Raster",
+  "multiviewRemove": "Aus Multiview entfernen",
   "catchupBadgeAvailable": "Catchup verfügbar",
   "catchupBadgeAvailableDays": "Catchup verfügbar: {days} Tage",
   "@catchupBadgeAvailableDays": {

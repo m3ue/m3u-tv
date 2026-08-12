@@ -45,6 +45,24 @@
   "liveTvRemoveFavorite": "Quitar de favoritos",
   "liveTvCatchupShows": "Programas de catchup",
   "catchupShowsEmpty": "No hay programas de catchup disponibles",
+  "liveTvAddMultiview": "Añadir a Multivista",
+  "liveTvRemoveMultiview": "Quitar de Multivista",
+  "liveTvMultiviewFull": "Multivista está lleno (máx. 9 transmisiones)",
+  "liveTvMultiviewCount": "Multivista · {count}",
+  "@liveTvMultiviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiviewTitle": "Multivista",
+  "multiviewEmpty": "Sin transmisiones — mantén pulsado un canal en Live TV y elige Añadir a Multivista",
+  "multiviewMove": "Mover",
+  "multiviewMakeFeatured": "Destacar",
+  "multiviewPictureInPicture": "Imagen en imagen",
+  "multiviewBackToGrid": "Volver a la cuadrícula",
+  "multiviewRemove": "Quitar de Multivista",
   "catchupBadgeAvailable": "Catchup disponible",
   "catchupBadgeAvailableDays": "Catchup disponible: {days} d",
   "@catchupBadgeAvailableDays": {

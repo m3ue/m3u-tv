@@ -45,6 +45,24 @@
   "liveTvRemoveFavorite": "取消收藏",
   "liveTvCatchupShows": "回看节目",
   "catchupShowsEmpty": "暂无可回看节目",
+  "liveTvAddMultiview": "添加到多画面",
+  "liveTvRemoveMultiview": "从多画面移除",
+  "liveTvMultiviewFull": "多画面已满（最多 9 路）",
+  "liveTvMultiviewCount": "多画面 · {count}",
+  "@liveTvMultiviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiviewTitle": "多画面",
+  "multiviewEmpty": "暂无频道——在直播列表中长按频道并选择“添加到多画面”",
+  "multiviewMove": "移动",
+  "multiviewMakeFeatured": "设为主画面",
+  "multiviewPictureInPicture": "画中画",
+  "multiviewBackToGrid": "返回网格",
+  "multiviewRemove": "从多画面移除",
   "catchupBadgeAvailable": "可回看",
   "catchupBadgeAvailableDays": "可回看 {days} 天",
   "@catchupBadgeAvailableDays": {

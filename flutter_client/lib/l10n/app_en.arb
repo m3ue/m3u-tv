@@ -45,6 +45,24 @@
   "liveTvRemoveFavorite": "Remove favorite",
   "liveTvCatchupShows": "Catchup shows",
   "catchupShowsEmpty": "No catchup shows available",
+  "liveTvAddMultiview": "Add to Multiview",
+  "liveTvRemoveMultiview": "Remove from Multiview",
+  "liveTvMultiviewFull": "Multiview is full (9 streams max)",
+  "liveTvMultiviewCount": "Multiview · {count}",
+  "@liveTvMultiviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiviewTitle": "Multiview",
+  "multiviewEmpty": "No streams — long-press a channel in Live TV and choose Add to Multiview",
+  "multiviewMove": "Move",
+  "multiviewMakeFeatured": "Make Featured",
+  "multiviewPictureInPicture": "Picture-in-Picture",
+  "multiviewBackToGrid": "Back to Grid",
+  "multiviewRemove": "Remove from Multiview",
   "catchupBadgeAvailable": "Catchup available",
   "catchupBadgeAvailableDays": "Catchup available: {days}d",
   "@catchupBadgeAvailableDays": {

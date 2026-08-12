@@ -454,6 +454,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _openPlayerDirect(PlayerArgs rawArgs) {
+    ref.read(playerOverlayActiveProvider.notifier).state = true;
     final args = _applyProxyPlayback(rawArgs);
     // Save the focused node so we can restore it precisely after the player
     // closes. _contentFocusNode.requestFocus() alone is unreliable: when
@@ -500,6 +501,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _closePlayer() {
+    ref.read(playerOverlayActiveProvider.notifier).state = false;
     final orch = _playerOrchestrator;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
@@ -1003,6 +1005,8 @@ class AppShellState extends ConsumerState<AppShell>
           channelId: channel.id,
           title: program.title,
         ),
+        onEnterFullScreenDetail: _enterFullScreenDetail,
+        onExitFullScreenDetail: _exitFullScreenDetail,
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,

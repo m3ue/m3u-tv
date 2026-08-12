@@ -38,13 +38,13 @@ void main() {
     expect(
       source,
       contains(
-        'selectTrack(characteristic: .audible, trackId: args?["trackId"] as? String)',
+        'selectTrack(playerId: playerId, characteristic: .audible, trackId: args?["trackId"] as? String)',
       ),
     );
     expect(
       source,
       contains(
-        'selectTrack(characteristic: .legible, trackId: args?["trackId"] as? String)',
+        'selectTrack(playerId: playerId, characteristic: .legible, trackId: args?["trackId"] as? String)',
       ),
     );
     expect(source, contains('group.options.enumerated().map'));
@@ -53,22 +53,26 @@ void main() {
     expect(source, contains('item.select(nil, in: group)'));
     expect(
       source,
-      contains('audioTracks: playbackTracks(characteristic: .audible)'),
-    );
-    expect(
-      source,
-      contains('subtitleTracks: playbackTracks(characteristic: .legible)'),
-    );
-    expect(
-      source,
       contains(
-        'selectedAudioTrackId: selectedTrackId(characteristic: .audible)',
+        'audioTracks: playbackTracks(playerId: playerId, characteristic: .audible)',
       ),
     );
     expect(
       source,
       contains(
-        'selectedSubtitleTrackId: selectedTrackId(characteristic: .legible)',
+        'subtitleTracks: playbackTracks(playerId: playerId, characteristic: .legible)',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        'selectedAudioTrackId: selectedTrackId(playerId: playerId, characteristic: .audible)',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        'selectedSubtitleTrackId: selectedTrackId(playerId: playerId, characteristic: .legible)',
       ),
     );
     expect(source, contains('includeSelectedAudioTrackId: true'));
@@ -91,5 +95,39 @@ void main() {
     expect(source, contains('event["audioTracks"] = a'));
     expect(source, contains('if let st = subtitleTracks'));
     expect(source, contains('event["subtitleTracks"] = st'));
+  });
+
+  test('tvOS AVKit keys player state by playerId for Multiview', () {
+    final source = File(
+      'tvos/Runner/AvKitPlaybackPlugin.swift',
+    ).readAsStringSync();
+
+    // One channel pair, several concurrent AVPlayers — every call after
+    // "probe" is routed by a Dart-assigned playerId instead of a single
+    // shared instance field.
+    expect(
+      source,
+      contains('private var states: [String: _PlayerState] = [:]'),
+    );
+    expect(
+      source,
+      contains('let playerId = (args?["playerId"] as? String) ?? "default"'),
+    );
+    expect(source, contains('states[playerId] = playerState'));
+    expect(source, contains('func releasePlayer(playerId: String)'));
+    expect(
+      source,
+      contains(
+        'guard let s = states.removeValue(forKey: playerId) else { return }',
+      ),
+    );
+    expect(source, contains('case "setVolume":'));
+    expect(source, contains('states[playerId]?.player.volume = volume'));
+    expect(
+      source,
+      contains(
+        'var event: [String: Any] = ["type": type, "backend": "appleAvKit", "playerId": playerId]',
+      ),
+    );
   });
 }

@@ -290,6 +290,72 @@ abstract class AppLocalizations {
   /// **'No catchup shows available'**
   String get catchupShowsEmpty;
 
+  /// No description provided for @liveTvAddMultiview.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Multiview'**
+  String get liveTvAddMultiview;
+
+  /// No description provided for @liveTvRemoveMultiview.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Multiview'**
+  String get liveTvRemoveMultiview;
+
+  /// No description provided for @liveTvMultiviewFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiview is full (9 streams max)'**
+  String get liveTvMultiviewFull;
+
+  /// No description provided for @liveTvMultiviewCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiview · {count}'**
+  String liveTvMultiviewCount(int count);
+
+  /// No description provided for @multiviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiview'**
+  String get multiviewTitle;
+
+  /// No description provided for @multiviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No streams — long-press a channel in Live TV and choose Add to Multiview'**
+  String get multiviewEmpty;
+
+  /// No description provided for @multiviewMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get multiviewMove;
+
+  /// No description provided for @multiviewMakeFeatured.
+  ///
+  /// In en, this message translates to:
+  /// **'Make Featured'**
+  String get multiviewMakeFeatured;
+
+  /// No description provided for @multiviewPictureInPicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture-in-Picture'**
+  String get multiviewPictureInPicture;
+
+  /// No description provided for @multiviewBackToGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Grid'**
+  String get multiviewBackToGrid;
+
+  /// No description provided for @multiviewRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Multiview'**
+  String get multiviewRemove;
+
   /// No description provided for @catchupBadgeAvailable.
   ///
   /// In en, this message translates to:

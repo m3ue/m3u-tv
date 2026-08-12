@@ -45,6 +45,24 @@
   "liveTvRemoveFavorite": "Retirer des favoris",
   "liveTvCatchupShows": "Programmes de rattrapage",
   "catchupShowsEmpty": "Aucun programme de rattrapage disponible",
+  "liveTvAddMultiview": "Ajouter à Multivue",
+  "liveTvRemoveMultiview": "Retirer de Multivue",
+  "liveTvMultiviewFull": "Multivue est complet (9 flux max)",
+  "liveTvMultiviewCount": "Multivue · {count}",
+  "@liveTvMultiviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiviewTitle": "Multivue",
+  "multiviewEmpty": "Aucun flux — appuyez longuement sur une chaîne dans Live TV et choisissez Ajouter à Multivue",
+  "multiviewMove": "Déplacer",
+  "multiviewMakeFeatured": "Mettre en avant",
+  "multiviewPictureInPicture": "Image dans l'image",
+  "multiviewBackToGrid": "Retour à la grille",
+  "multiviewRemove": "Retirer de Multivue",
   "catchupBadgeAvailable": "Catchup disponible",
   "catchupBadgeAvailableDays": "Catchup disponible : {days} j",
   "@catchupBadgeAvailableDays": {

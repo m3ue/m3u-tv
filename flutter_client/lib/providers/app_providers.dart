@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
@@ -189,4 +190,25 @@ final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>(
 /// can read and update layout preferences without touching credentials.
 final viewSettingsServiceProvider = Provider<ViewSettingsService>((ref) {
   return ref.read(appStateControllerProvider).appState.viewSettingsService;
+});
+
+// ---------------------------------------------------------------------------
+// Multiview: standalone session state, not backed by AppStateController (it
+// tracks an in-memory grid selection, not fetched domain data).
+// ---------------------------------------------------------------------------
+
+// Whether AppShell's single-player overlay (the normal full-screen
+// PlayerScreen) is currently showing. Multiview's grid pushes a tile's
+// channel through that same overlay to promote it to full-screen — set by
+// AppShell around `_playerArgs`/`_closePlayer` — and watches this to know
+// when to re-apply its own audio-follows-focus muting once the overlay
+// closes and the grid becomes visible (and audible) again.
+final playerOverlayActiveProvider = StateProvider<bool>((ref) => false);
+
+final multiviewControllerProvider = ChangeNotifierProvider<MultiviewController>(
+  (ref) => MultiviewController(),
+);
+
+final multiviewChannelsProvider = Provider<List<Channel>>((ref) {
+  return ref.watch(multiviewControllerProvider).channels;
 });

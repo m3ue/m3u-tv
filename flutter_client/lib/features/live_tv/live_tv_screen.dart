@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/catchup_shows_dialog.dart';
+import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -42,6 +45,8 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onCancelRecording,
     this.onCancelAndDeleteRecording,
     this.onRecordSeries,
+    this.onEnterFullScreenDetail,
+    this.onExitFullScreenDetail,
   });
 
   final FavoritesService favoritesService;
@@ -74,11 +79,24 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// so only channels actually scrolled into view get fetched.
   final EnsureEpg? onEnsureEpg;
 
+  /// Wired from AppShell to `AppShell._enterFullScreenDetail`/
+  /// `_exitFullScreenDetail`. Multiview opens via a plain `Navigator.push`
+  /// (see `dvr_recordings_screen.dart` for the same pattern), so it needs
+  /// these to hide the sidebar/bottom nav itself.
+  final VoidCallback? onEnterFullScreenDetail;
+  final VoidCallback? onExitFullScreenDetail;
+
   @override
   ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();
 }
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
+  // Multiview drives several concurrent native AVPlayer instances behind the
+  // tvOS-only AVKit plugin (see AvKitPlaybackPlugin.swift) — there's no
+  // equivalent multi-instance support on the other platform backends yet.
+  static final bool _multiviewSupported =
+      !kIsWeb && Platform.operatingSystem == 'tvos';
+
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
   String _query = '';
@@ -295,6 +313,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     final hasSeriesRule =
         recordableProgram != null && widget.onRecordSeries != null;
     final isFavorite = _favoriteIds.contains(channel.id);
+    final multiview = ref.read(multiviewControllerProvider);
+    final isInMultiview = multiview.contains(channel.id);
 
     final action = await showDialog<_ChannelContextAction>(
       context: context,
@@ -363,6 +383,20 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
                       dialogContext,
                     ).pop(_ChannelContextAction.catchupShows),
                   ),
+                if (_multiviewSupported)
+                  _ContextMenuOption(
+                    icon: isInMultiview
+                        ? Icons.grid_view
+                        : Icons.grid_view_outlined,
+                    label: isInMultiview
+                        ? AppLocalizations.of(
+                            dialogContext,
+                          ).liveTvRemoveMultiview
+                        : AppLocalizations.of(dialogContext).liveTvAddMultiview,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_ChannelContextAction.toggleMultiview),
+                  ),
                 _ContextMenuOption(
                   icon: Icons.close,
                   label: AppLocalizations.of(dialogContext).cancel,
@@ -429,8 +463,46 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         if (program != null) {
           widget.onCatchupProgramSelect?.call(channel, program);
         }
+      case _ChannelContextAction.toggleMultiview:
+        final added = ref.read(multiviewControllerProvider).toggle(channel);
+        if (!added && !isInMultiview) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).liveTvMultiviewFull),
+            ),
+          );
+        }
       case null:
         break;
+    }
+  }
+
+  Future<void> _openMultiview(BuildContext context) async {
+    widget.onEnterFullScreenDetail?.call();
+    try {
+      await Navigator.of(context).push<void>(
+        PageRouteBuilder<void>(
+          pageBuilder: (context, animation, secondaryAnimation) => const Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(color: Color(0xFF09090b)),
+              MultiviewScreen(),
+            ],
+          ),
+          transitionsBuilder: (context, animation, _, child) => SlideTransition(
+            position:
+                Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                ),
+            child: child,
+          ),
+        ),
+      );
+    } finally {
+      widget.onExitFullScreenDetail?.call();
     }
   }
 
@@ -502,6 +574,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   }
 
   Widget _buildSearchField() {
+    final multiviewCount = ref.watch(multiviewChannelsProvider).length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         MediaBrowsingMetrics.contentPadding,
@@ -509,10 +582,42 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         MediaBrowsingMetrics.contentPadding,
         0,
       ),
-      child: InlineMediaSearchField(
-        query: _query,
-        hintText: AppLocalizations.of(context).liveTvSearchHint,
-        onChanged: (value) => setState(() => _query = value),
+      child: Row(
+        children: [
+          Expanded(
+            child: InlineMediaSearchField(
+              query: _query,
+              hintText: AppLocalizations.of(context).liveTvSearchHint,
+              onChanged: (value) => setState(() => _query = value),
+            ),
+          ),
+          if (_multiviewSupported && multiviewCount > 0) ...[
+            const SizedBox(width: 12),
+            DpadInkWell(
+              onTap: () => unawaited(_openMultiview(context)),
+              borderRadius: const BorderRadius.all(Radius.circular(50)),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.grid_view, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppLocalizations.of(
+                        context,
+                      ).liveTvMultiviewCount(multiviewCount),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -673,6 +778,7 @@ enum _ChannelContextAction {
   recordSeries,
   toggleFavorite,
   catchupShows,
+  toggleMultiview,
 }
 
 class _ContextMenuOption extends StatelessWidget {

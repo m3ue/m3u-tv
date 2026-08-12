@@ -5,15 +5,25 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
-/// Dart adapter for the iOS AVKit/AVPlayer playback plugin.
+/// Dart adapter for the iOS/tvOS AVKit/AVPlayer playback plugin.
 ///
 /// Communicates with AvKitPlaybackPlugin.swift via MethodChannel +
 /// EventChannel, using the same event contract as the Android Media3 adapter.
+///
+/// [playerId] distinguishes concurrent instances sharing the one native
+/// channel pair — Multiview opens several of these at once, each driving its
+/// own native AVPlayer. The default id is what the single-player path uses.
 class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
-  AppleAvKitBackend() : _host = const _MethodChannelAvKitHost() {
-    _eventSub = _host.events.listen(_handleEvent);
+  AppleAvKitBackend({this.playerId = defaultPlayerId})
+    : _host = _MethodChannelAvKitHost(playerId: playerId) {
+    _eventSub = _host.events
+        .where((event) => event.playerId == playerId)
+        .listen(_handleEvent);
   }
 
+  static const String defaultPlayerId = 'primary';
+
+  final String playerId;
   final _AvKitHost _host;
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();
@@ -112,6 +122,10 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
     _emit(_state.copyWith(playbackSpeed: speed));
   }
 
+  /// Multiview-only: mutes/unmutes this instance without touching playback
+  /// state. Not part of [PlayerAdapter] since it's specific to this backend.
+  Future<void> setVolume(double volume) => _host.setVolume(volume);
+
   @override
   Future<void> dispose() async {
     await _eventSub?.cancel();
@@ -182,30 +196,45 @@ abstract class _AvKitHost {
   Future<void> stop();
   Future<void> setAudioTrack(String? trackId);
   Future<void> setSubtitleTrack(String? trackId);
+  Future<void> setVolume(double volume);
   Future<void> dispose();
 }
 
+// The plugin exposes exactly one method+event channel pair regardless of how
+// many concurrent players are open, so the broadcast event stream must be
+// listened to exactly once here and shared — a second receiveBroadcastStream()
+// listener would silently steal events from the first instead of adding a
+// second subscriber. Every [AppleAvKitBackend] instance filters this shared
+// stream down to its own playerId.
+Stream<_AvKitEvent>? _sharedAvKitEvents;
+Stream<_AvKitEvent> _avKitEvents(EventChannel channel) {
+  return _sharedAvKitEvents ??= channel.receiveBroadcastStream().map((raw) {
+    final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
+    return _AvKitEvent.fromMap(map);
+  }).asBroadcastStream();
+}
+
 class _MethodChannelAvKitHost implements _AvKitHost {
-  const _MethodChannelAvKitHost({
+  _MethodChannelAvKitHost({
+    required this.playerId,
     MethodChannel methodChannel = const MethodChannel('m3u_tv/apple_avkit'),
     EventChannel eventChannel = const EventChannel('m3u_tv/apple_avkit/events'),
   }) : _method = methodChannel,
        _event = eventChannel;
 
+  final String playerId;
   final MethodChannel _method;
   final EventChannel _event;
 
   @override
-  Stream<_AvKitEvent> get events => _event.receiveBroadcastStream().map((raw) {
-    final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
-    return _AvKitEvent.fromMap(map);
-  });
+  Stream<_AvKitEvent> get events => _avKitEvents(_event);
 
   @override
   Future<Map<String, dynamic>> load(PlaybackSource source) async {
     final result = await _method.invokeMethod<Object?>(
       'load',
       <String, Object?>{
+        'playerId': playerId,
         'source': <String, Object?>{
           'uri': source.uri,
           'title': source.title,
@@ -224,36 +253,54 @@ class _MethodChannelAvKitHost implements _AvKitHost {
   }
 
   @override
-  Future<void> play() => _method.invokeMethod<void>('play');
+  Future<void> play() => _method.invokeMethod<void>('play', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
-  Future<void> pause() => _method.invokeMethod<void>('pause');
+  Future<void> pause() => _method.invokeMethod<void>('pause', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
-  Future<void> seek(Duration position) => _method.invokeMethod<void>(
-    'seek',
-    <String, Object?>{'positionMs': position.inMilliseconds},
-  );
+  Future<void> seek(Duration position) =>
+      _method.invokeMethod<void>('seek', <String, Object?>{
+        'playerId': playerId,
+        'positionMs': position.inMilliseconds,
+      });
 
   @override
-  Future<void> stop() => _method.invokeMethod<void>('stop');
+  Future<void> stop() => _method.invokeMethod<void>('stop', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
-  Future<void> setAudioTrack(String? trackId) => _method.invokeMethod<void>(
-    'setAudioTrack',
-    <String, Object?>{'trackId': trackId},
-  );
+  Future<void> setAudioTrack(String? trackId) =>
+      _method.invokeMethod<void>('setAudioTrack', <String, Object?>{
+        'playerId': playerId,
+        'trackId': trackId,
+      });
 
   @override
-  Future<void> setSubtitleTrack(String? trackId) => _method.invokeMethod<void>(
-    'setSubtitleTrack',
-    <String, Object?>{'trackId': trackId},
-  );
+  Future<void> setSubtitleTrack(String? trackId) =>
+      _method.invokeMethod<void>('setSubtitleTrack', <String, Object?>{
+        'playerId': playerId,
+        'trackId': trackId,
+      });
+
+  @override
+  Future<void> setVolume(double volume) =>
+      _method.invokeMethod<void>('setVolume', <String, Object?>{
+        'playerId': playerId,
+        'volume': volume,
+      });
 
   @override
   Future<void> dispose() async {
     try {
-      await _method.invokeMethod<void>('dispose');
+      await _method.invokeMethod<void>('dispose', <String, Object?>{
+        'playerId': playerId,
+      });
     } on MissingPluginException {
       return;
     }
@@ -275,6 +322,7 @@ enum _AvKitEventType {
 class _AvKitEvent {
   const _AvKitEvent({
     required this.type,
+    this.playerId,
     this.position,
     this.videoAspectRatio,
     this.audioTracks,
@@ -293,6 +341,7 @@ class _AvKitEvent {
 
   factory _AvKitEvent.fromMap(Map<String, Object?> map) => _AvKitEvent(
     type: _typeFrom(map['type'] as String?),
+    playerId: map['playerId'] as String?,
     position: map['positionMs'] is num
         ? Duration(milliseconds: (map['positionMs']! as num).round())
         : null,
@@ -316,6 +365,7 @@ class _AvKitEvent {
   );
 
   final _AvKitEventType type;
+  final String? playerId;
   final Duration? position;
   final double? videoAspectRatio;
   final List<PlaybackTrack>? audioTracks;

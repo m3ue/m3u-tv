@@ -106,6 +106,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catchupShowsEmpty => 'No catchup shows available';
 
   @override
+  String get liveTvAddMultiview => 'Add to Multiview';
+
+  @override
+  String get liveTvRemoveMultiview => 'Remove from Multiview';
+
+  @override
+  String get liveTvMultiviewFull => 'Multiview is full (9 streams max)';
+
+  @override
+  String liveTvMultiviewCount(int count) {
+    return 'Multiview · $count';
+  }
+
+  @override
+  String get multiviewTitle => 'Multiview';
+
+  @override
+  String get multiviewEmpty =>
+      'No streams — long-press a channel in Live TV and choose Add to Multiview';
+
+  @override
+  String get multiviewMove => 'Move';
+
+  @override
+  String get multiviewMakeFeatured => 'Make Featured';
+
+  @override
+  String get multiviewPictureInPicture => 'Picture-in-Picture';
+
+  @override
+  String get multiviewBackToGrid => 'Back to Grid';
+
+  @override
+  String get multiviewRemove => 'Remove from Multiview';
+
+  @override
   String get catchupBadgeAvailable => 'Catchup available';
 
   @override

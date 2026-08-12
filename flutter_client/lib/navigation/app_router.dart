@@ -163,6 +163,25 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
   );
 }
 
+/// Builds one Multiview grid tile's player: an isolated [AppleAvKitBackend]
+/// instance (identified by [playerId]) wrapped in its own orchestrator, so
+/// each tile gets independent retry/error handling for free. tvOS-only —
+/// Multiview is only offered where AVKit is the native backend (see the
+/// `apple` branch above).
+({PlaybackOrchestrator orchestrator, AppleAvKitBackend backend})
+buildMultiviewTilePlayer(String playerId) {
+  final backend = AppleAvKitBackend(playerId: playerId);
+  final orchestrator = PlaybackOrchestrator(
+    platform: PlaybackPlatform.apple,
+    adapters: <PlaybackBackend, PlayerAdapter>{
+      PlaybackBackend.appleAvKit: backend,
+    },
+    transcodeGateway: const _UnavailableTranscodeGateway(),
+    retryDelay: Duration.zero,
+  );
+  return (orchestrator: orchestrator, backend: backend);
+}
+
 PlaybackPlatform _playbackPlatformForCurrentTarget() {
   if (kIsWeb) return PlaybackPlatform.server;
   return switch (defaultTargetPlatform) {
