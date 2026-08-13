@@ -165,27 +165,39 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   }
 
   bool _handleDirection(int index, TraversalDirection direction) {
-    if (_reorderingIndex != index) return false;
-    if (_layoutMode == _LayoutMode.pip) {
-      setState(
-        () => _pipCorner = multiviewPipCornerAfter(_pipCorner, direction),
+    if (_reorderingIndex == index) {
+      if (_layoutMode == _LayoutMode.pip) {
+        setState(
+          () => _pipCorner = multiviewPipCornerAfter(_pipCorner, direction),
+        );
+        return true;
+      }
+      final target = multiviewSwapTarget(
+        index: index,
+        itemCount: _tiles.length,
+        direction: direction,
       );
+      if (target == null) return true;
+      setState(() {
+        final tile = _tiles.removeAt(index);
+        _tiles.insert(target, tile);
+        _reorderingIndex = target;
+        if (_focusedIndex == index) _focusedIndex = target;
+      });
+      ref.read(multiviewControllerProvider).reorder(index, target);
       return true;
     }
-    final target = multiviewSwapTarget(
-      index: index,
-      itemCount: _tiles.length,
-      direction: direction,
-    );
-    if (target == null) return true;
-    setState(() {
-      final tile = _tiles.removeAt(index);
-      _tiles.insert(target, tile);
-      _reorderingIndex = target;
-      if (_focusedIndex == index) _focusedIndex = target;
-    });
-    ref.read(multiviewControllerProvider).reorder(index, target);
-    return true;
+    if (_layoutMode == _LayoutMode.pip && _tiles.length == 2) {
+      // The floating PiP tile's bounds sit entirely inside the full-bleed
+      // primary tile's bounds rather than beside it, so the d-pad's spatial
+      // "nearest focusable in this direction" traversal can never resolve a
+      // path onto it. With only ever two tiles in PiP, any direction press
+      // unambiguously means "the other one" — so just toggle focus directly
+      // instead of relying on geometry.
+      _tiles[index == 0 ? 1 : 0].focusNode.requestFocus();
+      return true;
+    }
+    return false;
   }
 
   Future<void> _showTileMenu(int index) async {
