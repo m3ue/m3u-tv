@@ -319,21 +319,39 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     };
   }
 
+  // A plain Row/Column grid rather than a GridView: with at most 9 tiles,
+  // this should always divide the available screen space evenly and never
+  // scroll. A scrollable GridView with a fixed childAspectRatio could size
+  // its content taller than the viewport, which both looks like a stray
+  // "webpage scroll" when the d-pad auto-scrolls the newly-focused row into
+  // view, and can crop a tile's rendered video against the viewport edge.
   Widget _buildGrid() {
     final columns = multiviewGridColumns(_tiles.length);
+    final rows = (_tiles.length / columns).ceil();
     return Padding(
       padding: const EdgeInsets.all(16),
       child: DpadRegion(
         memoryKey: 'multiview/grid',
-        child: GridView.builder(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 16 / 9,
-          ),
-          itemCount: _tiles.length,
-          itemBuilder: (context, index) => _buildTile(index),
+        child: Column(
+          children: [
+            for (var row = 0; row < rows; row++) ...[
+              if (row > 0) const SizedBox(height: 12),
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var col = 0; col < columns; col++) ...[
+                      if (col > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: row * columns + col < _tiles.length
+                            ? _buildTile(row * columns + col)
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
