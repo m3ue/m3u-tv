@@ -141,6 +141,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiviewRemove => '从多画面移除';
 
   @override
+  String get multiviewRetry => '播放失败 — 选择以重试';
+
+  @override
   String get catchupBadgeAvailable => '可回看';
 
   @override

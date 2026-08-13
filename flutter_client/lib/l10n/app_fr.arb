@@ -63,6 +63,7 @@
   "multiviewPictureInPicture": "Image dans l'image",
   "multiviewBackToGrid": "Retour à la grille",
   "multiviewRemove": "Retirer de Multivue",
+  "multiviewRetry": "Échec de la lecture — sélectionner pour réessayer",
   "catchupBadgeAvailable": "Catchup disponible",
   "catchupBadgeAvailableDays": "Catchup disponible : {days} j",
   "@catchupBadgeAvailableDays": {

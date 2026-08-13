@@ -63,6 +63,7 @@
   "multiviewPictureInPicture": "Bild-in-Bild",
   "multiviewBackToGrid": "Zurück zum Raster",
   "multiviewRemove": "Aus Multiview entfernen",
+  "multiviewRetry": "Wiedergabe fehlgeschlagen — zum Wiederholen auswählen",
   "catchupBadgeAvailable": "Catchup verfügbar",
   "catchupBadgeAvailableDays": "Catchup verfügbar: {days} Tage",
   "@catchupBadgeAvailableDays": {

@@ -356,6 +356,12 @@ abstract class AppLocalizations {
   /// **'Remove from Multiview'**
   String get multiviewRemove;
 
+  /// No description provided for @multiviewRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t play — select to retry'**
+  String get multiviewRetry;
+
   /// No description provided for @catchupBadgeAvailable.
   ///
   /// In en, this message translates to:

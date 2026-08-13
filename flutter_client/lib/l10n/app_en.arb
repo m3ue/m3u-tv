@@ -63,6 +63,7 @@
   "multiviewPictureInPicture": "Picture-in-Picture",
   "multiviewBackToGrid": "Back to Grid",
   "multiviewRemove": "Remove from Multiview",
+  "multiviewRetry": "Couldn't play — select to retry",
   "catchupBadgeAvailable": "Catchup available",
   "catchupBadgeAvailableDays": "Catchup available: {days}d",
   "@catchupBadgeAvailableDays": {

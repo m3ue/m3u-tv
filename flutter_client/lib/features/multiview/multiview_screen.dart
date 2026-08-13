@@ -44,10 +44,13 @@ class _MultiviewTile {
   PlaybackOrchestrator? orchestrator;
   AppleAvKitBackend? backend;
   StreamSubscription<PlaybackState>? stateSub;
+  StreamSubscription<PlaybackError>? errorSub;
   PlaybackState? state;
+  bool hasError = false;
 
   void dispose() {
     unawaited(stateSub?.cancel());
+    unawaited(errorSub?.cancel());
     focusNode.dispose();
     final orch = orchestrator;
     if (orch != null) unawaited(orch.dispose());
@@ -84,6 +87,13 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     super.dispose();
   }
 
+  PlaybackSource _sourceFor(Channel channel) => PlaybackSource(
+    uri: channel.streamUrl,
+    title: channel.name,
+    isLive: true,
+    headers: channel.headers,
+  );
+
   void _openTile(Channel channel) {
     final playerId = 'multiview-${_nextPlayerSeq++}';
     final tile = _MultiviewTile(channel, playerId);
@@ -93,19 +103,33 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       ..backend = built.backend
       ..stateSub = built.orchestrator.onState.listen((state) {
         if (!mounted) return;
-        setState(() => tile.state = state);
+        setState(() {
+          tile.state = state;
+          // A state update past the initial loading/buffering steps means
+          // the retry actually worked — clear the error so the tile stops
+          // showing the retry affordance.
+          if (state.status == PlaybackStatus.ready ||
+              state.status == PlaybackStatus.playing) {
+            tile.hasError = false;
+          }
+        });
+      })
+      ..errorSub = built.orchestrator.onError.listen((_) {
+        // PlaybackOrchestrator gives up after one internal retry and never
+        // tries again on its own — without this the tile would just stay
+        // black forever with no way to recover short of leaving and
+        // re-adding the channel.
+        if (!mounted) return;
+        setState(() => tile.hasError = true);
       });
     _tiles.add(tile);
-    unawaited(
-      built.orchestrator.open(
-        PlaybackSource(
-          uri: channel.streamUrl,
-          title: channel.name,
-          isLive: true,
-          headers: channel.headers,
-        ),
-      ),
-    );
+    unawaited(built.orchestrator.open(_sourceFor(channel)));
+  }
+
+  void _retryTile(int index) {
+    final tile = _tiles[index];
+    setState(() => tile.hasError = false);
+    unawaited(tile.orchestrator?.open(_sourceFor(tile.channel)));
   }
 
   void _applyAudioFocus() {
@@ -443,9 +467,11 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     return DpadFocusable(
       focusNode: tile.focusNode,
       autofocus: index == 0,
-      onSelect: () => isReordering
-          ? setState(() => _reorderingIndex = null)
-          : _openFullscreen(index),
+      onSelect: () => switch ((isReordering, tile.hasError)) {
+        (true, _) => setState(() => _reorderingIndex = null),
+        (false, true) => _retryTile(index),
+        (false, false) => _openFullscreen(index),
+      },
       onLongSelect: () => unawaited(_showTileMenu(index)),
       onDirection: (direction) => _handleDirection(index, direction),
       onFocusChange: (focused) => _handleTileFocusChange(index, focused),
@@ -466,7 +492,25 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 textureId: _textureIdFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
               ),
-              if (state == null ||
+              if (tile.hasError)
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppLocalizations.of(context).multiviewRetry,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                )
+              else if (state == null ||
                   state.status == PlaybackStatus.loading ||
                   state.status == PlaybackStatus.buffering)
                 const Center(

@@ -143,6 +143,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get multiviewRemove => 'Aus Multiview entfernen';
 
   @override
+  String get multiviewRetry =>
+      'Wiedergabe fehlgeschlagen — zum Wiederholen auswählen';
+
+  @override
   String get catchupBadgeAvailable => 'Catchup verfügbar';
 
   @override

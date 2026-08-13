@@ -63,6 +63,7 @@
   "multiviewPictureInPicture": "画中画",
   "multiviewBackToGrid": "返回网格",
   "multiviewRemove": "从多画面移除",
+  "multiviewRetry": "播放失败 — 选择以重试",
   "catchupBadgeAvailable": "可回看",
   "catchupBadgeAvailableDays": "可回看 {days} 天",
   "@catchupBadgeAvailableDays": {
