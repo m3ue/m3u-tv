@@ -31,3 +31,39 @@ int? multiviewSwapTarget({
   if (target == null || target < 0 || target >= itemCount) return null;
   return target;
 }
+
+/// Which corner of the screen the floating Picture-in-Picture tile docks to.
+enum MultiviewPipCorner { topLeft, topRight, bottomLeft, bottomRight }
+
+/// The corner reorder mode should move the PiP tile to when the user presses
+/// [direction] — up/down set the vertical edge, left/right set the
+/// horizontal edge, independently of one another, so e.g. pressing left
+/// twice in a row from bottomRight is a no-op the second time rather than
+/// cycling past bottomLeft.
+MultiviewPipCorner multiviewPipCornerAfter(
+  MultiviewPipCorner corner,
+  TraversalDirection direction,
+) {
+  final isTop =
+      corner == MultiviewPipCorner.topLeft ||
+      corner == MultiviewPipCorner.topRight;
+  final isLeft =
+      corner == MultiviewPipCorner.topLeft ||
+      corner == MultiviewPipCorner.bottomLeft;
+  final top = switch (direction) {
+    TraversalDirection.up => true,
+    TraversalDirection.down => false,
+    _ => isTop,
+  };
+  final left = switch (direction) {
+    TraversalDirection.left => true,
+    TraversalDirection.right => false,
+    _ => isLeft,
+  };
+  return switch ((top, left)) {
+    (true, true) => MultiviewPipCorner.topLeft,
+    (true, false) => MultiviewPipCorner.topRight,
+    (false, true) => MultiviewPipCorner.bottomLeft,
+    (false, false) => MultiviewPipCorner.bottomRight,
+  };
+}

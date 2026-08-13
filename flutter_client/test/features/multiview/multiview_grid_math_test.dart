@@ -79,4 +79,50 @@ void main() {
       expect(target, 3);
     });
   });
+
+  group('multiviewPipCornerAfter', () {
+    test('vertical presses only change the top/bottom edge', () {
+      expect(
+        multiviewPipCornerAfter(
+          MultiviewPipCorner.bottomRight,
+          TraversalDirection.up,
+        ),
+        MultiviewPipCorner.topRight,
+      );
+      expect(
+        multiviewPipCornerAfter(
+          MultiviewPipCorner.topLeft,
+          TraversalDirection.down,
+        ),
+        MultiviewPipCorner.bottomLeft,
+      );
+    });
+
+    test('horizontal presses only change the left/right edge', () {
+      expect(
+        multiviewPipCornerAfter(
+          MultiviewPipCorner.bottomRight,
+          TraversalDirection.left,
+        ),
+        MultiviewPipCorner.bottomLeft,
+      );
+      expect(
+        multiviewPipCornerAfter(
+          MultiviewPipCorner.topLeft,
+          TraversalDirection.right,
+        ),
+        MultiviewPipCorner.topRight,
+      );
+    });
+
+    test('repeating the same direction is idempotent', () {
+      expect(
+        multiviewPipCornerAfter(
+          MultiviewPipCorner.bottomRight,
+          TraversalDirection.right,
+        ),
+        MultiviewPipCorner.bottomRight,
+      );
+    });
+  });
 }

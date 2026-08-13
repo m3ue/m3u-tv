@@ -60,6 +60,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   int? _reorderingIndex;
   _LayoutMode _layoutMode = _LayoutMode.grid;
   int _primaryIndex = 0;
+  MultiviewPipCorner _pipCorner = MultiviewPipCorner.bottomRight;
   int _nextPlayerSeq = 0;
 
   @override
@@ -165,6 +166,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
 
   bool _handleDirection(int index, TraversalDirection direction) {
     if (_reorderingIndex != index) return false;
+    if (_layoutMode == _LayoutMode.pip) {
+      setState(
+        () => _pipCorner = multiviewPipCornerAfter(_pipCorner, direction),
+      );
+      return true;
+    }
     final target = multiviewSwapTarget(
       index: index,
       itemCount: _tiles.length,
@@ -193,7 +200,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_layoutMode == _LayoutMode.grid)
+                if (_layoutMode == _LayoutMode.grid ||
+                    (_layoutMode == _LayoutMode.pip && index != _primaryIndex))
                   _MenuOption(
                     icon: Icons.open_with,
                     label: l10n.multiviewMove,
@@ -386,16 +394,26 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     );
   }
 
+  static const double _pipInset = 24;
+
   Widget _buildPip() {
     final other = _primaryIndex == 0 ? 1 : 0;
+    final atTop =
+        _pipCorner == MultiviewPipCorner.topLeft ||
+        _pipCorner == MultiviewPipCorner.topRight;
+    final atLeft =
+        _pipCorner == MultiviewPipCorner.topLeft ||
+        _pipCorner == MultiviewPipCorner.bottomLeft;
     return DpadRegion(
       memoryKey: 'multiview/pip',
       child: Stack(
         children: [
           Positioned.fill(child: _buildTile(_primaryIndex)),
           Positioned(
-            right: 24,
-            bottom: 24,
+            top: atTop ? _pipInset : null,
+            bottom: atTop ? null : _pipInset,
+            left: atLeft ? _pipInset : null,
+            right: atLeft ? null : _pipInset,
             width: 280,
             height: 158,
             child: _buildTile(other),
