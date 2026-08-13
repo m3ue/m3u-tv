@@ -89,9 +89,13 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
             let item = AVPlayerItem(asset: asset)
             let player = AVPlayer(playerItem: item)
 
-            // Pixel buffer output for FlutterTexture
+            // Pixel buffer output for FlutterTexture. Metal compatibility must be
+            // requested explicitly — without it CoreVideo hands back buffers
+            // FlutterDarwinExternalTextureMetal can't wrap, failing every frame
+            // with CVReturn -6660 (kCVReturnPixelBufferNotMetalCompatible).
             let pixelBufferAttributes: [String: Any] = [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferMetalCompatibilityKey as String: true,
             ]
             let videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
             item.add(videoOutput)
