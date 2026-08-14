@@ -123,7 +123,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiviewTitle => '多画面';
 
   @override
-  String get multiviewEmpty => '暂无频道——在直播列表中长按频道并选择“添加到多画面”';
+  String get multiviewEmpty => '暂无频道，在直播列表中长按频道并选择“添加到多画面”';
 
   @override
   String get multiviewMove => '移动';
@@ -141,7 +141,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiviewRemove => '从多画面移除';
 
   @override
-  String get multiviewRetry => '播放失败 — 选择以重试';
+  String get multiviewRetry => '播放失败，选择以重试';
 
   @override
   String get catchupBadgeAvailable => '可回看';

@@ -323,7 +323,7 @@ abstract class AppLocalizations {
   /// No description provided for @multiviewEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No streams — long-press a channel in Live TV and choose Add to Multiview'**
+  /// **'No streams - long-press a channel in Live TV and choose Add to Multiview'**
   String get multiviewEmpty;
 
   /// No description provided for @multiviewMove.
@@ -359,7 +359,7 @@ abstract class AppLocalizations {
   /// No description provided for @multiviewRetry.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t play — select to retry'**
+  /// **'Couldn\'t play - select to retry'**
   String get multiviewRetry;
 
   /// No description provided for @catchupBadgeAvailable.

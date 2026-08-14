@@ -57,13 +57,13 @@
     }
   },
   "multiviewTitle": "多画面",
-  "multiviewEmpty": "暂无频道——在直播列表中长按频道并选择“添加到多画面”",
+  "multiviewEmpty": "暂无频道，在直播列表中长按频道并选择“添加到多画面”",
   "multiviewMove": "移动",
   "multiviewMakeFeatured": "设为主画面",
   "multiviewPictureInPicture": "画中画",
   "multiviewBackToGrid": "返回网格",
   "multiviewRemove": "从多画面移除",
-  "multiviewRetry": "播放失败 — 选择以重试",
+  "multiviewRetry": "播放失败，选择以重试",
   "catchupBadgeAvailable": "可回看",
   "catchupBadgeAvailableDays": "可回看 {days} 天",
   "@catchupBadgeAvailableDays": {

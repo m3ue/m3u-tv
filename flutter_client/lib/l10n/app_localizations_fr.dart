@@ -124,7 +124,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get multiviewEmpty =>
-      'Aucun flux — appuyez longuement sur une chaîne dans Live TV et choisissez Ajouter à Multivue';
+      'Aucun flux - appuyez longuement sur une chaîne dans Live TV et choisissez Ajouter à Multivue';
 
   @override
   String get multiviewMove => 'Déplacer';
@@ -143,7 +143,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get multiviewRetry =>
-      'Échec de la lecture — sélectionner pour réessayer';
+      'Échec de la lecture - sélectionner pour réessayer';
 
   @override
   String get catchupBadgeAvailable => 'Catchup disponible';

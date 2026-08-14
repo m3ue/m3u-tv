@@ -57,13 +57,13 @@
     }
   },
   "multiviewTitle": "Multiview",
-  "multiviewEmpty": "No streams — long-press a channel in Live TV and choose Add to Multiview",
+  "multiviewEmpty": "No streams - long-press a channel in Live TV and choose Add to Multiview",
   "multiviewMove": "Move",
   "multiviewMakeFeatured": "Make Featured",
   "multiviewPictureInPicture": "Picture-in-Picture",
   "multiviewBackToGrid": "Back to Grid",
   "multiviewRemove": "Remove from Multiview",
-  "multiviewRetry": "Couldn't play — select to retry",
+  "multiviewRetry": "Couldn't play - select to retry",
   "catchupBadgeAvailable": "Catchup available",
   "catchupBadgeAvailableDays": "Catchup available: {days}d",
   "@catchupBadgeAvailableDays": {

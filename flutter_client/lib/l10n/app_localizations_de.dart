@@ -125,7 +125,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get multiviewEmpty =>
-      'Keine Streams — Kanal in Live TV lange drücken und „Zu Multiview hinzufügen“ wählen';
+      'Keine Streams - Kanal in Live TV lange drücken und „Zu Multiview hinzufügen“ wählen';
 
   @override
   String get multiviewMove => 'Verschieben';
@@ -144,7 +144,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get multiviewRetry =>
-      'Wiedergabe fehlgeschlagen — zum Wiederholen auswählen';
+      'Wiedergabe fehlgeschlagen - zum Wiederholen auswählen';
 
   @override
   String get catchupBadgeAvailable => 'Catchup verfügbar';

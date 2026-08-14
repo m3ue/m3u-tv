@@ -125,7 +125,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get multiviewEmpty =>
-      'Sin transmisiones — mantén pulsado un canal en Live TV y elige Añadir a Multivista';
+      'Sin transmisiones - mantén pulsado un canal en Live TV y elige Añadir a Multivista';
 
   @override
   String get multiviewMove => 'Mover';
@@ -144,7 +144,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get multiviewRetry =>
-      'No se pudo reproducir — selecciona para reintentar';
+      'No se pudo reproducir - selecciona para reintentar';
 
   @override
   String get catchupBadgeAvailable => 'Catchup disponible';

@@ -124,7 +124,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get multiviewEmpty =>
-      'No streams — long-press a channel in Live TV and choose Add to Multiview';
+      'No streams - long-press a channel in Live TV and choose Add to Multiview';
 
   @override
   String get multiviewMove => 'Move';
@@ -142,7 +142,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get multiviewRemove => 'Remove from Multiview';
 
   @override
-  String get multiviewRetry => 'Couldn\'t play — select to retry';
+  String get multiviewRetry => 'Couldn\'t play - select to retry';
 
   @override
   String get catchupBadgeAvailable => 'Catchup available';
