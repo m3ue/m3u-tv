@@ -155,15 +155,24 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     _applyAudioFocus();
   }
 
-  void _openFullscreen(int index) {
-    // Promoting the audio-focused tile would otherwise leave it playing
-    // audibly in the background for as long as the full-screen player (a
-    // separate native player instance) is open, doubling the audio. Muted
-    // here, restored by the playerOverlayActiveProvider listener in build()
-    // once the full-screen overlay closes and this grid is visible again.
-    unawaited(_tiles[index].backend?.setVolume(0));
+  // The full-screen player is a separate native player instance opened as
+  // an overlay on top of this screen -- leaving the grid's own players
+  // running underneath it (even muted) is the same "two players alive for
+  // one stream at once" pattern that was crashing/freezing playback when
+  // direct-select used to trigger this. So every grid player is torn down
+  // and this screen is popped *before* the full-screen player opens,
+  // instead of layering it on top.
+  Future<void> _openFullscreen(int index) async {
     final channel = _tiles[index].channel;
-    ContentActions.of(context).onOpenPlayer(
+    final onOpenPlayer = ContentActions.of(context).onOpenPlayer;
+    final navigator = Navigator.of(context);
+    await Future.wait([
+      for (final tile in _tiles)
+        tile.orchestrator?.dispose() ?? Future<void>.value(),
+    ]);
+    if (!mounted) return;
+    navigator.pop();
+    onOpenPlayer(
       PlayerArgs(
         streamUrl: channel.streamUrl,
         title: channel.name,
@@ -318,7 +327,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       case _TileMenuAction.grid:
         setState(() => _layoutMode = _LayoutMode.grid);
       case _TileMenuAction.fullscreen:
-        _openFullscreen(index);
+        unawaited(_openFullscreen(index));
       case _TileMenuAction.remove:
         _removeTile(index);
       case null:
@@ -329,9 +338,6 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    ref.listen<bool>(playerOverlayActiveProvider, (wasActive, isActive) {
-      if (wasActive == true && !isActive) _applyAudioFocus();
-    });
     return Scaffold(
       backgroundColor: const Color(0xFF09090b),
       body: SafeArea(
