@@ -56,6 +56,7 @@ class AndroidPlaybackAdapter
   AndroidPlaybackAdapter({
     required AndroidPlaybackProbe probe,
     this.playerId = defaultPlayerId,
+    this.handleAudioFocus = true,
     AndroidMedia3Host? media3Host,
   }) : androidCapabilities = AndroidBackendCapabilities(probe: probe),
        _media3Host =
@@ -68,6 +69,7 @@ class AndroidPlaybackAdapter
   static const String defaultPlayerId = 'primary';
 
   final String playerId;
+  final bool handleAudioFocus;
 
   final AndroidBackendCapabilities androidCapabilities;
   final AndroidMedia3Host _media3Host;
@@ -125,7 +127,7 @@ class AndroidPlaybackAdapter
         ),
       );
       try {
-        await _media3Host.load(source);
+        await _media3Host.load(source, handleAudioFocus: handleAudioFocus);
       } on PlatformException catch (error) {
         final exception = PlaybackException(
           message: error.message ?? 'Android Media3 load failed',
@@ -372,7 +374,7 @@ class AndroidPlaybackAdapter
 abstract class AndroidMedia3Host {
   Stream<AndroidMedia3Event> get events;
 
-  Future<void> load(PlaybackSource source);
+  Future<void> load(PlaybackSource source, {bool handleAudioFocus = true});
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
@@ -424,9 +426,13 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   Stream<AndroidMedia3Event> get events => _media3Events(_event);
 
   @override
-  Future<void> load(PlaybackSource source) async {
+  Future<void> load(
+    PlaybackSource source, {
+    bool handleAudioFocus = true,
+  }) async {
     await _method.invokeMethod<Object?>('load', <String, Object?>{
       'playerId': playerId,
+      'handleAudioFocus': handleAudioFocus,
       'source': <String, Object?>{
         'uri': source.uri,
         'title': source.title,

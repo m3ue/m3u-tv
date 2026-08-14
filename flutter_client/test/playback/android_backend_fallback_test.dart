@@ -524,7 +524,10 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
   void emit(AndroidMedia3Event event) => _events.add(event);
 
   @override
-  Future<void> load(PlaybackSource source) async {
+  Future<void> load(
+    PlaybackSource source, {
+    bool handleAudioFocus = true,
+  }) async {
     commands.add('load:${source.uri}');
     loadedSources.add(source);
   }

@@ -160,6 +160,7 @@ class Media3PlaybackPlugin(
             ?: emptyMap()
         val userAgent = source["userAgent"] as? String
         val startPositionMs = (source["startPositionMs"] as? Number)?.toLong() ?: 0L
+        val handleAudioFocus = arguments["handleAudioFocus"] as? Boolean ?: true
 
         // SurfaceProducer works correctly with Flutter's Impeller renderer.
         // SurfaceTexture has a known black-screen bug with Impeller on Android.
@@ -179,7 +180,7 @@ class Media3PlaybackPlugin(
             .build()
         val player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory))
-            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
+            .setAudioAttributes(audioAttributes, handleAudioFocus)
             .build()
         val state = PlayerState(
             playerId = playerId,

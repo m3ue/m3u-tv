@@ -183,6 +183,11 @@ buildMultiviewTilePlayer(String playerId) {
     case PlaybackPlatform.android:
       backend = AndroidPlaybackAdapter(
         playerId: playerId,
+        // Multiview runs several concurrent ExoPlayer instances and manages
+        // per-tile audio itself via setVolume; Media3's default audio-focus
+        // handling would otherwise auto-pause every tile except whichever one
+        // most recently called play() and won system audio focus.
+        handleAudioFocus: false,
         probe: const AndroidPlaybackProbe(
           hardwareCodecs: <VideoCodec>{VideoCodec.h264},
           passthroughAudioCodecs: <AudioCodec>{
