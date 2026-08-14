@@ -5,12 +5,34 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
-class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
+// One handle per loaded stream is already multiplexed over the single
+// method+event channel pair (see `linux/desktop_libmpv_backend.cc`'s
+// `g_players` map), but the broadcast event stream itself must be listened
+// to exactly once here and shared -- a second receiveBroadcastStream()
+// listener would silently steal events from the first instead of adding a
+// second subscriber. Every [DesktopLibmpvBackend] instance already filters
+// this shared stream down to its own handle in [_applyEvent].
+// `receiveBroadcastStream()` already returns a broadcast stream, and `.map`
+// preserves that -- no extra `.asBroadcastStream()` wrapping is needed (and
+// actively breaks resubscription across sequential loads/disposes: its
+// default pause/resume semantics leave the upstream subscription paused
+// rather than fully cancelled between listeners, so a later listener never
+// re-triggers the platform channel's "listen" handshake).
+Stream<DesktopLibmpvEvent>? _sharedLibmpvEvents;
+Stream<DesktopLibmpvEvent> _libmpvEvents(EventChannel channel) {
+  return _sharedLibmpvEvents ??= channel.receiveBroadcastStream().map((raw) {
+    final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
+    return DesktopLibmpvEvent.fromMap(map);
+  });
+}
+
+class DesktopLibmpvBackend
+    implements PlayerAdapter, VideoTextureProvider, MultiviewBackend {
   DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _channel = channel ?? const MethodChannel(_methodChannelName),
       _eventChannel = eventChannel ?? const EventChannel(_eventChannelName) {
-    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
-      _handleRawEvent,
+    _eventSubscription = _libmpvEvents(_eventChannel).listen(
+      _handleEvent,
       onError: _handleEventStreamError,
     );
   }
@@ -233,6 +255,15 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
   }
 
   @override
+  Future<void> setVolume(double volume) async {
+    // mpv's `volume` property (like media_kit's) is 0-100, not the 0-1 scale
+    // [MultiviewAudioControl.setVolume] uses to match AVPlayer/ExoPlayer.
+    await _invokeControl('setVolume', <String, Object?>{
+      'volume': volume * 100,
+    });
+  }
+
+  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
@@ -276,11 +307,8 @@ class DesktopLibmpvBackend implements PlayerAdapter, VideoTextureProvider {
     });
   }
 
-  void _handleRawEvent(dynamic raw) {
+  void _handleEvent(DesktopLibmpvEvent event) {
     if (_disposed) return;
-
-    final map = Map<String, Object?>.from(raw as Map<Object?, Object?>);
-    final event = DesktopLibmpvEvent.fromMap(map);
 
     if (event.kind == DesktopLibmpvEventKind.unknown) {
       return;

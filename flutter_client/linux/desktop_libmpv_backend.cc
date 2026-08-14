@@ -1236,6 +1236,14 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     const std::string speed_value = std::to_string(speed);
     const char* command[] = {"set", "speed", speed_value.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (g_strcmp0(method, "setVolume") == 0) {
+    FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "volume");
+    const double volume = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT
+                               ? fl_value_get_float(value)
+                               : 100.0;
+    const std::string volume_value = std::to_string(volume);
+    const char* command[] = {"set", "volume", volume_value.c_str(), nullptr};
+    player->api->command(player->handle, command);
   } else if (g_strcmp0(method, "getVideoAspectRatio") == 0) {
     g_autoptr(FlValue) result = VideoAspectRatioResult(player);
     return FL_METHOD_RESPONSE(fl_method_success_response_new(result));

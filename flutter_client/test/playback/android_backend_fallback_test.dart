@@ -24,12 +24,18 @@ void main() {
             receivedCall = call;
             return null;
           });
-      const host = MethodChannelAndroidMedia3Host(methodChannel: channel);
+      final host = MethodChannelAndroidMedia3Host(
+        playerId: 'primary',
+        methodChannel: channel,
+      );
 
       await host.setPlaybackSpeed(1.25);
 
       expect(receivedCall?.method, 'setPlaybackSpeed');
-      expect(receivedCall?.arguments, <String, Object?>{'speed': 1.25});
+      expect(receivedCall?.arguments, <String, Object?>{
+        'playerId': 'primary',
+        'speed': 1.25,
+      });
     });
   });
 
@@ -547,6 +553,10 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
   @override
   Future<void> setPlaybackSpeed(double speed) async =>
       commands.add('setPlaybackSpeed:$speed');
+
+  @override
+  Future<void> setVolume(double volume) async =>
+      commands.add('setVolume:$volume');
 
   @override
   Future<void> dispose() async {

@@ -1047,6 +1047,10 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
     const std::string speed = std::to_string(DoubleArg(args, "speed", 1.0));
     const char* command[] = {"set", "speed", speed.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (method == "setVolume") {
+    const std::string volume = std::to_string(DoubleArg(args, "volume", 100.0));
+    const char* command[] = {"set", "volume", volume.c_str(), nullptr};
+    player->api->command(player->handle, command);
   } else if (method == "dispose") {
     g_players.erase(it);
   }

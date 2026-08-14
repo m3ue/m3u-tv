@@ -29,6 +29,16 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
 
+/**
+ * Media3/ExoPlayer-based playback plugin for Android.
+ *
+ * Every call after "probe" carries a Dart-assigned `playerId` string
+ * (defaulting to "default" when absent, so the single-player path is
+ * unaffected), and player state is keyed by it (`states[playerId]`) rather
+ * than held in a single field -- this lets Multiview run several concurrent
+ * ExoPlayer instances over the one channel pair without any registration
+ * changes. Mirrors the tvOS AvKitPlaybackPlugin.swift multi-instance shape.
+ */
 class Media3PlaybackPlugin(
     private val context: Context,
     flutterEngine: FlutterEngine,
@@ -37,8 +47,7 @@ class Media3PlaybackPlugin(
     private val eventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
     private val textures = flutterEngine.renderer
     private var events: EventChannel.EventSink? = null
-    private var playerState: PlayerState? = null
-    private var mediaSession: MediaSession? = null
+    private val states = mutableMapOf<String, PlayerState>()
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -47,46 +56,54 @@ class Media3PlaybackPlugin(
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        val arguments = call.arguments as? Map<String, Any?>
+        val playerId = arguments?.get("playerId") as? String ?: "default"
+
         try {
             when (call.method) {
                 "probe" -> result.success(mapOf("backend" to "media3", "inAppOnly" to true, "externalIntents" to false))
                 "load" -> {
-                    load(call.argumentsMap())
-                    result.success(mapOf("ok" to true, "textureId" to playerState?.textureId, "backend" to "media3"))
+                    load(playerId, arguments ?: emptyMap())
+                    result.success(mapOf("ok" to true, "textureId" to states[playerId]?.textureId, "backend" to "media3"))
                 }
                 "play" -> {
-                    requirePlayer().play()
+                    requirePlayer(playerId).play()
                     result.success(null)
                 }
                 "pause" -> {
-                    requirePlayer().pause()
+                    requirePlayer(playerId).pause()
                     result.success(null)
                 }
                 "seek" -> {
-                    requirePlayer().seekTo(call.longArgument("positionMs"))
+                    requirePlayer(playerId).seekTo(call.longArgument("positionMs"))
                     result.success(null)
                 }
                 "setAudioTrack" -> {
-                    selectTrack(C.TRACK_TYPE_AUDIO, call.optionalStringArgument("trackId"))
+                    selectTrack(playerId, C.TRACK_TYPE_AUDIO, call.optionalStringArgument("trackId"))
                     result.success(null)
                 }
                 "setSubtitleTrack" -> {
-                    selectTrack(C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
+                    selectTrack(playerId, C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
                     result.success(null)
                 }
                 "setPlaybackSpeed" -> {
                     val speed = call.argument<Number>("speed")?.toFloat()
                     val playbackParameters = PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)
-                    requirePlayer().playbackParameters = playbackParameters
+                    requirePlayer(playerId).playbackParameters = playbackParameters
+                    result.success(null)
+                }
+                "setVolume" -> {
+                    val volume = (call.argument<Number>("volume"))?.toFloat() ?: 1f
+                    requirePlayer(playerId).volume = volume
                     result.success(null)
                 }
                 "stop" -> {
-                    requirePlayer().stop()
-                    emit("stopped")
+                    requirePlayer(playerId).stop()
+                    emit(playerId, "stopped")
                     result.success(null)
                 }
                 "dispose" -> {
-                    releasePlayer()
+                    releasePlayer(playerId)
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -107,23 +124,29 @@ class Media3PlaybackPlugin(
     }
 
     override fun onStop(owner: LifecycleOwner) {
-        playerState?.player?.pause()
+        for (state in states.values) {
+            state.player.pause()
+        }
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
-        releasePlayer()
+        for (playerId in states.keys.toList()) {
+            releasePlayer(playerId)
+        }
     }
 
     fun dispose() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
-        releasePlayer()
+        for (playerId in states.keys.toList()) {
+            releasePlayer(playerId)
+        }
     }
 
     @OptIn(UnstableApi::class)
-    private fun load(arguments: Map<String, Any?>) {
-        releasePlayer()
+    private fun load(playerId: String, arguments: Map<String, Any?>) {
+        releasePlayer(playerId)
 
         val source = arguments["source"] as? Map<*, *> ?: emptyMap<String, Any?>()
         val uri = source["uri"] as? String ?: throw IllegalStateException("Missing playback source uri")
@@ -159,37 +182,38 @@ class Media3PlaybackPlugin(
             .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
         val state = PlayerState(
+            playerId = playerId,
             player = player,
             surfaceProducer = surfaceProducer,
             surface = surface,
             textureId = surfaceProducer.id(),
             uri = uri,
         )
-        playerState = state
-        mediaSession = MediaSession.Builder(context, player).build()
+        state.mediaSession = MediaSession.Builder(context, player).build()
+        states[playerId] = state
 
         player.setVideoSurface(surface)
-        player.addListener(Media3Listener())
+        player.addListener(Media3Listener(playerId))
         player.setMediaItem(buildMediaItem(uri, source), startPositionMs)
-        emit("buffering", uri = uri, positionMs = startPositionMs, textureId = state.textureId)
+        emit(playerId, "buffering", uri = uri, positionMs = startPositionMs, textureId = state.textureId)
         player.prepare()
         player.play()
     }
 
-    private fun requirePlayer(): ExoPlayer = playerState?.player ?: throw IllegalStateException("No Media3 player is loaded")
+    private fun requirePlayer(playerId: String): ExoPlayer =
+        states[playerId]?.player ?: throw IllegalStateException("No Media3 player is loaded for $playerId")
 
-    private fun releasePlayer() {
-        val state = playerState ?: return
-        mediaSession?.release()
-        mediaSession = null
+    private fun releasePlayer(playerId: String) {
+        val state = states.remove(playerId) ?: return
+        state.mediaSession?.release()
         state.player.release()
         state.surface.release()
         state.surfaceProducer.release()
-        playerState = null
-        emit("disposed")
+        emit(playerId, "disposed")
     }
 
     private fun emit(
+        playerId: String,
         type: String,
         uri: String? = null,
         positionMs: Long? = null,
@@ -206,7 +230,7 @@ class Media3PlaybackPlugin(
         message: String? = null,
         recoverable: Boolean? = null,
     ) {
-        val event = mutableMapOf<String, Any?>("type" to type, "backend" to "androidExoPlayer")
+        val event = mutableMapOf<String, Any?>("type" to type, "backend" to "androidExoPlayer", "playerId" to playerId)
         if (uri != null) event["uri"] = uri
         if (positionMs != null) event["positionMs"] = positionMs
         if (durationMs != null) event["durationMs"] = durationMs
@@ -222,8 +246,8 @@ class Media3PlaybackPlugin(
         events?.success(event)
     }
 
-    private fun selectTrack(trackType: Int, trackId: String?) {
-        val player = requirePlayer()
+    private fun selectTrack(playerId: String, trackType: Int, trackId: String?) {
+        val player = requirePlayer(playerId)
         val builder = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(trackType)
             .setTrackTypeDisabled(trackType, trackId == null)
@@ -239,11 +263,12 @@ class Media3PlaybackPlugin(
         }
 
         player.trackSelectionParameters = builder.build()
-        emitTrackSnapshot(player)
+        emitTrackSnapshot(playerId, player)
     }
 
-    private fun emitTrackSnapshot(player: Player) {
+    private fun emitTrackSnapshot(playerId: String, player: Player) {
         emit(
+            playerId = playerId,
             type = if (player.isPlaying) "playing" else "ready",
             positionMs = player.currentPosition,
             durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
@@ -306,9 +331,9 @@ class Media3PlaybackPlugin(
         return if (trackType == C.TRACK_TYPE_AUDIO) "Audio ${index + 1}" else "Subtitle ${index + 1}"
     }
 
-    private inner class Media3Listener : Player.Listener {
+    private inner class Media3Listener(private val playerId: String) : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) {
-            val state = playerState ?: return
+            val state = states[playerId] ?: return
             if (videoSize.width > 0 && videoSize.height > 0) {
                 if (state.lastVideoWidth != videoSize.width || state.lastVideoHeight != videoSize.height) {
                     state.surfaceProducer.setSize(videoSize.width, videoSize.height)
@@ -317,6 +342,7 @@ class Media3PlaybackPlugin(
                     val aspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
                     val player = state.player
                     emit(
+                        playerId = playerId,
                         type = if (player.isPlaying) "playing" else "ready",
                         positionMs = player.currentPosition,
                         durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
@@ -327,36 +353,37 @@ class Media3PlaybackPlugin(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-            val player = playerState?.player ?: return
-            emitTrackSnapshot(player)
+            val player = states[playerId]?.player ?: return
+            emitTrackSnapshot(playerId, player)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val player = playerState?.player ?: return
+            val player = states[playerId]?.player ?: return
             val dur = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
             when (playbackState) {
-                Player.STATE_BUFFERING -> emit("buffering", positionMs = player.currentPosition)
-                Player.STATE_READY -> emit(if (player.playWhenReady) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
-                Player.STATE_ENDED -> emit("end", positionMs = player.currentPosition, durationMs = dur)
+                Player.STATE_BUFFERING -> emit(playerId, "buffering", positionMs = player.currentPosition)
+                Player.STATE_READY -> emit(playerId, if (player.playWhenReady) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
+                Player.STATE_ENDED -> emit(playerId, "end", positionMs = player.currentPosition, durationMs = dur)
                 Player.STATE_IDLE -> Unit
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            val player = playerState?.player ?: return
+            val player = states[playerId]?.player ?: return
             val dur = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-            emit(if (isPlaying) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
+            emit(playerId, if (isPlaying) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            val state = playerState
+            val state = states[playerId]
             if (state != null && state.retryAsTs(error)) {
-                emit("buffering", uri = state.uri, positionMs = state.player.currentPosition, textureId = state.textureId)
+                emit(playerId, "buffering", uri = state.uri, positionMs = state.player.currentPosition, textureId = state.textureId)
                 state.player.prepare()
                 return
             }
 
             emit(
+                playerId,
                 "error",
                 positionMs = state?.player?.currentPosition,
                 code = error.errorCodeName,
@@ -367,11 +394,13 @@ class Media3PlaybackPlugin(
     }
 
     private data class PlayerState(
+        val playerId: String,
         val player: ExoPlayer,
         val surfaceProducer: TextureRegistry.SurfaceProducer,
         val surface: Surface,
         val textureId: Long,
         val uri: String,
+        var mediaSession: MediaSession? = null,
         var retriedHlsAsProgressive: Boolean = false,
         var lastVideoWidth: Int = 0,
         var lastVideoHeight: Int = 0,

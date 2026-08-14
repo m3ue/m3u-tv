@@ -22,6 +22,19 @@ abstract class VideoTextureProvider {
   int? get textureId;
 }
 
+/// Implemented by backends that can host several independent, concurrently
+/// playing instances -- Multiview mutes/unmutes each grid tile by audio
+/// focus without touching its playback state, which none of the other
+/// [PlayerAdapter] methods express.
+abstract class MultiviewAudioControl {
+  Future<void> setVolume(double volume);
+}
+
+/// Marker for a [PlayerAdapter] that Multiview can drive: one concurrently
+/// playable, independently mutable, texture-backed instance per grid tile.
+abstract class MultiviewBackend
+    implements PlayerAdapter, VideoTextureProvider, MultiviewAudioControl {}
+
 class FallbackPlayerAdapter implements PlayerAdapter {
   FallbackPlayerAdapter({required this.primary, required this.fallback})
     : _active = primary;

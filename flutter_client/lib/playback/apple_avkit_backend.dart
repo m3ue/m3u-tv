@@ -13,11 +13,12 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 /// [playerId] distinguishes concurrent instances sharing the one native
 /// channel pair — Multiview opens several of these at once, each driving its
 /// own native AVPlayer. The default id is what the single-player path uses.
-class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
+class AppleAvKitBackend
+    implements PlayerAdapter, VideoTextureProvider, MultiviewBackend {
   AppleAvKitBackend({this.playerId = defaultPlayerId})
     : _host = _MethodChannelAvKitHost(playerId: playerId) {
     _eventSub = _host.events
-        .where((event) => event.playerId == playerId)
+        .where((event) => event.playerId == null || event.playerId == playerId)
         .listen(_handleEvent);
   }
 
@@ -122,8 +123,7 @@ class AppleAvKitBackend implements PlayerAdapter, VideoTextureProvider {
     _emit(_state.copyWith(playbackSpeed: speed));
   }
 
-  /// Multiview-only: mutes/unmutes this instance without touching playback
-  /// state. Not part of [PlayerAdapter] since it's specific to this backend.
+  @override
   Future<void> setVolume(double volume) => _host.setVolume(volume);
 
   @override
@@ -202,16 +202,23 @@ abstract class _AvKitHost {
 
 // The plugin exposes exactly one method+event channel pair regardless of how
 // many concurrent players are open, so the broadcast event stream must be
-// listened to exactly once here and shared — a second receiveBroadcastStream()
+// listened to exactly once here and shared - a second receiveBroadcastStream()
 // listener would silently steal events from the first instead of adding a
 // second subscriber. Every [AppleAvKitBackend] instance filters this shared
 // stream down to its own playerId.
+//
+// `receiveBroadcastStream()` already returns a broadcast stream, and `.map`
+// preserves that - no extra `.asBroadcastStream()` wrapping is needed (and
+// actively breaks resubscription across sequential loads/disposes: its
+// default pause/resume semantics leave the upstream subscription paused
+// rather than fully cancelled between listeners, so a later listener never
+// re-triggers the platform channel's "listen" handshake).
 Stream<_AvKitEvent>? _sharedAvKitEvents;
 Stream<_AvKitEvent> _avKitEvents(EventChannel channel) {
   return _sharedAvKitEvents ??= channel.receiveBroadcastStream().map((raw) {
     final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
     return _AvKitEvent.fromMap(map);
-  }).asBroadcastStream();
+  });
 }
 
 class _MethodChannelAvKitHost implements _AvKitHost {

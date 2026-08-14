@@ -7,7 +7,11 @@ import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 class MediaKitDesktopAdapter
-    implements PlayerAdapter, VideoTextureProvider, SubtitleControllerProvider {
+    implements
+        PlayerAdapter,
+        VideoTextureProvider,
+        SubtitleControllerProvider,
+        MultiviewBackend {
   MediaKitDesktopAdapter() {
     _player = mk.Player();
     _controller = mkv.VideoController(_player);
@@ -200,6 +204,9 @@ class MediaKitDesktopAdapter
 
   @override
   Future<void> setPlaybackSpeed(double speed) => _player.setRate(speed);
+
+  @override
+  Future<void> setVolume(double volume) => _player.setVolume(volume * 100);
 
   @override
   Future<void> dispose() async {

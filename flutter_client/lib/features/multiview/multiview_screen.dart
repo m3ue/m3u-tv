@@ -9,7 +9,6 @@ import 'package:m3u_tv/features/multiview/multiview_grid_math.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
-import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -42,7 +41,7 @@ class _MultiviewTile {
   final String playerId;
   final FocusNode focusNode;
   PlaybackOrchestrator? orchestrator;
-  AppleAvKitBackend? backend;
+  MultiviewBackend? backend;
   StreamSubscription<PlaybackState>? stateSub;
   StreamSubscription<PlaybackError>? errorSub;
   PlaybackState? state;

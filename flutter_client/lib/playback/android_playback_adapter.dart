@@ -51,14 +51,23 @@ class AndroidBackendCapabilities {
   }
 }
 
-class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
+class AndroidPlaybackAdapter
+    implements PlayerAdapter, VideoTextureProvider, MultiviewBackend {
   AndroidPlaybackAdapter({
     required AndroidPlaybackProbe probe,
+    this.playerId = defaultPlayerId,
     AndroidMedia3Host? media3Host,
   }) : androidCapabilities = AndroidBackendCapabilities(probe: probe),
-       _media3Host = media3Host ?? const MethodChannelAndroidMedia3Host() {
-    _eventSubscription = _media3Host.events.listen(_handleNativeEvent);
+       _media3Host =
+           media3Host ?? MethodChannelAndroidMedia3Host(playerId: playerId) {
+    _eventSubscription = _media3Host.events
+        .where((event) => event.playerId == null || event.playerId == playerId)
+        .listen(_handleNativeEvent);
   }
+
+  static const String defaultPlayerId = 'primary';
+
+  final String playerId;
 
   final AndroidBackendCapabilities androidCapabilities;
   final AndroidMedia3Host _media3Host;
@@ -236,6 +245,13 @@ class AndroidPlaybackAdapter implements PlayerAdapter, VideoTextureProvider {
   }
 
   @override
+  Future<void> setVolume(double volume) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setVolume(volume);
+    }
+  }
+
+  @override
   Future<void> dispose() async {
     await _eventSubscription?.cancel();
     await _media3Host.dispose();
@@ -364,37 +380,53 @@ abstract class AndroidMedia3Host {
   Future<void> setAudioTrack(String? trackId);
   Future<void> setSubtitleTrack(String? trackId);
   Future<void> setPlaybackSpeed(double speed);
+  Future<void> setVolume(double volume);
   Future<void> dispose();
 }
 
+// The plugin exposes exactly one method+event channel pair regardless of how
+// many concurrent players are open, so the broadcast event stream must be
+// listened to exactly once here and shared -- a second receiveBroadcastStream()
+// listener would silently steal events from the first instead of adding a
+// second subscriber. Every [AndroidPlaybackAdapter] instance filters this
+// shared stream down to its own playerId.
+//
+// `receiveBroadcastStream()` already returns a broadcast stream, and `.map`
+// preserves that -- no extra `.asBroadcastStream()` wrapping is needed (and
+// actively breaks resubscription across sequential loads/disposes: its
+// default pause/resume semantics leave the upstream subscription paused
+// rather than fully cancelled between listeners, so a later listener never
+// re-triggers the platform channel's "listen" handshake).
+Stream<AndroidMedia3Event>? _sharedMedia3Events;
+Stream<AndroidMedia3Event> _media3Events(EventChannel channel) {
+  return _sharedMedia3Events ??= channel.receiveBroadcastStream().map((raw) {
+    final map = Map<String, Object?>.from(raw! as Map<Object?, Object?>);
+    return AndroidMedia3Event.fromMap(map);
+  });
+}
+
 class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
-  const MethodChannelAndroidMedia3Host({
+  MethodChannelAndroidMedia3Host({
+    required this.playerId,
     MethodChannel methodChannel = const MethodChannel(_methodChannelName),
     EventChannel eventChannel = const EventChannel(_eventChannelName),
-  }) : this._(methodChannel: methodChannel, eventChannel: eventChannel);
-
-  const MethodChannelAndroidMedia3Host._({
-    required this._methodChannel,
-    required this._eventChannel,
-  });
+  }) : _methodChannel = methodChannel,
+       _eventChannel = eventChannel;
 
   static const String _methodChannelName = 'm3u_tv/android_media3';
   static const String _eventChannelName = 'm3u_tv/android_media3/events';
 
+  final String playerId;
   final MethodChannel _methodChannel;
   final EventChannel _eventChannel;
 
   @override
-  Stream<AndroidMedia3Event> get events =>
-      _eventChannel.receiveBroadcastStream().map(
-        (event) => AndroidMedia3Event.fromMap(
-          Map<String, Object?>.from(event! as Map<Object?, Object?>),
-        ),
-      );
+  Stream<AndroidMedia3Event> get events => _media3Events(_eventChannel);
 
   @override
   Future<void> load(PlaybackSource source) async {
     await _methodChannel.invokeMethod<Object?>('load', <String, Object?>{
+      'playerId': playerId,
       'source': <String, Object?>{
         'uri': source.uri,
         'title': source.title,
@@ -410,44 +442,66 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   }
 
   @override
-  Future<void> play() => _methodChannel.invokeMethod<void>('play');
+  Future<void> play() =>
+      _methodChannel.invokeMethod<void>('play', <String, Object?>{
+        'playerId': playerId,
+      });
 
   @override
-  Future<void> pause() => _methodChannel.invokeMethod<void>('pause');
+  Future<void> pause() =>
+      _methodChannel.invokeMethod<void>('pause', <String, Object?>{
+        'playerId': playerId,
+      });
 
   @override
   Future<void> seek(Duration position) => _methodChannel.invokeMethod<void>(
     'seek',
-    <String, Object?>{'positionMs': position.inMilliseconds},
+    <String, Object?>{
+      'playerId': playerId,
+      'positionMs': position.inMilliseconds,
+    },
   );
 
   @override
-  Future<void> stop() => _methodChannel.invokeMethod<void>('stop');
+  Future<void> stop() =>
+      _methodChannel.invokeMethod<void>('stop', <String, Object?>{
+        'playerId': playerId,
+      });
 
   @override
   Future<void> setAudioTrack(String? trackId) =>
-      _methodChannel.invokeMethod<void>(
-        'setAudioTrack',
-        <String, Object?>{'trackId': trackId},
-      );
+      _methodChannel.invokeMethod<void>('setAudioTrack', <String, Object?>{
+        'playerId': playerId,
+        'trackId': trackId,
+      });
 
   @override
   Future<void> setSubtitleTrack(String? trackId) =>
-      _methodChannel.invokeMethod<void>(
-        'setSubtitleTrack',
-        <String, Object?>{'trackId': trackId},
-      );
+      _methodChannel.invokeMethod<void>('setSubtitleTrack', <String, Object?>{
+        'playerId': playerId,
+        'trackId': trackId,
+      });
 
   @override
   Future<void> setPlaybackSpeed(double speed) =>
       _methodChannel.invokeMethod<void>('setPlaybackSpeed', <String, Object?>{
+        'playerId': playerId,
         'speed': speed,
+      });
+
+  @override
+  Future<void> setVolume(double volume) =>
+      _methodChannel.invokeMethod<void>('setVolume', <String, Object?>{
+        'playerId': playerId,
+        'volume': volume,
       });
 
   @override
   Future<void> dispose() async {
     try {
-      await _methodChannel.invokeMethod<void>('dispose');
+      await _methodChannel.invokeMethod<void>('dispose', <String, Object?>{
+        'playerId': playerId,
+      });
     } on MissingPluginException {
       return;
     }
@@ -467,6 +521,7 @@ enum AndroidMedia3EventType {
 class AndroidMedia3Event {
   const AndroidMedia3Event({
     required this.type,
+    this.playerId,
     this.uri,
     this.position,
     this.duration,
@@ -489,6 +544,7 @@ class AndroidMedia3Event {
   factory AndroidMedia3Event.fromMap(Map<String, Object?> map) {
     return AndroidMedia3Event(
       type: _typeFromString(map['type'] as String?),
+      playerId: map['playerId'] as String?,
       uri: map['uri'] as String?,
       position: map['positionMs'] is num
           ? Duration(milliseconds: (map['positionMs']! as num).round())
@@ -518,6 +574,7 @@ class AndroidMedia3Event {
   }
 
   final AndroidMedia3EventType type;
+  final String? playerId;
   final String? uri;
   final Duration? position;
   final Duration? duration;

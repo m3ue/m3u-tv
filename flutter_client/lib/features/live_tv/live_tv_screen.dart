@@ -91,11 +91,22 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
-  // Multiview drives several concurrent native AVPlayer instances behind the
-  // tvOS-only AVKit plugin (see AvKitPlaybackPlugin.swift) — there's no
-  // equivalent multi-instance support on the other platform backends yet.
+  // Multiview drives several concurrent player instances. tvOS and Android
+  // multiplex them over their one native channel pair by playerId (see
+  // AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS (media_kit)
+  // and Linux/Windows (the in-process libmpv backend) are multi-instance by
+  // design already. iOS phones/tablets are excluded: Multiview is a TV/
+  // desktop grid feature, not a phone one.
+  static const Set<String> _multiviewSupportedOperatingSystems = {
+    'tvos',
+    'android',
+    'macos',
+    'linux',
+    'windows',
+  };
   static final bool _multiviewSupported =
-      !kIsWeb && Platform.operatingSystem == 'tvos';
+      !kIsWeb &&
+      _multiviewSupportedOperatingSystems.contains(Platform.operatingSystem);
 
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
