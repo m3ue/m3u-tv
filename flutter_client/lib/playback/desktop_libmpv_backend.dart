@@ -257,7 +257,7 @@ class DesktopLibmpvBackend
   @override
   Future<void> setVolume(double volume) async {
     // mpv's `volume` property (like media_kit's) is 0-100, not the 0-1 scale
-    // [MultiviewAudioControl.setVolume] uses to match AVPlayer/ExoPlayer.
+    // [MultiviewBackend.setVolume] uses to match AVPlayer/ExoPlayer.
     await _invokeControl('setVolume', <String, Object?>{
       'volume': volume * 100,
     });
