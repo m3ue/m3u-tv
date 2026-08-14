@@ -189,7 +189,7 @@ class Media3PlaybackPlugin(
             textureId = surfaceProducer.id(),
             uri = uri,
         )
-        state.mediaSession = MediaSession.Builder(context, player).build()
+        state.mediaSession = MediaSession.Builder(context, player).setId(playerId).build()
         states[playerId] = state
 
         player.setVideoSurface(surface)
