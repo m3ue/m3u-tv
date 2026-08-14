@@ -115,9 +115,7 @@ void main() {
   group('Test 3 — Screen omit-to-inherit defaults', () {
     testWidgets(
       'Save without touching any control returns correct omit/default values',
-      (
-        tester,
-      ) async {
+      (tester) async {
         // Show with 2 channels but NO episode matching nextAiringAt → channelId=null (any).
         final testShow = buildShowNoMatchingNextAiring();
 
@@ -246,9 +244,7 @@ void main() {
 
     testWidgets(
       'channelId defaults to the next-airing episode channel when matched',
-      (
-        tester,
-      ) async {
+      (tester) async {
         // Show: 2 channels, one episode with startTime == nextAiringAt on channel 2.
         final testShow = buildShowWithNextAiring();
 
@@ -361,6 +357,309 @@ void main() {
       expect(result!.priority, equals(70));
       expect(result!.startEarlySeconds, equals(120));
       expect(result!.endLateSeconds, equals(180));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Test 18 - Edit channel-scope update intent (issue #194)
+  // ---------------------------------------------------------------------------
+  //
+  // DvrSeriesRuleOptions gains a `channelUpdate` field (default
+  // DvrChannelScopeUnchanged) so an edit-mode save can distinguish "leave the
+  // rule's channel alone" from "explicitly re-scope it". The screen sets it
+  // only from explicit picker interaction; an untouched edit must keep the
+  // echoed channel without emitting an update intent.
+  group('Test 18 - Edit channel-scope update intent (issue #194)', () {
+    // Rule pinned to channel 2, which is one of the two channels in
+    // buildShowWithNextAiring(), so picker selections stay realistic.
+    const pinnedRule = DvrSeriesRule(
+      id: 21,
+      channelId: 2,
+      channelName: 'Channel 2',
+      seriesTitle: 'Test Show',
+      matchMode: DvrMatchMode.contains,
+      seriesMode: DvrSeriesMode.uniqueSe,
+      enabled: true,
+      enableComskip: false,
+    );
+
+    // Any Channel is represented by a nullable channel id in the domain model.
+    const anyChannelRule = DvrSeriesRule(
+      id: 22,
+      channelId: null,
+      seriesTitle: 'Test Show',
+      matchMode: DvrMatchMode.contains,
+      seriesMode: DvrSeriesMode.uniqueSe,
+      enabled: true,
+      enableComskip: false,
+    );
+
+    testWidgets('untouched pinned edit echoes the rule channel and returns '
+        'Unchanged', (tester) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+                initialRule: pinnedRule,
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(
+        result!.channelId,
+        equals(2),
+        reason: 'untouched edit preserves the echoed rule channel',
+      );
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeUnchanged>(),
+        reason: 'no picker interaction means no channel update intent',
+      );
+    });
+
+    testWidgets('selecting Any Channel on a pinned edit returns Clear', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+                initialRule: pinnedRule,
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      await tester.tap(find.text(l10n.dvrSeriesAnyChannel));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(
+        result!.channelId,
+        isNull,
+        reason: 'Any Channel selection clears the pinned channel',
+      );
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeClear>(),
+        reason: 'explicit Any Channel selection means clear the scope',
+      );
+    });
+
+    testWidgets('selecting another channel on a pinned edit returns Set with '
+        'its id', (tester) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+                initialRule: pinnedRule,
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      // Channel 1 is the other channel in the two-channel fixture.
+      await tester.tap(find.text('Channel 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(
+        result!.channelId,
+        equals(1),
+        reason: 'picker selection becomes the new channel',
+      );
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeSet>().having(
+          (scope) => scope.channelId,
+          'channelId',
+          equals(1),
+        ),
+        reason: 'explicit channel selection returns Set carrying its id',
+      );
+    });
+
+    testWidgets('untouched edit of an any-channel rule returns Unchanged', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+                initialRule: anyChannelRule,
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(
+        result!.channelId,
+        isNull,
+        reason: 'any-channel rule keeps a null channelId',
+      );
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeUnchanged>(),
+        reason: 'no picker interaction means no channel update intent',
+      );
+    });
+
+    testWidgets('explicitly selecting Any Channel on an any-channel rule '
+        'returns Clear', (tester) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+                initialRule: anyChannelRule,
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      // The Any Channel pill is already selected; tapping it again is an
+      // explicit picker interaction and must still emit Clear.
+      await tester.tap(find.text(l10n.dvrSeriesAnyChannel));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(result!.channelId, isNull, reason: 'selection stays any-channel');
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeClear>(),
+        reason: 'explicit Any Channel tap is an update intent, not a no-op',
+      );
+    });
+
+    testWidgets('create save keeps Unchanged intent and the next-airing '
+        'channelId', (tester) async {
+      DvrSeriesRuleOptions? result;
+
+      await tester.pumpWidget(
+        buildOptionsApp(
+          (context) => ElevatedButton(
+            onPressed: () async {
+              result = await openDvrSeriesRuleOptions(
+                context,
+                show: buildShowWithNextAiring(),
+              );
+            },
+            child: const Text('Open Options'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Options'));
+      await tester.pumpAndSettle();
+
+      final screenContext = tester.element(
+        find.byType(DvrSeriesRuleOptionsScreen),
+      );
+      final l10n = AppLocalizations.of(screenContext);
+      await tester.tap(find.text(l10n.dvrSeriesSave));
+      await tester.pumpAndSettle();
+
+      expect(result, isNotNull);
+      expect(
+        result!.channelId,
+        equals(2),
+        reason: 'create keeps the existing next-airing channelId behavior',
+      );
+      expect(
+        result!.channelUpdate,
+        isA<DvrChannelScopeUnchanged>(),
+        reason: 'create has no prior scope, so intent stays Unchanged',
+      );
     });
   });
 }
