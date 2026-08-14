@@ -313,6 +313,66 @@ void main() {
       expect(negativeDays.catchupDays, 0);
     });
 
+    test('live streams reject fractional and unsafe archive duration metadata', () {
+      // Given: archive durations include fractional, unsafe, and normal values.
+      final fractional = Channel.fromXtream(const {
+        'stream_id': 105,
+        'name': 'Fractional Hours',
+        'tv_archive': 1,
+        'tv_archive_duration': 1.9,
+      }, 'https://streams.example/live/105.m3u8');
+      final oversized = Channel.fromXtream(const {
+        'stream_id': 106,
+        'name': 'Oversized Hours',
+        'tv_archive': 1,
+        'tv_archive_duration': 2562047788015214,
+      }, 'https://streams.example/live/106.m3u8');
+      final maximum = Channel.fromXtream(const {
+        'stream_id': 107,
+        'name': 'Maximum Hours',
+        'tv_archive': 1,
+        'tv_archive_duration': 9223372036854775807,
+      }, 'https://streams.example/live/107.m3u8');
+      final normal = [1, 25, 48, 72].map(
+        (hours) => Channel.fromXtream({
+          'stream_id': 107 + hours,
+          'name': 'Normal $hours Hours',
+          'tv_archive': 1,
+          'tv_archive_duration': hours,
+        }, 'https://streams.example/live/${107 + hours}.m3u8'),
+      );
+      final dayKey = Channel.fromXtream(const {
+        'stream_id': 200,
+        'name': 'Explicit Days',
+        'tv_archive': 1,
+        'tv_archive_duration': 48,
+        'catchup_days': 3,
+      }, 'https://streams.example/live/200.m3u8');
+
+      // When: the channels are parsed from Xtream metadata.
+      final normalChannels = normal.toList(growable: false);
+
+      // Then: unsafe durations are disabled, valid hours are exact, and day keys win.
+      expect(fractional.catchupRetentionHours, 0);
+      expect(fractional.catchupDays, 0);
+      expect(oversized.catchupRetentionHours, 0);
+      expect(oversized.catchupDays, 0);
+      expect(maximum.catchupRetentionHours, 0);
+      expect(maximum.catchupDays, 0);
+      expect(
+        normalChannels.map((channel) => channel.catchupRetentionHours),
+        [1, 25, 48, 72],
+      );
+      expect(normalChannels.map((channel) => channel.catchupDays), [
+        0,
+        1,
+        2,
+        3,
+      ]);
+      expect(dayKey.catchupRetentionHours, isNull);
+      expect(dayKey.catchupDays, 3);
+    });
+
     test('builds Xtream catchup timeshift URL from program window', () async {
       final service = XtreamService(
         transport: FakeXtreamTransport({'auth': xtreamAuth(auth: 1)}).call,
@@ -1244,6 +1304,34 @@ void main() {
 
       expect(restored?.data.single.catchupDays, 7);
       expect(restored?.data.single.catchupRetentionHours, isNull);
+    });
+
+    test('cache rejects unsafe catchup retention hours', () async {
+      final file = io.File(
+        '${io.Directory.systemTemp.path}/m3u_tv_cache_unsafe_catchup_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+      final store = PersistentJsonStore(file: file);
+      await store.write('m3ue_cache_liveStreams', <String, Object?>{
+        'timestamp': DateTime.now().toIso8601String(),
+        'data': [
+          {
+            'stream_id': 101,
+            'name': 'BBC One',
+            'stream_url': 'https://streams.example/live/bbc-one.m3u8',
+            'catchup_supported': true,
+            'catchup_retention_hours': 9223372036854775807,
+          },
+        ],
+      });
+
+      final restored = await CacheService(store: store).get<List<Channel>>(
+        'liveStreams',
+      );
+
+      expect(restored?.data.single.catchupRetentionHours, 0);
     });
 
     test('favorites add and remove channel ids', () async {

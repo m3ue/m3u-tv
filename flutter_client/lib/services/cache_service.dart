@@ -174,7 +174,10 @@ Object? _decodeCacheData(String key, Object? raw) {
                   ? _positiveIntOrNull(json['catchup_days']) ?? 0
                   : null,
               catchupRetentionHours: json.containsKey('catchup_retention_hours')
-                  ? _positiveIntOrNull(json['catchup_retention_hours']) ?? 0
+                  ? validCatchupRetentionHours(
+                          json['catchup_retention_hours'],
+                        ) ??
+                        0
                   : null,
               catchupSource: _nullableString(json['catchup_source']),
             );

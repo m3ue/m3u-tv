@@ -3,6 +3,7 @@
 enum ContentType { live, vod, episode, aiostreams }
 
 final RegExp _schemePattern = RegExp('^[a-zA-Z][a-zA-Z0-9+.-]*://');
+const int kMaximumCatchupRetentionHours = 24 * 365 * 100;
 
 /// Strips trailing slashes and, if [server] has no explicit URI scheme
 /// (e.g. a bare `192.168.1.10:8080` typed on a TV remote), prefixes it with
@@ -98,7 +99,7 @@ class Channel {
         !hasCatchupDays &&
             (json.containsKey('tv_archive_duration') ||
                 _asBool(json['tv_archive']))
-        ? _positiveIntOrNull(json['tv_archive_duration']) ?? 0
+        ? validCatchupRetentionHours(json['tv_archive_duration']) ?? 0
         : null;
     final catchupDays = hasCatchupDays
         ? _positiveIntOrNull(json['catchup_days'] ?? json['catchup-days']) ?? 0
@@ -1330,6 +1331,17 @@ int? _asIntOrNull(Object? value) {
 int? _positiveIntOrNull(Object? value) {
   final parsed = _asIntOrNull(value);
   return parsed != null && parsed > 0 ? parsed : null;
+}
+
+int? validCatchupRetentionHours(Object? value) {
+  final parsed = value is int
+      ? value
+      : value is String
+      ? int.tryParse(value)
+      : null;
+  return parsed != null && parsed > 0 && parsed <= kMaximumCatchupRetentionHours
+      ? parsed
+      : null;
 }
 
 double? _asDoubleOrNull(Object? value) {
