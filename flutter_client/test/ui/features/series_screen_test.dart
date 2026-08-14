@@ -160,6 +160,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'stranger');
       await tester.pumpAndSettle();
 
@@ -174,6 +176,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Thriller'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'bad');
       await tester.pumpAndSettle();
@@ -210,6 +214,32 @@ void main() {
 
       expect(find.text('★ 4.8'), findsOneWidget);
     });
+
+    testWidgets(
+      'mobile layout shows a Filter button instead of category chips, '
+      'and selecting a category filters the grid',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            seriesList: testSeriesList,
+            categories: testCategories,
+            useSidebarLayout: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Filter'), findsOneWidget);
+
+        await tester.tap(find.text('Filter'));
+        await tester.pumpAndSettle();
+
+        final categoryTab = testCategories.first;
+        await tester.tap(find.text(categoryTab.name));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 
@@ -219,6 +249,7 @@ class _TestApp extends StatelessWidget {
     required this.categories,
     this.isLoading = false,
     this.isConfigured = true,
+    this.useSidebarLayout = true,
     this.onSeriesSelect,
   });
 
@@ -226,6 +257,7 @@ class _TestApp extends StatelessWidget {
   final List<Category> categories;
   final bool isLoading;
   final bool isConfigured;
+  final bool useSidebarLayout;
   final void Function(Series)? onSeriesSelect;
 
   @override
@@ -240,8 +272,10 @@ class _TestApp extends StatelessWidget {
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData.dark(useMaterial3: true),
         home: SeriesScreen(
+          useSidebarLayout: useSidebarLayout,
           onSeriesSelect: onSeriesSelect ?? (_) {},
         ),
       ),

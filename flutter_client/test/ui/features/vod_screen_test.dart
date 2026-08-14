@@ -193,6 +193,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'sintel');
       await tester.pumpAndSettle();
 
@@ -208,6 +210,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Action'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'steel');
       await tester.pumpAndSettle();
@@ -243,6 +247,34 @@ void main() {
 
       expect(find.text('★ 4.5'), findsOneWidget);
     });
+
+    testWidgets(
+      'mobile layout shows a Filter button instead of category chips, '
+      'and selecting a category filters the grid',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: testVodItems,
+            categories: testCategories,
+            useSidebarLayout: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Filter'), findsOneWidget);
+        expect(find.text('Action'), findsNothing);
+
+        await tester.tap(find.text('Filter'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Action'), findsOneWidget);
+        await tester.tap(find.text('Action'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Big Buck Bunny'), findsOneWidget);
+        expect(find.text('Sintel'), findsNothing);
+      },
+    );
   });
 }
 
@@ -252,6 +284,7 @@ class _TestApp extends StatelessWidget {
     required this.categories,
     this.isLoading = false,
     this.isConfigured = true,
+    this.useSidebarLayout = true,
     this.onVodSelect,
   });
 
@@ -259,6 +292,7 @@ class _TestApp extends StatelessWidget {
   final List<Category> categories;
   final bool isLoading;
   final bool isConfigured;
+  final bool useSidebarLayout;
   final void Function(VodItem)? onVodSelect;
 
   @override
@@ -273,8 +307,10 @@ class _TestApp extends StatelessWidget {
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData.dark(useMaterial3: true),
         home: VodScreen(
+          useSidebarLayout: useSidebarLayout,
           onVodSelect: onVodSelect ?? (_) {},
         ),
       ),

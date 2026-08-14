@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
@@ -98,6 +99,31 @@ void main() {
       // Only BBC One should be visible (categoryId: '10')
       expect(find.text('BBC One'), findsOneWidget);
     });
+
+    testWidgets(
+      'mobile layout shows a Filter button instead of category chips, '
+      'and selecting a category filters the channel list',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            useSidebarLayout: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Filter'), findsOneWidget);
+        expect(find.text('News'), findsNothing);
+
+        await tester.tap(find.text('Filter'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('News'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('BBC One'), findsOneWidget);
+      },
+    );
 
     testWidgets('tapping All Channels shows all channels', (tester) async {
       await tester.pumpWidget(
@@ -204,6 +230,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'cnn');
       await tester.pumpAndSettle();
 
@@ -227,6 +255,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('★ Favorites'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'bbc');
       await tester.pumpAndSettle();
@@ -381,6 +411,49 @@ void main() {
               );
           }
         }
+      },
+    );
+
+    testWidgets(
+      'D-pad Right from the Channels column enters the program grid',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.setLastViewMode('epgGrid');
+        final now = DateTime.now();
+        final program = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Evening News',
+          description: 'x',
+          start: now.subtract(const Duration(minutes: 15)),
+          end: now.add(const Duration(minutes: 15)),
+        );
+        final epgService = EpgService()..loadPrograms([program]);
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            favoritesService: favoritesService,
+            epgService: epgService,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+
+        final programBlockKey = ValueKey(
+          'timeline-program-${program.channelId}-'
+          '${program.start.toIso8601String()}',
+        );
+        final focusWidgets = tester
+            .widgetList<Focus>(
+              find.descendant(
+                of: find.byKey(programBlockKey),
+                matching: find.byType(Focus),
+              ),
+            )
+            .where((focus) => focus.focusNode != null);
+        expect(focusWidgets.any((focus) => focus.focusNode!.hasFocus), isTrue);
       },
     );
 
@@ -671,6 +744,7 @@ class _TestApp extends StatelessWidget {
     this.onChannelContextChanged,
     this.onScheduleProgram,
     this.dvrRecordings = const [],
+    this.useSidebarLayout = true,
   });
 
   final List<Channel> channels;
@@ -684,6 +758,7 @@ class _TestApp extends StatelessWidget {
   final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
   final List<DvrRecording> dvrRecordings;
+  final bool useSidebarLayout;
 
   @override
   Widget build(BuildContext context) {
@@ -712,6 +787,7 @@ class _TestApp extends StatelessWidget {
           favoritesService: favoritesService ?? FavoritesService(),
           viewSettingsService: viewSettingsService,
           onChannelSelect: onChannelSelect ?? (_) {},
+          useSidebarLayout: useSidebarLayout,
           onChannelContextChanged: onChannelContextChanged,
           onScheduleProgram: onScheduleProgram,
         ),

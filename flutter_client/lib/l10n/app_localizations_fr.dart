@@ -70,7 +70,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get admin => 'Administrateur';
 
   @override
-  String get liveTvSearchHint => 'Rechercher dans la Télévision en direct…';
+  String get mediaCategoryFilterButton => 'Filter';
+
+  @override
+  String get mediaCategoryFilterScreenTitle => 'Categories';
+
+  @override
+  String get liveTvViewModeList => 'List';
+
+  @override
+  String get liveTvViewModeGrid => 'Grid';
+
+  @override
+  String get liveTvViewModeEpg => 'EPG';
+
+  @override
+  String get liveTvSearchHint => 'Rechercher…';
 
   @override
   String get liveTvNoChannels => 'Aucune chaîne disponible';
@@ -236,10 +251,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get searchSectionSeries => 'Série';
 
   @override
-  String get vodSearchHint => 'Rechercher des films…';
+  String get vodSearchHint => 'Rechercher…';
 
   @override
-  String get seriesSearchHint => 'Rechercher des séries…';
+  String get seriesSearchHint => 'Rechercher…';
 
   @override
   String get settingsTitle => 'Paramètres';
@@ -716,7 +731,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get requestsTabMyRequests => 'Mes Demandes';
 
   @override
-  String get requestsSearchHint => 'Rechercher des films et séries…';
+  String get requestsSearchHint => 'Rechercher…';
 
   @override
   String get requestsNoResults => 'Aucun résultat trouvé';

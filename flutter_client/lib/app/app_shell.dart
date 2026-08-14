@@ -394,13 +394,52 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
+  // Screens that render a MediaCategoryNav strip (VOD/Series/Live TV/
+  // Requests) register their strip's own FocusScopeNode here, keyed by
+  // route, so _deactivateSidebar can always land there first instead of
+  // wherever focus happened to be before the sidebar was activated. Flutter's
+  // native FocusScopeNode restoration (`_contentFocusNode.requestFocus()`
+  // below) always drills down to whichever of a screen's sibling scopes
+  // (strip vs. grid) last held actual focus — which, once a screen has both,
+  // means it would silently skip the strip and land straight back in the
+  // grid whenever the grid was the last thing focused. Keying by route
+  // (rather than tracking "the last registered node") avoids clobbering the
+  // active tab's registration: go_router's StatefulNavigationShell keeps
+  // every visited branch mounted, so a screen registers exactly once, the
+  // first time its tab is built, and that registration is never disposed
+  // just because another tab becomes active.
+  final Map<String, FocusScopeNode> _contentEntryFocusByRoute = {};
+
+  void _registerContentEntryFocus(String routeName, FocusScopeNode node) {
+    _contentEntryFocusByRoute[routeName] = node;
+  }
+
+  // Lets a screen intercept the Back key itself before AppShell's default
+  // handling (sidebar activation) runs — currently only Live TV, to move
+  // focus to the EPG's Channels column instead. Same route-keyed,
+  // register-once pattern as _contentEntryFocusByRoute above, for the same
+  // StatefulNavigationShell branch-retention reason.
+  final Map<String, bool Function()> _contentBackHandlerByRoute = {};
+
+  void _registerContentBackHandler(String routeName, bool Function() handler) {
+    _contentBackHandlerByRoute[routeName] = handler;
+  }
+
   void _deactivateSidebar() {
     setState(() {
       _sidebarActive = false;
     });
     unawaited(
       Future.microtask(() {
-        if (mounted) _contentFocusNode.requestFocus();
+        if (!mounted) return;
+        final route =
+            RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+        final entry = _contentEntryFocusByRoute[route];
+        if (entry != null) {
+          entry.requestFocus();
+        } else {
+          _contentFocusNode.requestFocus();
+        }
       }),
     );
   }
@@ -539,6 +578,12 @@ class AppShellState extends ConsumerState<AppShell>
     final router = GoRouter.of(context);
     if (router.canPop()) {
       router.pop();
+      return true;
+    }
+
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    final screenBackHandler = _contentBackHandlerByRoute[route];
+    if (screenBackHandler != null && screenBackHandler()) {
       return true;
     }
 
@@ -1004,6 +1049,7 @@ class AppShellState extends ConsumerState<AppShell>
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
         viewSettingsService: _appState.viewSettingsService,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
         onChannelSelect: _openChannel,
         onChannelContextChanged: _setChannelContext,
         onCatchupProgramSelect: _openCatchupProgram,
@@ -1019,16 +1065,26 @@ class AppShellState extends ConsumerState<AppShell>
         ),
         onEnterFullScreenDetail: _enterFullScreenDetail,
         onExitFullScreenDetail: _exitFullScreenDetail,
+        onEntryFocusScopeReady: (node) =>
+            _registerContentEntryFocus(RouteNames.liveTv, node),
+        onBackHandlerReady: (handler) =>
+            _registerContentBackHandler(RouteNames.liveTv, handler),
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
         favoritesService: _appState.vodFavoritesService,
         onSidebarActivate: _activateSidebar,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
+        onEntryFocusScopeReady: (node) =>
+            _registerContentEntryFocus(RouteNames.vod, node),
       ),
       RouteNames.series => SeriesScreen(
         onSeriesSelect: _openSeries,
         favoritesService: _appState.seriesFavoritesService,
         onSidebarActivate: _activateSidebar,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
+        onEntryFocusScopeReady: (node) =>
+            _registerContentEntryFocus(RouteNames.series, node),
       ),
       RouteNames.aiostreams => ListenableBuilder(
         listenable: _appState,
@@ -1098,6 +1154,9 @@ class AppShellState extends ConsumerState<AppShell>
             onDismiss: _appState.dismissMediaRequest,
             onRefreshRequests: _appState.refreshMediaRequests,
             onSidebarActivate: _activateSidebar,
+            useSidebarLayout: shouldUseSidebar(widget.deviceType),
+            onEntryFocusScopeReady: (node) =>
+                _registerContentEntryFocus(RouteNames.requests, node),
           );
         },
       ),

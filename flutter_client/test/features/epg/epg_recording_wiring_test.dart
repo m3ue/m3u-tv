@@ -68,6 +68,10 @@ void main() {
           width: 800,
           height: 400,
           child: TimelineEpgView(
+            channelColumnFocusNode: FocusScopeNode(),
+            onChannelColumnEdge: (_) {},
+            dayControlsFocusNode: FocusScopeNode(),
+            onDayControlsEdge: (_) {},
             channels: const <Channel>[channel],
             epgService: service,
             onChannelSelect: (_) {},

@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart'
 import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
@@ -32,6 +34,9 @@ class MediaBrowsingMetrics {
   // Landscape "Continue Watching" cards: 16:9 thumbnail + text area.
   static const double landscapeCardWidth = 280;
   static const double landscapeCardHeight = 205; // 157.5 (9/16×280) + 47 text
+  // Width of the TV/Desktop interstitial search+category strip
+  // (MediaCategoryNav) between the sidebar and a screen's content grid.
+  static const double interstitialNavWidth = 240;
 }
 
 class InlineMediaSearchField extends StatefulWidget {
@@ -42,15 +47,37 @@ class InlineMediaSearchField extends StatefulWidget {
     this.autofocus = false,
     this.focusNode,
     this.textInputAction = TextInputAction.search,
+    this.activateOnSelect = false,
     super.key,
   });
 
   final String query;
   final ValueChanged<String> onChanged;
   final String hintText;
+
+  /// When [activateOnSelect] is false: autofocuses the real text field
+  /// (opens the keyboard immediately). When [activateOnSelect] is true:
+  /// autofocuses the inactive, button-like facade instead — see
+  /// [activateOnSelect].
   final bool autofocus;
   final FocusNode? focusNode;
   final TextInputAction textInputAction;
+
+  /// TV/desktop d-pad screens embed this field alongside other browsable
+  /// content (category chips, a content grid) rather than on a
+  /// dedicated search screen. A plain [TextField] can't tell "the user
+  /// d-padded past this on their way elsewhere" apart from "the user wants
+  /// to type" — both just focus it, which opens the keyboard and starts
+  /// eating Left/Right for cursor movement instead of navigation.
+  ///
+  /// When true, the field starts as a non-editing, [DpadInkWell]-focusable
+  /// button showing the current query (or hint); only pressing Select on it
+  /// opens the real text field and grabs keyboard focus. Back/Escape while
+  /// editing returns to the button instead of falling through to the
+  /// screen's own Back handling. [autofocus] then targets that button, not
+  /// the text field. Screens with a dedicated search purpose (e.g.
+  /// `SearchScreen`) should leave this false.
+  final bool activateOnSelect;
 
   @override
   State<InlineMediaSearchField> createState() => _InlineMediaSearchFieldState();
@@ -60,6 +87,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   late final TextEditingController _controller;
   FocusNode? _internalFocusNode;
   bool _focused = false;
+  late bool _activated = !widget.activateOnSelect;
 
   FocusNode get _focusNode =>
       widget.focusNode ?? (_internalFocusNode ??= FocusNode());
@@ -97,12 +125,40 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   }
 
   void _handleFocusChange() {
-    if (mounted) setState(() => _focused = _focusNode.hasFocus);
+    if (!mounted) return;
+    setState(() => _focused = _focusNode.hasFocus);
+    // Losing focus for any reason (d-pad navigating away, not just an
+    // explicit Escape/Back press) reverts to the inactive facade — a live
+    // TextField left mounted-but-unfocused looks and behaves differently
+    // from the facade button it should have become again.
+    if (!_focusNode.hasFocus) _deactivate();
   }
 
   void _clear() {
     _controller.clear();
     widget.onChanged('');
+  }
+
+  void _activate() {
+    setState(() => _activated = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _deactivate() {
+    if (!widget.activateOnSelect || !_activated) return;
+    setState(() => _activated = false);
+  }
+
+  KeyEventResult _handleEditingKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.goBack) {
+      _deactivate();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -111,55 +167,133 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
     const radius = BorderRadius.all(
       Radius.circular(MediaBrowsingMetrics.cardRadius),
     );
-    const noBorder = OutlineInputBorder(
-      borderRadius: radius,
-      borderSide: BorderSide.none,
+
+    // Fixed so the facade button and the real TextField below are pixel
+    // identical in height — letting each derive its own height from font
+    // metrics/padding produced a visible size jump on activate/deactivate.
+    const fieldHeight = 52.0;
+    final hintStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
     );
-    return Stack(
-      children: [
-        TextField(
-          controller: _controller,
-          focusNode: _focusNode,
+
+    if (widget.activateOnSelect && !_activated) {
+      return SizedBox(
+        height: fieldHeight,
+        child: DpadInkWell(
+          onTap: _activate,
           autofocus: widget.autofocus,
-          textInputAction: widget.textInputAction,
-          decoration: InputDecoration(
-            hintText: widget.hintText,
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: widget.query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear search',
-                    icon: const Icon(Icons.clear),
-                    onPressed: _clear,
+          borderRadius: radius,
+          color: colorScheme.surfaceContainerHigh,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search,
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.query.isEmpty ? widget.hintText : widget.query,
+                    overflow: TextOverflow.ellipsis,
+                    style: widget.query.isEmpty
+                        ? hintStyle
+                        : hintStyle?.copyWith(color: colorScheme.onSurface),
                   ),
-            filled: true,
-            fillColor: colorScheme.surfaceContainerHigh,
-            border: noBorder,
-            enabledBorder: noBorder,
-            focusedBorder: noBorder,
+                ),
+              ],
+            ),
           ),
-          onChanged: widget.onChanged,
         ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: _focused ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 150),
-              child: CustomPaint(
-                painter: GradientBorderPainter(
-                  borderRadius: radius,
-                  width: 2.5,
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [colorScheme.primary, colorScheme.secondary],
+      );
+    }
+
+    return SizedBox(
+      height: fieldHeight,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            // Built the same way as the facade's Row (below) rather than
+            // via InputDecoration's prefixIcon/isCollapsed machinery — that
+            // machinery lays its content out top-aligned once the decorator
+            // is stretched taller than its content, and there's no
+            // vertical-centering knob for it. A plain Row centers its
+            // children by default, so it just works.
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: radius,
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: widget.query.isEmpty ? 12 : 4,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search,
+                      size: 24,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Focus(
+                        onKeyEvent: widget.activateOnSelect
+                            ? _handleEditingKey
+                            : null,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          autofocus:
+                              !widget.activateOnSelect && widget.autofocus,
+                          textInputAction: widget.textInputAction,
+                          style: hintStyle?.copyWith(
+                            color: colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration.collapsed(
+                            hintText: widget.hintText,
+                            hintStyle: hintStyle,
+                          ),
+                          onChanged: widget.onChanged,
+                          onSubmitted: (_) => _deactivate(),
+                        ),
+                      ),
+                    ),
+                    if (widget.query.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clear,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _focused ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: CustomPaint(
+                  painter: GradientBorderPainter(
+                    borderRadius: radius,
+                    width: 2.5,
+                    gradient: LinearGradient(
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                      colors: [colorScheme.primary, colorScheme.secondary],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

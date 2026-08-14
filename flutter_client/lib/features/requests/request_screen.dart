@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/media_category_nav.dart';
 
 /// Guest content requests against the owner's Sonarr/Radarr integrations.
 ///
@@ -26,7 +27,9 @@ class RequestScreen extends ConsumerStatefulWidget {
     required this.onResultSelect,
     required this.onDismiss,
     required this.onRefreshRequests,
+    required this.useSidebarLayout,
     this.onSidebarActivate,
+    this.onEntryFocusScopeReady,
   });
 
   final bool isConfigured;
@@ -38,7 +41,17 @@ class RequestScreen extends ConsumerStatefulWidget {
   final void Function(ContentRequestSearchResult result) onResultSelect;
   final Future<void> Function(int requestId) onDismiss;
   final Future<void> Function() onRefreshRequests;
+
+  /// TV/desktop (`true`): the search tab's search+type filter render as a
+  /// vertical strip beside the results grid. Mobile (`false`): stacked at
+  /// the top with a Filter button.
+  final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
+
+  /// TV/desktop only: forwarded to [MediaCategoryNav.onEntryFocusScopeReady]
+  /// so AppShell can always re-enter this screen's strip first when the
+  /// sidebar deactivates.
+  final ValueChanged<FocusScopeNode>? onEntryFocusScopeReady;
 
   @override
   ConsumerState<RequestScreen> createState() => _RequestScreenState();
@@ -51,6 +64,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     vsync: this,
   );
   Timer? _debounce;
+  final FocusScopeNode _gridFocusNode = FocusScopeNode();
+  final GlobalKey<MediaCategoryNavState> _navKey =
+      GlobalKey<MediaCategoryNavState>();
 
   String _query = '';
   String _typeFilter = '';
@@ -69,6 +85,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   void dispose() {
     _debounce?.cancel();
     _tabController.dispose();
+    _gridFocusNode.dispose();
     super.dispose();
   }
 
@@ -204,37 +221,37 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   ) {
     final contentTypes =
         ref.watch(requestsCapabilityProvider)?.contentTypes ?? const [];
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            MediaBrowsingMetrics.contentPadding,
-            MediaBrowsingMetrics.contentPadding,
-            MediaBrowsingMetrics.contentPadding,
-            0,
-          ),
-          child: InlineMediaSearchField(
-            query: _query,
-            hintText: l.requestsSearchHint,
-            onChanged: _onQueryChanged,
-            autofocus: true,
-          ),
-        ),
-        if (contentTypes.length > 1)
-          ScrollableCategoryBar(
-            tabs: [
-              CategoryTabData(id: '', name: l.aiostreamsSearchAll),
-              if (contentTypes.contains('movie'))
-                CategoryTabData(id: 'movie', name: l.searchSectionMovies),
-              if (contentTypes.contains('series'))
-                CategoryTabData(id: 'series', name: l.searchSectionSeries),
-            ],
-            selectedId: _typeFilter,
-            onSelected: _onTypeFilterChanged,
-          ),
-        Expanded(child: _buildSearchResults(l, myRequests)),
-      ],
+    final tabs = contentTypes.length > 1
+        ? [
+            CategoryTabData(id: '', name: l.aiostreamsSearchAll),
+            if (contentTypes.contains('movie'))
+              CategoryTabData(id: 'movie', name: l.searchSectionMovies),
+            if (contentTypes.contains('series'))
+              CategoryTabData(id: 'series', name: l.searchSectionSeries),
+          ]
+        : const <CategoryTabData>[];
+    final nav = MediaCategoryNav(
+      key: _navKey,
+      useSidebarLayout: widget.useSidebarLayout,
+      query: _query,
+      onQueryChanged: _onQueryChanged,
+      searchHint: l.requestsSearchHint,
+      searchAutofocus: true,
+      tabs: tabs,
+      selectedId: _typeFilter,
+      onSelected: _onTypeFilterChanged,
+      filterButtonLabel: l.mediaCategoryFilterButton,
+      filterScreenTitle: l.mediaCategoryFilterScreenTitle,
+      onSidebarActivate: widget.onSidebarActivate,
+      gridFocusScopeNode: _gridFocusNode,
+      memoryKeyPrefix: 'requests',
+      onEntryFocusScopeReady: widget.onEntryFocusScopeReady,
     );
+    final content = Expanded(child: _buildSearchResults(l, myRequests));
+
+    return widget.useSidebarLayout
+        ? Row(children: [nav, content])
+        : Column(children: [nav, content]);
   }
 
   Widget _buildSearchResults(
@@ -282,24 +299,39 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         final availableWidth =
             constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
         final columnCount = _posterColumnCount(availableWidth);
-        return ScrollbarGridView(
-          padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columnCount,
-            childAspectRatio: 0.6,
-            mainAxisSpacing: MediaBrowsingMetrics.itemGap,
-            crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+        return FocusScope(
+          node: _gridFocusNode,
+          child: DpadRegion(
+            memoryKey: 'requests/grid',
+            horizontalEdge: DpadEdgeBehavior.stop,
+            onEdge: (direction) {
+              if (direction != TraversalDirection.left) return;
+              if (widget.useSidebarLayout) {
+                _navKey.currentState?.requestFocus();
+              } else {
+                widget.onSidebarActivate?.call();
+              }
+            },
+            child: ScrollbarGridView(
+              padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columnCount,
+                childAspectRatio: 0.6,
+                mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+                crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+              ),
+              itemCount: _results.length,
+              itemBuilder: (context, index) {
+                final result = _results[index];
+                return _RequestResultCard(
+                  result: result,
+                  autofocus: index == 0,
+                  isAlreadyRequested: _isAlreadyRequested(result, myRequests),
+                  onTap: () => widget.onResultSelect(result),
+                );
+              },
+            ),
           ),
-          itemCount: _results.length,
-          itemBuilder: (context, index) {
-            final result = _results[index];
-            return _RequestResultCard(
-              result: result,
-              autofocus: index == 0,
-              isAlreadyRequested: _isAlreadyRequested(result, myRequests),
-              onTap: () => widget.onResultSelect(result),
-            );
-          },
         );
       },
     );
