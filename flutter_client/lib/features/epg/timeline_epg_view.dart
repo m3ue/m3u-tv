@@ -362,6 +362,11 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                               isRecording: widget.recordingChannelIds.contains(
                                 widget.channels[i].id,
                               ),
+                              // The Channels column is the default landing
+                              // spot for the EPG view (not the day-nav
+                              // header or a program block), so it's the
+                              // only autofocus target in this widget.
+                              autofocus: i == 0,
                               onTap: () =>
                                   widget.onChannelSelect(widget.channels[i]),
                               onLongTap: widget.onChannelColumnLongPress == null
@@ -586,12 +591,20 @@ class _DayControls extends StatelessWidget {
     return Container(
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      // Left-aligned (Row's default) so this cluster sits directly above
+      // the Channels column (matching its horizontal position) instead of
+      // floating centered across the whole EPG width.
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           DpadInkWell(
             key: const ValueKey('timeline-previous-day'),
             onTap: canGoPrevious ? onPrevious : null,
+            // Not the visible landing focus (the Channels column autofocus,
+            // built after this, wins that) — this just seeds the
+            // day-controls/program-grid region's own focus history, so
+            // returning here from the Channels column (see
+            // LiveTvScreen._handleChannelColumnEdge) has a real fallback
+            // target instead of parking on an empty scope.
             autofocus: canGoPrevious,
             enabled: canGoPrevious,
             borderRadius: BorderRadius.circular(8),
@@ -666,11 +679,13 @@ class _ChannelCell extends StatelessWidget {
     this.isRecording = false,
     this.onTap,
     this.onLongTap,
+    this.autofocus = false,
   });
   final Channel channel;
   final bool isRecording;
   final VoidCallback? onTap;
   final VoidCallback? onLongTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -678,6 +693,7 @@ class _ChannelCell extends StatelessWidget {
     return DpadInkWell(
       onTap: onTap,
       onLongTap: onLongTap,
+      autofocus: autofocus,
       borderRadius: BorderRadius.zero,
       child: Container(
         height: _kRowH,

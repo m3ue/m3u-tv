@@ -806,6 +806,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // The Channels column is the default landing focus now, not the
+      // day-nav header — move focus there explicitly before exercising
+      // date-control-specific key sequences.
+      _dateControlFocusable(
+        tester,
+        const ValueKey('timeline-previous-day'),
+      ).focusNode?.requestFocus();
+      await tester.pump();
+
       await tester.sendKeyEvent(LogicalKeyboardKey.select);
       await tester.pump();
       expect(find.text('Jul 30, 2026'), findsOneWidget);
@@ -877,6 +886,16 @@ void main() {
         const ValueKey('timeline-previous-day'),
       );
       expect(previous.enabled, isFalse);
+
+      // The Channels column is the default landing focus now, not the
+      // day-nav header. "previous" is disabled, so move focus straight to
+      // "now" (matching what autofocus used to land on) before exercising
+      // the skip-disabled-control behavior below.
+      _dateControlFocusable(
+        tester,
+        const ValueKey('timeline-now'),
+      ).focusNode?.requestFocus();
+      await tester.pump();
       expect(
         _dateControlFocusable(
           tester,
@@ -956,6 +975,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // The Channels column is the default landing focus now, not the
+      // day-nav header — move focus to "previous" explicitly (matching
+      // what autofocus used to land on, since it's enabled here) before
+      // exercising the skip-disabled-control behavior below.
+      _dateControlFocusable(
+        tester,
+        const ValueKey('timeline-previous-day'),
+      ).focusNode?.requestFocus();
+      await tester.pump();
       expect(
         _dateControlFocusable(
           tester,

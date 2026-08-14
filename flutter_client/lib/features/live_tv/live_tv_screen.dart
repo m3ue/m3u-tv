@@ -145,8 +145,19 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
   // EPG-only: a distinct hop between the program grid and the nav strip,
   // reached via the Back key (see _handleBackFromEpg) rather than spatial
-  // left/right traversal from the grid.
-  final FocusScopeNode _channelColumnFocusNode = FocusScopeNode();
+  // left/right traversal from the grid. skipTraversal keeps this wrapper
+  // node itself out of dpad's spatial candidate search (which otherwise
+  // treats it as a real focusable item, in whichever region its own
+  // BuildContext resolves to) — without it, this node can be picked as a
+  // directional-navigation target in its own right, `.requestFocus()` calls
+  // aimed at *escaping* this region as a fresh candidate would just refocus
+  // itself, and the region behind it (or the day-navigation header, in the
+  // production layout) would never actually receive focus. skipTraversal
+  // does not affect explicit `.requestFocus()` calls (only candidate
+  // search), so entering the region programmatically still works.
+  final FocusScopeNode _channelColumnFocusNode = FocusScopeNode(
+    skipTraversal: true,
+  );
 
   @override
   void initState() {
@@ -655,7 +666,19 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
   void _handleChannelColumnEdge(TraversalDirection direction) {
     if (direction == TraversalDirection.right) {
+      // _channelColumnFocusNode is a *descendant* of _gridFocusNode (it's
+      // nested inside the same content area TimelineEpgView renders), not a
+      // sibling — so a plain _gridFocusNode.requestFocus() would just
+      // delegate straight back down to whichever node is still focused
+      // inside the Channels column, appearing "stuck". Flutter's own scope
+      // machinery already skips stale (no-longer-focusable) entries when
+      // resolving a scope's focusedChild (see FocusScopeNode._doRequestFocus's
+      // cleanup loop), so briefly marking this node unfocusable forces that
+      // resolution to fall through to the grid's own last-focused item
+      // (day-nav header or a program block) instead.
+      _channelColumnFocusNode.canRequestFocus = false;
       _gridFocusNode.requestFocus();
+      _channelColumnFocusNode.canRequestFocus = true;
       return;
     }
     if (direction != TraversalDirection.left) return;
