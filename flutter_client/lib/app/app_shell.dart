@@ -146,7 +146,10 @@ class AppShellState extends ConsumerState<AppShell>
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
   bool _playerHasFailed = false;
-  bool _playerTrackDialogVisible = false;
+  // True while any root-navigator modal dialog opened from within the
+  // player is on screen (track selector, stop/delete-recording confirm),
+  // so back handling dismisses the dialog instead of closing the player.
+  bool _playerModalDialogVisible = false;
   FocusNode? _focusBeforePlayer;
 
   // Bumped only when a brand-new player session starts (not on in-session
@@ -226,9 +229,9 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   Future<bool> _handleSystemBack() async {
-    if (_playerTrackDialogVisible) {
-      await Navigator.of(context, rootNavigator: true).maybePop();
-      return true;
+    if (_playerModalDialogVisible) {
+      final popped = await Navigator.of(context, rootNavigator: true).maybePop();
+      if (popped) return true;
     }
     if (_handleBackPress()) return true;
 
@@ -555,7 +558,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerArgs = null;
       _playerOrchestrator = null;
       _playerHasFailed = false;
-      _playerTrackDialogVisible = false;
+      _playerModalDialogVisible = false;
     });
     _playerChannelContext = const <Channel>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -595,9 +598,17 @@ class AppShellState extends ConsumerState<AppShell>
     return false;
   }
 
-  void _setPlayerTrackDialogVisible(bool visible) {
-    if (!mounted || _playerTrackDialogVisible == visible) return;
-    setState(() => _playerTrackDialogVisible = visible);
+  void _setPlayerModalDialogVisible(bool visible) {
+    if (!mounted || _playerModalDialogVisible == visible) return;
+    setState(() => _playerModalDialogVisible = visible);
+  }
+
+  bool _handleShortcutBack() {
+    if (_playerModalDialogVisible) {
+      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      return true;
+    }
+    return _handleBackPress();
   }
 
   void _openChannel(Channel channel) {
@@ -668,13 +679,18 @@ class AppShellState extends ConsumerState<AppShell>
   Future<void> _confirmStopRecording(
     BuildContext context,
     DvrRecording recording,
-  ) {
-    return confirmStopOrDeleteRecording(
-      context,
-      recording: recording,
-      onCancel: _appState.cancelDvrRecording,
-      onCancelAndDelete: _cancelAndDeleteRecording,
-    );
+  ) async {
+    _setPlayerModalDialogVisible(true);
+    try {
+      await confirmStopOrDeleteRecording(
+        context,
+        recording: recording,
+        onCancel: _appState.cancelDvrRecording,
+        onCancelAndDelete: _cancelAndDeleteRecording,
+      );
+    } finally {
+      _setPlayerModalDialogVisible(false);
+    }
   }
 
   void _openCatchupProgram(Channel channel, EpgProgram program) {
@@ -1235,7 +1251,7 @@ class AppShellState extends ConsumerState<AppShell>
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
-          _BackIntent: _BackAction(_handleBackPress),
+          _BackIntent: _BackAction(_handleShortcutBack),
           _MenuIntent: _MenuAction(_activateSidebar),
         },
         child: Focus(
@@ -1305,7 +1321,7 @@ class AppShellState extends ConsumerState<AppShell>
                       args.type == 'live' && _appState.hasDvrFeature
                       ? _handleRecordButtonTap
                       : null,
-                  onTrackDialogVisibilityChanged: _setPlayerTrackDialogVisible,
+                  onTrackDialogVisibilityChanged: _setPlayerModalDialogVisible,
                   isRecordingCurrentChannel:
                       args.type == 'live' &&
                       recordingChannelIds.contains(args.streamId),
