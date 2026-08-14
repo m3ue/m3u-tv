@@ -264,6 +264,13 @@ void main() {
     });
 
     test('live streams fail closed for invalid catchup retention metadata', () {
+      final missingHoursPayload = Map<String, Object?>.from(
+        m3uEditorLiveStreamPayload,
+      )..remove('tv_archive_duration');
+      final missingHours = Channel.fromXtream(
+        missingHoursPayload,
+        'https://streams.example/live/100.m3u8',
+      );
       final invalidHours = Channel.fromXtream({
         ...m3uEditorLiveStreamPayload,
         'tv_archive_duration': 'bad',
@@ -283,6 +290,8 @@ void main() {
 
       expect(invalidHours.catchupRetentionHours, 0);
       expect(invalidHours.catchupDays, 0);
+      expect(missingHours.catchupRetentionHours, 0);
+      expect(missingHours.catchupDays, 0);
       expect(nullHours.catchupRetentionHours, 0);
       expect(nullHours.catchupDays, 0);
       expect(zeroHours.catchupRetentionHours, 0);
