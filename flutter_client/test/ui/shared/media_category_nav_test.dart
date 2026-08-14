@@ -43,7 +43,11 @@ void main() {
       await tester.pumpWidget(buildNav(useSidebarLayout: true));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TextField), findsOneWidget);
+      // The sidebar strip's search field is click-to-activate (see
+      // InlineMediaSearchField.activateOnSelect) — it shows as a
+      // DpadInkWell button, not a live TextField, until Select is pressed.
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Search...'), findsOneWidget);
       expect(find.byType(VerticalCategoryList), findsOneWidget);
       expect(find.text('All'), findsOneWidget);
       expect(find.text('Action'), findsOneWidget);

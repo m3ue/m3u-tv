@@ -42,6 +42,8 @@ class TimelineEpgView extends StatefulWidget {
     required this.onChannelSelect,
     required this.channelColumnFocusNode,
     required this.onChannelColumnEdge,
+    required this.dayControlsFocusNode,
+    required this.onDayControlsEdge,
     this.onCatchupProgramSelect,
     this.onEnsureEpg,
     this.onChannelLongPress,
@@ -66,8 +68,21 @@ class TimelineEpgView extends StatefulWidget {
 
   /// Fired when d-pad navigation hits the channel column's own edge —
   /// mirrors the program grid's `onEdge` (left activates the nav
-  /// strip/sidebar, right returns focus to the program grid).
+  /// strip/sidebar, right returns focus to the program grid, up moves to
+  /// the day-nav header).
   final ValueChanged<TraversalDirection> onChannelColumnEdge;
+
+  /// The day-nav header's (previous/date/now/next) own focus scope, so the
+  /// caller can move focus there directly from the Channels column (up) the
+  /// same way [channelColumnFocusNode] is targeted from the Back key —
+  /// plain spatial traversal can't cross into a sibling [FocusScopeNode]
+  /// automatically, so this needs to be reachable programmatically.
+  final FocusScopeNode dayControlsFocusNode;
+
+  /// Fired when d-pad navigation hits the day-nav header's own edge — left
+  /// activates the nav strip/sidebar, right returns focus to the program
+  /// grid, down moves to the Channels column.
+  final ValueChanged<TraversalDirection> onDayControlsEdge;
 
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
   /// already fresh. Called per-row as the visible timeline builds.
@@ -297,17 +312,31 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
 
     return Column(
       children: [
-        _DayControls(
-          selectedDate: _selectedDate,
-          canGoPrevious: _selectedDate.isAfter(
-            _offsetDate(now, -_maxCatchupDays),
+        // Its own FocusScope (like the Channels column) so LiveTvScreen can
+        // jump straight here from the Channels column's up-edge — a plain
+        // FocusScopeNode boundary blocks Flutter's normal directional
+        // search from crossing into a sibling scope on its own, so both
+        // hops (here and the Channels column) need to be explicit.
+        FocusScope(
+          node: widget.dayControlsFocusNode,
+          child: DpadRegion(
+            memoryKey: 'live-tv/epg-daycontrols',
+            horizontalEdge: DpadEdgeBehavior.stop,
+            verticalEdge: DpadEdgeBehavior.stop,
+            onEdge: widget.onDayControlsEdge,
+            child: _DayControls(
+              selectedDate: _selectedDate,
+              canGoPrevious: _selectedDate.isAfter(
+                _offsetDate(now, -_maxCatchupDays),
+              ),
+              canGoNext: _selectedDate.isBefore(
+                _offsetDate(now, widget.futureDays),
+              ),
+              onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
+              onNow: () => _selectDate(_dateOnly(widget.clock())),
+              onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
+            ),
           ),
-          canGoNext: _selectedDate.isBefore(
-            _offsetDate(now, widget.futureDays),
-          ),
-          onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
-          onNow: () => _selectDate(_dateOnly(widget.clock())),
-          onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
         ),
         Expanded(
           child: Row(
@@ -350,6 +379,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                       child: DpadRegion(
                         memoryKey: 'live-tv/epg-channels',
                         horizontalEdge: DpadEdgeBehavior.stop,
+                        verticalEdge: DpadEdgeBehavior.stop,
                         onEdge: widget.onChannelColumnEdge,
                         child: FocusScope(
                           node: widget.channelColumnFocusNode,
@@ -594,7 +624,18 @@ class _DayControls extends StatelessWidget {
       // Left-aligned (Row's default) so this cluster sits directly above
       // the Channels column (matching its horizontal position) instead of
       // floating centered across the whole EPG width.
+      //
+      // crossAxisAlignment.stretch gives every child (icon buttons, the
+      // "now" pill, the date text) the exact same focus-node rect height.
+      // Without it, the "now" pill's naturally-shorter text-driven height
+      // sits entirely inside the taller icon buttons' rect on the vertical
+      // axis, which the dpad package's edge-based "is this candidate below
+      // me" check (see DpadTraversalPolicy._isCandidate) reads as still
+      // being a same-row neighbor even after Down should have left the
+      // row — so pressing Down from "now" would land on "previous"/"next"
+      // instead of dropping to the Channels column.
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DpadInkWell(
             key: const ValueKey('timeline-previous-day'),
@@ -609,26 +650,30 @@ class _DayControls extends StatelessWidget {
             enabled: canGoPrevious,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: Icon(
-                Icons.chevron_left,
-                size: 20,
-                color: canGoPrevious
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurface.withValues(alpha: 0.35),
-                semanticLabel: l10n.epgPreviousDay,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              child: Center(
+                child: Icon(
+                  Icons.chevron_left,
+                  size: 20,
+                  color: canGoPrevious
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurface.withValues(alpha: 0.35),
+                  semanticLabel: l10n.epgPreviousDay,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 6),
           SizedBox(
             width: 116,
-            child: Text(
-              DateFormat.yMMMd(
-                Localizations.localeOf(context).toLanguageTag(),
-              ).format(selectedDate),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelMedium,
+            child: Center(
+              child: Text(
+                DateFormat.yMMMd(
+                  Localizations.localeOf(context).toLanguageTag(),
+                ).format(selectedDate),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -639,12 +684,14 @@ class _DayControls extends StatelessWidget {
             borderRadius: BorderRadius.circular(50),
             color: colorScheme.primaryContainer,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              child: Text(
-                l10n.epgNow,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w600,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: Text(
+                  l10n.epgNow,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -656,14 +703,16 @@ class _DayControls extends StatelessWidget {
             enabled: canGoNext,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: Icon(
-                Icons.chevron_right,
-                size: 20,
-                color: canGoNext
-                    ? colorScheme.onSurface
-                    : colorScheme.onSurface.withValues(alpha: 0.35),
-                semanticLabel: l10n.epgNextDay,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              child: Center(
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: canGoNext
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurface.withValues(alpha: 0.35),
+                  semanticLabel: l10n.epgNextDay,
+                ),
               ),
             ),
           ),

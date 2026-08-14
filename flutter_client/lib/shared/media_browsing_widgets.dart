@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart'
 import 'package:dpad/dpad.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
@@ -45,15 +47,37 @@ class InlineMediaSearchField extends StatefulWidget {
     this.autofocus = false,
     this.focusNode,
     this.textInputAction = TextInputAction.search,
+    this.activateOnSelect = false,
     super.key,
   });
 
   final String query;
   final ValueChanged<String> onChanged;
   final String hintText;
+
+  /// When [activateOnSelect] is false: autofocuses the real text field
+  /// (opens the keyboard immediately). When [activateOnSelect] is true:
+  /// autofocuses the inactive, button-like facade instead — see
+  /// [activateOnSelect].
   final bool autofocus;
   final FocusNode? focusNode;
   final TextInputAction textInputAction;
+
+  /// TV/desktop d-pad screens embed this field alongside other browsable
+  /// content (category chips, a content grid) rather than on a
+  /// dedicated search screen. A plain [TextField] can't tell "the user
+  /// d-padded past this on their way elsewhere" apart from "the user wants
+  /// to type" — both just focus it, which opens the keyboard and starts
+  /// eating Left/Right for cursor movement instead of navigation.
+  ///
+  /// When true, the field starts as a non-editing, [DpadInkWell]-focusable
+  /// button showing the current query (or hint); only pressing Select on it
+  /// opens the real text field and grabs keyboard focus. Back/Escape while
+  /// editing returns to the button instead of falling through to the
+  /// screen's own Back handling. [autofocus] then targets that button, not
+  /// the text field. Screens with a dedicated search purpose (e.g.
+  /// `SearchScreen`) should leave this false.
+  final bool activateOnSelect;
 
   @override
   State<InlineMediaSearchField> createState() => _InlineMediaSearchFieldState();
@@ -63,6 +87,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   late final TextEditingController _controller;
   FocusNode? _internalFocusNode;
   bool _focused = false;
+  late bool _activated = !widget.activateOnSelect;
 
   FocusNode get _focusNode =>
       widget.focusNode ?? (_internalFocusNode ??= FocusNode());
@@ -108,40 +133,96 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
     widget.onChanged('');
   }
 
+  void _activate() {
+    setState(() => _activated = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _deactivate() {
+    if (!widget.activateOnSelect || !_activated) return;
+    setState(() => _activated = false);
+  }
+
+  KeyEventResult _handleEditingKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.goBack) {
+      _deactivate();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     const radius = BorderRadius.all(
       Radius.circular(MediaBrowsingMetrics.cardRadius),
     );
+
+    if (widget.activateOnSelect && !_activated) {
+      return DpadInkWell(
+        onTap: _activate,
+        autofocus: widget.autofocus,
+        borderRadius: radius,
+        color: colorScheme.surfaceContainerHigh,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.search, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.query.isEmpty ? widget.hintText : widget.query,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: widget.query.isEmpty
+                        ? colorScheme.onSurfaceVariant
+                        : colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     const noBorder = OutlineInputBorder(
       borderRadius: radius,
       borderSide: BorderSide.none,
     );
     return Stack(
       children: [
-        TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          autofocus: widget.autofocus,
-          textInputAction: widget.textInputAction,
-          decoration: InputDecoration(
-            hintText: widget.hintText,
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: widget.query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear search',
-                    icon: const Icon(Icons.clear),
-                    onPressed: _clear,
-                  ),
-            filled: true,
-            fillColor: colorScheme.surfaceContainerHigh,
-            border: noBorder,
-            enabledBorder: noBorder,
-            focusedBorder: noBorder,
+        Focus(
+          onKeyEvent: widget.activateOnSelect ? _handleEditingKey : null,
+          child: TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            autofocus: !widget.activateOnSelect && widget.autofocus,
+            textInputAction: widget.textInputAction,
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: widget.query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clear,
+                    ),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerHigh,
+              border: noBorder,
+              enabledBorder: noBorder,
+              focusedBorder: noBorder,
+            ),
+            onChanged: widget.onChanged,
+            onSubmitted: (_) => _deactivate(),
           ),
-          onChanged: widget.onChanged,
         ),
         Positioned.fill(
           child: IgnorePointer(

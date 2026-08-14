@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
@@ -229,6 +230,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'cnn');
       await tester.pumpAndSettle();
 
@@ -252,6 +255,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('★ Favorites'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'bbc');
       await tester.pumpAndSettle();
@@ -406,6 +411,49 @@ void main() {
               );
           }
         }
+      },
+    );
+
+    testWidgets(
+      'D-pad Right from the Channels column enters the program grid',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.setLastViewMode('epgGrid');
+        final now = DateTime.now();
+        final program = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Evening News',
+          description: 'x',
+          start: now.subtract(const Duration(minutes: 15)),
+          end: now.add(const Duration(minutes: 15)),
+        );
+        final epgService = EpgService()..loadPrograms([program]);
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            favoritesService: favoritesService,
+            epgService: epgService,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+
+        final programBlockKey = ValueKey(
+          'timeline-program-${program.channelId}-'
+          '${program.start.toIso8601String()}',
+        );
+        final focusWidgets = tester
+            .widgetList<Focus>(
+              find.descendant(
+                of: find.byKey(programBlockKey),
+                matching: find.byType(Focus),
+              ),
+            )
+            .where((focus) => focus.focusNode != null);
+        expect(focusWidgets.any((focus) => focus.focusNode!.hasFocus), isTrue);
       },
     );
 

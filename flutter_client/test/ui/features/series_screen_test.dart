@@ -160,6 +160,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'stranger');
       await tester.pumpAndSettle();
 
@@ -174,6 +176,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Thriller'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'bad');
       await tester.pumpAndSettle();

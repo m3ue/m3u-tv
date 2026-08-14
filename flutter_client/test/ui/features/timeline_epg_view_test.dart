@@ -34,6 +34,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -95,6 +97,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [channel],
                 epgService: epgService,
                 onChannelSelect: (_) {},
@@ -155,6 +159,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -215,6 +221,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -286,6 +294,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -318,6 +328,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -443,6 +455,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: channels,
                   epgService: epg,
                   onChannelSelect: selectedChannels.add,
@@ -563,6 +577,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: channels,
                 epgService: epg,
                 onChannelSelect: selectedChannels.add,
@@ -637,6 +653,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -692,6 +710,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -737,6 +757,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -786,6 +808,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -861,6 +885,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -954,6 +980,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -1054,6 +1082,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -1130,6 +1160,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -1163,6 +1195,8 @@ void main() {
                 child: TimelineEpgView(
                   channelColumnFocusNode: FocusScopeNode(),
                   onChannelColumnEdge: (_) {},
+                  dayControlsFocusNode: FocusScopeNode(),
+                  onDayControlsEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -1203,6 +1237,8 @@ void main() {
               child: TimelineEpgView(
                 channelColumnFocusNode: FocusScopeNode(),
                 onChannelColumnEdge: (_) {},
+                dayControlsFocusNode: FocusScopeNode(),
+                onDayControlsEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,

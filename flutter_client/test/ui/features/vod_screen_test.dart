@@ -193,6 +193,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'sintel');
       await tester.pumpAndSettle();
 
@@ -208,6 +210,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Action'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'steel');
       await tester.pumpAndSettle();

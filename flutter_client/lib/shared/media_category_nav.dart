@@ -152,6 +152,11 @@ class MediaCategoryNavState extends State<MediaCategoryNav> {
                   hintText: widget.searchHint,
                   onChanged: widget.onQueryChanged,
                   autofocus: widget.searchAutofocus,
+                  // TV/desktop only: this field sits in the same d-pad
+                  // strip as the category list, so plain d-pad traversal
+                  // passing over it must not open the keyboard — see
+                  // InlineMediaSearchField.activateOnSelect.
+                  activateOnSelect: true,
                 ),
                 if (widget.leading != null) ...[
                   const SizedBox(height: MediaBrowsingMetrics.chipGap),

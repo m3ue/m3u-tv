@@ -143,6 +143,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   final GlobalKey<MediaCategoryNavState> _navKey =
       GlobalKey<MediaCategoryNavState>();
 
+  // Lets the Channels column's and day-nav header's own right-edge handlers
+  // reach the program grid's actual last-focused block directly, rather
+  // than through _gridFocusNode's focus-history stack — that stack now also
+  // holds the Channels column's and day-controls' own (separately-scoped)
+  // entries, which can outrank a real grid block there and send focus back
+  // to one of them instead of into the grid.
+  final GlobalKey<DpadRegionState> _epgGridRegionKey =
+      GlobalKey<DpadRegionState>();
+
   // EPG-only: a distinct hop between the program grid and the nav strip,
   // reached via the Back key (see _handleBackFromEpg) rather than spatial
   // left/right traversal from the grid. skipTraversal keeps this wrapper
@@ -156,6 +165,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   // does not affect explicit `.requestFocus()` calls (only candidate
   // search), so entering the region programmatically still works.
   final FocusScopeNode _channelColumnFocusNode = FocusScopeNode(
+    skipTraversal: true,
+  );
+
+  // Same rationale as _channelColumnFocusNode above, mirrored for the
+  // day-nav header: its own scope so up/down between it and the Channels
+  // column can be jumped to explicitly (see _handleChannelColumnEdge /
+  // _handleDayControlsEdge), since neither scope's boundary lets normal
+  // directional search reach the other on its own.
+  final FocusScopeNode _dayControlsFocusNode = FocusScopeNode(
     skipTraversal: true,
   );
 
@@ -192,6 +210,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     _detachViewSettingsListener(widget.viewSettingsService);
     _gridFocusNode.dispose();
     _channelColumnFocusNode.dispose();
+    _dayControlsFocusNode.dispose();
     super.dispose();
   }
 
@@ -657,6 +676,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
   void _handleGridLeftEdge(TraversalDirection direction) {
     if (direction != TraversalDirection.left) return;
+    _activateSidebarNav();
+  }
+
+  void _activateSidebarNav() {
     if (widget.useSidebarLayout) {
       _navKey.currentState?.requestFocus();
     } else {
@@ -664,28 +687,48 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     }
   }
 
+  // Targets the program grid's own DpadRegionState directly (via
+  // _epgGridRegionKey) instead of _gridFocusNode's focus-history stack —
+  // that stack also holds the Channels column's and day-controls' own
+  // (separately-scoped) entries, which are more recent than any grid block
+  // whenever the user arrived at either of them via the Back key or the
+  // Channels-column-default landing focus, so falling back through it would
+  // just bounce between those two instead of ever reaching the grid.
+  void _focusEpgGridFallback() {
+    final region = _epgGridRegionKey.currentState;
+    if (region == null) return;
+    final target = region.lastFocused ?? _firstFocusNode(region.focusNodes);
+    target?.requestFocus();
+  }
+
+  FocusNode? _firstFocusNode(Iterable<FocusNode> nodes) {
+    final iterator = nodes.iterator;
+    return iterator.moveNext() ? iterator.current : null;
+  }
+
   void _handleChannelColumnEdge(TraversalDirection direction) {
-    if (direction == TraversalDirection.right) {
-      // _channelColumnFocusNode is a *descendant* of _gridFocusNode (it's
-      // nested inside the same content area TimelineEpgView renders), not a
-      // sibling — so a plain _gridFocusNode.requestFocus() would just
-      // delegate straight back down to whichever node is still focused
-      // inside the Channels column, appearing "stuck". Flutter's own scope
-      // machinery already skips stale (no-longer-focusable) entries when
-      // resolving a scope's focusedChild (see FocusScopeNode._doRequestFocus's
-      // cleanup loop), so briefly marking this node unfocusable forces that
-      // resolution to fall through to the grid's own last-focused item
-      // (day-nav header or a program block) instead.
-      _channelColumnFocusNode.canRequestFocus = false;
-      _gridFocusNode.requestFocus();
-      _channelColumnFocusNode.canRequestFocus = true;
-      return;
+    switch (direction) {
+      case TraversalDirection.right:
+        _focusEpgGridFallback();
+      case TraversalDirection.up:
+        _dayControlsFocusNode.requestFocus();
+      case TraversalDirection.left:
+        _activateSidebarNav();
+      case TraversalDirection.down:
+        break;
     }
-    if (direction != TraversalDirection.left) return;
-    if (widget.useSidebarLayout) {
-      _navKey.currentState?.requestFocus();
-    } else {
-      widget.onSidebarActivate?.call();
+  }
+
+  void _handleDayControlsEdge(TraversalDirection direction) {
+    switch (direction) {
+      case TraversalDirection.down:
+        _channelColumnFocusNode.requestFocus();
+      case TraversalDirection.left:
+        _activateSidebarNav();
+      case TraversalDirection.right:
+        _focusEpgGridFallback();
+      case TraversalDirection.up:
+        break;
     }
   }
 
@@ -771,6 +814,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     EpgRecordingIndex recordingIndex,
   ) {
     return DpadRegion(
+      key: _epgGridRegionKey,
       memoryKey: 'live-tv/epg',
       horizontalEdge: DpadEdgeBehavior.stop,
       onEdge: _handleGridLeftEdge,
@@ -786,6 +830,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
         epgStartView: _epgStartView,
         channelColumnFocusNode: _channelColumnFocusNode,
         onChannelColumnEdge: _handleChannelColumnEdge,
+        dayControlsFocusNode: _dayControlsFocusNode,
+        onDayControlsEdge: _handleDayControlsEdge,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);
