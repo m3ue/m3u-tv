@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/media_category_nav.dart';
 
 /// Series screen with category filtering and poster grid.
 ///
@@ -21,13 +22,24 @@ class SeriesScreen extends ConsumerStatefulWidget {
   const SeriesScreen({
     super.key,
     required this.onSeriesSelect,
+    required this.useSidebarLayout,
     this.favoritesService,
     this.onSidebarActivate,
+    this.onEntryFocusScopeReady,
   });
 
   final void Function(Series) onSeriesSelect;
+
+  /// TV/desktop (`true`): search+category render as a vertical strip beside
+  /// the grid. Mobile (`false`): stacked at the top with a Filter button.
+  final bool useSidebarLayout;
   final FavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
+
+  /// TV/desktop only: forwarded to [MediaCategoryNav.onEntryFocusScopeReady]
+  /// so AppShell can always re-enter this screen's strip first when the
+  /// sidebar deactivates.
+  final ValueChanged<FocusScopeNode>? onEntryFocusScopeReady;
 
   @override
   ConsumerState<SeriesScreen> createState() => _SeriesScreenState();
@@ -41,11 +53,20 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   String? _selectedCategory;
   String _query = '';
   Set<int> _favoriteIds = {};
+  final FocusScopeNode _gridFocusNode = FocusScopeNode();
+  final GlobalKey<MediaCategoryNavState> _navKey =
+      GlobalKey<MediaCategoryNavState>();
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadFavorites());
+  }
+
+  @override
+  void dispose() {
+    _gridFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFavorites() async {
@@ -80,6 +101,29 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         .toList(growable: false);
   }
 
+  List<CategoryTabData> _tabs(List<Category> categories) {
+    final l = AppLocalizations.of(context);
+    return [
+      CategoryTabData(id: '', name: l.seriesAllSeries),
+      if (_favoriteIds.isNotEmpty)
+        CategoryTabData(id: _kFavoritesCategoryId, name: l.liveTvFavorites),
+      ...categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
+    ];
+  }
+
+  Map<String, int> _categoryCounts(List<Series> seriesList) {
+    final counts = <String, int>{'': seriesList.length};
+    if (_favoriteIds.isNotEmpty) {
+      counts[_kFavoritesCategoryId] = _favoriteIds.length;
+    }
+    for (final item in seriesList) {
+      final categoryId = item.categoryId;
+      if (categoryId == null) continue;
+      counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
@@ -104,58 +148,41 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     }
 
     final filtered = _filteredItems(seriesList);
-
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildSearchField(),
-          _buildCategoryBar(categories),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      'No series available',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  )
-                : _buildGrid(filtered),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MediaBrowsingMetrics.contentPadding,
-        MediaBrowsingMetrics.contentPadding,
-        MediaBrowsingMetrics.contentPadding,
-        0,
-      ),
-      child: InlineMediaSearchField(
-        query: _query,
-        hintText: AppLocalizations.of(context).seriesSearchHint,
-        onChanged: (value) => setState(() => _query = value),
-      ),
-    );
-  }
-
-  Widget _buildCategoryBar(List<Category> categories) {
     final l = AppLocalizations.of(context);
-    final tabs = [
-      CategoryTabData(id: '', name: l.seriesAllSeries),
-      if (_favoriteIds.isNotEmpty)
-        CategoryTabData(id: _kFavoritesCategoryId, name: l.liveTvFavorites),
-      ...categories.map((c) => CategoryTabData(id: c.id, name: c.name)),
-    ];
-
-    return ScrollableCategoryBar(
-      tabs: tabs,
+    final nav = MediaCategoryNav(
+      key: _navKey,
+      useSidebarLayout: widget.useSidebarLayout,
+      query: _query,
+      onQueryChanged: (value) => setState(() => _query = value),
+      searchHint: l.seriesSearchHint,
+      tabs: _tabs(categories),
       selectedId: _selectedCategory ?? '',
       onSelected: (id) => setState(() => _selectedCategory = id),
+      filterButtonLabel: l.mediaCategoryFilterButton,
+      filterScreenTitle: l.mediaCategoryFilterScreenTitle,
+      categoryCounts: _categoryCounts(seriesList),
+      onSidebarActivate: widget.onSidebarActivate,
+      gridFocusScopeNode: _gridFocusNode,
+      memoryKeyPrefix: 'series',
+      onEntryFocusScopeReady: widget.onEntryFocusScopeReady,
+    );
+    final content = Expanded(
+      child: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : filtered.isEmpty
+          ? Center(
+              child: Text(
+                'No series available',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            )
+          : _buildGrid(filtered),
+    );
+
+    return Scaffold(
+      body: widget.useSidebarLayout
+          ? Row(children: [nav, content])
+          : Column(children: [nav, content]),
     );
   }
 
@@ -166,37 +193,43 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
             constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
         final columnCount = _posterColumnCount(availableWidth);
 
-        return DpadRegion(
-          memoryKey: 'series/grid',
-          horizontalEdge: DpadEdgeBehavior.stop,
-          onEdge: (direction) {
-            if (direction == TraversalDirection.left) {
-              widget.onSidebarActivate?.call();
-            }
-          },
-          child: ScrollbarGridView(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columnCount,
-              childAspectRatio: 0.6,
-              mainAxisSpacing: MediaBrowsingMetrics.itemGap,
-              crossAxisSpacing: MediaBrowsingMetrics.itemGap,
-            ),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _SeriesCard(
-                item: item,
-                autofocus: index == 0,
-                isFavorite: _favoriteIds.contains(item.id),
-                onTap: () => widget.onSeriesSelect(item),
-                onLongTap: widget.favoritesService == null
-                    ? null
-                    : () async {
-                        await widget.favoritesService!.toggle(item.id);
-                        await _loadFavorites();
-                      },
-              );
+        return FocusScope(
+          node: _gridFocusNode,
+          child: DpadRegion(
+            memoryKey: 'series/grid',
+            horizontalEdge: DpadEdgeBehavior.stop,
+            onEdge: (direction) {
+              if (direction != TraversalDirection.left) return;
+              if (widget.useSidebarLayout) {
+                _navKey.currentState?.requestFocus();
+              } else {
+                widget.onSidebarActivate?.call();
+              }
             },
+            child: ScrollbarGridView(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columnCount,
+                childAspectRatio: 0.6,
+                mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+                crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+              ),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return _SeriesCard(
+                  item: item,
+                  autofocus: index == 0,
+                  isFavorite: _favoriteIds.contains(item.id),
+                  onTap: () => widget.onSeriesSelect(item),
+                  onLongTap: widget.favoritesService == null
+                      ? null
+                      : () async {
+                          await widget.favoritesService!.toggle(item.id);
+                          await _loadFavorites();
+                        },
+                );
+              },
+            ),
           ),
         );
       },

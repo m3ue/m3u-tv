@@ -70,7 +70,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get admin => '管理员';
 
   @override
-  String get liveTvSearchHint => '搜索直播电视…';
+  String get mediaCategoryFilterButton => 'Filter';
+
+  @override
+  String get mediaCategoryFilterScreenTitle => 'Categories';
+
+  @override
+  String get liveTvViewModeList => 'List';
+
+  @override
+  String get liveTvViewModeGrid => 'Grid';
+
+  @override
+  String get liveTvViewModeEpg => 'EPG';
+
+  @override
+  String get liveTvSearchHint => '搜索…';
 
   @override
   String get liveTvNoChannels => '暂无可用频道';
@@ -234,10 +249,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSectionSeries => '剧集';
 
   @override
-  String get vodSearchHint => '搜索电影…';
+  String get vodSearchHint => '搜索…';
 
   @override
-  String get seriesSearchHint => '搜索剧集…';
+  String get seriesSearchHint => '搜索…';
 
   @override
   String get settingsTitle => '设置';
@@ -692,7 +707,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get requestsTabMyRequests => '我的请求';
 
   @override
-  String get requestsSearchHint => '搜索电影和剧集…';
+  String get requestsSearchHint => '搜索…';
 
   @override
   String get requestsNoResults => '未找到结果';

@@ -99,6 +99,31 @@ void main() {
       expect(find.text('BBC One'), findsOneWidget);
     });
 
+    testWidgets(
+      'mobile layout shows a Filter button instead of category chips, '
+      'and selecting a category filters the channel list',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            channels: testChannels,
+            categories: testCategories,
+            useSidebarLayout: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Filter'), findsOneWidget);
+        expect(find.text('News'), findsNothing);
+
+        await tester.tap(find.text('Filter'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('News'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('BBC One'), findsOneWidget);
+      },
+    );
+
     testWidgets('tapping All Channels shows all channels', (tester) async {
       await tester.pumpWidget(
         _TestApp(channels: testChannels, categories: testCategories),
@@ -671,6 +696,7 @@ class _TestApp extends StatelessWidget {
     this.onChannelContextChanged,
     this.onScheduleProgram,
     this.dvrRecordings = const [],
+    this.useSidebarLayout = true,
   });
 
   final List<Channel> channels;
@@ -684,6 +710,7 @@ class _TestApp extends StatelessWidget {
   final void Function(List<Channel>)? onChannelContextChanged;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
   final List<DvrRecording> dvrRecordings;
+  final bool useSidebarLayout;
 
   @override
   Widget build(BuildContext context) {
@@ -712,6 +739,7 @@ class _TestApp extends StatelessWidget {
           favoritesService: favoritesService ?? FavoritesService(),
           viewSettingsService: viewSettingsService,
           onChannelSelect: onChannelSelect ?? (_) {},
+          useSidebarLayout: useSidebarLayout,
           onChannelContextChanged: onChannelContextChanged,
           onScheduleProgram: onScheduleProgram,
         ),

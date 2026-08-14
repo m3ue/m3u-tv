@@ -218,10 +218,40 @@ abstract class AppLocalizations {
   /// **'Admin'**
   String get admin;
 
+  /// No description provided for @mediaCategoryFilterButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get mediaCategoryFilterButton;
+
+  /// No description provided for @mediaCategoryFilterScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get mediaCategoryFilterScreenTitle;
+
+  /// No description provided for @liveTvViewModeList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get liveTvViewModeList;
+
+  /// No description provided for @liveTvViewModeGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get liveTvViewModeGrid;
+
+  /// No description provided for @liveTvViewModeEpg.
+  ///
+  /// In en, this message translates to:
+  /// **'EPG'**
+  String get liveTvViewModeEpg;
+
   /// No description provided for @liveTvSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search live TV...'**
+  /// **'Search...'**
   String get liveTvSearchHint;
 
   /// No description provided for @liveTvNoChannels.
@@ -533,13 +563,13 @@ abstract class AppLocalizations {
   /// No description provided for @vodSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search movies...'**
+  /// **'Search...'**
   String get vodSearchHint;
 
   /// No description provided for @seriesSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search series...'**
+  /// **'Search...'**
   String get seriesSearchHint;
 
   /// No description provided for @settingsTitle.
@@ -1403,7 +1433,7 @@ abstract class AppLocalizations {
   /// No description provided for @requestsSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search movies & shows…'**
+  /// **'Search...'**
   String get requestsSearchHint;
 
   /// No description provided for @requestsNoResults.

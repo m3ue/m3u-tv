@@ -39,6 +39,7 @@ void main() {
           home: LiveTvScreen(
             favoritesService: favorites,
             onChannelSelect: (_) {},
+            useSidebarLayout: true,
           ),
         ),
       ),
@@ -102,6 +103,7 @@ void main() {
             home: LiveTvScreen(
               favoritesService: favorites,
               onChannelSelect: (_) {},
+              useSidebarLayout: true,
               onScheduleProgram: (channel, program) {
                 recordedChannel = channel;
                 recordedProgram = program;
@@ -163,6 +165,7 @@ void main() {
             home: LiveTvScreen(
               favoritesService: favorites,
               onChannelSelect: (_) {},
+              useSidebarLayout: true,
             ),
           ),
         ),
@@ -228,6 +231,7 @@ void main() {
             home: LiveTvScreen(
               favoritesService: favorites,
               onChannelSelect: (_) {},
+              useSidebarLayout: true,
               onCatchupProgramSelect: (channel, program) {
                 selectedChannel = channel;
                 selectedProgram = program;
@@ -294,6 +298,7 @@ void main() {
           home: LiveTvScreen(
             favoritesService: favorites,
             onChannelSelect: (_) {},
+            useSidebarLayout: true,
           ),
         ),
       ),

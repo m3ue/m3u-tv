@@ -32,6 +32,9 @@ class MediaBrowsingMetrics {
   // Landscape "Continue Watching" cards: 16:9 thumbnail + text area.
   static const double landscapeCardWidth = 280;
   static const double landscapeCardHeight = 205; // 157.5 (9/16×280) + 47 text
+  // Width of the TV/Desktop interstitial search+category strip
+  // (MediaCategoryNav) between the sidebar and a screen's content grid.
+  static const double interstitialNavWidth = 240;
 }
 
 class InlineMediaSearchField extends StatefulWidget {

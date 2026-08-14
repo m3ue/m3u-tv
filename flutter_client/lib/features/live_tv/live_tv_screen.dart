@@ -16,9 +16,11 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
@@ -36,6 +38,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     super.key,
     required this.favoritesService,
     required this.onChannelSelect,
+    required this.useSidebarLayout,
     this.viewSettingsService,
     this.onChannelContextChanged,
     this.onCatchupProgramSelect,
@@ -47,11 +50,22 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onRecordSeries,
     this.onEnterFullScreenDetail,
     this.onExitFullScreenDetail,
+    this.onEntryFocusScopeReady,
   });
 
   final FavoritesService favoritesService;
   final ViewSettingsService? viewSettingsService;
   final void Function(Channel) onChannelSelect;
+
+  /// TV/desktop (`true`): search+category render as a vertical strip beside
+  /// the channel list/grid. Mobile (`false`): stacked at the top with a
+  /// Filter button.
+  final bool useSidebarLayout;
+
+  /// TV/desktop only: forwarded to [MediaCategoryNav.onEntryFocusScopeReady]
+  /// so AppShell can always re-enter this screen's strip first when the
+  /// sidebar deactivates.
+  final ValueChanged<FocusScopeNode>? onEntryFocusScopeReady;
 
   /// Called with the filtered channel list (category/favorites/search) right
   /// before [onChannelSelect], so the player's skip-previous/skip-next stays
@@ -116,6 +130,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   _ViewMode _viewMode = _ViewMode.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
   int _viewSettingsGeneration = 0;
+  // Shared across all three view modes since only one is ever mounted at a
+  // time (see the `switch (_viewMode)` in build()).
+  final FocusScopeNode _gridFocusNode = FocusScopeNode();
+  final GlobalKey<MediaCategoryNavState> _navKey =
+      GlobalKey<MediaCategoryNavState>();
 
   @override
   void initState() {
@@ -140,6 +159,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   void dispose() {
     widget.favoritesService.removeListener(_onFavoritesChanged);
     _detachViewSettingsListener(widget.viewSettingsService);
+    _gridFocusNode.dispose();
     super.dispose();
   }
 
@@ -544,126 +564,115 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
 
     final filtered = _filteredChannels(channels);
     _loadEpgForChannels(filtered, epgService);
-
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildSearchField(),
-          _buildCategoryBar(categories),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      AppLocalizations.of(context).liveTvNoChannels,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  )
-                : switch (_viewMode) {
-                    _ViewMode.epgGrid => _buildEpgGrid(
-                      filtered,
-                      epgService,
-                      recordingChannelIds,
-                      EpgRecordingIndex.fromRecordings(
-                        ref.watch(dvrRecordingsProvider),
-                      ),
-                    ),
-                    _ViewMode.logoGrid => _buildGridView(
-                      filtered,
-                      recordingChannelIds,
-                    ),
-                    _ViewMode.list => _buildListView(
-                      filtered,
-                      recordingChannelIds,
-                    ),
-                  },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    final multiviewCount = ref.watch(multiviewChannelsProvider).length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MediaBrowsingMetrics.contentPadding,
-        MediaBrowsingMetrics.contentPadding,
-        MediaBrowsingMetrics.contentPadding,
-        0,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: InlineMediaSearchField(
-              query: _query,
-              hintText: AppLocalizations.of(context).liveTvSearchHint,
-              onChanged: (value) => setState(() => _query = value),
-            ),
-          ),
-          if (_multiviewSupported && multiviewCount > 0) ...[
-            const SizedBox(width: 12),
-            DpadInkWell(
-              onTap: () => unawaited(_openMultiview(context)),
-              borderRadius: const BorderRadius.all(Radius.circular(50)),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.grid_view, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      AppLocalizations.of(
-                        context,
-                      ).liveTvMultiviewCount(multiviewCount),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryBar(List<Category> categories) {
-    return ScrollableCategoryBar(
+    final l = AppLocalizations.of(context);
+    final nav = MediaCategoryNav(
+      key: _navKey,
+      useSidebarLayout: widget.useSidebarLayout,
+      query: _query,
+      onQueryChanged: (value) => setState(() => _query = value),
+      searchHint: l.liveTvSearchHint,
       tabs: _categoryTabs(categories),
       selectedId: _selectedCategory ?? '',
       onSelected: (id) => setState(() => _selectedCategory = id),
-      leading: IconButton(
-        icon: Icon(switch (_viewMode) {
-          _ViewMode.list => Icons.grid_view,
-          _ViewMode.logoGrid => Icons.view_list,
-          _ViewMode.epgGrid => Icons.list,
-        }),
-        onPressed: () {
-          final next = switch (_viewMode) {
-            _ViewMode.list => _ViewMode.logoGrid,
-            _ViewMode.logoGrid => _ViewMode.epgGrid,
-            _ViewMode.epgGrid => _ViewMode.list,
-          };
-          setState(() => _viewMode = next);
-          final viewSettings = widget.viewSettingsService;
-          if (viewSettings != null) {
-            unawaited(viewSettings.setLiveTvLayout(_viewModeToLayout(next)));
-          } else {
-            unawaited(widget.favoritesService.setLastViewMode(next.name));
-          }
-        },
-        tooltip: switch (_viewMode) {
-          _ViewMode.list => 'Logo grid',
-          _ViewMode.logoGrid => 'EPG grid',
-          _ViewMode.epgGrid => 'List view',
-        },
+      filterButtonLabel: l.mediaCategoryFilterButton,
+      filterScreenTitle: l.mediaCategoryFilterScreenTitle,
+      leading: _buildViewModeToggle(),
+      trailing: _buildMultiviewButton(),
+      onSidebarActivate: widget.onSidebarActivate,
+      gridFocusScopeNode: _gridFocusNode,
+      memoryKeyPrefix: 'live-tv',
+      onEntryFocusScopeReady: widget.onEntryFocusScopeReady,
+    );
+    final content = Expanded(
+      child: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : filtered.isEmpty
+          ? Center(
+              child: Text(
+                AppLocalizations.of(context).liveTvNoChannels,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            )
+          : FocusScope(
+              node: _gridFocusNode,
+              child: switch (_viewMode) {
+                _ViewMode.epgGrid => _buildEpgGrid(
+                  filtered,
+                  epgService,
+                  recordingChannelIds,
+                  EpgRecordingIndex.fromRecordings(
+                    ref.watch(dvrRecordingsProvider),
+                  ),
+                ),
+                _ViewMode.logoGrid => _buildGridView(
+                  filtered,
+                  recordingChannelIds,
+                ),
+                _ViewMode.list => _buildListView(
+                  filtered,
+                  recordingChannelIds,
+                ),
+              },
+            ),
+    );
+
+    return Scaffold(
+      body: widget.useSidebarLayout
+          ? Row(children: [nav, content])
+          : Column(children: [nav, content]),
+    );
+  }
+
+  void _handleGridLeftEdge(TraversalDirection direction) {
+    if (direction != TraversalDirection.left) return;
+    if (widget.useSidebarLayout) {
+      _navKey.currentState?.requestFocus();
+    } else {
+      widget.onSidebarActivate?.call();
+    }
+  }
+
+  Widget? _buildMultiviewButton() {
+    final multiviewCount = ref.watch(multiviewChannelsProvider).length;
+    if (!_multiviewSupported || multiviewCount == 0) return null;
+    return AppButton(
+      icon: Icons.grid_view,
+      label: AppLocalizations.of(context).liveTvMultiviewCount(
+        multiviewCount,
       ),
+      onPressed: () => unawaited(_openMultiview(context)),
+    );
+  }
+
+  // A tooltip alone doesn't work on TV (hover-only, no mouse), so the
+  // current mode gets an explicit text label alongside its icon rather than
+  // relying on IconButton's tooltip — this also gives the mobile stacked
+  // layout a button matching the Filter button's AppButton styling instead
+  // of a bare IconButton.
+  Widget _buildViewModeToggle() {
+    final l = AppLocalizations.of(context);
+    final (icon, label) = switch (_viewMode) {
+      _ViewMode.list => (Icons.view_list, l.liveTvViewModeList),
+      _ViewMode.logoGrid => (Icons.grid_view, l.liveTvViewModeGrid),
+      _ViewMode.epgGrid => (Icons.view_timeline, l.liveTvViewModeEpg),
+    };
+    return AppButton(
+      icon: icon,
+      label: label,
+      onPressed: () {
+        final next = switch (_viewMode) {
+          _ViewMode.list => _ViewMode.logoGrid,
+          _ViewMode.logoGrid => _ViewMode.epgGrid,
+          _ViewMode.epgGrid => _ViewMode.list,
+        };
+        setState(() => _viewMode = next);
+        final viewSettings = widget.viewSettingsService;
+        if (viewSettings != null) {
+          unawaited(viewSettings.setLiveTvLayout(_viewModeToLayout(next)));
+        } else {
+          unawaited(widget.favoritesService.setLastViewMode(next.name));
+        }
+      },
     );
   }
 
@@ -671,11 +680,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     return DpadRegion(
       memoryKey: 'live-tv/list',
       horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
+      onEdge: _handleGridLeftEdge,
       child: ScrollbarListView(
         itemCount: channels.length,
         itemBuilder: (context, index) {
@@ -711,11 +716,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     return DpadRegion(
       memoryKey: 'live-tv/epg',
       horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
+      onEdge: _handleGridLeftEdge,
       child: TimelineEpgView(
         channels: channels,
         epgService: epgService,
@@ -747,12 +748,17 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     return DpadRegion(
       memoryKey: 'live-tv/grid',
       horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
+      onEdge: _handleGridLeftEdge,
       child: ScrollbarGridView(
+        // Zero top inset only, to match the List and EPG views' flush top
+        // edge — ScrollbarGridView's own default padding is symmetric,
+        // which otherwise leaves Grid visibly lower than its siblings.
+        padding: const EdgeInsets.fromLTRB(
+          MediaBrowsingMetrics.contentPadding,
+          0,
+          MediaBrowsingMetrics.contentPadding,
+          MediaBrowsingMetrics.contentPadding,
+        ),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 160,
           mainAxisExtent: 120,
