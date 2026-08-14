@@ -28,14 +28,14 @@ void main() {
     });
 
     test('notifies listeners on toggle', () {
-      final controller = MultiviewController();
       var notifications = 0;
-      controller.addListener(() => notifications++);
-
-      controller.toggle(_channel(1));
-      controller.toggle(_channel(1));
+      final controller = MultiviewController()
+        ..addListener(() => notifications++)
+        ..toggle(_channel(1))
+        ..toggle(_channel(1));
 
       expect(notifications, 2);
+      expect(controller.channels, isEmpty);
     });
 
     test('refuses to add past maxStreams', () {
@@ -53,17 +53,16 @@ void main() {
       final controller = MultiviewController()
         ..toggle(_channel(1))
         ..toggle(_channel(2))
-        ..toggle(_channel(3));
-
-      controller.reorder(0, 2);
+        ..toggle(_channel(3))
+        ..reorder(0, 2);
 
       expect(controller.channels.map((c) => c.id), [2, 3, 1]);
     });
 
     test('reorder ignores out-of-range indices', () {
-      final controller = MultiviewController()..toggle(_channel(1));
-
-      controller.reorder(0, 5);
+      final controller = MultiviewController()
+        ..toggle(_channel(1))
+        ..reorder(0, 5);
 
       expect(controller.channels.map((c) => c.id), [1]);
     });
@@ -71,9 +70,8 @@ void main() {
     test('clear empties the selection', () {
       final controller = MultiviewController()
         ..toggle(_channel(1))
-        ..toggle(_channel(2));
-
-      controller.clear();
+        ..toggle(_channel(2))
+        ..clear();
 
       expect(controller.channels, isEmpty);
     });

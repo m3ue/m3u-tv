@@ -410,22 +410,22 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
     required this.playerId,
     MethodChannel methodChannel = const MethodChannel(_methodChannelName),
     EventChannel eventChannel = const EventChannel(_eventChannelName),
-  }) : _methodChannel = methodChannel,
-       _eventChannel = eventChannel;
+  }) : _method = methodChannel,
+       _event = eventChannel;
 
   static const String _methodChannelName = 'm3u_tv/android_media3';
   static const String _eventChannelName = 'm3u_tv/android_media3/events';
 
   final String playerId;
-  final MethodChannel _methodChannel;
-  final EventChannel _eventChannel;
+  final MethodChannel _method;
+  final EventChannel _event;
 
   @override
-  Stream<AndroidMedia3Event> get events => _media3Events(_eventChannel);
+  Stream<AndroidMedia3Event> get events => _media3Events(_event);
 
   @override
   Future<void> load(PlaybackSource source) async {
-    await _methodChannel.invokeMethod<Object?>('load', <String, Object?>{
+    await _method.invokeMethod<Object?>('load', <String, Object?>{
       'playerId': playerId,
       'source': <String, Object?>{
         'uri': source.uri,
@@ -442,19 +442,17 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   }
 
   @override
-  Future<void> play() =>
-      _methodChannel.invokeMethod<void>('play', <String, Object?>{
-        'playerId': playerId,
-      });
+  Future<void> play() => _method.invokeMethod<void>('play', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
-  Future<void> pause() =>
-      _methodChannel.invokeMethod<void>('pause', <String, Object?>{
-        'playerId': playerId,
-      });
+  Future<void> pause() => _method.invokeMethod<void>('pause', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
-  Future<void> seek(Duration position) => _methodChannel.invokeMethod<void>(
+  Future<void> seek(Duration position) => _method.invokeMethod<void>(
     'seek',
     <String, Object?>{
       'playerId': playerId,
@@ -463,35 +461,34 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   );
 
   @override
-  Future<void> stop() =>
-      _methodChannel.invokeMethod<void>('stop', <String, Object?>{
-        'playerId': playerId,
-      });
+  Future<void> stop() => _method.invokeMethod<void>('stop', <String, Object?>{
+    'playerId': playerId,
+  });
 
   @override
   Future<void> setAudioTrack(String? trackId) =>
-      _methodChannel.invokeMethod<void>('setAudioTrack', <String, Object?>{
+      _method.invokeMethod<void>('setAudioTrack', <String, Object?>{
         'playerId': playerId,
         'trackId': trackId,
       });
 
   @override
   Future<void> setSubtitleTrack(String? trackId) =>
-      _methodChannel.invokeMethod<void>('setSubtitleTrack', <String, Object?>{
+      _method.invokeMethod<void>('setSubtitleTrack', <String, Object?>{
         'playerId': playerId,
         'trackId': trackId,
       });
 
   @override
   Future<void> setPlaybackSpeed(double speed) =>
-      _methodChannel.invokeMethod<void>('setPlaybackSpeed', <String, Object?>{
+      _method.invokeMethod<void>('setPlaybackSpeed', <String, Object?>{
         'playerId': playerId,
         'speed': speed,
       });
 
   @override
   Future<void> setVolume(double volume) =>
-      _methodChannel.invokeMethod<void>('setVolume', <String, Object?>{
+      _method.invokeMethod<void>('setVolume', <String, Object?>{
         'playerId': playerId,
         'volume': volume,
       });
@@ -499,7 +496,7 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
   @override
   Future<void> dispose() async {
     try {
-      await _methodChannel.invokeMethod<void>('dispose', <String, Object?>{
+      await _method.invokeMethod<void>('dispose', <String, Object?>{
         'playerId': playerId,
       });
     } on MissingPluginException {
