@@ -332,6 +332,12 @@ abstract class AppLocalizations {
   /// **'Move'**
   String get multiviewMove;
 
+  /// No description provided for @multiviewOpenFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Fullscreen'**
+  String get multiviewOpenFullscreen;
+
   /// No description provided for @multiviewMakeFeatured.
   ///
   /// In en, this message translates to:

@@ -130,6 +130,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get multiviewMove => 'Move';
 
   @override
+  String get multiviewOpenFullscreen => 'Open Fullscreen';
+
+  @override
   String get multiviewMakeFeatured => 'Make Featured';
 
   @override

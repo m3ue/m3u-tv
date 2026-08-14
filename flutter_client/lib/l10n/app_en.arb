@@ -59,6 +59,7 @@
   "multiviewTitle": "Multiview",
   "multiviewEmpty": "No streams - long-press a channel in Live TV and choose Add to Multiview",
   "multiviewMove": "Move",
+  "multiviewOpenFullscreen": "Open Fullscreen",
   "multiviewMakeFeatured": "Make Featured",
   "multiviewPictureInPicture": "Picture-in-Picture",
   "multiviewBackToGrid": "Back to Grid",

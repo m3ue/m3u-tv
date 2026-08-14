@@ -131,6 +131,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get multiviewMove => 'Verschieben';
 
   @override
+  String get multiviewOpenFullscreen => 'Vollbild öffnen';
+
+  @override
   String get multiviewMakeFeatured => 'Hervorheben';
 
   @override

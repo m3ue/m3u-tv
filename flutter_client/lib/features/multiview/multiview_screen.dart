@@ -21,11 +21,13 @@ enum _LayoutMode { grid, featured, pip }
 /// Up to [MultiviewController.maxStreams] live channels playing at once.
 ///
 /// D-pad movement follows which tile is audible (all others are muted);
-/// select promotes the focused tile to the normal full-screen player —
-/// reused unmodified via [ContentActions.onOpenPlayer], so every stream gets
-/// full playback controls for free. Long-press opens a per-tile menu to
-/// reorder, feature one tile larger (<=3 streams), go picture-in-picture
-/// (exactly 2 streams), or drop a stream from the grid.
+/// select just activates a tile as that audio source. Long-press opens a
+/// per-tile menu to reorder, feature one tile larger (<=3 streams), go
+/// picture-in-picture (exactly 2 streams), drop a stream from the grid, or
+/// promote it to the normal full-screen player (reused unmodified via
+/// [ContentActions.onOpenPlayer]) — kept off direct select since opening a
+/// second native player on top of a grid tile's own was crashing/freezing
+/// playback on multiple platforms.
 class MultiviewScreen extends ConsumerStatefulWidget {
   const MultiviewScreen({super.key});
 
@@ -71,11 +73,6 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     for (final channel in ref.read(multiviewChannelsProvider)) {
       _openTile(channel);
     }
-    // Native `load` calls for every tile were already enqueued above, in
-    // order, on the one shared method channel — this is guaranteed to be
-    // processed after all of them, so every tile's player exists by the
-    // time it arrives even though `open()` itself hasn't resolved yet.
-    _applyAudioFocus();
   }
 
   @override
@@ -122,7 +119,19 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
         setState(() => tile.hasError = true);
       });
     _tiles.add(tile);
-    unawaited(built.orchestrator.open(_sourceFor(channel)));
+    // Android's native player is only created inside its "load" handler, so
+    // a setVolume sent before this resolves races the player into existing
+    // and silently no-ops -- leaving whichever tile buffers first audible
+    // regardless of focus. Reapplying focus after open() actually finishes
+    // (guaranteed once its Future resolves) is the only fully reliable
+    // point, so this replaces the single eager call this used to make from
+    // initState() right after opening every tile.
+    unawaited(
+      built.orchestrator.open(_sourceFor(channel)).then((_) {
+        if (!mounted) return;
+        _applyAudioFocus();
+      }),
+    );
   }
 
   void _retryTile(int index) {
@@ -269,6 +278,13 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                         Navigator.of(dialogContext).pop(_TileMenuAction.grid),
                   ),
                 _MenuOption(
+                  icon: Icons.fullscreen,
+                  label: l10n.multiviewOpenFullscreen,
+                  onTap: () => Navigator.of(
+                    dialogContext,
+                  ).pop(_TileMenuAction.fullscreen),
+                ),
+                _MenuOption(
                   icon: Icons.close,
                   label: l10n.multiviewRemove,
                   onTap: () =>
@@ -301,6 +317,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
         });
       case _TileMenuAction.grid:
         setState(() => _layoutMode = _LayoutMode.grid);
+      case _TileMenuAction.fullscreen:
+        _openFullscreen(index);
       case _TileMenuAction.remove:
         _removeTile(index);
       case null:
@@ -466,10 +484,16 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     return DpadFocusable(
       focusNode: tile.focusNode,
       autofocus: index == 0,
-      onSelect: () => switch ((isReordering, tile.hasError)) {
-        (true, _) => setState(() => _reorderingIndex = null),
-        (false, true) => _retryTile(index),
-        (false, false) => _openFullscreen(index),
+      onSelect: () {
+        if (isReordering) {
+          setState(() => _reorderingIndex = null);
+        } else if (tile.hasError) {
+          _retryTile(index);
+        }
+        // Tapping already focuses the tile (via DpadFocusable's tapDown)
+        // before this fires, which is all select should do otherwise --
+        // opening a second native player on top of this tile's own was
+        // what caused the "player within a player" crashes/freezes.
       },
       onLongSelect: () => unawaited(_showTileMenu(index)),
       onDirection: (direction) => _handleDirection(index, direction),
@@ -555,7 +579,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   }
 }
 
-enum _TileMenuAction { move, feature, pip, grid, remove }
+enum _TileMenuAction { move, feature, pip, grid, fullscreen, remove }
 
 class _MenuOption extends StatelessWidget {
   const _MenuOption({

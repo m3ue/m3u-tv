@@ -129,6 +129,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiviewMove => '移动';
 
   @override
+  String get multiviewOpenFullscreen => '全屏打开';
+
+  @override
   String get multiviewMakeFeatured => '设为主画面';
 
   @override
