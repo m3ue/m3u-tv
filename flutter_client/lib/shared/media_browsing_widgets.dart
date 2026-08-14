@@ -125,7 +125,13 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
   }
 
   void _handleFocusChange() {
-    if (mounted) setState(() => _focused = _focusNode.hasFocus);
+    if (!mounted) return;
+    setState(() => _focused = _focusNode.hasFocus);
+    // Losing focus for any reason (d-pad navigating away, not just an
+    // explicit Escape/Back press) reverts to the inactive facade — a live
+    // TextField left mounted-but-unfocused looks and behaves differently
+    // from the facade button it should have become again.
+    if (!_focusNode.hasFocus) _deactivate();
   }
 
   void _clear() {
@@ -162,88 +168,132 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
       Radius.circular(MediaBrowsingMetrics.cardRadius),
     );
 
+    // Fixed so the facade button and the real TextField below are pixel
+    // identical in height — letting each derive its own height from font
+    // metrics/padding produced a visible size jump on activate/deactivate.
+    const fieldHeight = 52.0;
+    final hintStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+    );
+
     if (widget.activateOnSelect && !_activated) {
-      return DpadInkWell(
-        onTap: _activate,
-        autofocus: widget.autofocus,
-        borderRadius: radius,
-        color: colorScheme.surfaceContainerHigh,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          child: Row(
-            children: [
-              Icon(Icons.search, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.query.isEmpty ? widget.hintText : widget.query,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: widget.query.isEmpty
-                        ? colorScheme.onSurfaceVariant
-                        : colorScheme.onSurface,
+      return SizedBox(
+        height: fieldHeight,
+        child: DpadInkWell(
+          onTap: _activate,
+          autofocus: widget.autofocus,
+          borderRadius: radius,
+          color: colorScheme.surfaceContainerHigh,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search,
+                  size: 24,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.query.isEmpty ? widget.hintText : widget.query,
+                    overflow: TextOverflow.ellipsis,
+                    style: widget.query.isEmpty
+                        ? hintStyle
+                        : hintStyle?.copyWith(color: colorScheme.onSurface),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
 
-    const noBorder = OutlineInputBorder(
-      borderRadius: radius,
-      borderSide: BorderSide.none,
-    );
-    return Stack(
-      children: [
-        Focus(
-          onKeyEvent: widget.activateOnSelect ? _handleEditingKey : null,
-          child: TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            autofocus: !widget.activateOnSelect && widget.autofocus,
-            textInputAction: widget.textInputAction,
-            decoration: InputDecoration(
-              hintText: widget.hintText,
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: widget.query.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.clear),
-                      onPressed: _clear,
+    return SizedBox(
+      height: fieldHeight,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            // Built the same way as the facade's Row (below) rather than
+            // via InputDecoration's prefixIcon/isCollapsed machinery — that
+            // machinery lays its content out top-aligned once the decorator
+            // is stretched taller than its content, and there's no
+            // vertical-centering knob for it. A plain Row centers its
+            // children by default, so it just works.
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: radius,
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: widget.query.isEmpty ? 12 : 4,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search,
+                      size: 24,
+                      color: colorScheme.onSurfaceVariant,
                     ),
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHigh,
-              border: noBorder,
-              enabledBorder: noBorder,
-              focusedBorder: noBorder,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Focus(
+                        onKeyEvent: widget.activateOnSelect
+                            ? _handleEditingKey
+                            : null,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          autofocus:
+                              !widget.activateOnSelect && widget.autofocus,
+                          textInputAction: widget.textInputAction,
+                          style: hintStyle?.copyWith(
+                            color: colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration.collapsed(
+                            hintText: widget.hintText,
+                            hintStyle: hintStyle,
+                          ),
+                          onChanged: widget.onChanged,
+                          onSubmitted: (_) => _deactivate(),
+                        ),
+                      ),
+                    ),
+                    if (widget.query.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clear,
+                      ),
+                  ],
+                ),
+              ),
             ),
-            onChanged: widget.onChanged,
-            onSubmitted: (_) => _deactivate(),
           ),
-        ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: _focused ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 150),
-              child: CustomPaint(
-                painter: GradientBorderPainter(
-                  borderRadius: radius,
-                  width: 2.5,
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [colorScheme.primary, colorScheme.secondary],
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _focused ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: CustomPaint(
+                  painter: GradientBorderPainter(
+                    borderRadius: radius,
+                    width: 2.5,
+                    gradient: LinearGradient(
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                      colors: [colorScheme.primary, colorScheme.secondary],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
