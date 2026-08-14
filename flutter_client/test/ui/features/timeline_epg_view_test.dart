@@ -32,6 +32,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -91,6 +93,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [channel],
                 epgService: epgService,
                 onChannelSelect: (_) {},
@@ -149,6 +153,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -207,6 +213,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -276,6 +284,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [channel],
                   epgService: epgService,
                   onChannelSelect: (_) {},
@@ -306,6 +316,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -429,6 +441,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: channels,
                   epgService: epg,
                   onChannelSelect: selectedChannels.add,
@@ -547,6 +561,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: channels,
                 epgService: epg,
                 onChannelSelect: selectedChannels.add,
@@ -619,6 +635,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -672,6 +690,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -715,6 +735,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -762,6 +784,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -816,10 +840,18 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: DpadRegion(
+              // Matches the production wrapping in live_tv_screen.dart's
+              // `_buildEpgGrid` (`horizontalEdge: stop`) — without it, a
+              // left-arrow with nothing left to focus in this region falls
+              // through to a cross-region search and can land on the
+              // channel column instead of stopping in place.
+              horizontalEdge: DpadEdgeBehavior.stop,
               child: SizedBox(
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -901,6 +933,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -990,6 +1024,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,
@@ -1064,6 +1100,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -1095,6 +1133,8 @@ void main() {
                 width: 800,
                 height: 300,
                 child: TimelineEpgView(
+                  channelColumnFocusNode: FocusScopeNode(),
+                  onChannelColumnEdge: (_) {},
                   channels: const [
                     Channel(
                       id: 101,
@@ -1133,6 +1173,8 @@ void main() {
               width: 800,
               height: 300,
               child: TimelineEpgView(
+                channelColumnFocusNode: FocusScopeNode(),
+                onChannelColumnEdge: (_) {},
                 channels: const [
                   Channel(
                     id: 101,

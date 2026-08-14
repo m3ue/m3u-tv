@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -39,9 +40,12 @@ class TimelineEpgView extends StatefulWidget {
     required this.channels,
     required this.epgService,
     required this.onChannelSelect,
+    required this.channelColumnFocusNode,
+    required this.onChannelColumnEdge,
     this.onCatchupProgramSelect,
     this.onEnsureEpg,
     this.onChannelLongPress,
+    this.onChannelColumnLongPress,
     this.recordingChannelIds = const <int>{},
     this.recordingStateFor = _noRecordingState,
     this.windowHours = 24,
@@ -55,6 +59,16 @@ class TimelineEpgView extends StatefulWidget {
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
 
+  /// The channel column's own focus scope, so the caller (`LiveTvScreen`)
+  /// can move focus there directly (e.g. from the Back key) instead of only
+  /// via spatial traversal from the program grid.
+  final FocusScopeNode channelColumnFocusNode;
+
+  /// Fired when d-pad navigation hits the channel column's own edge —
+  /// mirrors the program grid's `onEdge` (left activates the nav
+  /// strip/sidebar, right returns focus to the program grid).
+  final ValueChanged<TraversalDirection> onChannelColumnEdge;
+
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
   /// already fresh. Called per-row as the visible timeline builds.
   final EnsureEpg? onEnsureEpg;
@@ -64,6 +78,10 @@ class TimelineEpgView extends StatefulWidget {
   /// parity. The program passed is whichever block was pressed (past,
   /// current, or future); the caller decides whether it's still schedulable.
   final CatchupProgramSelect? onChannelLongPress;
+
+  /// Same context menu as [onChannelLongPress], but for long-pressing the
+  /// channel column itself, which has no associated program block.
+  final ValueChanged<Channel>? onChannelColumnLongPress;
 
   final Set<int> recordingChannelIds;
 
@@ -315,14 +333,43 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                     ),
                     // Channel name/logo list (synced vertically with program rows)
                     Expanded(
-                      child: ListView.builder(
-                        controller: _leftVCtrl,
-                        itemCount: widget.channels.length,
-                        itemExtent: _kRowH,
-                        itemBuilder: (_, i) => _ChannelCell(
-                          channel: widget.channels[i],
-                          isRecording: widget.recordingChannelIds.contains(
-                            widget.channels[i].id,
+                      // DpadRegion must be the OUTER widget here, not the
+                      // FocusScope: `DpadRegion.ofNode` resolves a node's
+                      // region from that node's own BuildContext, walking
+                      // upward. With FocusScope outside, its FocusScopeNode
+                      // (which defaults to canRequestFocus: true, unlike the
+                      // package's own region markers) would resolve to
+                      // whatever DpadRegion encloses this whole EPG view
+                      // (live-tv/epg) rather than this nested one — making
+                      // it a spurious spatial-navigation candidate that can
+                      // steal focus from unrelated controls elsewhere in
+                      // that outer region (e.g. the day-navigation header).
+                      // Nesting FocusScope inside DpadRegion instead makes
+                      // the scope node belong to *this* region, where it's
+                      // correctly excluded from being its own candidate.
+                      child: DpadRegion(
+                        memoryKey: 'live-tv/epg-channels',
+                        horizontalEdge: DpadEdgeBehavior.stop,
+                        onEdge: widget.onChannelColumnEdge,
+                        child: FocusScope(
+                          node: widget.channelColumnFocusNode,
+                          child: ListView.builder(
+                            controller: _leftVCtrl,
+                            itemCount: widget.channels.length,
+                            itemExtent: _kRowH,
+                            itemBuilder: (_, i) => _ChannelCell(
+                              channel: widget.channels[i],
+                              isRecording: widget.recordingChannelIds.contains(
+                                widget.channels[i].id,
+                              ),
+                              onTap: () =>
+                                  widget.onChannelSelect(widget.channels[i]),
+                              onLongTap: widget.onChannelColumnLongPress == null
+                                  ? null
+                                  : () => widget.onChannelColumnLongPress!(
+                                      widget.channels[i],
+                                    ),
+                            ),
                           ),
                         ),
                       ),
@@ -614,52 +661,64 @@ class _DayControls extends StatelessWidget {
 }
 
 class _ChannelCell extends StatelessWidget {
-  const _ChannelCell({required this.channel, this.isRecording = false});
+  const _ChannelCell({
+    required this.channel,
+    this.isRecording = false,
+    this.onTap,
+    this.onLongTap,
+  });
   final Channel channel;
   final bool isRecording;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      height: _kRowH,
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        children: [
-          if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty)
-            Image.network(
-              channel.logoUrl!,
-              width: 32,
-              height: 32,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Icon(Icons.tv, size: 28),
-            )
-          else
-            const Icon(Icons.tv, size: 28),
-          const SizedBox(width: 6),
-          if (isRecording) ...[
-            RecordingDot(color: colorScheme.error),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text(
-              channel.name,
-              style: Theme.of(context).textTheme.labelSmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+    return DpadInkWell(
+      onTap: onTap,
+      onLongTap: onLongTap,
+      borderRadius: BorderRadius.zero,
+      child: Container(
+        height: _kRowH,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          border: Border(
+            bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
           ),
-          if (channel.catchupSupported) ...[
-            const SizedBox(width: 4),
-            CatchupBadge(days: channel.catchupDays),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty)
+              Image.network(
+                channel.logoUrl!,
+                width: 32,
+                height: 32,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const Icon(Icons.tv, size: 28),
+              )
+            else
+              const Icon(Icons.tv, size: 28),
+            const SizedBox(width: 6),
+            if (isRecording) ...[
+              RecordingDot(color: colorScheme.error),
+              const SizedBox(width: 4),
+            ],
+            Expanded(
+              child: Text(
+                channel.name,
+                style: Theme.of(context).textTheme.labelSmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (channel.catchupSupported) ...[
+              const SizedBox(width: 4),
+              CatchupBadge(days: channel.catchupDays),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

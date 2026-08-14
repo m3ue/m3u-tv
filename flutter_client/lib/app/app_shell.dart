@@ -409,6 +409,17 @@ class AppShellState extends ConsumerState<AppShell>
     _contentEntryFocusByRoute[routeName] = node;
   }
 
+  // Lets a screen intercept the Back key itself before AppShell's default
+  // handling (sidebar activation) runs — currently only Live TV, to move
+  // focus to the EPG's Channels column instead. Same route-keyed,
+  // register-once pattern as _contentEntryFocusByRoute above, for the same
+  // StatefulNavigationShell branch-retention reason.
+  final Map<String, bool Function()> _contentBackHandlerByRoute = {};
+
+  void _registerContentBackHandler(String routeName, bool Function() handler) {
+    _contentBackHandlerByRoute[routeName] = handler;
+  }
+
   void _deactivateSidebar() {
     setState(() {
       _sidebarActive = false;
@@ -561,6 +572,12 @@ class AppShellState extends ConsumerState<AppShell>
     final router = GoRouter.of(context);
     if (router.canPop()) {
       router.pop();
+      return true;
+    }
+
+    final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    final screenBackHandler = _contentBackHandlerByRoute[route];
+    if (screenBackHandler != null && screenBackHandler()) {
       return true;
     }
 
@@ -1039,6 +1056,8 @@ class AppShellState extends ConsumerState<AppShell>
         onExitFullScreenDetail: _exitFullScreenDetail,
         onEntryFocusScopeReady: (node) =>
             _registerContentEntryFocus(RouteNames.liveTv, node),
+        onBackHandlerReady: (handler) =>
+            _registerContentBackHandler(RouteNames.liveTv, handler),
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,

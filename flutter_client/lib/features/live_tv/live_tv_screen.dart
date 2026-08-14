@@ -51,6 +51,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onEnterFullScreenDetail,
     this.onExitFullScreenDetail,
     this.onEntryFocusScopeReady,
+    this.onBackHandlerReady,
   });
 
   final FavoritesService favoritesService;
@@ -66,6 +67,12 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// so AppShell can always re-enter this screen's strip first when the
   /// sidebar deactivates.
   final ValueChanged<FocusScopeNode>? onEntryFocusScopeReady;
+
+  /// TV/desktop only: called once with a handler that intercepts the Back
+  /// key. Returning `true` means this screen handled it itself (moves focus
+  /// to the EPG's Channels column instead of AppShell's default sidebar
+  /// activation); `false` lets AppShell fall through to its usual behavior.
+  final ValueChanged<bool Function()>? onBackHandlerReady;
 
   /// Called with the filtered channel list (category/favorites/search) right
   /// before [onChannelSelect], so the player's skip-previous/skip-next stays
@@ -136,12 +143,25 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   final GlobalKey<MediaCategoryNavState> _navKey =
       GlobalKey<MediaCategoryNavState>();
 
+  // EPG-only: a distinct hop between the program grid and the nav strip,
+  // reached via the Back key (see _handleBackFromEpg) rather than spatial
+  // left/right traversal from the grid.
+  final FocusScopeNode _channelColumnFocusNode = FocusScopeNode();
+
   @override
   void initState() {
     super.initState();
     widget.favoritesService.addListener(_onFavoritesChanged);
     _attachViewSettingsListener();
     unawaited(_initCategory());
+    widget.onBackHandlerReady?.call(_handleBackFromEpg);
+  }
+
+  bool _handleBackFromEpg() {
+    if (_viewMode != _ViewMode.epgGrid) return false;
+    if (!_gridFocusNode.hasFocus) return false;
+    _channelColumnFocusNode.requestFocus();
+    return true;
   }
 
   @override
@@ -160,6 +180,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     widget.favoritesService.removeListener(_onFavoritesChanged);
     _detachViewSettingsListener(widget.viewSettingsService);
     _gridFocusNode.dispose();
+    _channelColumnFocusNode.dispose();
     super.dispose();
   }
 
@@ -632,6 +653,19 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     }
   }
 
+  void _handleChannelColumnEdge(TraversalDirection direction) {
+    if (direction == TraversalDirection.right) {
+      _gridFocusNode.requestFocus();
+      return;
+    }
+    if (direction != TraversalDirection.left) return;
+    if (widget.useSidebarLayout) {
+      _navKey.currentState?.requestFocus();
+    } else {
+      widget.onSidebarActivate?.call();
+    }
+  }
+
   Widget? _buildMultiviewButton() {
     final multiviewCount = ref.watch(multiviewChannelsProvider).length;
     if (!_multiviewSupported || multiviewCount == 0) return null;
@@ -727,6 +761,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           programEnd: program.end,
         ),
         epgStartView: _epgStartView,
+        channelColumnFocusNode: _channelColumnFocusNode,
+        onChannelColumnEdge: _handleChannelColumnEdge,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);
@@ -740,6 +776,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           // if this program has already ended.
           _openChannelContextMenu(context, channel, program),
         ),
+        onChannelColumnLongPress: (channel) =>
+            unawaited(_openChannelContextMenu(context, channel, null)),
       ),
     );
   }
