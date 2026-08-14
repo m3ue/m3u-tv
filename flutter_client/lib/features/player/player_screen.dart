@@ -47,6 +47,7 @@ class PlayerScreen extends StatefulWidget {
     this.onNextChannel,
     this.onPreviousChannel,
     this.onRecordProgram,
+    this.onTrackDialogVisibilityChanged,
     this.isRecordingCurrentChannel = false,
     super.key,
   });
@@ -65,6 +66,7 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
   final void Function(EpgProgram program)? onRecordProgram;
+  final ValueChanged<bool>? onTrackDialogVisibilityChanged;
   final bool isRecordingCurrentChannel;
 
   @override
@@ -1035,6 +1037,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             _isSubtitleTrackSelectionKnown,
                         onAudioTrackSelected: _handleAudioTrackSelected,
                         onSubtitleTrackSelected: _handleSubtitleTrackSelected,
+                        onTrackDialogVisibilityChanged:
+                            widget.onTrackDialogVisibilityChanged,
                         fallbackReason: _showPlaybackDiagnostics
                             ? _fallbackReason
                             : null,

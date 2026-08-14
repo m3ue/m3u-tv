@@ -146,6 +146,7 @@ class AppShellState extends ConsumerState<AppShell>
   PlayerArgs? _playerArgs;
   PlaybackOrchestrator? _playerOrchestrator;
   bool _playerHasFailed = false;
+  bool _playerTrackDialogVisible = false;
   FocusNode? _focusBeforePlayer;
 
   // Bumped only when a brand-new player session starts (not on in-session
@@ -225,6 +226,10 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   Future<bool> _handleSystemBack() async {
+    if (_playerTrackDialogVisible) {
+      await Navigator.of(context, rootNavigator: true).maybePop();
+      return true;
+    }
     if (_handleBackPress()) return true;
 
     // Double-back to exit: require two back presses within 2 seconds.
@@ -511,6 +516,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerArgs = null;
       _playerOrchestrator = null;
       _playerHasFailed = false;
+      _playerTrackDialogVisible = false;
     });
     _playerChannelContext = const <Channel>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -542,6 +548,11 @@ class AppShellState extends ConsumerState<AppShell>
     }
 
     return false;
+  }
+
+  void _setPlayerTrackDialogVisible(bool visible) {
+    if (!mounted || _playerTrackDialogVisible == visible) return;
+    setState(() => _playerTrackDialogVisible = visible);
   }
 
   void _openChannel(Channel channel) {
@@ -1235,6 +1246,7 @@ class AppShellState extends ConsumerState<AppShell>
                       args.type == 'live' && _appState.hasDvrFeature
                       ? _handleRecordButtonTap
                       : null,
+                  onTrackDialogVisibilityChanged: _setPlayerTrackDialogVisible,
                   isRecordingCurrentChannel:
                       args.type == 'live' &&
                       recordingChannelIds.contains(args.streamId),

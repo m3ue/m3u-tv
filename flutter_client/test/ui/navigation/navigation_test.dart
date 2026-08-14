@@ -1199,6 +1199,54 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
+  testWidgets('TV back dismisses audio selection before closing player', (
+    tester,
+  ) async {
+    final adapter = _NavigationPlayerAdapter(
+      audioTracks: const <PlaybackTrack>[
+        PlaybackTrack(id: 'audio-en', label: 'English'),
+      ],
+    );
+    final appState = _testAppState(xtreamService: _NavigationXtreamService());
+    addTearDown(appState.dispose);
+    await appState.connectXtream(
+      const UserCredentials(
+        server: 'http://example.com',
+        username: 'user',
+        password: 'pass',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        deviceType: DeviceType.tv,
+        appState: appState,
+        playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+        useProductionPlayer: true,
+      ),
+    );
+    await _pumpAppFrame(tester);
+
+    await tester.tap(find.text('Route News').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byIcon(Icons.audiotrack));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Audio Track'), findsOneWidget);
+
+    await _sendPlatformNavigationMethod(tester, const MethodCall('popRoute'));
+    await _pumpAppFrame(tester);
+
+    expect(find.text('Audio Track'), findsNothing);
+    expect(find.byType(PlayerScreen), findsOneWidget);
+
+    await _sendPlatformNavigationMethod(tester, const MethodCall('popRoute'));
+    await _pumpAppFrame(tester);
+    expect(find.byType(PlayerScreen), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('TV back dismisses player controls before closing player', (
     tester,
   ) async {
@@ -1833,10 +1881,15 @@ PlaybackOrchestrator _testPlaybackOrchestrator([
 }
 
 class _NavigationPlayerAdapter implements PlayerAdapter {
+  _NavigationPlayerAdapter({
+    this.audioTracks = const <PlaybackTrack>[],
+  });
+
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();
   final StreamController<PlaybackError> _errorController =
       StreamController<PlaybackError>.broadcast();
+  final List<PlaybackTrack> audioTracks;
 
   int loadCallCount = 0;
   int disposeCallCount = 0;
@@ -1859,6 +1912,7 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
         status: PlaybackStatus.playing,
         source: source,
         duration: source.isLive ? null : const Duration(hours: 2),
+        audioTracks: audioTracks,
       ),
     );
   }
