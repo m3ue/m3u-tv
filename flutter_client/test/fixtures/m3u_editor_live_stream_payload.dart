@@ -1,0 +1,16 @@
+const m3uEditorLiveStreamPayload = <String, Object?>{
+  'num': 1,
+  'name': 'CNN HD',
+  'stream_type': 'live',
+  'stream_id': '12345',
+  'stream_icon': 'https://example.com/logos/cnn.png',
+  'epg_channel_id': 'cnn.us',
+  'added': '1640995200',
+  'category_id': '1',
+  'category_ids': <int>[1],
+  'tv_archive': 1,
+  'tv_archive_duration': 24,
+  'custom_sid': 'cnn-hd',
+  'thumbnail': 'https://example.com/logos/cnn.png',
+  'direct_source': '',
+};
