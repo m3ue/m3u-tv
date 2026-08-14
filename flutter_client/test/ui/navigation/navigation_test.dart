@@ -1271,8 +1271,7 @@ void main() {
         _TestApp(
           deviceType: DeviceType.tv,
           appState: appState,
-          playbackOrchestratorBuilder: () =>
-              _testPlaybackOrchestrator(adapter),
+          playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
           useProductionPlayer: true,
         ),
       );

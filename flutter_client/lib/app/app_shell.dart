@@ -230,7 +230,10 @@ class AppShellState extends ConsumerState<AppShell>
 
   Future<bool> _handleSystemBack() async {
     if (_playerModalDialogVisible) {
-      final popped = await Navigator.of(context, rootNavigator: true).maybePop();
+      final popped = await Navigator.of(
+        context,
+        rootNavigator: true,
+      ).maybePop();
       if (popped) return true;
     }
     if (_handleBackPress()) return true;
