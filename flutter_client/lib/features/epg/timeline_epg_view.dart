@@ -538,7 +538,6 @@ class _DayControls extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Container(
       height: 42,
-      color: colorScheme.surfaceContainerHigh,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -379,7 +379,7 @@ void main() {
 
       expect(find.text('Search'), findsOneWidget);
       expect(find.text('My Requests'), findsOneWidget);
-      expect(find.text('Search movies & shows…'), findsOneWidget);
+      expect(find.text('Search...'), findsOneWidget);
     });
 
     testWidgets('sidebar labels remain visible after selecting a route', (
