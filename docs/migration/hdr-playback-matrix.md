@@ -23,18 +23,45 @@ Native events and diagnostics may contain only normalized non-sensitive transfer
 
 Server transcode is unverified and not HDR-capable until complete generated output and delivery path prove metadata preservation and renderer behavior. It inherits no HDR claim from the source.
 
+## Threat Model
+
+Source HDR metadata can be untrusted, absent, or wrong. Device and display capability can be conditional or unsupported, and source detection can be mislabeled as HDR output active. Server transcode can be accidentally assumed, and diagnostics can leak sensitive metadata. Playback or rendering implementation is also out of scope for this contract. The bounded mitigation is authoritative native evidence, normalized non-sensitive state only, and a fail-closed unverified/blocker outcome until the complete delivery path is verified.
+
+## Acceptance Criteria
+
+- All 8 x 4 target-format cells contain an explicit non-empty normalized decision.
+- Decisions use only the four normalized states above and remain separate from source detection, presentation, fallback, and user communication.
+- Every platform keeps its real-device or real-runtime gate and conservative server fallback.
+- Metadata remains non-sensitive, related-work caveats and citations remain present, and this phase adds no runtime implementation.
+
+## Detection
+
+Detection can establish `source HDR detected` only from authoritative native source metadata. Source detection never proves output, metadata preservation, display mode, tone mapping, or `HDR output active`.
+
+## Presentation
+
+Presentation reports only a verified normalized output state. It must not call source metadata an active HDR output path; without output evidence, the current contract remains `HDR unsupported/unavailable` and the platform gate remains unverified/blocker.
+
+## Fallback
+
+Fallback is conservative: preserve normal SDR playback when safely available, report `HDR unsupported/unavailable` when output is not proven, and never silently assume that server transcode preserves HDR.
+
+## User Communication
+
+User communication is non-sensitive and clearly distinguishes source detection from actual output. It may expose normalized state and non-sensitive color metadata, but never stream URLs, headers, credentials, tokens, or raw native payloads.
+
 ## Decision summary
 
 | Target | Backend and native path | HDR10 | HDR10+ | HLG | Dolby Vision | Metadata preservation | Tone mapping/fallback | Minimum prerequisites and packaging | Real device/runtime |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Android phone/tablet | Media3 ExoPlayer to Flutter texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or HDR packaging proof recorded | unverified/blocker |
-| Android TV | Media3 ExoPlayer to Flutter texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or HDR packaging proof recorded | unverified/blocker |
-| iOS | media_kit and AVKit via BGRA Flutter texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or App Store HDR packaging proof recorded | unverified/blocker |
-| iPadOS | media_kit and AVKit via BGRA Flutter texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or App Store HDR packaging proof recorded | unverified/blocker |
-| tvOS | AVKit via Metal-compatible BGRA Flutter texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or tvOS packaging proof recorded | unverified/blocker |
-| macOS | media_kit AVFoundation-backed texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | No app-specific HDR minimum or signed/notarized HDR packaging proof recorded | unverified/blocker |
-| Linux | in-process libmpv software RGBA texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | Existing runtime needs libmpv and its distro dependencies; HDR renderer and driver requirements unverified | unverified/blocker |
-| Windows | in-process libmpv RGBA pixel-buffer texture | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | unverified/blocker | Existing bundle needs `mpv-2.dll` and dependent runtime DLLs; HDR renderer and driver requirements unverified | unverified/blocker |
+| Android phone/tablet | Media3 ExoPlayer to Flutter texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or HDR packaging proof recorded | unverified/blocker |
+| Android TV | Media3 ExoPlayer to Flutter texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or HDR packaging proof recorded | unverified/blocker |
+| iOS | media_kit and AVKit via BGRA Flutter texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or App Store HDR packaging proof recorded | unverified/blocker |
+| iPadOS | media_kit and AVKit via BGRA Flutter texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or App Store HDR packaging proof recorded | unverified/blocker |
+| tvOS | AVKit via Metal-compatible BGRA Flutter texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or tvOS packaging proof recorded | unverified/blocker |
+| macOS | media_kit AVFoundation-backed texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | No app-specific HDR minimum or signed/notarized HDR packaging proof recorded | unverified/blocker |
+| Linux | in-process libmpv software RGBA texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | Existing runtime needs libmpv and its distro dependencies; HDR renderer and driver requirements unverified | unverified/blocker |
+| Windows | in-process libmpv RGBA pixel-buffer texture | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | HDR unsupported/unavailable | unverified/blocker | unverified/blocker | Existing bundle needs `mpv-2.dll` and dependent runtime DLLs; HDR renderer and driver requirements unverified | unverified/blocker |
 
 The format columns are separate decisions for every target and active backend path. They are not decoder capability assertions. The Android documentation describes device-dependent supported formats, and the mpv manual describes output configuration; neither proves this app's end-to-end output path.
 
