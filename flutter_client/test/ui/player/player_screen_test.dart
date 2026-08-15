@@ -1192,6 +1192,188 @@ void main() {
   });
 
   group('PlayerScreen', () {
+    testWidgets(
+      'hides visible controls when the overlay background is tapped',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1200, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/live.m3u8',
+                title: 'Overlay Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(PlaybackControls), findsOneWidget);
+
+        await tester.tapAt(const Offset(1100, 400));
+        await tester.pump();
+
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
+    testWidgets('keeps visible controls open when play pause is tapped', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'Control Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pump();
+
+      expect(adapter.playCallCount, 1);
+      expect(find.byType(PlaybackControls), findsOneWidget);
+    });
+
+    testWidgets('hides visible controls when the live EPG overlay is tapped', (
+      tester,
+    ) async {
+      final now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final epgService = EpgService(clock: () => now)
+        ..loadPrograms(<EpgProgram>[
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Current News',
+            description: 'Fixture bulletin',
+            start: now.subtract(const Duration(minutes: 10)),
+            end: now.add(const Duration(minutes: 20)),
+          ),
+        ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'EPG Tap Fixture',
+              type: 'live',
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: epgService,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(EpgOverlay), findsOneWidget);
+
+      await tester.tap(find.byType(EpgOverlay));
+      await tester.pump();
+
+      expect(find.byType(PlaybackControls), findsNothing);
+    });
+
+    testWidgets(
+      'hides visible controls when the Now Playing overlay is tapped',
+      (
+        tester,
+      ) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/movie.mkv',
+                title: 'Now Playing Tap Fixture',
+                type: 'vod',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(NowPlayingOverlay), findsOneWidget);
+
+        await tester.tap(find.byType(NowPlayingOverlay));
+        await tester.pump();
+
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
     testWidgets('renders desktop libmpv texture when backend is ready', (
       tester,
     ) async {
