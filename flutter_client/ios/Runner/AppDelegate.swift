@@ -4,6 +4,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
     private var avKitPlugin: AvKitPlaybackPlugin?
+    private var mpvPlugin: MpvPlayerPlugin?
 
     override func application(
         _ application: UIApplication,
@@ -15,6 +16,32 @@ import UIKit
     func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
         GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
         registerAvKitPlugin(engineBridge: engineBridge)
+        registerMpvPlugin(engineBridge: engineBridge)
+    }
+
+    private func registerMpvPlugin(engineBridge: FlutterImplicitEngineBridge) {
+        guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "MpvPlayerPlugin") else { return }
+        let messenger = registrar.messenger()
+
+        let plugin = MpvPlayerPlugin()
+        mpvPlugin = plugin
+
+        FlutterMethodChannel(
+            name: MpvPlayerPlugin.methodChannelName,
+            binaryMessenger: messenger
+        ).setMethodCallHandler { [weak plugin] call, result in
+            plugin?.handle(call, result: result)
+        }
+
+        FlutterEventChannel(
+            name: MpvPlayerPlugin.eventChannelName,
+            binaryMessenger: messenger
+        ).setStreamHandler(plugin)
+
+        registrar.register(
+            MpvPlayerPlatformViewFactory(plugin: plugin),
+            withId: "m3u_tv/apple_mpv_view"
+        )
     }
 
     private func registerAvKitPlugin(engineBridge: FlutterImplicitEngineBridge) {

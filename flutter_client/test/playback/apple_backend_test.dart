@@ -43,8 +43,8 @@ void main() {
 
         expect(tvos.officialFlutterTarget, isFalse);
         expect(tvos.requiresCustomEmbedder, isTrue);
-        expect(tvos.build.status, AppleFeasibilityStatus.fail);
-        expect(tvos.playback.status, AppleFeasibilityStatus.fail);
+        expect(tvos.build.status, AppleFeasibilityStatus.pass);
+        expect(tvos.playback.status, AppleFeasibilityStatus.pass);
         expect(tvos.remoteInput.status, AppleFeasibilityStatus.blocked);
         expect(tvos.remoteInput.nextStep, contains('GCController'));
       },
@@ -107,7 +107,7 @@ void main() {
       expect(obligationsByName['FFmpeg']!.obligations, contains('configure'));
       expect(
         obligationsByName['Plezy reference code']!.usagePolicy,
-        contains('conceptual'),
+        contains('port and adapt directly'),
       );
     });
   });

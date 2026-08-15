@@ -5,6 +5,7 @@ import UIKit
 @main
 class AppDelegate: FlutterAppDelegate {
     private var avKitPlugin: AvKitPlaybackPlugin?
+    private var mpvPlugin: MpvPlayerPlugin?
 
     override func application(
         _ application: UIApplication,
@@ -21,6 +22,7 @@ class AppDelegate: FlutterAppDelegate {
         // reach the same engine that is actually running the Dart code.
         GeneratedPluginRegistrant.register(with: flutterVC.pluginRegistry())
         registerAvKitPlugin(with: flutterVC)
+        registerMpvPlugin(with: flutterVC)
 
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
@@ -41,5 +43,28 @@ class AppDelegate: FlutterAppDelegate {
             name: AvKitPlaybackPlugin.eventChannelName,
             binaryMessenger: registrar.messenger()
         ).setStreamHandler(plugin)
+    }
+
+    private func registerMpvPlugin(with controller: FlutterViewController) {
+        guard let registrar = controller.pluginRegistry().registrar(forPlugin: "MpvPlayerPlugin") else { return }
+        let plugin = MpvPlayerPlugin()
+        mpvPlugin = plugin
+
+        FlutterMethodChannel(
+            name: MpvPlayerPlugin.methodChannelName,
+            binaryMessenger: registrar.messenger()
+        ).setMethodCallHandler { [weak plugin] call, result in
+            plugin?.handle(call, result: result)
+        }
+
+        FlutterEventChannel(
+            name: MpvPlayerPlugin.eventChannelName,
+            binaryMessenger: registrar.messenger()
+        ).setStreamHandler(plugin)
+
+        registrar.register(
+            MpvPlayerPlatformViewFactory(plugin: plugin),
+            withId: "m3u_tv/apple_mpv_view"
+        )
     }
 }

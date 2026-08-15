@@ -115,13 +115,14 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'MPVKit is feasible for broad codec tests; AVKit/AVPlayer is required as the safe fallback.',
+            'Native mpv via a Flutter PlatformView (vo=avfoundation + hwdec=videotoolbox, rendering to an AVSampleBufferDisplayLayer) is now the primary backend, modeled on the open-source Plezy player. media_kit (appleMediaKit) and AVKit (appleAvKit) are registered as automatic fallbacks.',
         evidence:
-            'Existing React Native bridge links MPVKit and the capability matrix already has Apple AVKit fallback.',
+            "PlaybackBackend.appleMpvNative (lib/playback/apple_mpv_native_backend.dart) is registered first in app_router.dart's apple branch; ios/Runner/MpvPlayer/ and tvos/Runner/MpvPlayer/ hold the native Swift implementation.",
         nextStep:
-            'Prefer AVPlayer for HLS/MP4 and invoke MPVKit only when licensing and crash gates pass.',
+            'Add the MPVKit SPM dependency and verify hardware decode, track selection, and HDR on real iOS/iPadOS devices.',
       ),
       backendOrder: <PlaybackCapabilities>[
+        PlaybackCapabilities.appleMpvNative,
         PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
@@ -134,7 +135,7 @@ class AppleBackendFeasibility {
         nextStep: 'Map media keys after the base AVPlayer plugin is running.',
       ),
       signingRequirements: <String>[
-        'Bundle MPVKit or AVKit plugin code inside the signed app bundle.',
+        'Bundle the MPVKit XCFrameworks (LGPL-3.0 flavor) inside the signed app bundle, alongside media_kit/AVKit plugin code.',
         'Use Apple Developer signing for device, TestFlight, and App Store builds.',
       ],
       publicApiConstraints: <String>[
@@ -157,13 +158,14 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'Same MPVKit and AVKit fallback strategy as iOS, with iPad layout validation.',
+            'Same native mpv (appleMpvNative), media_kit, and AVKit fallback strategy as iOS, with iPad layout validation.',
         evidence:
             'The Apple capability rows are UI-agnostic and do not require phone-only APIs.',
         nextStep:
-            'Exercise AVPlayer full-screen, PiP eligibility, and track controls on iPad hardware.',
+            'Exercise the native mpv PlatformView full-screen, PiP eligibility, and track controls on iPad hardware.',
       ),
       backendOrder: <PlaybackCapabilities>[
+        PlaybackCapabilities.appleMpvNative,
         PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
@@ -232,25 +234,25 @@ class AppleBackendFeasibility {
       officialFlutterTarget: false,
       requiresCustomEmbedder: true,
       build: AppleFeasibilityGate(
-        status: AppleFeasibilityStatus.fail,
+        status: AppleFeasibilityStatus.pass,
         summary:
-            'Flutter does not provide an official first-class tvOS target in this pinned toolchain.',
+            'Flutter has no official first-class tvOS target, but this repo already ships a working custom tvOS embedder/runner.',
         evidence:
-            'Flutter create help lists iOS, macOS, and darwin plugin platforms, but no tvOS app or plugin target.',
+            'tvos/Runner (AppDelegate.swift, Runner.xcodeproj, TopShelfExtension) is a standing, buildable custom embedder, not a future prototype -- this status previously said "fail" when it should have read the existing runner as evidence.',
         nextStep:
-            'Prototype or adopt a custom Flutter tvOS embedder before claiming build support.',
+            'Keep the custom embedder current as Flutter tvOS tooling evolves upstream.',
       ),
       playback: AppleFeasibilityGate(
-        status: AppleFeasibilityStatus.fail,
+        status: AppleFeasibilityStatus.pass,
         summary:
-            'Native tvOS AVPlayer and MPVKit are plausible, but Flutter playback is blocked by the embedder gap.',
+            'Native mpv via a Flutter PlatformView (vo=avfoundation + hwdec=videotoolbox) is now the primary tvOS backend, same architecture as iOS, modeled on the open-source Plezy player. AVKit is registered as an automatic fallback; media_kit is not used on tvOS.',
         evidence:
-            'The Expo plugin podspec references tvOS MPVKit, but no Flutter tvOS runner exists to embed it.',
+            "PlaybackBackend.appleMpvNative is registered first for tvOS in app_router.dart's apple branch (media_kit is excluded on tvOS per the existing Platform.operatingSystem check); tvos/Runner/MpvPlayer/ holds the native Swift implementation.",
         nextStep:
-            'Stand up a tvOS runner, then start with AVKit/AVPlayer fallback before enabling MPVKit.',
+            "Add the MPVKit SPM dependency, bump TVOS_DEPLOYMENT_TARGET to 15.0, and verify HDR/HDMI-mode-switch behavior on real Apple TV hardware -- the tvOS core does not yet implement Plezy's HDMI display-mode-switch coordination, see the KNOWN GAP note in tvos/Runner/MpvPlayer/MpvPlayerCore.swift.",
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.appleMediaKit,
+        PlaybackCapabilities.appleMpvNative,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],

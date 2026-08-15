@@ -99,10 +99,12 @@ class AndroidPlaybackAdapter
       PlaybackBackend.androidExoPlayer => PlaybackCapabilities.androidExoPlayer,
       PlaybackBackend.androidMpv => PlaybackCapabilities.androidMpv,
       PlaybackBackend.serverTranscode => PlaybackCapabilities.serverTranscode,
+      PlaybackBackend.appleMpvNative ||
       PlaybackBackend.appleMediaKit ||
       PlaybackBackend.appleAvKit ||
       PlaybackBackend.desktopLibmpv ||
-      PlaybackBackend.desktopMediaKit => PlaybackCapabilities.androidExoPlayer,
+      PlaybackBackend.desktopMediaKit ||
+      PlaybackBackend.macMpvNative => PlaybackCapabilities.androidExoPlayer,
     };
   }
 

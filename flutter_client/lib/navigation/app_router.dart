@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
+import 'package:m3u_tv/playback/apple_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/mac_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
@@ -131,6 +132,16 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       ),
     );
   } else if (platform == PlaybackPlatform.apple) {
+    // Native mpv via a Flutter PlatformView (`vo=avfoundation` +
+    // `hwdec=videotoolbox`, rendering straight to an
+    // `AVSampleBufferDisplayLayer`), registered as primary on both iOS and
+    // tvOS -- same architecture as the macOS `MacMpvNativeBackend` above,
+    // modeled on the open-source Plezy player. `MediaKitIosAdapter` (iOS
+    // only) and `AppleAvKitBackend` (iOS + tvOS) stay registered as
+    // automatic fallbacks via `PlaybackOrchestrator`'s own native
+    // multi-backend fallback -- do not wrap these in `FallbackPlayerAdapter`,
+    // see the desktop branch below for why.
+    adapters[PlaybackBackend.appleMpvNative] = AppleMpvNativeBackend();
     if (!kIsWeb && Platform.operatingSystem != 'tvos') {
       adapters[PlaybackBackend.appleMediaKit] = MediaKitIosAdapter();
     }

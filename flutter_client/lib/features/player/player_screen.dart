@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HttpClient, HttpStatus;
+import 'dart:io' show HttpClient, HttpStatus, Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
@@ -1162,17 +1162,21 @@ class _VideoSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final view = platformView;
     if (view != null) {
-      return ColoredBox(
-        color: Colors.black,
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: aspectRatio,
-            child: AppKitView(
+      final child = Platform.isMacOS
+          ? AppKitView(
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,
               creationParamsCodec: const StandardMessageCodec(),
-            ),
-          ),
+            )
+          : UiKitView(
+              viewType: view.platformViewType,
+              creationParams: view.platformViewCreationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+            );
+      return ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: AspectRatio(aspectRatio: aspectRatio, child: child),
         ),
       );
     }
@@ -1377,10 +1381,12 @@ class _PlaybackDiagnosticsSnapshot {
     return switch (parts[1]) {
       'androidExoPlayer' => PlaybackBackend.androidExoPlayer,
       'androidMpv' => PlaybackBackend.androidMpv,
+      'appleMpvNative' => PlaybackBackend.appleMpvNative,
       'appleMediaKit' => PlaybackBackend.appleMediaKit,
       'appleAvKit' => PlaybackBackend.appleAvKit,
       'desktopLibmpv' => PlaybackBackend.desktopLibmpv,
       'desktopMediaKit' => PlaybackBackend.desktopMediaKit,
+      'macMpvNative' => PlaybackBackend.macMpvNative,
       'serverTranscode' => PlaybackBackend.serverTranscode,
       _ => null,
     };
@@ -1390,10 +1396,12 @@ class _PlaybackDiagnosticsSnapshot {
     return switch (backend) {
       PlaybackBackend.androidExoPlayer => 'Android ExoPlayer',
       PlaybackBackend.androidMpv => 'Android mpv/libmpv disabled',
+      PlaybackBackend.appleMpvNative => 'Apple native mpv',
       PlaybackBackend.appleMediaKit => 'Apple Media Kit',
       PlaybackBackend.appleAvKit => 'Apple AVKit fallback',
       PlaybackBackend.desktopLibmpv => 'Desktop libmpv',
       PlaybackBackend.desktopMediaKit => 'Desktop Media Kit',
+      PlaybackBackend.macMpvNative => 'macOS native mpv',
       PlaybackBackend.serverTranscode => 'Server transcode fallback',
       null => 'Selecting backend',
     };

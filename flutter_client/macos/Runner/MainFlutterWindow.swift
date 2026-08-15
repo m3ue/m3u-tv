@@ -46,6 +46,8 @@ private final class DesktopLibmpvBackend {
 }
 
 class MainFlutterWindow: NSWindow {
+  private var mpvPlugin: MpvPlayerPlugin?
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -54,7 +56,30 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     DesktopLibmpvBackend.register(with: flutterViewController, window: self)
+    registerMpvPlugin(with: flutterViewController)
 
     super.awakeFromNib()
+  }
+
+  private func registerMpvPlugin(with controller: FlutterViewController) {
+    let plugin = MpvPlayerPlugin()
+    mpvPlugin = plugin
+
+    let messenger = controller.engine.binaryMessenger
+    FlutterMethodChannel(
+      name: MpvPlayerPlugin.methodChannelName,
+      binaryMessenger: messenger
+    ).setMethodCallHandler { [weak plugin] call, result in
+      plugin?.handle(call, result: result)
+    }
+    FlutterEventChannel(
+      name: MpvPlayerPlugin.eventChannelName,
+      binaryMessenger: messenger
+    ).setStreamHandler(plugin)
+
+    controller.registrar(forPlugin: "MpvPlayerPlugin")?.register(
+      MpvPlayerPlatformViewFactory(plugin: plugin),
+      withId: "m3u_tv/mac_mpv_view"
+    )
   }
 }
