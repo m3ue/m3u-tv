@@ -163,8 +163,17 @@ class PlaybackOrchestrator {
     if (_disposed) return;
     await stop();
     _disposed = true;
+    // Deliberately not awaited: awaiting a subscription's cancel() Future
+    // and then later closing the broadcast StreamController it was
+    // subscribed to (which every adapter.dispose() below does, for its own
+    // onState/onError controllers) can deadlock under Flutter's test zone
+    // (confirmed independent of any app code -- a minimal
+    // listen()+await cancel()+close() repro hangs under `flutter_test`,
+    // while the identical sequence completes instantly under plain `dart
+    // run`). cancel() still runs and detaches the listener; just don't
+    // block on its Future completing.
     for (final subscription in _subscriptions) {
-      await subscription.cancel();
+      unawaited(subscription.cancel());
     }
     for (final adapter in _adapters.values.toSet()) {
       await adapter.dispose();
@@ -200,6 +209,24 @@ class PlaybackOrchestrator {
     _activeAdapter = adapter;
     _activeBackend = backend;
     _activeSource = source;
+    if (adapter is PlatformViewProvider) {
+      // A PlatformView-backed adapter's native side can't finish load()
+      // until Flutter actually creates its platform view and the native
+      // create() callback runs -- which can't happen without a widget
+      // rebuild. Nothing otherwise guarantees a rebuild happens in the gap
+      // between selecting this backend and its first real onState event
+      // (that event is what a listener like PlayerScreen would normally
+      // rebuild on, but the adapter can't emit one yet for exactly this
+      // reason). On screens with little incidental UI activity there may be
+      // no other rebuild trigger during that window, so without this the
+      // platform view never mounts and load() times out waiting for a
+      // native side that was never given the chance to attach.
+      _stateController.add(
+        PlaybackState.idle(
+          backend: backend,
+        ).copyWith(status: PlaybackStatus.loading, source: source),
+      );
+    }
     try {
       await adapter.load(source);
       if (!_isCurrentGeneration(generation)) {

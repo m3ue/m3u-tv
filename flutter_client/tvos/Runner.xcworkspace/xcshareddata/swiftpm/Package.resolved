@@ -1,4 +1,5 @@
 {
+  "originHash" : "9effb082a6e47796e1d5e2f5791cd2dccb8dfc49b4cfd823e2f7b4ce83a67ee8",
   "pins" : [
     {
       "identity" : "mpvkit",
@@ -10,5 +11,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

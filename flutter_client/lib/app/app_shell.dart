@@ -540,12 +540,29 @@ class AppShellState extends ConsumerState<AppShell>
     return false;
   }
 
-  void _closePlayer() {
+  Future<void> _closePlayer() async {
     ref.read(playerOverlayActiveProvider.notifier).state = false;
     final orch = _playerOrchestrator;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
     unawaited(_systemUiPolicy.applyBrowsing());
+    // Stop (and fully dispose) the active adapter BEFORE removing
+    // PlayerScreen's native view (Texture/PlatformView) from the widget
+    // tree, not after. This used to run in a postFrameCallback scheduled
+    // *after* the tree-removing setState below, which raced against
+    // Flutter tearing down the native platform view -- tvOS's mpv backend
+    // hands mpv an unretained pointer to its video layer via `wid`, so a
+    // platform view torn down before mpv had actually stopped touching it
+    // was a use-after-free that crashed reliably on stop. Bounded with a
+    // timeout: a hung backend dispose() must not leave the whole app stuck
+    // unable to close the player.
+    try {
+      await orch?.dispose().timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      // Fall through and close anyway -- better to leak a not-fully-disposed
+      // adapter than leave the user stuck on a dead player screen.
+    }
+    if (!mounted) return;
     setState(() {
       _playerArgs = null;
       _playerOrchestrator = null;
@@ -553,7 +570,6 @@ class AppShellState extends ConsumerState<AppShell>
     });
     _playerChannelContext = const <Channel>[];
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      orch?.dispose().ignore();
       if (!mounted) return;
       if (savedFocus != null && savedFocus.canRequestFocus) {
         savedFocus.requestFocus();
@@ -565,7 +581,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   bool _handleBackPress() {
     if (_playerArgs != null) {
-      _closePlayer();
+      unawaited(_closePlayer());
       return true;
     }
 

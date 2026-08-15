@@ -3,10 +3,10 @@
     {
       "identity" : "mpvkit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mpvkit/MPVKit.git",
+      "location" : "https://github.com/edde746/MPVKit.git",
       "state" : {
-        "revision" : "288527dffbc6d3e63cce147fc7b520c64a791603",
-        "version" : "1.0.0"
+        "revision" : "1b8e5b2ba83f0b62c0eab6e90f36fa3dc5b4038f",
+        "version" : "1.0.21"
       }
     }
   ],
