@@ -7,6 +7,7 @@ enum PlaybackBackend {
   appleAvKit,
   desktopLibmpv,
   desktopMediaKit,
+  macMpvNative,
   serverTranscode,
 }
 
@@ -171,6 +172,26 @@ class PlaybackCapabilities {
     supportsLiveSeek: false,
   );
 
+  static const PlaybackCapabilities macMpvNative = PlaybackCapabilities(
+    platform: PlaybackPlatform.desktop,
+    backend: PlaybackBackend.macMpvNative,
+    displayName: 'macOS native mpv',
+    supportsDirectStreams: true,
+    supportsServerTranscodeFallback: true,
+    supportsHls: true,
+    supportsMpegTs: true,
+    supportsMp4: true,
+    supportsAdvancedCodecs: true,
+    supportsAudioTrackSelection: true,
+    supportsSubtitleTrackSelection: true,
+    supportsEmbeddedSubtitles: true,
+    supportsExternalSubtitles: false,
+    supportsAdvancedSubtitleFormats: true,
+    supportsPlaybackSpeed: true,
+    supportsSeek: true,
+    supportsLiveSeek: false,
+  );
+
   static const PlaybackCapabilities serverTranscode = PlaybackCapabilities(
     platform: PlaybackPlatform.server,
     backend: PlaybackBackend.serverTranscode,
@@ -199,6 +220,7 @@ class PlaybackCapabilities {
     appleAvKit,
     desktopLibmpv,
     desktopMediaKit,
+    macMpvNative,
     serverTranscode,
   ];
 
@@ -214,8 +236,9 @@ class PlaybackCapabilities {
         serverTranscode,
       ],
       PlaybackPlatform.desktop => const <PlaybackCapabilities>[
-        desktopLibmpv,
+        macMpvNative,
         desktopMediaKit,
+        desktopLibmpv,
         serverTranscode,
       ],
       PlaybackPlatform.server => const <PlaybackCapabilities>[serverTranscode],

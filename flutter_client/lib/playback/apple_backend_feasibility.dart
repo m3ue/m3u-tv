@@ -200,11 +200,11 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'media_kit (AVFoundation-backed) playback works correctly; a native in-process libmpv backend was prototyped and reverted because media_kit already covers macOS well. libmpv is not planned for this platform.',
+            'media_kit (AVFoundation-backed) playback works correctly today, but a native mpv/MPVKit backend using vo=gpu-next + gpu-context=moltenvk + hwdec=videotoolbox, rendered through a Flutter PlatformView, is now in progress to address macOS performance and HDR limits. A prior native macOS attempt was prototyped and reverted, but it used MPV_RENDER_API_TYPE_SW through the Flutter texture bridge (the same class of bottleneck as media_kit itself), not a PlatformView — see docs/migration/desktop-libmpv-feasibility.md for the historical record. The app relicensed to GPL-3.0 (with an App Store distribution exception) specifically to allow this, so the prior GPL-incompatibility blocker no longer applies.',
         evidence:
-            'The existing playback contract has a Desktop Media Kit row and Apple AVKit fallback row.',
+            'The existing playback contract has a Desktop Media Kit row and Apple AVKit fallback row; the new native backend is being added as PlaybackBackend.macMpvNative with media_kit retained as an automatic fallback via FallbackPlayerAdapter during rollout.',
         nextStep:
-            'Verify sandbox-safe framework embedding and notarized/Mac App Store packaging.',
+            'Verify sandbox-safe framework embedding and notarized/Mac App Store packaging for the bundled MPVKit XCFrameworks.',
       ),
       backendOrder: <PlaybackCapabilities>[
         PlaybackCapabilities.desktopMediaKit,
@@ -219,7 +219,7 @@ class AppleBackendFeasibility {
             'Route GCController events through the same playback action dispatcher used by TV remotes.',
       ),
       signingRequirements: <String>[
-        'Embed media_kit dependent dylibs/frameworks inside the .app bundle (no libmpv/MPVKit — not planned for macOS).',
+        'Embed media_kit dependent dylibs/frameworks inside the .app bundle, plus the MPVKit XCFrameworks (LGPL-3.0 flavor) for the new native mpv backend.',
         'Meet Mac App Store sandbox, hardened runtime, and notarization requirements for the chosen channel.',
       ],
       publicApiConstraints: <String>[
@@ -335,11 +335,12 @@ class AppleBackendFeasibility {
     ),
     AppleLicenseObligation(
       component: 'MPVKit',
-      license: 'GPL-3.0 in the current local podspec reference',
+      license:
+          'LGPL-3.0 (plain MPVKit product) or GPL-3.0 (MPVKit-GPL product, adds Samba support)',
       obligations:
-          'GPL-3.0 distribution requires compatible app licensing and corresponding source for the combined work.',
+          'Use the plain LGPL-3.0 MPVKit product (not MPVKit-GPL) unless Samba support is specifically needed. Either way, the app itself is now GPL-3.0 (see repository root LICENSE), so combining with either flavor is compatible; preserve upstream copyright/license notices for the bundled XCFrameworks.',
       usagePolicy:
-          'Feasibility-only dependency unless the app license and App Store strategy explicitly accept GPL obligations.',
+          'Active dependency for the macOS native mpv backend (PlaybackBackend.macMpvNative).',
     ),
     AppleLicenseObligation(
       component: 'libass',
@@ -351,11 +352,11 @@ class AppleBackendFeasibility {
     ),
     AppleLicenseObligation(
       component: 'Plezy reference code',
-      license: 'GPL reference material',
+      license: 'GPL-3.0 (github.com/edde746/plezy)',
       obligations:
-          'Do not copy source unless the project accepts GPL-compatible licensing for the derived work.',
+          'This app is GPL-3.0 as of the macOS native mpv backend work, so Plezy source may be directly adapted, provided upstream copyright/license notices are preserved in the ported files and the resulting m3u-tv code remains GPL-3.0 (or a GPL-compatible license).',
       usagePolicy:
-          'conceptual reference only: architecture lessons may be used, code must not be copied into this repository.',
+          'Active reference for the macOS native mpv backend (vo=gpu-next/moltenvk/hwdec=videotoolbox) and any future iOS/tvOS work (vo=avfoundation): port and adapt directly rather than reimplementing from scratch, per past ground-up attempts having repeatedly failed.',
     ),
   ];
 

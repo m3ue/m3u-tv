@@ -80,6 +80,12 @@ class PlaybackOrchestrator {
     return (adapter as SubtitleControllerProvider).subtitleController;
   }
 
+  PlatformViewProvider? get activePlatformViewProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! PlatformViewProvider) return null;
+    return adapter! as PlatformViewProvider;
+  }
+
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
 
   Future<void> open(PlaybackSource source) async {

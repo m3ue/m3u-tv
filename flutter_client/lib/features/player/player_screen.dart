@@ -931,6 +931,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     Positioned.fill(
                       child: _VideoSurface(
                         textureId: widget.orchestrator.activeTextureId,
+                        platformView:
+                            widget.orchestrator.activePlatformViewProvider,
                         aspectRatio: _videoAspectRatio,
                       ),
                     ),
@@ -1146,13 +1148,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
 }
 
 class _VideoSurface extends StatelessWidget {
-  const _VideoSurface({required this.textureId, required this.aspectRatio});
+  const _VideoSurface({
+    required this.textureId,
+    required this.platformView,
+    required this.aspectRatio,
+  });
 
   final int? textureId;
+  final PlatformViewProvider? platformView;
   final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
+    final view = platformView;
+    if (view != null) {
+      return ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: aspectRatio,
+            child: AppKitView(
+              viewType: view.platformViewType,
+              creationParams: view.platformViewCreationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+            ),
+          ),
+        ),
+      );
+    }
     final id = textureId;
     if (id == null) return const ColoredBox(color: Colors.black);
     return ColoredBox(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
+import 'package:m3u_tv/playback/mac_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
 import 'package:m3u_tv/playback/media_kit_ios_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -144,11 +145,29 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     // to software texture upload (media-kit/media-kit#1404). The in-process
     // libmpv backend uses `MPV_RENDER_API_TYPE_SW` with `FlPixelBufferTexture`
     // and `hwdec=auto-safe`, sidestepping the EGL dependency entirely while
-    // keeping hardware video decode. macOS renders through Metal, not EGL, so
-    // it never hits #1404 and stays on `MediaKitDesktopAdapter` (media_kit) —
-    // a native libmpv backend was prototyped there and reverted since
-    // media_kit already worked correctly; it is not planned for macOS.
+    // keeping hardware video decode. macOS never hits #1404 (it renders
+    // through Metal, not EGL), so that specific bug never justified a swap
+    // there.
+    //
+    // macOS instead now registers two backends: `MacMpvNativeBackend`
+    // (native mpv via a Flutter PlatformView, `vo=gpu-next` +
+    // `gpu-context=moltenvk` + `hwdec=videotoolbox`, bypassing the texture
+    // bridge entirely -- modeled on the open-source Plezy player) as
+    // primary, with `MediaKitDesktopAdapter` (media_kit) registered as an
+    // automatic fallback. `PlaybackOrchestrator._nativeBackends()` walks
+    // `PlaybackCapabilities.forPlatform` in order and falls through to the
+    // next registered backend on a recoverable `PlaybackException`, so no
+    // wrapper adapter is needed here -- and none should be added: wrapping
+    // these in `FallbackPlayerAdapter` would break rendering, since it does
+    // not forward `PlatformViewProvider`/`VideoTextureProvider`/
+    // `SubtitleControllerProvider`, so `PlaybackOrchestrator`'s `is` checks
+    // against `_activeAdapter` need the literal registered instance. A
+    // different, SW-texture-bridge macOS backend was prototyped and
+    // reverted previously -- see docs/migration/desktop-libmpv-feasibility.md
+    // ("macOS: not planned" and its follow-up note) for why this attempt is
+    // architecturally different, not a repeat.
     if (Platform.isMacOS) {
+      adapters[PlaybackBackend.macMpvNative] = MacMpvNativeBackend();
       adapters[PlaybackBackend.desktopMediaKit] = MediaKitDesktopAdapter();
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();

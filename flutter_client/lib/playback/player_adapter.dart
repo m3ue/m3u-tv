@@ -22,6 +22,20 @@ abstract class VideoTextureProvider {
   int? get textureId;
 }
 
+/// A [PlayerAdapter] that renders through a native `FlutterPlatformView`
+/// (e.g. `AppKitView`) instead of a `Texture`. Used by backends that draw
+/// directly to a native surface owned by the platform's compositor (GPU/Metal
+/// on macOS, `AVSampleBufferDisplayLayer` on iOS/tvOS) to avoid the
+/// CVPixelBuffer/texture-copy bridge that [VideoTextureProvider] backends go
+/// through.
+abstract class PlatformViewProvider {
+  /// The registered platform view type, e.g. `'m3u_tv/mac_mpv_view'`.
+  String get platformViewType;
+
+  /// Creation-time arguments passed to the platform view factory, if any.
+  Map<String, dynamic>? get platformViewCreationParams;
+}
+
 /// A [PlayerAdapter] that Multiview can drive: one concurrently playable,
 /// texture-backed instance per grid tile. [setVolume] mutes/unmutes a tile
 /// by audio focus without touching its playback state, which none of the

@@ -4,9 +4,9 @@ This document records the third-party dependency license notices that must be in
 
 ## App License
 
-- The M3U TV Flutter client is licensed under **CC BY-NC-SA 4.0**.
-- The full license text is available at the repository root: `LICENSE`.
-- Attribution, non-commercial, and share-allike obligations apply to all distributed artifacts.
+- The M3U TV Flutter client is licensed under **GPL-3.0**, with an additional permission under GPLv3 section 7 that allows distribution through the Apple App Store, Apple TV App Store, and Google Play Store despite those stores' additional restrictions, provided the complete corresponding source is also made available through an unrestricted channel (this repository).
+- The full license text, including the store-distribution exception, is available at the repository root: `LICENSE`.
+- Source-availability, notice-preservation, and copyleft obligations apply to all distributed artifacts. Contributor sign-off for the relicense from the prior CC BY-NC-SA 4.0 license was obtained from all contributors with commits in the tree.
 
 ## Android Playback Dependencies
 
@@ -50,34 +50,40 @@ This document records the third-party dependency license notices that must be in
 ## Apple Playback Dependencies
 
 ### AVKit / AVPlayer
-- **Scope**: iOS, iPadOS, and tvOS playback (permanent primary backend, not a fallback pending MPVKit approval). macOS uses media_kit instead — see the Desktop Playback Dependencies section.
+- **Scope**: iOS, iPadOS, and tvOS playback (primary backend). macOS moves to a native mpv/MPVKit backend — see MPVKit entry below and the Desktop Playback Dependencies section.
 - **License**: Apple proprietary framework; no additional third-party notice required beyond Apple standard terms.
 - **Status**: Safe, permanent path for iOS/iPadOS/tvOS.
 - **Gate**: No additional license gate beyond standard Apple distribution terms.
 
-### MPVKit (Not planned, iOS/tvOS)
-- **Scope**: Broad-codec playback via MPVKit framework. Not planned for iOS/tvOS — GPL-3.0 is incompatible with App Store distribution for this app, a firm decision rather than a pending review gate. Not planned for macOS either — macOS stays on media_kit/AVKit; a native libmpv backend was prototyped and reverted there.
-- **License**: GPL/LGPL (same as mpv/libmpv).
-- **Status**: Not planned. This section is kept only as reference in case the decision is ever revisited.
-- **Gate**: Do not ship MPVKit in a store artifact without explicit GPL acceptance and license review evidence.
+### MPVKit (Active, macOS)
+- **Scope**: Native mpv playback on macOS via a Flutter PlatformView (`vo=gpu-next` + `gpu-context=moltenvk` + `hwdec=videotoolbox`), replacing media_kit's texture-bridge render path to address performance and HDR limits. Not yet planned for iOS/tvOS — that remains a separate future decision.
+- **License**: LGPL-3.0 (use the plain `MPVKit` SPM product, not the `MPVKit-GPL` product, since Samba support isn't needed).
+- **Status**: Active dependency. The app itself is now GPL-3.0 (see App License above, with an App Store distribution exception), which resolves the prior GPL/App-Store-incompatibility blocker that kept this "not planned."
+- **Gate**: Include MPVKit/libmpv/FFmpeg/libass license notices (same content as the desktop mpv notices below) in the macOS artifact. Verify the LGPL-3.0 product is used, not the GPL-3.0 Samba-enabled one, unless that's a deliberate future choice.
+
+### Plezy reference code (macOS native mpv backend)
+- **Scope**: `github.com/edde746/plezy` (GPL-3.0) is used as a direct implementation reference/port source for the macOS `vo=gpu-next`/MoltenVK PlatformView backend, not merely conceptual guidance.
+- **License**: GPL-3.0.
+- **Status**: Active. Permitted because this app is GPL-3.0.
+- **Gate**: Preserve upstream copyright/license notices in any ported Swift source files; keep the resulting m3u-tv code GPL-3.0 (or GPL-compatible).
 
 ## GPL Policy Gate
 
-- **Rule**: Do not ship GPL-only binaries, GPL-derived code, or Plezy reference code in a store/direct-download artifact unless the release owner explicitly accepts the GPL distribution obligations and records that decision in release evidence.
-- **Scope**: This applies to mpv core, GPL-enabled FFmpeg builds, and any statically linked GPL components.
-- **Safe path**: Media3/ExoPlayer on Android, AVKit on Apple, and dynamically linked LGPL libmpv on desktop (with proper notices and source offer) are the safe default paths.
-- **Evidence requirement**: Any release that includes GPL components must have a signed-off license review document saved with the artifact evidence.
+- **Rule**: This app is GPL-3.0. GPL-only binaries and GPL-derived code (mpv core, GPL-enabled FFmpeg builds, Plezy-derived Swift source, statically linked GPL components) may ship in store/direct-download artifacts as normal GPL-3.0 distribution — the App Store/Play Store additional permission in `LICENSE` covers store-terms compatibility. This replaces the prior blanket "do not ship GPL" prohibition, which predated the relicense.
+- **Scope**: Applies to mpv core, GPL-enabled FFmpeg builds, MPVKit-GPL (if ever used instead of the plain LGPL product), and any statically linked GPL components.
+- **Requirement**: Every such release must make the complete corresponding source available through an unrestricted channel (this repository) alongside the store artifact, and preserve upstream notices per each component's obligations above.
+- **Evidence requirement**: Any release that includes GPL components must have a signed-off license review document saved with the artifact evidence, confirming source availability and notice preservation.
 
 ## Release Artifact Checklist
 
 Before any store or sideload release, verify:
 
-- [ ] `LICENSE` (CC BY-NC-SA 4.0) is included or referenced in the artifact metadata.
+- [ ] `LICENSE` (GPL-3.0 with App Store distribution exception) is included or referenced in the artifact metadata.
 - [ ] Media3/ExoPlayer AndroidX notices are present (via `NOTICES.Z` or explicit third-party notices file).
 - [ ] Flutter SDK and plugin notices are present (via `NOTICES.Z` or explicit third-party notices file).
-- [ ] Desktop artifacts only: libmpv, FFmpeg, and libass notices are present and the exact license (LGPL vs GPL) is verified.
-- [ ] Desktop artifacts only: a written offer for source code is included if LGPL components are distributed as binaries.
-- [ ] No GPL-only components are included without explicit release-owner acceptance and evidence.
+- [ ] Desktop/macOS artifacts only: libmpv, FFmpeg, libass, and (macOS) MPVKit notices are present and the exact license (LGPL vs GPL) is verified.
+- [ ] Complete corresponding source for the artifact is available through this repository (satisfies both LGPL source-offer and GPL source-availability obligations).
+- [ ] Any GPL-only components included (MPVKit-GPL, Plezy-derived source, etc.) have release-owner acceptance and evidence on file, even though GPL distribution itself is now the app's normal default.
 - [ ] All notices are saved with the signed artifact evidence under `.omo/evidence/` or equivalent release evidence directory.
 
 ## Honest Blockers
