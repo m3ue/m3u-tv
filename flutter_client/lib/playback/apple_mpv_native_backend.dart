@@ -607,11 +607,17 @@ class AppleMpvEventReducer {
           videoAspectRatio: event.videoAspectRatio ?? current.videoAspectRatio,
         );
       case AppleMpvEventKind.endFile:
-        return current.copyWith(backend: backend, status: PlaybackStatus.completed);
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.completed,
+        );
       case AppleMpvEventKind.stop:
       case AppleMpvEventKind.quit:
       case AppleMpvEventKind.shutdown:
-        return current.copyWith(backend: backend, status: PlaybackStatus.stopped);
+        return current.copyWith(
+          backend: backend,
+          status: PlaybackStatus.stopped,
+        );
       case AppleMpvEventKind.error:
         // Errors are emitted as PlaybackError; state is left unchanged.
         return current;

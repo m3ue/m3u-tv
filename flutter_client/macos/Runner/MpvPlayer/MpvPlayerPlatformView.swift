@@ -10,19 +10,6 @@ final class MpvPlayerNSView: NSView {
   override var isFlipped: Bool { true }
 }
 
-final class MpvPlayerPlatformView: NSObject, FlutterPlatformView {
-  private let nsView: MpvPlayerNSView
-
-  init(viewId: Int, frame: CGRect, plugin: MpvPlayerPlugin) {
-    self.nsView = MpvPlayerNSView(frame: frame)
-    self.nsView.wantsLayer = true
-    super.init()
-    plugin.attachCore(viewId: viewId, to: nsView)
-  }
-
-  func view() -> NSView { nsView }
-}
-
 final class MpvPlayerPlatformViewFactory: NSObject, FlutterPlatformViewFactory {
   private let plugin: MpvPlayerPlugin
 
@@ -31,18 +18,16 @@ final class MpvPlayerPlatformViewFactory: NSObject, FlutterPlatformViewFactory {
     super.init()
   }
 
-  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+  func createArgsCodec() -> (FlutterMessageCodec & NSObjectProtocol)? {
     FlutterStandardMessageCodec.sharedInstance()
   }
 
   func create(withViewIdentifier viewId: Int64, arguments args: Any?) -> NSView {
     let params = args as? [String: Any]
     let mpvViewId = (params?["viewId"] as? NSNumber)?.intValue ?? Int(viewId)
-    let platformView = MpvPlayerPlatformView(
-      viewId: mpvViewId,
-      frame: .zero,
-      plugin: plugin
-    )
-    return platformView.view()
+    let nsView = MpvPlayerNSView(frame: .zero)
+    nsView.wantsLayer = true
+    plugin.attachCore(viewId: mpvViewId, to: nsView)
+    return nsView
   }
 }

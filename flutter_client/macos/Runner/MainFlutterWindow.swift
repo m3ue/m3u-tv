@@ -77,7 +77,7 @@ class MainFlutterWindow: NSWindow {
       binaryMessenger: messenger
     ).setStreamHandler(plugin)
 
-    controller.registrar(forPlugin: "MpvPlayerPlugin")?.register(
+    controller.registrar(forPlugin: "MpvPlayerPlugin").register(
       MpvPlayerPlatformViewFactory(plugin: plugin),
       withId: "m3u_tv/mac_mpv_view"
     )

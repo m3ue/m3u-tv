@@ -22,7 +22,7 @@
 // analogues in Plezy for the pattern to port next).
 
 import AVFoundation
-import MPVKit
+import Libmpv
 import UIKit
 
 protocol MpvPlayerCoreDelegate: AnyObject {
@@ -219,7 +219,7 @@ final class MpvPlayerCore {
       if let data = event.data {
         let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         if endFile.reason == MPV_END_FILE_REASON_ERROR {
-          let message = mpv.map { _ in String(cString: mpv_error_string(endFile.error)) } ?? "playback error"
+          let message = String(cString: mpv_error_string(endFile.error))
           emitError(message: message, code: "apple-mpv-error")
           return
         }

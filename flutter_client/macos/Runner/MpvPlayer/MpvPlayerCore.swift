@@ -18,7 +18,7 @@
 // for that history.
 
 import AppKit
-import MPVKit
+import Libmpv
 
 protocol MpvPlayerCoreDelegate: AnyObject {
   func mpvPlayerCore(_ core: MpvPlayerCore, didEmit event: [String: Any])
@@ -212,7 +212,7 @@ final class MpvPlayerCore {
       if let data = event.data {
         let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         if endFile.reason == MPV_END_FILE_REASON_ERROR {
-          let message = mpv.map { String(cString: mpv_error_string(endFile.error)) } ?? "playback error"
+          let message = String(cString: mpv_error_string(endFile.error))
           emitError(message: message, code: "mac-mpv-error")
           return
         }

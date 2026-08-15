@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		267FE65DCC8344A18355CC8D /* MpvPlayerCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853F0645A76AD0E168FBA877 /* MpvPlayerCore.swift */; };
+		8948C9B24E8858B13E86D3A4 /* MpvPlayerPlatformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43CC39930E7131E68C6281EE /* MpvPlayerPlatformView.swift */; };
 		97C146FB1CF9000082B4168C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000082B4168C /* AppDelegate.swift */; };
 		97C1470A1CF9000082B4168D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000082B4168D /* Main.storyboard */; };
 		97C1470B1CF9000082B4168D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000082B4168E /* LaunchScreen.storyboard */; };
@@ -15,6 +17,8 @@
 		9B0F8667B39E7F1C06F7609E /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DC4CC88681F21DAC930D199 /* Pods_Runner.framework */; };
 		AAB100000000000000000001 /* AvKitPlaybackPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB000000000000000000001 /* AvKitPlaybackPlugin.swift */; };
 		AAF20000000000000000F00D /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = AAF30000000000000000F00D /* FlutterGeneratedPluginSwiftPackage */; };
+		B2BD2FEB440BF9873DAFFCA0 /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9E4D82C06F21F34506FFF59A /* MPVKit */; };
+		D1B030AE0CBCBC5F4F1637C5 /* MpvPlayerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56D462336DCDDB1DFF755D6 /* MpvPlayerPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,8 +27,10 @@
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		3B3967151E833CAB004F5970 /* Flutter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Flutter.framework; path = Flutter/Flutter.framework; sourceTree = "<group>"; };
 		3DC4CC88681F21DAC930D199 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		43CC39930E7131E68C6281EE /* MpvPlayerPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerPlatformView.swift; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		853F0645A76AD0E168FBA877 /* MpvPlayerCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerCore.swift; sourceTree = "<group>"; };
 		8653C7579EA42A6BD6BA0D93 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000082B41680 /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -36,6 +42,7 @@
 		9A701F4897516923FFDD5E29 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		AAA000000000000000000003 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		AAB000000000000000000001 /* AvKitPlaybackPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvKitPlaybackPlugin.swift; sourceTree = "<group>"; };
+		B56D462336DCDDB1DFF755D6 /* MpvPlayerPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,12 +52,24 @@
 			files = (
 				AAF20000000000000000F00D /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
 				9B0F8667B39E7F1C06F7609E /* Pods_Runner.framework in Frameworks */,
+				B2BD2FEB440BF9873DAFFCA0 /* MPVKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0278DF3D54B1E478F1B7D95C /* MpvPlayer */ = {
+			isa = PBXGroup;
+			children = (
+				853F0645A76AD0E168FBA877 /* MpvPlayerCore.swift */,
+				43CC39930E7131E68C6281EE /* MpvPlayerPlatformView.swift */,
+				B56D462336DCDDB1DFF755D6 /* MpvPlayerPlugin.swift */,
+			);
+			name = MpvPlayer;
+			path = MpvPlayer;
+			sourceTree = "<group>";
+		};
 		5D4F0F85EC049E1B18B023C6 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
@@ -92,6 +111,7 @@
 				97C146FE1CF9000082B4168C /* Info.plist */,
 				97C146FF1CF9000082B4168D /* Main.storyboard */,
 				97C146FF1CF9000082B4168E /* LaunchScreen.storyboard */,
+				0278DF3D54B1E478F1B7D95C /* MpvPlayer */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -129,7 +149,6 @@
 				AAF10000000000000000F00D /* Embed App.framework */,
 				9740EEB31CF901A200538489 /* Copy flutter_assets */,
 				AAF50000000000000000F00D /* Sign Flutter.framework */,
-				2E9D39E8D8CE0E90012616F0 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -138,6 +157,7 @@
 			name = Runner;
 			packageProductDependencies = (
 				AAF30000000000000000F00D /* FlutterGeneratedPluginSwiftPackage */,
+				9E4D82C06F21F34506FFF59A /* MPVKit */,
 			);
 			productName = Runner;
 			productReference = 97C146EE1CF9000082B41680 /* Runner.app */;
@@ -169,6 +189,7 @@
 			mainGroup = 97C146E51CF9000082B4168C;
 			packageReferences = (
 				AAF40000000000000000F00D /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
+				5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */,
 			);
 			productRefGroup = 97C146EF1CF9000082B41690 /* Products */;
 			projectDirPath = "";
@@ -193,23 +214,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		2E9D39E8D8CE0E90012616F0 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 		445A65D36D2ECA031B6D5B34 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -291,6 +295,9 @@
 				97C146FB1CF9000082B4168C /* AppDelegate.swift in Sources */,
 				AAB100000000000000000001 /* AvKitPlaybackPlugin.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				267FE65DCC8344A18355CC8D /* MpvPlayerCore.swift in Sources */,
+				8948C9B24E8858B13E86D3A4 /* MpvPlayerPlatformView.swift in Sources */,
+				D1B030AE0CBCBC5F4F1637C5 /* MpvPlayerPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,7 +351,7 @@
 				SDKROOT = appletvos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				TVOS_DEPLOYMENT_TARGET = 13.0;
+				TVOS_DEPLOYMENT_TARGET = 15.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Profile;
@@ -436,7 +443,7 @@
 				SDKROOT = appletvos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				TVOS_DEPLOYMENT_TARGET = 13.0;
+				TVOS_DEPLOYMENT_TARGET = 15.0;
 			};
 			name = Debug;
 		};
@@ -520,7 +527,7 @@
 				SDKROOT = appletvos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				TVOS_DEPLOYMENT_TARGET = 13.0;
+				TVOS_DEPLOYMENT_TARGET = 15.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -590,7 +597,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mpvkit/MPVKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		9E4D82C06F21F34506FFF59A /* MPVKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */;
+			productName = MPVKit;
+		};
 		AAF30000000000000000F00D /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
