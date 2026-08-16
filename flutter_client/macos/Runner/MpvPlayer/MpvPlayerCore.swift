@@ -24,6 +24,21 @@ protocol MpvPlayerCoreDelegate: AnyObject {
   func mpvPlayerCore(_ core: MpvPlayerCore, didEmit event: [String: Any])
 }
 
+/// MoltenVK's `vkCreateMetalSurfaceEXT` (`MVKSurface::initLayer`) requires an
+/// actual `CAMetalLayer` -- handing mpv a plain `NSView`-backed layer via
+/// `wid` crashes inside MoltenVK trying to treat it as one. Ported from
+/// Plezy's `MpvMetalLayer`; the zero-drawable-size guard matches
+/// https://github.com/mpv-player/mpv/pull/13651.
+final class MpvMetalLayer: CAMetalLayer {
+  override var drawableSize: CGSize {
+    get { super.drawableSize }
+    set {
+      guard newValue.width > 0, newValue.height > 0 else { return }
+      super.drawableSize = newValue
+    }
+  }
+}
+
 final class MpvPlayerCore {
   let viewId: Int
   weak var delegate: MpvPlayerCoreDelegate?
@@ -33,18 +48,45 @@ final class MpvPlayerCore {
   private var sequence = 0
   private var readyEmitted = false
   private var disposed = false
+  private var metalLayer: MpvMetalLayer?
+  private var frameObserver: NSObjectProtocol?
 
   init(viewId: Int) {
     self.viewId = viewId
     self.queue = DispatchQueue(label: "m3u_tv.mac_mpv.\(viewId)")
   }
 
-  /// Creates and initializes the mpv handle, targeting `view`'s layer as the
-  /// render surface. Must be called once, before `load`.
+  /// Creates and initializes the mpv handle, targeting a `CAMetalLayer`
+  /// inserted into `view`'s layer as the render surface. Must be called
+  /// once, before `load`.
   func attach(to view: NSView) {
-    // `wantsLayer` is an AppKit UI property and must be set on the main
+    // Layer/view mutation is AppKit UI work and must happen on the main
     // thread -- everything else below is safe to do on the mpv queue.
     view.wantsLayer = true
+    let metalLayer = MpvMetalLayer()
+    metalLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+    view.layer?.addSublayer(metalLayer)
+    self.metalLayer = metalLayer
+
+    // `CAMetalLayer.drawableSize` is independent of `frame`/`bounds` and is
+    // never synced by AppKit automatically. The `AppKitView` is also
+    // created with `frame: .zero` before Flutter lays it out (see
+    // MpvPlayerPlatformView.swift), so the size at `attach()` time is not
+    // yet the real one either -- track every subsequent frame change so
+    // libplacebo's swapchain gets a real drawable size once layout
+    // actually happens. Without this, `vo/gpu-next` silently fails its
+    // `reconfig` (drawable size 0x0) and mpv drops the video track
+    // entirely, falling back to audio-only playback with a black screen.
+    view.postsFrameChangedNotifications = true
+    updateMetalLayerGeometry(metalLayer, for: view)
+    frameObserver = NotificationCenter.default.addObserver(
+      forName: NSView.frameDidChangeNotification,
+      object: view,
+      queue: .main
+    ) { [weak self, weak view] _ in
+      guard let self, let view, let metalLayer = self.metalLayer else { return }
+      self.updateMetalLayerGeometry(metalLayer, for: view)
+    }
 
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
@@ -55,8 +97,8 @@ final class MpvPlayerCore {
       }
       self.mpv = handle
 
-      var viewPointer = Int64(bitPattern: UInt64(UInt(bitPattern: Unmanaged.passUnretained(view).toOpaque())))
-      mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &viewPointer)
+      var layerPointer = Int64(bitPattern: UInt64(UInt(bitPattern: Unmanaged.passUnretained(metalLayer).toOpaque())))
+      mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &layerPointer)
 
       mpv_set_option_string(handle, "vo", "gpu-next")
       mpv_set_option_string(handle, "gpu-context", "moltenvk")
@@ -83,6 +125,8 @@ final class MpvPlayerCore {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
       }
 
+      mpv_request_log_messages(handle, "v")
+
       let context = Unmanaged.passUnretained(self).toOpaque()
       mpv_set_wakeup_callback(handle, { context in
         guard let context else { return }
@@ -96,6 +140,16 @@ final class MpvPlayerCore {
         return
       }
     }
+  }
+
+  private func updateMetalLayerGeometry(_ metalLayer: MpvMetalLayer, for view: NSView) {
+    let scale = view.window?.backingScaleFactor ?? 2.0
+    metalLayer.frame = view.bounds
+    metalLayer.contentsScale = scale
+    metalLayer.drawableSize = CGSize(
+      width: view.bounds.width * scale,
+      height: view.bounds.height * scale
+    )
   }
 
   func load(
@@ -177,12 +231,30 @@ final class MpvPlayerCore {
   }
 
   func dispose() {
-    queue.async { [weak self] in
-      guard let self, let handle = self.mpv, !self.disposed else { return }
+    // Deliberately a strong capture, not `[weak self]`: `MpvPlayerPlugin`
+    // calls `dispose()` (which only schedules this block) and then
+    // synchronously drops its own dictionary entry -- the only other
+    // strong reference -- right after. A weak capture would let ARC
+    // deallocate `self` before this block runs, so `guard let self` would
+    // fail silently and `mpv_terminate_destroy`/unregistering the wakeup
+    // callback would never happen. mpv's core thread would keep running
+    // with its wakeup callback pointing at freed memory, crashing (SIGSEGV)
+    // the next time it fires an event. Keeping `self` alive until real
+    // teardown completes here is required, not just tidiness.
+    queue.async {
+      guard let handle = self.mpv, !self.disposed else { return }
       self.disposed = true
       mpv_set_wakeup_callback(handle, nil, nil)
       mpv_terminate_destroy(handle)
       self.mpv = nil
+      DispatchQueue.main.async {
+        if let frameObserver = self.frameObserver {
+          NotificationCenter.default.removeObserver(frameObserver)
+          self.frameObserver = nil
+        }
+        self.metalLayer?.removeFromSuperlayer()
+        self.metalLayer = nil
+      }
     }
   }
 
@@ -199,6 +271,14 @@ final class MpvPlayerCore {
 
   private func handle_(event: mpv_event) {
     switch event.event_id {
+    case MPV_EVENT_LOG_MESSAGE:
+      if let data = event.data {
+        let msg = data.assumingMemoryBound(to: mpv_event_log_message.self).pointee
+        let prefix = msg.prefix.map { String(cString: $0) } ?? ""
+        let level = msg.level.map { String(cString: $0) } ?? ""
+        let text = msg.text.map { String(cString: $0) } ?? ""
+        NSLog("[mpv:\(level)] [\(prefix)] \(text.trimmingCharacters(in: .newlines))")
+      }
     case MPV_EVENT_START_FILE:
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:

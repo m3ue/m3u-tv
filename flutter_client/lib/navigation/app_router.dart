@@ -8,7 +8,6 @@ import 'package:m3u_tv/playback/apple_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/mac_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
-import 'package:m3u_tv/playback/media_kit_ios_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -141,10 +140,13 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     // automatic fallbacks via `PlaybackOrchestrator`'s own native
     // multi-backend fallback -- do not wrap these in `FallbackPlayerAdapter`,
     // see the desktop branch below for why.
+    // `MediaKitIosAdapter` (media_kit) is no longer registered here --
+    // media_kit_libs_ios_video was removed because it vendored a second,
+    // independently-versioned ffmpeg/libmpv build that collided at link
+    // time with MPVKit's, corrupting native mpv's own library-version
+    // check. See MPV_MIGRATION_STATUS.md. `AppleAvKitBackend` remains the
+    // sole automatic fallback.
     adapters[PlaybackBackend.appleMpvNative] = AppleMpvNativeBackend();
-    if (!kIsWeb && Platform.operatingSystem != 'tvos') {
-      adapters[PlaybackBackend.appleMediaKit] = MediaKitIosAdapter();
-    }
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
     // Use the in-process C++ libmpv backend (`linux/desktop_libmpv_backend.cc`,
@@ -178,8 +180,14 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     // ("macOS: not planned" and its follow-up note) for why this attempt is
     // architecturally different, not a repeat.
     if (Platform.isMacOS) {
+      // `MediaKitDesktopAdapter` (media_kit) is no longer registered here --
+      // media_kit_libs_macos_video was removed because it vendored a
+      // second, independently-versioned ffmpeg/libmpv build that collided
+      // at link time with MPVKit's, corrupting native mpv's own
+      // library-version check. See MPV_MIGRATION_STATUS.md.
+      // `MacMpvNativeBackend` has no automatic fallback on macOS until a
+      // replacement is chosen.
       adapters[PlaybackBackend.macMpvNative] = MacMpvNativeBackend();
-      adapters[PlaybackBackend.desktopMediaKit] = MediaKitDesktopAdapter();
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
     }
