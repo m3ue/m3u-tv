@@ -2,6 +2,21 @@
 
 Task 7 proves the Flutter desktop path without Electron, external mpv windows, or reparented player processes. The spike adds a `m3u_tv/desktop_libmpv` native method channel on Linux and Windows plus a Dart `DesktopLibmpvBackend` adapter in `flutter_client/lib/playback/desktop_libmpv_backend.dart`. A native macOS implementation was later prototyped and reverted — see "macOS: not planned" below.
 
+> **Status update**: the "macOS: not planned" framing below (and its
+> "Follow-up" note) is superseded by current intent. The project relicensed
+> to GPL-3.0 (see repository root `LICENSE`), which unblocks bundling
+> MPVKit/libmpv — see `apple-playback-store-feasibility.md`'s status update
+> for why that changes the whole Apple platform picture, not just macOS. The
+> current goal is **native mpv playback on all three Apple platforms**
+> (macOS, iOS, tvOS), using the `edde746/MPVKit` Swift package and modeled on
+> the open-source [Plezy](https://github.com/edde746/plezy) player (same
+> author, GPL-3.0). See `/MPV_MIGRATION_STATUS.md` at the repo root for
+> current implementation status, what's working, what's broken, and the full
+> debugging history for the in-progress macOS/iOS crash. This section is kept
+> for its historical record of why the first (software-texture-bridge)
+> prototype was reverted, which still holds — the *current* native mpv
+> attempt is a different architecture, not a repeat of that one.
+
 ## Result matrix
 
 | Target | Result | Native surface/layer | Render path | Fallback decision |
@@ -64,6 +79,8 @@ Bundle steps:
 A native in-process libmpv backend for macOS (MPVKit XCFramework via SPM, `MPV_RENDER_API_TYPE_SW` + `FlutterTexture`/`CVPixelBuffer`, mirroring the Linux/Windows shape) was fully implemented and hands-on tested. It worked, but reimplemented — with more bugs along the way (duration detection, scrubbing, a 900% CPU spike from `force-seekable=yes` full-stream probing) — most of what `media_kit_video`'s macOS build already provides out of the box via its own bundled libmpv. Testing confirmed `media_kit_video` on macOS does not hit the EGL bug described below (EGL is a Linux/Windows-only rendering concern there; macOS uses Metal), so there was no upstream bug to route around on this platform in the first place. The custom backend was reverted; macOS stayed on `MediaKitDesktopAdapter` (media_kit) unless a concrete, reproducible macOS-specific problem justified revisiting it.
 
 **Follow-up (superseding the "indefinitely" framing above):** that bar has since been met — media_kit's texture-bridge render path is the suspected cause of separate, concrete macOS performance and HDR limitations, unrelated to the EGL issue this document otherwise covers. A second native macOS attempt is now in progress (`PlaybackBackend.macMpvNative`, `lib/playback/mac_mpv_native_backend.dart`), but it is a **different architecture** from the reverted prototype above, not a repeat of it: the reverted prototype used `MPV_RENDER_API_TYPE_SW` through the Flutter texture bridge, i.e. still software-composited, the same class of bottleneck as media_kit itself. The new attempt uses `vo=gpu-next` + `gpu-context=moltenvk` + `hwdec=videotoolbox` rendered through a native Swift `FlutterPlatformView` (`AppKitView`), bypassing the Flutter texture bridge entirely — modeled directly on the open-source Plezy player (github.com/edde746/plezy, GPL-3.0), which this app can now adapt from directly since it relicensed to GPL-3.0 (see repository root `LICENSE`). It explicitly avoids the prior prototype's known bugs, in particular never setting `force-seekable=yes`, and is held to the same duration/scrubbing regression bar the prior attempt failed. See `flutter_client/lib/playback/apple_backend_feasibility.dart` for the current macOS playback gate.
+
+**Second follow-up:** this is no longer a macOS-only effort — the same native mpv approach (now on the `edde746/MPVKit` fork specifically, swapped from upstream `mpvkit/MPVKit` for better Apple GPU/Metal support) is the intended playback backend for iOS and tvOS as well, all modeled on Plezy. As of this writing, mpv playback works on tvOS (with a known overlay-scaling UI bug, unrelated to mpv itself) but macOS and iOS are currently broken (an `mpv_initialize()` crash, root cause not yet found). See `/MPV_MIGRATION_STATUS.md` at the repo root for full current status and debugging history across all three platforms.
 
 ## Test command
 

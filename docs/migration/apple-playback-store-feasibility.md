@@ -1,5 +1,28 @@
 # Apple Playback and Store Feasibility
 
+> **Status update — the "MPVKit/libmpv not planned" decisions throughout this
+> document are superseded.** This spike's central blocker for iOS/iPadOS/tvOS
+> was that MPVKit's GPL-3.0 posture was judged incompatible with this app's
+> (then non-GPL) App Store distribution. **This project has since relicensed
+> to GPL-3.0** (see repository root `LICENSE` and
+> `docs/release/license-notices-checklist.md`), which removes that blocker.
+> Native mpv playback (via the `edde746/MPVKit` Swift package, modeled on the
+> open-source [Plezy](https://github.com/edde746/plezy) player, same author,
+> GPL-3.0) is now the **intended playback backend on all three Apple
+> platforms** — macOS, iOS, and tvOS — not just the media_kit/AVKit paths
+> this document describes as permanent. As of this writing mpv playback works
+> on tvOS (with an unrelated overlay-scaling UI bug), and is broken on
+> macOS/iOS (an `mpv_initialize()` crash, still under investigation). See
+> `/MPV_MIGRATION_STATUS.md` at the repo root for current implementation
+> status and debugging history. This document's App Store guideline analysis
+> (2.4.3, 2.4.5, 2.5.1, 2.5.2), tvOS embedder/remote-input findings, and
+> AVKit-as-fallback design remain valid and relevant — only the "MPVKit is
+> not planned, GPL blocks it" conclusion is out of date. A follow-up legal/App
+> Store review pass specifically for GPL-3.0 distribution (source-offer
+> obligations, App Store Review Guideline 2.5.1's stance on GPL binaries,
+> etc.) has not yet been done and should happen before shipping mpv-based
+> builds to the App Store.
+
 This spike proves the Apple playback strategy for the Flutter rewrite at the
 contract/documentation layer before native plugin work starts. The safe product
 shape is an AVKit/AVPlayer-safe default for iOS and iPadOS HLS/MP4 playback,
