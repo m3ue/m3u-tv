@@ -1019,37 +1019,40 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
                     // Playback controls overlay
                     if (_overlayVisible && _errorMessage == null)
-                      PlaybackControls(
-                        isPlaying: _isPlaying,
-                        isLive: _isLive,
-                        canSeek: _canSeek,
-                        currentPosition: _currentPosition,
-                        duration: _duration,
-                        onPlayPause: _togglePlayPause,
-                        onSeek: _seekTo,
-                        onBack: _goBack,
-                        audioTracks: _audioTracks,
-                        subtitleTracks: _subtitleTracks,
-                        selectedAudioTrackId: _selectedAudioTrackId,
-                        selectedSubtitleTrackId: _selectedSubtitleTrackId,
-                        isAudioTrackSelectionKnown: _isAudioTrackSelectionKnown,
-                        isSubtitleTrackSelectionKnown:
-                            _isSubtitleTrackSelectionKnown,
-                        onAudioTrackSelected: _handleAudioTrackSelected,
-                        onSubtitleTrackSelected: _handleSubtitleTrackSelected,
-                        fallbackReason: _showPlaybackDiagnostics
-                            ? _fallbackReason
-                            : null,
-                        playPauseFocusNode: _controlsFocusNode,
-                        onNextChannel: widget.onNextChannel,
-                        onPreviousChannel: widget.onPreviousChannel,
-                        onRecordNow:
-                            (_isLive &&
-                                widget.onRecordProgram != null &&
-                                _epgData?.current != null)
-                            ? () => widget.onRecordProgram!(_epgData!.current)
-                            : null,
-                        isRecording: widget.isRecordingCurrentChannel,
+                      Positioned.fill(
+                        child: PlaybackControls(
+                          isPlaying: _isPlaying,
+                          isLive: _isLive,
+                          canSeek: _canSeek,
+                          currentPosition: _currentPosition,
+                          duration: _duration,
+                          onPlayPause: _togglePlayPause,
+                          onSeek: _seekTo,
+                          onBack: _goBack,
+                          audioTracks: _audioTracks,
+                          subtitleTracks: _subtitleTracks,
+                          selectedAudioTrackId: _selectedAudioTrackId,
+                          selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                          isAudioTrackSelectionKnown:
+                              _isAudioTrackSelectionKnown,
+                          isSubtitleTrackSelectionKnown:
+                              _isSubtitleTrackSelectionKnown,
+                          onAudioTrackSelected: _handleAudioTrackSelected,
+                          onSubtitleTrackSelected: _handleSubtitleTrackSelected,
+                          fallbackReason: _showPlaybackDiagnostics
+                              ? _fallbackReason
+                              : null,
+                          playPauseFocusNode: _controlsFocusNode,
+                          onNextChannel: widget.onNextChannel,
+                          onPreviousChannel: widget.onPreviousChannel,
+                          onRecordNow:
+                              (_isLive &&
+                                  widget.onRecordProgram != null &&
+                                  _epgData?.current != null)
+                              ? () => widget.onRecordProgram!(_epgData!.current)
+                              : null,
+                          isRecording: widget.isRecordingCurrentChannel,
+                        ),
                       ),
 
                     if (_showPlaybackDiagnostics &&

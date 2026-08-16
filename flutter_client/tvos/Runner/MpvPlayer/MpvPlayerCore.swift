@@ -38,7 +38,6 @@ final class MpvPlayerCore {
   private var sequence = 0
   private var readyEmitted = false
   private var disposed = false
-  private weak var displayLayer: AVSampleBufferDisplayLayer?
 
   init(viewId: Int) {
     self.viewId = viewId
@@ -50,12 +49,6 @@ final class MpvPlayerCore {
   func attach(to displayLayer: AVSampleBufferDisplayLayer) {
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
-      self.displayLayer = displayLayer
-      NSLog(
-        "[mpv-tvos] attach: layer.frame=%@ layer.bounds=%@ layer.isHidden=%@ superlayer=%@",
-        NSCoder.string(for: displayLayer.frame), NSCoder.string(for: displayLayer.bounds),
-        String(displayLayer.isHidden), displayLayer.superlayer.map { String(describing: $0) } ?? "nil"
-      )
 
       guard let handle = mpv_create() else {
         self.emitError(message: "mpv_create failed", code: "backend_unavailable")
@@ -90,9 +83,6 @@ final class MpvPlayerCore {
         ("sid", MPV_FORMAT_STRING),
         ("track-list", MPV_FORMAT_NODE),
         ("video-params/aspect", MPV_FORMAT_DOUBLE),
-        ("video-params/w", MPV_FORMAT_INT64),
-        ("video-params/h", MPV_FORMAT_INT64),
-        ("video-params/hw-pixelformat", MPV_FORMAT_STRING),
       ]
       for (index, entry) in observed.enumerated() {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
@@ -110,7 +100,6 @@ final class MpvPlayerCore {
         self.emitError(message: "mpv_initialize failed (\(result))", code: "backend_unavailable")
         return
       }
-      mpv_request_log_messages(handle, "v")
     }
   }
 
@@ -252,10 +241,8 @@ final class MpvPlayerCore {
     case MPV_EVENT_FILE_LOADED:
       readyEmitted = true
       emit(kind: "FILE_LOADED", extra: snapshot())
-      logVideoDiagnostics(context: "FILE_LOADED")
     case MPV_EVENT_PLAYBACK_RESTART:
       emit(kind: "PLAYBACK_RESTART", extra: snapshot())
-      logVideoDiagnostics(context: "PLAYBACK_RESTART")
     case MPV_EVENT_PROPERTY_CHANGE:
       if readyEmitted {
         emit(kind: "PLAYBACK_RESTART", extra: snapshot())
@@ -272,35 +259,9 @@ final class MpvPlayerCore {
       emit(kind: "END_FILE", extra: [:])
     case MPV_EVENT_IDLE, MPV_EVENT_SHUTDOWN:
       emit(kind: "SHUTDOWN", extra: [:])
-    case MPV_EVENT_LOG_MESSAGE:
-      if let data = event.data {
-        let msg = data.assumingMemoryBound(to: mpv_event_log_message.self).pointee
-        let prefix = msg.prefix.map { String(cString: $0) } ?? ""
-        let text = msg.text.map { String(cString: $0) } ?? ""
-        NSLog("[mpv-tvos][%@] %@", prefix, text.trimmingCharacters(in: .newlines))
-      }
     default:
       break
     }
-  }
-
-  private func logVideoDiagnostics(context: String) {
-    guard let handle = mpv else { return }
-    var w: Int64 = 0
-    var h: Int64 = 0
-    _ = mpv_get_property(handle, "video-params/w", MPV_FORMAT_INT64, &w)
-    _ = mpv_get_property(handle, "video-params/h", MPV_FORMAT_INT64, &h)
-    let pixfmt = stringProperty(handle, "video-params/hw-pixelformat") ?? "nil"
-    let layer = displayLayer
-    NSLog(
-      "[mpv-tvos] %@: video-params w=%lld h=%lld hw-pixfmt=%@ layer.frame=%@ layer.isHidden=%@ layer.error=%@ layer.status=%ld isReadyForMoreMediaData=%@",
-      context, w, h, pixfmt,
-      layer.map { NSCoder.string(for: $0.frame) } ?? "nil-layer",
-      layer.map { String($0.isHidden) } ?? "nil",
-      layer?.error.map { String(describing: $0) } ?? "nil",
-      layer?.status.rawValue ?? -1,
-      layer.map { String($0.isReadyForMoreMediaData) } ?? "nil"
-    )
   }
 
   private func snapshot() -> [String: Any] {

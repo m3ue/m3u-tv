@@ -312,7 +312,19 @@ class _TvZoom extends StatelessWidget {
         child: SizedBox.fromSize(
           size: virtualSize,
           child: MediaQuery(
-            data: mediaQuery.copyWith(size: virtualSize),
+            // padding/viewPadding/viewInsets/systemGestureInsets are all
+            // calibrated for the real screen -- FittedBox stretches the
+            // virtual canvas back up by _scale, so anything computed from
+            // these in the virtual coordinate space (SafeArea, manual
+            // Positioned offsets) must divide by _scale too, or it consumes
+            // a _scale-times-too-large share of the smaller virtual canvas.
+            data: mediaQuery.copyWith(
+              size: virtualSize,
+              padding: mediaQuery.padding / _scale,
+              viewPadding: mediaQuery.viewPadding / _scale,
+              viewInsets: mediaQuery.viewInsets / _scale,
+              systemGestureInsets: mediaQuery.systemGestureInsets / _scale,
+            ),
             child: child,
           ),
         ),

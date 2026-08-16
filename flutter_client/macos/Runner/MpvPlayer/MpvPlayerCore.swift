@@ -42,10 +42,12 @@ final class MpvPlayerCore {
   /// Creates and initializes the mpv handle, targeting `view`'s layer as the
   /// render surface. Must be called once, before `load`.
   func attach(to view: NSView) {
+    // `wantsLayer` is an AppKit UI property and must be set on the main
+    // thread -- everything else below is safe to do on the mpv queue.
+    view.wantsLayer = true
+
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
-
-      view.wantsLayer = true
 
       guard let handle = mpv_create() else {
         self.emitError(message: "mpv_create failed", code: "backend_unavailable")
