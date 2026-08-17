@@ -174,8 +174,20 @@ final class MpvPlayerCore {
   }
 
   func dispose() {
-    queue.async { [weak self] in
-      guard let self, let handle = self.mpv, !self.disposed else { return }
+    // Captures `self` strongly, deliberately -- not `[weak self]`. mpv holds
+    // an *unretained* raw pointer to this instance (`wid`, and the wakeup
+    // callback below via `Unmanaged.passUnretained`) for as long as the mpv
+    // handle is alive, and can call into it from its own internal thread at
+    // any time until `mpv_terminate_destroy` actually unregisters it. If
+    // this instance's only strong reference (MpvPlayerPlugin's `cores`
+    // entry) were dropped before this block runs, ARC could deallocate it
+    // while mpv still holds that raw pointer -- an EXC_BAD_ACCESS in the
+    // wakeup callback's `Unmanaged...takeUnretainedValue()`. This is the
+    // same crash macOS's `MpvPlayerCore.dispose()` had (see
+    // MPV_MIGRATION_STATUS.md) and tvOS's `dispose(completion:)` already
+    // guards against -- iOS was the one platform still missing it.
+    queue.async {
+      guard let handle = self.mpv, !self.disposed else { return }
       self.disposed = true
       mpv_set_wakeup_callback(handle, nil, nil)
       mpv_terminate_destroy(handle)
