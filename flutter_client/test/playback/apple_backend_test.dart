@@ -126,26 +126,31 @@ void main() {
         expect(
           text,
           contains(
-            '| iOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | AVKit/AVPlayer-safe default for HLS/MP4, then server transcode.',
+            '| iOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing on iOS Simulator |',
           ),
         );
         expect(
           text,
           contains(
-            '| iPadOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | AVKit/AVPlayer-safe default for HLS/MP4, then server transcode.',
+            '| iPadOS | PASS for Flutter project generation | WORKING (shares the iOS target) |',
           ),
         );
         expect(
           text,
           contains(
-            '| macOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | media_kit (AVFoundation-backed), then server transcode.',
+            '| macOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing |',
           ),
         );
-        expect(text, contains('| tvOS | FAIL | BLOCKED/GATED |'));
+        expect(
+          text,
+          contains(
+            '| tvOS | Builds via a custom Xcode-based runner (no `flutter build tvos` CLI support) | WORKING',
+          ),
+        );
         expect(text, contains('Apple platforms stay non-blocking'));
         expect(text, isNot(contains('tvOS release-complete')));
         expect(text, isNot(contains('MPVKit is approved')));
-        expect(text, contains('AVKit/AVPlayer fallback'));
+        expect(text, contains('AVKit fallback'));
         expect(text, contains('GCController'));
         expect(text, contains('custom Flutter tvOS embedder'));
         expect(text, contains('App Store Review Guideline 2.5.1'));

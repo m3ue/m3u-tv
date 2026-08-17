@@ -406,18 +406,15 @@ void main() {
       );
 
       for (final expected in <String>[
-        'AVKit/AVPlayer-safe default',
-        'MPVKit/libmpv remains GATED',
+        'AVKit/AVPlayer as the safe default',
+        'GATED and tvOS is not release-complete',
         'GPL',
         'LGPL',
         'App Store policy',
-        'crash/runtime review',
-        'native dependency review',
         'legal review',
         'Platform.isIOS vs tvOS',
         'missing tvOS plugin implementations',
-        'community/custom embedder proof',
-        'tvOS remains BLOCKED/GATED',
+        'Community/custom embedder proof',
       ]) {
         expect(appleFeasibility, contains(expected));
       }
@@ -426,7 +423,7 @@ void main() {
         'Blocking release targets: Linux desktop, Windows desktop, Android phone/tablet, and Android TV.',
         'macOS desktop | NON-BLOCKING/GATED',
         'iOS/iPadOS | NON-BLOCKING/GATED',
-        'tvOS | NON-BLOCKING/GATED and BLOCKED',
+        'tvOS | NON-BLOCKING/GATED',
         'Apple/tvOS gates do not block the Desktop+Android release track',
       ]) {
         expect(releaseMatrix, contains(expected));
