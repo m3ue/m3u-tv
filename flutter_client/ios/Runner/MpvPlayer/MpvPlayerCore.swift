@@ -173,7 +173,18 @@ final class MpvPlayerCore {
     }
   }
 
-  func dispose() {
+  /// `completion` fires only once `mpv_terminate_destroy` has actually
+  /// finished -- that call blocks until mpv's internal render thread has
+  /// stopped touching the `AVSampleBufferDisplayLayer` handed to it via
+  /// `wid` (an unretained pointer -- `Unmanaged.passUnretained` -- so ARC
+  /// has no idea mpv still needs it alive). If the plugin's `dispose`
+  /// method-channel call resolved before mpv actually stopped, Dart could
+  /// tear down the platform view -- deallocating that layer -- while mpv's
+  /// render thread was still mid-write to it: a use-after-free that
+  /// reliably crashes with EXC_BAD_ACCESS on stop. Mirrors the tvOS core's
+  /// `dispose(completion:)`, which macOS/iOS shared this exact crash class
+  /// with before being fixed.
+  func dispose(completion: @escaping () -> Void) {
     // Captures `self` strongly, deliberately -- not `[weak self]`. mpv holds
     // an *unretained* raw pointer to this instance (`wid`, and the wakeup
     // callback below via `Unmanaged.passUnretained`) for as long as the mpv
@@ -182,16 +193,18 @@ final class MpvPlayerCore {
     // this instance's only strong reference (MpvPlayerPlugin's `cores`
     // entry) were dropped before this block runs, ARC could deallocate it
     // while mpv still holds that raw pointer -- an EXC_BAD_ACCESS in the
-    // wakeup callback's `Unmanaged...takeUnretainedValue()`. This is the
-    // same crash macOS's `MpvPlayerCore.dispose()` had (see
-    // MPV_MIGRATION_STATUS.md) and tvOS's `dispose(completion:)` already
-    // guards against -- iOS was the one platform still missing it.
+    // wakeup callback's `Unmanaged...takeUnretainedValue()`. Capturing
+    // `self` here keeps it alive for the full duration of teardown.
     queue.async {
-      guard let handle = self.mpv, !self.disposed else { return }
+      guard let handle = self.mpv, !self.disposed else {
+        DispatchQueue.main.async { completion() }
+        return
+      }
       self.disposed = true
       mpv_set_wakeup_callback(handle, nil, nil)
       mpv_terminate_destroy(handle)
       self.mpv = nil
+      DispatchQueue.main.async { completion() }
     }
   }
 
@@ -212,12 +225,18 @@ final class MpvPlayerCore {
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:
       readyEmitted = true
-      emit(kind: "FILE_LOADED", extra: snapshot())
+      emit(kind: "FILE_LOADED", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PLAYBACK_RESTART:
-      emit(kind: "PLAYBACK_RESTART", extra: snapshot())
+      emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
       if readyEmitted {
-        emit(kind: "PLAYBACK_RESTART", extra: snapshot())
+        // Most property-change events are `time-pos` ticks (essentially
+        // every frame during playback); only re-walk the track list when
+        // the property that actually changed is track-related, so a
+        // position tick doesn't pay for an mpv_get_property(track-list)
+        // NODE walk + Dart-side re-parse dozens of times a second.
+        let includeTracks = Self.trackRelatedPropertyIndices.contains(event.reply_userdata)
+        emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: includeTracks))
       }
     case MPV_EVENT_END_FILE:
       if let data = event.data {
@@ -236,7 +255,12 @@ final class MpvPlayerCore {
     }
   }
 
-  private func snapshot() -> [String: Any] {
+  /// Indices passed to `mpv_observe_property` in `attach(to:)` for
+  /// properties whose change should trigger a `track-list` re-walk in
+  /// `snapshot(includeTracks:)` -- `aid`, `sid`, `track-list`.
+  private static let trackRelatedPropertyIndices: Set<UInt64> = [6, 7, 8]
+
+  private func snapshot(includeTracks: Bool) -> [String: Any] {
     guard let handle = mpv else { return [:] }
     var result: [String: Any] = [:]
 
@@ -272,11 +296,13 @@ final class MpvPlayerCore {
       result["sid"] = sid
     }
 
-    let tracks = trackList(handle)
-    result["audioTracks"] = tracks.filter { $0["type"] as? String == "audio" }
-      .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
-    result["subtitleTracks"] = tracks.filter { $0["type"] as? String == "sub" }
-      .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+    if includeTracks {
+      let tracks = trackList(handle)
+      result["audioTracks"] = tracks.filter { $0["type"] as? String == "audio" }
+        .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+      result["subtitleTracks"] = tracks.filter { $0["type"] as? String == "sub" }
+        .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+    }
 
     return result
   }

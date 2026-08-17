@@ -134,17 +134,16 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     // `hwdec=videotoolbox`, rendering straight to an
     // `AVSampleBufferDisplayLayer`), registered as primary on both iOS and
     // tvOS -- same architecture as the macOS `MacMpvNativeBackend` above,
-    // modeled on the open-source Plezy player. `MediaKitIosAdapter` (iOS
-    // only) and `AppleAvKitBackend` (iOS + tvOS) stay registered as
-    // automatic fallbacks via `PlaybackOrchestrator`'s own native
-    // multi-backend fallback -- do not wrap these in `FallbackPlayerAdapter`,
-    // see the desktop branch below for why.
+    // modeled on the open-source Plezy player. `AppleAvKitBackend` (iOS +
+    // tvOS) stays registered as an automatic fallback via
+    // `PlaybackOrchestrator`'s own native multi-backend fallback -- do not
+    // wrap it in `FallbackPlayerAdapter`, see the desktop branch below for
+    // why.
     // `MediaKitIosAdapter` (media_kit) is no longer registered here --
     // media_kit_libs_ios_video was removed because it vendored a second,
     // independently-versioned ffmpeg/libmpv build that collided at link
     // time with MPVKit's, corrupting native mpv's own library-version
-    // check. See MPV_MIGRATION_STATUS.md. `AppleAvKitBackend` remains the
-    // sole automatic fallback.
+    // check. `AppleAvKitBackend` remains the sole automatic fallback.
     adapters[PlaybackBackend.appleMpvNative] = AppleMpvNativeBackend();
     adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
   } else if (platform == PlaybackPlatform.desktop) {
@@ -183,9 +182,12 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       // media_kit_libs_macos_video was removed because it vendored a
       // second, independently-versioned ffmpeg/libmpv build that collided
       // at link time with MPVKit's, corrupting native mpv's own
-      // library-version check. See MPV_MIGRATION_STATUS.md.
+      // library-version check.
       // `MacMpvNativeBackend` has no automatic fallback on macOS until a
-      // replacement is chosen.
+      // replacement is chosen -- a recoverable load failure surfaces
+      // directly to the user via `_openServerTranscode`'s `lastFailure`
+      // path in playback_orchestrator.dart, since no server-transcode
+      // adapter is registered either.
       adapters[PlaybackBackend.macMpvNative] = MacMpvNativeBackend();
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();

@@ -11,6 +11,13 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 
+/// Edge padding for [PlaybackControls]' back-button corner. tvOS gets a
+/// much smaller value since `SafeArea` already insets for its focus-safe
+/// zone; stacking the full padding on top of that would double up. Shared
+/// with `PlayerScreen`'s diagnostics overlay, which must position itself
+/// against this same value to line up with the back button.
+final double overlayEdgePadding = Platform.operatingSystem == 'tvos' ? 8 : 40;
+
 /// Playback controls overlay for the player screen.
 ///
 /// Shows play/pause, seek, and back controls. The parent widget
@@ -82,16 +89,14 @@ class PlaybackControls extends StatelessWidget {
           // (notably tvOS's ~80px focus-safe-zone margin, which on TV also
           // passes through _TvZoom's 1.6x scale-up). Stacking the full 40px
           // app padding on top of that compounds into an excessive, "boxed
-          // in" inset on tvOS specifically -- see MPV_MIGRATION_STATUS.md's
-          // tvOS overlay investigation. tvOS gets a much smaller value, pure
-          // app-level breathing room rather than a safe-zone duplicate;
+          // in" inset on tvOS specifically. tvOS gets a much smaller value,
+          // pure app-level breathing room rather than a safe-zone duplicate;
           // other platforms (no SafeArea contribution) keep the original 40
           // so macOS/iOS spacing -- already confirmed working -- doesn't
-          // change.
+          // change. PlayerScreen's diagnostics overlay positions itself
+          // against this same value -- see [overlayEdgePadding].
           child: Padding(
-            padding: EdgeInsets.all(
-              Platform.operatingSystem == 'tvos' ? 8 : 40,
-            ),
+            padding: EdgeInsets.all(overlayEdgePadding),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [

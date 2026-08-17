@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
@@ -11,6 +9,7 @@ import 'package:m3u_tv/features/multiview/multiview_grid_math.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/content_actions.dart';
+import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -186,9 +185,27 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     );
   }
 
-  void _removeTile(int index) {
-    ref.read(multiviewControllerProvider).toggle(_tiles[index].channel);
-    _tiles.removeAt(index).dispose();
+  Future<void> _removeTile(int index) async {
+    final tile = _tiles[index];
+    ref.read(multiviewControllerProvider).toggle(tile.channel);
+    // Wait for native teardown to actually finish before removing this
+    // tile's platform view from the widget tree below -- a platform-view
+    // backend's native core can hold an unretained pointer into that
+    // view's own layer, so unmounting it first (as an unawaited dispose
+    // would let happen) risks a use-after-free. Same rationale as
+    // MpvPlayerCore.dispose's header comment / app_shell.dart's
+    // _closePlayer.
+    await tile.orchestrator?.dispose();
+    if (!mounted) return;
+    // The awaited dispose above gives a concurrent removal a chance to run
+    // first, so re-resolve this tile's position instead of trusting the
+    // stale `index` argument.
+    final currentIndex = _tiles.indexOf(tile);
+    if (currentIndex == -1) return;
+    unawaited(tile.stateSub?.cancel());
+    unawaited(tile.errorSub?.cancel());
+    tile.focusNode.dispose();
+    _tiles.removeAt(currentIndex);
     if (_tiles.isEmpty) {
       Navigator.of(context).pop();
       return;
@@ -196,7 +213,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     setState(() {
       if (_focusedIndex >= _tiles.length) _focusedIndex = _tiles.length - 1;
       if (_primaryIndex >= _tiles.length) _primaryIndex = 0;
-      if (_reorderingIndex == index) _reorderingIndex = null;
+      if (_reorderingIndex == currentIndex) _reorderingIndex = null;
       final layoutStillValid = switch (_layoutMode) {
         _LayoutMode.pip => _tiles.length == 2,
         _LayoutMode.featured => _tiles.length > 1,
@@ -331,7 +348,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       case _TileMenuAction.fullscreen:
         unawaited(_openFullscreen(index));
       case _TileMenuAction.remove:
-        _removeTile(index);
+        unawaited(_removeTile(index));
       case null:
         break;
     }
@@ -519,10 +536,11 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _TileVideoSurface(
+              NativeVideoSurface(
                 textureId: _textureIdFor(tile),
                 platformView: _platformViewFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
+                wrapInBlackBackground: false,
               ),
               if (tile.hasError)
                 Center(
@@ -628,47 +646,6 @@ class _MenuOption extends StatelessWidget {
             Text(label),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _TileVideoSurface extends StatelessWidget {
-  const _TileVideoSurface({
-    required this.textureId,
-    required this.platformView,
-    required this.aspectRatio,
-  });
-
-  final int? textureId;
-  final PlatformViewProvider? platformView;
-  final double aspectRatio;
-
-  @override
-  Widget build(BuildContext context) {
-    final view = platformView;
-    if (view != null) {
-      final child = Platform.isMacOS
-          ? AppKitView(
-              viewType: view.platformViewType,
-              creationParams: view.platformViewCreationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            )
-          : UiKitView(
-              viewType: view.platformViewType,
-              creationParams: view.platformViewCreationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            );
-      return Center(
-        child: AspectRatio(aspectRatio: aspectRatio, child: child),
-      );
-    }
-    final id = textureId;
-    if (id == null) return const ColoredBox(color: Colors.black);
-    return Center(
-      child: AspectRatio(
-        aspectRatio: aspectRatio,
-        child: Texture(textureId: id),
       ),
     );
   }

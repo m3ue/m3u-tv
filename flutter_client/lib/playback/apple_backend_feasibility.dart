@@ -115,15 +115,14 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'Native mpv via a Flutter PlatformView (vo=avfoundation + hwdec=videotoolbox, rendering to an AVSampleBufferDisplayLayer) is now the primary backend, modeled on the open-source Plezy player. media_kit (appleMediaKit) and AVKit (appleAvKit) are registered as automatic fallbacks.',
+            'Native mpv via a Flutter PlatformView (vo=avfoundation + hwdec=videotoolbox, rendering to an AVSampleBufferDisplayLayer) is now the primary backend, modeled on the open-source Plezy player. AVKit (appleAvKit) is registered as an automatic fallback; media_kit (appleMediaKit) is not registered -- media_kit_libs_ios_video was removed because it vendored a second, independently-versioned ffmpeg/libmpv build that collided at link time with the one MPVKit itself vendors.',
         evidence:
-            "PlaybackBackend.appleMpvNative (lib/playback/apple_mpv_native_backend.dart) is registered first in app_router.dart's apple branch; ios/Runner/MpvPlayer/ and tvos/Runner/MpvPlayer/ hold the native Swift implementation.",
+            'buildPlaybackOrchestrator() in lib/navigation/app_router.dart registers only PlaybackBackend.appleMpvNative and PlaybackBackend.appleAvKit for the apple platform; ios/Runner/MpvPlayer/ and tvos/Runner/MpvPlayer/ hold the native Swift implementation.',
         nextStep:
             'Add the MPVKit SPM dependency and verify hardware decode, track selection, and HDR on real iOS/iPadOS devices.',
       ),
       backendOrder: <PlaybackCapabilities>[
         PlaybackCapabilities.appleMpvNative,
-        PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],
@@ -158,7 +157,7 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'Same native mpv (appleMpvNative), media_kit, and AVKit fallback strategy as iOS, with iPad layout validation.',
+            'Same native mpv (appleMpvNative) primary + AVKit (appleAvKit) fallback strategy as iOS -- media_kit is not registered here either -- with iPad layout validation.',
         evidence:
             'The Apple capability rows are UI-agnostic and do not require phone-only APIs.',
         nextStep:
@@ -166,7 +165,6 @@ class AppleBackendFeasibility {
       ),
       backendOrder: <PlaybackCapabilities>[
         PlaybackCapabilities.appleMpvNative,
-        PlaybackCapabilities.appleMediaKit,
         PlaybackCapabilities.appleAvKit,
         PlaybackCapabilities.serverTranscode,
       ],
@@ -202,15 +200,17 @@ class AppleBackendFeasibility {
       playback: AppleFeasibilityGate(
         status: AppleFeasibilityStatus.pass,
         summary:
-            'media_kit (AVFoundation-backed) playback works correctly today, but a native mpv/MPVKit backend using vo=gpu-next + gpu-context=moltenvk + hwdec=videotoolbox, rendered through a Flutter PlatformView, is now in progress to address macOS performance and HDR limits. A prior native macOS attempt was prototyped and reverted, but it used MPV_RENDER_API_TYPE_SW through the Flutter texture bridge (the same class of bottleneck as media_kit itself), not a PlatformView — see docs/migration/desktop-libmpv-feasibility.md for the historical record. The app relicensed to GPL-3.0 (with an App Store distribution exception) specifically to allow this, so the prior GPL-incompatibility blocker no longer applies.',
+            'Native mpv/MPVKit (vo=gpu-next + gpu-context=moltenvk + hwdec=videotoolbox, rendered through a Flutter PlatformView) is now the primary macOS backend, replacing media_kit (AVFoundation-backed) to address macOS performance and HDR limits. A prior native macOS attempt was prototyped and reverted, but it used MPV_RENDER_API_TYPE_SW through the Flutter texture bridge (the same class of bottleneck as media_kit itself), not a PlatformView -- see docs/migration/desktop-libmpv-feasibility.md for the historical record. The app relicensed to GPL-3.0 (with an App Store distribution exception) specifically to allow this, so the prior GPL-incompatibility blocker no longer applies. media_kit is NOT registered as a fallback -- media_kit_libs_macos_video was removed because it vendored a second, independently-versioned ffmpeg/libmpv build that collided at link time with the one MPVKit itself vendors, so a recoverable macMpvNative load failure currently surfaces directly to the user (via the lastFailure path in PlaybackOrchestrator._openServerTranscode) rather than falling back to another player.',
         evidence:
-            'The existing playback contract has a Desktop Media Kit row and Apple AVKit fallback row; the new native backend is being added as PlaybackBackend.macMpvNative with media_kit retained as an automatic fallback via FallbackPlayerAdapter during rollout.',
+            'buildPlaybackOrchestrator() in lib/navigation/app_router.dart registers only PlaybackBackend.macMpvNative for macOS -- no PlaybackBackend.desktopMediaKit adapter and no server-transcode adapter are registered there, so macMpvNative currently has no automatic fallback.',
         nextStep:
             'Verify sandbox-safe framework embedding and notarized/Mac App Store packaging for the bundled MPVKit XCFrameworks.',
       ),
       backendOrder: <PlaybackCapabilities>[
-        PlaybackCapabilities.desktopMediaKit,
-        PlaybackCapabilities.appleAvKit,
+        // No automatic fallback after macMpvNative -- see the playback gate
+        // above and buildPlaybackOrchestrator() in
+        // lib/navigation/app_router.dart.
+        PlaybackCapabilities.macMpvNative,
         PlaybackCapabilities.serverTranscode,
       ],
       remoteInput: AppleRemoteInputFeasibility(

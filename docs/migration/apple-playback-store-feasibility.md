@@ -1,6 +1,6 @@
 # Apple Playback and Store Feasibility
 
-> **Status update — the "MPVKit/libmpv not planned" decisions throughout this
+> **Status update -- the "MPVKit/libmpv not planned" decisions throughout this
 > document are superseded.** This spike's central blocker for iOS/iPadOS/tvOS
 > was that MPVKit's GPL-3.0 posture was judged incompatible with this app's
 > (then non-GPL) App Store distribution. **This project has since relicensed
@@ -22,7 +22,7 @@
 > anywhere on macOS: the separate Multiview surface now also uses
 > `MacMpvNativeBackend`. This document's App Store guideline analysis (2.4.3, 2.4.5, 2.5.1,
 > 2.5.2), tvOS embedder/remote-input findings, and AVKit-as-fallback design
-> remain valid and relevant — only the "MPVKit is not planned, GPL blocks it"
+> remain valid and relevant -- only the "MPVKit is not planned, GPL blocks it"
 > conclusion is out of date. App Store submission readiness itself (signing,
 > notarization, TestFlight, a follow-up legal/App Store review pass
 > specifically for GPL-3.0 distribution -- source-offer obligations, App

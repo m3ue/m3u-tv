@@ -50,13 +50,13 @@ This document records the third-party dependency license notices that must be in
 ## Apple Playback Dependencies
 
 ### AVKit / AVPlayer
-- **Scope**: iOS, iPadOS, and tvOS playback (primary backend). macOS moves to a native mpv/MPVKit backend — see MPVKit entry below and the Desktop Playback Dependencies section.
+- **Scope**: iOS, iPadOS, and tvOS playback (primary backend). macOS moves to a native mpv/MPVKit backend -- see MPVKit entry below and the Desktop Playback Dependencies section.
 - **License**: Apple proprietary framework; no additional third-party notice required beyond Apple standard terms.
 - **Status**: Safe, permanent path for iOS/iPadOS/tvOS.
 - **Gate**: No additional license gate beyond standard Apple distribution terms.
 
 ### MPVKit (Active, macOS)
-- **Scope**: Native mpv playback on macOS via a Flutter PlatformView (`vo=gpu-next` + `gpu-context=moltenvk` + `hwdec=videotoolbox`), replacing media_kit's texture-bridge render path to address performance and HDR limits. Not yet planned for iOS/tvOS — that remains a separate future decision.
+- **Scope**: Native mpv playback on macOS via a Flutter PlatformView (`vo=gpu-next` + `gpu-context=moltenvk` + `hwdec=videotoolbox`), replacing media_kit's texture-bridge render path to address performance and HDR limits. Not yet planned for iOS/tvOS -- that remains a separate future decision.
 - **License**: LGPL-3.0 (use the plain `MPVKit` SPM product, not the `MPVKit-GPL` product, since Samba support isn't needed).
 - **Status**: Active dependency. The app itself is now GPL-3.0 (see App License above, with an App Store distribution exception), which resolves the prior GPL/App-Store-incompatibility blocker that kept this "not planned."
 - **Gate**: Include MPVKit/libmpv/FFmpeg/libass license notices (same content as the desktop mpv notices below) in the macOS artifact. Verify the LGPL-3.0 product is used, not the GPL-3.0 Samba-enabled one, unless that's a deliberate future choice.
@@ -69,7 +69,7 @@ This document records the third-party dependency license notices that must be in
 
 ## GPL Policy Gate
 
-- **Rule**: This app is GPL-3.0. GPL-only binaries and GPL-derived code (mpv core, GPL-enabled FFmpeg builds, Plezy-derived Swift source, statically linked GPL components) may ship in store/direct-download artifacts as normal GPL-3.0 distribution — the App Store/Play Store additional permission in `LICENSE` covers store-terms compatibility. This replaces the prior blanket "do not ship GPL" prohibition, which predated the relicense.
+- **Rule**: This app is GPL-3.0. GPL-only binaries and GPL-derived code (mpv core, GPL-enabled FFmpeg builds, Plezy-derived Swift source, statically linked GPL components) may ship in store/direct-download artifacts as normal GPL-3.0 distribution -- the App Store/Play Store additional permission in `LICENSE` covers store-terms compatibility. This replaces the prior blanket "do not ship GPL" prohibition, which predated the relicense.
 - **Scope**: Applies to mpv core, GPL-enabled FFmpeg builds, MPVKit-GPL (if ever used instead of the plain LGPL product), and any statically linked GPL components.
 - **Requirement**: Every such release must make the complete corresponding source available through an unrestricted channel (this repository) alongside the store artifact, and preserve upstream notices per each component's obligations above.
 - **Evidence requirement**: Any release that includes GPL components must have a signed-off license review document saved with the artifact evidence, confirming source availability and notice preservation.

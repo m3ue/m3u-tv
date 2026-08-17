@@ -138,7 +138,7 @@ void main() {
 
     // Was previously a single shared `state: _PlayerState?` field, so
     // opening a second Multiview tile tore down the first tile's player
-    // instead of running concurrently — mirrors the tvOS fix above.
+    // instead of running concurrently -- mirrors the tvOS fix above.
     expect(
       source,
       contains('private var states: [String: _PlayerState] = [:]'),

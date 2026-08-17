@@ -261,6 +261,17 @@ class PlaybackOrchestrator {
         _activeBackend = null;
         _activeSource = null;
       }
+      if (adapter is PlatformViewProvider) {
+        // This adapter's platform view is about to be unmounted (the
+        // caller falls through to a different backend, and PlayerScreen
+        // rebuilds without this adapter once activePlatformViewProvider no
+        // longer resolves to it). A native platform-view-backed core can
+        // hold an unretained pointer into that view's own layer, so it must
+        // finish releasing it before the widget tree unmounts the view --
+        // otherwise the fallback backend's own rebuild can deallocate the
+        // layer while the native core is still attached to it.
+        await (adapter as PlatformViewProvider).releaseNativeView();
+      }
       _diagnostics.add(
         'load-failed:${backend.name}:${error.code}:${error.message}',
       );

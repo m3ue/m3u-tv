@@ -235,19 +235,31 @@ final class MpvPlayerCore {
     }
   }
 
-  func dispose() {
+  /// `completion` fires only once `mpv_terminate_destroy` has actually
+  /// finished -- that call blocks until mpv's internal render thread has
+  /// stopped touching the `CAMetalLayer` handed to it via `wid` (an
+  /// unretained pointer -- `Unmanaged.passUnretained` -- so ARC has no idea
+  /// mpv still needs it alive). If the plugin's `dispose` method-channel
+  /// call resolved before mpv actually stopped, Dart could tear down the
+  /// platform view -- deallocating that layer -- while mpv's render thread
+  /// was still mid-write to it: a use-after-free that reliably crashes with
+  /// EXC_BAD_ACCESS on stop. Mirrors the tvOS/iOS cores' `dispose(completion:)`.
+  func dispose(completion: @escaping () -> Void) {
     // Deliberately a strong capture, not `[weak self]`: `MpvPlayerPlugin`
-    // calls `dispose()` (which only schedules this block) and then
-    // synchronously drops its own dictionary entry -- the only other
-    // strong reference -- right after. A weak capture would let ARC
-    // deallocate `self` before this block runs, so `guard let self` would
-    // fail silently and `mpv_terminate_destroy`/unregistering the wakeup
-    // callback would never happen. mpv's core thread would keep running
-    // with its wakeup callback pointing at freed memory, crashing (SIGSEGV)
-    // the next time it fires an event. Keeping `self` alive until real
-    // teardown completes here is required, not just tidiness.
+    // calls `dispose(completion:)` and only drops its own dictionary entry
+    // -- the only other strong reference -- once `completion` fires. A weak
+    // capture would let ARC deallocate `self` before this block runs, so
+    // `guard let self` would fail silently and
+    // `mpv_terminate_destroy`/unregistering the wakeup callback would never
+    // happen. mpv's core thread would keep running with its wakeup callback
+    // pointing at freed memory, crashing (SIGSEGV) the next time it fires
+    // an event. Keeping `self` alive until real teardown completes here is
+    // required, not just tidiness.
     queue.async {
-      guard let handle = self.mpv, !self.disposed else { return }
+      guard let handle = self.mpv, !self.disposed else {
+        DispatchQueue.main.async { completion() }
+        return
+      }
       self.disposed = true
       mpv_set_wakeup_callback(handle, nil, nil)
       mpv_terminate_destroy(handle)
@@ -259,6 +271,7 @@ final class MpvPlayerCore {
         }
         self.metalLayer?.removeFromSuperlayer()
         self.metalLayer = nil
+        completion()
       }
     }
   }
@@ -276,24 +289,22 @@ final class MpvPlayerCore {
 
   private func handle_(event: mpv_event) {
     switch event.event_id {
-    case MPV_EVENT_LOG_MESSAGE:
-      if let data = event.data {
-        let msg = data.assumingMemoryBound(to: mpv_event_log_message.self).pointee
-        let prefix = msg.prefix.map { String(cString: $0) } ?? ""
-        let level = msg.level.map { String(cString: $0) } ?? ""
-        let text = msg.text.map { String(cString: $0) } ?? ""
-        NSLog("[mpv:\(level)] [\(prefix)] \(text.trimmingCharacters(in: .newlines))")
-      }
     case MPV_EVENT_START_FILE:
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:
       readyEmitted = true
-      emit(kind: "FILE_LOADED", extra: snapshot())
+      emit(kind: "FILE_LOADED", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PLAYBACK_RESTART:
-      emit(kind: "PLAYBACK_RESTART", extra: snapshot())
+      emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
       if readyEmitted {
-        emit(kind: "PLAYBACK_RESTART", extra: snapshot())
+        // Most property-change events are `time-pos` ticks (essentially
+        // every frame during playback); only re-walk the track list when
+        // the property that actually changed is track-related, so a
+        // position tick doesn't pay for an mpv_get_property(track-list)
+        // NODE walk + Dart-side re-parse dozens of times a second.
+        let includeTracks = Self.trackRelatedPropertyIndices.contains(event.reply_userdata)
+        emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: includeTracks))
       }
     case MPV_EVENT_END_FILE:
       if let data = event.data {
@@ -312,7 +323,12 @@ final class MpvPlayerCore {
     }
   }
 
-  private func snapshot() -> [String: Any] {
+  /// Indices passed to `mpv_observe_property` in `attach(to:)` for
+  /// properties whose change should trigger a `track-list` re-walk in
+  /// `snapshot(includeTracks:)` -- `aid`, `sid`, `track-list`.
+  private static let trackRelatedPropertyIndices: Set<UInt64> = [6, 7, 8]
+
+  private func snapshot(includeTracks: Bool) -> [String: Any] {
     guard let handle = mpv else { return [:] }
     var result: [String: Any] = [:]
 
@@ -348,11 +364,13 @@ final class MpvPlayerCore {
       result["sid"] = sid
     }
 
-    let tracks = trackList(handle)
-    result["audioTracks"] = tracks.filter { $0["type"] as? String == "audio" }
-      .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
-    result["subtitleTracks"] = tracks.filter { $0["type"] as? String == "sub" }
-      .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+    if includeTracks {
+      let tracks = trackList(handle)
+      result["audioTracks"] = tracks.filter { $0["type"] as? String == "audio" }
+        .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+      result["subtitleTracks"] = tracks.filter { $0["type"] as? String == "sub" }
+        .map { ["id": $0["id"] as Any, "label": $0["label"] as Any, "language": $0["language"] as Any] }
+    }
 
     return result
   }

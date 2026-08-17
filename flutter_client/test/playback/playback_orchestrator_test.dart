@@ -63,7 +63,7 @@ void main() {
       'falls back to the native platform backend before transcoding',
       () async {
         final direct = _FakePlayerAdapter(
-          capabilities: PlaybackCapabilities.appleMediaKit,
+          capabilities: PlaybackCapabilities.appleMpvNative,
           unsupportedVideoCodecs: <String>{'hevc'},
         );
         final fallback = _FakePlayerAdapter(
@@ -73,7 +73,7 @@ void main() {
         final orchestrator = PlaybackOrchestrator(
           platform: PlaybackPlatform.apple,
           adapters: <PlaybackBackend, PlayerAdapter>{
-            PlaybackBackend.appleMediaKit: direct,
+            PlaybackBackend.appleMpvNative: direct,
             PlaybackBackend.appleAvKit: fallback,
           },
           transcodeGateway: transcode,
@@ -93,7 +93,7 @@ void main() {
         expect(orchestrator.activeBackend, PlaybackBackend.appleAvKit);
         expect(
           orchestrator.diagnostics,
-          contains('fallback:appleAvKit:preferred appleMediaKit unsupported'),
+          contains('fallback:appleAvKit:preferred appleMpvNative unsupported'),
         );
 
         await orchestrator.dispose();
@@ -364,11 +364,11 @@ void main() {
 
     test('preserves resume seek when loading a server transcode URL', () async {
       final direct = _FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.appleAvKit,
+        capabilities: PlaybackCapabilities.appleMpvNative,
         unsupportedVideoCodecs: <String>{'hevc'},
       );
       final fallback = _FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.appleMediaKit,
+        capabilities: PlaybackCapabilities.appleAvKit,
         unsupportedVideoCodecs: <String>{'hevc'},
       );
       final serverPlayer = _FakePlayerAdapter(
@@ -387,8 +387,8 @@ void main() {
       final orchestrator = PlaybackOrchestrator(
         platform: PlaybackPlatform.apple,
         adapters: <PlaybackBackend, PlayerAdapter>{
-          PlaybackBackend.appleAvKit: direct,
-          PlaybackBackend.appleMediaKit: fallback,
+          PlaybackBackend.appleMpvNative: direct,
+          PlaybackBackend.appleAvKit: fallback,
           PlaybackBackend.serverTranscode: serverPlayer,
         },
         transcodeGateway: transcode,

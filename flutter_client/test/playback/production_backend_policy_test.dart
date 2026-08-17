@@ -216,6 +216,9 @@ void main() {
       final playerScreen = File(
         'lib/features/player/player_screen.dart',
       ).readAsStringSync();
+      final nativeVideoSurface = File(
+        'lib/playback/native_video_surface.dart',
+      ).readAsStringSync();
       const keepAspectOption =
           'api.set_option_string(handle, "keepaspect", "no");';
 
@@ -231,7 +234,7 @@ void main() {
       }
 
       expect(playerScreen, contains('aspectRatio: _videoAspectRatio'));
-      expect(playerScreen, contains('aspectRatio: aspectRatio'));
+      expect(nativeVideoSurface, contains('aspectRatio: aspectRatio'));
     });
 
     test('desktop libmpv load applies resume start position', () {

@@ -78,11 +78,18 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       core(for: viewId)?.setVolume(volume)
       result(nil)
     case "dispose":
-      core(for: viewId)?.dispose()
-      lock.lock()
-      cores.removeValue(forKey: viewId)
-      lock.unlock()
-      result(nil)
+      guard let existingCore = core(for: viewId) else {
+        result(nil)
+        return
+      }
+      // Only drop the strong reference (`cores`) once teardown has actually
+      // finished -- see MpvPlayerCore.dispose's header comment for why.
+      existingCore.dispose { [weak self] in
+        self?.lock.lock()
+        self?.cores.removeValue(forKey: viewId)
+        self?.lock.unlock()
+        result(nil)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }

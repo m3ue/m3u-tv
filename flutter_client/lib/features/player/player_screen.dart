@@ -13,6 +13,7 @@ import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -916,30 +917,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 final mediaQuery = MediaQuery.of(context);
                 final isCompact = mediaQuery.size.width < 600;
                 // On compact/portrait layouts the back button lives in
-                // PlaybackControls' own top-left corner (40px padding + a
-                // ~44px circular hit target); the overlay must clear that
-                // whole row instead of overlapping it. On tvOS,
-                // PlaybackControls uses a much smaller 8px padding (see its
-                // own comment), so the fixed 104 constant used elsewhere
-                // -- tuned around the old 40px padding -- left only ~2px
-                // between the back button and this overlay. Derive the left
-                // offset from the actual button geometry instead of a magic
-                // constant: safe-area inset + PlaybackControls' own padding
-                // + the ~44px circular back button + a real gap. See
-                // MPV_MIGRATION_STATUS.md's tvOS overlay investigation.
+                // PlaybackControls' own top-left corner
+                // (overlayEdgePadding + a ~44px circular hit target); the
+                // overlay must clear that whole row instead of overlapping
+                // it. Derive the left offset from the actual button
+                // geometry instead of a magic constant: safe-area inset +
+                // PlaybackControls' own padding (overlayEdgePadding, shared
+                // with it so the two can't drift apart) + the ~44px
+                // circular back button + a real gap.
                 final overlayLeft = isCompact
                     ? 16.0
                     : Platform.operatingSystem == 'tvos'
-                    ? mediaQuery.padding.left + 8.0 + 44.0 + 16.0
+                    ? mediaQuery.padding.left + overlayEdgePadding + 44.0 + 16.0
                     : 104.0;
-                // On tvOS, PlaybackControls uses a much smaller 8px padding
-                // (see its own comment) rather than 40, so this must match
-                // that or the back button and this overlay's top edges drift
-                // apart -- see MPV_MIGRATION_STATUS.md's tvOS overlay
-                // investigation.
+                // Must match PlaybackControls' own overlayEdgePadding or the
+                // back button and this overlay's top edges drift apart.
                 final topPaddingMatch = Platform.operatingSystem == 'tvos'
-                    ? 8.0
-                    : (isCompact ? 96.0 : 40.0);
+                    ? overlayEdgePadding
+                    : (isCompact ? 96.0 : overlayEdgePadding);
                 final overlayTop = mediaQuery.padding.top + topPaddingMatch;
                 final overlayWidth = isCompact
                     ? mediaQuery.size.width - overlayLeft * 2
@@ -948,7 +943,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 return Stack(
                   children: [
                     Positioned.fill(
-                      child: _VideoSurface(
+                      child: NativeVideoSurface(
                         textureId: widget.orchestrator.activeTextureId,
                         platformView:
                             widget.orchestrator.activePlatformViewProvider,
@@ -1163,53 +1158,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
               },
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VideoSurface extends StatelessWidget {
-  const _VideoSurface({
-    required this.textureId,
-    required this.platformView,
-    required this.aspectRatio,
-  });
-
-  final int? textureId;
-  final PlatformViewProvider? platformView;
-  final double aspectRatio;
-
-  @override
-  Widget build(BuildContext context) {
-    final view = platformView;
-    if (view != null) {
-      final child = Platform.isMacOS
-          ? AppKitView(
-              viewType: view.platformViewType,
-              creationParams: view.platformViewCreationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            )
-          : UiKitView(
-              viewType: view.platformViewType,
-              creationParams: view.platformViewCreationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            );
-      return ColoredBox(
-        color: Colors.black,
-        child: Center(
-          child: AspectRatio(aspectRatio: aspectRatio, child: child),
-        ),
-      );
-    }
-    final id = textureId;
-    if (id == null) return const ColoredBox(color: Colors.black);
-    return ColoredBox(
-      color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: aspectRatio,
-          child: Texture(textureId: id),
         ),
       ),
     );

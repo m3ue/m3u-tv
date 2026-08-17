@@ -246,6 +246,16 @@ class PlaybackCapabilities {
     serverTranscode,
   ];
 
+  /// The declared capability rows for [platform], in fallback order.
+  /// `PlaybackOrchestrator._nativeBackends()` walks this list filtered by
+  /// which backends actually have an adapter registered
+  /// (`_adapters.containsKey`) -- this list is the full theoretical catalog
+  /// for the platform, not a claim that every row is currently wired up in
+  /// `buildPlaybackOrchestrator()` (lib/navigation/app_router.dart). Notably
+  /// `appleMediaKit`/`desktopMediaKit` are declared here but are not
+  /// registered anywhere today (MPVKit symbol collision; see that
+  /// function's comments) -- see `apple_backend_feasibility.dart` for what
+  /// is actually registered per Apple target.
   static List<PlaybackCapabilities> forPlatform(PlaybackPlatform platform) {
     return switch (platform) {
       PlaybackPlatform.android => const <PlaybackCapabilities>[

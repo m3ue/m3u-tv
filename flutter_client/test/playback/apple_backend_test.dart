@@ -50,15 +50,8 @@ void main() {
       },
     );
 
-    test('keeps AVKit or AVPlayer fallback in every Apple playback order', () {
+    test('keeps AVKit fallback in every iOS/tvOS Apple playback order', () {
       for (final target in AppleBackendFeasibility.targets) {
-        expect(
-          target.backendOrder.map(
-            (capabilities) => capabilities.backend,
-          ),
-          contains(PlaybackBackend.appleAvKit),
-          reason: '${target.platform.label} must not block playback on mpv',
-        );
         expect(
           target.backendOrder.last.backend,
           PlaybackBackend.serverTranscode,
@@ -67,11 +60,37 @@ void main() {
         );
       }
 
+      // iOS/iPadOS/tvOS register AppleAvKitBackend as an automatic fallback
+      // (see buildPlaybackOrchestrator() in lib/navigation/app_router.dart).
+      for (final platform in <AppleTargetPlatform>[
+        AppleTargetPlatform.ios,
+        AppleTargetPlatform.ipados,
+        AppleTargetPlatform.tvos,
+      ]) {
+        expect(
+          AppleBackendFeasibility.forPlatform(
+            platform,
+          ).backendOrder.map((capabilities) => capabilities.backend),
+          contains(PlaybackBackend.appleAvKit),
+          reason: '${platform.label} must not block playback on mpv',
+        );
+      }
+
+      // macOS registers only MacMpvNativeBackend -- no automatic fallback
+      // is wired up yet (media_kit was removed for the same MPVKit
+      // symbol-collision reason as iOS; see the macOS playback gate's
+      // summary/evidence). This asserts the current, accepted gap rather
+      // than a fallback that doesn't actually exist, so a future PR that
+      // reintroduces a real macOS fallback has to update this test too.
+      final macos = AppleBackendFeasibility.forPlatform(
+        AppleTargetPlatform.macos,
+      );
       expect(
-        AppleBackendFeasibility.forPlatform(
-          AppleTargetPlatform.macos,
-        ).backendOrder.first.backend,
-        PlaybackBackend.desktopMediaKit,
+        macos.backendOrder.map((capabilities) => capabilities.backend),
+        <PlaybackBackend>[
+          PlaybackBackend.macMpvNative,
+          PlaybackBackend.serverTranscode,
+        ],
       );
     });
 
