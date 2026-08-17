@@ -1147,6 +1147,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLiveTvLayoutTimeline => 'Línea temporal';
 
   @override
+  String get settingsLiveTvChannelColumn => 'Columna de canales';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoTitle => 'Logo + Título';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoOnly => 'Solo logo';
+
+  @override
+  String get settingsLiveTvChannelColumnTitleOnly => 'Solo título';
+
+  @override
   String get settingsEpgStartView => 'La guía empieza a las';
 
   @override

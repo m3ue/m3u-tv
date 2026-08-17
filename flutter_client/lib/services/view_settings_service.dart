@@ -32,6 +32,22 @@ enum EpgStartView {
       );
 }
 
+/// What to display for each row of the EPG timeline's fixed Channels column.
+enum ChannelColumnLayout {
+  logoAndTitle('logoAndTitle'),
+  logoOnly('logoOnly'),
+  titleOnly('titleOnly');
+
+  const ChannelColumnLayout(this.value);
+  final String value;
+
+  static ChannelColumnLayout fromValue(String? value) =>
+      ChannelColumnLayout.values.firstWhere(
+        (layout) => layout.value == value,
+        orElse: () => ChannelColumnLayout.logoOnly,
+      );
+}
+
 /// Persists non-credential view preferences such as the Live TV default layout
 /// and the EPG default starting view.
 class ViewSettingsService extends ChangeNotifier {
@@ -42,6 +58,7 @@ class ViewSettingsService extends ChangeNotifier {
 
   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
+  static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
@@ -78,6 +95,20 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setEpgStartView(EpgStartView view) async {
     await _write(epgStartViewKey, view.value);
+    notifyListeners();
+  }
+
+  Future<ChannelColumnLayout> channelColumnLayout() async {
+    final raw = await _read(channelColumnLayoutKey);
+    return ChannelColumnLayout.fromValue(raw as String?);
+  }
+
+  /// Synchronous access to the in-memory cached channel column layout.
+  ChannelColumnLayout get channelColumnLayoutSync =>
+      ChannelColumnLayout.fromValue(_memory[channelColumnLayoutKey] as String?);
+
+  Future<void> setChannelColumnLayout(ChannelColumnLayout layout) async {
+    await _write(channelColumnLayoutKey, layout.value);
     notifyListeners();
   }
 

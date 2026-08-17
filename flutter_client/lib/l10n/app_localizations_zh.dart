@@ -1118,6 +1118,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLiveTvLayoutTimeline => '时间线';
 
   @override
+  String get settingsLiveTvChannelColumn => '频道列显示';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoTitle => '台标+名称';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoOnly => '仅台标';
+
+  @override
+  String get settingsLiveTvChannelColumnTitleOnly => '仅名称';
+
+  @override
   String get settingsEpgStartView => '节目单起始时间';
 
   @override

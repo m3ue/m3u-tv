@@ -594,6 +594,10 @@
   "settingsLiveTvLayoutList": "Lista",
   "settingsLiveTvLayoutGrid": "Cuadrícula",
   "settingsLiveTvLayoutTimeline": "Línea temporal",
+  "settingsLiveTvChannelColumn": "Columna de canales",
+  "settingsLiveTvChannelColumnLogoTitle": "Logo + Título",
+  "settingsLiveTvChannelColumnLogoOnly": "Solo logo",
+  "settingsLiveTvChannelColumnTitleOnly": "Solo título",
   "settingsEpgStartView": "La guía empieza a las",
   "settingsEpgStartViewCurrentTime": "Hora actual",
   "settingsEpgStartViewPrimeTime": "Horario estelar"

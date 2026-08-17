@@ -1145,6 +1145,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsLiveTvLayoutTimeline => 'Zeitleiste';
 
   @override
+  String get settingsLiveTvChannelColumn => 'Kanalspalte';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoTitle => 'Logo + Titel';
+
+  @override
+  String get settingsLiveTvChannelColumnLogoOnly => 'Nur Logo';
+
+  @override
+  String get settingsLiveTvChannelColumnTitleOnly => 'Nur Titel';
+
+  @override
   String get settingsEpgStartView => 'EPG startet um';
 
   @override

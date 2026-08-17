@@ -594,6 +594,10 @@
   "settingsLiveTvLayoutList": "List",
   "settingsLiveTvLayoutGrid": "Grid",
   "settingsLiveTvLayoutTimeline": "Timeline",
+  "settingsLiveTvChannelColumn": "Live TV channels column",
+  "settingsLiveTvChannelColumnLogoTitle": "Logo + Title",
+  "settingsLiveTvChannelColumnLogoOnly": "Logo Only",
+  "settingsLiveTvChannelColumnTitleOnly": "Title Only",
   "settingsEpgStartView": "EPG starts at",
   "settingsEpgStartViewCurrentTime": "Current time",
   "settingsEpgStartViewPrimeTime": "Prime time"

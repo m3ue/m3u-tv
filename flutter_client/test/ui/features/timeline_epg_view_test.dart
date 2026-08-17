@@ -519,7 +519,7 @@ void main() {
         tester.widget<DpadInkWell>(olderBlock).onTap?.call();
 
         expect(replayedPrograms, [retainedProgram]);
-        expect(selectedChannels, [channel]);
+        expect(selectedChannels, isEmpty);
       },
     );
 
@@ -617,7 +617,7 @@ void main() {
       }
 
       expect(replayedPrograms, isEmpty);
-      expect(selectedChannels, channels);
+      expect(selectedChannels, isEmpty);
     });
 
     testWidgets(

@@ -594,6 +594,10 @@
   "settingsLiveTvLayoutList": "Liste",
   "settingsLiveTvLayoutGrid": "Raster",
   "settingsLiveTvLayoutTimeline": "Zeitleiste",
+  "settingsLiveTvChannelColumn": "Kanalspalte",
+  "settingsLiveTvChannelColumnLogoTitle": "Logo + Titel",
+  "settingsLiveTvChannelColumnLogoOnly": "Nur Logo",
+  "settingsLiveTvChannelColumnTitleOnly": "Nur Titel",
   "settingsEpgStartView": "EPG startet um",
   "settingsEpgStartViewCurrentTime": "Aktuelle Uhrzeit",
   "settingsEpgStartViewPrimeTime": "Prime Time"

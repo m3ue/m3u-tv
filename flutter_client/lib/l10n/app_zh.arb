@@ -594,6 +594,10 @@
   "settingsLiveTvLayoutList": "列表",
   "settingsLiveTvLayoutGrid": "网格",
   "settingsLiveTvLayoutTimeline": "时间线",
+  "settingsLiveTvChannelColumn": "频道列显示",
+  "settingsLiveTvChannelColumnLogoTitle": "台标+名称",
+  "settingsLiveTvChannelColumnLogoOnly": "仅台标",
+  "settingsLiveTvChannelColumnTitleOnly": "仅名称",
   "settingsEpgStartView": "节目单起始时间",
   "settingsEpgStartViewCurrentTime": "当前时间",
   "settingsEpgStartViewPrimeTime": "黄金时段"

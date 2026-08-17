@@ -2081,6 +2081,7 @@ class _ViewSettingsSection extends StatefulWidget {
 class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   LiveTvLayout _liveTvLayout = LiveTvLayout.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
 
   @override
   void initState() {
@@ -2098,10 +2099,12 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   Future<void> _refresh() async {
     final layout = await widget.service.liveTvLayout();
     final startView = await widget.service.epgStartView();
+    final channelColumnLayout = await widget.service.channelColumnLayout();
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;
       _epgStartView = startView;
+      _channelColumnLayout = channelColumnLayout;
     });
   }
 
@@ -2140,6 +2143,41 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                   isSelected: _liveTvLayout == LiveTvLayout.timeline,
                   onTap: () =>
                       widget.service.setLiveTvLayout(LiveTvLayout.timeline),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l.settingsLiveTvChannelColumn,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _IntervalChip(
+                  label: l.settingsLiveTvChannelColumnLogoTitle,
+                  isSelected:
+                      _channelColumnLayout == ChannelColumnLayout.logoAndTitle,
+                  onTap: () => widget.service.setChannelColumnLayout(
+                    ChannelColumnLayout.logoAndTitle,
+                  ),
+                ),
+                _IntervalChip(
+                  label: l.settingsLiveTvChannelColumnLogoOnly,
+                  isSelected:
+                      _channelColumnLayout == ChannelColumnLayout.logoOnly,
+                  onTap: () => widget.service.setChannelColumnLayout(
+                    ChannelColumnLayout.logoOnly,
+                  ),
+                ),
+                _IntervalChip(
+                  label: l.settingsLiveTvChannelColumnTitleOnly,
+                  isSelected:
+                      _channelColumnLayout == ChannelColumnLayout.titleOnly,
+                  onTap: () => widget.service.setChannelColumnLayout(
+                    ChannelColumnLayout.titleOnly,
+                  ),
                 ),
               ],
             ),

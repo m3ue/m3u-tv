@@ -47,6 +47,7 @@ class PlayerScreen extends StatefulWidget {
     this.onNextChannel,
     this.onPreviousChannel,
     this.onRecordProgram,
+    this.onTrackDialogVisibilityChanged,
     this.isRecordingCurrentChannel = false,
     super.key,
   });
@@ -65,6 +66,7 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
   final void Function(EpgProgram program)? onRecordProgram;
+  final ValueChanged<bool>? onTrackDialogVisibilityChanged;
   final bool isRecordingCurrentChannel;
 
   @override
@@ -110,6 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _pendingComskipSeekTimer;
 
   bool _overlayVisible = true;
+  bool _trackDialogVisible = false;
 
   // Owns the outer Focus so we can steal focus from the content area when
   // the player opens, and reclaim it whenever the overlay hides.
@@ -547,6 +550,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // hide info the user is deliberately looking at. Playback resuming (or
     // the initial load reaching `playing`) reschedules the timer below.
     if (!_isPlaying) return;
+    // While the audio/subtitle track dialog is open, don't let this timer
+    // unmount PlaybackControls (and steal focus back to the player) out
+    // from under the still-open dialog. Rescheduled once the dialog closes.
+    if (_trackDialogVisible) return;
     _overlayHideTimer = Timer(_overlayTimeout, () {
       if (!_disposed && mounted) {
         setState(() => _overlayVisible = false);
@@ -845,6 +852,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _handleBack() {
+    if (_trackDialogVisible) {
+      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      return;
+    }
     if (_errorMessage != null) {
       _goBack();
       return;
@@ -854,6 +865,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else {
       _goBack();
     }
+  }
+
+  void _handleTrackDialogVisibilityChanged(bool visible) {
+    if (mounted) setState(() => _trackDialogVisible = visible);
+    if (visible) {
+      _overlayHideTimer?.cancel();
+    } else if (_overlayVisible) {
+      _scheduleOverlayHide();
+    }
+    widget.onTrackDialogVisibilityChanged?.call(visible);
   }
 
   @override
@@ -1039,6 +1060,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               _isSubtitleTrackSelectionKnown,
                           onAudioTrackSelected: _handleAudioTrackSelected,
                           onSubtitleTrackSelected: _handleSubtitleTrackSelected,
+                          onTrackDialogVisibilityChanged:
+                              _handleTrackDialogVisibilityChanged,
                           fallbackReason: _showPlaybackDiagnostics
                               ? _fallbackReason
                               : null,

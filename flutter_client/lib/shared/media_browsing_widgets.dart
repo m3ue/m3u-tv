@@ -36,7 +36,7 @@ class MediaBrowsingMetrics {
   static const double landscapeCardHeight = 205; // 157.5 (9/16×280) + 47 text
   // Width of the TV/Desktop interstitial search+category strip
   // (MediaCategoryNav) between the sidebar and a screen's content grid.
-  static const double interstitialNavWidth = 240;
+  static const double interstitialNavWidth = 200;
 }
 
 class InlineMediaSearchField extends StatefulWidget {

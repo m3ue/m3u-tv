@@ -2126,6 +2126,30 @@ abstract class AppLocalizations {
   /// **'Timeline'**
   String get settingsLiveTvLayoutTimeline;
 
+  /// No description provided for @settingsLiveTvChannelColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Live TV channels column'**
+  String get settingsLiveTvChannelColumn;
+
+  /// No description provided for @settingsLiveTvChannelColumnLogoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Logo + Title'**
+  String get settingsLiveTvChannelColumnLogoTitle;
+
+  /// No description provided for @settingsLiveTvChannelColumnLogoOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Logo Only'**
+  String get settingsLiveTvChannelColumnLogoOnly;
+
+  /// No description provided for @settingsLiveTvChannelColumnTitleOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Title Only'**
+  String get settingsLiveTvChannelColumnTitleOnly;
+
   /// No description provided for @settingsEpgStartView.
   ///
   /// In en, this message translates to:

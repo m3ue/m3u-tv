@@ -9,10 +9,12 @@ import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
-import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart'
+    show ChannelColumnLayout, EpgStartView;
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
 typedef CatchupProgramSelect =
@@ -54,6 +56,8 @@ class TimelineEpgView extends StatefulWidget {
     this.futureDays = 7,
     this.clock = DateTime.now,
     this.epgStartView = EpgStartView.currentTime,
+    this.useSidebarLayout = false,
+    this.channelColumnLayout = ChannelColumnLayout.logoOnly,
   });
 
   final List<Channel> channels;
@@ -123,6 +127,15 @@ class TimelineEpgView extends StatefulWidget {
   final int futureDays;
   final Clock clock;
   final EpgStartView epgStartView;
+
+  /// Whether the caller is using the sidebar (TV/desktop) layout rather than
+  /// the mobile stacked one — mirrors `MediaCategoryNav.useSidebarLayout`.
+  /// Rounds the Channels column's corner cell to match the sidebar strip's
+  /// search input radius; left off (square corner) on mobile.
+  final bool useSidebarLayout;
+
+  /// What each row of the fixed Channels column shows for a channel.
+  final ChannelColumnLayout channelColumnLayout;
 
   @override
   State<TimelineEpgView> createState() => _TimelineEpgViewState();
@@ -349,7 +362,16 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                     // Corner cell
                     Container(
                       height: _kTimeHeaderH,
-                      color: colorScheme.surfaceContainerHighest,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: widget.useSidebarLayout
+                            ? const BorderRadius.only(
+                                topLeft: Radius.circular(
+                                  MediaBrowsingMetrics.cardRadius,
+                                ),
+                              )
+                            : null,
+                      ),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -389,6 +411,7 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                             itemExtent: _kRowH,
                             itemBuilder: (_, i) => _ChannelCell(
                               channel: widget.channels[i],
+                              columnLayout: widget.channelColumnLayout,
                               isRecording: widget.recordingChannelIds.contains(
                                 widget.channels[i].id,
                               ),
@@ -520,18 +543,34 @@ class _TimelineEpgViewState extends State<TimelineEpgView> {
                                     recordingStateFor: (program) => widget
                                         .recordingStateFor(channel, program),
                                     onTap: (program) {
+                                      final tapNow = widget.clock();
                                       final canReplay = EpgService.canReplay(
                                         catchupRetentionDays,
                                         program,
-                                        widget.clock(),
+                                        tapNow,
                                       );
-                                      if (canReplay &&
-                                          widget.onCatchupProgramSelect !=
-                                              null) {
-                                        widget.onCatchupProgramSelect!(
+                                      if (canReplay) {
+                                        widget.onCatchupProgramSelect?.call(
                                           channel,
                                           program,
                                         );
+                                        return;
+                                      }
+                                      if (program.start.isAfter(tapNow)) {
+                                        // Future programme: offer the
+                                        // context menu (record, etc.)
+                                        // instead of starting playback.
+                                        widget.onChannelLongPress?.call(
+                                          channel,
+                                          program,
+                                        );
+                                        return;
+                                      }
+                                      if (program.end.isBefore(tapNow) ||
+                                          program.end.isAtSameMomentAs(
+                                            tapNow,
+                                          )) {
+                                        // Past, non-catchup programme: no-op.
                                         return;
                                       }
                                       widget.onChannelSelect(channel);
@@ -729,12 +768,52 @@ class _ChannelCell extends StatelessWidget {
     this.onTap,
     this.onLongTap,
     this.autofocus = false,
+    this.columnLayout = ChannelColumnLayout.logoOnly,
   });
   final Channel channel;
   final bool isRecording;
   final VoidCallback? onTap;
   final VoidCallback? onLongTap;
   final bool autofocus;
+  final ChannelColumnLayout columnLayout;
+
+  Widget _logo({required double size}) {
+    if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty) {
+      return Image.network(
+        channel.logoUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Icon(Icons.tv, size: size - 4),
+      );
+    }
+    return Icon(Icons.tv, size: size - 4);
+  }
+
+  /// Logo with the recording dot pinned to its top-right corner — used by
+  /// every layout that renders a logo, so recording status stays visible
+  /// even when [ChannelColumnLayout.logoOnly] hides the title.
+  Widget _logoWithRecordingBadge(
+    ColorScheme colorScheme, {
+    required double size,
+  }) {
+    if (!isRecording) return _logo(size: size);
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _logo(size: size),
+          Positioned(
+            top: -2,
+            right: -2,
+            child: RecordingDot(color: colorScheme.error),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -752,39 +831,81 @@ class _ChannelCell extends StatelessWidget {
             bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Row(
+        // A Stack rather than a plain padded child so the catchup badge can
+        // float in a fixed corner of the cell (see below) without being laid
+        // out as part of the logo/title content — keeping it out of that
+        // flow is what keeps its position identical across every
+        // [ChannelColumnLayout] and stops it from fighting the column/row
+        // for space (and overflowing) the way an inline badge did.
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty)
-              Image.network(
-                channel.logoUrl!,
-                width: 32,
-                height: 32,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const Icon(Icons.tv, size: 28),
-              )
-            else
-              const Icon(Icons.tv, size: 28),
-            const SizedBox(width: 6),
-            if (isRecording) ...[
-              RecordingDot(color: colorScheme.error),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: Text(
-                channel.name,
-                style: Theme.of(context).textTheme.labelSmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
+                child: switch (columnLayout) {
+                  ChannelColumnLayout.logoAndTitle => _buildLogoAndTitle(
+                    context,
+                    colorScheme,
+                  ),
+                  ChannelColumnLayout.logoOnly => Center(
+                    child: _logoWithRecordingBadge(colorScheme, size: 44),
+                  ),
+                  ChannelColumnLayout.titleOnly => _buildTitleOnly(
+                    context,
+                    colorScheme,
+                  ),
+                },
               ),
             ),
-            if (channel.catchupSupported) ...[
-              const SizedBox(width: 4),
-              CatchupBadge(days: channel.catchupDays),
-            ],
+            if (channel.catchupSupported)
+              Positioned(
+                top: 2,
+                right: 4,
+                child: CatchupBadge(days: channel.catchupDays, compact: true),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLogoAndTitle(BuildContext context, ColorScheme colorScheme) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _logoWithRecordingBadge(colorScheme, size: 26),
+        const SizedBox(height: 3),
+        Text(
+          channel.name,
+          style: Theme.of(context).textTheme.labelSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTitleOnly(BuildContext context, ColorScheme colorScheme) {
+    return Row(
+      children: [
+        if (isRecording) ...[
+          RecordingDot(color: colorScheme.error),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Text(
+            channel.name,
+            style: Theme.of(context).textTheme.labelSmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -136,6 +136,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   int _viewSettingsGeneration = 0;
   // Shared across all three view modes since only one is ever mounted at a
   // time (see the `switch (_viewMode)` in build()).
@@ -236,20 +237,29 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
     setState(() {
       _viewMode = _layoutToViewMode(loaded.layout);
       _epgStartView = loaded.epgStartView;
+      _channelColumnLayout = loaded.channelColumnLayout;
     });
   }
 
-  Future<({LiveTvLayout layout, EpgStartView epgStartView})?>
+  Future<
+    ({
+      LiveTvLayout layout,
+      EpgStartView epgStartView,
+      ChannelColumnLayout channelColumnLayout,
+    })?
+  >
   _loadViewSettings() async {
     final viewSettings = widget.viewSettingsService;
     if (viewSettings == null) return null;
     final results = await Future.wait([
       viewSettings.liveTvLayout(),
       viewSettings.epgStartView(),
+      viewSettings.channelColumnLayout(),
     ]);
     return (
       layout: results[0] as LiveTvLayout,
       epgStartView: results[1] as EpgStartView,
+      channelColumnLayout: results[2] as ChannelColumnLayout,
     );
   }
 
@@ -279,6 +289,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
           if (loaded != null) {
             _viewMode = _layoutToViewMode(loaded.layout);
             _epgStartView = loaded.epgStartView;
+            _channelColumnLayout = loaded.channelColumnLayout;
           }
         });
       }
@@ -820,6 +831,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen> {
       child: TimelineEpgView(
         channels: channels,
         epgService: epgService,
+        useSidebarLayout: widget.useSidebarLayout,
+        channelColumnLayout: _channelColumnLayout,
         recordingChannelIds: recordingChannelIds,
         recordingStateFor: (channel, program) => recordingIndex.stateFor(
           channelId: channel.id,
