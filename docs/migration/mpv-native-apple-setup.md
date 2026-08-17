@@ -78,7 +78,12 @@ Follow the verification steps in the approved plan
      in `tvos/Runner/MpvPlayer/MpvPlayerCore.swift` -- and should not be
      advertised as supported until verified on real Apple TV hardware.
 
-If `macMpvNative`/`appleMpvNative` fails to load a stream, the orchestrator
-automatically falls back to `MediaKitDesktopAdapter` (macOS) or
-`MediaKitIosAdapter`/`AppleAvKitBackend` (iOS/tvOS) -- confirm the fallback
-path itself still works too, since that's the safety net for this rollout.
+If `appleMpvNative` fails to load a stream on iOS/tvOS, the orchestrator
+automatically falls back to `AppleAvKitBackend` -- confirm that fallback
+path itself still works too, since it's the safety net for this rollout.
+`MediaKitIosAdapter` has been removed from the adapter registration
+entirely and is no longer a fallback on iOS. On macOS, `MediaKitDesktopAdapter`
+was also removed as a fallback for `macMpvNative` -- there is currently no
+automatic fallback if native mpv throws on macOS (media_kit is still used
+there, but only for the separate Multiview surface, which has a known
+regression -- see `playback-backend-matrix.md`).

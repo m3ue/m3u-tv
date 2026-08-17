@@ -8,32 +8,48 @@
 > `docs/release/license-notices-checklist.md`), which removes that blocker.
 > Native mpv playback (via the `edde746/MPVKit` Swift package, modeled on the
 > open-source [Plezy](https://github.com/edde746/plezy) player, same author,
-> GPL-3.0) is now the **intended playback backend on all three Apple
-> platforms** — macOS, iOS, and tvOS — not just the media_kit/AVKit paths
-> this document describes as permanent. As of this writing mpv playback works
-> on tvOS (with an unrelated overlay-scaling UI bug), and is broken on
-> macOS/iOS (an `mpv_initialize()` crash, still under investigation). See
-> `/MPV_MIGRATION_STATUS.md` at the repo root for current implementation
-> status and debugging history. This document's App Store guideline analysis
-> (2.4.3, 2.4.5, 2.5.1, 2.5.2), tvOS embedder/remote-input findings, and
-> AVKit-as-fallback design remain valid and relevant — only the "MPVKit is
-> not planned, GPL blocks it" conclusion is out of date. A follow-up legal/App
-> Store review pass specifically for GPL-3.0 distribution (source-offer
-> obligations, App Store Review Guideline 2.5.1's stance on GPL binaries,
-> etc.) has not yet been done and should happen before shipping mpv-based
-> builds to the App Store.
+> GPL-3.0) is now the **primary, working playback backend on all three Apple
+> platforms** (macOS, iOS, and tvOS), not just the media_kit/AVKit paths
+> this document describes as permanent. Native mpv is confirmed fully working
+> (video, audio, subtitles, track switching, seeking, clean back-navigation
+> teardown) on macOS and iOS via hands-on click-testing, and playback (video,
+> audio, subtitles) works correctly on tvOS too, with one known open cosmetic
+> bug: the playback overlay renders "boxed in", smaller than the video behind
+> it. `media_kit` (`MediaKitIosAdapter`/`MediaKitDesktopAdapter`) has been
+> removed from the main-playback fallback chain on iOS and macOS; only
+> `AppleAvKitBackend` remains as an automatic fallback (iOS/tvOS only --
+> macOS currently has no automatic fallback). `media_kit` is still used on
+> macOS, but only for the separate Multiview surface, which is a known
+> regression now that `media_kit_libs_macos_video` has been removed from
+> `pubspec.yaml` -- see `/MPV_MIGRATION_STATUS.md` for details. See that same
+> file at the repo root for current implementation status and debugging
+> history. This document's App Store guideline analysis (2.4.3, 2.4.5, 2.5.1,
+> 2.5.2), tvOS embedder/remote-input findings, and AVKit-as-fallback design
+> remain valid and relevant — only the "MPVKit is not planned, GPL blocks it"
+> conclusion is out of date. App Store submission readiness itself (signing,
+> notarization, TestFlight, a follow-up legal/App Store review pass
+> specifically for GPL-3.0 distribution -- source-offer obligations, App
+> Store Review Guideline 2.5.1's stance on GPL binaries, etc.) has not yet
+> been attempted and should happen before shipping mpv-based builds to the
+> App Store.
 
-This spike proves the Apple playback strategy for the Flutter rewrite at the
-contract/documentation layer before native plugin work starts. The safe product
-shape is an AVKit/AVPlayer-safe default for iOS and iPadOS HLS/MP4 playback,
-and media_kit (AVFoundation-backed) for macOS. MPVKit/libmpv remains GATED
-behind licensing, App Store policy, crash/runtime review, native dependency review,
-and legal review for iOS/iPadOS; it is not planned for macOS — a
-native in-process libmpv backend was prototyped there and reverted once
-media_kit was confirmed to already work correctly. tvOS remains
-BLOCKED/GATED until a community/custom embedder proof, plugin audit, and remote
-input proof exist. Apple platforms stay non-blocking for the Desktop+Android
-release track.
+This spike originally proved the Apple playback strategy for the Flutter
+rewrite at the contract/documentation layer before native plugin work
+started, with AVKit/AVPlayer as the safe default for iOS/iPadOS and
+media_kit for macOS, and MPVKit/libmpv gated behind licensing and App Store
+policy review. That plan has since been superseded: the project relicensed
+to GPL-3.0 specifically to unblock bundling MPVKit, and native mpv (via
+`edde746/MPVKit`) is now the working primary playback backend on macOS, iOS,
+and tvOS, with AVKit/AVPlayer demoted to an automatic fallback (iOS/tvOS
+only) rather than the primary path, and media_kit removed from main
+playback entirely (it remains only for macOS Multiview, which has a known
+regression -- see the status callout above). tvOS playback itself works
+(video, audio, subtitles); the tvOS Flutter embedder/build/remote-input
+findings below remain accurate as historical/reference context for how the
+tvOS runner was built, but should not be read as still gating playback
+availability. Apple platforms stay non-blocking for the Desktop+Android
+release track. App Store distribution readiness (signing, notarization,
+submission review) has not yet been verified for the mpv-based builds.
 
 ## Evidence used
 
@@ -64,38 +80,44 @@ release track.
 
 | Platform | Build | Playback | Primary backend | Required fallback | Decision |
 | --- | --- | --- | --- | --- | --- |
-| iOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | AVKit/AVPlayer-safe default for HLS/MP4, then server transcode. | MPVKit/libmpv not planned — GPL-3.0 distribution is incompatible with App Store review, so this app cannot list with it bundled. | Flutter can generate iOS projects, but App Store readiness is not claimed. AVKit/AVPlayer is the permanent playback strategy, not an interim step pending MPVKit approval. |
-| iPadOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | AVKit/AVPlayer-safe default for HLS/MP4, then server transcode. | MPVKit/libmpv not planned — same GPL/App Store incompatibility as iOS. | Uses the supported iOS Flutter target; full-screen and iPad idiom QA remain gated. |
-| macOS | PASS for Flutter project generation only | NON-BLOCKING/GATED | media_kit (AVFoundation-backed), then server transcode. | None planned — a native in-process libmpv backend was prototyped and reverted; media_kit already covers macOS well. | Flutter macOS is supported, but signing, notarization, and sandbox are not release-complete. Broad-codec playback via libmpv/MPVKit is not planned for this platform. |
-| tvOS | FAIL | BLOCKED/GATED | No release backend can be claimed yet. | AVKit/AVPlayer after a custom runner exists, then server transcode. MPVKit/libmpv not planned — same GPL/App Store incompatibility as iOS, independent of the embedder blocker below. | tvOS remains BLOCKED/GATED and is not release-complete until Flutter tvOS embedder, plugin, store, and remote QA proof exist. |
+| iOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing on iOS Simulator | Native mpv (`edde746/MPVKit`, `PlaybackBackend.appleMpvNative`), confirmed working (video, audio, no crash on back navigation). | `AppleAvKitBackend` as the sole automatic fallback if native mpv throws. | Native mpv is the primary, working playback strategy on iOS. App Store submission readiness (signing, notarization, review) is not yet verified. |
+| iPadOS | PASS for Flutter project generation | WORKING (shares the iOS target) | Same as iOS: native mpv primary, `AppleAvKitBackend` fallback. | `AppleAvKitBackend`. | Uses the supported iOS Flutter target; iPad-specific idiom/full-screen QA is separate from the backend question and remains untracked here. |
+| macOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing | Native mpv (`edde746/MPVKit`, `PlaybackBackend.macMpvNative`), confirmed working (video, audio, subtitles, track switching, seeking, clean teardown). | None for main playback currently -- `MediaKitDesktopAdapter` was removed as a fallback. media_kit remains only for the Multiview surface, which has a known regression (see status callout). | Native mpv is the primary, working playback strategy on macOS. Signing, notarization, and sandbox readiness for App Store distribution are not release-complete. |
+| tvOS | Builds via a custom Xcode-based runner (no `flutter build tvos` CLI support) | WORKING -- video, audio, subtitles all confirmed correct | Native mpv (`edde746/MPVKit`, `PlaybackBackend.appleMpvNative`), same as iOS. | `AppleAvKitBackend`. | tvOS playback works. One known open cosmetic bug: the playback overlay renders "boxed in" relative to the video (see `/MPV_MIGRATION_STATUS.md`). App Store/TestFlight submission readiness is not yet verified. |
 
 ## Playback fallback matrix
 
 | Target | Backend order | Why |
 | --- | --- | --- |
-| iOS | AVKit/AVPlayer-safe default, server transcode | AVPlayer is the App Store-safe path for HLS/MP4 and the permanent strategy. MPVKit/libmpv is not planned — GPL-3.0 cannot be reconciled with App Store distribution for this app. |
-| iPadOS | AVKit/AVPlayer-safe default, server transcode | Same as iOS; iPad-specific work is layout and accessory input, not a separate decoder stack. MPVKit/libmpv not planned for the same GPL/App Store reason. |
-| macOS | media_kit (AVFoundation-backed), server transcode | media_kit is the default and only planned backend; libmpv/MPVKit is not planned for macOS after prototyping confirmed media_kit already handles it well. |
-| tvOS | BLOCKED/GATED until custom/community embedder proof, then AVKit/AVPlayer first | This order is a native-design target only. Flutter cannot claim it until the tvOS embedder, plugins, and remote bridge run on simulator/hardware. MPVKit/libmpv is not planned regardless, for the same GPL/App Store reason as iOS. |
+| iOS | Native mpv (`appleMpvNative`), then `AppleAvKitBackend`, then server transcode | Native mpv (`edde746/MPVKit`) is the working primary backend, confirmed via click-testing; GPL-3.0 relicensing removed the prior App Store blocker. AVKit remains the automatic fallback if native mpv throws. |
+| iPadOS | Same as iOS | Shares the iOS target; iPad-specific work is layout and accessory input, not a separate decoder stack. |
+| macOS | Native mpv (`macMpvNative`), then server transcode | Native mpv is the working primary backend, confirmed via click-testing. No automatic native fallback currently exists for main playback (media_kit was removed from that role and remains only for Multiview, which has a known regression). |
+| tvOS | Native mpv (`appleMpvNative`), then `AppleAvKitBackend`, then server transcode | Playback (video/audio/subtitles) works; one known open cosmetic bug (overlay "boxed in" relative to the video). The custom Xcode-based tvOS runner referenced below is already in place and building. |
 
-AVKit/AVPlayer fallback is mandatory on every iOS/iPadOS/tvOS target; the
-release-safe default there is AVKit/AVPlayer first for HLS/MP4, followed by
-server-transcoded HLS when native paths reject the stream. macOS uses
-media_kit as its default and only planned backend. Apple playback must not be
-blocked on mpv, MPVKit, libmpv, or FFmpeg.
+Native mpv is the primary backend on all three Apple platforms.
+`AppleAvKitBackend` remains the mandatory automatic fallback on iOS/tvOS if
+native mpv throws a recoverable `PlaybackException`; macOS currently has no
+automatic fallback for main playback. Server-transcoded HLS is the final
+fallback everywhere when native paths reject the stream. Apple playback is
+no longer blocked on MPVKit/libmpv licensing -- the GPL-3.0 relicense
+removed that blocker.
 
 ## tvOS build, embedder, focus, and remote decision
 
-Current status: FAIL for Flutter build/playback and BLOCKED/GATED for remote,
-plugin, store, and custom embedder proof. tvOS is not release-complete.
+Current status: build and playback now work via a custom Xcode-managed
+`tvos/Runner.xcodeproj` runner (see `mpv-native-apple-setup.md`), with
+native mpv playback confirmed (video, audio, subtitles correct; one open
+cosmetic overlay-scaling bug). Store/App-Store-submission proof is still
+GATED and tvOS is not release-complete for that purpose.
 
-- Flutter tvOS is not an official first-class target in the pinned toolchain.
-  The CLI platform generation help lists iOS/macOS/darwin but no tvOS, and the
-  build command surface does not provide `flutter build tvos`.
-- A custom Flutter tvOS embedder is required before app-level feasibility can be
-  upgraded. The embedder must create a tvOS `UIApplication`, host the Flutter
-  engine/view, load a tvOS plugin registrar, and package/sign the runner through
-  Xcode.
+- Flutter tvOS is still not an official first-class target in the pinned
+  toolchain -- the CLI platform generation help lists iOS/macOS/darwin but
+  no tvOS, and the build command surface does not provide `flutter build
+  tvos`. The app instead builds through a manually-wired Xcode project (see
+  `mpv-native-apple-setup.md`), which is the path actually in use today.
+- The custom runner already hosts the Flutter engine/view, loads the tvOS
+  plugin registrar, and packages/signs through Xcode -- this is done, not
+  merely planned.
 - Remote/gamepad handling cannot be marked PASS yet. The next technical step is
   to prototype `pressesBegan`/`pressesEnded` and `GCController` forwarding in
   the custom Flutter tvOS embedder, then map Siri Remote select/menu/play-pause
@@ -126,24 +148,26 @@ items:
 
 | Gate | Relevant guideline | PASS condition | Current result |
 | --- | --- | --- | --- |
-| Public APIs | App Store Review Guideline 2.5.1 | Use only AVKit, AVFoundation, UIKit/AppKit, Metal, VideoToolbox, GameController, and documented Flutter embedding APIs in release builds. | PASS for the AVKit path (the only planned iOS/iPadOS/tvOS path). MPVKit/libmpv is not planned — its GPL-3.0 posture is incompatible with App Store distribution for this app. |
-| Self-contained bundle | Guidelines 2.4.5 and 2.5.2 | All frameworks, dylibs, codec libraries, subtitle libraries, and Flutter artifacts are embedded and signed inside the app bundle; no shared install locations. | PASS for the planned AVKit path; not applicable to MPVKit/libmpv since it is not planned. |
-| No dynamic executable downloads | Guideline 2.5.2 | The app may stream media but must not download codecs, filters, native plugins, or executable code after review. | PASS if server transcode returns media only. |
-| App completeness/crashes | Guideline 2.1 | Native playback must be tested on-device/simulator, with no mpv event-loop deadlocks or teardown crashes. | FAIL until native Flutter plugins are implemented and exercised. |
-| Apple TV input | Guideline 2.4.3 | tvOS app works with Siri Remote and optional disclosed controllers. | FAIL/BLOCKED until custom embedder forwards remote/gamepad input. |
-| macOS sandbox/package | Guideline 2.4.5 | Mac App Store build is sandboxed, Xcode-packaged, self-contained, and does not spawn unbundled helpers. | PASS for the media_kit path. libmpv is not planned for macOS, so its sandbox/helper-process gate does not apply here. |
+| Public APIs | App Store Review Guideline 2.5.1 | Use only AVKit, AVFoundation, UIKit/AppKit, Metal, VideoToolbox, GameController, and documented Flutter embedding APIs in release builds. | Native mpv (MPVKit, GPL-3.0) is now the primary path on iOS/iPadOS/tvOS/macOS, with AVKit as an automatic fallback (iOS/tvOS). A dedicated legal/App Store review pass on GPL-3.0 binary distribution under 2.5.1 has not yet been done -- see the licensing obligations table below. |
+| Self-contained bundle | Guidelines 2.4.5 and 2.5.2 | All frameworks, dylibs, codec libraries, subtitle libraries, and Flutter artifacts are embedded and signed inside the app bundle; no shared install locations. | MPVKit is added as an SPM dependency embedded in the Runner targets (see `mpv-native-apple-setup.md`); bundle/signing verification for App Store distribution has not yet been done. |
+| No dynamic executable downloads | Guideline 2.5.2 | The app may stream media but must not download codecs, filters, native plugins, or executable code after review. | PASS if server transcode returns media only; native mpv/MPVKit is statically embedded at build time, not downloaded at runtime. |
+| App completeness/crashes | Guideline 2.1 | Native playback must be tested on-device/simulator, with no mpv event-loop deadlocks or teardown crashes. | Confirmed via hands-on click-testing on macOS and iOS Simulator: no crashes, clean teardown on back navigation. tvOS playback is also crash-free; still needs verification on real Apple TV hardware, not just simulator/dev builds. |
+| Apple TV input | Guideline 2.4.3 | tvOS app works with Siri Remote and optional disclosed controllers. | The app is D-pad/Siri-Remote-driven via the `dpad` package throughout; dedicated remote-input App Store review proof has not been separately re-verified in this doc. |
+| macOS sandbox/package | Guideline 2.4.5 | Mac App Store build is sandboxed, Xcode-packaged, self-contained, and does not spawn unbundled helpers. | Native mpv (MPVKit) is the primary macOS path now; sandbox/hardened-runtime/notarization verification for a GPL-3.0 native library has not yet been done. |
 
 Signing/bundle requirements:
 
-- iOS/iPadOS/tvOS native frameworks must be embedded in the app target and
-  code-signed by Xcode with valid provisioning profiles.
-- libmpv/FFmpeg/libass are not planned for macOS; the media_kit dependencies it
-  already ships with must live inside the `.app` bundle and pass
-  sandbox/hardened-runtime/notarization checks for the selected distribution
-  channel.
-- MPVKit is not planned for iOS/tvOS (GPL-3.0 is incompatible with App Store
-  distribution for this app); the xcframework-slice/architecture notes below
-  are kept only as historical reference from the Expo/React Native podspec.
+- iOS/iPadOS/tvOS/macOS native frameworks (including the `edde746/MPVKit`
+  SPM package) must be embedded in the app target and code-signed by Xcode
+  with valid provisioning profiles.
+- Native mpv/MPVKit ships GPL-3.0 code on all four Apple targets now; the
+  media_kit dependencies previously used as the macOS default no longer
+  apply to main playback (media_kit remains only for macOS Multiview).
+  Sandbox/hardened-runtime/notarization checks for the MPVKit-based bundle
+  have not yet been run for any distribution channel.
+- The xcframework-slice/architecture notes historically kept here as
+  reference from the old Expo/React Native podspec remain reference-only
+  context for how MPVKit frameworks are structured.
 - Do not ship separate codec installers, post-review framework downloads, or
   unbundled helper binaries.
 
@@ -151,30 +175,41 @@ Signing/bundle requirements:
 
 | Component | License signal | Obligations | Shipping decision |
 | --- | --- | --- | --- |
-| mpv | GPL-2.0-or-later by default, with possible LGPL-only build modes depending on configuration. | Publish corresponding source/notices for GPL builds, or prove and document an LGPL-only configuration with relink rights before distribution. | Not planned for iOS/iPadOS/tvOS — AVKit/AVPlayer is the permanent strategy there. Kept as reference material only. |
-| FFmpeg | LGPL/GPL configuration-dependent; nonfree combinations are not redistributable. | Record exact configure flags, enabled codecs, external libraries, source offers, and relink path. GPL/nonfree codec choices can make App Store distribution impossible for this app. | Not planned for iOS/iPadOS/tvOS; AVKit is used instead. |
-| MPVKit | The former RN podspec (now removed) declared GPL-3.0 and downloaded `MPVKit-GPL-Frameworks.zip`. Any Flutter equivalent must make the same declaration. | GPL-3.0 requires compatible licensing for the combined distributed app plus corresponding source. | Not planned for iOS/iPadOS/tvOS — GPL-3.0 is incompatible with App Store distribution for this app, not a to-be-resolved review gate. |
+| mpv | GPL-2.0-or-later by default, with possible LGPL-only build modes depending on configuration. | Publish corresponding source/notices for GPL builds, or prove and document an LGPL-only configuration with relink rights before distribution. | Now shipping on iOS/iPadOS/tvOS/macOS as the primary playback path via MPVKit. These obligations are actually applicable now, not hypothetical -- see `docs/release/license-notices-checklist.md`. |
+| FFmpeg | LGPL/GPL configuration-dependent; nonfree combinations are not redistributable. | Record exact configure flags, enabled codecs, external libraries, source offers, and relink path. GPL/nonfree codec choices can make App Store distribution impossible for this app. | Bundled transitively via MPVKit on all Apple targets now. The project relicensed to GPL-3.0 specifically to allow this; exact configure-flag/source-offer documentation still needs to be finalized before an App Store submission. |
+| MPVKit | The former RN podspec (now removed) declared GPL-3.0 and downloaded `MPVKit-GPL-Frameworks.zip`. The current Flutter integration uses the `edde746/MPVKit` Swift Package Manager fork (GPL-3.0), added per-target in Xcode (see `mpv-native-apple-setup.md`). | GPL-3.0 requires compatible licensing for the combined distributed app plus corresponding source. | Actively shipping on iOS/iPadOS/tvOS/macOS as the primary backend. The project's GPL-3.0 relicense (repo root `LICENSE`) satisfies the combined-licensing requirement; a dedicated App Store review pass for GPL-3.0 binary distribution has not yet been done. |
 | libass | ISC permissive license. | Preserve copyright/license notices when bundled directly or through mpv/FFmpeg. | Acceptable as a dependency, but combined binaries inherit mpv/FFmpeg obligations. |
-| Plezy reference code | GPL reference material. | Do not copy source unless this project accepts GPL-compatible licensing for derived work. | Conceptual reference only; use architecture lessons, not code. |
+| Plezy reference code | GPL reference material. | Do not copy source unless this project accepts GPL-compatible licensing for derived work. | Conceptual reference only; no Plezy source is copied into this repository. The GPL-3.0 relicense makes such GPL-compatible licensing moot as a blocker either way. |
 
-The current product-safe path is AVKit/AVPlayer plus server transcode on
-iOS/iPadOS/tvOS, and media_kit plus server transcode on macOS. MPVKit/libmpv
-is not planned for any Apple platform: on iOS/iPadOS/tvOS it is blocked by
-GPL-3.0's incompatibility with App Store distribution (a firm decision, not
-a review gate awaiting approval), and on macOS media_kit was prototyped
-against and already covers what libmpv would have provided.
+The current product path is native mpv (MPVKit) plus AVKit fallback and
+server transcode on iOS/iPadOS/tvOS, and native mpv plus server transcode on
+macOS (no automatic native fallback there yet). This is a change from the
+prior plan of AVKit/media_kit as the permanent strategy: MPVKit/libmpv is no
+longer blocked by GPL-3.0 incompatibility with App Store distribution, since
+the project relicensed to GPL-3.0 specifically to unblock it. What remains
+open is verifying actual App Store submission readiness (notarization,
+TestFlight, review) for the GPL-3.0 binary, not the playback backend choice
+itself.
 
 ## Next technical steps
 
-1. Implement a Flutter iOS/iPadOS playback plugin API that selects AVPlayer
-   for HLS/MP4, then server transcode. MPVKit/libmpv is not planned — do not
-   build a licensing-gated fallback path for it. macOS uses media_kit and
-   needs no equivalent plugin work.
-2. Build iOS/iPadOS native plugin spikes on a macOS/Xcode host and add
-   simulator/device smoke tests for load/play/pause/seek/teardown.
-3. Prototype a custom Flutter tvOS embedder with AVPlayer playback only, then
-   add `GCController` and Siri Remote press forwarding. MPVKit is not planned
-   for tvOS either.
-4. If the MPVKit/App Store decision is ever revisited, produce a legal bill of
-   materials for any mpv/FFmpeg/MPVKit/libass binary first — this is not
-   currently planned work.
+1. Native mpv playback plugins are implemented and confirmed working on
+   iOS/iPadOS (click-tested on iOS Simulator), macOS (click-tested), and
+   tvOS (video/audio/subtitles correct, one open cosmetic overlay bug). The
+   remaining work here is App Store submission readiness, not the backend
+   implementation itself: verify signing, notarization, and GPL-3.0 source-
+   offer/notice obligations before submitting mpv-based builds for review.
+2. Fix the tvOS overlay-scaling cosmetic bug (playback overlay renders
+   "boxed in" relative to the video) -- root cause theory not yet confirmed
+   is a coordinate-space mismatch between `_TvZoom`'s Flutter-tree scaling
+   and the native `AVSampleBufferDisplayLayer`. See `/MPV_MIGRATION_STATUS.md`.
+3. Fix the macOS Multiview regression: `buildMultiviewTilePlayer()` still
+   hard-codes `MediaKitDesktopAdapter`, which likely no longer has a
+   vendored native library to render with on macOS since
+   `media_kit_libs_macos_video` was removed from `pubspec.yaml`. Needs
+   either multi-instance/`playerId` support in `MacMpvNativeBackend` or a
+   replacement backend for Multiview specifically.
+4. Produce a legal bill of materials for the mpv/FFmpeg/MPVKit/libass
+   binaries now actually shipping, and complete GPL-3.0 App Store
+   submission review (source-offer obligations, notarization, TestFlight)
+   before submitting mpv-based builds for review.
