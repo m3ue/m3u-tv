@@ -915,13 +915,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // top edge under the status bar/notch.
                 final mediaQuery = MediaQuery.of(context);
                 final isCompact = mediaQuery.size.width < 600;
-                final overlayLeft = isCompact ? 16.0 : 104.0;
                 // On compact/portrait layouts the back button lives in
                 // PlaybackControls' own top-left corner (40px padding + a
                 // ~44px circular hit target); the overlay must clear that
-                // whole row instead of overlapping it.
-                final overlayTop =
-                    mediaQuery.padding.top + (isCompact ? 96.0 : 40.0);
+                // whole row instead of overlapping it. On tvOS,
+                // PlaybackControls uses a much smaller 8px padding (see its
+                // own comment), so the fixed 104 constant used elsewhere
+                // -- tuned around the old 40px padding -- left only ~2px
+                // between the back button and this overlay. Derive the left
+                // offset from the actual button geometry instead of a magic
+                // constant: safe-area inset + PlaybackControls' own padding
+                // + the ~44px circular back button + a real gap. See
+                // MPV_MIGRATION_STATUS.md's tvOS overlay investigation.
+                final overlayLeft = isCompact
+                    ? 16.0
+                    : Platform.operatingSystem == 'tvos'
+                    ? mediaQuery.padding.left + 8.0 + 44.0 + 16.0
+                    : 104.0;
+                // On tvOS, PlaybackControls uses a much smaller 8px padding
+                // (see its own comment) rather than 40, so this must match
+                // that or the back button and this overlay's top edges drift
+                // apart -- see MPV_MIGRATION_STATUS.md's tvOS overlay
+                // investigation.
+                final topPaddingMatch = Platform.operatingSystem == 'tvos'
+                    ? 8.0
+                    : (isCompact ? 96.0 : 40.0);
+                final overlayTop = mediaQuery.padding.top + topPaddingMatch;
                 final overlayWidth = isCompact
                     ? mediaQuery.size.width - overlayLeft * 2
                     : 420.0;

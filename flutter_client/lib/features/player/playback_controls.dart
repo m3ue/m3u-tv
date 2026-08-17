@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -77,8 +78,20 @@ class PlaybackControls extends StatelessWidget {
       child: ColoredBox(
         color: Colors.black26,
         child: SafeArea(
+          // SafeArea above already insets for the platform's real safe zone
+          // (notably tvOS's ~80px focus-safe-zone margin, which on TV also
+          // passes through _TvZoom's 1.6x scale-up). Stacking the full 40px
+          // app padding on top of that compounds into an excessive, "boxed
+          // in" inset on tvOS specifically -- see MPV_MIGRATION_STATUS.md's
+          // tvOS overlay investigation. tvOS gets a much smaller value, pure
+          // app-level breathing room rather than a safe-zone duplicate;
+          // other platforms (no SafeArea contribution) keep the original 40
+          // so macOS/iOS spacing -- already confirmed working -- doesn't
+          // change.
           child: Padding(
-            padding: const EdgeInsets.all(40),
+            padding: EdgeInsets.all(
+              Platform.operatingSystem == 'tvos' ? 8 : 40,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
