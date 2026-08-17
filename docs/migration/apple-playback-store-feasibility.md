@@ -18,12 +18,9 @@
 > it. `media_kit` (`MediaKitIosAdapter`/`MediaKitDesktopAdapter`) has been
 > removed from the main-playback fallback chain on iOS and macOS; only
 > `AppleAvKitBackend` remains as an automatic fallback (iOS/tvOS only --
-> macOS currently has no automatic fallback). `media_kit` is still used on
-> macOS, but only for the separate Multiview surface, which is a known
-> regression now that `media_kit_libs_macos_video` has been removed from
-> `pubspec.yaml` -- see `/MPV_MIGRATION_STATUS.md` for details. See that same
-> file at the repo root for current implementation status and debugging
-> history. This document's App Store guideline analysis (2.4.3, 2.4.5, 2.5.1,
+> macOS currently has no automatic fallback). `media_kit` is no longer used
+> anywhere on macOS: the separate Multiview surface now also uses
+> `MacMpvNativeBackend`. This document's App Store guideline analysis (2.4.3, 2.4.5, 2.5.1,
 > 2.5.2), tvOS embedder/remote-input findings, and AVKit-as-fallback design
 > remain valid and relevant — only the "MPVKit is not planned, GPL blocks it"
 > conclusion is out of date. App Store submission readiness itself (signing,
@@ -41,9 +38,8 @@ policy review. That plan has since been superseded: the project relicensed
 to GPL-3.0 specifically to unblock bundling MPVKit, and native mpv (via
 `edde746/MPVKit`) is now the working primary playback backend on macOS, iOS,
 and tvOS, with AVKit/AVPlayer demoted to an automatic fallback (iOS/tvOS
-only) rather than the primary path, and media_kit removed from main
-playback entirely (it remains only for macOS Multiview, which has a known
-regression -- see the status callout above). tvOS playback itself works
+only) rather than the primary path, and media_kit removed entirely, from
+macOS Multiview too (see the status callout above). tvOS playback itself works
 (video, audio, subtitles); the tvOS Flutter embedder/build/remote-input
 findings below remain accurate as historical/reference context for how the
 tvOS runner was built, but should not be read as still gating playback
@@ -82,8 +78,8 @@ submission review) has not yet been verified for the mpv-based builds.
 | --- | --- | --- | --- | --- | --- |
 | iOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing on iOS Simulator | Native mpv (`edde746/MPVKit`, `PlaybackBackend.appleMpvNative`), confirmed working (video, audio, no crash on back navigation). | `AppleAvKitBackend` as the sole automatic fallback if native mpv throws. | Native mpv is the primary, working playback strategy on iOS. App Store submission readiness (signing, notarization, review) is not yet verified. |
 | iPadOS | PASS for Flutter project generation | WORKING (shares the iOS target) | Same as iOS: native mpv primary, `AppleAvKitBackend` fallback. | `AppleAvKitBackend`. | Uses the supported iOS Flutter target; iPad-specific idiom/full-screen QA is separate from the backend question and remains untracked here. |
-| macOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing | Native mpv (`edde746/MPVKit`, `PlaybackBackend.macMpvNative`), confirmed working (video, audio, subtitles, track switching, seeking, clean teardown). | None for main playback currently -- `MediaKitDesktopAdapter` was removed as a fallback. media_kit remains only for the Multiview surface, which has a known regression (see status callout). | Native mpv is the primary, working playback strategy on macOS. Signing, notarization, and sandbox readiness for App Store distribution are not release-complete. |
-| tvOS | Builds via a custom Xcode-based runner (no `flutter build tvos` CLI support) | WORKING -- video, audio, subtitles all confirmed correct | Native mpv (`edde746/MPVKit`, `PlaybackBackend.appleMpvNative`), same as iOS. | `AppleAvKitBackend`. | tvOS playback works. One known open cosmetic bug: the playback overlay renders "boxed in" relative to the video (see `/MPV_MIGRATION_STATUS.md`). App Store/TestFlight submission readiness is not yet verified. |
+| macOS | PASS for Flutter project generation | WORKING -- confirmed via click-testing | Native mpv (`edde746/MPVKit`, `PlaybackBackend.macMpvNative`), confirmed working (video, audio, subtitles, track switching, seeking, clean teardown). | None for main playback currently -- `MediaKitDesktopAdapter` was removed as a fallback and is no longer used anywhere on macOS, including for Multiview (now also on `MacMpvNativeBackend`). | Native mpv is the primary, working playback strategy on macOS. Signing, notarization, and sandbox readiness for App Store distribution are not release-complete. |
+| tvOS | Builds via a custom Xcode-based runner (no `flutter build tvos` CLI support) | WORKING -- video, audio, subtitles all confirmed correct | Native mpv (`edde746/MPVKit`, `PlaybackBackend.appleMpvNative`), same as iOS. | `AppleAvKitBackend`. | tvOS playback works. The overlay-scaling cosmetic bug (playback overlay rendering "boxed in" relative to the video) has been fixed. App Store/TestFlight submission readiness is not yet verified. |
 
 ## Playback fallback matrix
 
@@ -91,8 +87,8 @@ submission review) has not yet been verified for the mpv-based builds.
 | --- | --- | --- |
 | iOS | Native mpv (`appleMpvNative`), then `AppleAvKitBackend`, then server transcode | Native mpv (`edde746/MPVKit`) is the working primary backend, confirmed via click-testing; GPL-3.0 relicensing removed the prior App Store blocker. AVKit remains the automatic fallback if native mpv throws. |
 | iPadOS | Same as iOS | Shares the iOS target; iPad-specific work is layout and accessory input, not a separate decoder stack. |
-| macOS | Native mpv (`macMpvNative`), then server transcode | Native mpv is the working primary backend, confirmed via click-testing. No automatic native fallback currently exists for main playback (media_kit was removed from that role and remains only for Multiview, which has a known regression). |
-| tvOS | Native mpv (`appleMpvNative`), then `AppleAvKitBackend`, then server transcode | Playback (video/audio/subtitles) works; one known open cosmetic bug (overlay "boxed in" relative to the video). The custom Xcode-based tvOS runner referenced below is already in place and building. |
+| macOS | Native mpv (`macMpvNative`), then server transcode | Native mpv is the working primary backend, confirmed via click-testing. No automatic native fallback currently exists for main playback (media_kit was removed from that role entirely, including for Multiview). |
+| tvOS | Native mpv (`appleMpvNative`), then `AppleAvKitBackend`, then server transcode | Playback (video/audio/subtitles) works; the overlay-scaling cosmetic bug (overlay "boxed in" relative to the video) has been fixed. The custom Xcode-based tvOS runner referenced below is already in place and building. |
 
 Native mpv is the primary backend on all three Apple platforms.
 `AppleAvKitBackend` remains the mandatory automatic fallback on iOS/tvOS if
@@ -161,10 +157,10 @@ Signing/bundle requirements:
   SPM package) must be embedded in the app target and code-signed by Xcode
   with valid provisioning profiles.
 - Native mpv/MPVKit ships GPL-3.0 code on all four Apple targets now; the
-  media_kit dependencies previously used as the macOS default no longer
-  apply to main playback (media_kit remains only for macOS Multiview).
-  Sandbox/hardened-runtime/notarization checks for the MPVKit-based bundle
-  have not yet been run for any distribution channel.
+  media_kit dependencies previously used as the macOS default are no
+  longer used at all, including for macOS Multiview. Sandbox/hardened-
+  runtime/notarization checks for the MPVKit-based bundle have not yet
+  been run for any distribution channel.
 - The xcframework-slice/architecture notes historically kept here as
   reference from the old Expo/React Native podspec remain reference-only
   context for how MPVKit frameworks are structured.
@@ -195,20 +191,15 @@ itself.
 
 1. Native mpv playback plugins are implemented and confirmed working on
    iOS/iPadOS (click-tested on iOS Simulator), macOS (click-tested), and
-   tvOS (video/audio/subtitles correct, one open cosmetic overlay bug). The
-   remaining work here is App Store submission readiness, not the backend
-   implementation itself: verify signing, notarization, and GPL-3.0 source-
-   offer/notice obligations before submitting mpv-based builds for review.
-2. Fix the tvOS overlay-scaling cosmetic bug (playback overlay renders
-   "boxed in" relative to the video) -- root cause theory not yet confirmed
-   is a coordinate-space mismatch between `_TvZoom`'s Flutter-tree scaling
-   and the native `AVSampleBufferDisplayLayer`. See `/MPV_MIGRATION_STATUS.md`.
-3. Fix the macOS Multiview regression: `buildMultiviewTilePlayer()` still
-   hard-codes `MediaKitDesktopAdapter`, which likely no longer has a
-   vendored native library to render with on macOS since
-   `media_kit_libs_macos_video` was removed from `pubspec.yaml`. Needs
-   either multi-instance/`playerId` support in `MacMpvNativeBackend` or a
-   replacement backend for Multiview specifically.
+   tvOS (video/audio/subtitles correct). The remaining work here is App
+   Store submission readiness, not the backend implementation itself:
+   verify signing, notarization, and GPL-3.0 source-offer/notice
+   obligations before submitting mpv-based builds for review.
+2. The tvOS overlay-scaling cosmetic bug (playback overlay renders
+   "boxed in" relative to the video) has been fixed.
+3. The macOS Multiview regression has been fixed: `buildMultiviewTilePlayer()`
+   now uses `MacMpvNativeBackend` (which implements `MultiviewBackend`)
+   instead of `MediaKitDesktopAdapter`.
 4. Produce a legal bill of materials for the mpv/FFmpeg/MPVKit/libass
    binaries now actually shipping, and complete GPL-3.0 App Store
    submission review (source-offer obligations, notarization, TestFlight)
