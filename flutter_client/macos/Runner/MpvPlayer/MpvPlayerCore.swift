@@ -125,8 +125,6 @@ final class MpvPlayerCore {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
       }
 
-      mpv_request_log_messages(handle, "v")
-
       let context = Unmanaged.passUnretained(self).toOpaque()
       mpv_set_wakeup_callback(handle, { context in
         guard let context else { return }
