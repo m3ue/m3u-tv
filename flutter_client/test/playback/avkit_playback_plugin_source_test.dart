@@ -130,4 +130,38 @@ void main() {
       ),
     );
   });
+
+  test('iOS AVKit keys player state by playerId for Multiview', () {
+    final source = File(
+      'ios/Runner/AvKitPlaybackPlugin.swift',
+    ).readAsStringSync();
+
+    // Was previously a single shared `state: _PlayerState?` field, so
+    // opening a second Multiview tile tore down the first tile's player
+    // instead of running concurrently — mirrors the tvOS fix above.
+    expect(
+      source,
+      contains('private var states: [String: _PlayerState] = [:]'),
+    );
+    expect(
+      source,
+      contains('let playerId = (args?["playerId"] as? String) ?? "default"'),
+    );
+    expect(source, contains('states[playerId] = playerState'));
+    expect(source, contains('func releasePlayer(playerId: String)'));
+    expect(
+      source,
+      contains(
+        'guard let s = states.removeValue(forKey: playerId) else { return }',
+      ),
+    );
+    expect(source, contains('case "setVolume":'));
+    expect(source, contains('states[playerId]?.player.volume = volume'));
+    expect(
+      source,
+      contains(
+        'var event: [String: Any] = ["type": type, "backend": "appleAvKit", "playerId": playerId]',
+      ),
+    );
+  });
 }
