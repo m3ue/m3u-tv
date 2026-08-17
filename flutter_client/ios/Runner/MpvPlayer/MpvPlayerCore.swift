@@ -55,8 +55,11 @@ final class MpvPlayerCore {
       )
       mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &layerPointer)
 
-      mpv_set_option_string(handle, "vo", "avfoundation")
+      // Must be set before mpv_initialize -- Plezy's tvOS core notes this
+      // ordering avoids a freeze on player exit specific to this VO; iOS
+      // shares the same avfoundation VO so it shares the same requirement.
       mpv_set_option_string(handle, "avfoundation-composite-osd", "yes")
+      mpv_set_option_string(handle, "vo", "avfoundation")
       mpv_set_option_string(handle, "hwdec", "videotoolbox")
       mpv_set_option_string(handle, "hwdec-codecs", "all")
       mpv_set_option_string(handle, "hwdec-software-fallback", "yes")
@@ -90,6 +93,8 @@ final class MpvPlayerCore {
       let result = mpv_initialize(handle)
       if result < 0 {
         self.emitError(message: "mpv_initialize failed (\(result))", code: "backend_unavailable")
+        mpv_terminate_destroy(handle)
+        self.mpv = nil
         return
       }
     }

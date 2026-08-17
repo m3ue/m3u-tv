@@ -98,6 +98,8 @@ final class MpvPlayerCore {
       let result = mpv_initialize(handle)
       if result < 0 {
         self.emitError(message: "mpv_initialize failed (\(result))", code: "backend_unavailable")
+        mpv_terminate_destroy(handle)
+        self.mpv = nil
         return
       }
     }

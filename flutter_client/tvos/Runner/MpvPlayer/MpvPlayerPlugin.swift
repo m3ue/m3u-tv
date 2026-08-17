@@ -21,6 +21,17 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   private let lock = NSLock()
 
   func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer) {
+    lock.lock()
+    let staleCore = cores[viewId]
+    lock.unlock()
+    // A platform view being recreated under a reused viewId before the old
+    // one's async dispose completed would otherwise silently orphan its
+    // core -- it'd keep running (and holding its native resources) with no
+    // reference left in `cores` to ever dispose it.
+    if let staleCore {
+      staleCore.dispose {}
+    }
+
     let core = MpvPlayerCore(viewId: viewId)
     core.delegate = self
     lock.lock()

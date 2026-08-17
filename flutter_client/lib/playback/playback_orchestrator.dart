@@ -245,6 +245,14 @@ class PlaybackOrchestrator {
           _activeBackend = null;
           _activeSource = null;
         }
+        if (adapter is PlatformViewProvider) {
+          // Same use-after-free reasoning as the PlaybackException branch
+          // below: this adapter's platform view is about to be unmounted
+          // (the current generation's own adapter is what's now mounted),
+          // and a native platform-view-backed core can hold an unretained
+          // pointer into that view's layer until this finishes.
+          await (adapter as PlatformViewProvider).releaseNativeView();
+        }
         await adapter.stop();
         return null;
       }

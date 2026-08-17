@@ -67,6 +67,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   int _primaryIndex = 0;
   MultiviewPipCorner _pipCorner = MultiviewPipCorner.bottomRight;
   int _nextPlayerSeq = 0;
+  bool _closing = false;
 
   @override
   void initState() {
@@ -82,6 +83,23 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       tile.dispose();
     }
     super.dispose();
+  }
+
+  // Same rationale as app_shell.dart's _closePlayer: a platform-view-backed
+  // core can hold an unretained pointer into its own native view's layer,
+  // so every tile's native teardown must finish before this route's own
+  // pop unmounts those views, not after. Routed through PopScope (below)
+  // rather than State.dispose(), which the framework calls synchronously
+  // as the route is already being removed -- too late to delay anything.
+  Future<void> _handleClose() async {
+    if (_closing) return;
+    _closing = true;
+    await Future.wait([
+      for (final tile in _tiles)
+        tile.orchestrator?.dispose() ?? Future<void>.value(),
+    ]);
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   PlaybackSource _sourceFor(Channel channel) => PlaybackSource(
@@ -357,41 +375,48 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFF09090b),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Row(
-                children: [
-                  DpadFocusable(
-                    onSelect: () => Navigator.of(context).pop(),
-                    effects: const [
-                      GradientBorderEffect(
-                        borderRadius: BorderRadius.all(Radius.circular(50)),
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_handleClose());
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF09090b),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                child: Row(
+                  children: [
+                    DpadFocusable(
+                      onSelect: () => Navigator.of(context).pop(),
+                      effects: const [
+                        GradientBorderEffect(
+                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                        ),
+                      ],
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back),
                       ),
-                    ],
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.arrow_back),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    l10n.multiviewTitle,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ],
+                    const SizedBox(width: 16),
+                    Text(
+                      l10n.multiviewTitle,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: _tiles.isEmpty
-                  ? Center(child: Text(l10n.multiviewEmpty))
-                  : _buildLayout(),
-            ),
-          ],
+              Expanded(
+                child: _tiles.isEmpty
+                    ? Center(child: Text(l10n.multiviewEmpty))
+                    : _buildLayout(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -537,6 +562,14 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
             fit: StackFit.expand,
             children: [
               NativeVideoSurface(
+                // Reordering swaps which tile backs this grid position
+                // (_handleDirection moves entries within _tiles), but this
+                // widget's position in the tree stays put -- without a key
+                // tied to the tile's own identity, Flutter would reuse the
+                // existing AppKitView/UiKitView element and its already-
+                // attached native view for the new tile instead of
+                // recreating it.
+                key: ValueKey(tile.playerId),
                 textureId: _textureIdFor(tile),
                 platformView: _platformViewFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
