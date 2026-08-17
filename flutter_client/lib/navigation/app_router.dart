@@ -7,7 +7,6 @@ import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/apple_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/mac_mpv_native_backend.dart';
-import 'package:m3u_tv/playback/media_kit_desktop_adapter.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -206,7 +205,8 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
 /// retry/error handling for free. Only offered on platforms whose native
 /// backend can host several concurrent players (see `_multiviewSupported`
 /// in `live_tv_screen.dart`): tvOS, iOS, and Android key native player state
-/// by [playerId] to multiplex over their one channel pair; macOS (media_kit)
+/// by [playerId] to multiplex over their one channel pair; macOS
+/// (`MacMpvNativeBackend`, keyed by its own internally-generated `_viewId`)
 /// and Linux/Windows (the in-process libmpv backend) are multi-instance by
 /// design already, so `playerId` is unused there.
 ({PlaybackOrchestrator orchestrator, MultiviewBackend backend})
@@ -239,8 +239,8 @@ buildMultiviewTilePlayer(String playerId) {
       backendKind = PlaybackBackend.androidExoPlayer;
     case PlaybackPlatform.desktop:
       if (Platform.isMacOS) {
-        backend = MediaKitDesktopAdapter();
-        backendKind = PlaybackBackend.desktopMediaKit;
+        backend = MacMpvNativeBackend();
+        backendKind = PlaybackBackend.macMpvNative;
       } else {
         backend = DesktopLibmpvBackend();
         backendKind = PlaybackBackend.desktopLibmpv;

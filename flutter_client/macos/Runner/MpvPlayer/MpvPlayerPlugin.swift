@@ -73,6 +73,10 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       let speed = (args["speed"] as? NSNumber)?.doubleValue ?? 1.0
       core(for: viewId)?.setPlaybackSpeed(speed)
       result(nil)
+    case "setVolume":
+      let volume = (args["volume"] as? NSNumber)?.doubleValue ?? 100.0
+      core(for: viewId)?.setVolume(volume)
+      result(nil)
     case "dispose":
       core(for: viewId)?.dispose()
       lock.lock()

@@ -228,6 +228,13 @@ final class MpvPlayerCore {
     }
   }
 
+  func setVolume(_ volume: Double) {
+    queue.async { [weak self] in
+      guard let self, let handle = self.mpv else { return }
+      mpv_set_property_string(handle, "volume", String(volume))
+    }
+  }
+
   func dispose() {
     // Deliberately a strong capture, not `[weak self]`: `MpvPlayerPlugin`
     // calls `dispose()` (which only schedules this block) and then

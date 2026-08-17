@@ -35,7 +35,8 @@ int _nextViewId = 0;
 /// Subtitles are rendered natively (mpv's own libass compositing, baked into
 /// the `gpu-next`/libplacebo output), so this adapter does not implement
 /// `SubtitleControllerProvider` -- same as `DesktopLibmpvBackend`.
-class MacMpvNativeBackend implements PlayerAdapter, PlatformViewProvider {
+class MacMpvNativeBackend
+    implements PlayerAdapter, PlatformViewProvider, MultiviewBackend {
   MacMpvNativeBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _viewId = _nextViewId++,
       _channel = channel ?? const MethodChannel(_methodChannelName),
@@ -221,6 +222,15 @@ class MacMpvNativeBackend implements PlayerAdapter, PlatformViewProvider {
   @override
   Future<void> setPlaybackSpeed(double speed) async {
     await _invokeControl('setPlaybackSpeed', <String, Object?>{'speed': speed});
+  }
+
+  @override
+  Future<void> setVolume(double volume) async {
+    // mpv's `volume` property (like media_kit's) is 0-100, not the 0-1 scale
+    // [MultiviewBackend.setVolume] uses to match AVPlayer/ExoPlayer.
+    await _invokeControl('setVolume', <String, Object?>{
+      'volume': volume * 100,
+    });
   }
 
   @override

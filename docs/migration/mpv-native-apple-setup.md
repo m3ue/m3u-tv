@@ -84,6 +84,6 @@ path itself still works too, since it's the safety net for this rollout.
 `MediaKitIosAdapter` has been removed from the adapter registration
 entirely and is no longer a fallback on iOS. On macOS, `MediaKitDesktopAdapter`
 was also removed as a fallback for `macMpvNative` -- there is currently no
-automatic fallback if native mpv throws on macOS (media_kit is still used
-there, but only for the separate Multiview surface, which has a known
-regression -- see `playback-backend-matrix.md`).
+automatic fallback if native mpv throws on macOS. `MediaKitDesktopAdapter`
+is no longer used anywhere on macOS: the separate Multiview surface now
+also runs on `MacMpvNativeBackend` -- see `playback-backend-matrix.md`.

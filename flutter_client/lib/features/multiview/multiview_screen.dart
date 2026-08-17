@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
@@ -519,6 +521,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
             children: [
               _TileVideoSurface(
                 textureId: _textureIdFor(tile),
+                platformView: _platformViewFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
               ),
               if (tile.hasError)
@@ -580,8 +583,18 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
 
   int? _textureIdFor(_MultiviewTile tile) {
     final backend = tile.backend;
-    if (backend == null) return null;
-    return backend.textureId;
+    if (backend is VideoTextureProvider) {
+      return (backend! as VideoTextureProvider).textureId;
+    }
+    return null;
+  }
+
+  PlatformViewProvider? _platformViewFor(_MultiviewTile tile) {
+    final backend = tile.backend;
+    if (backend is PlatformViewProvider) {
+      return backend! as PlatformViewProvider;
+    }
+    return null;
   }
 }
 
@@ -621,13 +634,35 @@ class _MenuOption extends StatelessWidget {
 }
 
 class _TileVideoSurface extends StatelessWidget {
-  const _TileVideoSurface({required this.textureId, required this.aspectRatio});
+  const _TileVideoSurface({
+    required this.textureId,
+    required this.platformView,
+    required this.aspectRatio,
+  });
 
   final int? textureId;
+  final PlatformViewProvider? platformView;
   final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
+    final view = platformView;
+    if (view != null) {
+      final child = Platform.isMacOS
+          ? AppKitView(
+              viewType: view.platformViewType,
+              creationParams: view.platformViewCreationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+            )
+          : UiKitView(
+              viewType: view.platformViewType,
+              creationParams: view.platformViewCreationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+            );
+      return Center(
+        child: AspectRatio(aspectRatio: aspectRatio, child: child),
+      );
+    }
     final id = textureId;
     if (id == null) return const ColoredBox(color: Colors.black);
     return Center(

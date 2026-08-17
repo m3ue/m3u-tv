@@ -36,11 +36,12 @@ abstract class PlatformViewProvider {
   Map<String, dynamic>? get platformViewCreationParams;
 }
 
-/// A [PlayerAdapter] that Multiview can drive: one concurrently playable,
-/// texture-backed instance per grid tile. [setVolume] mutes/unmutes a tile
-/// by audio focus without touching its playback state, which none of the
-/// other [PlayerAdapter] methods express.
-abstract class MultiviewBackend implements PlayerAdapter, VideoTextureProvider {
+/// A [PlayerAdapter] that Multiview can drive: one concurrently playable
+/// instance per grid tile, rendered via either [VideoTextureProvider] or
+/// [PlatformViewProvider]. [setVolume] mutes/unmutes a tile by audio focus
+/// without touching its playback state, which none of the other
+/// [PlayerAdapter] methods express.
+abstract class MultiviewBackend implements PlayerAdapter {
   Future<void> setVolume(double volume);
 }
 
