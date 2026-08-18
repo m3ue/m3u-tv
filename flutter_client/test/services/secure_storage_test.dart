@@ -97,6 +97,72 @@ void main() {
       expect(appStateJson, isNot(contains(passwordSentinel)));
     },
   );
+
+  group('ResilientSecureStorage', () {
+    test('uses the primary storage when it works', () async {
+      final primary = InMemorySecureStorage();
+      final fallback = InMemorySecureStorage();
+      final storage = ResilientSecureStorage(
+        primary: primary,
+        fallback: fallback,
+      );
+
+      await storage.write('key', 'value');
+
+      expect(await primary.read('key'), 'value');
+      expect(await fallback.read('key'), isNull);
+    });
+
+    test(
+      'falls back permanently after the primary throws, and reports it',
+      () async {
+        final fallback = InMemorySecureStorage();
+        final primary = InMemorySecureStorage();
+        Object? reportedError;
+        final storage = ResilientSecureStorage(
+          primary: _OnceFailingSecureStorage(primary),
+          fallback: fallback,
+          onFallback: (error) => reportedError = error,
+        );
+
+        await storage.write('key', 'value');
+        expect(await fallback.read('key'), 'value');
+        expect(reportedError, isA<StateError>());
+
+        // Primary would now succeed (it only fails its first call), but the
+        // fallback decision is permanent for this instance -- a second write
+        // must still land in fallback, not primary.
+        await storage.write('other', 'value2');
+        expect(await fallback.read('other'), 'value2');
+        expect(await primary.read('other'), isNull);
+      },
+    );
+  });
+}
+
+/// Delegates to [delegate], but throws once on the first call and never
+/// again -- used to prove a caller's fallback decision, once made, is not
+/// re-evaluated even after the primary would start succeeding again.
+class _OnceFailingSecureStorage implements SecureStorage {
+  _OnceFailingSecureStorage(this.delegate);
+
+  final SecureStorage delegate;
+  bool _hasFailed = false;
+
+  @override
+  Future<String?> read(String key) => delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) async {
+    if (!_hasFailed) {
+      _hasFailed = true;
+      throw StateError('storage unavailable');
+    }
+    await delegate.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) => delegate.delete(key);
 }
 
 class _FailingSecureStorage implements SecureStorage {

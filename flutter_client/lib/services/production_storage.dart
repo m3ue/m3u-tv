@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 
@@ -21,10 +23,30 @@ ProductionStorage createProductionStorage({
 }) {
   final appStateStore = persistentStore ?? PersistentJsonStore();
   final credentialStorage = switch (operatingSystem) {
+    // Linux's OS keyring (libsecret/gnome-keyring) can be genuinely
+    // unreachable in some environments -- headless/VNC sessions whose PAM
+    // stack never auto-unlocks it and that have no secret-prompter component
+    // to unlock it interactively either, surfacing as a permanent
+    // `PlatformException(KeyringLocked, ...)`. That's documented upstream
+    // flutter_secure_storage behavior, not a transient error a retry fixes.
+    // ResilientSecureStorage keeps the real OS keyring for the (common) case
+    // where it works, and only degrades to plaintext file storage for the
+    // (uncommon) environments where it genuinely can't be reached.
+    'linux' => secureStorageFactory != null
+        ? secureStorageFactory()
+        : ResilientSecureStorage(
+            primary: FlutterSecureStorageAdapter(),
+            fallback: FileSecureStorage(store: appStateStore),
+            onFallback: (error) => developer.log(
+              'Linux OS keyring unavailable; falling back to file-based '
+              'credential storage for this session: $error',
+              name: 'ProductionStorage',
+              level: 900, // warning
+            ),
+          ),
     'android' ||
     'ios' ||
     'tvos' ||
-    'linux' ||
     'windows' => (secureStorageFactory ?? FlutterSecureStorageAdapter.new)(),
     _ => FileSecureStorage(store: appStateStore),
   };

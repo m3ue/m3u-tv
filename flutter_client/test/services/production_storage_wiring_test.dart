@@ -6,13 +6,7 @@ import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 
 void main() {
-  for (final operatingSystem in <String>[
-    'android',
-    'ios',
-    'tvos',
-    'linux',
-    'windows',
-  ]) {
+  for (final operatingSystem in <String>['android', 'ios', 'tvos', 'windows']) {
     test('$operatingSystem startup injects secure credential storage', () {
       final store = PersistentJsonStore();
 
@@ -25,6 +19,27 @@ void main() {
       expect(storage.appStateStore, same(store));
     });
   }
+
+  test(
+    'linux startup injects a keyring-first, file-fallback credential storage',
+    () {
+      final store = PersistentJsonStore();
+
+      final storage = createProductionStorage(
+        operatingSystem: 'linux',
+        persistentStore: store,
+      );
+
+      final credentialStorage = storage.credentialStorage;
+      expect(credentialStorage, isA<ResilientSecureStorage>());
+      expect(
+        (credentialStorage as ResilientSecureStorage).primary,
+        isA<FlutterSecureStorageAdapter>(),
+      );
+      expect(credentialStorage.fallback, isA<FileSecureStorage>());
+      expect(storage.appStateStore, same(store));
+    },
+  );
 
   test('desktop startup migrates Linux and Windows credentials', () {
     expect(shouldMigrateLegacyCredentials('linux'), isTrue);

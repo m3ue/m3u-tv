@@ -165,3 +165,54 @@ class FileSecureStorage implements SecureStorage {
     await _store.delete(key);
   }
 }
+
+/// Prefers [primary] (the OS keyring) but permanently switches this instance
+/// to [fallback] the first time [primary] throws -- e.g. Linux's
+/// `PlatformException(KeyringLocked, ...)` when no Secret Service is
+/// reachable at all (headless/VNC dev environments with no PAM auto-unlock
+/// and no secret prompter; this is documented upstream `flutter_secure_storage`
+/// behavior, not something a retry or a different call recovers from). Users
+/// whose keyring works keep full OS-level encryption; only environments
+/// where it's genuinely unusable degrade to [fallback].
+///
+/// The fallback decision is per-process, not persisted -- a fresh launch
+/// tries [primary] again, so a keyring that gets unlocked/fixed between runs
+/// is used again automatically.
+class ResilientSecureStorage implements SecureStorage {
+  ResilientSecureStorage({
+    required this.primary,
+    required this.fallback,
+    void Function(Object error)? onFallback,
+  }) : _onFallback = onFallback;
+
+  final SecureStorage primary;
+  final SecureStorage fallback;
+  final void Function(Object error)? _onFallback;
+  bool _useFallback = false;
+
+  @override
+  Future<String?> read(String key) =>
+      _run(() => primary.read(key), () => fallback.read(key));
+
+  @override
+  Future<void> write(String key, String value) =>
+      _run(() => primary.write(key, value), () => fallback.write(key, value));
+
+  @override
+  Future<void> delete(String key) =>
+      _run(() => primary.delete(key), () => fallback.delete(key));
+
+  Future<T> _run<T>(
+    Future<T> Function() usePrimary,
+    Future<T> Function() useFallback,
+  ) async {
+    if (_useFallback) return useFallback();
+    try {
+      return await usePrimary();
+    } on Object catch (error) {
+      _useFallback = true;
+      _onFallback?.call(error);
+      return useFallback();
+    }
+  }
+}
