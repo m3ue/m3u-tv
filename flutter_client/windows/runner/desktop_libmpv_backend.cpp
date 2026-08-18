@@ -74,6 +74,7 @@ using mpv_observe_property_fn = int (*)(mpv_handle*, uint64_t, const char*, int)
 using mpv_unobserve_property_fn = int (*)(mpv_handle*, uint64_t);
 using mpv_wakeup_fn = void (*)(mpv_handle*);
 using mpv_wait_event_fn = struct mpv_event* (*)(mpv_handle*, double);
+using mpv_request_log_messages_fn = int (*)(mpv_handle*, const char*);
 using mpv_render_update_fn = void (*)(void*);
 using mpv_render_context = struct mpv_render_context;
 using mpv_render_context_create_fn = int (*)(mpv_render_context**, mpv_handle*, void*);
@@ -106,6 +107,15 @@ struct mpv_event_end_file {
   int64_t playlist_insert_id;
   int playlist_insert_num_entries;
 };
+
+struct mpv_event_log_message {
+  const char* prefix;
+  const char* level;
+  const char* text;
+  int log_level;
+};
+
+constexpr int MPV_EVENT_LOG_MESSAGE = 2;
 
 constexpr int MPV_FORMAT_DOUBLE = 5;
 constexpr int MPV_FORMAT_FLAG = 3;
@@ -186,6 +196,7 @@ struct LibmpvApi {
   mpv_unobserve_property_fn unobserve_property = nullptr;
   mpv_wakeup_fn wakeup = nullptr;
   mpv_wait_event_fn wait_event = nullptr;
+  mpv_request_log_messages_fn request_log_messages = nullptr;
   mpv_render_context_create_fn render_context_create = nullptr;
   mpv_render_context_set_update_callback_fn render_context_set_update_callback = nullptr;
   mpv_render_context_render_fn render_context_render = nullptr;
@@ -553,6 +564,11 @@ struct PlayerInstance {
   std::thread event_thread;
   std::atomic<bool> disposing{false};
   std::atomic<int64_t> sequence{0};
+  // The most recent mpv log line at "warn" level or above, kept so an
+  // END_FILE/ERROR snapshot can report *why* rather than just mpv's
+  // sparse numeric error code. Only ever touched from the event thread,
+  // which is also what builds that snapshot, so no lock is needed.
+  std::string last_log_message;
 
   // GPU/native-window path only (see the second constructor above).
   bool using_gpu_window = false;
@@ -630,6 +646,8 @@ LibmpvApi& Api() {
   g_api.unobserve_property = reinterpret_cast<mpv_unobserve_property_fn>(LoadSymbol(g_api.library, "mpv_unobserve_property"));
   g_api.wakeup = reinterpret_cast<mpv_wakeup_fn>(LoadSymbol(g_api.library, "mpv_wakeup"));
   g_api.wait_event = reinterpret_cast<mpv_wait_event_fn>(LoadSymbol(g_api.library, "mpv_wait_event"));
+  g_api.request_log_messages =
+      reinterpret_cast<mpv_request_log_messages_fn>(LoadSymbol(g_api.library, "mpv_request_log_messages"));
   g_api.render_context_create = reinterpret_cast<mpv_render_context_create_fn>(LoadSymbol(g_api.library, "mpv_render_context_create"));
   g_api.render_context_set_update_callback = reinterpret_cast<mpv_render_context_set_update_callback_fn>(LoadSymbol(g_api.library, "mpv_render_context_set_update_callback"));
   g_api.render_context_render = reinterpret_cast<mpv_render_context_render_fn>(LoadSymbol(g_api.library, "mpv_render_context_render"));
@@ -1185,6 +1203,7 @@ void PlayerInstance::StartEventThread() {
     for (const char* name : doubles) api->observe_property(handle, 0, name, MPV_FORMAT_DOUBLE);
     for (const char* name : flags) api->observe_property(handle, 0, name, MPV_FORMAT_FLAG);
     for (const char* name : strings) api->observe_property(handle, 0, name, MPV_FORMAT_STRING);
+    if (api->request_log_messages != nullptr) api->request_log_messages(handle, "warn");
     if (using_gpu_window) {
       // Only the GPU/native-window path has an OS display to toggle HDR or
       // match a refresh rate against; the SW pixel-buffer path has neither.
@@ -1199,6 +1218,23 @@ void PlayerInstance::StartEventThread() {
         const auto* property = static_cast<const mpv_event_property*>(event->data);
         if (property != nullptr && property->format == MPV_FORMAT_NODE && property->data != nullptr) {
           ApplyHdrForVideoParams(this, static_cast<const mpv_node*>(property->data));
+        }
+        continue;
+      }
+      if (event->event_id == MPV_EVENT_LOG_MESSAGE) {
+        // Cached, not forwarded to Dart on its own: this is "warn" level and
+        // above (see request_log_messages above), which includes routine
+        // warnings alongside the fatal/error lines that actually explain a
+        // load failure. Kept so the *next* END_FILE/ERROR snapshot -- which
+        // otherwise carries only mpv's sparse numeric error code -- can
+        // report the real reason underneath it.
+        const auto* log_message = static_cast<const mpv_event_log_message*>(event->data);
+        if (log_message != nullptr && log_message->text != nullptr) {
+          std::string text = log_message->text;
+          while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
+          if (!text.empty()) {
+            last_log_message = (log_message->prefix != nullptr ? std::string(log_message->prefix) + ": " : "") + text;
+          }
         }
         continue;
       }
@@ -1236,6 +1272,7 @@ void PlayerInstance::StartEventThread() {
             snapshot.kind = "ERROR";
             snapshot.message = "libmpv end-file error " +
                                std::to_string(end_file->error);
+            if (!last_log_message.empty()) snapshot.message += " (" + last_log_message + ")";
             snapshot.code = "mpv-end-file-error";
             snapshot.recoverable = true;
             break;
