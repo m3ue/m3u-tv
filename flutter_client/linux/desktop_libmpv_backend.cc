@@ -9,6 +9,9 @@
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
+#ifdef HAVE_WAYLAND_MPV_PLANE
+#include "wayland_video_surface.h"
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -77,6 +80,31 @@ struct mpv_render_param {
   int type;
   void* data;
 };
+
+#ifdef HAVE_WAYLAND_MPV_PLANE
+// mpv's OpenGL render API (mpv/render_gl.h), hardcoded against the stable
+// values documented there -- the same approach already used above for the
+// software render API's MPV_RENDER_PARAM_SW_* constants, so no libmpv
+// devel headers are required to build this file (only the runtime .so,
+// dlopen'd via LibmpvApi below).
+constexpr int MPV_RENDER_PARAM_OPENGL_INIT_PARAMS = 2;
+constexpr int MPV_RENDER_PARAM_OPENGL_FBO = 3;
+constexpr int MPV_RENDER_PARAM_FLIP_Y = 4;
+constexpr int MPV_RENDER_PARAM_DEPTH = 5;
+constexpr char kMpvRenderApiTypeOpenGl[] = "opengl";
+
+using mpv_opengl_get_proc_address_fn = void* (*)(void* ctx, const char* name);
+struct mpv_opengl_init_params {
+  mpv_opengl_get_proc_address_fn get_proc_address;
+  void* get_proc_address_ctx;
+};
+struct mpv_opengl_fbo {
+  int fbo;
+  int w;
+  int h;
+  int internal_format;
+};
+#endif  // HAVE_WAYLAND_MPV_PLANE
 
 struct mpv_event {
   int event_id;
@@ -382,6 +410,12 @@ struct TextureDispatchState {
   FlTexture* texture = nullptr;
 };
 
+struct PlayerInstance;
+#ifdef HAVE_WAYLAND_MPV_PLANE
+// Defined near the other GPU render-path helpers, after this struct.
+void TeardownGpuPlane(PlayerInstance* player);
+#endif
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, FlTextureRegistrar* texture_registrar,
                  std::shared_ptr<EventDispatchState> event_dispatch_state,
@@ -401,6 +435,24 @@ struct PlayerInstance {
     texture->copy_context = copy_context;
     copy_context->Retain();
   }
+
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  // GPU/Wayland-plane constructor: no Flutter texture is created at all --
+  // video reaches the screen through the wl_subsurface `gpu_plane` owns, not
+  // through anything Flutter's compositor knows about. See CreateGpuPlane()
+  // in Load().
+  PlayerInstance(LibmpvApi* api, std::shared_ptr<EventDispatchState> event_dispatch_state,
+                 mpv_handle* handle, mpv_render_context* render_context, EGLContext gpu_egl_context,
+                 std::unique_ptr<m3u_tv_mpv_plane::WaylandVideoSurface> gpu_plane, int64_t id)
+      : api(api),
+        event_dispatch_state(std::move(event_dispatch_state)),
+        handle(handle),
+        render_context(render_context),
+        id(id),
+        using_gpu_plane(true),
+        gpu_egl_context(gpu_egl_context),
+        gpu_plane(std::move(gpu_plane)) {}
+#endif
 
   ~PlayerInstance() {
     disposing.store(true);
@@ -442,6 +494,16 @@ struct PlayerInstance {
       copy_context->Release();
       copy_context = nullptr;
     }
+#ifdef HAVE_WAYLAND_MPV_PLANE
+    // Defined below, alongside the rest of the GPU render-path helpers: the
+    // GPU plane's render_context/EGL context are only ever touched from the
+    // GTK main thread (RenderGpuFrame's idle source, and this destructor,
+    // which likewise only ever runs there), unlike CopyPixelsContext's
+    // mutex-guarded render_context, which the Flutter raster thread's
+    // MpvTextureCopyPixels callback can reach concurrently. See
+    // TeardownGpuPlane's own comment.
+    if (using_gpu_plane) TeardownGpuPlane(this);
+#endif
   }
 
   void StartEventThread();
@@ -459,6 +521,17 @@ struct PlayerInstance {
   int64_t id = 0;
   std::thread event_thread;
   std::atomic<bool> disposing{false};
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  bool using_gpu_plane = false;
+  EGLContext gpu_egl_context = EGL_NO_CONTEXT;
+  std::unique_ptr<m3u_tv_mpv_plane::WaylandVideoSurface> gpu_plane;
+  // Coalesces mpv's render-update callback (fired from an mpv thread) onto a
+  // single pending GTK-main-thread idle source. Guards against scheduling a
+  // redraw after PlayerInstance starts tearing down.
+  std::atomic<bool> gpu_needs_redraw{false};
+  std::atomic<bool> gpu_render_scheduled{false};
+  std::atomic<guint> gpu_idle_source_id{0};
+#endif
   std::atomic<int> sequence{0};
   CopyPixelsContext* copy_context = nullptr;
   TextureDispatchState* texture_state = nullptr;
@@ -469,6 +542,12 @@ FlTextureRegistrar* g_texture_registrar = nullptr;
 std::shared_ptr<EventChannelState> g_event_channel_state;
 int64_t g_next_handle = 1;
 std::map<int64_t, std::unique_ptr<PlayerInstance>> g_players;
+#ifdef HAVE_WAYLAND_MPV_PLANE
+// The Flutter view widget, captured at plugin registration. Needed to create
+// the Wayland video plane subsurface (it must be a child of the toplevel
+// this view is hosted in) -- see CreateGpuPlane().
+FlView* g_flutter_view = nullptr;
+#endif
 
 void* LoadSymbol(void* library, const char* name) { return dlsym(library, name); }
 
@@ -637,6 +716,210 @@ std::string HeaderString(FlValue* args) {
     value << fl_value_get_string(key) << ": " << fl_value_get_string(item);
   }
   return value.str();
+}
+
+#ifdef HAVE_WAYLAND_MPV_PLANE
+void* GetOpenGlProcAddress(void* ctx, const char* name) {
+  (void)ctx;
+  return reinterpret_cast<void*>(eglGetProcAddress(name));
+}
+
+// Renders one mpv frame into the plane's EGL surface and presents it. Must
+// only be called on the GTK main thread (it makes the plane's EGL context
+// current on this thread).
+void RenderGpuFrame(PlayerInstance* player) {
+  if (player == nullptr || player->disposing.load(std::memory_order_acquire)) return;
+  m3u_tv_mpv_plane::WaylandVideoSurface* plane = player->gpu_plane.get();
+  if (plane == nullptr || !plane->valid() || !plane->has_size()) return;
+  if (plane->frame_pending()) return;  // Present() will no-op; wait for the ack.
+
+  if (!eglMakeCurrent(plane->egl_display(), plane->egl_surface(), plane->egl_surface(), player->gpu_egl_context)) {
+    g_warning("MPV video plane: failed to activate EGL context for render: 0x%x", eglGetError());
+    return;
+  }
+
+  player->gpu_needs_redraw.store(false, std::memory_order_release);
+
+  mpv_opengl_fbo fbo{};
+  fbo.fbo = 0;  // the plane's own default framebuffer
+  fbo.w = plane->width();
+  fbo.h = plane->height();
+  fbo.internal_format = plane->depth_bits() >= 10 ? 0x8059 /* GL_RGB10_A2 */ : 0x8058 /* GL_RGBA8 */;
+  int flip_y = 1;
+  int depth = plane->depth_bits();
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
+      {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
+      {MPV_RENDER_PARAM_DEPTH, &depth},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  if (player->api != nullptr && player->api->render_context_render != nullptr) {
+    player->api->render_context_render(player->render_context, params);
+  }
+  plane->Present();
+}
+
+gboolean RenderGpuFrameIdle(gpointer data) {
+  auto* player = static_cast<PlayerInstance*>(data);
+  player->gpu_idle_source_id.store(0, std::memory_order_release);
+  player->gpu_render_scheduled.store(false, std::memory_order_release);
+  if (!player->disposing.load(std::memory_order_acquire) && player->gpu_needs_redraw.load(std::memory_order_acquire)) {
+    RenderGpuFrame(player);
+  }
+  return G_SOURCE_REMOVE;
+}
+
+// Coalesces a redraw request onto a single pending GTK-main-thread idle
+// source. Safe to call from any thread (mpv's render-update callback may
+// fire from an mpv-internal thread; the plane's own frame-ack callback
+// always runs on the GTK main thread already).
+void ScheduleGpuRender(PlayerInstance* player) {
+  if (player == nullptr || player->disposing.load(std::memory_order_acquire)) return;
+  player->gpu_needs_redraw.store(true, std::memory_order_release);
+  bool expected = false;
+  if (!player->gpu_render_scheduled.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+    return;  // Already scheduled; it will pick up the latest gpu_needs_redraw.
+  }
+  const guint source_id = g_idle_add(RenderGpuFrameIdle, player);
+  player->gpu_idle_source_id.store(source_id, std::memory_order_release);
+}
+
+// mpv's OpenGL render-update callback. May be invoked from an mpv-internal
+// thread per the render API's documented contract.
+void OnMpvRenderUpdateGpu(void* ctx) { ScheduleGpuRender(static_cast<PlayerInstance*>(ctx)); }
+
+// The GPU plane has no CopyPixelsContext-style mutex-guarded wrapper around
+// render_context_set_update_callback -- unlike the software path, nothing on
+// the Flutter raster thread ever touches this render_context (see
+// TeardownGpuPlane's comment), so there is no concurrent caller to guard
+// against. Kept as its own function purely so the raw API call has one
+// obvious call site.
+void AttachGpuRenderCallback(LibmpvApi& api, mpv_render_context* render_context, PlayerInstance* player) {
+  api.render_context_set_update_callback(render_context, OnMpvRenderUpdateGpu, player);
+}
+
+// Creates the isolated EGL context and mpv OpenGL render context bound to
+// `plane`. Deliberately not shared with Flutter's own GL context -- see
+// wayland_video_surface.h. Returns false and fills `error` on any failure.
+bool CreateGpuRenderContext(LibmpvApi& api, mpv_handle* handle, m3u_tv_mpv_plane::WaylandVideoSurface& plane,
+                            EGLContext* out_context, mpv_render_context** out_render, std::string* error) {
+  if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+    if (error) *error = "Failed to bind OpenGL ES API for the video plane";
+    return false;
+  }
+
+  EGLContext context = EGL_NO_CONTEXT;
+  for (const EGLint client_version : {3, 2}) {
+    const EGLint attribs[] = {EGL_CONTEXT_CLIENT_VERSION, client_version, EGL_NONE};
+    context = eglCreateContext(plane.egl_display(), plane.egl_config(), EGL_NO_CONTEXT, attribs);
+    if (context != EGL_NO_CONTEXT) break;
+  }
+  if (context == EGL_NO_CONTEXT) {
+    if (error) *error = "Failed to create the video-plane EGL context";
+    return false;
+  }
+
+  if (!eglMakeCurrent(plane.egl_display(), plane.egl_surface(), plane.egl_surface(), context)) {
+    eglDestroyContext(plane.egl_display(), context);
+    if (error) *error = "Failed to activate the video-plane EGL context";
+    return false;
+  }
+  // The plane paces itself with its own frame-ack callback; the default
+  // swap interval would otherwise throttle eglSwapBuffers on the
+  // compositor's frame callback, which an occluded surface never receives.
+  eglSwapInterval(plane.egl_display(), 0);
+
+  mpv_opengl_init_params gl_init_params{};
+  gl_init_params.get_proc_address = GetOpenGlProcAddress;
+  gl_init_params.get_proc_address_ctx = nullptr;
+  mpv_render_param params[] = {
+      {MPV_RENDER_PARAM_API_TYPE, const_cast<char*>(kMpvRenderApiTypeOpenGl)},
+      {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init_params},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+
+  mpv_render_context* render_context = nullptr;
+  const int rc = api.render_context_create(&render_context, handle, params);
+  if (rc < 0 || render_context == nullptr) {
+    eglMakeCurrent(plane.egl_display(), EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    eglDestroyContext(plane.egl_display(), context);
+    if (error) *error = "mpv_render_context_create failed for the video plane";
+    return false;
+  }
+
+  *out_context = context;
+  *out_render = render_context;
+  return true;
+}
+
+// Tears down a GPU-plane PlayerInstance's render_context/EGL context/Wayland
+// plane, called once from ~PlayerInstance. Unlike CopyPixelsContext's
+// mutex-guarded equivalent (needed because the raster thread's
+// MpvTextureCopyPixels can call into it concurrently with the GTK main
+// thread), nothing here needs a lock: RenderGpuFrame only ever runs from a
+// GTK-main-thread idle source, and this destructor path only ever runs on
+// the GTK main thread too, so the two can never overlap.
+void TeardownGpuPlane(PlayerInstance* player) {
+  // Stop new render-update callbacks before anything else: once this
+  // returns, OnMpvRenderUpdateGpu can no longer schedule a fresh idle source
+  // referencing this (soon to be destroyed) instance.
+  if (player->render_context != nullptr && player->api != nullptr &&
+      player->api->render_context_set_update_callback != nullptr) {
+    player->api->render_context_set_update_callback(player->render_context, nullptr, nullptr);
+  }
+  const guint pending_source = player->gpu_idle_source_id.exchange(0);
+  if (pending_source != 0) g_source_remove(pending_source);
+
+  // mpv_render_context_free must run while its GL context is current; the
+  // plane's own Destroy() below then tears down the EGL surface and Wayland
+  // objects the context was current *against*.
+  if (player->gpu_plane != nullptr && player->gpu_plane->valid() && player->gpu_egl_context != EGL_NO_CONTEXT) {
+    eglMakeCurrent(player->gpu_plane->egl_display(), player->gpu_plane->egl_surface(),
+                   player->gpu_plane->egl_surface(), player->gpu_egl_context);
+  }
+  if (player->render_context != nullptr && player->api != nullptr && player->api->render_context_free != nullptr) {
+    player->api->render_context_free(player->render_context);
+    player->render_context = nullptr;
+  }
+  if (player->gpu_plane != nullptr) {
+    EGLDisplay display = player->gpu_plane->egl_display();
+    if (display != EGL_NO_DISPLAY) eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    if (player->gpu_egl_context != EGL_NO_CONTEXT) eglDestroyContext(display, player->gpu_egl_context);
+    player->gpu_egl_context = EGL_NO_CONTEXT;
+    player->gpu_plane->Destroy();
+    player->gpu_plane.reset();
+  }
+  if (player->handle != nullptr && player->api != nullptr && player->api->terminate_destroy != nullptr) {
+    player->api->terminate_destroy(player->handle);
+    player->handle = nullptr;
+  }
+}
+#endif  // HAVE_WAYLAND_MPV_PLANE
+
+// Issues an mpv `sub-add` command for each entry of the `externalSubtitles`
+// list argument (see `lib/playback/player_adapter.dart`'s
+// `PlaybackSource.externalSubtitles`), matching the sub-add/sub-auto=fuzzy
+// support already present on the macOS/iOS/tvOS/Android native mpv backends.
+void AddExternalSubtitles(LibmpvApi& api, mpv_handle* handle, FlValue* args) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) return;
+  FlValue* subtitles = fl_value_lookup_string(args, "externalSubtitles");
+  if (subtitles == nullptr || fl_value_get_type(subtitles) != FL_VALUE_TYPE_LIST) return;
+
+  const size_t count = fl_value_get_length(subtitles);
+  for (size_t i = 0; i < count; ++i) {
+    FlValue* entry = fl_value_get_list_value(subtitles, i);
+    const std::string uri = StringArg(entry, "uri");
+    if (uri.empty()) continue;
+    const std::string title = StringArg(entry, "title");
+    const std::string language = StringArg(entry, "language");
+    std::vector<const char*> sub_args = {"sub-add", uri.c_str(), "auto"};
+    if (!title.empty()) {
+      sub_args.push_back(title.c_str());
+      if (!language.empty()) sub_args.push_back(language.c_str());
+    }
+    sub_args.push_back(nullptr);
+    api.command(handle, sub_args.data());
+  }
 }
 
 FlMethodResponse* LoadFailure(const char* code, const std::string& error) {
@@ -1096,6 +1379,7 @@ FlMethodResponse* Load(FlValue* args) {
   api.set_option_string(handle, "hwdec", "auto-safe");
   api.set_option_string(handle, "idle", "yes");
   api.set_option_string(handle, "keepaspect", "no");
+  api.set_option_string(handle, "sub-auto", "fuzzy");
   std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   std::string headers = HeaderString(args);
@@ -1106,6 +1390,61 @@ FlMethodResponse* Load(FlValue* args) {
     api.terminate_destroy(handle);
     return LoadFailure("desktop-libmpv-load-failed", "mpv_initialize failed");
   }
+
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  // GPU path: a Wayland subsurface driven by mpv's OpenGL render API,
+  // bypassing Flutter's texture bridge entirely (see wayland_video_surface.h
+  // for why -- Flutter's Linux embedder has no platform-view API, and its
+  // FlTextureGL is capped to an 8-bit RGBA format). Falls through to the
+  // proven software pixel-buffer path below on X11, or on any failure.
+  if (g_flutter_view != nullptr &&
+      m3u_tv_mpv_plane::WaylandVideoSurface::IsSupported(gtk_widget_get_display(GTK_WIDGET(g_flutter_view)))) {
+    auto plane = std::make_unique<m3u_tv_mpv_plane::WaylandVideoSurface>();
+    std::string plane_error;
+    if (plane->Create(GTK_WIDGET(g_flutter_view), &plane_error)) {
+      EGLContext gpu_context = EGL_NO_CONTEXT;
+      mpv_render_context* gpu_render_context = nullptr;
+      std::string render_error;
+      if (CreateGpuRenderContext(api, handle, *plane, &gpu_context, &gpu_render_context, &render_error)) {
+        const int64_t id = g_next_handle++;
+        auto player = std::make_unique<PlayerInstance>(&api, event_dispatch_state, handle, gpu_render_context,
+                                                        gpu_context, std::move(plane), id);
+        AttachGpuRenderCallback(api, gpu_render_context, player.get());
+        player->gpu_plane->SetFrameCallback([raw = player.get()]() { ScheduleGpuRender(raw); });
+        player->StartEventThread();
+
+        std::string uri = StringArg(args, "uri");
+        const int64_t start_position_ms = IntArg(args, "startPositionMs");
+        std::string start_option;
+        if (start_position_ms > 0) {
+          start_option = "start=" + std::to_string(static_cast<double>(start_position_ms) / 1000.0);
+        }
+        const char* load_args[] = {"loadfile", uri.c_str(), "replace",
+                                   start_option.empty() ? nullptr : start_option.c_str(), nullptr};
+        rc = api.command(handle, load_args);
+        if (rc < 0) {
+          return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
+        }
+        AddExternalSubtitles(api, handle, args);
+        player->gpu_plane->SetVisible(true);
+
+        g_autoptr(FlValue) result = fl_value_new_map();
+        fl_value_set_string_take(result, "ok", fl_value_new_bool(TRUE));
+        fl_value_set_string_take(result, "handle", fl_value_new_int(id));
+        fl_value_set_string_take(result, "usesNativePlane", fl_value_new_bool(TRUE));
+        fl_value_set_string_take(result, "display",
+                                 fl_value_new_string("Wayland GPU video plane (OpenGL render API)"));
+        g_players[id] = std::move(player);
+        return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+      }
+      g_warning("MPV video plane: GPU render context unavailable (%s); falling back to the software texture path",
+               render_error.c_str());
+      plane->Destroy();
+    } else {
+      g_message("MPV video plane: %s; falling back to the software texture path", plane_error.c_str());
+    }
+  }
+#endif  // HAVE_WAYLAND_MPV_PLANE
 
   const char* api_type = "sw";
   const DisplayInfo display = GetDisplayInfo();
@@ -1162,6 +1501,7 @@ FlMethodResponse* Load(FlValue* args) {
   if (rc < 0) {
     return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
   }
+  AddExternalSubtitles(api, handle, args);
 
   g_players[id] = std::move(player);
   g_autoptr(FlValue) result = fl_value_new_map();
@@ -1177,6 +1517,23 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
   auto it = g_players.find(id);
   if (it == g_players.end()) return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   PlayerInstance* player = it->second.get();
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  if (g_strcmp0(method, "setVideoRect") == 0) {
+    // Reported by Dart on every layout of the widget hosting this backend
+    // (see native_video_surface.dart's NativePlaneVideoSurface); a no-op for
+    // players still on the software texture path.
+    if (player->using_gpu_plane && player->gpu_plane != nullptr) {
+      const int32_t x = static_cast<int32_t>(IntArg(args, "x"));
+      const int32_t y = static_cast<int32_t>(IntArg(args, "y"));
+      const int32_t width = static_cast<int32_t>(IntArg(args, "width"));
+      const int32_t height = static_cast<int32_t>(IntArg(args, "height"));
+      const int32_t scale = static_cast<int32_t>(IntArg(args, "scale"));
+      player->gpu_plane->SetRect(x, y, width, height, scale > 0 ? scale : 1);
+      ScheduleGpuRender(player);
+    }
+    return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  }
+#endif
   if (g_strcmp0(method, "play") == 0) {
     const char* command[] = {"set", "pause", "no", nullptr};
     player->api->command(player->handle, command);
@@ -1299,6 +1656,9 @@ void desktop_libmpv_backend_shutdown() {
   g_players.clear();
   g_event_channel_state.reset();
   g_texture_registrar = nullptr;
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  g_flutter_view = nullptr;
+#endif
   if (g_gtk_main_context != nullptr) {
     g_main_context_unref(g_gtk_main_context);
     g_gtk_main_context = nullptr;
@@ -1309,6 +1669,9 @@ void desktop_libmpv_backend_register(FlPluginRegistry* registry) {
   FlPluginRegistrar* registrar = fl_plugin_registry_get_registrar_for_plugin(
       registry, "DesktopLibmpvBackend");
   g_texture_registrar = fl_plugin_registrar_get_texture_registrar(registrar);
+#ifdef HAVE_WAYLAND_MPV_PLANE
+  g_flutter_view = fl_plugin_registrar_get_view(registrar);
+#endif
 
   if (g_gtk_main_context == nullptr) {
     g_gtk_main_context = g_main_context_default();

@@ -572,6 +572,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 key: ValueKey(tile.playerId),
                 textureId: _textureIdFor(tile),
                 platformView: _platformViewFor(tile),
+                nativePlane: _nativePlaneFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
                 wrapInBlackBackground: false,
               ),
@@ -644,6 +645,14 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     final backend = tile.backend;
     if (backend is PlatformViewProvider) {
       return backend! as PlatformViewProvider;
+    }
+    return null;
+  }
+
+  NativePlaneProvider? _nativePlaneFor(_MultiviewTile tile) {
+    final backend = tile.backend;
+    if (backend is NativePlaneProvider) {
+      return backend! as NativePlaneProvider;
     }
     return null;
   }

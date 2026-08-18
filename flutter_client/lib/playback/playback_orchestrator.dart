@@ -86,6 +86,12 @@ class PlaybackOrchestrator {
     return adapter! as PlatformViewProvider;
   }
 
+  NativePlaneProvider? get activeNativePlaneProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! NativePlaneProvider) return null;
+    return adapter! as NativePlaneProvider;
+  }
+
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
 
   Future<void> open(PlaybackSource source) async {

@@ -67,18 +67,37 @@ else()
   message(WARNING "libmpv.so runtime was not found by CMake; bundle/provide libmpv.so.2, libmpv.so.1, or libmpv.so for in-process playback.")
 endif()
 
+# Optional: the GPU-rendered Wayland video plane (wayland_video_surface.cc).
+# Kept QUIET/optional, matching MPV above, so a build host without Wayland
+# development headers still configures and builds -- it just keeps using the
+# software pixel-buffer texture path (also the path X11 sessions always use;
+# mpv's --wid embedding, the X11 equivalent, has no Wayland counterpart).
+pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
+pkg_check_modules(WAYLAND_EGL QUIET wayland-egl)
+pkg_check_modules(MPV_EGL QUIET egl)
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND AND MPV_EGL_FOUND)
+  message(STATUS "Wayland/EGL development headers found; building the GPU video plane")
+else()
+  message(WARNING "Wayland/EGL development headers not found (wayland-client/wayland-egl/egl .pc files); Linux playback will use the software pixel-buffer texture path only")
+endif()
+
 add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 
 # Define the application target. To change its name, change BINARY_NAME above,
 # not the value here, or `flutter run` will no longer work.
 #
 # Any new source files that you add to the application should be added here.
-add_executable(${BINARY_NAME}
+set(RUNNER_SOURCES
   "main.cc"
   "desktop_libmpv_backend.cc"
   "my_application.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND AND MPV_EGL_FOUND)
+  list(APPEND RUNNER_SOURCES "wayland_video_surface.cc")
+endif()
+
+add_executable(${BINARY_NAME} ${RUNNER_SOURCES})
 
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
@@ -87,6 +106,12 @@ apply_standard_settings(${BINARY_NAME})
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND AND MPV_EGL_FOUND)
+  target_compile_definitions(${BINARY_NAME} PRIVATE HAVE_WAYLAND_MPV_PLANE)
+  target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::WAYLAND_CLIENT)
+  target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::WAYLAND_EGL)
+  target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::MPV_EGL)
+endif()
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

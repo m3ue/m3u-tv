@@ -10,9 +10,11 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
 /// Renders whichever of [platformView] (a `PlatformViewProvider`-backed
-/// native mpv core) or [textureId] (a `VideoTextureProvider`-backed
-/// backend) is active, or a black placeholder while neither is available
-/// yet. Shared by `PlayerScreen`'s `_VideoSurface` and
+/// native mpv core), [nativePlane] (a `NativePlaneProvider`-backed backend
+/// rendering through a native surface outside Flutter's compositor, e.g. the
+/// Linux Wayland video plane), or [textureId] (a `VideoTextureProvider`-
+/// backed backend) is active, or a black placeholder while none is
+/// available yet. Shared by `PlayerScreen`'s `_VideoSurface` and
 /// `MultiviewScreen`'s `_TileVideoSurface`.
 class NativeVideoSurface extends StatelessWidget {
   const NativeVideoSurface({
@@ -20,11 +22,13 @@ class NativeVideoSurface extends StatelessWidget {
     required this.textureId,
     required this.platformView,
     required this.aspectRatio,
+    this.nativePlane,
     this.wrapInBlackBackground = true,
   });
 
   final int? textureId;
   final PlatformViewProvider? platformView;
+  final NativePlaneProvider? nativePlane;
   final double aspectRatio;
 
   /// Whether to wrap the platform-view/texture surface in its own black
@@ -35,6 +39,17 @@ class NativeVideoSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final plane = nativePlane;
+    if (plane != null && plane.usesNativePlane) {
+      return _wrap(
+        Center(
+          child: AspectRatio(
+            aspectRatio: aspectRatio,
+            child: _NativePlaneReporter(plane: plane),
+          ),
+        ),
+      );
+    }
     final view = platformView;
     if (view != null) {
       final child = Platform.isMacOS
@@ -112,6 +127,48 @@ class NativeVideoSurface extends StatelessWidget {
         unawaited(controller.create());
         return controller;
       },
+    );
+  }
+}
+
+/// Reports this widget's on-screen rect to [plane] on every layout, and
+/// paints fully transparent -- the actual video is a native surface (e.g. a
+/// Wayland `wl_subsurface`) stacked outside Flutter's own compositor, which
+/// only shows through where Flutter itself paints nothing.
+class _NativePlaneReporter extends StatefulWidget {
+  const _NativePlaneReporter({required this.plane});
+
+  final NativePlaneProvider plane;
+
+  @override
+  State<_NativePlaneReporter> createState() => _NativePlaneReporterState();
+}
+
+class _NativePlaneReporterState extends State<_NativePlaneReporter> {
+  final GlobalKey _key = GlobalKey();
+
+  void _reportRect(Duration _) {
+    if (!mounted) return;
+    final renderObject = _key.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final size = renderObject.size;
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    widget.plane.reportVideoRect(
+      topLeft.dx * devicePixelRatio,
+      topLeft.dy * devicePixelRatio,
+      size.width * devicePixelRatio,
+      size.height * devicePixelRatio,
+      devicePixelRatio,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback(_reportRect);
+    return SizedBox.expand(
+      key: _key,
+      child: const ColoredBox(color: Colors.transparent),
     );
   }
 }

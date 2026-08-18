@@ -1003,6 +1003,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         textureId: widget.orchestrator.activeTextureId,
                         platformView:
                             widget.orchestrator.activePlatformViewProvider,
+                        nativePlane:
+                            widget.orchestrator.activeNativePlaneProvider,
                         aspectRatio: _videoAspectRatio,
                       ),
                     ),

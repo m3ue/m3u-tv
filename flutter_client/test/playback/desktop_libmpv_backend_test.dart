@@ -257,6 +257,7 @@ void main() {
           'isLive': false,
           'userAgent': 'm3u-tv/windows-test',
           'headers': <String, String>{'Referer': 'https://provider.test'},
+          'externalSubtitles': <Map<String, Object?>>[],
         });
         expect(backend.textureId, isNull);
 

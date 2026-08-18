@@ -3,12 +3,47 @@
 #include <locale.h>
 
 #include <flutter_linux/flutter_linux.h>
+#include <gdk/gdk.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
+#endif
+#ifdef GDK_WINDOWING_WAYLAND
+#include <gdk/gdkwayland.h>
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_libmpv_backend.h"
+
+// On Wayland, the GPU mpv video plane (see wayland_video_surface.h) is a
+// wl_subsurface stacked *below* this window's own surface, so the window
+// needs an alpha channel for it to show through, and Flutter must stop
+// filling the frame opaque (fl_view clears to its background colour every
+// frame regardless of the GTK visual). Harmless when the plane is
+// unavailable or unused (X11, or GPU init failed): the Flutter UI paints
+// opaque either way, and desktop_libmpv_backend.cc falls back to the
+// software texture path in that case.
+static void enable_video_plane_transparency(GtkWindow* window, FlView* view) {
+#ifdef GDK_WINDOWING_WAYLAND
+  GdkDisplay* display = gtk_widget_get_display(GTK_WIDGET(window));
+  if (display == nullptr || !GDK_IS_WAYLAND_DISPLAY(display)) return;
+
+  GdkScreen* screen = gtk_widget_get_screen(GTK_WIDGET(window));
+  GdkVisual* visual = gdk_screen_get_rgba_visual(screen);
+  if (visual == nullptr) {
+    g_warning("MPV video plane: no RGBA visual; the video plane would be hidden behind an opaque window");
+    return;
+  }
+
+  gtk_widget_set_visual(GTK_WIDGET(window), visual);
+  gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+
+  GdkRGBA transparent = {0.0, 0.0, 0.0, 0.0};
+  fl_view_set_background_color(view, &transparent);
+#else
+  (void)window;
+  (void)view;
+#endif
+}
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -51,12 +86,15 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
-  gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  // Must run before the window is realized (gtk_widget_show below): GTK
+  // visuals can only be set on an unrealized widget.
+  enable_video_plane_transparency(window, view);
+  gtk_widget_show(GTK_WIDGET(window));
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
