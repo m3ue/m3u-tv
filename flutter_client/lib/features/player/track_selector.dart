@@ -17,6 +17,7 @@ class TrackSelector extends StatelessWidget {
     required this.selectedSubtitleTrackId,
     required this.onAudioTrackSelected,
     required this.onSubtitleTrackSelected,
+    this.onDialogVisibilityChanged,
     this.isAudioTrackSelectionKnown = false,
     this.isSubtitleTrackSelectionKnown = false,
     super.key,
@@ -48,6 +49,7 @@ class TrackSelector extends StatelessWidget {
 
   /// Called when the user selects a subtitle track.
   final ValueChanged<String?> onSubtitleTrackSelected;
+  final ValueChanged<bool>? onDialogVisibilityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +102,7 @@ class TrackSelector extends StatelessWidget {
       : selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
 
   void _showAudioDialog(BuildContext context) {
+    onDialogVisibilityChanged?.call(true);
     unawaited(
       showDialog<void>(
         context: context,
@@ -130,11 +133,12 @@ class TrackSelector extends StatelessWidget {
             ),
           );
         },
-      ),
+      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
     );
   }
 
   void _showSubtitleDialog(BuildContext context) {
+    onDialogVisibilityChanged?.call(true);
     unawaited(
       showDialog<void>(
         context: context,
@@ -167,7 +171,7 @@ class TrackSelector extends StatelessWidget {
             ),
           );
         },
-      ),
+      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
     );
   }
 }

@@ -890,6 +890,7 @@ class XtreamService {
               duration: episode.duration,
               releaseDate: episode.releaseDate,
               streamUrl: episode.streamUrl,
+              edlUrl: episode.edlUrl,
             );
           })
           .toList(growable: false);

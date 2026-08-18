@@ -88,6 +88,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvSearchHint => '搜索…';
 
   @override
+  String get liveTvUpcomingAirings => '即将播出';
+
+  @override
+  String get liveTvSearchFilterAll => '全部';
+
+  @override
+  String get liveTvShowResultsLoading => '正在搜索节目…';
+
+  @override
+  String get liveTvOnNow => '正在播出';
+
+  @override
+  String liveTvAiringUntil(String time) {
+    return '$time 结束';
+  }
+
+  @override
+  String liveTvAiringTomorrow(String time) {
+    return '明天 $time';
+  }
+
+  @override
+  String liveTvMoreAirings(int count) {
+    return '+$count 更多';
+  }
+
+  @override
   String get liveTvNoChannels => '暂无可用频道';
 
   @override

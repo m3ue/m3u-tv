@@ -57,7 +57,7 @@ class InlineMediaSearchField extends StatefulWidget {
 
   /// When [activateOnSelect] is false: autofocuses the real text field
   /// (opens the keyboard immediately). When [activateOnSelect] is true:
-  /// autofocuses the inactive, button-like facade instead — see
+  /// autofocuses the inactive, button-like facade instead - see
   /// [activateOnSelect].
   final bool autofocus;
   final FocusNode? focusNode;
@@ -67,7 +67,7 @@ class InlineMediaSearchField extends StatefulWidget {
   /// content (category chips, a content grid) rather than on a
   /// dedicated search screen. A plain [TextField] can't tell "the user
   /// d-padded past this on their way elsewhere" apart from "the user wants
-  /// to type" — both just focus it, which opens the keyboard and starts
+  /// to type" - both just focus it, which opens the keyboard and starts
   /// eating Left/Right for cursor movement instead of navigation.
   ///
   /// When true, the field starts as a non-editing, [DpadInkWell]-focusable
@@ -128,7 +128,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
     if (!mounted) return;
     setState(() => _focused = _focusNode.hasFocus);
     // Losing focus for any reason (d-pad navigating away, not just an
-    // explicit Escape/Back press) reverts to the inactive facade — a live
+    // explicit Escape/Back press) reverts to the inactive facade - a live
     // TextField left mounted-but-unfocused looks and behaves differently
     // from the facade button it should have become again.
     if (!_focusNode.hasFocus) _deactivate();
@@ -169,7 +169,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
     );
 
     // Fixed so the facade button and the real TextField below are pixel
-    // identical in height — letting each derive its own height from font
+    // identical in height - letting each derive its own height from font
     // metrics/padding produced a visible size jump on activate/deactivate.
     const fieldHeight = 52.0;
     final hintStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -216,7 +216,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
         children: [
           Positioned.fill(
             // Built the same way as the facade's Row (below) rather than
-            // via InputDecoration's prefixIcon/isCollapsed machinery — that
+            // via InputDecoration's prefixIcon/isCollapsed machinery - that
             // machinery lays its content out top-aligned once the decorator
             // is stretched taller than its content, and there's no
             // vertical-centering knob for it. A plain Row centers its
@@ -672,6 +672,7 @@ class MediaPreviewItem {
     this.progressFraction,
     this.overlayBadges = const <String>[],
     this.overlayLabel,
+    this.emphasisLabel,
   });
 
   final String title;
@@ -695,6 +696,18 @@ class MediaPreviewItem {
 
   /// Optional label shown left-aligned opposite the overlay badges.
   final String? overlayLabel;
+
+  /// A short, high-value string rendered between the title and subtitle on
+  /// default/poster cards at title-scale weight - for a 10-foot UI, the one
+  /// datum that must survive a glance from the couch (here: when a programme
+  /// airs). Null on every existing rail, which renders exactly today's tree.
+  ///
+  /// Rendered ONLY by `_buildDefaultContent`. Landscape cards have no room and
+  /// deliberately ignore it - see the assert in `build`. Note the precedent:
+  /// `overlayLabel`, `overlayBadges` and `progressFraction` are declared here
+  /// but read only by `_buildLandscapeContent` (L745-878), so they silently do
+  /// nothing on default cards. Do not add to that trap.
+  final String? emphasisLabel;
 }
 
 class MediaPreviewSection extends StatefulWidget {
@@ -844,6 +857,10 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
     super.build(context);
     final colorScheme = Theme.of(context).colorScheme;
     final item = widget.item;
+    assert(
+      !widget.landscapeStyle || item.emphasisLabel == null,
+      'MediaPreviewItem.emphasisLabel is not rendered by landscape cards.',
+    );
     final isRating = item.subtitle?.startsWith('★') ?? false;
     final width =
         widget.cardWidth ??
@@ -1110,6 +1127,22 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
                 maxLines: posterStyle ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (item.emphasisLabel != null) ...[
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    item.emphasisLabel!,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
               if (item.subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(

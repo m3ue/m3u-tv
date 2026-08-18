@@ -741,6 +741,54 @@ void main() {
       },
     );
 
+    test(
+      'getSeriesInfo preserves edlUrl through the season-0 rebuild',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_series_info': {
+            'seasons': <Map<String, Object?>>[],
+            'info': seriesItem(301, 'Fixture Show', '30'),
+            'episodes': <String, Object?>{
+              '1': <Map<String, Object?>>[
+                <String, Object?>{
+                  'id': '9001',
+                  'episode_num': 1,
+                  'title': 'DVR Episode',
+                  'container_extension': 'mp4',
+                  'season': 0,
+                  'edl_url': 'https://xtream.example/dvr/series/9001/edl',
+                },
+              ],
+            },
+          },
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        final info = await service.getSeriesInfo(301);
+
+        final episode = info.episodesBySeason[1]!.single;
+        expect(episode.id, '9001');
+        expect(
+          episode.seasonNumber,
+          1,
+          reason: 'season-0 in payload should be backfilled from map key',
+        );
+        expect(
+          episode.edlUrl,
+          'https://xtream.example/dvr/series/9001/edl',
+          reason: 'season-0 rebuild must not drop edlUrl',
+        );
+      },
+    );
+
     test('VOD info parses m3u-editor get_vod_info metadata', () async {
       final transport = FakeXtreamTransport({
         'auth': xtreamAuth(auth: 1),

@@ -188,6 +188,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             'plot': episode.plot
           else if (_seriesInfo?.series.plot != null)
             'plot': _seriesInfo!.series.plot,
+          if (episode.edlUrl != null) 'edl_url': episode.edlUrl,
         },
       ),
     );

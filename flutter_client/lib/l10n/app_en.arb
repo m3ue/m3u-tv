@@ -39,6 +39,35 @@
   "liveTvViewModeGrid": "Grid",
   "liveTvViewModeEpg": "EPG",
   "liveTvSearchHint": "Search...",
+  "liveTvUpcomingAirings": "Upcoming",
+  "liveTvSearchFilterAll": "All",
+  "liveTvShowResultsLoading": "Searching shows…",
+  "liveTvOnNow": "On Now",
+  "liveTvAiringUntil": "Until {time}",
+  "@liveTvAiringUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvAiringTomorrow": "Tomorrow {time}",
+  "@liveTvAiringTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvMoreAirings": "{count, plural, =1{+1 more} other{+{count} more}}",
+  "@liveTvMoreAirings": {
+    "description": "Affordance on a grouped Upcoming row when the show has more future airings than fit on the row. The leading + is part of the string so it sits visually as a suffix to the airing times.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "liveTvNoChannels": "No channels available",
   "liveTvAllChannels": "All Channels",
   "liveTvFavorites": "★ Favorites",

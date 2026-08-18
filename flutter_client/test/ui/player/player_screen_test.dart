@@ -1192,6 +1192,188 @@ void main() {
   });
 
   group('PlayerScreen', () {
+    testWidgets(
+      'hides visible controls when the overlay background is tapped',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1200, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/live.m3u8',
+                title: 'Overlay Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(PlaybackControls), findsOneWidget);
+
+        await tester.tapAt(const Offset(1100, 400));
+        await tester.pump();
+
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
+    testWidgets('keeps visible controls open when play pause is tapped', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'Control Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pump();
+
+      expect(adapter.playCallCount, 1);
+      expect(find.byType(PlaybackControls), findsOneWidget);
+    });
+
+    testWidgets('hides visible controls when the live EPG overlay is tapped', (
+      tester,
+    ) async {
+      final now = DateTime.utc(2026, 1, 1, 12);
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+      final epgService = EpgService(clock: () => now)
+        ..loadPrograms(<EpgProgram>[
+          EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Current News',
+            description: 'Fixture bulletin',
+            start: now.subtract(const Duration(minutes: 10)),
+            end: now.add(const Duration(minutes: 20)),
+          ),
+        ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/live.m3u8',
+              title: 'EPG Tap Fixture',
+              type: 'live',
+              epgChannelId: 'bbc.one',
+            ),
+            orchestrator: orchestrator,
+            epgService: epgService,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(EpgOverlay), findsOneWidget);
+
+      await tester.tap(find.byType(EpgOverlay));
+      await tester.pump();
+
+      expect(find.byType(PlaybackControls), findsNothing);
+    });
+
+    testWidgets(
+      'hides visible controls when the Now Playing overlay is tapped',
+      (
+        tester,
+      ) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/movie.mkv',
+                title: 'Now Playing Tap Fixture',
+                type: 'vod',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(NowPlayingOverlay), findsOneWidget);
+
+        await tester.tap(find.byType(NowPlayingOverlay));
+        await tester.pump();
+
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
     testWidgets('renders desktop libmpv texture when backend is ready', (
       tester,
     ) async {
@@ -3522,6 +3704,491 @@ void main() {
             expect(fetched.scheme, 'https');
             expect(fetched.host, 'm3u.bearald.com');
             expect(fetched.path, '/dvr/real/path/edl');
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'fast path with edl_url in metadata does not call XtreamService',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final requestedActions = <String>[];
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action != null) {
+                requestedActions.add(request.action!);
+              }
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: recordingArgs,
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  hasDvrFeature: true,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(
+              requestedActions.contains('get_vod_info'),
+              isFalse,
+              reason:
+                  'Fast path must not call getVodInfo when metadata has edl_url',
+            );
+            expect(
+              requestedActions.contains('get_series_info'),
+              isFalse,
+              reason:
+                  'Fast path must not call getSeriesInfo when metadata has edl_url',
+            );
+            expect(httpClient.requestedUrls.single.host, 'example.com');
+            expect(
+              httpClient.requestedUrls.single.path,
+              '/recording/edl',
+            );
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'VOD fallback resolves edl_url via getVodInfo when metadata lacks it',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              if (request.action == 'get_vod_info') {
+                return <String, Object?>{
+                  'info': {
+                    'edl_url': 'https://xtream.example/dvr/vod/edl',
+                  },
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 30.0, 'end': 60.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://xtream.example/recording.mp4',
+                    title: 'VOD Fallback Fixture',
+                    type: 'vod',
+                    streamId: 4242,
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  hasDvrFeature: true,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isNotEmpty);
+            expect(
+              httpClient.requestedUrls.single.toString(),
+              'https://xtream.example/dvr/vod/edl',
+            );
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'series fallback matches episode by id and fetches its edl_url',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              if (request.action == 'get_series_info') {
+                return <String, Object?>{
+                  'seasons': <Map<String, Object?>>[],
+                  'info': <String, Object?>{},
+                  'episodes': <String, Object?>{
+                    '1': <Map<String, Object?>>[
+                      <String, Object?>{
+                        'id': '99',
+                        'episode_num': 1,
+                        'title': 'Not This One',
+                        'container_extension': 'mp4',
+                        'season': 1,
+                      },
+                      <String, Object?>{
+                        'id': '123',
+                        'episode_num': 2,
+                        'title': 'Target Episode',
+                        'container_extension': 'mp4',
+                        'season': 1,
+                        'edl_url': 'https://xtream.example/dvr/series/ep-edl',
+                      },
+                    ],
+                  },
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 90.0, 'end': 120.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://xtream.example/series/123.mp4',
+                    title: 'Series Fallback Fixture',
+                    type: 'series',
+                    streamId: 123,
+                    seriesId: 7,
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  hasDvrFeature: true,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isNotEmpty);
+            expect(
+              httpClient.requestedUrls.single.toString(),
+              'https://xtream.example/dvr/series/ep-edl',
+            );
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+      testWidgets(
+        'gate closed: hasDvrFeature false issues no XtreamService call',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final requestedActions = <String>[];
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action != null) {
+                requestedActions.add(request.action!);
+              }
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://xtream.example/recording.mp4',
+                    title: 'Gate Closed Fixture',
+                    type: 'vod',
+                    streamId: 4242,
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(
+              requestedActions.contains('get_vod_info'),
+              isFalse,
+              reason:
+                  'Gate must suppress getVodInfo when hasDvrFeature is false',
+            );
+            expect(
+              requestedActions.contains('get_series_info'),
+              isFalse,
+              reason:
+                  'Gate must suppress getSeriesInfo when hasDvrFeature is false',
+            );
+            expect(httpClient.requestedUrls, isEmpty);
+            expect(find.text('Skipped commercial'), findsNothing);
+            expect(find.text('Skip commercial'), findsNothing);
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'fail-open: server returns no edl_url yields no comskip UI and no crash',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              if (request.action == 'get_vod_info') {
+                return <String, Object?>{'info': <String, Object?>{}};
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://xtream.example/recording.mp4',
+                    title: 'Fail-open Fixture',
+                    type: 'vod',
+                    streamId: 4242,
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  hasDvrFeature: true,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isEmpty);
+            expect(adapter.seekCalls, isEmpty);
+            expect(find.text('Skipped commercial'), findsNothing);
+            expect(find.text('Skip commercial'), findsNothing);
+          }, createHttpClient: (_) => httpClient);
+        },
+      );
+
+      testWidgets(
+        'loopback rewrite applies to a fallback-resolved edl_url',
+        (tester) async {
+          final adapter = FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 1,
+          );
+          final orchestrator = buildOrchestrator(adapter);
+          addTearDown(orchestrator.dispose);
+
+          final xtreamService = XtreamService(
+            transport: (request) async {
+              if (request.action == null) {
+                return {
+                  'user_info': {'auth': 1, 'status': 'Active'},
+                  'm3u_editor': {'version': 'fixture'},
+                };
+              }
+              if (request.action == 'get_vod_info') {
+                return <String, Object?>{
+                  'info': {
+                    'edl_url': 'http://localhost/dvr/fallback/edl',
+                  },
+                };
+              }
+              return <String, Object?>{};
+            },
+          );
+          await xtreamService.authenticate(
+            const UserCredentials(
+              server: 'https://xtream.example',
+              username: 'demo',
+              password: 'secret',
+            ),
+          );
+
+          final httpClient = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+
+          await HttpOverrides.runZoned(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: PlayerScreen(
+                  args: const PlayerArgs(
+                    streamUrl: 'https://xtream.example/recording.mp4',
+                    title: 'Loopback Fallback Fixture',
+                    type: 'vod',
+                    streamId: 4242,
+                  ),
+                  orchestrator: orchestrator,
+                  epgService: EpgService(clock: () => DateTime.utc(2026)),
+                  xtreamService: xtreamService,
+                  hasDvrFeature: true,
+                  comskipSettings: ComskipSettings(),
+                ),
+              ),
+            );
+            await tester.pump();
+
+            for (var i = 0; i < 10; i++) {
+              await tester.pump(const Duration(milliseconds: 10));
+            }
+
+            expect(httpClient.requestedUrls, isNotEmpty);
+            final fetched = httpClient.requestedUrls.single;
+            expect(fetched.scheme, 'https');
+            expect(fetched.host, 'xtream.example');
+            expect(fetched.path, '/dvr/fallback/edl');
           }, createHttpClient: (_) => httpClient);
         },
       );

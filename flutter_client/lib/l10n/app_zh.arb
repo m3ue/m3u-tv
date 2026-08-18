@@ -39,6 +39,34 @@
   "liveTvViewModeGrid": "Grid",
   "liveTvViewModeEpg": "EPG",
   "liveTvSearchHint": "搜索…",
+  "liveTvUpcomingAirings": "即将播出",
+  "liveTvSearchFilterAll": "全部",
+  "liveTvOnNow": "正在播出",
+  "liveTvAiringUntil": "{time} 结束",
+  "@liveTvAiringUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvAiringTomorrow": "明天 {time}",
+  "@liveTvAiringTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvMoreAirings": "+{count} 更多",
+  "@liveTvMoreAirings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveTvShowResultsLoading": "正在搜索节目…",
   "liveTvNoChannels": "暂无可用频道",
   "liveTvAllChannels": "全部频道",
   "liveTvFavorites": "★ 收藏",

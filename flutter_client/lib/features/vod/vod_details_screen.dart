@@ -297,6 +297,7 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
           if (details.tmdbId != null) 'tmdb_id': details.tmdbId,
           if (details.plot != null) 'plot': details.plot,
+          if (details.edlUrl != null) 'edl_url': details.edlUrl,
         },
       ),
     );
@@ -322,6 +323,7 @@ class _ResolvedVodDetails {
   String? get containerExtension =>
       _notEmpty(info?.containerExtension) ?? item.containerExtension;
   int? get tmdbId => info?.tmdbId;
+  String? get edlUrl => _notEmpty(info?.edlUrl);
 }
 
 String? _notEmpty(String? value) {

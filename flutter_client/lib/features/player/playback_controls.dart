@@ -41,6 +41,7 @@ class PlaybackControls extends StatelessWidget {
     this.isSubtitleTrackSelectionKnown = false,
     this.onAudioTrackSelected,
     this.onSubtitleTrackSelected,
+    this.onTrackDialogVisibilityChanged,
     this.fallbackReason,
     this.playPauseFocusNode,
     this.onNextChannel,
@@ -66,6 +67,7 @@ class PlaybackControls extends StatelessWidget {
   final bool isSubtitleTrackSelectionKnown;
   final ValueChanged<String?>? onAudioTrackSelected;
   final ValueChanged<String?>? onSubtitleTrackSelected;
+  final ValueChanged<bool>? onTrackDialogVisibilityChanged;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
   final VoidCallback? onNextChannel;
@@ -190,6 +192,7 @@ class PlaybackControls extends StatelessWidget {
       isSubtitleTrackSelectionKnown: isSubtitleTrackSelectionKnown,
       onAudioTrackSelected: onAudioTrackSelected ?? (_) {},
       onSubtitleTrackSelected: onSubtitleTrackSelected ?? (_) {},
+      onDialogVisibilityChanged: onTrackDialogVisibilityChanged,
     );
   }
 

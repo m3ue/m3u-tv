@@ -254,6 +254,48 @@ abstract class AppLocalizations {
   /// **'Search...'**
   String get liveTvSearchHint;
 
+  /// No description provided for @liveTvUpcomingAirings.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get liveTvUpcomingAirings;
+
+  /// No description provided for @liveTvSearchFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get liveTvSearchFilterAll;
+
+  /// No description provided for @liveTvShowResultsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching shows…'**
+  String get liveTvShowResultsLoading;
+
+  /// No description provided for @liveTvOnNow.
+  ///
+  /// In en, this message translates to:
+  /// **'On Now'**
+  String get liveTvOnNow;
+
+  /// No description provided for @liveTvAiringUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Until {time}'**
+  String liveTvAiringUntil(String time);
+
+  /// No description provided for @liveTvAiringTomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow {time}'**
+  String liveTvAiringTomorrow(String time);
+
+  /// Affordance on a grouped Upcoming row when the show has more future airings than fit on the row. The leading + is part of the string so it sits visually as a suffix to the airing times.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{+1 more} other{+{count} more}}'**
+  String liveTvMoreAirings(int count);
+
   /// No description provided for @liveTvNoChannels.
   ///
   /// In en, this message translates to:

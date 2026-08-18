@@ -133,6 +133,59 @@ void main() {
     });
   });
 
+  group('VodInfo.edlUrl from get_vod_info', () {
+    test('reads edl_url nested under info (DVR-backed movie)', () {
+      final info = VodInfo.fromXtream(<String, Object?>{
+        'info': {
+          'edl_url': 'https://xtream.example/dvr/movie/edl',
+        },
+        'movie_data': {
+          'stream_id': 201,
+          'name': 'Recorded Movie',
+          'container_extension': 'mp4',
+        },
+      });
+      expect(info.edlUrl, 'https://xtream.example/dvr/movie/edl');
+    });
+
+    test('null when no edl_url is present anywhere', () {
+      final info = VodInfo.fromXtream(<String, Object?>{
+        'info': {'plot': 'A regular movie'},
+        'movie_data': {
+          'stream_id': 202,
+          'name': 'Regular Movie',
+          'container_extension': 'mp4',
+        },
+      });
+      expect(info.edlUrl, isNull);
+    });
+  });
+
+  group('Episode.edlUrl from get_series_info', () {
+    test('reads top-level edl_url (DVR-backed episode)', () {
+      final episode = Episode.fromXtream(<String, Object?>{
+        'id': '123',
+        'episode_num': 2,
+        'title': 'Target Episode',
+        'container_extension': 'mp4',
+        'season': 1,
+        'edl_url': 'https://xtream.example/dvr/series/ep-edl',
+      });
+      expect(episode.edlUrl, 'https://xtream.example/dvr/series/ep-edl');
+    });
+
+    test('null when edl_url is absent', () {
+      final episode = Episode.fromXtream(<String, Object?>{
+        'id': '124',
+        'episode_num': 1,
+        'title': 'Non-DVR Episode',
+        'container_extension': 'mp4',
+        'season': 1,
+      });
+      expect(episode.edlUrl, isNull);
+    });
+  });
+
   group('DvrStorageInfo.fromXtream', () {
     test('parses a quota-scoped response', () {
       final info = DvrStorageInfo.fromXtream(<String, Object?>{

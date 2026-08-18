@@ -39,6 +39,34 @@
   "liveTvViewModeGrid": "Grid",
   "liveTvViewModeEpg": "EPG",
   "liveTvSearchHint": "Suchen …",
+  "liveTvUpcomingAirings": "Demnächst",
+  "liveTvSearchFilterAll": "Alle",
+  "liveTvOnNow": "Jetzt live",
+  "liveTvAiringUntil": "Bis {time}",
+  "@liveTvAiringUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvAiringTomorrow": "Morgen {time}",
+  "@liveTvAiringTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTvMoreAirings": "{count, plural, =1{+1 weitere} other{+{count} weitere}}",
+  "@liveTvMoreAirings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveTvShowResultsLoading": "Sendungen werden gesucht …",
   "liveTvNoChannels": "Keine Sender verfügbar",
   "liveTvAllChannels": "Alle Sender",
   "liveTvFavorites": "★ Favoriten",
