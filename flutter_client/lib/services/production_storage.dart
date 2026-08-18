@@ -32,18 +32,19 @@ ProductionStorage createProductionStorage({
     // ResilientSecureStorage keeps the real OS keyring for the (common) case
     // where it works, and only degrades to plaintext file storage for the
     // (uncommon) environments where it genuinely can't be reached.
-    'linux' => secureStorageFactory != null
-        ? secureStorageFactory()
-        : ResilientSecureStorage(
-            primary: FlutterSecureStorageAdapter(),
-            fallback: FileSecureStorage(store: appStateStore),
-            onFallback: (error) => developer.log(
-              'Linux OS keyring unavailable; falling back to file-based '
-              'credential storage for this session: $error',
-              name: 'ProductionStorage',
-              level: 900, // warning
+    'linux' =>
+      secureStorageFactory != null
+          ? secureStorageFactory()
+          : ResilientSecureStorage(
+              primary: FlutterSecureStorageAdapter(),
+              fallback: FileSecureStorage(store: appStateStore),
+              onFallback: (error) => developer.log(
+                'Linux OS keyring unavailable; falling back to file-based '
+                'credential storage for this session: $error',
+                name: 'ProductionStorage',
+                level: 900, // warning
+              ),
             ),
-          ),
     'android' ||
     'ios' ||
     'tvos' ||

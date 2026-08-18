@@ -183,7 +183,7 @@ class ResilientSecureStorage implements SecureStorage {
     required this.primary,
     required this.fallback,
     void Function(Object error)? onFallback,
-  }) : _onFallback = onFallback;
+  }) : _onFallback = onFallback; // ignore: prefer_initializing_formals
 
   final SecureStorage primary;
   final SecureStorage fallback;
