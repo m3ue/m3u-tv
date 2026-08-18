@@ -8,6 +8,8 @@
 
 #include <windows.h>
 
+#include "mpv/display_mode_manager.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -88,6 +90,12 @@ struct mpv_event {
   int event_id;
   int error;
   uint64_t reply_userdata;
+  void* data;
+};
+
+struct mpv_event_property {
+  const char* name;
+  int format;
   void* data;
 };
 
@@ -446,6 +454,29 @@ struct PlayerInstance {
     texture_state->dispatcher = this->dispatcher;
   }
 
+  // GPU/native-window constructor: mpv is given a real child HWND via its
+  // `wid` option and manages its own D3D11 swap chain into it directly --
+  // no render_context, no CopyPixels, no Flutter texture at all. Simpler
+  // than the SW path specifically because mpv's windowed embedding does the
+  // presentation itself; our job is just to own and position the window.
+  //
+  // Whether this window actually composites *behind* Flutter's own UI (so
+  // player controls drawn above the video in the widget tree stay visible)
+  // depends on engine behavior this project cannot verify without a Windows
+  // box -- see the large comment on CreateGpuVideoWindow.
+  // `top_level_hwnd` is the Flutter window itself, used for DisplayConfig/
+  // monitor lookups -- deliberately not `video_hwnd`, which starts at 1x1
+  // and unpositioned until Dart's first layout-driven setVideoRect call, so
+  // an HDR/refresh-rate decision that fires before that (video-params can
+  // arrive very early) would otherwise resolve against whatever monitor
+  // happens to contain the coordinate origin rather than the real one.
+  PlayerInstance(LibmpvApi* api, std::shared_ptr<PlatformDispatcher> dispatcher,
+                 std::shared_ptr<EventSinkState> event_sink_state, mpv_handle* handle, HWND video_hwnd,
+                 HWND top_level_hwnd, int64_t id)
+      : api(api), dispatcher(std::move(dispatcher)), event_sink_state(std::move(event_sink_state)), handle(handle),
+        id(id), using_gpu_window(true), video_hwnd(video_hwnd), top_level_hwnd(top_level_hwnd),
+        display_mode_manager(std::make_unique<m3u_tv_mpv_windows::DisplayModeManager>()) {}
+
   ~PlayerInstance() {
     disposing.store(true);
     if (api != nullptr && api->wakeup != nullptr && handle != nullptr) api->wakeup(handle);
@@ -453,6 +484,28 @@ struct PlayerInstance {
     if (api != nullptr && api->unobserve_property != nullptr && handle != nullptr) {
       api->unobserve_property(handle, 0);
     }
+
+    if (using_gpu_window) {
+      // Undo any OS-level display-mode/HDR override this player applied,
+      // then destroy mpv (which owns its own D3D11 swap chain against
+      // video_hwnd -- terminate_destroy before DestroyWindow, so mpv tears
+      // its swap chain down against a still-valid window) and finally the
+      // window itself.
+      if (display_mode_manager != nullptr) {
+        display_mode_manager->RestoreOriginalHDRState(top_level_hwnd);
+        display_mode_manager->RestoreOriginalMode(top_level_hwnd);
+      }
+      if (api != nullptr && api->terminate_destroy != nullptr && handle != nullptr) {
+        api->terminate_destroy(handle);
+      }
+      handle = nullptr;
+      if (video_hwnd != nullptr) {
+        DestroyWindow(video_hwnd);
+        video_hwnd = nullptr;
+      }
+      return;
+    }
+
     copy_context->SetUpdateCallback(nullptr, nullptr);
     texture_state->active.store(false);
     auto release_context = std::make_shared<TextureReleaseContext>(
@@ -501,6 +554,19 @@ struct PlayerInstance {
   std::thread event_thread;
   std::atomic<bool> disposing{false};
   std::atomic<int64_t> sequence{0};
+
+  // GPU/native-window path only (see the second constructor above).
+  bool using_gpu_window = false;
+  HWND video_hwnd = nullptr;
+  HWND top_level_hwnd = nullptr;
+  std::unique_ptr<m3u_tv_mpv_windows::DisplayModeManager> display_mode_manager;
+  // Whether this instance currently has an OS HDR override applied, and
+  // whether a refresh-rate match has already been attempted for the current
+  // source -- both only meaningful with using_gpu_window, and both gate
+  // ApplyHdrForVideoParams/MatchRefreshRate against firing repeatedly for
+  // every video-params tick of a source that has not actually changed.
+  bool hdr_requested = false;
+  bool refresh_rate_matched = false;
 };
 
 LibmpvApi g_api;
@@ -654,6 +720,158 @@ std::string HeaderString(const flutter::EncodableMap* args) {
   return value.str();
 }
 
+// mpv's reply userdata for the runner's own `video-params` observation, used
+// to intercept HDR-relevant source changes without turning every tick of it
+// into a spurious PLAYBACK_RESTART event to Dart.
+constexpr uint64_t kVideoParamsHdrUserdata = UINT64_MAX;
+
+// Creates the native child window mpv's `wid` embeds into and presents its
+// own D3D11 swap chain against directly -- unlike the SW pixel-buffer path,
+// mpv owns rendering and presentation here entirely; this project only owns
+// creating, positioning and destroying the window.
+//
+// IMPORTANT CAVEAT, unresolved without a Windows box to verify against: the
+// open-source Plezy player (github.com/edde746/plezy, GPL-3.0), whose child-
+// window design this is adapted from, only gets correct z-ordering (video
+// *behind* the Flutter-drawn UI, including player controls) because its
+// engine build presents Flutter's own UI on a topmost DirectComposition
+// visual explicitly ordered above the video child window. That is a
+// modification to the Flutter engine itself, which this project does not
+// have and cannot build here. Flutter's own `platform_view` example ships a
+// Windows target that renders nothing but placeholder text, confirming the
+// stock engine has no platform-view API to lean on instead. On stock
+// Flutter, a plain WS_CHILD window's content is not guaranteed to composite
+// *behind* what its parent draws in the same screen region -- ordinary
+// Win32 z-order rules put a child's own paint *above* its parent's, which is
+// backwards from what video-behind-UI needs. Concretely, this may mean video
+// renders on top of player controls instead of behind them. Treat this as
+// unverified until confirmed (or fixed) on real hardware.
+HWND CreateGpuVideoWindow(HWND parent, std::string* error) {
+  if (parent == nullptr) {
+    if (error) *error = "no top-level HWND to parent the video window to";
+    return nullptr;
+  }
+  // WS_DISABLED takes the window out of input targeting entirely, so mouse
+  // input over the video reaches the parent Flutter view instead of being
+  // swallowed here (mpv never needs input; input-vo-keyboard is left at its
+  // default, no, and there is no forwarding subclass since this project has
+  // no controls that need to arrive through mpv's own window procedure).
+  constexpr DWORD kVideoHostWindowStyle = WS_CHILD | WS_CLIPSIBLINGS | WS_DISABLED;
+  HWND hwnd = CreateWindowExW(
+      WS_EX_NOPARENTNOTIFY, L"STATIC", L"", kVideoHostWindowStyle, 0, 0, 1, 1, parent, nullptr,
+      GetModuleHandleW(nullptr), nullptr);
+  if (hwnd == nullptr && error) *error = "CreateWindowExW failed: " + LastErrorMessage(GetLastError());
+  return hwnd;
+}
+
+// True when `params` (a `video-params` MPV_FORMAT_NODE) describes an HDR
+// source: a PQ or HLG transfer function over BT.2020 primaries. Unlike the
+// Linux Wayland path, no protocol-error-prone luminance negotiation is
+// needed here -- mpv's own D3D11 GPU-next VO handles the swap chain's color
+// space and metadata once `target-colorspace-hint`/`hdr-compute-peak` are
+// left on auto; the only decision left to this project is whether the *OS
+// display* should be switched into HDR mode at all, which mpv has no way to
+// do itself.
+bool ParseVideoParamsIsHdr(const mpv_node* params) {
+  if (params == nullptr || params->format != MPV_FORMAT_NODE_MAP || params->u.list == nullptr) return false;
+  const mpv_node_list& entries = *params->u.list;
+  if (entries.keys == nullptr || entries.values == nullptr) return false;
+
+  bool is_hdr_transfer = false;
+  bool is_bt2020 = false;
+  for (int index = 0; index < entries.num; ++index) {
+    const char* key = entries.keys[index];
+    if (key == nullptr) continue;
+    const mpv_node& value = entries.values[index];
+    if (value.format != MPV_FORMAT_STRING || value.u.string == nullptr) continue;
+    if (std::strcmp(key, "gamma") == 0) {
+      is_hdr_transfer = std::strcmp(value.u.string, "pq") == 0 || std::strcmp(value.u.string, "hlg") == 0;
+    } else if (std::strcmp(key, "primaries") == 0) {
+      is_bt2020 = std::strcmp(value.u.string, "bt.2020") == 0;
+    }
+  }
+  return is_hdr_transfer && is_bt2020;
+}
+
+// Toggles the OS display's HDR mode to match whether the current source is
+// HDR, called on every `video-params` change. Gated on `hdr_requested` so a
+// source that has not actually changed HDR-ness does not repeat the
+// DisplayConfigSetDeviceInfo/registry round trip on every tick.
+void ApplyHdrForVideoParams(PlayerInstance* player, const mpv_node* params) {
+  if (player == nullptr || !player->using_gpu_window || player->display_mode_manager == nullptr) return;
+  const bool is_hdr_source = ParseVideoParamsIsHdr(params);
+  if (is_hdr_source == player->hdr_requested) return;
+  player->hdr_requested = is_hdr_source;
+
+  if (is_hdr_source) {
+    if (player->display_mode_manager->IsHDRSupported(player->top_level_hwnd)) {
+      player->display_mode_manager->SetHDREnabled(player->top_level_hwnd, true);
+    }
+  } else {
+    player->display_mode_manager->RestoreOriginalHDRState(player->top_level_hwnd);
+  }
+}
+
+bool DoubleProperty(PlayerInstance* player, const char* name, double* value);
+
+// Issues an mpv `sub-add` command for each entry of the `externalSubtitles`
+// arg list (each a map with `uri`/`title`/`language` string fields). Applies
+// to both the GPU and SW load paths.
+void AddExternalSubtitles(LibmpvApi& api, mpv_handle* handle, const flutter::EncodableMap* args) {
+  if (args == nullptr) return;
+  auto it = args->find(flutter::EncodableValue("externalSubtitles"));
+  if (it == args->end()) return;
+  const flutter::EncodableList* subtitles = std::get_if<flutter::EncodableList>(&it->second);
+  if (subtitles == nullptr) return;
+
+  for (const flutter::EncodableValue& entry : *subtitles) {
+    const flutter::EncodableMap* map = std::get_if<flutter::EncodableMap>(&entry);
+    if (map == nullptr) continue;
+    const auto uri_it = map->find(flutter::EncodableValue("uri"));
+    if (uri_it == map->end()) continue;
+    const std::string* uri = std::get_if<std::string>(&uri_it->second);
+    if (uri == nullptr || uri->empty()) continue;
+
+    std::string title;
+    const auto title_it = map->find(flutter::EncodableValue("title"));
+    if (title_it != map->end()) {
+      if (const std::string* value = std::get_if<std::string>(&title_it->second)) title = *value;
+    }
+    std::string language;
+    const auto language_it = map->find(flutter::EncodableValue("language"));
+    if (language_it != map->end()) {
+      if (const std::string* value = std::get_if<std::string>(&language_it->second)) language = *value;
+    }
+
+    // mpv_command's argv is a single nullptr-terminated array with strictly
+    // positional arguments -- a nullptr placeholder in the middle (rather
+    // than a shorter array) would truncate the command there, silently
+    // dropping anything after it. So title/language are only appended while
+    // present, and language only alongside a title, never in its place.
+    std::vector<const char*> sub_args = {"sub-add", uri->c_str(), "auto"};
+    if (!title.empty()) {
+      sub_args.push_back(title.c_str());
+      if (!language.empty()) sub_args.push_back(language.c_str());
+    }
+    sub_args.push_back(nullptr);
+    api.command(handle, sub_args.data());
+  }
+}
+
+// Attempts to lock the display's refresh rate to the source's frame rate
+// (the classic "24Hz mode" home-theater feature) once per loaded source, at
+// the *current* resolution only -- see DisplayModeManager::MatchRefreshRate
+// for why a resolution change is deliberately never attempted.
+void MaybeMatchRefreshRate(PlayerInstance* player) {
+  if (player == nullptr || !player->using_gpu_window || player->display_mode_manager == nullptr) return;
+  if (player->refresh_rate_matched) return;
+  player->refresh_rate_matched = true;
+  double fps = 0.0;
+  if (DoubleProperty(player, "container-fps", &fps) && fps > 0.0) {
+    player->display_mode_manager->MatchRefreshRate(player->top_level_hwnd, fps);
+  }
+}
+
 ProbeMap LoadFailure(const char* code, const std::string& error) {
   return ProbeMap{
       {flutter::EncodableValue("ok"), flutter::EncodableValue(false)},
@@ -677,6 +895,83 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   }
   if (hwnd == nullptr) return LoadFailure(kBackendUnavailableCode, "Win32 HWND unavailable");
 
+  const std::string user_agent = StringArg(args, "userAgent");
+  const std::string headers = HeaderString(args);
+  const std::string uri = StringArg(args, "uri");
+  const int64_t start_position_ms = IntArg(args, "startPositionMs");
+  std::string start_option;
+  if (start_position_ms > 0) {
+    const double seconds = static_cast<double>(start_position_ms) / 1000.0;
+    start_option = "start=" + std::to_string(seconds);
+  }
+  const char* load_args[] = {"loadfile", uri.c_str(), "replace",
+                             start_option.empty() ? nullptr : start_option.c_str(),
+                             nullptr};
+
+  // GPU path: mpv embeds into a native child window (`wid`) and presents its
+  // own D3D11 swap chain into it directly, bypassing Flutter's texture
+  // bridge entirely -- see CreateGpuVideoWindow for the one big open
+  // question about whether that composites correctly on stock Flutter.
+  // Falls through to the proven SW pixel-buffer path below on any failure
+  // (window creation, or mpv_initialize itself failing for any reason --
+  // this project cannot detect a *later*, asynchronous D3D11/VO failure the
+  // way Linux's synchronously-created EGL surface could be validated up
+  // front, so a VO that opens successfully at mpv_initialize time but later
+  // fails to actually present is a real gap; it would surface as a black
+  // video area rather than a crash).
+  {
+    std::string window_error;
+    HWND video_hwnd = CreateGpuVideoWindow(hwnd, &window_error);
+    if (video_hwnd != nullptr) {
+      mpv_handle* gpu_handle = api.create();
+      if (gpu_handle != nullptr) {
+        api.set_option_string(gpu_handle, "terminal", "no");
+        api.set_option_string(gpu_handle, "config", "no");
+        const std::string wid = std::to_string(reinterpret_cast<intptr_t>(video_hwnd));
+        api.set_option_string(gpu_handle, "wid", wid.c_str());
+        api.set_option_string(gpu_handle, "vo", "gpu-next");
+        api.set_option_string(gpu_handle, "gpu-api", "auto");
+        api.set_option_string(gpu_handle, "hwdec", "auto-safe");
+        api.set_option_string(gpu_handle, "idle", "yes");
+        api.set_option_string(gpu_handle, "keepaspect", "no");
+        api.set_option_string(gpu_handle, "sub-auto", "fuzzy");
+        // mpv's own D3D11 GPU-next VO negotiates the swap chain's color
+        // space and HDR metadata itself once the OS display is actually in
+        // HDR mode; ApplyHdrForVideoParams (driven by video-params) is what
+        // decides whether the OS display should be.
+        api.set_option_string(gpu_handle, "target-colorspace-hint", "auto");
+        api.set_option_string(gpu_handle, "hdr-compute-peak", "auto");
+        api.set_option_string(gpu_handle, "tone-mapping", "auto");
+        if (!user_agent.empty()) api.set_option_string(gpu_handle, "user-agent", user_agent.c_str());
+        if (!headers.empty()) api.set_option_string(gpu_handle, "http-header-fields", headers.c_str());
+
+        if (api.initialize(gpu_handle) >= 0) {
+          const int64_t id = g_next_handle++;
+          auto player =
+              std::make_unique<PlayerInstance>(&api, dispatcher, event_sink_state, gpu_handle, video_hwnd, hwnd, id);
+          player->StartEventThread();
+          AddExternalSubtitles(api, gpu_handle, args);
+          if (api.command(gpu_handle, load_args) >= 0) {
+            g_players[id] = std::move(player);
+            return ProbeMap{
+                {flutter::EncodableValue("ok"), flutter::EncodableValue(true)},
+                {flutter::EncodableValue("handle"), flutter::EncodableValue(id)},
+                {flutter::EncodableValue("usesNativePlane"), flutter::EncodableValue(true)},
+                {flutter::EncodableValue("display"), flutter::EncodableValue(DisplayDetails(hwnd) + " (GPU D3D11 native window)")},
+            };
+          }
+          // loadfile failed -- player's destructor tears the GPU handle and
+          // window down; nothing to fall through to.
+          return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
+        }
+        api.terminate_destroy(gpu_handle);
+      }
+      DestroyWindow(video_hwnd);
+    }
+    // GPU path unavailable or failed; fall through to the SW path below on a
+    // fresh handle.
+  }
+
   mpv_handle* handle = api.create();
   if (handle == nullptr) return LoadFailure("desktop-libmpv-load-failed", "mpv_create returned null");
 
@@ -686,9 +981,8 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   api.set_option_string(handle, "hwdec", "auto-safe");
   api.set_option_string(handle, "idle", "yes");
   api.set_option_string(handle, "keepaspect", "no");
-  const std::string user_agent = StringArg(args, "userAgent");
+  api.set_option_string(handle, "sub-auto", "fuzzy");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
-  const std::string headers = HeaderString(args);
   if (!headers.empty()) api.set_option_string(handle, "http-header-fields", headers.c_str());
 
   int rc = api.initialize(handle);
@@ -735,17 +1029,8 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   player->texture_state->texture_id = texture_id;
   player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state.get());
   player->StartEventThread();
+  AddExternalSubtitles(api, handle, args);
 
-  const std::string uri = StringArg(args, "uri");
-  const int64_t start_position_ms = IntArg(args, "startPositionMs");
-  std::string start_option;
-  if (start_position_ms > 0) {
-    const double seconds = static_cast<double>(start_position_ms) / 1000.0;
-    start_option = "start=" + std::to_string(seconds);
-  }
-  const char* load_args[] = {"loadfile", uri.c_str(), "replace",
-                             start_option.empty() ? nullptr : start_option.c_str(),
-                             nullptr};
   rc = api.command(handle, load_args);
   if (rc < 0) return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
 
@@ -895,10 +1180,25 @@ void PlayerInstance::StartEventThread() {
     for (const char* name : doubles) api->observe_property(handle, 0, name, MPV_FORMAT_DOUBLE);
     for (const char* name : flags) api->observe_property(handle, 0, name, MPV_FORMAT_FLAG);
     for (const char* name : strings) api->observe_property(handle, 0, name, MPV_FORMAT_STRING);
+    if (using_gpu_window) {
+      // Only the GPU/native-window path has an OS display to toggle HDR or
+      // match a refresh rate against; the SW pixel-buffer path has neither.
+      api->observe_property(handle, kVideoParamsHdrUserdata, "video-params", MPV_FORMAT_NODE);
+      api->observe_property(handle, 0, "container-fps", MPV_FORMAT_DOUBLE);
+    }
     while (!disposing.load()) {
       mpv_event* event = api->wait_event(handle, 0.1);
       if (event == nullptr || event->event_id == MPV_EVENT_NONE) continue;
+      if (using_gpu_window && event->event_id == MPV_EVENT_PROPERTY_CHANGE &&
+          event->reply_userdata == kVideoParamsHdrUserdata) {
+        const auto* property = static_cast<const mpv_event_property*>(event->data);
+        if (property != nullptr && property->format == MPV_FORMAT_NODE && property->data != nullptr) {
+          ApplyHdrForVideoParams(this, static_cast<const mpv_node*>(property->data));
+        }
+        continue;
+      }
       EventSnapshot snapshot;
+      if (using_gpu_window && event->event_id == MPV_EVENT_FILE_LOADED) MaybeMatchRefreshRate(this);
       if (event->event_id == MPV_EVENT_QUEUE_OVERFLOW) {
         snapshot.kind = "ERROR";
         snapshot.message = "mpv event queue overflow";
@@ -1000,6 +1300,20 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
   auto it = g_players.find(id);
   if (it == g_players.end()) return;
   PlayerInstance* player = it->second.get();
+  if (method == "setVideoRect") {
+    // Reported by Dart on every layout of the widget hosting this backend;
+    // a no-op for players still on the SW texture path.
+    if (player->using_gpu_window && player->video_hwnd != nullptr) {
+      const int x = static_cast<int>(IntArg(args, "x"));
+      const int y = static_cast<int>(IntArg(args, "y"));
+      const int width = static_cast<int>(IntArg(args, "width"));
+      const int height = static_cast<int>(IntArg(args, "height"));
+      SetWindowPos(
+          player->video_hwnd, nullptr, x, y, std::max(width, 1), std::max(height, 1),
+          SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    return;
+  }
   if (method == "play") {
     const char* command[] = {"set", "pause", "no", nullptr};
     player->api->command(player->handle, command);
@@ -1132,5 +1446,9 @@ bool DispatchDesktopLibmpvPlatformMessage(WPARAM task_id) {
 }
 
 void RegisterDesktopLibmpvBackend(flutter::PluginRegistrarWindows* registrar, HWND hwnd) {
+  // Best-effort: undoes a display-mode/HDR override left applied by a
+  // previous run of this app that crashed or was killed before it could
+  // restore the display itself. See DisplayModeManager::RecoverIfNeeded.
+  m3u_tv_mpv_windows::DisplayModeManager::RecoverIfNeeded();
   registrar->AddPlugin(std::make_unique<DesktopLibmpvBackendPlugin>(registrar, hwnd));
 }
