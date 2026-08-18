@@ -1259,11 +1259,6 @@ class _PlaybackDiagnosticsPanel extends StatelessWidget {
         _DiagnosticsRow(label: 'Transcode', value: snapshot.transcodeSession!),
       if (snapshot.cleanupStatus != null)
         _DiagnosticsRow(label: 'Cleanup', value: snapshot.cleanupStatus!),
-      if (snapshot.androidMpvStatus != null)
-        _DiagnosticsRow(
-          label: 'Android mpv/libmpv',
-          value: snapshot.androidMpvStatus!,
-        ),
     ];
 
     return IgnorePointer(
@@ -1343,7 +1338,6 @@ class _PlaybackDiagnosticsSnapshot {
     this.codecDecision,
     this.transcodeSession,
     this.cleanupStatus,
-    this.androidMpvStatus,
   });
 
   final String backendLabel;
@@ -1351,7 +1345,6 @@ class _PlaybackDiagnosticsSnapshot {
   final String? codecDecision;
   final String? transcodeSession;
   final String? cleanupStatus;
-  final String? androidMpvStatus;
 
   static _PlaybackDiagnosticsSnapshot from({
     required PlaybackBackend? activeBackend,
@@ -1362,7 +1355,6 @@ class _PlaybackDiagnosticsSnapshot {
     String? codecDecision;
     String? transcodeSession;
     String? cleanupStatus;
-    String? androidMpvStatus;
 
     for (final item in diagnostics) {
       if (item.startsWith('active-backend:')) {
@@ -1384,11 +1376,6 @@ class _PlaybackDiagnosticsSnapshot {
           'cleanup:server-transcode:stopped:'.length,
         );
         cleanupStatus = 'server transcode stopped ($payload)';
-      } else if (item.startsWith('android-mpv:disabled-future-gated:')) {
-        final reason = item.substring(
-          'android-mpv:disabled-future-gated:'.length,
-        );
-        androidMpvStatus = 'disabled/future-gated ($reason)';
       }
     }
 
@@ -1398,7 +1385,6 @@ class _PlaybackDiagnosticsSnapshot {
       codecDecision: codecDecision,
       transcodeSession: transcodeSession,
       cleanupStatus: cleanupStatus,
-      androidMpvStatus: androidMpvStatus,
     );
   }
 
@@ -1435,7 +1421,7 @@ class _PlaybackDiagnosticsSnapshot {
   static String _backendLabel(PlaybackBackend? backend) {
     return switch (backend) {
       PlaybackBackend.androidExoPlayer => 'Android ExoPlayer',
-      PlaybackBackend.androidMpv => 'Android mpv/libmpv disabled',
+      PlaybackBackend.androidMpv => 'Android native mpv',
       PlaybackBackend.appleMpvNative => 'Apple native mpv',
       PlaybackBackend.appleMediaKit => 'Apple Media Kit',
       PlaybackBackend.appleAvKit => 'Apple AVKit fallback',

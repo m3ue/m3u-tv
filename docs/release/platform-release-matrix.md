@@ -30,7 +30,7 @@ The workflow does not run Electron builder commands, Electron scripts, or React 
 ## Honest Release Blockers
 
 - Android SDK/JDK setup, signed release artifacts, Play Console metadata, physical Android phone/tablet QA, and physical Android TV hardware validation are not completed by this baseline task. Emulator logs are supplemental only.
-- Android playback defaults to Media3/ExoPlayer. The blocking fallback is m3u-editor server transcode. Android mpv/libmpv remains future-gated and non-blocking for release readiness.
+- Android now uses native mpv (`PlaybackBackend.androidMpv`, `dev.jdtech.mpv` libmpv bindings, rendered via a `SurfaceView`-hosted `AndroidView`) as the primary playback path, with Media3/ExoPlayer as the automatic fallback and m3u-editor server transcode as the final fallback. Native mpv playback has only been confirmed via limited manual testing on physical Android TV hardware (playback starts, video renders, back-navigation tears down cleanly); subtitle rendering, HDR, and broader device/codec QA remain open before this can be claimed release-ready.
 - Linux production packaging must bundle `libmpv.so.2`, verify dynamic dependencies and ZIP integrity, and include license notices before public release.
 - Windows production packaging must verify `libmpv-2.dll` and required runtime files inside the ZIP. Authenticode or MSIX signing and real-device playback evidence remain release blockers.
 - Apple/tvOS gates do not block the Desktop+Android release track. Apple work is a non-blocking gated track while Linux desktop, Windows desktop, Android phone/tablet, and Android TV remain the blocking release targets.

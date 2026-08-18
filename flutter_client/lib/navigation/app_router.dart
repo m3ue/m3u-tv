@@ -135,7 +135,6 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
       probe: const AndroidPlaybackProbe(
         hardwareCodecs: <VideoCodec>{VideoCodec.h264},
         passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac, AudioCodec.mp3},
-        mpvAvailable: true,
         serverTranscodeAvailable: false,
       ),
     );
@@ -244,7 +243,6 @@ buildMultiviewTilePlayer(String playerId) {
             AudioCodec.aac,
             AudioCodec.mp3,
           },
-          mpvAvailable: false,
           serverTranscodeAvailable: false,
         ),
       );

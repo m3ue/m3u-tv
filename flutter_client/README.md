@@ -371,8 +371,8 @@ supportedLocales: AppLocalizations.supportedLocales,
 
 See [../docs/release/platform-release-matrix.md](../docs/release/platform-release-matrix.md) for full release gates.
 
-- Android playback defaults to Media3/ExoPlayer. The blocking fallback is m3u-editor server transcode when direct playback fails.
-- Android mpv/libmpv remains future-gated and non-blocking.
+- Android playback now uses native mpv (`PlaybackBackend.androidMpv`) as the primary path, with Media3/ExoPlayer as the automatic fallback and m3u-editor server transcode as the final fallback when direct playback fails.
+- Native mpv playback has only been confirmed via limited manual testing on physical Android TV hardware; subtitle rendering, HDR, and broader device/codec QA remain open.
 - Emulator logs are supplemental only. Release sign-off requires physical Android phone/tablet QA and physical Android TV hardware QA on the target API level.
 
 ## Toolchain versions

@@ -49,7 +49,6 @@ void main() {
             VideoCodec.av1,
           },
           passthroughAudioCodecs: <AudioCodec>{AudioCodec.ac3},
-          mpvAvailable: true,
           serverTranscodeAvailable: true,
         ),
       );
@@ -83,7 +82,6 @@ void main() {
         probe: const AndroidPlaybackProbe(
           hardwareCodecs: <VideoCodec>{VideoCodec.h264},
           passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac, AudioCodec.mp3},
-          mpvAvailable: false,
           serverTranscodeAvailable: false,
         ),
         media3Host: host,
@@ -107,13 +105,12 @@ void main() {
     });
 
     test(
-      'uses server transcode for unsupported codec fixtures while Android MPV is future-gated',
+      'uses server transcode for unsupported codec fixtures',
       () async {
         final adapter = AndroidPlaybackAdapter(
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: true,
             serverTranscodeAvailable: true,
           ),
         );
@@ -137,10 +134,6 @@ void main() {
         );
         expect(
           adapter.decisionLog,
-          contains('android-mpv:disabled-future-gated:unsupported-codec'),
-        );
-        expect(
-          adapter.decisionLog,
           contains('fallback:server-transcode:unsupported-codec'),
         );
 
@@ -150,13 +143,12 @@ void main() {
     );
 
     test(
-      'uses server transcode for decoder failures even when Android MPV probe is available',
+      'uses server transcode for decoder failures',
       () async {
         final adapter = AndroidPlaybackAdapter(
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: true,
             serverTranscodeAvailable: true,
           ),
         );
@@ -173,10 +165,6 @@ void main() {
         expect(adapter.activeBackend, PlaybackBackend.serverTranscode);
         expect(
           adapter.decisionLog,
-          contains('android-mpv:disabled-future-gated:black-screen'),
-        );
-        expect(
-          adapter.decisionLog,
           contains('fallback:server-transcode:black-screen'),
         );
 
@@ -191,7 +179,6 @@ void main() {
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: true,
             serverTranscodeAvailable: true,
           ),
         );
@@ -207,10 +194,6 @@ void main() {
         expect(serverAdapter.activeBackend, PlaybackBackend.serverTranscode);
         expect(
           serverAdapter.decisionLog,
-          contains('android-mpv:disabled-future-gated:unsupported-codec'),
-        );
-        expect(
-          serverAdapter.decisionLog,
           contains('fallback:server-transcode:unsupported-codec'),
         );
 
@@ -218,7 +201,6 @@ void main() {
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: true,
             serverTranscodeAvailable: false,
           ),
         );
@@ -256,10 +238,6 @@ void main() {
         expect(errors.single.recoverable, isTrue);
         expect(
           unsupportedAdapter.decisionLog,
-          contains('android-mpv:disabled-future-gated:unsupported-codec'),
-        );
-        expect(
-          unsupportedAdapter.decisionLog,
           contains('error:unsupported:unsupported-codec'),
         );
 
@@ -277,7 +255,6 @@ void main() {
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: false,
             serverTranscodeAvailable: false,
           ),
           media3Host: host,
@@ -345,7 +322,6 @@ void main() {
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: false,
             serverTranscodeAvailable: false,
           ),
           media3Host: host,
@@ -380,7 +356,6 @@ void main() {
           probe: const AndroidPlaybackProbe(
             hardwareCodecs: <VideoCodec>{VideoCodec.h264},
             passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac},
-            mpvAvailable: false,
             serverTranscodeAvailable: true,
           ),
           media3Host: host,

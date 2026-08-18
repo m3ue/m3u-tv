@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Native Android/Android TV mpv playback core.
@@ -59,6 +60,12 @@ class MpvPlayerCore(
     val surfaceView: SurfaceView = SurfaceView(context)
 
     init {
+        // A plain SurfaceView punches a hole and composites *underneath* its
+        // parent's own surface by default -- since this view is nested inside
+        // a Flutter AndroidView (itself backed by a surface Flutter
+        // composites), without this the video surface renders but is
+        // entirely obscured by Flutter's own layer, showing as black.
+        surfaceView.setZOrderOnTop(true)
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
                 attachSurface(holder.surface)
@@ -247,7 +254,17 @@ class MpvPlayerCore(
                 player = null
                 try {
                     current?.detachSurface()
-                    current?.close()
+                    // close() is a synchronous, blocking AutoCloseable
+                    // teardown -- unlike command/setProperty/create, it is
+                    // not `suspend`, so calling it directly on this scope's
+                    // Dispatchers.Main would block the main thread for as
+                    // long as native mpv teardown takes. If that teardown
+                    // itself needs the main looper free to finish (e.g. a
+                    // pending Surface/Handler callback), this deadlocks the
+                    // app -- matching an observed freeze on back-press that
+                    // required a force-close. Running it on Dispatchers.IO
+                    // keeps the main thread free while it completes.
+                    withContext(Dispatchers.IO) { current?.close() }
                 } catch (_: Exception) {
                     // Already closed/closing.
                 }

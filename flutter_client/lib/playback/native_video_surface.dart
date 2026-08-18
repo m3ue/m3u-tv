@@ -1,6 +1,10 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show Factory;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
 import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -40,11 +44,7 @@ class NativeVideoSurface extends StatelessWidget {
               creationParamsCodec: const StandardMessageCodec(),
             )
           : Platform.isAndroid
-          ? AndroidView(
-              viewType: view.platformViewType,
-              creationParams: view.platformViewCreationParams,
-              creationParamsCodec: const StandardMessageCodec(),
-            )
+          ? _androidHybridCompositionView(view)
           : UiKitView(
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,
@@ -80,5 +80,38 @@ class NativeVideoSurface extends StatelessWidget {
   Widget _wrap(Widget child) {
     if (!wrapInBlackBackground) return child;
     return ColoredBox(color: Colors.black, child: child);
+  }
+
+  /// `AndroidMpvBackend`'s platform view hosts a raw `SurfaceView` (mpv
+  /// draws into it directly via `attachSurface`) -- Flutter's default
+  /// `AndroidView` composition mode captures platform-view content into an
+  /// offscreen buffer, which a `SurfaceView` bypasses entirely by
+  /// compositing straight through to the system compositor, so its content
+  /// never appears there. Explicit Hybrid Composition (this
+  /// `PlatformViewLink`/`initSurfaceAndroidView` shape) is Flutter's
+  /// documented mechanism for embedding a `SurfaceView` correctly.
+  Widget _androidHybridCompositionView(PlatformViewProvider view) {
+    return PlatformViewLink(
+      viewType: view.platformViewType,
+      surfaceFactory: (context, controller) {
+        return AndroidViewSurface(
+          controller: controller as AndroidViewController,
+          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+          hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+        );
+      },
+      onCreatePlatformView: (params) {
+        final controller = PlatformViewsService.initSurfaceAndroidView(
+          id: params.id,
+          viewType: view.platformViewType,
+          layoutDirection: TextDirection.ltr,
+          creationParams: view.platformViewCreationParams,
+          creationParamsCodec: const StandardMessageCodec(),
+          onFocus: () => params.onFocusChanged(true),
+        )..addOnPlatformViewCreatedListener(params.onPlatformViewCreated);
+        unawaited(controller.create());
+        return controller;
+      },
+    );
   }
 }
