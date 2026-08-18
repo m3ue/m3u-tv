@@ -1,6 +1,9 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.10)
-project(runner LANGUAGES CXX)
+# CXX for the runner itself; C for the vendored, wayland-scanner-generated
+# color-management-v1-protocol.c (only built when Wayland/EGL dev headers are
+# present -- see the optional HDR video-plane block below).
+project(runner LANGUAGES CXX C)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
