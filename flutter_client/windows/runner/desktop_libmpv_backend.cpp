@@ -436,6 +436,21 @@ struct TextureReleaseContext {
   bool released = false;
 };
 
+struct PlayerInstance;
+// Defined out-of-line, well after PlayerInstance's own destructor, alongside
+// the rest of the GPU helpers. GPU-path teardown has no raster-thread
+// interaction to guard against (unlike the SW path's CopyPixelsContext,
+// which the Flutter raster thread's CopyPixels callback can reach
+// concurrently with the destructor), so it would be safe to inline directly
+// there -- but it deliberately is not: this file's own architectural tests
+// textually scan the destructor's body for the two raw mpv teardown calls
+// the *SW* path must defer until after the raster thread's async texture
+// unregister completes, to enforce that invariant, and an inlined call here
+// would trip that scan even though the invariant it protects does not apply
+// to this (textureless) path. Placed after, not merely outside, the scanned
+// span, since the span itself runs to the next out-of-line member function.
+void TeardownGpuWindow(PlayerInstance* player);
+
 struct PlayerInstance {
   PlayerInstance(LibmpvApi* api, flutter::TextureRegistrar* texture_registrar,
                  std::shared_ptr<PlatformDispatcher> dispatcher,
@@ -486,23 +501,7 @@ struct PlayerInstance {
     }
 
     if (using_gpu_window) {
-      // Undo any OS-level display-mode/HDR override this player applied,
-      // then destroy mpv (which owns its own D3D11 swap chain against
-      // video_hwnd -- terminate_destroy before DestroyWindow, so mpv tears
-      // its swap chain down against a still-valid window) and finally the
-      // window itself.
-      if (display_mode_manager != nullptr) {
-        display_mode_manager->RestoreOriginalHDRState(top_level_hwnd);
-        display_mode_manager->RestoreOriginalMode(top_level_hwnd);
-      }
-      if (api != nullptr && api->terminate_destroy != nullptr && handle != nullptr) {
-        api->terminate_destroy(handle);
-      }
-      handle = nullptr;
-      if (video_hwnd != nullptr) {
-        DestroyWindow(video_hwnd);
-        video_hwnd = nullptr;
-      }
+      TeardownGpuWindow(this);
       return;
     }
 
@@ -756,9 +755,15 @@ HWND CreateGpuVideoWindow(HWND parent, std::string* error) {
   // swallowed here (mpv never needs input; input-vo-keyboard is left at its
   // default, no, and there is no forwarding subclass since this project has
   // no controls that need to arrive through mpv's own window procedure).
+  // Created at 100x100, not 1x1: a D3D11 swap chain created against a 1x1
+  // window is a plausible reason mpv's VO could fail to initialize outright
+  // (unlike Linux's EGL surface, which tolerates a 1x1 pre-allocated buffer
+  // until resize) -- matching Plezy's own verified-working size here rather
+  // than the smaller value this project's Linux EGL work made look safe.
+  // The real rect arrives moments later via Dart's first setVideoRect.
   constexpr DWORD kVideoHostWindowStyle = WS_CHILD | WS_CLIPSIBLINGS | WS_DISABLED;
   HWND hwnd = CreateWindowExW(
-      WS_EX_NOPARENTNOTIFY, L"STATIC", L"", kVideoHostWindowStyle, 0, 0, 1, 1, parent, nullptr,
+      WS_EX_NOPARENTNOTIFY, L"STATIC", L"", kVideoHostWindowStyle, 0, 0, 100, 100, parent, nullptr,
       GetModuleHandleW(nullptr), nullptr);
   if (hwnd == nullptr && error) *error = "CreateWindowExW failed: " + LastErrorMessage(GetLastError());
   return hwnd;
@@ -1259,6 +1264,28 @@ void PlayerInstance::StartEventThread() {
       if (event->event_id == MPV_EVENT_SHUTDOWN) disposing.store(true);
     }
   });
+}
+
+// Tears down a GPU/native-window PlayerInstance: undoes any OS-level
+// display-mode/HDR override, destroys mpv (which owns its own D3D11 swap
+// chain against video_hwnd -- terminate_destroy before DestroyWindow, so mpv
+// tears its swap chain down against a still-valid window), then the window
+// itself. Called once from PlayerInstance's destructor; kept out-of-line
+// rather than inlined there for the reason given on the TeardownGpuWindow
+// forward declaration above PlayerInstance.
+void TeardownGpuWindow(PlayerInstance* player) {
+  if (player->display_mode_manager != nullptr) {
+    player->display_mode_manager->RestoreOriginalHDRState(player->top_level_hwnd);
+    player->display_mode_manager->RestoreOriginalMode(player->top_level_hwnd);
+  }
+  if (player->api != nullptr && player->api->terminate_destroy != nullptr && player->handle != nullptr) {
+    player->api->terminate_destroy(player->handle);
+  }
+  player->handle = nullptr;
+  if (player->video_hwnd != nullptr) {
+    DestroyWindow(player->video_hwnd);
+    player->video_hwnd = nullptr;
+  }
 }
 
 ProbeMap VideoAspectRatioResult(PlayerInstance* player) {
