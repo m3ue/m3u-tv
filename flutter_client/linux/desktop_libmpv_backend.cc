@@ -113,6 +113,12 @@ struct mpv_event {
   void* data;
 };
 
+struct mpv_event_property {
+  const char* name;
+  int format;
+  void* data;
+};
+
 struct mpv_event_end_file {
   int reason;
   int error;
@@ -531,6 +537,13 @@ struct PlayerInstance {
   std::atomic<bool> gpu_needs_redraw{false};
   std::atomic<bool> gpu_render_scheduled{false};
   std::atomic<guint> gpu_idle_source_id{0};
+  // The most recent source HDR metadata applied by ApplyHdrForVideoParams,
+  // re-consulted when the compositor's preferred description changes (a
+  // monitor move, or the output's own HDR mode being switched under us) so
+  // the same source can be re-decided against the new output state without
+  // waiting for mpv to report `video-params` again -- which it will not,
+  // since the source itself has not changed.
+  m3u_tv_mpv_plane::HdrMetadata last_source_hdr;
 #endif
   std::atomic<int> sequence{0};
   CopyPixelsContext* copy_context = nullptr;
@@ -894,6 +907,186 @@ void TeardownGpuPlane(PlayerInstance* player) {
     player->handle = nullptr;
   }
 }
+
+// mpv's reply userdata for the runner's own `video-params` observation, used
+// to intercept HDR-relevant source changes without disturbing the generic
+// PLAYBACK_RESTART snapshot rebuild every other observed property triggers.
+// Adapted from Plezy's `kVideoParamsUserdata` (mpv_player.cc).
+constexpr uint64_t kVideoParamsHdrUserdata = UINT64_MAX;
+
+// Reads the fields the HDR decision needs out of a `video-params` node,
+// directly into hdr_metadata.h's `HdrMetadata` -- adapted from Plezy's
+// `video_params.h`, but folded into this file (rather than kept as its own
+// header) because it has to operate on *this* file's local, dlopen-friendly
+// `mpv_node` layout rather than the real `<mpv/client.h>` one: this backend
+// deliberately avoids depending on libmpv devel headers at build time (see
+// the comment beside MPV_RENDER_PARAM_OPENGL_INIT_PARAMS above), and the two
+// struct layouts, while ABI-compatible, are not the same C++ type.
+//
+// A luminance the source did not state stays absent (zero) rather than
+// becoming a zero-valued claim -- mpv omits the field entirely rather than
+// reporting a zero, and zero is exactly how HdrMetadata spells "not stated".
+m3u_tv_mpv_plane::HdrMetadata ParseVideoParamsHdrMetadata(const mpv_node* params) {
+  m3u_tv_mpv_plane::HdrMetadata metadata;
+  if (params == nullptr || params->format != MPV_FORMAT_NODE_MAP || params->u.list == nullptr) return metadata;
+  const mpv_node_list& entries = *params->u.list;
+  if (entries.keys == nullptr || entries.values == nullptr) return metadata;
+
+  auto as_double = [](const mpv_node& value, double* out) {
+    if (value.format == MPV_FORMAT_DOUBLE) {
+      *out = value.u.double_;
+      return true;
+    }
+    if (value.format == MPV_FORMAT_INT64) {
+      *out = static_cast<double>(value.u.int64);
+      return true;
+    }
+    return false;
+  };
+  auto as_positive_uint32 = [&as_double](const mpv_node& value, uint32_t* out) {
+    double parsed = 0.0;
+    if (as_double(value, &parsed) && parsed > 0.0) *out = static_cast<uint32_t>(parsed);
+  };
+
+  for (int index = 0; index < entries.num; ++index) {
+    const char* key = entries.keys[index];
+    if (key == nullptr) continue;
+    const mpv_node& value = entries.values[index];
+    if (std::strcmp(key, "gamma") == 0) {
+      if (value.format == MPV_FORMAT_STRING && value.u.string != nullptr) {
+        if (std::strcmp(value.u.string, "pq") == 0) {
+          metadata.transfer = m3u_tv_mpv_plane::SourceTransfer::kPq;
+        } else if (std::strcmp(value.u.string, "hlg") == 0) {
+          metadata.transfer = m3u_tv_mpv_plane::SourceTransfer::kHlg;
+        }
+      }
+    } else if (std::strcmp(key, "primaries") == 0) {
+      if (value.format == MPV_FORMAT_STRING && value.u.string != nullptr &&
+          std::strcmp(value.u.string, "bt.2020") == 0) {
+        metadata.primaries = m3u_tv_mpv_plane::SourcePrimaries::kBt2020;
+      }
+    } else if (std::strcmp(key, "max-cll") == 0) {
+      as_positive_uint32(value, &metadata.max_cll);
+    } else if (std::strcmp(key, "max-fall") == 0) {
+      as_positive_uint32(value, &metadata.max_fall);
+    } else if (std::strcmp(key, "max-luma") == 0) {
+      as_positive_uint32(value, &metadata.max_luminance);
+    } else if (std::strcmp(key, "min-luma") == 0) {
+      // The mastering floor is the one luminance a source may legitimately
+      // state as zero, so it is taken on its own terms.
+      double parsed = 0.0;
+      if (as_double(value, &parsed) && parsed >= 0.0) metadata.min_luminance = parsed;
+    }
+  }
+  return metadata;
+}
+
+// Switches mpv's output color-space properties to match `transfer`/
+// `target_peak_nits`, synchronously via the same `mpv_command(["set", ...])`
+// pattern Control() already uses for every other runtime property. Adapted
+// from the *values* Plezy's MpvPlayer::SetHdrOutput applies (mpv_player.cc);
+// not its async property-sequence-with-rollback machinery, which exists
+// there to arbitrate rapidly overlapping user-driven HDR toggle requests.
+// This app has no such toggle -- HDR is applied automatically whenever
+// DecideHdr says so -- so a single serialized synchronous set is equivalent
+// and far simpler; mpv_command is documented as blocking, unlike
+// mpv_command_async.
+void ApplyMpvOutputColorProperties(
+    PlayerInstance* player, m3u_tv_mpv_plane::SourceTransfer transfer, uint32_t target_peak_nits) {
+  if (player == nullptr || player->api == nullptr || player->api->command == nullptr || player->handle == nullptr) {
+    return;
+  }
+  const bool enabled = transfer != m3u_tv_mpv_plane::SourceTransfer::kSdr;
+  const bool tone_map_here =
+      target_peak_nits >= 10 && target_peak_nits <= m3u_tv_mpv_plane::kPqMaxLuminanceNits;
+  const std::string peak = tone_map_here ? std::to_string(target_peak_nits) : std::string("auto");
+  const char* primaries = enabled ? "bt.2020" : "auto";
+  const char* curve = transfer == m3u_tv_mpv_plane::SourceTransfer::kHlg
+                          ? "hlg"
+                          : (transfer == m3u_tv_mpv_plane::SourceTransfer::kPq ? "pq" : (tone_map_here ? "srgb" : "auto"));
+  // mobius only while mpv is doing the tone-mapping itself for an undescribed
+  // SDR target; anywhere else auto is the honest answer (see the reasoning in
+  // Plezy's mpv_player.cc beside this same table of values).
+  const char* tone_mapping = (tone_map_here && !enabled) ? "mobius" : "auto";
+
+  g_message("MPV: output color target peak=%s prim=%s trc=%s tone-mapping=%s", peak.c_str(), primaries, curve, tone_mapping);
+  const char* trc_command[] = {"set", "target-trc", curve, nullptr};
+  player->api->command(player->handle, trc_command);
+  const char* prim_command[] = {"set", "target-prim", primaries, nullptr};
+  player->api->command(player->handle, prim_command);
+  const char* tone_mapping_command[] = {"set", "tone-mapping", tone_mapping, nullptr};
+  player->api->command(player->handle, tone_mapping_command);
+  const char* peak_command[] = {"set", "target-peak", peak.c_str(), nullptr};
+  player->api->command(player->handle, peak_command);
+}
+
+// Runs the HDR decision (hdr_metadata.h's DecideHdr) for `source` against
+// `player`'s Wayland plane and applies it: stages an image-description
+// transition on the plane, switches mpv's output color space once it
+// settles, then commits the transition so the first buffer rendered in the
+// new color space is the one the compositor is told carries it. Must only
+// be called on the GTK main thread.
+//
+// HDR is applied automatically -- `allowed` is always true -- there is no
+// user-facing toggle for it yet (unlike Plezy, which exposes one).
+void ApplyHdrForVideoParams(int64_t player_id, const m3u_tv_mpv_plane::HdrMetadata& source) {
+  auto it = g_players.find(player_id);
+  if (it == g_players.end()) return;
+  PlayerInstance* player = it->second.get();
+  if (!player->using_gpu_plane || player->gpu_plane == nullptr) return;
+  m3u_tv_mpv_plane::WaylandVideoSurface* plane = player->gpu_plane.get();
+  player->last_source_hdr = source;
+
+  m3u_tv_mpv_plane::HdrInputs inputs;
+  inputs.allowed = true;
+  inputs.client_can_describe = plane->supports_hdr();
+  inputs.output_is_hdr = plane->output_is_hdr();
+  inputs.source_describable = plane->CanDescribeSource(source);
+  // The compositor developers' recommended mode: mpv tone-maps to the
+  // display's real peak (learned from the compositor's preferred
+  // description) and declares that same peak, leaving the compositor an
+  // identity transform.
+  inputs.requested = m3u_tv_mpv_plane::HdrToneMapping::kPlayer;
+  inputs.display_peak_nits = plane->preferred().max_luminance;
+  inputs.sdr_reference_nits = plane->preferred().reference_luminance;
+
+  const m3u_tv_mpv_plane::HdrDecision decision = m3u_tv_mpv_plane::DecideHdr(inputs, source);
+  const m3u_tv_mpv_plane::HdrMetadata described = decision.tone_map_in_player
+      ? m3u_tv_mpv_plane::DescribeTonemappedTo(source, decision.target_peak_nits)
+      : source;
+  const m3u_tv_mpv_plane::SourceTransfer transfer =
+      decision.describe ? described.transfer : m3u_tv_mpv_plane::SourceTransfer::kSdr;
+
+  plane->BeginHdrTransition(
+      decision.describe, described, [player_id, decision, transfer](uint64_t token, bool staged) {
+        auto inner_it = g_players.find(player_id);
+        if (inner_it == g_players.end()) return;
+        PlayerInstance* inner_player = inner_it->second.get();
+        if (!inner_player->using_gpu_plane || inner_player->gpu_plane == nullptr) return;
+        m3u_tv_mpv_plane::WaylandVideoSurface* inner_plane = inner_player->gpu_plane.get();
+        if (!staged) {
+          inner_plane->AbortHdrTransition(token);
+          ScheduleGpuRender(inner_player);
+          return;
+        }
+        ApplyMpvOutputColorProperties(inner_player, transfer, decision.target_peak_nits);
+        if (inner_plane->CommitHdrTransition(token)) ScheduleGpuRender(inner_player);
+      });
+}
+
+gboolean ApplyHdrForVideoParamsIdle(gpointer data) {
+  auto* dispatch = static_cast<std::pair<int64_t, m3u_tv_mpv_plane::HdrMetadata>*>(data);
+  ApplyHdrForVideoParams(dispatch->first, dispatch->second);
+  delete dispatch;
+  return G_SOURCE_REMOVE;
+}
+
+// Marshals an mpv-thread `video-params` observation onto the GTK main
+// thread, where the plane and mpv's output properties may be touched.
+void DispatchHdrUpdate(int64_t player_id, const m3u_tv_mpv_plane::HdrMetadata& source) {
+  auto* dispatch = new std::pair<int64_t, m3u_tv_mpv_plane::HdrMetadata>(player_id, source);
+  if (!DispatchOnGtkMain(ApplyHdrForVideoParamsIdle, dispatch)) delete dispatch;
+}
 #endif  // HAVE_WAYLAND_MPV_PLANE
 
 // Issues an mpv `sub-add` command for each entry of the `externalSubtitles`
@@ -1241,6 +1434,13 @@ void PlayerInstance::StartEventThread() {
     api->observe_property(handle, 0, "dheight", MPV_FORMAT_DOUBLE);
     api->observe_property(handle, 0, "aid", MPV_FORMAT_STRING);
     api->observe_property(handle, 0, "sid", MPV_FORMAT_STRING);
+#ifdef HAVE_WAYLAND_MPV_PLANE
+    // Only the GPU/Wayland-plane path can describe HDR to the compositor; the
+    // software pixel-buffer path has no plane to describe it to.
+    if (using_gpu_plane) {
+      api->observe_property(handle, kVideoParamsHdrUserdata, "video-params", MPV_FORMAT_NODE);
+    }
+#endif
 
     while (!disposing.load()) {
       mpv_event* ev = api->wait_event(handle, 0.05);
@@ -1266,6 +1466,15 @@ void PlayerInstance::StartEventThread() {
 
       // Property change events.
       if (ev->event_id == 22) {  // MPV_EVENT_PROPERTY_CHANGE
+#ifdef HAVE_WAYLAND_MPV_PLANE
+        if (ev->reply_userdata == kVideoParamsHdrUserdata) {
+          const auto* property = static_cast<const mpv_event_property*>(ev->data);
+          if (property != nullptr && property->format == MPV_FORMAT_NODE && property->data != nullptr) {
+            DispatchHdrUpdate(id, ParseVideoParamsHdrMetadata(static_cast<const mpv_node*>(property->data)));
+          }
+          continue;
+        }
+#endif
         snapshot.sequence = sequence.fetch_add(1);
         snapshot.kind = "PLAYBACK_RESTART";
         ReadSnapshotProperties(&snapshot);
@@ -1411,6 +1620,20 @@ FlMethodResponse* Load(FlValue* args) {
                                                         gpu_context, std::move(plane), id);
         AttachGpuRenderCallback(api, gpu_render_context, player.get());
         player->gpu_plane->SetFrameCallback([raw = player.get()]() { ScheduleGpuRender(raw); });
+        // Resumes presenting after the transition watchdog abandons a
+        // colour change the compositor went silent on -- nothing else would
+        // prompt a re-render in that case (see WaylandVideoSurface's own
+        // comment on SetForcedRenderCallback).
+        player->gpu_plane->SetForcedRenderCallback([raw = player.get()]() { ScheduleGpuRender(raw); });
+        // Re-decides HDR for the same source when the compositor's preferred
+        // description changes under us (a monitor move, or HDR being
+        // switched on/off at the OS level) -- looked up by id, not a raw
+        // capture, since this can fire long after Load() returns.
+        player->gpu_plane->SetPreferredChangedCallback([id]() {
+          auto it = g_players.find(id);
+          if (it == g_players.end()) return;
+          ApplyHdrForVideoParams(id, it->second->last_source_hdr);
+        });
         player->StartEventThread();
 
         std::string uri = StringArg(args, "uri");

@@ -67,11 +67,12 @@ else()
   message(WARNING "libmpv.so runtime was not found by CMake; bundle/provide libmpv.so.2, libmpv.so.1, or libmpv.so for in-process playback.")
 endif()
 
-# Optional: the GPU-rendered Wayland video plane (wayland_video_surface.cc).
-# Kept QUIET/optional, matching MPV above, so a build host without Wayland
-# development headers still configures and builds -- it just keeps using the
-# software pixel-buffer texture path (also the path X11 sessions always use;
-# mpv's --wid embedding, the X11 equivalent, has no Wayland counterpart).
+# Optional: the GPU-rendered Wayland video plane (wayland_video_surface.cc),
+# including its wp_color_manager_v1-based HDR passthrough. Kept QUIET/optional,
+# matching MPV above, so a build host without Wayland development headers
+# still configures and builds -- it just keeps using the software pixel-buffer
+# texture path (also the path X11 sessions always use; mpv's --wid embedding,
+# the X11 equivalent, has no Wayland counterpart, and neither does HDR).
 pkg_check_modules(WAYLAND_CLIENT QUIET IMPORTED_TARGET wayland-client)
 pkg_check_modules(WAYLAND_EGL QUIET IMPORTED_TARGET wayland-egl)
 pkg_check_modules(MPV_EGL QUIET IMPORTED_TARGET egl)
@@ -94,7 +95,7 @@ set(RUNNER_SOURCES
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND AND MPV_EGL_FOUND)
-  list(APPEND RUNNER_SOURCES "wayland_video_surface.cc")
+  list(APPEND RUNNER_SOURCES "wayland_video_surface.cc" "wayland/color-management-v1-protocol.c")
 endif()
 
 add_executable(${BINARY_NAME} ${RUNNER_SOURCES})
