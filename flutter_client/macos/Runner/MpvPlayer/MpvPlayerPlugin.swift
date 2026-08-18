@@ -57,7 +57,8 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
           startPositionMs: (args["startPositionMs"] as? NSNumber)?.intValue ?? 0,
           isLive: args["isLive"] as? Bool ?? false,
           userAgent: args["userAgent"] as? String,
-          headers: args["headers"] as? [String: String]
+          headers: args["headers"] as? [String: String],
+          externalSubtitles: Self.parseExternalSubtitles(args["externalSubtitles"])
         )
         result(["ok": true])
       }
@@ -145,6 +146,18 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
       self?.waitForCore(viewId: viewId, attemptsRemaining: attemptsRemaining - 1, completion: completion)
+    }
+  }
+
+  /// Parses the `externalSubtitles` list `PlaybackSource` sends over the
+  /// `load` method call (see `MpvNativeBackendBase.load` in
+  /// lib/playback/mpv_native_backend_base.dart) into the tuple shape
+  /// `MpvPlayerCore.load(externalSubtitles:)` expects.
+  static func parseExternalSubtitles(_ raw: Any?) -> [(uri: String, title: String?, language: String?)] {
+    guard let list = raw as? [[String: Any]] else { return [] }
+    return list.compactMap { entry in
+      guard let uri = entry["uri"] as? String, !uri.isEmpty else { return nil }
+      return (uri: uri, title: entry["title"] as? String, language: entry["language"] as? String)
     }
   }
 }

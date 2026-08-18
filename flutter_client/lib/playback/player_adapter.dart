@@ -165,6 +165,7 @@ class PlaybackSource {
     this.userAgent,
     this.headers = const <String, String>{},
     this.metadata = const <String, Object?>{},
+    this.externalSubtitles = const <ExternalSubtitle>[],
   });
 
   final String uri;
@@ -176,6 +177,11 @@ class PlaybackSource {
   final String? userAgent;
   final Map<String, String> headers;
   final Map<String, Object?> metadata;
+
+  /// Sidecar subtitle files (e.g. `.srt`/`.vtt`) to load alongside [uri],
+  /// in addition to whatever tracks are embedded in the container. A native
+  /// mpv backend adds each of these via mpv's `sub-add` command on load.
+  final List<ExternalSubtitle> externalSubtitles;
 
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 }
@@ -219,6 +225,16 @@ class PlaybackTrack {
 
   final String id;
   final String label;
+  final String? language;
+}
+
+/// A sidecar subtitle file to load alongside a [PlaybackSource]'s main
+/// [PlaybackSource.uri], e.g. a `.srt`/`.vtt` found next to a VOD file.
+class ExternalSubtitle {
+  const ExternalSubtitle({required this.uri, this.title, this.language});
+
+  final String uri;
+  final String? title;
   final String? language;
 }
 

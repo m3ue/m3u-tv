@@ -39,6 +39,12 @@ class NativeVideoSurface extends StatelessWidget {
               creationParams: view.platformViewCreationParams,
               creationParamsCodec: const StandardMessageCodec(),
             )
+          : Platform.isAndroid
+          ? AndroidView(
+              viewType: view.platformViewType,
+              creationParams: view.platformViewCreationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+            )
           : UiKitView(
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,

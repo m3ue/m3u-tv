@@ -15,17 +15,24 @@ import 'package:m3u_tv/transcoding/transcoding.dart';
 void main() {
   group('production backend policy', () {
     testWidgets(
-      'unsupported_codec: Android uses Media3 then server transcode without player diagnostics',
+      'unsupported_codec: Android falls through mpv then Media3 to server '
+      'transcode without player diagnostics',
       (tester) async {
+        // androidMpv is now the primary Android backend (tried before
+        // androidExoPlayer) -- see PlaybackCapabilities.forPlatform(android).
+        final androidMpv = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidMpv,
+          loadFailure: const PlaybackException.unsupported(
+            'Unsupported codec hevc/aac on Android mpv',
+            backend: PlaybackBackend.androidMpv,
+          ),
+        );
         final media3 = _PolicyPlayerAdapter(
           capabilities: PlaybackCapabilities.androidExoPlayer,
           loadFailure: const PlaybackException.unsupported(
             'Unsupported codec hevc/aac on Android Media3',
             backend: PlaybackBackend.androidExoPlayer,
           ),
-        );
-        final androidMpv = _PolicyPlayerAdapter(
-          capabilities: PlaybackCapabilities.androidMpv,
         );
         final serverPlayer = _PolicyPlayerAdapter(
           capabilities: PlaybackCapabilities.serverTranscode,
@@ -69,18 +76,16 @@ void main() {
         await tester.pump();
         await tester.pump();
 
+        expect(androidMpv.commands, <String>[
+          'load:https://provider.example/live/unsupported.ts',
+        ]);
         expect(media3.commands, <String>[
           'load:https://provider.example/live/unsupported.ts',
         ]);
-        expect(androidMpv.commands, isEmpty);
         expect(gateway.startedServerRequests, hasLength(1));
         expect(gateway.startedServerRequests.single.videoCodec, 'hevc');
         expect(serverPlayer.loadedSources.single.uri, contains('unsupported'));
         expect(orchestrator.activeBackend, PlaybackBackend.serverTranscode);
-        expect(
-          orchestrator.diagnostics,
-          contains('android-mpv:disabled-future-gated:unsupported'),
-        );
         expect(
           orchestrator.diagnostics,
           contains('active-backend:serverTranscode:ready'),

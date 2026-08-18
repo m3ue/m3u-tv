@@ -91,6 +91,15 @@ abstract class MpvNativeBackendBase implements PlayerAdapter {
         'isLive': source.isLive,
         'userAgent': source.userAgent,
         'headers': source.headers,
+        'externalSubtitles': source.externalSubtitles
+            .map(
+              (subtitle) => <String, Object?>{
+                'uri': subtitle.uri,
+                'title': subtitle.title,
+                'language': subtitle.language,
+              },
+            )
+            .toList(growable: false),
       });
 
       if (!_isActiveLoad(generation)) return;

@@ -124,10 +124,6 @@ class PlaybackOrchestrator {
       if (!_isCurrentGeneration(generation)) return;
       attempt += 1;
       if (failure == null) return;
-      if (_platform == PlaybackPlatform.android &&
-          backend == PlaybackBackend.androidExoPlayer) {
-        _diagnostics.add('android-mpv:disabled-future-gated:${failure.code}');
-      }
       previousBackend = backend;
       if (!failure.recoverable) return;
       lastRecoverableFailure = failure;
@@ -185,10 +181,6 @@ class PlaybackOrchestrator {
   Iterable<PlaybackBackend> _nativeBackends() sync* {
     for (final capabilities in PlaybackCapabilities.forPlatform(_platform)) {
       if (capabilities.backend == PlaybackBackend.serverTranscode) {
-        continue;
-      }
-      if (_platform == PlaybackPlatform.android &&
-          capabilities.backend == PlaybackBackend.androidMpv) {
         continue;
       }
       if (_adapters.containsKey(capabilities.backend)) {

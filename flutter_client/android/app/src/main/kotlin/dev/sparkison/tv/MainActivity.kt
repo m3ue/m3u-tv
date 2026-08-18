@@ -10,12 +10,15 @@ import android.util.DisplayMetrics
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import dev.sparkison.tv.mpv.MpvPlayerPlatformViewFactory
+import dev.sparkison.tv.mpv.MpvPlayerPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var media3Plugin: Media3PlaybackPlugin? = null
+    private var mpvPlugin: MpvPlayerPlugin? = null
     private var deviceInfoChannel: MethodChannel? = null
     private var systemUiChannel: MethodChannel? = null
 
@@ -50,6 +53,12 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         media3Plugin = Media3PlaybackPlugin(this, flutterEngine)
+        val mpv = MpvPlayerPlugin(this, flutterEngine)
+        mpvPlugin = mpv
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "m3u_tv/android_mpv_view",
+            MpvPlayerPlatformViewFactory(mpv),
+        )
         deviceInfoChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_INFO_CHANNEL).also { channel ->
             channel.setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -74,6 +83,8 @@ class MainActivity : FlutterActivity() {
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         media3Plugin?.dispose()
         media3Plugin = null
+        mpvPlugin?.dispose()
+        mpvPlugin = null
         deviceInfoChannel?.setMethodCallHandler(null)
         deviceInfoChannel = null
         systemUiChannel?.setMethodCallHandler(null)

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/playback/android_mpv_backend.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
 import 'package:m3u_tv/playback/apple_mpv_native_backend.dart';
@@ -121,11 +122,20 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
   final adapters = <PlaybackBackend, PlayerAdapter>{};
 
   if (platform == PlaybackPlatform.android) {
+    // Native mpv via a Flutter PlatformView (`AndroidView` hosting a
+    // `SurfaceView`, `vo=gpu-next` + `gpu-context=android` +
+    // `hwdec=mediacodec`), registered as primary -- same architecture as
+    // `MacMpvNativeBackend`/`AppleMpvNativeBackend` above, modeled on the
+    // open-source Plezy player. `AndroidPlaybackAdapter` (ExoPlayer) stays
+    // registered as an automatic fallback via `PlaybackOrchestrator`'s own
+    // native multi-backend fallback -- do not wrap it in
+    // `FallbackPlayerAdapter`, see the desktop branch below for why.
+    adapters[PlaybackBackend.androidMpv] = AndroidMpvBackend();
     adapters[PlaybackBackend.androidExoPlayer] = AndroidPlaybackAdapter(
       probe: const AndroidPlaybackProbe(
         hardwareCodecs: <VideoCodec>{VideoCodec.h264},
         passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac, AudioCodec.mp3},
-        mpvAvailable: false,
+        mpvAvailable: true,
         serverTranscodeAvailable: false,
       ),
     );
