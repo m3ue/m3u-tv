@@ -72,9 +72,9 @@ endif()
 # development headers still configures and builds -- it just keeps using the
 # software pixel-buffer texture path (also the path X11 sessions always use;
 # mpv's --wid embedding, the X11 equivalent, has no Wayland counterpart).
-pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
-pkg_check_modules(WAYLAND_EGL QUIET wayland-egl)
-pkg_check_modules(MPV_EGL QUIET egl)
+pkg_check_modules(WAYLAND_CLIENT QUIET IMPORTED_TARGET wayland-client)
+pkg_check_modules(WAYLAND_EGL QUIET IMPORTED_TARGET wayland-egl)
+pkg_check_modules(MPV_EGL QUIET IMPORTED_TARGET egl)
 if(WAYLAND_CLIENT_FOUND AND WAYLAND_EGL_FOUND AND MPV_EGL_FOUND)
   message(STATUS "Wayland/EGL development headers found; building the GPU video plane")
 else()
