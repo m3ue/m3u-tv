@@ -11,7 +11,8 @@ set(BINARY_NAME "m3u_tv")
 # it, since that is the reference this project's native mpv backend
 # (windows/runner/desktop_libmpv_backend.cpp) is modeled on. Only the DLL is
 # consumed (windows/runner/CMakeLists.txt copies it into the runner output
-# directory as "libmpv-2.dll") -- unlike Plezy, this project deliberately
+# directory as "libmpv-gpu-2.dll", not "libmpv-2.dll" -- see the comment
+# beside that copy step for why) -- unlike Plezy, this project deliberately
 # does not link against libmpv.dll.a or include mpv/client.h at build time
 # (see the ABI structs hand-declared in desktop_libmpv_backend.cpp); it
 # dlopens the DLL at runtime instead, so MPV_INCLUDE_DIR is unused here.

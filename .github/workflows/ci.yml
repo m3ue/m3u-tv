@@ -151,6 +151,7 @@ jobs:
           $Required = @(
             "m3u_tv.exe",
             "flutter_windows.dll",
+            "libmpv-gpu-2.dll",
             "libmpv-2.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"

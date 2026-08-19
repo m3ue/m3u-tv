@@ -48,14 +48,20 @@ add_dependencies(${BINARY_NAME} flutter_assemble)
 # gpu-next/D3D11-capable libmpv build for the native mpv backend
 # (desktop_libmpv_backend.cpp), fetched by the top-level CMakeLists.txt (see
 # MPV_LIB_DIR there) the same way the open-source Plezy player fetches it.
-# Named "libmpv-2.dll", not "mpv-2.dll", so it is picked up ahead of -- and
-# never collides with -- the "mpv-2.dll" the media_kit_libs_windows_video
-# plugin bundles for the separate MediaKit fallback adapter: that build is
-# compiled for media_kit's own render-API/texture usage and cannot open a
-# windowed gpu-next/D3D11 VO, which is why desktop_libmpv_backend.cpp's
-# loader tries "libmpv-2.dll" first (see kMpvDllNames).
+# Renamed to "libmpv-gpu-2.dll" on copy -- the media_kit_libs_windows_video
+# plugin (kept for the separate MediaKit fallback adapter) also bundles a
+# DLL literally named "libmpv-2.dll" into this same output directory via the
+# top-level project's install() step, which -- because
+# CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD makes it its own INSTALL project
+# that Visual Studio always builds after every other target, including this
+# POST_BUILD -- runs after this copy and would silently overwrite a
+# same-named file. media_kit's build cannot open a windowed gpu-next/D3D11
+# VO, so being overwritten by it reintroduces the exact "Error
+# opening/initializing the selected video_out (--vo) device" failure this
+# fetch exists to fix. See kMpvDllNames in desktop_libmpv_backend.cpp, which
+# tries "libmpv-gpu-2.dll" first for the same reason.
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${MPV_LIB_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:${BINARY_NAME}>/libmpv-2.dll"
-  COMMENT "Copying fetched libmpv-2.dll"
+    "${MPV_LIB_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:${BINARY_NAME}>/libmpv-gpu-2.dll"
+  COMMENT "Copying fetched libmpv-2.dll as libmpv-gpu-2.dll"
 )

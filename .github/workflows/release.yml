@@ -839,7 +839,10 @@ jobs:
   # ── Windows ───────────────────────────────────────────────────────────────
   #
   # The Windows target uses a custom libmpv backend (desktop_libmpv_backend.cpp)
-  # and loads the libmpv-2.dll bundled by media_kit_libs_windows_video.
+  # that loads its own fetched libmpv-gpu-2.dll (windows/CMakeLists.txt); the
+  # libmpv-2.dll bundled by media_kit_libs_windows_video is kept only for the
+  # separate MediaKit fallback adapter and deliberately not consumed by the
+  # native backend, since both once shared a filename and collided.
   # ─────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows ZIP
@@ -876,6 +879,7 @@ jobs:
           $Required = @(
             "m3u_tv.exe",
             "flutter_windows.dll",
+            "libmpv-gpu-2.dll",
             "libmpv-2.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"
@@ -903,7 +907,7 @@ jobs:
           $Zip = "m3u-tv-v${V}-windows.zip"
           $VerifyDir = Join-Path $env:RUNNER_TEMP "m3u-tv-windows-verify"
           Expand-Archive -Path $Zip -DestinationPath $VerifyDir
-          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-2.dll", "data\icudtl.dat")) {
+          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-gpu-2.dll", "libmpv-2.dll", "data\icudtl.dat")) {
             $Path = Join-Path $VerifyDir $RelativePath
             if (-not (Test-Path $Path -PathType Leaf)) {
               throw "Required archived Windows file is missing: $RelativePath"
