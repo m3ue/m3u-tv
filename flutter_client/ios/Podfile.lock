@@ -66,8 +66,6 @@ PODS:
     - GoogleUtilities/Privacy
   - integration_test (0.0.1):
     - Flutter
-  - media_kit_video (0.0.1):
-    - Flutter
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -91,7 +89,6 @@ DEPENDENCIES:
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
-  - media_kit_video (from `.symlinks/plugins/media_kit_video/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
@@ -122,8 +119,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
-  media_kit_video:
-    :path: ".symlinks/plugins/media_kit_video/ios"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   sqflite_darwin:
@@ -135,25 +130,24 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Firebase: e8400c058702940d53f31fc0653e4e7a06332326
-  firebase_core: ed4af79ed27e2ce1b00d110a13d53dd27ce3cf8a
-  firebase_messaging: 333b8f434aee2a676be5cd86040f2a66f1a78806
+  firebase_core: c94f9efeed0ded590b7eecaf6110a374eb865d7a
+  firebase_messaging: 00bcc97454f71d0dbe0a8adc6f2abf952320cfb2
   FirebaseCore: 52d4512296984a44a8c8870c6494870fc7aeee2f
   FirebaseCoreInternal: 3b310521b34a51ce3a6c605e4618b9aef8f6c112
   FirebaseInstallations: bd8e80f51d4c8bdc6c872011dede0b800c5b49ea
   FirebaseMessaging: 313d69fe6529c8846813d1660b65d7d38bc16954
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_local_notifications: eda81afddbf18f8589f6ec069ce593c4c6378769
-  flutter_secure_storage_darwin: 79a377dfb00a246ccab2c64fe79d4d78c89e0fbc
+  flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
+  flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
-  integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
-  media_kit_video: 26c5b265a4094a2df3e8d41e6724d9b964c13151
+  integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  package_info_plus: c0502532a26c7662a62a356cebe2692ec5fe4ec4
+  package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
-  sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
-  url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
-  wakelock_plus: 76957ab028e12bfa4e66813c99e46637f367fc7e
+  sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
+  wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
 
 PODFILE CHECKSUM: 453c8d62eeb59c16f22132f49c950b24449bfd82
 

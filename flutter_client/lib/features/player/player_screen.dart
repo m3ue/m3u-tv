@@ -569,7 +569,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
         );
       }
       if (_disposed || !mounted || source.isLive) return;
-      if (source.startPosition > Duration.zero) {
+      // A non-recoverable load failure lets open() return normally (the
+      // failure is reported asynchronously via onError/_handleError instead
+      // of being thrown here) but leaves no active adapter behind. Without
+      // this guard, seek() below throws a bare StateError that this
+      // function's own catch clause then shows via _setErrorMessage,
+      // clobbering the real error _handleError already surfaced.
+      if (source.startPosition > Duration.zero &&
+          widget.orchestrator.activeBackend != null) {
         await widget.orchestrator.seek(source.startPosition);
       }
     } on Object catch (error) {
