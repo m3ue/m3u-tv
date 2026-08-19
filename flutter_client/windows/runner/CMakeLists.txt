@@ -48,18 +48,19 @@ add_dependencies(${BINARY_NAME} flutter_assemble)
 # gpu-next/D3D11-capable libmpv build for the native mpv backend
 # (desktop_libmpv_backend.cpp), fetched by the top-level CMakeLists.txt (see
 # MPV_LIB_DIR there) the same way the open-source Plezy player fetches it.
-# Renamed to "libmpv-gpu-2.dll" on copy -- the media_kit_libs_windows_video
-# plugin (kept for the separate MediaKit fallback adapter) also bundles a
-# DLL literally named "libmpv-2.dll" into this same output directory via the
-# top-level project's install() step, which -- because
-# CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD makes it its own INSTALL project
-# that Visual Studio always builds after every other target, including this
-# POST_BUILD -- runs after this copy and would silently overwrite a
-# same-named file. media_kit's build cannot open a windowed gpu-next/D3D11
-# VO, so being overwritten by it reintroduces the exact "Error
-# opening/initializing the selected video_out (--vo) device" failure this
-# fetch exists to fix. See kMpvDllNames in desktop_libmpv_backend.cpp, which
-# tries "libmpv-gpu-2.dll" first for the same reason.
+# Renamed to "libmpv-gpu-2.dll" on copy: this used to matter because the
+# media_kit_libs_windows_video plugin (no longer a dependency of this
+# project at all -- see kMpvDllNames in desktop_libmpv_backend.cpp for the
+# full history) bundled a DLL literally named "libmpv-2.dll" into this same
+# output directory, and its copy always ran after this one (Visual Studio
+# builds the INSTALL project, which is where that copy happened, after every
+# other target), silently overwriting ours and reintroducing the exact
+# "Error opening/initializing the selected video_out (--vo) device" failure
+# this fetch exists to fix. Kept distinctly named regardless, both as
+# defense against any future plugin doing the same thing and because it is
+# simply accurate: this is our own fetched build. See kMpvDllNames in
+# desktop_libmpv_backend.cpp, which tries "libmpv-gpu-2.dll" first for the
+# same reason.
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${MPV_LIB_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:${BINARY_NAME}>/libmpv-gpu-2.dll"

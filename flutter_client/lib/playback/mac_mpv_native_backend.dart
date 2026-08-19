@@ -23,8 +23,8 @@ int _nextViewId = 0;
 
 /// Native macOS mpv backend rendered through a `FlutterPlatformView`
 /// (`AppKitView`) driving `vo=gpu-next`/`gpu-context=moltenvk`/
-/// `hwdec=videotoolbox` directly, bypassing the Flutter texture bridge that
-/// `MediaKitDesktopAdapter` goes through. Modeled on
+/// `hwdec=videotoolbox` directly, bypassing the Flutter texture bridge
+/// entirely. Modeled on
 /// `macos/Runner/MpvPlayer/MpvPlayerCore.swift`, itself adapted from the
 /// open-source Plezy player (github.com/edde746/plezy, GPL-3.0).
 ///
@@ -34,8 +34,7 @@ int _nextViewId = 0;
 /// not a handle returned from a `load` response.
 ///
 /// Subtitles are rendered natively (mpv's own libass compositing, baked into
-/// the `gpu-next`/libplacebo output), so this adapter does not implement
-/// `SubtitleControllerProvider`, same as `DesktopLibmpvBackend`.
+/// the `gpu-next`/libplacebo output).
 ///
 /// Shares its load/play/pause/stop/dispose/event-reduction state machine
 /// with `AppleMpvNativeBackend` via `MpvNativeBackendBase` -- the two

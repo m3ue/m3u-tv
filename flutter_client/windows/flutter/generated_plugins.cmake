@@ -5,8 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   flutter_secure_storage_windows
-  media_kit_libs_windows_video
-  media_kit_video
   screen_retriever_windows
   url_launcher_windows
   window_manager

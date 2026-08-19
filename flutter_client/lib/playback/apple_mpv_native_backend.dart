@@ -24,7 +24,7 @@ int _nextViewId = 0;
 /// Native iOS/tvOS mpv backend rendered through a `FlutterPlatformView`
 /// (`UiKitView`) driving `vo=avfoundation`/`hwdec=videotoolbox` directly,
 /// rendering to an `AVSampleBufferDisplayLayer` and bypassing the Flutter
-/// texture bridge that `MediaKitIosAdapter` goes through. Modeled on
+/// texture bridge entirely. Modeled on
 /// `ios/Runner/MpvPlayer/MpvPlayerCore.swift` and
 /// `tvos/Runner/MpvPlayer/MpvPlayerCore.swift`, themselves adapted from the
 /// open-source Plezy player (github.com/edde746/plezy, GPL-3.0). One shared
@@ -35,8 +35,7 @@ int _nextViewId = 0;
 /// Like `MacMpvNativeBackend`, the native player instance is addressed by a
 /// Dart-generated `viewId` so the platform view can be created and attached
 /// before `load()` is ever called, and subtitles are rendered natively
-/// (mpv's own libass compositing), so this adapter does not implement
-/// `SubtitleControllerProvider`.
+/// (mpv's own libass compositing).
 ///
 /// Shares its load/play/pause/stop/dispose/event-reduction state machine
 /// with `MacMpvNativeBackend` via `MpvNativeBackendBase` -- the two backends

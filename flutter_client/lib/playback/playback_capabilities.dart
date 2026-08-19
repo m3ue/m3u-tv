@@ -3,11 +3,9 @@ enum PlaybackPlatform { android, apple, desktop, server }
 enum PlaybackBackend {
   androidExoPlayer,
   androidMpv,
-  appleMediaKit,
   appleAvKit,
   appleMpvNative,
   desktopLibmpv,
-  desktopMediaKit,
   macMpvNative,
   serverTranscode,
 }
@@ -113,26 +111,6 @@ class PlaybackCapabilities {
     supportsLiveSeek: false,
   );
 
-  static const PlaybackCapabilities appleMediaKit = PlaybackCapabilities(
-    platform: PlaybackPlatform.apple,
-    backend: PlaybackBackend.appleMediaKit,
-    displayName: 'Apple Media Kit',
-    supportsDirectStreams: true,
-    supportsServerTranscodeFallback: true,
-    supportsHls: true,
-    supportsMpegTs: true,
-    supportsMp4: true,
-    supportsAdvancedCodecs: true,
-    supportsAudioTrackSelection: true,
-    supportsSubtitleTrackSelection: true,
-    supportsEmbeddedSubtitles: true,
-    supportsExternalSubtitles: true,
-    supportsAdvancedSubtitleFormats: true,
-    supportsPlaybackSpeed: true,
-    supportsSeek: true,
-    supportsLiveSeek: false,
-  );
-
   static const PlaybackCapabilities appleAvKit = PlaybackCapabilities(
     platform: PlaybackPlatform.apple,
     backend: PlaybackBackend.appleAvKit,
@@ -157,26 +135,6 @@ class PlaybackCapabilities {
     platform: PlaybackPlatform.desktop,
     backend: PlaybackBackend.desktopLibmpv,
     displayName: 'Desktop libmpv',
-    supportsDirectStreams: true,
-    supportsServerTranscodeFallback: true,
-    supportsHls: true,
-    supportsMpegTs: true,
-    supportsMp4: true,
-    supportsAdvancedCodecs: true,
-    supportsAudioTrackSelection: true,
-    supportsSubtitleTrackSelection: true,
-    supportsEmbeddedSubtitles: true,
-    supportsExternalSubtitles: true,
-    supportsAdvancedSubtitleFormats: true,
-    supportsPlaybackSpeed: true,
-    supportsSeek: true,
-    supportsLiveSeek: false,
-  );
-
-  static const PlaybackCapabilities desktopMediaKit = PlaybackCapabilities(
-    platform: PlaybackPlatform.desktop,
-    backend: PlaybackBackend.desktopMediaKit,
-    displayName: 'Desktop Media Kit',
     supportsDirectStreams: true,
     supportsServerTranscodeFallback: true,
     supportsHls: true,
@@ -238,10 +196,8 @@ class PlaybackCapabilities {
     androidExoPlayer,
     androidMpv,
     appleMpvNative,
-    appleMediaKit,
     appleAvKit,
     desktopLibmpv,
-    desktopMediaKit,
     macMpvNative,
     serverTranscode,
   ];
@@ -251,11 +207,9 @@ class PlaybackCapabilities {
   /// which backends actually have an adapter registered
   /// (`_adapters.containsKey`) -- this list is the full theoretical catalog
   /// for the platform, not a claim that every row is currently wired up in
-  /// `buildPlaybackOrchestrator()` (lib/navigation/app_router.dart). Notably
-  /// `appleMediaKit`/`desktopMediaKit` are declared here but are not
-  /// registered anywhere today (MPVKit symbol collision; see that
-  /// function's comments) -- see `apple_backend_feasibility.dart` for what
-  /// is actually registered per Apple target.
+  /// `buildPlaybackOrchestrator()` (lib/navigation/app_router.dart) -- see
+  /// `apple_backend_feasibility.dart` for what is actually registered per
+  /// Apple target.
   static List<PlaybackCapabilities> forPlatform(PlaybackPlatform platform) {
     return switch (platform) {
       PlaybackPlatform.android => const <PlaybackCapabilities>[
@@ -265,13 +219,11 @@ class PlaybackCapabilities {
       ],
       PlaybackPlatform.apple => const <PlaybackCapabilities>[
         appleMpvNative,
-        appleMediaKit,
         appleAvKit,
         serverTranscode,
       ],
       PlaybackPlatform.desktop => const <PlaybackCapabilities>[
         macMpvNative,
-        desktopMediaKit,
         desktopLibmpv,
         serverTranscode,
       ],

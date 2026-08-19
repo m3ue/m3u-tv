@@ -135,9 +135,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     with SingleTickerProviderStateMixin {
   // Multiview drives several concurrent player instances. tvOS, iOS, and
   // Android multiplex them over their one native channel pair by playerId
-  // (see AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS
-  // (media_kit) and Linux/Windows (the in-process libmpv backend) are
-  // multi-instance by design already.
+  // (see AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS and
+  // Linux/Windows (the in-process libmpv backend) are multi-instance by
+  // design already.
   static const Set<String> _multiviewSupportedOperatingSystems = {
     'tvos',
     'ios',

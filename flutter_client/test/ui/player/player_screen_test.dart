@@ -2073,18 +2073,6 @@ void main() {
             size: const Size(1920, 1080),
           ),
           (
-            name: 'iPhone MediaKit',
-            platform: PlaybackPlatform.apple,
-            capabilities: PlaybackCapabilities.appleMediaKit,
-            size: const Size(430, 932),
-          ),
-          (
-            name: 'macOS MediaKit',
-            platform: PlaybackPlatform.desktop,
-            capabilities: PlaybackCapabilities.desktopMediaKit,
-            size: const Size(1440, 900),
-          ),
-          (
             name: 'Linux libmpv',
             platform: PlaybackPlatform.desktop,
             capabilities: PlaybackCapabilities.desktopLibmpv,

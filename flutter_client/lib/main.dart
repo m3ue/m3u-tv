@@ -18,7 +18,6 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
@@ -28,17 +27,6 @@ Future<void> main() async {
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
-  // MediaKit (libmpv) is only bundled for Linux/Windows now -- Apple
-  // platforms use native mpv (MPVKit) as primary, with AVKit as an
-  // automatic fallback on iOS/tvOS (macOS has none, see
-  // buildPlaybackOrchestrator in lib/navigation/app_router.dart).
-  // media_kit_libs_macos_video/ios_video were removed because they vendored
-  // a second, independently-versioned ffmpeg/libmpv build that collided at
-  // link time with MPVKit's, corrupting native mpv's own library-version
-  // check.
-  if (Platform.isLinux || Platform.isWindows) {
-    MediaKit.ensureInitialized();
-  }
   if (!kIsWeb && Platform.isMacOS) {
     await _configureMacOSWindow();
   }

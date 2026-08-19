@@ -161,7 +161,7 @@ void main() {
       },
     );
 
-    test('Windows loader resolves the libmpv DLL bundled by media_kit', () {
+    test("Windows loader resolves this project's own fetched libmpv DLL", () {
       final windowsBackend = File(
         'windows/runner/desktop_libmpv_backend.cpp',
       ).readAsStringSync();
@@ -169,16 +169,18 @@ void main() {
         '../.github/workflows/release.yml',
       ).readAsStringSync();
 
+      final fetchedNameIndex = windowsBackend.indexOf('L"libmpv-gpu-2.dll"');
       final bundledNameIndex = windowsBackend.indexOf('L"libmpv-2.dll"');
       final compatibilityNameIndex = windowsBackend.indexOf('L"mpv-2.dll"');
-      expect(bundledNameIndex, isNonNegative);
+      expect(fetchedNameIndex, isNonNegative);
+      expect(bundledNameIndex, greaterThan(fetchedNameIndex));
       expect(compatibilityNameIndex, greaterThan(bundledNameIndex));
       expect(
         releaseWorkflow,
         contains(r'foreach ($RelativePath in $Required)'),
       );
       expect(releaseWorkflow, contains(r'Test-Path $Path -PathType Leaf'));
-      expect(releaseWorkflow, contains('libmpv-2.dll'));
+      expect(releaseWorkflow, contains('libmpv-gpu-2.dll'));
     });
 
     test('desktop smoke requires the packaged libmpv runtime', () {

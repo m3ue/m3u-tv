@@ -25,7 +25,6 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
-import 'package:media_kit_video/media_kit_video.dart' as mkv;
 
 const bool _showPlaybackDiagnostics = bool.fromEnvironment(
   'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
@@ -1032,15 +1031,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                     ),
 
-                    if (widget.orchestrator.activeSubtitleController != null)
-                      Positioned.fill(
-                        child: mkv.SubtitleView(
-                          controller:
-                              widget.orchestrator.activeSubtitleController!,
-                          configuration: const mkv.SubtitleViewConfiguration(),
-                        ),
-                      ),
-
                     // Loading indicator
                     if (_status == PlaybackStatus.loading &&
                         _errorMessage == null)
@@ -1436,10 +1426,8 @@ class _PlaybackDiagnosticsSnapshot {
       'androidExoPlayer' => PlaybackBackend.androidExoPlayer,
       'androidMpv' => PlaybackBackend.androidMpv,
       'appleMpvNative' => PlaybackBackend.appleMpvNative,
-      'appleMediaKit' => PlaybackBackend.appleMediaKit,
       'appleAvKit' => PlaybackBackend.appleAvKit,
       'desktopLibmpv' => PlaybackBackend.desktopLibmpv,
-      'desktopMediaKit' => PlaybackBackend.desktopMediaKit,
       'macMpvNative' => PlaybackBackend.macMpvNative,
       'serverTranscode' => PlaybackBackend.serverTranscode,
       _ => null,
@@ -1451,10 +1439,8 @@ class _PlaybackDiagnosticsSnapshot {
       PlaybackBackend.androidExoPlayer => 'Android ExoPlayer',
       PlaybackBackend.androidMpv => 'Android native mpv',
       PlaybackBackend.appleMpvNative => 'Apple native mpv',
-      PlaybackBackend.appleMediaKit => 'Apple Media Kit',
       PlaybackBackend.appleAvKit => 'Apple AVKit fallback',
       PlaybackBackend.desktopLibmpv => 'Desktop libmpv',
-      PlaybackBackend.desktopMediaKit => 'Desktop Media Kit',
       PlaybackBackend.macMpvNative => 'macOS native mpv',
       PlaybackBackend.serverTranscode => 'Server transcode fallback',
       null => 'Selecting backend',

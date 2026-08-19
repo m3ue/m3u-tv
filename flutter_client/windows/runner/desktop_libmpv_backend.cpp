@@ -36,26 +36,29 @@ constexpr char kEventChannelName[] = "m3u_tv/desktop_libmpv/events";
 constexpr char kBackendUnavailableCode[] = "backend_unavailable";
 // "libmpv-gpu-2.dll" is *our* fetched, gpu-next/D3D11-capable build (see
 // MPV_LIB_DIR in ../CMakeLists.txt and the POST_BUILD copy step in this
-// directory's CMakeLists.txt) -- deliberately not named "libmpv-2.dll",
-// because the media_kit_libs_windows_video plugin (kept for the separate
-// MediaKitDesktopAdapter fallback) also bundles a DLL under that exact name
-// (see media_kit_libs_windows_video's windows/CMakeLists.txt,
-// media_kit_libs_windows_video_bundled_libraries), copied into this same
-// runner output directory by the top-level project's install() step, which
-// -- because CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD makes it its own
-// INSTALL project that Visual Studio builds after every other target,
-// including this one's POST_BUILD -- always runs *after* our copy and would
-// silently overwrite it if both used the same filename. media_kit's build
-// cannot open a windowed gpu-next/D3D11 VO, which is what actually caused
-// the "Error opening/initializing the selected video_out (--vo) device"
-// failure this array's previous (incorrect) fix attempted to solve: an
-// earlier version of this array assumed media_kit's DLL was named
-// "mpv-2.dll" and tried to win a same-directory race against it under the
-// name "libmpv-2.dll", which does not work since it is not actually a race
-// -- both copy steps target the identical path, so build order alone
-// decides, and install() always goes last. Giving our build a name nothing
-// else can ever produce removes the possibility of collision entirely,
-// regardless of build order. "libmpv-2.dll"/"mpv-2.dll" remain as fallbacks
+// directory's CMakeLists.txt) -- deliberately not named "libmpv-2.dll". That
+// name collided with the media_kit_libs_windows_video plugin, which used to
+// be a dependency of this project (for a MediaKitDesktopAdapter fallback
+// that, in the end, was never actually registered anywhere -- see
+// app_router.dart) and bundled a DLL under that exact same name, copied into
+// this same runner output directory by the top-level project's install()
+// step, which -- because CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD makes it
+// its own INSTALL project that Visual Studio builds after every other
+// target, including this one's POST_BUILD -- always ran *after* our copy and
+// silently overwrote it. media_kit's build could not open a windowed
+// gpu-next/D3D11 VO, which is what actually caused the "Error
+// opening/initializing the selected video_out (--vo) device" failure this
+// array's previous (incorrect) fix attempted to solve: an earlier version of
+// this array assumed media_kit's DLL was named "mpv-2.dll" and tried to win
+// a same-directory race against it under the name "libmpv-2.dll", which did
+// not work since it was not actually a race -- both copy steps targeted the
+// identical path, so build order alone decided, and install() always went
+// last. media_kit is no longer a dependency of this project at all (removed
+// entirely, not just left unregistered), which removes the collision at its
+// root -- but this build still keeps its own name nothing else can ever
+// produce, both as defense against any future plugin doing the same thing
+// and because it is simply accurate: this is our own fetched build, not a
+// generic "the" libmpv. "libmpv-2.dll"/"mpv-2.dll" remain as fallbacks
 // purely so a manually-vendored libmpv still works if ever placed by hand.
 constexpr const wchar_t* kMpvDllNames[] = {
     L"libmpv-gpu-2.dll",

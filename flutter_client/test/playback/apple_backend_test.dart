@@ -77,11 +77,12 @@ void main() {
       }
 
       // macOS registers only MacMpvNativeBackend -- no automatic fallback
-      // is wired up yet (media_kit was removed for the same MPVKit
-      // symbol-collision reason as iOS; see the macOS playback gate's
-      // summary/evidence). This asserts the current, accepted gap rather
-      // than a fallback that doesn't actually exist, so a future PR that
-      // reintroduces a real macOS fallback has to update this test too.
+      // is wired up yet (media_kit is not a dependency of this project at
+      // all, removed for the same MPVKit symbol-collision reason as iOS;
+      // see the macOS playback gate's summary/evidence). This asserts the
+      // current, accepted gap rather than a fallback that doesn't actually
+      // exist, so a future PR that reintroduces a real macOS fallback has
+      // to update this test too.
       final macos = AppleBackendFeasibility.forPlatform(
         AppleTargetPlatform.macos,
       );

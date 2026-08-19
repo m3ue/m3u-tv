@@ -671,22 +671,17 @@ jobs:
           test -x "$BUNDLE/m3u_tv"
           test -s "$BUNDLE/lib/libflutter_linux_gtk.so"
           test -s "$BUNDLE/lib/libmpv.so.2"
-          test -s "$BUNDLE/lib/libmedia_kit_video_plugin.so"
           test -s "$BUNDLE/data/icudtl.dat"
           test -d "$BUNDLE/data/flutter_assets"
           readelf -d "$BUNDLE/m3u_tv"
-          readelf -d "$BUNDLE/lib/libmedia_kit_video_plugin.so" \
-            > /tmp/m3u-tv-media-kit-video-dynamic.txt
-          grep -F 'Library runpath: [$ORIGIN]' \
-            /tmp/m3u-tv-media-kit-video-dynamic.txt
           if ldd "$BUNDLE/m3u_tv" | tee /tmp/m3u-tv-ldd.txt | grep -q 'not found'; then
             cat /tmp/m3u-tv-ldd.txt
             exit 1
           fi
 
           # Explicit allowlist of intentional system dependencies. Libraries
-          # resolved from inside the bundle (media_kit, libmpv, the Flutter
-          # engine) are already covered by the checks above and are exempt.
+          # resolved from inside the bundle (libmpv, the Flutter engine) are
+          # already covered by the checks above and are exempt.
           # Anything else must be a known, reviewed system dependency of the
           # GTK/X11/glibc stack this app links against - add new entries here
           # deliberately, not to silence a failure.
@@ -839,10 +834,10 @@ jobs:
   # ── Windows ───────────────────────────────────────────────────────────────
   #
   # The Windows target uses a custom libmpv backend (desktop_libmpv_backend.cpp)
-  # that loads its own fetched libmpv-gpu-2.dll (windows/CMakeLists.txt); the
-  # libmpv-2.dll bundled by media_kit_libs_windows_video is kept only for the
-  # separate MediaKit fallback adapter and deliberately not consumed by the
-  # native backend, since both once shared a filename and collided.
+  # that loads its own fetched libmpv-gpu-2.dll (windows/CMakeLists.txt).
+  # media_kit is not a dependency of this project -- it was removed entirely
+  # after it turned out to be dead weight vendoring a second,
+  # independently-versioned libmpv build that collided with this one.
   # ─────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows ZIP
@@ -880,7 +875,6 @@ jobs:
             "m3u_tv.exe",
             "flutter_windows.dll",
             "libmpv-gpu-2.dll",
-            "libmpv-2.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"
           )
@@ -907,7 +901,7 @@ jobs:
           $Zip = "m3u-tv-v${V}-windows.zip"
           $VerifyDir = Join-Path $env:RUNNER_TEMP "m3u-tv-windows-verify"
           Expand-Archive -Path $Zip -DestinationPath $VerifyDir
-          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-gpu-2.dll", "libmpv-2.dll", "data\icudtl.dat")) {
+          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-gpu-2.dll", "data\icudtl.dat")) {
             $Path = Join-Path $VerifyDir $RelativePath
             if (-not (Test-Path $Path -PathType Leaf)) {
               throw "Required archived Windows file is missing: $RelativePath"

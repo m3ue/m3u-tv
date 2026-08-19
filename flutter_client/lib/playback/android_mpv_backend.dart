@@ -46,8 +46,7 @@ int _nextViewId = 0;
 /// to it before `load()` is ever called), not a handle returned from a
 /// `load` response.
 ///
-/// Subtitles are rendered natively (mpv's own libass compositing), so this
-/// adapter does not implement `SubtitleControllerProvider`, same as
+/// Subtitles are rendered natively (mpv's own libass compositing), same as
 /// `MacMpvNativeBackend`/`AppleMpvNativeBackend`/`DesktopLibmpvBackend`.
 ///
 /// Shares its load/play/pause/stop/dispose/event-reduction state machine

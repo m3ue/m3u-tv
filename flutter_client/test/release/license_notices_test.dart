@@ -229,12 +229,4 @@ void main() {
           'Window must not defer Show() to SetNextFrameCallback — app must appear immediately on startup',
     );
   });
-
-  test('Windows bundles MediaKit native video libraries', () {
-    final pubspec = readFile('pubspec.yaml');
-    final windowsPlugins = readFile('windows/flutter/generated_plugins.cmake');
-
-    expect(pubspec, contains('media_kit_libs_windows_video:'));
-    expect(windowsPlugins, contains('media_kit_libs_windows_video'));
-  });
 }
