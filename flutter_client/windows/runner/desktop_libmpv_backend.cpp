@@ -582,6 +582,15 @@ struct PlayerInstance {
   // every video-params tick of a source that has not actually changed.
   bool hdr_requested = false;
   bool refresh_rate_matched = false;
+  // User-facing override, mirrored from the `enableHDR` app setting via the
+  // `setHdrEnabled` control method. Gates whether ApplyHdrForVideoParams may
+  // switch the OS display into HDR mode at all; defaults on so playback
+  // matches the prior, always-on behavior until the user turns it off.
+  // mpv's own `target-colorspace-hint`/`hdr-compute-peak` stay on "auto"
+  // regardless (see the comment beside ParseVideoParamsIsHdr) -- this only
+  // controls the OS-level display switch, which is the one HDR decision mpv
+  // cannot make for itself.
+  bool hdr_user_enabled = true;
 };
 
 LibmpvApi g_api;
@@ -710,6 +719,14 @@ int64_t IntArg(const flutter::EncodableMap* args, const char* key) {
   return 0;
 }
 
+bool BoolArg(const flutter::EncodableMap* args, const char* key, bool fallback) {
+  if (args == nullptr) return fallback;
+  auto it = args->find(flutter::EncodableValue(key));
+  if (it == args->end()) return fallback;
+  const bool* value = std::get_if<bool>(&it->second);
+  return value == nullptr ? fallback : *value;
+}
+
 double DoubleArg(const flutter::EncodableMap* args, const char* key, double fallback) {
   if (args == nullptr) return fallback;
   auto it = args->find(flutter::EncodableValue(key));
@@ -822,7 +839,7 @@ bool ParseVideoParamsIsHdr(const mpv_node* params) {
 // DisplayConfigSetDeviceInfo/registry round trip on every tick.
 void ApplyHdrForVideoParams(PlayerInstance* player, const mpv_node* params) {
   if (player == nullptr || !player->using_gpu_window || player->display_mode_manager == nullptr) return;
-  const bool is_hdr_source = ParseVideoParamsIsHdr(params);
+  const bool is_hdr_source = player->hdr_user_enabled && ParseVideoParamsIsHdr(params);
   if (is_hdr_source == player->hdr_requested) return;
   player->hdr_requested = is_hdr_source;
 
@@ -832,6 +849,23 @@ void ApplyHdrForVideoParams(PlayerInstance* player, const mpv_node* params) {
     }
   } else {
     player->display_mode_manager->RestoreOriginalHDRState(player->top_level_hwnd);
+  }
+}
+
+// Re-runs the OS display HDR decision against the current source without
+// waiting for another `video-params` event -- used when the user flips the
+// `hdr-enabled` control mid-playback, since the source's own HDR-ness has not
+// changed. Cheap no-op via ApplyHdrForVideoParams's `hdr_requested` dedup
+// when the toggle did not actually change the outcome (e.g. an SDR source).
+void ReapplyHdrForCurrentSource(PlayerInstance* player) {
+  if (player == nullptr || player->handle == nullptr || player->api == nullptr ||
+      player->api->get_property == nullptr) {
+    return;
+  }
+  mpv_node params{};
+  if (player->api->get_property(player->handle, "video-params", MPV_FORMAT_NODE, &params) >= 0) {
+    ApplyHdrForVideoParams(player, &params);
+    if (player->api->free_node_contents != nullptr) player->api->free_node_contents(&params);
   }
 }
 
@@ -1429,6 +1463,9 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
     const std::string volume = std::to_string(DoubleArg(args, "volume", 100.0));
     const char* command[] = {"set", "volume", volume.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (method == "setHdrEnabled") {
+    player->hdr_user_enabled = BoolArg(args, "enabled", true);
+    ReapplyHdrForCurrentSource(player);
   } else if (method == "dispose") {
     g_players.erase(it);
   }

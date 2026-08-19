@@ -72,6 +72,19 @@ abstract class NativePlaneProvider {
   );
 }
 
+/// A [PlayerAdapter] that exposes a user-facing HDR on/off override, mirroring
+/// the same `hdr-enabled` control the open-source Plezy player exposes.
+/// Implemented by `DesktopLibmpvBackend` (Linux/Windows) only -- Apple's mpv
+/// backends and ExoPlayer decide HDR automatically from the source and
+/// display, with no equivalent override.
+// ignore: one_member_abstracts
+abstract class HdrToggleProvider {
+  Future<void> setHdrEnabled(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  );
+}
+
 /// A [PlayerAdapter] that Multiview can drive: one concurrently playable
 /// instance per grid tile, rendered via either [VideoTextureProvider] or
 /// [PlatformViewProvider]. [setVolume] mutes/unmutes a tile by audio focus

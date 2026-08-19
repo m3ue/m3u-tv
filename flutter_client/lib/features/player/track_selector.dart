@@ -20,6 +20,9 @@ class TrackSelector extends StatelessWidget {
     this.onDialogVisibilityChanged,
     this.isAudioTrackSelectionKnown = false,
     this.isSubtitleTrackSelectionKnown = false,
+    this.supportsHdrToggle = false,
+    this.hdrEnabled = true,
+    this.onHdrEnabledChanged,
     super.key,
   });
 
@@ -51,11 +54,41 @@ class TrackSelector extends StatelessWidget {
   final ValueChanged<String?> onSubtitleTrackSelected;
   final ValueChanged<bool>? onDialogVisibilityChanged;
 
+  /// Whether the active backend can toggle HDR playback (currently only
+  /// `DesktopLibmpvBackend` on Linux/Windows -- see [HdrToggleProvider]).
+  final bool supportsHdrToggle;
+
+  /// Current HDR setting, only meaningful when [supportsHdrToggle] is true.
+  final bool hdrEnabled;
+
+  /// Called when the user taps the HDR button to flip [hdrEnabled].
+  final ValueChanged<bool>? onHdrEnabledChanged;
+
   @override
   Widget build(BuildContext context) {
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (supportsHdrToggle)
+          Padding(
+            padding: EdgeInsets.only(
+              right: audioTracks.isNotEmpty || subtitleTracks.isNotEmpty
+                  ? buttonGap
+                  : 0,
+            ),
+            child: SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppButton(
+                  icon: Icons.hdr_on,
+                  label: hdrEnabled ? 'HDR On' : 'HDR Off',
+                  onPressed: () => onHdrEnabledChanged?.call(!hdrEnabled),
+                ),
+              ),
+            ),
+          ),
         if (audioTracks.isNotEmpty)
           SizedBox(
             width: buttonWidth,

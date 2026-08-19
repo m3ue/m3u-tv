@@ -42,6 +42,9 @@ class PlaybackControls extends StatelessWidget {
     this.onAudioTrackSelected,
     this.onSubtitleTrackSelected,
     this.onTrackDialogVisibilityChanged,
+    this.supportsHdrToggle = false,
+    this.hdrEnabled = true,
+    this.onHdrEnabledChanged,
     this.fallbackReason,
     this.playPauseFocusNode,
     this.onNextChannel,
@@ -68,6 +71,9 @@ class PlaybackControls extends StatelessWidget {
   final ValueChanged<String?>? onAudioTrackSelected;
   final ValueChanged<String?>? onSubtitleTrackSelected;
   final ValueChanged<bool>? onTrackDialogVisibilityChanged;
+  final bool supportsHdrToggle;
+  final bool hdrEnabled;
+  final ValueChanged<bool>? onHdrEnabledChanged;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
   final VoidCallback? onNextChannel;
@@ -180,7 +186,7 @@ class PlaybackControls extends StatelessWidget {
   }
 
   bool get _hasTrackControls =>
-      audioTracks.isNotEmpty || subtitleTracks.isNotEmpty;
+      audioTracks.isNotEmpty || subtitleTracks.isNotEmpty || supportsHdrToggle;
 
   Widget _buildTrackControls() {
     return TrackSelector(
@@ -193,6 +199,9 @@ class PlaybackControls extends StatelessWidget {
       onAudioTrackSelected: onAudioTrackSelected ?? (_) {},
       onSubtitleTrackSelected: onSubtitleTrackSelected ?? (_) {},
       onDialogVisibilityChanged: onTrackDialogVisibilityChanged,
+      supportsHdrToggle: supportsHdrToggle,
+      hdrEnabled: hdrEnabled,
+      onHdrEnabledChanged: onHdrEnabledChanged,
     );
   }
 

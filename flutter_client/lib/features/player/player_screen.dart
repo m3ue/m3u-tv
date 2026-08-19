@@ -21,6 +21,7 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -51,6 +52,7 @@ class PlayerScreen extends StatefulWidget {
     this.onRecordProgram,
     this.onTrackDialogVisibilityChanged,
     this.isRecordingCurrentChannel = false,
+    this.viewSettingsService,
     super.key,
   });
 
@@ -64,6 +66,7 @@ class PlayerScreen extends StatefulWidget {
   final TraktService? traktService;
   final WakelockController wakelockController;
   final String viewerId;
+  final ViewSettingsService? viewSettingsService;
   final VoidCallback? onClose;
   final VoidCallback? onPlaybackFailure;
   final VoidCallback? onNextChannel;
@@ -95,6 +98,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _selectedSubtitleTrackId;
   bool _isAudioTrackSelectionKnown = false;
   bool _isSubtitleTrackSelectionKnown = false;
+  late bool _hdrEnabled = widget.viewSettingsService?.hdrEnabledSync ?? true;
 
   EpgCurrentNext? _epgData;
 
@@ -557,6 +561,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _openAndSeek(PlaybackSource source) async {
     try {
       await widget.orchestrator.open(source);
+      // Native backends default to HDR on; only push an explicit call when
+      // the persisted setting disagrees, so backends without the capability
+      // (and the common case of it already being on) skip the round trip.
+      if (!_hdrEnabled) {
+        unawaited(
+          widget.orchestrator.activeHdrToggleProvider?.setHdrEnabled(false),
+        );
+      }
       if (_disposed || !mounted || source.isLive) return;
       if (source.startPosition > Duration.zero) {
         await widget.orchestrator.seek(source.startPosition);
@@ -871,6 +883,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
 
+  bool get _supportsHdrToggle =>
+      widget.orchestrator.activeHdrToggleProvider != null;
+
+  void _handleHdrEnabledChanged(bool enabled) {
+    setState(() => _hdrEnabled = enabled);
+    unawaited(widget.viewSettingsService?.setHdrEnabled(enabled));
+    unawaited(
+      widget.orchestrator.activeHdrToggleProvider?.setHdrEnabled(enabled),
+    );
+  }
+
   void _showOverlay() {
     setState(() => _overlayVisible = true);
     _scheduleOverlayHide();
@@ -1115,6 +1138,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onAudioTrackSelected: _handleAudioTrackSelected,
                             onSubtitleTrackSelected:
                                 _handleSubtitleTrackSelected,
+                            supportsHdrToggle: _supportsHdrToggle,
+                            hdrEnabled: _hdrEnabled,
+                            onHdrEnabledChanged: _handleHdrEnabledChanged,
                             onTrackDialogVisibilityChanged:
                                 _handleTrackDialogVisibilityChanged,
                             fallbackReason: _showPlaybackDiagnostics

@@ -92,6 +92,12 @@ class PlaybackOrchestrator {
     return adapter! as NativePlaneProvider;
   }
 
+  HdrToggleProvider? get activeHdrToggleProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! HdrToggleProvider) return null;
+    return adapter! as HdrToggleProvider;
+  }
+
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
 
   Future<void> open(PlaybackSource source) async {

@@ -1338,6 +1338,7 @@ class AppShellState extends ConsumerState<AppShell>
                   comskipSettings: _appState.comskipSettings,
                   hasDvrFeature: _appState.hasDvrFeature,
                   viewerId: viewerId,
+                  viewSettingsService: _appState.viewSettingsService,
                   onNextChannel: args.type == 'live' ? _openNextChannel : null,
                   onPreviousChannel: args.type == 'live'
                       ? _openPreviousChannel

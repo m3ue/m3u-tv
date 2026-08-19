@@ -31,6 +31,7 @@ class DesktopLibmpvBackend
         PlayerAdapter,
         VideoTextureProvider,
         NativePlaneProvider,
+        HdrToggleProvider,
         MultiviewBackend {
   DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _channel = channel ?? const MethodChannel(_methodChannelName),
@@ -293,6 +294,13 @@ class DesktopLibmpvBackend
   @override
   Future<void> setPlaybackSpeed(double speed) async {
     await _invokeControl('setPlaybackSpeed', <String, Object?>{'speed': speed});
+  }
+
+  @override
+  Future<void> setHdrEnabled(bool enabled) async {
+    await _invokeControl('setHdrEnabled', <String, Object?>{
+      'enabled': enabled,
+    });
   }
 
   @override

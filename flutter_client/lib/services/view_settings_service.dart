@@ -59,6 +59,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
   static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
+  static const hdrEnabledKey = 'm3ue_tv_hdr_enabled';
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
@@ -109,6 +110,25 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setChannelColumnLayout(ChannelColumnLayout layout) async {
     await _write(channelColumnLayoutKey, layout.value);
+    notifyListeners();
+  }
+
+  /// Whether native mpv desktop backends (Linux/Windows) are allowed to
+  /// switch playback and the OS display into HDR mode. Defaults on, matching
+  /// the always-on behavior before this setting existed.
+  Future<bool> hdrEnabled() async {
+    final raw = await _read(hdrEnabledKey);
+    return raw as bool? ?? true;
+  }
+
+  /// Synchronous access to the in-memory cached HDR setting.
+  bool get hdrEnabledSync => (_memory[hdrEnabledKey] as bool?) ?? true;
+
+  Future<void> setHdrEnabled(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(hdrEnabledKey, enabled);
     notifyListeners();
   }
 

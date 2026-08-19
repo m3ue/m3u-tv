@@ -544,6 +544,11 @@ struct PlayerInstance {
   // waiting for mpv to report `video-params` again -- which it will not,
   // since the source itself has not changed.
   m3u_tv_mpv_plane::HdrMetadata last_source_hdr;
+  // User-facing override, mirrored from the `enableHDR` app setting via the
+  // `setHdrEnabled` control method. Feeds HdrInputs::allowed in
+  // ApplyHdrForVideoParams; defaults on so playback matches the prior,
+  // always-on behavior until the user turns it off.
+  bool hdr_user_enabled = true;
 #endif
   std::atomic<int> sequence{0};
   CopyPixelsContext* copy_context = nullptr;
@@ -704,6 +709,13 @@ int64_t IntArg(FlValue* args, const char* key) {
   FlValue* value = fl_value_lookup_string(args, key);
   if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_INT) return 0;
   return fl_value_get_int(value);
+}
+
+bool BoolArg(FlValue* args, const char* key, bool fallback) {
+  if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) return fallback;
+  FlValue* value = fl_value_lookup_string(args, key);
+  if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) return fallback;
+  return fl_value_get_bool(value);
 }
 
 FlValue* MapArg(FlValue* args, const char* key) {
@@ -1027,8 +1039,10 @@ void ApplyMpvOutputColorProperties(
 // new color space is the one the compositor is told carries it. Must only
 // be called on the GTK main thread.
 //
-// HDR is applied automatically -- `allowed` is always true -- there is no
-// user-facing toggle for it yet (unlike Plezy, which exposes one).
+// `allowed` mirrors the user-facing HDR toggle (player->hdr_user_enabled,
+// set via the `setHdrEnabled` control method) -- off forces `describe` to
+// false in DecideHdr, which routes the source back through the SDR path
+// below exactly like an output that cannot carry HDR at all.
 void ApplyHdrForVideoParams(int64_t player_id, const m3u_tv_mpv_plane::HdrMetadata& source) {
   auto it = g_players.find(player_id);
   if (it == g_players.end()) return;
@@ -1038,7 +1052,7 @@ void ApplyHdrForVideoParams(int64_t player_id, const m3u_tv_mpv_plane::HdrMetada
   player->last_source_hdr = source;
 
   m3u_tv_mpv_plane::HdrInputs inputs;
-  inputs.allowed = true;
+  inputs.allowed = player->hdr_user_enabled;
   inputs.client_can_describe = plane->supports_hdr();
   inputs.output_is_hdr = plane->output_is_hdr();
   inputs.source_describable = plane->CanDescribeSource(source);
@@ -1824,6 +1838,13 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     const std::string volume_value = std::to_string(volume);
     const char* command[] = {"set", "volume", volume_value.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (g_strcmp0(method, "setHdrEnabled") == 0) {
+#ifdef HAVE_WAYLAND_MPV_PLANE
+    player->hdr_user_enabled = BoolArg(args, "enabled", true);
+    if (player->using_gpu_plane) {
+      ApplyHdrForVideoParams(player->id, player->last_source_hdr);
+    }
+#endif
   } else if (g_strcmp0(method, "getVideoAspectRatio") == 0) {
     g_autoptr(FlValue) result = VideoAspectRatioResult(player);
     return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
