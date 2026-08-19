@@ -6,6 +6,57 @@ project(m3u_tv LANGUAGES CXX)
 # the on-disk name of your application.
 set(BINARY_NAME "m3u_tv")
 
+# gpu-next/D3D11-capable libmpv, fetched the same way the open-source Plezy
+# player (github.com/edde746/plezy, GPL-3.0, windows/CMakeLists.txt) fetches
+# it, since that is the reference this project's native mpv backend
+# (windows/runner/desktop_libmpv_backend.cpp) is modeled on. Only the DLL is
+# consumed (windows/runner/CMakeLists.txt copies it into the runner output
+# directory as "libmpv-2.dll") -- unlike Plezy, this project deliberately
+# does not link against libmpv.dll.a or include mpv/client.h at build time
+# (see the ABI structs hand-declared in desktop_libmpv_backend.cpp); it
+# dlopens the DLL at runtime instead, so MPV_INCLUDE_DIR is unused here.
+set(MPV_VERSION "20260809")
+set(MPV_GIT_HASH "dd5d17d328")
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64")
+  set(MPV_FILENAME "mpv-dev-aarch64-${MPV_VERSION}-git-${MPV_GIT_HASH}.7z")
+  set(MPV_URL "https://sourceforge.net/projects/mpv-player-windows/files/libmpv/${MPV_FILENAME}/download")
+  set(MPV_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/mpv-dev-arm64")
+  set(MPV_ARCHIVE "${MPV_DOWNLOAD_DIR}/${MPV_FILENAME}")
+
+  if(NOT EXISTS "${MPV_DOWNLOAD_DIR}/libmpv-2.dll")
+    message(STATUS "Downloading MPV for ARM64...")
+    file(DOWNLOAD "${MPV_URL}" "${MPV_ARCHIVE}" SHOW_PROGRESS STATUS MPV_DL_STATUS)
+    list(GET MPV_DL_STATUS 0 MPV_DL_RESULT)
+    if(NOT MPV_DL_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to download MPV: ${MPV_DL_STATUS}")
+    endif()
+
+    # CMake's built-in libarchive can't handle LZMA2 on ARM64.
+    find_program(7Z_EXECUTABLE 7z REQUIRED HINTS "C:/Program Files/7-Zip")
+    message(STATUS "Extracting MPV with ${7Z_EXECUTABLE}...")
+    execute_process(
+      COMMAND "${7Z_EXECUTABLE}" x "${MPV_ARCHIVE}" "-o${MPV_DOWNLOAD_DIR}" -y
+      RESULT_VARIABLE MPV_EXTRACT_RESULT
+    )
+    if(NOT MPV_EXTRACT_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to extract MPV archive")
+    endif()
+    file(REMOVE "${MPV_ARCHIVE}")
+  endif()
+
+  set(MPV_LIB_DIR "${MPV_DOWNLOAD_DIR}")
+else()
+  include(FetchContent)
+  FetchContent_Declare(
+    mpv_dev
+    URL https://sourceforge.net/projects/mpv-player-windows/files/libmpv/mpv-dev-x86_64-${MPV_VERSION}-git-${MPV_GIT_HASH}.7z/download
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  )
+  FetchContent_MakeAvailable(mpv_dev)
+
+  set(MPV_LIB_DIR "${mpv_dev_SOURCE_DIR}")
+endif()
+
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
