@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "angle_surface_manager.cc"
   "desktop_libmpv_backend.cpp"
   "flutter_window.cpp"
   "main.cpp"
@@ -40,7 +41,19 @@ target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 # HDR/refresh-rate switching) and the registry Reg* calls its crash-recovery
 # journal uses.
 target_link_libraries(${BINARY_NAME} PRIVATE "user32.lib" "advapi32.lib")
+# angle_surface_manager.cc's D3D11 device/texture creation (d3d11.lib) and
+# shared-handle retrieval via IDXGIResource/IDXGIDevice (dxgi.lib), plus the
+# ANGLE import libraries themselves (GL->D3D11 translation, fetched by the
+# top-level CMakeLists.txt as ANGLE_LIB_DIR) so mpv's OpenGL render API calls
+# resolve at link time even though the actual libEGL.dll/libGLESv2.dll are
+# loaded at runtime from next to the exe (see the POST_BUILD copy below).
+target_link_libraries(${BINARY_NAME} PRIVATE "d3d11.lib" "dxgi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE
+  "${ANGLE_LIB_DIR}/lib/libEGL.dll.lib"
+  "${ANGLE_LIB_DIR}/lib/libGLESv2.dll.lib"
+)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(${BINARY_NAME} PRIVATE "${ANGLE_LIB_DIR}/include")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
@@ -65,4 +78,20 @@ add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${MPV_LIB_DIR}/libmpv-2.dll" "$<TARGET_FILE_DIR:${BINARY_NAME}>/libmpv-gpu-2.dll"
   COMMENT "Copying fetched libmpv-2.dll as libmpv-gpu-2.dll"
+)
+
+# Runtime ANGLE DLLs for the GPU-texture rendering path
+# (angle_surface_manager.cc). d3dcompiler_47.dll/zlib.dll are ANGLE's own
+# runtime dependencies. Deliberately not copying ANGLE's bundled
+# vk_swiftshader.dll/vulkan-1.dll (its software Vulkan fallback for machines
+# with no real GPU at all) -- this project already has its own proven SW
+# pixel-buffer fallback for that case (see TryLoadGpuTexture's runtime
+# capability check in desktop_libmpv_backend.cpp), so ANGLE's own software
+# path is never reached here.
+add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${ANGLE_LIB_DIR}/libEGL.dll" "${ANGLE_LIB_DIR}/libGLESv2.dll"
+    "${ANGLE_LIB_DIR}/d3dcompiler_47.dll" "${ANGLE_LIB_DIR}/zlib.dll"
+    "$<TARGET_FILE_DIR:${BINARY_NAME}>/"
+  COMMENT "Copying ANGLE runtime DLLs"
 )

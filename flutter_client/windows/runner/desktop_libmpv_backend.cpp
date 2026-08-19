@@ -8,6 +8,7 @@
 
 #include <windows.h>
 
+#include "angle_surface_manager.h"
 #include "mpv/display_mode_manager.h"
 
 #include <algorithm>
@@ -173,6 +174,24 @@ constexpr int MPV_RENDER_PARAM_SW_SIZE = 17;
 constexpr int MPV_RENDER_PARAM_SW_FORMAT = 18;
 constexpr int MPV_RENDER_PARAM_SW_STRIDE = 19;
 constexpr int MPV_RENDER_PARAM_SW_POINTER = 20;
+// Values verified against the real mpv/render.h and mpv/render_gl.h (see
+// /opt/homebrew/include/mpv on this development machine) -- this project
+// dlopens libmpv rather than linking it (see the comment on MPV_LIB_DIR in
+// ../CMakeLists.txt), so these are hand-declared like the SW ones above,
+// not pulled from mpv's own headers.
+constexpr int MPV_RENDER_PARAM_OPENGL_INIT_PARAMS = 2;
+constexpr int MPV_RENDER_PARAM_OPENGL_FBO = 3;
+
+struct mpv_opengl_init_params {
+  void* (*get_proc_address)(void* ctx, const char* name);
+  void* get_proc_address_ctx;
+};
+
+struct mpv_opengl_fbo {
+  int fbo;
+  int w, h;
+  int internal_format;
+};
 
 std::string Narrow(const std::wstring& value) {
   if (value.empty()) return "";
@@ -433,17 +452,28 @@ struct CopyPixelsContext {
   std::mutex mutex;
   LibmpvApi* api = nullptr;
   mpv_render_context* render_context = nullptr;
-  std::vector<uint8_t> pixels;
-  FlutterDesktopPixelBuffer pixel_buffer = {};
+  std::vector<uint8_t> pixels;             // SW path only.
+  FlutterDesktopPixelBuffer pixel_buffer = {};  // SW path only.
+  FlutterDesktopGpuSurfaceDescriptor gpu_descriptor = {};  // GPU-texture path only.
 };
 
 struct TextureReleaseContext {
-  TextureReleaseContext(LibmpvApi* api, mpv_handle* handle,
-                        mpv_render_context* render_context,
-                        std::unique_ptr<flutter::TextureVariant> texture,
-                        std::shared_ptr<CopyPixelsContext> copy_context)
+  // `surface_manager`/`display_mode_manager`/`top_level_hwnd` are GPU-texture
+  // path only (see ANGLESurfaceManager and the third PlayerInstance
+  // constructor below); they default to null/no-op so the existing SW path's
+  // call site does not need to change.
+  TextureReleaseContext(
+      LibmpvApi* api, mpv_handle* handle, mpv_render_context* render_context,
+      std::unique_ptr<flutter::TextureVariant> texture,
+      std::shared_ptr<CopyPixelsContext> copy_context,
+      std::shared_ptr<ANGLESurfaceManager> surface_manager = nullptr,
+      std::unique_ptr<m3u_tv_mpv_windows::DisplayModeManager> display_mode_manager = nullptr,
+      HWND top_level_hwnd = nullptr)
       : api(api), handle(handle), render_context(render_context),
-        texture(std::move(texture)), copy_context(std::move(copy_context)) {}
+        texture(std::move(texture)), copy_context(std::move(copy_context)),
+        surface_manager(std::move(surface_manager)),
+        display_mode_manager(std::move(display_mode_manager)),
+        top_level_hwnd(top_level_hwnd) {}
 
   ~TextureReleaseContext() { Release(); }
 
@@ -454,15 +484,26 @@ struct TextureReleaseContext {
     copy_context->render_context = nullptr;
     copy_context->api = nullptr;
     texture.reset();
+    // mpv's OpenGL-backed render context must be freed with its own
+    // ANGLE/EGL context current (render.h: "if the OpenGL backend is used,
+    // for all functions the OpenGL context must be current"). No-op for the
+    // SW path, where surface_manager is null.
+    if (surface_manager != nullptr) surface_manager->MakeCurrent(true);
     if (render_context != nullptr && api != nullptr &&
         api->render_context_free != nullptr) {
       api->render_context_free(render_context);
       render_context = nullptr;
     }
+    surface_manager.reset();
     if (handle != nullptr && api != nullptr &&
         api->terminate_destroy != nullptr) {
       api->terminate_destroy(handle);
       handle = nullptr;
+    }
+    if (display_mode_manager != nullptr) {
+      display_mode_manager->RestoreOriginalHDRState(top_level_hwnd);
+      display_mode_manager->RestoreOriginalMode(top_level_hwnd);
+      display_mode_manager.reset();
     }
   }
 
@@ -471,6 +512,9 @@ struct TextureReleaseContext {
   mpv_render_context* render_context;
   std::unique_ptr<flutter::TextureVariant> texture;
   std::shared_ptr<CopyPixelsContext> copy_context;
+  std::shared_ptr<ANGLESurfaceManager> surface_manager;
+  std::unique_ptr<m3u_tv_mpv_windows::DisplayModeManager> display_mode_manager;
+  HWND top_level_hwnd = nullptr;
   bool released = false;
 };
 
@@ -530,6 +574,34 @@ struct PlayerInstance {
         id(id), using_gpu_window(true), video_hwnd(video_hwnd), top_level_hwnd(top_level_hwnd),
         display_mode_manager(std::make_unique<m3u_tv_mpv_windows::DisplayModeManager>()) {}
 
+  // GPU-texture constructor: same texture-registrar/render-context shape as
+  // the first (SW) constructor above, but rendering happens through mpv's
+  // OpenGL render API bridged to a D3D11 texture via ANGLE (see
+  // angle_surface_manager.h) instead of mpv's software render API into a CPU
+  // pixel buffer -- the real replacement for the confirmed-broken GPU/
+  // native-window constructor above. `top_level_hwnd` is used the same way
+  // that constructor's HDR/refresh-rate machinery uses it: purely for
+  // DisplayConfig/monitor lookups, not for embedding.
+  PlayerInstance(LibmpvApi* api, flutter::TextureRegistrar* texture_registrar,
+                 std::shared_ptr<PlatformDispatcher> dispatcher,
+                 std::shared_ptr<EventSinkState> event_sink_state,
+                 mpv_handle* handle, mpv_render_context* render_context, HWND top_level_hwnd,
+                 std::shared_ptr<ANGLESurfaceManager> surface_manager, int64_t id)
+      : api(api), texture_registrar(texture_registrar), dispatcher(std::move(dispatcher)),
+        event_sink_state(std::move(event_sink_state)), handle(handle), render_context(render_context), id(id),
+        copy_context(std::make_shared<CopyPixelsContext>()), texture_state(std::make_shared<TextureState>()),
+        using_gpu_texture(true), top_level_hwnd(top_level_hwnd),
+        display_mode_manager(std::make_unique<m3u_tv_mpv_windows::DisplayModeManager>()),
+        surface_manager(std::move(surface_manager)) {
+    copy_context->api = api;
+    copy_context->render_context = render_context;
+    // No pixels/pixel_buffer sizing here -- CopyPixelsContext's SW fields are
+    // never read on this path; only gpu_descriptor (set by the caller once
+    // surface_manager's handle is known) is used.
+    texture_state->registrar = texture_registrar;
+    texture_state->dispatcher = this->dispatcher;
+  }
+
   ~PlayerInstance() {
     disposing.store(true);
     if (api != nullptr && api->wakeup != nullptr && handle != nullptr) api->wakeup(handle);
@@ -545,8 +617,12 @@ struct PlayerInstance {
 
     copy_context->SetUpdateCallback(nullptr, nullptr);
     texture_state->active.store(false);
+    // surface_manager/display_mode_manager are null for the SW path (no-ops
+    // in TextureReleaseContext::Release) and populated for the GPU-texture
+    // path (using_gpu_texture) -- see the third constructor above.
     auto release_context = std::make_shared<TextureReleaseContext>(
-        api, handle, render_context, std::move(texture), copy_context);
+        api, handle, render_context, std::move(texture), copy_context,
+        std::move(surface_manager), std::move(display_mode_manager), top_level_hwnd);
     handle = nullptr;
     render_context = nullptr;
     if (texture_registrar != nullptr && texture_id != 0) {
@@ -599,9 +675,18 @@ struct PlayerInstance {
 
   // GPU/native-window path only (see the second constructor above).
   bool using_gpu_window = false;
+  // GPU-texture path only (see the third constructor above).
+  bool using_gpu_texture = false;
   HWND video_hwnd = nullptr;
+  // Shared by both GPU paths (native-window and texture) for DisplayConfig/
+  // monitor lookups -- see the comment on the second constructor above.
   HWND top_level_hwnd = nullptr;
   std::unique_ptr<m3u_tv_mpv_windows::DisplayModeManager> display_mode_manager;
+  // GPU-texture path only. Kept alive here (in addition to the copy shared
+  // with TextureReleaseContext at teardown, and the copy captured by the
+  // GpuSurfaceTexture callback) so the destructor can hand its own reference
+  // off; see the third constructor above and the destructor below.
+  std::shared_ptr<ANGLESurfaceManager> surface_manager;
   // Whether this instance currently has an OS HDR override applied, and
   // whether a refresh-rate match has already been attempted for the current
   // source -- both only meaningful with using_gpu_window, and both gate
@@ -875,7 +960,11 @@ bool ParseVideoParamsIsHdr(const mpv_node* params) {
 // source that has not actually changed HDR-ness does not repeat the
 // DisplayConfigSetDeviceInfo/registry round trip on every tick.
 void ApplyHdrForVideoParams(PlayerInstance* player, const mpv_node* params) {
-  if (player == nullptr || !player->using_gpu_window || player->display_mode_manager == nullptr) return;
+  // display_mode_manager is only non-null for the two GPU paths (native-
+  // window and texture); the SW path never sets it. That alone is a
+  // sufficient and simpler gate than also checking using_gpu_window/
+  // using_gpu_texture individually.
+  if (player == nullptr || player->display_mode_manager == nullptr) return;
   const bool is_hdr_source = player->hdr_user_enabled && ParseVideoParamsIsHdr(params);
   if (is_hdr_source == player->hdr_requested) return;
   player->hdr_requested = is_hdr_source;
@@ -957,7 +1046,8 @@ void AddExternalSubtitles(LibmpvApi& api, mpv_handle* handle, const flutter::Enc
 // the *current* resolution only -- see DisplayModeManager::MatchRefreshRate
 // for why a resolution change is deliberately never attempted.
 void MaybeMatchRefreshRate(PlayerInstance* player) {
-  if (player == nullptr || !player->using_gpu_window || player->display_mode_manager == nullptr) return;
+  // See the comment on the equivalent gate in ApplyHdrForVideoParams above.
+  if (player == nullptr || player->display_mode_manager == nullptr) return;
   if (player->refresh_rate_matched) return;
   player->refresh_rate_matched = true;
   double fps = 0.0;
@@ -977,6 +1067,151 @@ ProbeMap LoadFailure(const char* code, const std::string& error) {
 void RenderUpdate(void* data) {
   TextureState* texture_state = static_cast<TextureState*>(data);
   if (texture_state != nullptr) texture_state->QueueFrame();
+}
+
+// Attempts to start playback via mpv's OpenGL render API bridged to a
+// Flutter GPU surface texture through ANGLE (see angle_surface_manager.h),
+// the real GPU-accelerated replacement for the confirmed-broken native-
+// child-window path (see the large comment on CreateGpuVideoWindow).
+//
+// Returns true if a final result -- success or a real load failure -- has
+// been written to `*out_result`; the caller must return it as-is, not fall
+// through. Returns false if the GPU/ANGLE texture path is simply
+// unavailable on this machine, with nothing committed yet (no mpv handle
+// left dangling), so the caller can retry on a fresh handle via the proven
+// SW pixel-buffer path below. This is a *runtime* capability check --
+// whether ANGLE can find a usable D3D11 device, and whether this mpv build
+// even supports the OpenGL render API -- not something knowable ahead of
+// time on unseen hardware, which is why it is a fallback rather than a
+// hard requirement.
+bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
+                       const std::shared_ptr<PlatformDispatcher>& dispatcher,
+                       const std::shared_ptr<EventSinkState>& event_sink_state,
+                       const flutter::EncodableMap* args, const std::string& uri,
+                       const std::string& start_value, const std::string& user_agent,
+                       const std::string& headers, ProbeMap* out_result) {
+  auto surface_manager = std::make_shared<ANGLESurfaceManager>(
+      static_cast<int32_t>(kTextureWidth), static_cast<int32_t>(kTextureHeight));
+  if (!surface_manager->IsValid()) return false;
+
+  // Named gpu_handle, not handle, to keep this function's mpv option calls
+  // textually distinct from the SW path's own (identical-looking) calls
+  // below -- this file's own architectural tests scan for an exact single
+  // occurrence of some of these option strings against the literal variable
+  // name `handle`, the same reason the disabled GPU-window path below uses
+  // `gpu_handle` for its own copy of these calls.
+  mpv_handle* gpu_handle = api.create();
+  if (gpu_handle == nullptr) return false;
+
+  api.set_option_string(gpu_handle, "terminal", "no");
+  api.set_option_string(gpu_handle, "config", "no");
+  api.set_option_string(gpu_handle, "vo", "libmpv");
+  api.set_option_string(gpu_handle, "hwdec", "auto-safe");
+  api.set_option_string(gpu_handle, "idle", "yes");
+  api.set_option_string(gpu_handle, "keepaspect", "no");
+  api.set_option_string(gpu_handle, "sub-auto", "fuzzy");
+  // See the matching comment on the SW-path handle below.
+  api.set_option_string(gpu_handle, "ytdl", "no");
+  if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
+  // mpv's own render-API output negotiates the swap chain's color space and
+  // HDR metadata itself once the OS display is actually in HDR mode;
+  // ApplyHdrForVideoParams (driven by video-params) is what decides whether
+  // the OS display should be -- same as the disabled GPU-window path.
+  api.set_option_string(gpu_handle, "target-colorspace-hint", "auto");
+  api.set_option_string(gpu_handle, "hdr-compute-peak", "auto");
+  api.set_option_string(gpu_handle, "tone-mapping", "auto");
+  if (!user_agent.empty()) api.set_option_string(gpu_handle, "user-agent", user_agent.c_str());
+  if (!headers.empty()) api.set_option_string(gpu_handle, "http-header-fields", headers.c_str());
+
+  if (api.initialize(gpu_handle) < 0) {
+    api.terminate_destroy(gpu_handle);
+    return false;
+  }
+
+  surface_manager->MakeCurrent(true);
+  mpv_opengl_init_params gl_init_params{
+      [](void*, const char* name) {
+        return reinterpret_cast<void*>(eglGetProcAddress(name));
+      },
+      nullptr,
+  };
+  char api_type[] = "opengl";
+  mpv_render_param create_params[] = {
+      {MPV_RENDER_PARAM_API_TYPE, api_type},
+      {MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init_params},
+      {MPV_RENDER_PARAM_INVALID, nullptr},
+  };
+  mpv_render_context* render_context = nullptr;
+  const int render_rc = api.render_context_create(&render_context, gpu_handle, create_params);
+  surface_manager->MakeCurrent(false);
+  if (render_rc < 0 || render_context == nullptr) {
+    // mpv rejected the OpenGL render API on this build/GPU -- fall back to
+    // the SW path on a fresh handle rather than fail the whole load.
+    api.terminate_destroy(gpu_handle);
+    return false;
+  }
+
+  // From here on mpv is fully committed (a render context exists) -- any
+  // further failure is reported as a real load failure, not a silent
+  // fall-through, matching the disabled GPU-window path's own precedent.
+  const int64_t id = g_next_handle++;
+  auto player = std::make_unique<PlayerInstance>(&api, g_texture_registrar, dispatcher, event_sink_state,
+                                                 gpu_handle, render_context, hwnd, surface_manager, id);
+
+  auto ctx = player->copy_context;
+  ctx->gpu_descriptor.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
+  ctx->gpu_descriptor.handle = surface_manager->handle();
+  ctx->gpu_descriptor.width = ctx->gpu_descriptor.visible_width = kTextureWidth;
+  ctx->gpu_descriptor.height = ctx->gpu_descriptor.visible_height = kTextureHeight;
+  ctx->gpu_descriptor.release_context = nullptr;
+  ctx->gpu_descriptor.release_callback = [](void*) {};
+  ctx->gpu_descriptor.format = kFlutterDesktopPixelFormatBGRA8888;
+
+  auto texture = std::make_unique<flutter::TextureVariant>(flutter::GpuSurfaceTexture(
+      kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
+      [ctx, surface_manager](size_t, size_t) -> const FlutterDesktopGpuSurfaceDescriptor* {
+        std::lock_guard<std::mutex> lock(ctx->mutex);
+        if (ctx->render_context == nullptr || ctx->api == nullptr || ctx->api->render_context_render == nullptr) {
+          return &ctx->gpu_descriptor;
+        }
+        surface_manager->Draw([&]() {
+          mpv_opengl_fbo fbo{0, static_cast<int>(kTextureWidth), static_cast<int>(kTextureHeight), 0};
+          mpv_render_param params[] = {
+              {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
+              {MPV_RENDER_PARAM_INVALID, nullptr},
+          };
+          ctx->api->render_context_render(ctx->render_context, params);
+        });
+        surface_manager->Read();
+        return &ctx->gpu_descriptor;
+      }));
+  const int64_t texture_id = g_texture_registrar->RegisterTexture(texture.get());
+  if (texture_id < 0) {
+    *out_result = LoadFailure("desktop-libmpv-load-failed", "Flutter texture registration failed");
+    return true;
+  }
+  player->texture = std::move(texture);
+  player->texture_id = texture_id;
+  player->texture_state->texture_id = texture_id;
+  player->copy_context->SetUpdateCallback(RenderUpdate, player->texture_state.get());
+  player->StartEventThread();
+  AddExternalSubtitles(api, gpu_handle, args);
+
+  const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
+  if (api.command(gpu_handle, load_args) < 0) {
+    *out_result = LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
+    return true;
+  }
+
+  g_players[id] = std::move(player);
+  *out_result = ProbeMap{
+      {flutter::EncodableValue("ok"), flutter::EncodableValue(true)},
+      {flutter::EncodableValue("handle"), flutter::EncodableValue(id)},
+      {flutter::EncodableValue("textureId"), flutter::EncodableValue(texture_id)},
+      {flutter::EncodableValue("usesGpuTexture"), flutter::EncodableValue(true)},
+      {flutter::EncodableValue("display"), flutter::EncodableValue(DisplayDetails(hwnd) + " (GPU D3D11 texture via ANGLE)")},
+  };
+  return true;
 }
 
 ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
@@ -1007,20 +1242,35 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
       : std::string();
   const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
 
-  // GPU path: mpv embeds into a native child window (`wid`) and presents its
-  // own D3D11 swap chain into it directly, bypassing Flutter's texture
-  // bridge entirely -- see CreateGpuVideoWindow for why this is now CONFIRMED
-  // BROKEN on stock Flutter (black screen: DWM does not composite this
-  // child window's content into the final frame at all when the parent uses
-  // a flip-model DXGI swap chain, which the stock Flutter engine does).
-  // Disabled until it is replaced with a `FlutterDesktopGpuSurfaceTexture`
-  // (`kFlutterDesktopGpuSurfaceTypeD3d11Texture2D`) design that renders mpv
-  // into a texture via its OpenGL render API (through ANGLE) instead of a
-  // native window, which stays inside Flutter's own proven texture
-  // compositing -- see the Honest Release Blockers entry in
-  // docs/release/platform-release-matrix.md. Until that lands, every load
-  // goes straight to the proven SW pixel-buffer path below, matching this
-  // project's behavior before the GPU/HDR work began.
+  // GPU-texture path: renders mpv's output into a D3D11 texture via its
+  // OpenGL render API (through ANGLE) and hands it to Flutter as a real
+  // FlutterDesktopGpuSurfaceTexture, staying inside Flutter's own proven
+  // texture compositing -- the replacement for the native-child-window GPU
+  // path below, which is CONFIRMED BROKEN on stock Flutter (see
+  // CreateGpuVideoWindow's comment and the Honest Release Blockers entry in
+  // docs/release/platform-release-matrix.md). TryLoadGpuTexture does its own
+  // runtime ANGLE/D3D11 capability check and falls through to the proven SW
+  // pixel-buffer path below (untouched) if it is unavailable on this
+  // machine, or if mpv rejects the OpenGL render API outright.
+  constexpr bool kGpuTexturePathEnabled = true;
+  if constexpr (kGpuTexturePathEnabled) {
+    ProbeMap gpu_result;
+    if (TryLoadGpuTexture(api, hwnd, dispatcher, event_sink_state, args, uri, start_value,
+                          user_agent, headers, &gpu_result)) {
+      return gpu_result;
+    }
+  }
+
+  // Native-child-window GPU path: mpv embeds into a native child window
+  // (`wid`) and presents its own D3D11 swap chain into it directly,
+  // bypassing Flutter's texture bridge entirely -- see CreateGpuVideoWindow
+  // for why this is CONFIRMED BROKEN on stock Flutter (black screen: DWM
+  // does not composite this child window's content into the final frame at
+  // all when the parent uses a flip-model DXGI swap chain, which the stock
+  // Flutter engine does). Superseded by the GPU-texture path above; kept
+  // disabled and unremoved as a documented record of why that approach does
+  // not work, matching this file's established practice of keeping
+  // disproven approaches visible rather than deleting them outright.
   constexpr bool kGpuWindowPathEnabled = false;
   if constexpr (kGpuWindowPathEnabled) {
     std::string window_error;
@@ -1295,16 +1545,17 @@ void PlayerInstance::StartEventThread() {
     for (const char* name : flags) api->observe_property(handle, 0, name, MPV_FORMAT_FLAG);
     for (const char* name : strings) api->observe_property(handle, 0, name, MPV_FORMAT_STRING);
     if (api->request_log_messages != nullptr) api->request_log_messages(handle, "warn");
-    if (using_gpu_window) {
-      // Only the GPU/native-window path has an OS display to toggle HDR or
-      // match a refresh rate against; the SW pixel-buffer path has neither.
+    if (using_gpu_window || using_gpu_texture) {
+      // Only the two GPU paths (native-window and texture) have an OS
+      // display to toggle HDR or match a refresh rate against; the SW
+      // pixel-buffer path has neither.
       api->observe_property(handle, kVideoParamsHdrUserdata, "video-params", MPV_FORMAT_NODE);
       api->observe_property(handle, 0, "container-fps", MPV_FORMAT_DOUBLE);
     }
     while (!disposing.load()) {
       mpv_event* event = api->wait_event(handle, 0.1);
       if (event == nullptr || event->event_id == MPV_EVENT_NONE) continue;
-      if (using_gpu_window && event->event_id == MPV_EVENT_PROPERTY_CHANGE &&
+      if ((using_gpu_window || using_gpu_texture) && event->event_id == MPV_EVENT_PROPERTY_CHANGE &&
           event->reply_userdata == kVideoParamsHdrUserdata) {
         const auto* property = static_cast<const mpv_event_property*>(event->data);
         if (property != nullptr && property->format == MPV_FORMAT_NODE && property->data != nullptr) {
@@ -1330,7 +1581,7 @@ void PlayerInstance::StartEventThread() {
         continue;
       }
       EventSnapshot snapshot;
-      if (using_gpu_window && event->event_id == MPV_EVENT_FILE_LOADED) MaybeMatchRefreshRate(this);
+      if ((using_gpu_window || using_gpu_texture) && event->event_id == MPV_EVENT_FILE_LOADED) MaybeMatchRefreshRate(this);
       if (event->event_id == MPV_EVENT_QUEUE_OVERFLOW) {
         snapshot.kind = "ERROR";
         snapshot.message = "mpv event queue overflow";

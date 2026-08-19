@@ -151,6 +151,10 @@ jobs:
             "m3u_tv.exe",
             "flutter_windows.dll",
             "libmpv-gpu-2.dll",
+            "libEGL.dll",
+            "libGLESv2.dll",
+            "d3dcompiler_47.dll",
+            "zlib.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"
           )

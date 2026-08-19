@@ -875,6 +875,10 @@ jobs:
             "m3u_tv.exe",
             "flutter_windows.dll",
             "libmpv-gpu-2.dll",
+            "libEGL.dll",
+            "libGLESv2.dll",
+            "d3dcompiler_47.dll",
+            "zlib.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"
           )
@@ -901,7 +905,7 @@ jobs:
           $Zip = "m3u-tv-v${V}-windows.zip"
           $VerifyDir = Join-Path $env:RUNNER_TEMP "m3u-tv-windows-verify"
           Expand-Archive -Path $Zip -DestinationPath $VerifyDir
-          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-gpu-2.dll", "data\icudtl.dat")) {
+          foreach ($RelativePath in @("m3u_tv.exe", "flutter_windows.dll", "libmpv-gpu-2.dll", "libEGL.dll", "libGLESv2.dll", "data\icudtl.dat")) {
             $Path = Join-Path $VerifyDir $RelativePath
             if (-not (Test-Path $Path -PathType Leaf)) {
               throw "Required archived Windows file is missing: $RelativePath"
