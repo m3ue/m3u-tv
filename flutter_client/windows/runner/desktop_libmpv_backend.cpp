@@ -993,14 +993,19 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   const std::string headers = HeaderString(args);
   const std::string uri = StringArg(args, "uri");
   const int64_t start_position_ms = IntArg(args, "startPositionMs");
-  std::string start_option;
-  if (start_position_ms > 0) {
-    const double seconds = static_cast<double>(start_position_ms) / 1000.0;
-    start_option = "start=" + std::to_string(seconds);
-  }
-  const char* load_args[] = {"loadfile", uri.c_str(), "replace",
-                             start_option.empty() ? nullptr : start_option.c_str(),
-                             nullptr};
+  // Set as the `start` option before mpv_initialize below, not smuggled into
+  // the `loadfile` command's argv: `loadfile <url> [<flags> [<index>
+  // [<options>]]]` has an integer `<index>` slot BEFORE `<options>`, so a
+  // string like "start=90.5" placed right after "replace" lands in the
+  // index slot, not the options slot. Some mpv builds tolerate this; a
+  // stricter/newer one (like the fetched gpu-next build here) rejects it
+  // outright with a generic "mpv loadfile command failed", which is exactly
+  // what broke resume/continue-watching (start=0 loads never hit this,
+  // since they never build a 4th argv element at all).
+  const std::string start_value = start_position_ms > 0
+      ? std::to_string(static_cast<double>(start_position_ms) / 1000.0)
+      : std::string();
+  const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
 
   // GPU path: mpv embeds into a native child window (`wid`) and presents its
   // own D3D11 swap chain into it directly, bypassing Flutter's texture
@@ -1040,6 +1045,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
         // "ytdl_hook: youtube-dl failed: not found or not enough
         // permissions" end-file error even for plain local/network media.
         api.set_option_string(gpu_handle, "ytdl", "no");
+        if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
         // mpv's own D3D11 GPU-next VO negotiates the swap chain's color
         // space and HDR metadata itself once the OS display is actually in
         // HDR mode; ApplyHdrForVideoParams (driven by video-params) is what
@@ -1089,6 +1095,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   api.set_option_string(handle, "sub-auto", "fuzzy");
   // See the matching comment on the GPU-path handle above.
   api.set_option_string(handle, "ytdl", "no");
+  if (!start_value.empty()) api.set_option_string(handle, "start", start_value.c_str());
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   if (!headers.empty()) api.set_option_string(handle, "http-header-fields", headers.c_str());
 

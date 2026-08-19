@@ -1659,12 +1659,18 @@ FlMethodResponse* Load(FlValue* args) {
 
         std::string uri = StringArg(args, "uri");
         const int64_t start_position_ms = IntArg(args, "startPositionMs");
-        std::string start_option;
+        // Set via the `set` command, not smuggled into `loadfile`'s argv:
+        // `loadfile <url> [<flags> [<index> [<options>]]]` has an integer
+        // `<index>` slot BEFORE `<options>`, so a string like "start=90.5"
+        // placed right after "replace" lands in the index slot, not the
+        // options slot. Some mpv builds tolerate this; a stricter one
+        // rejects it outright with a generic "mpv loadfile command failed".
         if (start_position_ms > 0) {
-          start_option = "start=" + std::to_string(static_cast<double>(start_position_ms) / 1000.0);
+          const std::string start_value = std::to_string(static_cast<double>(start_position_ms) / 1000.0);
+          const char* set_start_args[] = {"set", "start", start_value.c_str(), nullptr};
+          api.command(handle, set_start_args);
         }
-        const char* load_args[] = {"loadfile", uri.c_str(), "replace",
-                                   start_option.empty() ? nullptr : start_option.c_str(), nullptr};
+        const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
         rc = api.command(handle, load_args);
         if (rc < 0) {
           return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
@@ -1733,14 +1739,13 @@ FlMethodResponse* Load(FlValue* args) {
 
   std::string uri = StringArg(args, "uri");
   const int64_t start_position_ms = IntArg(args, "startPositionMs");
-  std::string start_option;
+  // See the matching comment on the GPU-path load above.
   if (start_position_ms > 0) {
-    const double seconds = static_cast<double>(start_position_ms) / 1000.0;
-    start_option = "start=" + std::to_string(seconds);
+    const std::string start_value = std::to_string(static_cast<double>(start_position_ms) / 1000.0);
+    const char* set_start_args[] = {"set", "start", start_value.c_str(), nullptr};
+    api.command(handle, set_start_args);
   }
-  const char* load_args[] = {"loadfile", uri.c_str(), "replace",
-                             start_option.empty() ? nullptr : start_option.c_str(),
-                             nullptr};
+  const char* load_args[] = {"loadfile", uri.c_str(), "replace", nullptr};
   rc = api.command(handle, load_args);
   if (rc < 0) {
     return LoadFailure("desktop-libmpv-load-failed", "mpv loadfile command failed");
