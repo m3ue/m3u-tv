@@ -1004,16 +1004,20 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
 
   // GPU path: mpv embeds into a native child window (`wid`) and presents its
   // own D3D11 swap chain into it directly, bypassing Flutter's texture
-  // bridge entirely -- see CreateGpuVideoWindow for the one big open
-  // question about whether that composites correctly on stock Flutter.
-  // Falls through to the proven SW pixel-buffer path below on any failure
-  // (window creation, or mpv_initialize itself failing for any reason --
-  // this project cannot detect a *later*, asynchronous D3D11/VO failure the
-  // way Linux's synchronously-created EGL surface could be validated up
-  // front, so a VO that opens successfully at mpv_initialize time but later
-  // fails to actually present is a real gap; it would surface as a black
-  // video area rather than a crash).
-  {
+  // bridge entirely -- see CreateGpuVideoWindow for why this is now CONFIRMED
+  // BROKEN on stock Flutter (black screen: DWM does not composite this
+  // child window's content into the final frame at all when the parent uses
+  // a flip-model DXGI swap chain, which the stock Flutter engine does).
+  // Disabled until it is replaced with a `FlutterDesktopGpuSurfaceTexture`
+  // (`kFlutterDesktopGpuSurfaceTypeD3d11Texture2D`) design that renders mpv
+  // into a texture via its OpenGL render API (through ANGLE) instead of a
+  // native window, which stays inside Flutter's own proven texture
+  // compositing -- see the Honest Release Blockers entry in
+  // docs/release/platform-release-matrix.md. Until that lands, every load
+  // goes straight to the proven SW pixel-buffer path below, matching this
+  // project's behavior before the GPU/HDR work began.
+  constexpr bool kGpuWindowPathEnabled = false;
+  if constexpr (kGpuWindowPathEnabled) {
     std::string window_error;
     HWND video_hwnd = CreateGpuVideoWindow(hwnd, &window_error);
     if (video_hwnd != nullptr) {
