@@ -1603,6 +1603,13 @@ FlMethodResponse* Load(FlValue* args) {
   api.set_option_string(handle, "idle", "yes");
   api.set_option_string(handle, "keepaspect", "no");
   api.set_option_string(handle, "sub-auto", "fuzzy");
+  // This app only ever plays direct/proxy/server URLs, never generic web
+  // pages, and never bundles a youtube-dl/yt-dlp binary on any platform --
+  // mpv's built-in ytdl_hook script would otherwise try (and fail to find)
+  // one on every URL load, surfacing as an opaque "ytdl_hook: youtube-dl
+  // failed: not found or not enough permissions" end-file error even for
+  // plain local/network media.
+  api.set_option_string(handle, "ytdl", "no");
   std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   std::string headers = HeaderString(args);

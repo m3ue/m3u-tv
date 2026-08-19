@@ -791,22 +791,32 @@ constexpr uint64_t kVideoParamsHdrUserdata = UINT64_MAX;
 // mpv owns rendering and presentation here entirely; this project only owns
 // creating, positioning and destroying the window.
 //
-// IMPORTANT CAVEAT, unresolved without a Windows box to verify against: the
-// open-source Plezy player (github.com/edde746/plezy, GPL-3.0), whose child-
-// window design this is adapted from, only gets correct z-ordering (video
-// *behind* the Flutter-drawn UI, including player controls) because its
-// engine build presents Flutter's own UI on a topmost DirectComposition
-// visual explicitly ordered above the video child window. That is a
-// modification to the Flutter engine itself, which this project does not
-// have and cannot build here. Flutter's own `platform_view` example ships a
-// Windows target that renders nothing but placeholder text, confirming the
-// stock engine has no platform-view API to lean on instead. On stock
-// Flutter, a plain WS_CHILD window's content is not guaranteed to composite
-// *behind* what its parent draws in the same screen region -- ordinary
-// Win32 z-order rules put a child's own paint *above* its parent's, which is
-// backwards from what video-behind-UI needs. Concretely, this may mean video
-// renders on top of player controls instead of behind them. Treat this as
-// unverified until confirmed (or fixed) on real hardware.
+// CONFIRMED BROKEN on real Windows hardware: this child-window design
+// renders a black screen once mpv's VO successfully opens (audio plays,
+// no VO-open error), not merely "video on top of controls" as first
+// suspected. The open-source Plezy player (github.com/edde746/plezy,
+// GPL-3.0), whose child-window design this is adapted from, only gets
+// correct compositing at all because its engine build presents Flutter's
+// own UI on a topmost DirectComposition visual explicitly ordered above
+// the video child window -- a modification to the Flutter engine itself,
+// which this project does not have and cannot build here. Flutter's own
+// `platform_view` example ships a Windows target that renders nothing but
+// placeholder text, confirming the stock engine has no platform-view API
+// to lean on instead. The black screen (rather than video-over-controls)
+// is consistent with a separate, well-documented Windows/DXGI quirk on top
+// of the z-order problem: a top-level window using a flip-model DXGI swap
+// chain (which the stock Flutter engine does) can cause DWM to stop
+// compositing sibling/child HWND content into the final frame at all, not
+// just reorder it -- the child window's own D3D11 presentation happens,
+// but never reaches the screen. Fixing this on stock Flutter requires
+// abandoning the native-child-window approach entirely: render mpv's
+// output into a D3D11 texture via its render API (`MPV_RENDER_API_TYPE_SW`
+// is the software fallback already used elsewhere in this file;
+// `MPV_RENDER_API_TYPE_OPENGL`/D3D11-interop equivalents are the GPU one)
+// and feed it to a `FlutterDesktopGpuSurfaceTexture`, staying inside
+// Flutter's own proven texture compositing instead of a sibling window.
+// See the Honest Release Blockers entry in
+// docs/release/platform-release-matrix.md for the full writeup.
 HWND CreateGpuVideoWindow(HWND parent, std::string* error) {
   if (parent == nullptr) {
     if (error) *error = "no top-level HWND to parent the video window to";
@@ -1019,6 +1029,13 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
         api.set_option_string(gpu_handle, "idle", "yes");
         api.set_option_string(gpu_handle, "keepaspect", "no");
         api.set_option_string(gpu_handle, "sub-auto", "fuzzy");
+        // This app only ever plays direct/proxy/server URLs, never generic
+        // web pages, and never bundles a youtube-dl/yt-dlp binary on any
+        // platform -- mpv's built-in ytdl_hook script would otherwise try
+        // (and fail to find) one on every URL load, surfacing as an opaque
+        // "ytdl_hook: youtube-dl failed: not found or not enough
+        // permissions" end-file error even for plain local/network media.
+        api.set_option_string(gpu_handle, "ytdl", "no");
         // mpv's own D3D11 GPU-next VO negotiates the swap chain's color
         // space and HDR metadata itself once the OS display is actually in
         // HDR mode; ApplyHdrForVideoParams (driven by video-params) is what
@@ -1066,6 +1083,8 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   api.set_option_string(handle, "idle", "yes");
   api.set_option_string(handle, "keepaspect", "no");
   api.set_option_string(handle, "sub-auto", "fuzzy");
+  // See the matching comment on the GPU-path handle above.
+  api.set_option_string(handle, "ytdl", "no");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   if (!headers.empty()) api.set_option_string(handle, "http-header-fields", headers.c_str());
 
