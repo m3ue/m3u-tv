@@ -1197,4 +1197,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => 'Prime Time';
+
+  @override
+  String get settingsFilterPersistence => 'Filterpersistenz';
+
+  @override
+  String get settingsFilterPersistenceRemember => 'Merken';
+
+  @override
+  String get settingsFilterPersistenceReset => 'Bei jedem Start zurücksetzen';
+
+  @override
+  String get vodSortDialogTitle => 'Filme sortieren nach';
+
+  @override
+  String get vodSortDefault => 'Standard';
+
+  @override
+  String get vodSortRating => 'Bewertung';
 }

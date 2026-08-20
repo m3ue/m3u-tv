@@ -1198,5 +1198,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsEpgStartViewCurrentTime => 'Hora actual';
 
   @override
-  String get settingsEpgStartViewPrimeTime => 'Horario estelar';
+  String get settingsEpgStartViewPrimeTime => 'Prime time';
+
+  @override
+  String get settingsFilterPersistence => 'Persistencia del filtro';
+
+  @override
+  String get settingsFilterPersistenceRemember => 'Recordar';
+
+  @override
+  String get settingsFilterPersistenceReset => 'Restablecer cada vez';
+
+  @override
+  String get vodSortDialogTitle => 'Ordenar películas por';
+
+  @override
+  String get vodSortDefault => 'Predeterminado';
+
+  @override
+  String get vodSortRating => 'Calificación';
 }

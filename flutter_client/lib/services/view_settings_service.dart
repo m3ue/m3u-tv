@@ -48,6 +48,23 @@ enum ChannelColumnLayout {
       );
 }
 
+/// Sort order for the VOD (Movies) grid. Defaults to the server's natural
+/// order so existing callers see no change. New sort dimensions should be
+/// appended here rather than overloading existing values.
+enum VodSortOption {
+  defaultOrder('defaultOrder'),
+  ratingDesc('ratingDesc');
+
+  const VodSortOption(this.value);
+  final String value;
+
+  static VodSortOption fromValue(String? value) =>
+      VodSortOption.values.firstWhere(
+        (option) => option.value == value,
+        orElse: () => VodSortOption.defaultOrder,
+      );
+}
+
 /// Persists non-credential view preferences such as the Live TV default layout
 /// and the EPG default starting view.
 class ViewSettingsService extends ChangeNotifier {
@@ -60,6 +77,8 @@ class ViewSettingsService extends ChangeNotifier {
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
   static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
   static const hdrEnabledKey = 'm3ue_tv_hdr_enabled';
+  static const rememberVodSortKey = 'm3ue_tv_remember_vod_sort';
+  static const vodSortOptionKey = 'm3ue_tv_vod_sort_option';
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
@@ -129,6 +148,42 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(hdrEnabledKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the user's chosen VOD sort order survives across launches.
+  /// Defaults to `false` so existing users keep today's session-only behavior
+  /// (resets to server order on each fresh boot of the app). Persisted as
+  /// its own key so toggling this off doesn't clear a separately-stored
+  /// [vodSortOption] - the latter is simply ignored until re-enabled.
+  Future<bool> rememberVodSort() async {
+    final raw = await _read(rememberVodSortKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous accessor — see [hdrEnabledSync].
+  bool get rememberVodSortSync =>
+      (_memory[rememberVodSortKey] as bool?) ?? false;
+
+  Future<void> setRememberVodSort(
+    // ignore: avoid_positional_boolean_parameters
+    bool value,
+  ) async {
+    await _write(rememberVodSortKey, value);
+    notifyListeners();
+  }
+
+  Future<VodSortOption> vodSortOption() async {
+    final raw = await _read(vodSortOptionKey);
+    return VodSortOption.fromValue(raw as String?);
+  }
+
+  /// Synchronous accessor — see [hdrEnabledSync].
+  VodSortOption get vodSortOptionSync =>
+      VodSortOption.fromValue(_memory[vodSortOptionKey] as String?);
+
+  Future<void> setVodSortOption(VodSortOption option) async {
+    await _write(vodSortOptionKey, option.value);
     notifyListeners();
   }
 

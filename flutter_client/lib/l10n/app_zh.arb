@@ -628,5 +628,11 @@
   "settingsLiveTvChannelColumnTitleOnly": "仅名称",
   "settingsEpgStartView": "节目单起始时间",
   "settingsEpgStartViewCurrentTime": "当前时间",
-  "settingsEpgStartViewPrimeTime": "黄金时段"
+  "settingsEpgStartViewPrimeTime": "黄金时段",
+  "settingsFilterPersistence": "筛选保留",
+  "settingsFilterPersistenceRemember": "记住",
+  "settingsFilterPersistenceReset": "每次重置",
+  "vodSortDialogTitle": "电影排序",
+  "vodSortDefault": "默认",
+  "vodSortRating": "评分"
 }

@@ -629,5 +629,11 @@
   "settingsLiveTvChannelColumnTitleOnly": "Title Only",
   "settingsEpgStartView": "EPG starts at",
   "settingsEpgStartViewCurrentTime": "Current time",
-  "settingsEpgStartViewPrimeTime": "Prime time"
+  "settingsEpgStartViewPrimeTime": "Prime time",
+  "settingsFilterPersistence": "Filter Persistence",
+  "settingsFilterPersistenceRemember": "Remember",
+  "settingsFilterPersistenceReset": "Reset Each Time",
+  "vodSortDialogTitle": "Sort Movies By",
+  "vodSortDefault": "Default",
+  "vodSortRating": "Rating"
 }

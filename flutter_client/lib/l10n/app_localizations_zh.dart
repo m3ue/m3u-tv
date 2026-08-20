@@ -1164,4 +1164,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => '黄金时段';
+
+  @override
+  String get settingsFilterPersistence => '筛选保留';
+
+  @override
+  String get settingsFilterPersistenceRemember => '记住';
+
+  @override
+  String get settingsFilterPersistenceReset => '每次重置';
+
+  @override
+  String get vodSortDialogTitle => '电影排序';
+
+  @override
+  String get vodSortDefault => '默认';
+
+  @override
+  String get vodSortRating => '评分';
 }

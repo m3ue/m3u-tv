@@ -585,12 +585,19 @@ class CategoryFilterChip extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.onLongPress,
     super.key,
   });
 
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+
+  /// Optional long-press handler — mirrors `DpadInkWell.onLongTap` so TV
+  /// d-pad hold and touch long-press both trigger it. Used by VOD's
+  /// "press-and-hold to sort" affordance; null elsewhere (no behavior
+  /// change).
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -600,6 +607,7 @@ class CategoryFilterChip extends StatelessWidget {
     );
     return DpadInkWell(
       onTap: onTap,
+      onLongTap: onLongPress,
       effects: const [GradientBorderEffect(borderRadius: radius)],
       color: isSelected
           ? colorScheme.primaryContainer

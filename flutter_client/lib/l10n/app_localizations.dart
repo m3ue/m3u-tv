@@ -2209,6 +2209,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prime time'**
   String get settingsEpgStartViewPrimeTime;
+
+  /// No description provided for @settingsFilterPersistence.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Persistence'**
+  String get settingsFilterPersistence;
+
+  /// No description provided for @settingsFilterPersistenceRemember.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember'**
+  String get settingsFilterPersistenceRemember;
+
+  /// No description provided for @settingsFilterPersistenceReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Each Time'**
+  String get settingsFilterPersistenceReset;
+
+  /// No description provided for @vodSortDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort Movies By'**
+  String get vodSortDialogTitle;
+
+  /// No description provided for @vodSortDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get vodSortDefault;
+
+  /// No description provided for @vodSortRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get vodSortRating;
 }
 
 class _AppLocalizationsDelegate
