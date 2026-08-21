@@ -246,6 +246,70 @@ void main() {
     });
   });
 
+  group('DvrSeriesRule.fromXtream channel scope parsing', () {
+    Map<String, Object?> ruleJson({Object? channelId, bool includeKey = true}) {
+      final json = <String, Object?>{
+        'id': 1,
+        'series_title': 'Example Series',
+      };
+      if (includeKey) json['channel_id'] = channelId;
+      return json;
+    }
+
+    test('null channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson()).channelId,
+        isNull,
+      );
+    });
+
+    test('missing channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(includeKey: false)).channelId,
+        isNull,
+      );
+    });
+
+    test('numeric zero channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(channelId: 0)).channelId,
+        isNull,
+      );
+    });
+
+    test('string zero channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(channelId: '0')).channelId,
+        isNull,
+      );
+    });
+
+    test('malformed channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(channelId: 'not-a-number')).channelId,
+        isNull,
+      );
+    });
+
+    test('negative channel_id parses as null', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(channelId: -4)).channelId,
+        isNull,
+      );
+    });
+
+    test('positive numeric channel_id remains positive', () {
+      expect(DvrSeriesRule.fromXtream(ruleJson(channelId: 42)).channelId, 42);
+    });
+
+    test('positive string channel_id remains positive', () {
+      expect(
+        DvrSeriesRule.fromXtream(ruleJson(channelId: '42')).channelId,
+        42,
+      );
+    });
+  });
+
   // `search_epg_shows.recent_episodes[].subtitle` is plain text (not base64).
   // The client treats `null` and blank/whitespace-only as "absent" so the
   // display site can safely fall back to `title` via `subtitle ?? title`.

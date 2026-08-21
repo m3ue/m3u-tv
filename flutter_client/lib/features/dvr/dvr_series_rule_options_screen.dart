@@ -117,6 +117,11 @@ class _DvrSeriesRuleOptionsScreenState
   late DvrSeriesMode? _selectedSeriesMode;
   late DvrMatchMode _selectedMatchMode;
 
+  // Whether the channel picker was explicitly changed. Edit mode needs this
+  // to tell "leave the stored channel alone" apart from an explicit pick of
+  // Any Channel (clear) or a specific channel (set).
+  bool _channelPickerTouched = false;
+
   // Controllers for numeric TextFields (0 is a valid value; empty = omit).
   late TextEditingController _keepLastController;
   late TextEditingController _priorityController;
@@ -135,7 +140,8 @@ class _DvrSeriesRuleOptionsScreenState
       _selectedSeriesMode = null; // Use default = omit
       _selectedMatchMode = DvrMatchMode.contains;
     } else {
-      _selectedChannelId = rule.channelId == 0 ? null : rule.channelId;
+      // DvrSeriesRule.fromXtream already normalizes a legacy 0 to null.
+      _selectedChannelId = rule.channelId;
       _selectedSeriesMode = rule.seriesMode;
       _selectedMatchMode = rule.matchMode;
     }
@@ -170,8 +176,21 @@ class _DvrSeriesRuleOptionsScreenState
   }
 
   DvrSeriesRuleOptions _buildOptions() {
+    // channelId echoes the current selection for create and legacy callers;
+    // channelUpdate carries edit-mode intent: untouched means preserve the
+    // stored channel, so only an explicit pick emits Clear or Set.
+    final DvrChannelScopeUpdate channelUpdate;
+    final selectedId = _selectedChannelId;
+    if (widget.initialRule == null || !_channelPickerTouched) {
+      channelUpdate = const DvrChannelScopeUnchanged();
+    } else if (selectedId == null) {
+      channelUpdate = const DvrChannelScopeClear();
+    } else {
+      channelUpdate = DvrChannelScopeSet(selectedId);
+    }
     return DvrSeriesRuleOptions(
       channelId: _selectedChannelId,
+      channelUpdate: channelUpdate,
       matchMode: _selectedMatchMode,
       seriesMode: _selectedSeriesMode,
       keepLast: _parseInt(_keepLastController),
@@ -227,11 +246,12 @@ class _DvrSeriesRuleOptionsScreenState
                       name: channel.channelName ?? 'Ch ${channel.channelId}',
                     ),
                 ],
-                onSelected: (id) => setState(
-                  () => _selectedChannelId = id == _anyChannelTabId
+                onSelected: (id) => setState(() {
+                  _channelPickerTouched = true;
+                  _selectedChannelId = id == _anyChannelTabId
                       ? null
-                      : int.parse(id),
-                ),
+                      : int.parse(id);
+                }),
               ),
               const SizedBox(height: 16),
             ],
