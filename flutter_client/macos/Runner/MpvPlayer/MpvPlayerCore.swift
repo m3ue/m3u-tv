@@ -131,6 +131,18 @@ final class MpvPlayerCore {
       // youtube-dl failed: not found or not enough permissions" end-file
       // error even for plain local/network media.
       mpv_set_option_string(handle, "ytdl", "no")
+      // This app owns 100% of the playback UI in Flutter, so none of mpv's
+      // built-in Lua scripts (osc.lua, console.lua, stats.lua, ytdl_hook.lua,
+      // etc.) are needed. NOTE: this does NOT stop them from loading --
+      // ytdl_hook.lua in particular is loaded unconditionally by libmpv
+      // 0.41's player/scripting.c regardless of this option -- it only
+      // covers scripts autoloaded from config script directories. Real fix
+      // for the resulting Apple Silicon JIT crash is the
+      // `disable-executable-page-protection` entitlement (see
+      // macos/Runner/Release.entitlements); this is left set as-is since it
+      // does no harm and covers any scripts a user config directory might
+      // introduce.
+      mpv_set_option_string(handle, "load-scripts", "no")
       // Deliberately no `force-seekable` -- see file header.
 
       let observed: [(String, mpv_format)] = [
