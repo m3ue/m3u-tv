@@ -129,10 +129,7 @@ class PlaybackOrchestrator {
     if (!_isCurrentGeneration(generation)) return;
     await _cleanupSessions();
     if (!_isCurrentGeneration(generation)) return;
-    _activeAdapter = null;
-    _activeBackend = null;
-    _activeSource = null;
-    _syncNativePlaneComposition();
+    _clearActiveAdapter();
 
     PlaybackException? lastRecoverableFailure;
     PlaybackBackend? previousBackend;
@@ -225,10 +222,7 @@ class PlaybackOrchestrator {
     final adapter = _adapters[backend];
     if (adapter == null) return null;
     _bind(adapter);
-    _activeAdapter = adapter;
-    _activeBackend = backend;
-    _activeSource = source;
-    _syncNativePlaneComposition();
+    _setActiveAdapter(adapter, backend, source);
     if (adapter is PlatformViewProvider) {
       // A PlatformView-backed adapter's native side can't finish load()
       // until Flutter actually creates its platform view and the native
@@ -279,10 +273,7 @@ class PlaybackOrchestrator {
         if (identical(_activeAdapter, adapter) &&
             _activeBackend == backend &&
             identical(_activeSource, source)) {
-          _activeAdapter = null;
-          _activeBackend = null;
-          _activeSource = null;
-          _syncNativePlaneComposition();
+          _clearActiveAdapter();
         }
         if (adapter is PlatformViewProvider) {
           // This adapter's platform view is about to be unmounted (the
@@ -331,10 +322,7 @@ class PlaybackOrchestrator {
       if (identical(_activeAdapter, adapter) &&
           _activeBackend == backend &&
           identical(_activeSource, source)) {
-        _activeAdapter = null;
-        _activeBackend = null;
-        _activeSource = null;
-        _syncNativePlaneComposition();
+        _clearActiveAdapter();
       }
       if (adapter is PlatformViewProvider) {
         // Same use-after-free reasoning as the PlaybackException branch
@@ -482,10 +470,11 @@ class PlaybackOrchestrator {
     );
 
     _bind(adapter);
-    _activeAdapter = adapter;
-    _activeBackend = PlaybackBackend.serverTranscode;
-    _activeSource = transcodedSource;
-    _syncNativePlaneComposition();
+    _setActiveAdapter(
+      adapter,
+      PlaybackBackend.serverTranscode,
+      transcodedSource,
+    );
     try {
       await adapter.load(transcodedSource);
       if (!_isCurrentGeneration(generation)) {
@@ -496,10 +485,7 @@ class PlaybackOrchestrator {
         if (identical(_activeAdapter, adapter) &&
             _activeBackend == PlaybackBackend.serverTranscode &&
             identical(_activeSource, transcodedSource)) {
-          _activeAdapter = null;
-          _activeBackend = null;
-          _activeSource = null;
-          _syncNativePlaneComposition();
+          _clearActiveAdapter();
         }
         await adapter.stop();
         if (identical(_activeBroadcast, broadcast) && broadcast != null) {
@@ -516,10 +502,7 @@ class PlaybackOrchestrator {
       if (identical(_activeAdapter, adapter) &&
           _activeBackend == PlaybackBackend.serverTranscode &&
           identical(_activeSource, transcodedSource)) {
-        _activeAdapter = null;
-        _activeBackend = null;
-        _activeSource = null;
-        _syncNativePlaneComposition();
+        _clearActiveAdapter();
       }
       await _cleanupSessions();
       _emitError(PlaybackError.fromException(error));
@@ -575,10 +558,7 @@ class PlaybackOrchestrator {
     _cancelBufferingTimer();
     final adapter = _activeAdapter;
     if (adapter == null) return;
-    _activeAdapter = null;
-    _activeBackend = null;
-    _activeSource = null;
-    _syncNativePlaneComposition();
+    _clearActiveAdapter();
     await adapter.stop();
   }
 
@@ -728,6 +708,28 @@ class PlaybackOrchestrator {
   void _cancelBufferingTimer() {
     _bufferingTimer?.cancel();
     _bufferingTimer = null;
+  }
+
+  // Every assignment to _activeAdapter/_activeBackend/_activeSource must be
+  // followed by _syncNativePlaneComposition() -- funneling the trio through
+  // these two setters means a future call site can't set the fields and
+  // forget the sync.
+  void _setActiveAdapter(
+    PlayerAdapter adapter,
+    PlaybackBackend backend,
+    PlaybackSource source,
+  ) {
+    _activeAdapter = adapter;
+    _activeBackend = backend;
+    _activeSource = source;
+    _syncNativePlaneComposition();
+  }
+
+  void _clearActiveAdapter() {
+    _activeAdapter = null;
+    _activeBackend = null;
+    _activeSource = null;
+    _syncNativePlaneComposition();
   }
 
   void _syncNativePlaneComposition() {

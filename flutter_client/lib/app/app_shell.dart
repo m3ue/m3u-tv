@@ -531,6 +531,7 @@ class AppShellState extends ConsumerState<AppShell>
       setState(() {
         _playerArgs = args;
         _playerHasFailed = false;
+        _playerNativePlaneActive = _playerOrchestrator!.isNativePlaneActive;
       });
       return;
     }
@@ -1514,6 +1515,7 @@ class AppShellState extends ConsumerState<AppShell>
                   },
                   traktService: _appState.traktService,
                   onPlaybackFailure: () {
+                    if (!mounted) return;
                     setState(() => _playerHasFailed = true);
                     unawaited(_systemUiPolicy.applyBrowsing());
                   },

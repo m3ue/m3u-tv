@@ -188,7 +188,6 @@ class DesktopLibmpvBackend
 
       _handle = handle;
       _textureId = textureId;
-      _usesNativePlane = usesNativePlane;
       _lastSequence = -1;
       _errorEmitted = false;
 
@@ -214,6 +213,12 @@ class DesktopLibmpvBackend
       if (!_isActiveLoad(generation)) return;
       _clearLoading(ready);
       if (failure != null) throw failure;
+      // Flipped only once FILE_LOADED is actually confirmed -- setting this
+      // earlier let a buffered pre-load event drained above emit a state
+      // update while the Wayland subsurface had no frame yet, which could
+      // make a listener (e.g. NativeVideoSurface) hole-punch the widget
+      // before there was anything for the native plane to show through.
+      _usesNativePlane = usesNativePlane;
     } on PlaybackException {
       _clearLoading(ready);
       rethrow;

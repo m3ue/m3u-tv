@@ -196,7 +196,13 @@ class _NativePlaneReporterState extends State<_NativePlaneReporter> {
 
   void _reportRect(Duration _) {
     if (!mounted) return;
-    if (_routeAnimation?.status != AnimationStatus.completed) {
+    // A null route animation means there's no enclosing ModalRoute to gate
+    // on (e.g. this surface isn't hosted inside a pushed route) -- report
+    // the real rect rather than treating "no route" the same as "route
+    // mid-transition", which would otherwise hide the plane permanently.
+    final routeAnimation = _routeAnimation;
+    if (routeAnimation != null &&
+        routeAnimation.status != AnimationStatus.completed) {
       _reportHiddenRect();
       return;
     }
