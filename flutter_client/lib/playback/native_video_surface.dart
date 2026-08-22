@@ -158,10 +158,10 @@ class _NativePlaneHolePainter extends CustomPainter {
   bool shouldRepaint(_NativePlaneHolePainter oldDelegate) => false;
 }
 
-/// Reports this widget's on-screen rect to [plane] on every layout, and
-/// paints fully transparent -- the actual video is a native surface (e.g. a
-/// Wayland `wl_subsurface`) stacked outside Flutter's own compositor, which
-/// only shows through where Flutter itself paints nothing.
+/// Reports this widget's on-screen rect to [plane], and paints fully
+/// transparent -- the actual video is a native surface (e.g. a Wayland
+/// `wl_subsurface`) stacked outside Flutter's own compositor, which only
+/// shows through where Flutter itself paints nothing.
 class _NativePlaneReporter extends StatefulWidget {
   const _NativePlaneReporter({required this.plane});
 
@@ -173,9 +173,33 @@ class _NativePlaneReporter extends StatefulWidget {
 
 class _NativePlaneReporterState extends State<_NativePlaneReporter> {
   final GlobalKey _key = GlobalKey();
+  Animation<double>? _routeAnimation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final routeAnimation = ModalRoute.of(context)?.animation;
+    if (_routeAnimation == routeAnimation) return;
+    _routeAnimation?.removeStatusListener(_handleRouteStatusChanged);
+    _routeAnimation = routeAnimation;
+    _routeAnimation?.addStatusListener(_handleRouteStatusChanged);
+  }
+
+  void _handleRouteStatusChanged(AnimationStatus status) {
+    if (!mounted) return;
+    if (status != AnimationStatus.completed) {
+      _reportHiddenRect();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback(_reportRect);
+  }
 
   void _reportRect(Duration _) {
     if (!mounted) return;
+    if (_routeAnimation?.status != AnimationStatus.completed) {
+      _reportHiddenRect();
+      return;
+    }
     final renderObject = _key.currentContext?.findRenderObject();
     if (renderObject is! RenderBox || !renderObject.hasSize) return;
     final topLeft = renderObject.localToGlobal(Offset.zero);
@@ -190,6 +214,11 @@ class _NativePlaneReporterState extends State<_NativePlaneReporter> {
     );
   }
 
+  void _reportHiddenRect() {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    widget.plane.reportVideoRect(0, 0, 0, 0, devicePixelRatio);
+  }
+
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback(_reportRect);
@@ -197,5 +226,11 @@ class _NativePlaneReporterState extends State<_NativePlaneReporter> {
       key: _key,
       child: const ColoredBox(color: Colors.transparent),
     );
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_handleRouteStatusChanged);
+    super.dispose();
   }
 }
