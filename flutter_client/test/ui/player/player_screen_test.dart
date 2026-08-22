@@ -1193,6 +1193,106 @@ void main() {
 
   group('PlayerScreen', () {
     testWidgets(
+      'active native plane makes the full-screen scaffold transparent but errors stay black',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          usesNativePlane: true,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/native-plane.m3u8',
+                title: 'Native Plane Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          Colors.transparent,
+        );
+
+        adapter.emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.desktopLibmpv,
+            message: 'Native plane failed',
+            code: 'native_plane_failed',
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+          Colors.black,
+        );
+      },
+    );
+
+    testWidgets('texture player keeps the full-screen scaffold black', (
+      tester,
+    ) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/texture.m3u8',
+              title: 'Texture Backing Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+        Colors.black,
+      );
+    });
+
+    testWidgets(
       'hides visible controls when the overlay background is tapped',
       (
         tester,

@@ -193,6 +193,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
   bool get _isSeries => widget.args.type == 'series';
+  bool get _isNativePlaneActive => widget.orchestrator.isNativePlaneActive;
 
   String _nowPlayingBadgeLabel(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -1198,7 +1199,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: _isNativePlaneActive && _errorMessage == null
+          ? Colors.transparent
+          : Colors.black,
       body: Shortcuts(
         shortcuts: <LogicalKeySet, Intent>{
           LogicalKeySet(LogicalKeyboardKey.escape): const _BackIntent(),

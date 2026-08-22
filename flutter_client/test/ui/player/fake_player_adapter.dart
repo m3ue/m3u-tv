@@ -5,10 +5,12 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 
 /// A fake PlayerAdapter for widget tests that records calls and emits
 /// configurable state/error streams.
-class FakePlayerAdapter implements PlayerAdapter, VideoTextureProvider {
+class FakePlayerAdapter
+    implements PlayerAdapter, VideoTextureProvider, NativePlaneProvider {
   FakePlayerAdapter({
     PlaybackCapabilities? capabilities,
     this.textureId,
+    this.usesNativePlane = false,
   }) : capabilities = capabilities ?? PlaybackCapabilities.androidExoPlayer;
 
   @override
@@ -16,6 +18,9 @@ class FakePlayerAdapter implements PlayerAdapter, VideoTextureProvider {
 
   @override
   final int? textureId;
+
+  @override
+  final bool usesNativePlane;
 
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();
@@ -91,4 +96,13 @@ class FakePlayerAdapter implements PlayerAdapter, VideoTextureProvider {
 
   /// Emit an error for testing.
   void emitError(PlaybackError error) => _errorController.add(error);
+
+  @override
+  void reportVideoRect(
+    double x,
+    double y,
+    double width,
+    double height,
+    double devicePixelRatio,
+  ) {}
 }

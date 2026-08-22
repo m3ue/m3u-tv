@@ -57,6 +57,8 @@ class PlaybackOrchestrator {
       StreamController<PlaybackState>.broadcast();
   final StreamController<PlaybackError> _errorController =
       StreamController<PlaybackError>.broadcast();
+  final StreamController<bool> _nativePlaneController =
+      StreamController<bool>.broadcast();
   final List<String> _diagnostics = <String>[];
   final List<StreamSubscription<Object?>> _subscriptions =
       <StreamSubscription<Object?>>[];
@@ -72,10 +74,19 @@ class PlaybackOrchestrator {
   int _playbackGeneration = 0;
   bool _recovering = false;
   bool _disposed = false;
+  bool _nativePlaneActive = false;
 
   Stream<PlaybackState> get onState => _stateController.stream;
   Stream<PlaybackError> get onError => _errorController.stream;
+  Stream<bool> get onNativePlaneCompositionChanged =>
+      _nativePlaneController.stream;
   PlaybackBackend? get activeBackend => _activeBackend;
+  bool get isNativePlaneActive {
+    final adapter = _activeAdapter;
+    return adapter is NativePlaneProvider &&
+        (adapter! as NativePlaneProvider).usesNativePlane;
+  }
+
   int? get activeTextureId {
     final adapter = _activeAdapter;
     if (adapter is! VideoTextureProvider) return null;
@@ -121,6 +132,7 @@ class PlaybackOrchestrator {
     _activeAdapter = null;
     _activeBackend = null;
     _activeSource = null;
+    _syncNativePlaneComposition();
 
     PlaybackException? lastRecoverableFailure;
     PlaybackBackend? previousBackend;
@@ -190,6 +202,7 @@ class PlaybackOrchestrator {
     }
     await _stateController.close();
     await _errorController.close();
+    await _nativePlaneController.close();
   }
 
   Iterable<PlaybackBackend> _nativeBackends() sync* {
@@ -215,6 +228,7 @@ class PlaybackOrchestrator {
     _activeAdapter = adapter;
     _activeBackend = backend;
     _activeSource = source;
+    _syncNativePlaneComposition();
     if (adapter is PlatformViewProvider) {
       // A PlatformView-backed adapter's native side can't finish load()
       // until Flutter actually creates its platform view and the native
@@ -237,6 +251,7 @@ class PlaybackOrchestrator {
     while (true) {
       try {
         await adapter.load(source);
+        _syncNativePlaneComposition();
         break;
       } on PlaybackException catch (error) {
         final isStreamUnavailable =
@@ -267,6 +282,7 @@ class PlaybackOrchestrator {
           _activeAdapter = null;
           _activeBackend = null;
           _activeSource = null;
+          _syncNativePlaneComposition();
         }
         if (adapter is PlatformViewProvider) {
           // This adapter's platform view is about to be unmounted (the
@@ -318,6 +334,7 @@ class PlaybackOrchestrator {
         _activeAdapter = null;
         _activeBackend = null;
         _activeSource = null;
+        _syncNativePlaneComposition();
       }
       if (adapter is PlatformViewProvider) {
         // Same use-after-free reasoning as the PlaybackException branch
@@ -468,6 +485,7 @@ class PlaybackOrchestrator {
     _activeAdapter = adapter;
     _activeBackend = PlaybackBackend.serverTranscode;
     _activeSource = transcodedSource;
+    _syncNativePlaneComposition();
     try {
       await adapter.load(transcodedSource);
       if (!_isCurrentGeneration(generation)) {
@@ -481,6 +499,7 @@ class PlaybackOrchestrator {
           _activeAdapter = null;
           _activeBackend = null;
           _activeSource = null;
+          _syncNativePlaneComposition();
         }
         await adapter.stop();
         if (identical(_activeBroadcast, broadcast) && broadcast != null) {
@@ -500,6 +519,7 @@ class PlaybackOrchestrator {
         _activeAdapter = null;
         _activeBackend = null;
         _activeSource = null;
+        _syncNativePlaneComposition();
       }
       await _cleanupSessions();
       _emitError(PlaybackError.fromException(error));
@@ -558,6 +578,7 @@ class PlaybackOrchestrator {
     _activeAdapter = null;
     _activeBackend = null;
     _activeSource = null;
+    _syncNativePlaneComposition();
     await adapter.stop();
   }
 
@@ -605,6 +626,7 @@ class PlaybackOrchestrator {
 
   void _handleAdapterState(PlaybackState state) {
     if (_disposed) return;
+    _syncNativePlaneComposition();
     _stateController.add(state);
     if (state.status == PlaybackStatus.buffering &&
         state.backend == _activeBackend) {
@@ -706,6 +728,15 @@ class PlaybackOrchestrator {
   void _cancelBufferingTimer() {
     _bufferingTimer?.cancel();
     _bufferingTimer = null;
+  }
+
+  void _syncNativePlaneComposition() {
+    final active = isNativePlaneActive;
+    if (_nativePlaneActive == active) return;
+    _nativePlaneActive = active;
+    if (!_disposed && !_nativePlaneController.isClosed) {
+      _nativePlaneController.add(active);
+    }
   }
 
   PlayerAdapter _requireActiveAdapter() {

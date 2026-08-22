@@ -24,6 +24,7 @@ class NativeVideoSurface extends StatelessWidget {
     required this.aspectRatio,
     this.nativePlane,
     this.wrapInBlackBackground = true,
+    this.clearAncestorPaintForNativePlane = false,
   });
 
   final int? textureId;
@@ -37,15 +38,26 @@ class NativeVideoSurface extends StatelessWidget {
   /// `false` to avoid an extra, redundant paint layer.
   final bool wrapInBlackBackground;
 
+  /// Clears Flutter paint already present behind an active native plane.
+  /// Multiview needs this because its below-parent planes sit inside an
+  /// otherwise opaque browsing route; full-screen playback instead makes
+  /// those ancestors transparent directly.
+  final bool clearAncestorPaintForNativePlane;
+
   @override
   Widget build(BuildContext context) {
     final plane = nativePlane;
     if (plane != null && plane.usesNativePlane) {
-      return _wrap(
-        Center(
-          child: AspectRatio(
-            aspectRatio: aspectRatio,
-            child: _NativePlaneReporter(plane: plane),
+      return Center(
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (clearAncestorPaintForNativePlane)
+                const CustomPaint(painter: _NativePlaneHolePainter()),
+              _NativePlaneReporter(plane: plane),
+            ],
           ),
         ),
       );
@@ -129,6 +141,21 @@ class NativeVideoSurface extends StatelessWidget {
       },
     );
   }
+}
+
+class _NativePlaneHolePainter extends CustomPainter {
+  const _NativePlaneHolePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..blendMode = BlendMode.clear,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NativePlaneHolePainter oldDelegate) => false;
 }
 
 /// Reports this widget's on-screen rect to [plane] on every layout, and

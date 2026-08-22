@@ -486,6 +486,72 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'active native plane suppresses browsing paint and restores it on release and close',
+    (tester) async {
+      final adapter = _NavigationPlayerAdapter();
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          useProductionPlayer: true,
+          playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route News').last);
+      await _pumpAppFrame(tester);
+
+      bool browsingPaintSuppressed() => tester
+          .widgetList<Opacity>(
+            find.ancestor(
+              of: find.byType(NavigationSidebar),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .any((opacity) => opacity.opacity == 0);
+
+      expect(browsingPaintSuppressed(), isFalse);
+
+      adapter.setUsesNativePlane(value: true);
+      await tester.pump();
+
+      expect(browsingPaintSuppressed(), isTrue);
+
+      adapter.setUsesNativePlane(value: false);
+      await tester.pump();
+
+      expect(browsingPaintSuppressed(), isFalse);
+
+      adapter.setUsesNativePlane(value: true);
+      await tester.pump();
+      expect(browsingPaintSuppressed(), isTrue);
+
+      expect(
+        await tester
+            .state<_TestAppState>(find.byType(_TestApp))
+            .dispatchRouterBack(),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PlayerScreen), findsNothing);
+      expect(find.byType(NavigationSidebar), findsOneWidget);
+      expect(browsingPaintSuppressed(), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('player open and Android back apply route system UI policies', (
     tester,
   ) async {
@@ -2003,7 +2069,7 @@ PlaybackOrchestrator _testPlaybackOrchestrator([
   );
 }
 
-class _NavigationPlayerAdapter implements PlayerAdapter {
+class _NavigationPlayerAdapter implements PlayerAdapter, NativePlaneProvider {
   _NavigationPlayerAdapter({
     this.audioTracks = const <PlaybackTrack>[],
   });
@@ -2016,6 +2082,10 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
 
   int loadCallCount = 0;
   int disposeCallCount = 0;
+  bool _usesNativePlane = false;
+
+  @override
+  bool get usesNativePlane => _usesNativePlane;
 
   @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
@@ -2041,6 +2111,25 @@ class _NavigationPlayerAdapter implements PlayerAdapter {
   }
 
   void emitError(PlaybackError error) => _errorController.add(error);
+
+  void setUsesNativePlane({required bool value}) {
+    _usesNativePlane = value;
+    _stateController.add(
+      const PlaybackState(
+        backend: PlaybackBackend.desktopLibmpv,
+        status: PlaybackStatus.playing,
+      ),
+    );
+  }
+
+  @override
+  void reportVideoRect(
+    double x,
+    double y,
+    double width,
+    double height,
+    double devicePixelRatio,
+  ) {}
 
   @override
   Future<void> play() async {}

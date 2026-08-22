@@ -531,6 +531,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     final state = tile.state;
     final isFocused = _focusedIndex == index;
     final isReordering = _reorderingIndex == index;
+    final nativePlaneActive = _nativePlaneFor(tile)?.usesNativePlane ?? false;
     return DpadFocusable(
       focusNode: tile.focusNode,
       autofocus: index == 0,
@@ -557,7 +558,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       child: ClipRRect(
         borderRadius: const BorderRadius.all(Radius.circular(8)),
         child: ColoredBox(
-          color: Colors.black,
+          color: nativePlaneActive ? Colors.transparent : Colors.black,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -575,6 +576,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 nativePlane: _nativePlaneFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
                 wrapInBlackBackground: false,
+                clearAncestorPaintForNativePlane: true,
               ),
               if (tile.hasError)
                 Center(
