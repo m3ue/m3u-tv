@@ -94,12 +94,12 @@ static void my_application_activate(GApplication* application) {
   // Must run before the window is realized (gtk_widget_show below): GTK
   // visuals can only be set on an unrealized widget.
   enable_video_plane_transparency(window, view);
-  gtk_widget_show(GTK_WIDGET(window));
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   desktop_libmpv_backend_register(FL_PLUGIN_REGISTRY(view));
+  gtk_widget_show(GTK_WIDGET(window));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
