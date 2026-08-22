@@ -552,6 +552,82 @@ void main() {
     },
   );
 
+  testWidgets(
+    'native-plane playback failure restores browsing composition',
+    (tester) async {
+      final adapter = _NavigationPlayerAdapter();
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      addTearDown(appState.dispose);
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: DeviceType.tv,
+          appState: appState,
+          useProductionPlayer: true,
+          playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route News').last);
+      await _pumpAppFrame(tester);
+
+      final sidebar = find.byType(NavigationSidebar);
+      Iterable<T> browsingAncestors<T extends Widget>() => tester.widgetList<T>(
+        find.ancestor(of: sidebar, matching: find.byType(T)),
+      );
+
+      adapter.setUsesNativePlane(value: true);
+      await tester.pump();
+
+      expect(browsingAncestors<Opacity>().any((w) => w.opacity == 0), isTrue);
+      expect(browsingAncestors<IgnorePointer>().any((w) => w.ignoring), isTrue);
+      expect(
+        browsingAncestors<ExcludeSemantics>().any((w) => w.excluding),
+        isTrue,
+      );
+
+      adapter.emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.desktopLibmpv,
+          message: 'Playback failed',
+          code: 'playback_failed',
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Playback error'), findsOneWidget);
+      expect(browsingAncestors<Opacity>().any((w) => w.opacity == 0), isFalse);
+      expect(
+        browsingAncestors<IgnorePointer>().any((w) => w.ignoring),
+        isFalse,
+      );
+      expect(
+        browsingAncestors<ExcludeSemantics>().any((w) => w.excluding),
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<Scaffold>(
+              find.ancestor(
+                of: find.text('Playback error'),
+                matching: find.byType(Scaffold),
+              ),
+            )
+            .backgroundColor,
+        Colors.black,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('player open and Android back apply route system UI policies', (
     tester,
   ) async {

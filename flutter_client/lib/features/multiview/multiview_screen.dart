@@ -531,7 +531,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     final state = tile.state;
     final isFocused = _focusedIndex == index;
     final isReordering = _reorderingIndex == index;
-    final nativePlaneActive = _nativePlaneFor(tile)?.usesNativePlane ?? false;
+    final nativePlaneActive =
+        !tile.hasError && (_nativePlaneFor(tile)?.usesNativePlane ?? false);
     return DpadFocusable(
       focusNode: tile.focusNode,
       autofocus: index == 0,
@@ -576,7 +577,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 nativePlane: _nativePlaneFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
                 wrapInBlackBackground: false,
-                clearAncestorPaintForNativePlane: true,
+                clearAncestorPaintForNativePlane: nativePlaneActive,
               ),
               if (tile.hasError)
                 Center(

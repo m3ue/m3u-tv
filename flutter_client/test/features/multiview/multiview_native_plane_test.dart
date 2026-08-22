@@ -14,7 +14,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'active Linux native-plane tile punches through instead of painting black',
+    'Linux native-plane tile clears while healthy and paints black on error',
     (tester) async {
       const methodChannel = MethodChannel('m3u_tv/desktop_libmpv');
       const eventChannel = EventChannel('m3u_tv/desktop_libmpv/events');
@@ -89,17 +89,63 @@ void main() {
         tester.widget<NativeVideoSurface>(surface).nativePlane?.usesNativePlane,
         isTrue,
       );
+      final clippedTile = find
+          .ancestor(
+            of: surface,
+            matching: find.byType(ClipRRect),
+          )
+          .first;
+
+      List<RecordedInvocation> recordedTilePaint() {
+        final canvas = TestRecordingCanvas();
+        final context = TestRecordingPaintingContext(canvas);
+        tester.renderObject<RenderBox>(clippedTile).paint(context, Offset.zero);
+        context.dispose();
+        return canvas.invocations;
+      }
+
+      bool paintsWithBlendMode(
+        List<RecordedInvocation> invocations,
+        BlendMode blendMode,
+      ) {
+        return invocations.any(
+          (record) =>
+              record.invocation.memberName == #drawRect &&
+              (record.invocation.positionalArguments[1] as Paint).blendMode ==
+                  blendMode,
+        );
+      }
+
+      final healthyPaint = recordedTilePaint();
       expect(
-        tester
-            .widgetList<ColoredBox>(
-              find.ancestor(of: surface, matching: find.byType(ColoredBox)),
-            )
-            .where((box) => box.color == Colors.black),
-        isEmpty,
+        healthyPaint.any(
+          (record) => record.invocation.memberName == #clipRRect,
+        ),
+        isTrue,
       );
+      expect(paintsWithBlendMode(healthyPaint, BlendMode.clear), isTrue);
+
+      events.add(<String, Object?>{
+        'schemaVersion': 1,
+        'handle': 1,
+        'sequence': 1,
+        'kind': 'ERROR',
+        'message': 'Playback failed',
+        'code': 'playback_failed',
+      });
+      await tester.pump();
+
+      expect(find.text("Couldn't play - select to retry"), findsOneWidget);
+      final errorPaint = recordedTilePaint();
+      expect(paintsWithBlendMode(errorPaint, BlendMode.clear), isFalse);
       expect(
-        find.descendant(of: surface, matching: find.byType(CustomPaint)),
-        findsOneWidget,
+        errorPaint.any(
+          (record) =>
+              record.invocation.memberName == #drawRect &&
+              (record.invocation.positionalArguments[1] as Paint).color ==
+                  Colors.black,
+        ),
+        isTrue,
       );
 
       await tester.pumpWidget(const SizedBox.shrink());

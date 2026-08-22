@@ -1350,17 +1350,19 @@ class AppShellState extends ConsumerState<AppShell>
 
     final viewerId = _appState.activeViewer?.ulid ?? '';
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final suppressBrowsingComposition =
+        _playerNativePlaneActive && !_playerHasFailed;
 
     return NotificationToastOverlay(
       key: _toastKey,
       child: Stack(
         children: [
           IgnorePointer(
-            ignoring: _playerNativePlaneActive,
+            ignoring: suppressBrowsingComposition,
             child: ExcludeSemantics(
-              excluding: _playerNativePlaneActive,
+              excluding: suppressBrowsingComposition,
               child: Opacity(
-                opacity: _playerNativePlaneActive ? 0 : 1,
+                opacity: suppressBrowsingComposition ? 0 : 1,
                 child: backAwareShell,
               ),
             ),
@@ -1512,7 +1514,7 @@ class AppShellState extends ConsumerState<AppShell>
                   },
                   traktService: _appState.traktService,
                   onPlaybackFailure: () {
-                    _playerHasFailed = true;
+                    setState(() => _playerHasFailed = true);
                     unawaited(_systemUiPolicy.applyBrowsing());
                   },
                   onClose: _closePlayer,
