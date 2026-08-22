@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -152,5 +153,12 @@ void main() {
       await tester.pump();
     },
     variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    // `buildMultiviewTilePlayer` picks Linux's DesktopLibmpvBackend vs.
+    // macOS's MacMpvNativeBackend by checking the real `Platform.isMacOS`,
+    // not this test's TargetPlatformVariant override -- so on a macOS host
+    // this always resolves to MacMpvNativeBackend (not a NativePlaneProvider)
+    // and the native-plane assertions below can never pass. CI's flutter
+    // test job runs on ubuntu-latest, where this exercises the real path.
+    skip: !Platform.isLinux,
   );
 }
