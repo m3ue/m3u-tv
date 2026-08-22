@@ -41,12 +41,10 @@ class NativeVideoSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final plane = nativePlane;
     if (plane != null && plane.usesNativePlane) {
-      return _wrap(
-        Center(
-          child: AspectRatio(
-            aspectRatio: aspectRatio,
-            child: _NativePlaneReporter(plane: plane),
-          ),
+      return Center(
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: _NativePlaneReporter(plane: plane),
         ),
       );
     }
