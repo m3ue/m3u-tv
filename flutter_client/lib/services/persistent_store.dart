@@ -144,18 +144,29 @@ class PersistentJsonStore {
   }
 
   /// One-time move of keys matching [test] out of [source] and into this
-  /// store. No-op when this store already holds a matching key (migration
-  /// already ran) or [source] has none. Writes here first, then clears
-  /// [source]; a crash in between leaves the keys in both files, which the
-  /// "already holds a matching key" guard treats as done - dead keys in
-  /// [source] are harmless.
+  /// store, run on boot. Writes here first, then clears [source]. It is
+  /// idempotent: once this store holds the keys, later calls only sweep any
+  /// copy still left in [source] - e.g. from a crash between the two writes,
+  /// or from [source] being reseeded - so the large payload can never linger
+  /// there (which would defeat the point of the split).
   Future<void> adoptKeysFrom(
     PersistentJsonStore source,
     bool Function(String key) test,
   ) async {
-    if (identical(source, this)) return;
+    // Distinct instances can share one file, and its cache + write queue, via
+    // the static _states map; a shared state means there is nothing to move.
+    if (identical(_state, source._state)) return;
+    await _writeQueue.drained;
     final existing = await _readAllUnlocked();
-    if (existing.keys.any(test)) return;
+    if (existing.keys.any(test)) {
+      // Destination already migrated. Only rewrite the source if an earlier
+      // run left matching keys behind - otherwise every boot would rewrite
+      // app_state.json for nothing.
+      if ((await source.snapshot()).keys.any(test)) {
+        await source.removeWhere(test);
+      }
+      return;
+    }
     final sourceData = await source.snapshot();
     final migrated = <String, Object?>{
       for (final entry in sourceData.entries)

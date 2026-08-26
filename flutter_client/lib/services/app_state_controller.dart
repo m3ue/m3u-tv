@@ -470,11 +470,17 @@ class AppStateController extends ChangeNotifier {
 
     // One-time move of the content cache into its own file for installs that
     // predate the split. No-op once done, or when a single store is in use.
+    // Best-effort: an IO failure here just defers the split to a later boot,
+    // it must not block startup.
     if (!identical(_cacheStore, _appStateStore)) {
-      await _cacheStore.adoptKeysFrom(
-        _appStateStore,
-        (key) => key.startsWith('m3ue_cache_'),
-      );
+      try {
+        await _cacheStore.adoptKeysFrom(
+          _appStateStore,
+          (key) => key.startsWith('m3ue_cache_'),
+        );
+      } on Object catch (error) {
+        debugPrint('Content cache migration deferred: $error');
+      }
     }
 
     final savedLocale = await secureStorage.read(_localeKey);
