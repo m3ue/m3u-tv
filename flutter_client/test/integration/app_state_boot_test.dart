@@ -1144,7 +1144,9 @@ void main() {
           ),
           isTrue,
         );
-        final stateBefore = await PersistentJsonStore(file: stateFile).snapshot();
+        final stateBefore = await PersistentJsonStore(
+          file: stateFile,
+        ).snapshot();
         expect(
           stateBefore.keys.any((key) => key.startsWith('m3ue_cache_')),
           isTrue,
@@ -1166,8 +1168,12 @@ void main() {
         expect(migrated.sourceType, AppSourceType.xtream);
         expect(migrated.channels.single.name, 'BBC One');
 
-        final stateAfter = await PersistentJsonStore(file: stateFile).snapshot();
-        final cacheAfter = await PersistentJsonStore(file: cacheFile).snapshot();
+        final stateAfter = await PersistentJsonStore(
+          file: stateFile,
+        ).snapshot();
+        final cacheAfter = await PersistentJsonStore(
+          file: cacheFile,
+        ).snapshot();
         expect(
           stateAfter.keys.any((key) => key.startsWith('m3ue_cache_')),
           isFalse,
