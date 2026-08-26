@@ -2082,6 +2082,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   LiveTvLayout _liveTvLayout = LiveTvLayout.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
+  bool _rememberVodSort = false;
 
   @override
   void initState() {
@@ -2100,11 +2101,13 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final layout = await widget.service.liveTvLayout();
     final startView = await widget.service.epgStartView();
     final channelColumnLayout = await widget.service.channelColumnLayout();
+    final rememberVodSort = await widget.service.rememberVodSort();
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;
       _epgStartView = startView;
       _channelColumnLayout = channelColumnLayout;
+      _rememberVodSort = rememberVodSort;
     });
   }
 
@@ -2201,6 +2204,27 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                   isSelected: _epgStartView == EpgStartView.primeTime,
                   onTap: () =>
                       widget.service.setEpgStartView(EpgStartView.primeTime),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l.settingsFilterPersistence,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _IntervalChip(
+                  label: l.settingsFilterPersistenceRemember,
+                  isSelected: _rememberVodSort,
+                  onTap: () => widget.service.setRememberVodSort(true),
+                ),
+                _IntervalChip(
+                  label: l.settingsFilterPersistenceReset,
+                  isSelected: !_rememberVodSort,
+                  onTap: () => widget.service.setRememberVodSort(false),
                 ),
               ],
             ),

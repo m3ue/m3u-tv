@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
 void main() {
@@ -276,16 +277,324 @@ void main() {
       },
     );
   });
+
+  // ---------------------------------------------------------------------
+  // #235 VOD category sort (long-press affordance + persistence behavior)
+  //
+  // All four items are in the same category so the category filter is a
+  // no-op and any reorder is purely the sort step. The default (server)
+  // order is AAAA → BBBB → CCCC → DDDD; ratingDesc produces
+  // AAAA → DDDD → BBBB → CCCC (unrated sinks last).
+  // ---------------------------------------------------------------------
+  group('VodScreen VOD sort by long-press', () {
+    late List<VodItem> sortItems;
+    late List<Category> sortCategories;
+
+    setUp(() {
+      sortItems = const [
+        VodItem(
+          id: 1,
+          name: 'AAAA Highest',
+          streamUrl: 'http://example.com/1.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+          rating: 9,
+        ),
+        VodItem(
+          id: 2,
+          name: 'BBBB Mid',
+          streamUrl: 'http://example.com/2.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+          rating: 7,
+        ),
+        VodItem(
+          id: 3,
+          name: 'CCCC Unrated',
+          streamUrl: 'http://example.com/3.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+        ),
+        VodItem(
+          id: 4,
+          name: 'DDDD Third',
+          streamUrl: 'http://example.com/4.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+          rating: 8,
+        ),
+      ];
+      sortCategories = const [Category(id: '20', name: 'Action')];
+    });
+
+    // Reads the four movie titles in document (widget-tree) order. The
+    // grid renders them left-to-right, top-to-bottom; `find.byType(Text)`
+    // returns matches in tree order, which is the same source order the
+    // items were built in by `_filteredItems`.
+    List<String> gridTitles(WidgetTester tester) {
+      const knownNames = {
+        'AAAA Highest',
+        'BBBB Mid',
+        'CCCC Unrated',
+        'DDDD Third',
+      };
+      return tester
+          .widgetList<Text>(find.byType(Text))
+          .where(
+            (text) => text.data != null && knownNames.contains(text.data),
+          )
+          .map((text) => text.data!)
+          .toList();
+    }
+
+    testWidgets(
+      'long-press on a category chip opens the sort menu with Default, Rating, Cancel',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Trigger the long-press via the chip's underlying InkWell long-press.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Sort Movies By'), findsOneWidget);
+        expect(find.text('Default'), findsOneWidget);
+        expect(find.text('Rating'), findsOneWidget);
+        expect(find.text('Cancel'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'selecting Rating re-sorts the grid descending by rating, unrated last',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Sanity: default order has BBBB before DDDD.
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'BBBB Mid',
+          'CCCC Unrated',
+          'DDDD Third',
+        ]);
+
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Rating'));
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'DDDD Third',
+          'BBBB Mid',
+          'CCCC Unrated',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'selecting Default reverts to the original server order',
+      (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Apply Rating first so we have something to revert.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Rating'));
+        await tester.pumpAndSettle();
+
+        // Now switch back to Default.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Default'));
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'BBBB Mid',
+          'CCCC Unrated',
+          'DDDD Third',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'sort dialog autofocuses and checks the currently-active row, not always the first',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Switch to Rating first so Default is NOT active.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Rating'));
+        await tester.pumpAndSettle();
+
+        // Re-open the dialog — Rating should now be the active row.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+
+        // The check icon is the active-row indicator. It must sit next to
+        // "Rating", not "Default".
+        final ratingCheck = find.descendant(
+          of: find.ancestor(
+            of: find.text('Rating'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byIcon(Icons.check),
+        );
+        expect(ratingCheck, findsOneWidget);
+
+        final defaultCheck = find.descendant(
+          of: find.ancestor(
+            of: find.text('Default'),
+            matching: find.byType(Row),
+          ),
+          matching: find.byIcon(Icons.check),
+        );
+        expect(defaultCheck, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'with rememberVodSort false (default), restart does not restore Rating sort',
+      (tester) async {
+        final service = ViewSettingsService();
+        // Distinct Keys between pumps force Flutter to recreate the
+        // Element/State subtree - otherwise pumpWidget reuses the State
+        // because the widget types match, and `_loadSortPreference`'s
+        // initState path never runs again.
+        const firstKey = ValueKey('restart-first');
+        const secondKey = ValueKey('restart-second');
+        await tester.pumpWidget(
+          _TestApp(
+            key: firstKey,
+            vodItems: sortItems,
+            categories: sortCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Apply Rating once.
+        await tester.longPress(find.text('All Movies'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Rating'));
+        await tester.pumpAndSettle();
+
+        // Per the plan, the service is only written when
+        // `rememberVodSort` is true — session-only choices deliberately
+        // leave the on-disk value at the conservative default.
+        expect(await service.vodSortOption(), VodSortOption.defaultOrder);
+        expect(await service.rememberVodSort(), isFalse);
+
+        // Re-mount from scratch with the same persistent service. The new
+        // _VodScreenState starts with `_sortOption = defaultOrder` and the
+        // remember=false guard skips the persisted vodSortOption read.
+        await tester.pumpWidget(
+          _TestApp(
+            key: secondKey,
+            vodItems: sortItems,
+            categories: sortCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'BBBB Mid',
+          'CCCC Unrated',
+          'DDDD Third',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'with rememberVodSort true, the persisted Rating sort is restored on restart',
+      (tester) async {
+        final service = ViewSettingsService();
+        await service.setRememberVodSort(true);
+        await service.setVodSortOption(VodSortOption.ratingDesc);
+
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // No user interaction with the dialog this run — the grid should
+        // already show the persisted rating order because
+        // _loadSortPreference read vodSortOption() at startup.
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'DDDD Third',
+          'BBBB Mid',
+          'CCCC Unrated',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'mobile (stacked) layout does not expose the long-press sort affordance',
+      (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            vodItems: sortItems,
+            categories: sortCategories,
+            useSidebarLayout: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Mobile has a "Filter" button rather than chips in the strip.
+        // Long-pressing it should not open the sort dialog — the only
+        // existing behavior is the Filter screen push.
+        await tester.longPress(find.text('Filter'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Sort Movies By'), findsNothing);
+      },
+    );
+  });
 }
 
 class _TestApp extends StatelessWidget {
   const _TestApp({
+    super.key,
     required this.vodItems,
     required this.categories,
     this.isLoading = false,
     this.isConfigured = true,
     this.useSidebarLayout = true,
     this.onVodSelect,
+    this.viewSettingsService,
   });
 
   final List<VodItem> vodItems;
@@ -294,9 +603,11 @@ class _TestApp extends StatelessWidget {
   final bool isConfigured;
   final bool useSidebarLayout;
   final void Function(VodItem)? onVodSelect;
+  final ViewSettingsService? viewSettingsService;
 
   @override
   Widget build(BuildContext context) {
+    final service = viewSettingsService ?? ViewSettingsService();
     return ProviderScope(
       overrides: [
         isBootstrappingProvider.overrideWith((_) => false),
@@ -304,6 +615,7 @@ class _TestApp extends StatelessWidget {
         isLoadingContentProvider.overrideWith((_) => isLoading),
         vodItemsProvider.overrideWith((_) => vodItems),
         vodCategoriesProvider.overrideWith((_) => categories),
+        viewSettingsServiceProvider.overrideWith((_) => service),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
