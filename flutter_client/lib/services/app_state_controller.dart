@@ -75,6 +75,7 @@ class AppStateController extends ChangeNotifier {
     ViewerService? viewerService,
     EpgService? epgService,
     PersistentJsonStore? persistentStore,
+    PersistentJsonStore? cacheStore,
     TvNotificationService? tvNotificationService,
     TvNotificationStore? tvNotificationStore,
     ReverbService? reverbService,
@@ -88,7 +89,18 @@ class AppStateController extends ChangeNotifier {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
         secureStorage ?? FileSecureStorage(store: store);
-    final resolvedCacheService = cacheService ?? CacheService(store: store);
+    // The content cache (whole channel/VOD/series catalog) lives in its own
+    // file on the production path so a small single-key write elsewhere -
+    // e.g. the resume tracker every ~10s during playback - never has to
+    // re-serialize it. When a caller supplies its own store or cacheService
+    // (tests), keep everything in the one file so their assertions hold.
+    final resolvedCacheStore =
+        cacheStore ??
+        (persistentStore == null && cacheService == null
+            ? PersistentJsonStore(fileName: 'cache.json')
+            : store);
+    final resolvedCacheService =
+        cacheService ?? CacheService(store: resolvedCacheStore);
     final resolvedXtreamService =
         xtreamService ??
         authNotifier?.xtreamService ??
@@ -103,6 +115,8 @@ class AppStateController extends ChangeNotifier {
       xtreamService: resolvedXtreamService,
       secureStorage: resolvedSecureStorage,
       cacheService: resolvedCacheService,
+      appStateStore: store,
+      cacheStore: resolvedCacheStore,
       favoritesService: favoritesService ?? FavoritesService(store: store),
       vodFavoritesService:
           vodFavoritesService ??
@@ -136,6 +150,8 @@ class AppStateController extends ChangeNotifier {
     required this.xtreamService,
     required this.secureStorage,
     required this.cacheService,
+    required this._appStateStore,
+    required this._cacheStore,
     required this.favoritesService,
     required this.vodFavoritesService,
     required this.seriesFavoritesService,
@@ -185,6 +201,12 @@ class AppStateController extends ChangeNotifier {
 
   final AuthNotifier authNotifier;
   final XtreamService xtreamService;
+
+  /// The app-state file (credentials, settings, favorites, resume progress)
+  /// and the content-cache file. Equal when a test forces a single store; a
+  /// one-time key migration between them runs in [boot].
+  final PersistentJsonStore _appStateStore;
+  final PersistentJsonStore _cacheStore;
   final SecureStorage secureStorage;
   final CacheService cacheService;
   final FavoritesService favoritesService;
@@ -445,6 +467,15 @@ class AppStateController extends ChangeNotifier {
     unawaited(traktService.init());
     unawaited(proxyPlaybackSettings.load());
     unawaited(comskipSettings.load());
+
+    // One-time move of the content cache into its own file for installs that
+    // predate the split. No-op once done, or when a single store is in use.
+    if (!identical(_cacheStore, _appStateStore)) {
+      await _cacheStore.adoptKeysFrom(
+        _appStateStore,
+        (key) => key.startsWith('m3ue_cache_'),
+      );
+    }
 
     final savedLocale = await secureStorage.read(_localeKey);
     if (savedLocale != null) _locale = Locale(savedLocale);

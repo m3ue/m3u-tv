@@ -82,7 +82,7 @@ Future<void> _initPushNotifications(AppStateController appState) async {
 
 Future<AppStateController> _buildAppState() async {
   final operatingSystem = Platform.operatingSystem;
-  final store = await _createAppStateStore(operatingSystem);
+  final (store, cacheStore) = await _createAppStateStores(operatingSystem);
   final storage = createProductionStorage(
     operatingSystem: operatingSystem,
     persistentStore: store,
@@ -95,11 +95,16 @@ Future<AppStateController> _buildAppState() async {
   }
   return AppStateController(
     persistentStore: storage.appStateStore,
+    cacheStore: cacheStore,
     secureStorage: storage.credentialStorage,
   );
 }
 
-Future<PersistentJsonStore> _createAppStateStore(
+/// Returns the app-state store and the content-cache store as a pair. The
+/// cache (whole channel/VOD/series catalog) is a sibling `cache.json` so a
+/// small single-key write to `app_state.json` - e.g. the resume tracker every
+/// ~10s during playback - never has to re-serialize the catalog.
+Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
   String operatingSystem,
 ) async {
   if (operatingSystem == 'tvos') {
@@ -117,13 +122,22 @@ Future<PersistentJsonStore> _createAppStateStore(
     // before any image widget builds, lets the manager use a writable
     // directory instead.
     MediaImageCacheManager.tvosCacheDirectory = dir;
-    return PersistentJsonStore(file: File('${dir.path}/app_state.json'));
+    return (
+      PersistentJsonStore(file: File('${dir.path}/app_state.json')),
+      PersistentJsonStore(file: File('${dir.path}/cache.json')),
+    );
   }
   if (operatingSystem == 'android' || operatingSystem == 'ios') {
     final dir = await getApplicationDocumentsDirectory();
-    return PersistentJsonStore(file: File('${dir.path}/app_state.json'));
+    return (
+      PersistentJsonStore(file: File('${dir.path}/app_state.json')),
+      PersistentJsonStore(file: File('${dir.path}/cache.json')),
+    );
   }
-  return PersistentJsonStore();
+  return (
+    PersistentJsonStore(),
+    PersistentJsonStore(fileName: 'cache.json'),
+  );
 }
 
 class MyApp extends StatefulWidget {

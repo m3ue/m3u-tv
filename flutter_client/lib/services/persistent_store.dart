@@ -5,7 +5,13 @@ import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 
 class PersistentJsonStore {
-  PersistentJsonStore({File? file}) : this._(file ?? File(_defaultPath()));
+  /// [fileName] picks the basename inside the platform app-data directory
+  /// (default `app_state.json`). Pass a distinct name (e.g. `cache.json`) to
+  /// keep a large, frequently-rewritten section in its own file so an
+  /// unrelated single-key write does not re-serialize it. Ignored when an
+  /// explicit [file] is given (tests).
+  PersistentJsonStore({File? file, String fileName = 'app_state.json'})
+    : this._(file ?? File(_defaultPath(fileName)));
 
   PersistentJsonStore._(File file)
     : _file = file,
@@ -137,6 +143,33 @@ class PersistentJsonStore {
     return Map<String, Object?>.from(await _readAllUnlocked());
   }
 
+  /// One-time move of keys matching [test] out of [source] and into this
+  /// store. No-op when this store already holds a matching key (migration
+  /// already ran) or [source] has none. Writes here first, then clears
+  /// [source]; a crash in between leaves the keys in both files, which the
+  /// "already holds a matching key" guard treats as done - dead keys in
+  /// [source] are harmless.
+  Future<void> adoptKeysFrom(
+    PersistentJsonStore source,
+    bool Function(String key) test,
+  ) async {
+    if (identical(source, this)) return;
+    final existing = await _readAllUnlocked();
+    if (existing.keys.any(test)) return;
+    final sourceData = await source.snapshot();
+    final migrated = <String, Object?>{
+      for (final entry in sourceData.entries)
+        if (test(entry.key)) entry.key: entry.value,
+    };
+    if (migrated.isEmpty) return;
+    await _queueWrite(() async {
+      final data = await _readAllUnlocked();
+      data.addAll(migrated);
+      await _writeAll(data);
+    });
+    await source.removeWhere(test);
+  }
+
   Future<void> removeWhere(bool Function(String key) test) async {
     await _queueWrite(() async {
       final data = await _readAllUnlocked();
@@ -217,7 +250,7 @@ class PersistentJsonStore {
     return true;
   }
 
-  static String _defaultPath() {
+  static String _defaultPath(String fileName) {
     final env = Platform.environment;
     final base = switch (Platform.operatingSystem) {
       'windows' =>
@@ -229,7 +262,7 @@ class PersistentJsonStore {
             '${env['HOME'] ?? Directory.systemTemp.path}/.local/share',
       _ => '${env['HOME'] ?? Directory.systemTemp.path}/.m3u_tv',
     };
-    return '$base/m3u_tv/app_state.json';
+    return '$base/m3u_tv/$fileName';
   }
 }
 
