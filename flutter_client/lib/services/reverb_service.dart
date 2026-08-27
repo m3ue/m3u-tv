@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -107,7 +106,6 @@ class ReverbService {
     final session = _session;
     final creds = _credentials;
 
-    debugPrint('[reverb] connecting to ${session.reverb.wsUri}');
     try {
       final socket = _channelFactory(session.reverb.wsUri);
       if (_connectionGeneration.isStale(connectionGeneration)) {
@@ -128,22 +126,12 @@ class ReverbService {
           );
           _resetIdleTimer(connectionGeneration, socket);
         },
-        onError: (Object error) {
-          debugPrint('[reverb] socket onError: $error - reconnecting');
-          _scheduleReconnect(connectionGeneration, socket);
-        },
-        onDone: () {
-          debugPrint(
-            '[reverb] socket onDone (closeCode=${socket.closeCode} '
-            'reason=${socket.closeReason}) - reconnecting',
-          );
-          _scheduleReconnect(connectionGeneration, socket);
-        },
+        onError: (_) => _scheduleReconnect(connectionGeneration, socket),
+        onDone: () => _scheduleReconnect(connectionGeneration, socket),
         cancelOnError: true,
       );
       _resetIdleTimer(connectionGeneration, socket);
-    } on Object catch (error) {
-      debugPrint('[reverb] connect threw: $error - reconnecting');
+    } on Object catch (_) {
       _scheduleReconnect(connectionGeneration);
     }
   }
@@ -208,14 +196,8 @@ class ReverbService {
     }
 
     final event = '${msg['event'] ?? ''}';
-    if (event != 'pusher:ping' && event != 'pusher:pong') {
-      debugPrint('[reverb] <- $event');
-    }
 
     switch (event) {
-      case 'pusher:error':
-        debugPrint('[reverb] server error: ${msg['data']}');
-
       case 'pusher:connection_established':
         final data = _parseData(msg['data']);
         final socketId = '${data['socket_id'] ?? ''}';
@@ -239,7 +221,6 @@ class ReverbService {
         _send(socket, {'event': 'pusher:pong', 'data': {}});
 
       case 'pusher_internal:subscription_succeeded':
-        debugPrint('[reverb] subscribed OK to ${session.channelName}');
         _connected = true;
         _retryDelay = 2;
         _onConnected?.call();
@@ -298,13 +279,11 @@ class ReverbService {
           !identical(_ws, socket)) {
         return;
       }
-      debugPrint('[reverb] -> subscribe $channelName');
       _send(socket, {
         'event': 'pusher:subscribe',
         'data': {'auth': auth, 'channel': channelName},
       });
-    } on Object catch (error) {
-      debugPrint('[reverb] broadcastAuth FAILED for $channelName: $error');
+    } on Object catch (_) {
       _scheduleReconnect(connectionGeneration, socket);
     }
   }
