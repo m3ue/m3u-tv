@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
@@ -169,10 +170,20 @@ class TvNotificationService {
 
   Future<DeviceIdentity?> _resolveIdentity() async {
     final service = _deviceIdentity;
-    if (service == null) return null;
+    if (service == null) {
+      debugPrint('[device-id] no DeviceIdentityService wired');
+      return null;
+    }
     try {
-      return await service.resolve();
-    } on Object catch (_) {
+      final identity = await service.resolve();
+      debugPrint(
+        '[device-id] resolved id=${identity.deviceId} '
+        'platform=${identity.platform} name=${identity.deviceName} '
+        'appVersion=${identity.appVersion}',
+      );
+      return identity;
+    } on Object catch (error, stack) {
+      debugPrint('[device-id] resolve FAILED: $error\n$stack');
       return null;
     }
   }
@@ -203,11 +214,26 @@ class TvNotificationService {
       queryParameters: queryParams.isEmpty ? null : _flattenParams(queryParams),
     );
 
-    final response = await _get(uri);
+    debugPrint(
+      '[tv-notif] GET ${uri.scheme}://${uri.host}:${uri.port}${uri.path}'
+      '?${uri.query}',
+    );
+    final Object? response;
+    try {
+      response = await _get(uri);
+    } on Object catch (error) {
+      debugPrint('[tv-notif] GET failed: $error');
+      rethrow;
+    }
     final json =
         (response as Map?)?.cast<String, Object?>() ?? <String, Object?>{};
 
     final reverbJson = (json['reverb'] as Map?)?.cast<String, Object?>() ?? {};
+    debugPrint(
+      '[tv-notif] response keys=${json.keys.toList()} '
+      'reverb=${reverbJson.isEmpty ? "MISSING" : reverbJson} '
+      'device_revoked=${json['device_revoked']}',
+    );
 
     final rawChannels = json['available_channels'] as List? ?? const [];
     final availableChannels = rawChannels
@@ -270,7 +296,9 @@ class TvNotificationService {
   // ---- helpers ----
 
   Uri _baseUri(String server) {
-    final uri = Uri.parse(server.replaceAll(RegExp(r'/+$'), ''));
+    // Mirror XtreamService: a bare host like "m3ueditor.test" (scheme loosened
+    // on the connect form) parses as a path with no host, so prefix http://.
+    final uri = Uri.parse(normalizeServerUrl(server));
     // Strip /player_api.php if the server URL includes it.
     final path = uri.path.endsWith('/player_api.php')
         ? uri.path.substring(0, uri.path.length - '/player_api.php'.length)

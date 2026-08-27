@@ -618,11 +618,15 @@ class AppStateController extends ChangeNotifier {
   }
 
   Future<bool> connectXtream(UserCredentials credentials) {
+    // Resolve a bare host (scheme loosened on the connect form) to an absolute
+    // URL up front so the notification/Reverb path downstream keys off the same
+    // value the Xtream client normalizes to internally.
+    final normalized = credentials.normalized();
     final sourceGeneration = _sourceOperationGeneration.advance();
     final rollbackGeneration = _sourceRollbackGeneration.current;
     if (_sourceReplacementOwners == 0) {
       return _connectXtream(
-        credentials,
+        normalized,
         sourceGeneration,
         rollbackGeneration: rollbackGeneration,
         ownsQueue: false,
@@ -632,7 +636,7 @@ class AppStateController extends ChangeNotifier {
       _sourceReplacementOwners += 1;
       try {
         return await _connectXtream(
-          credentials,
+          normalized,
           sourceGeneration,
           rollbackGeneration: rollbackGeneration,
           ownsQueue: true,
@@ -805,13 +809,19 @@ class AppStateController extends ChangeNotifier {
     UserCredentials credentials,
     int notificationGeneration,
   ) async {
+    debugPrint('[tv-notif] connect start server=${credentials.server}');
     try {
       final session = await _reconcileUnreadNotifications(
         credentials,
         present: _pendingNotificationActivations.isEmpty,
         notificationGeneration: notificationGeneration,
       );
+      debugPrint(
+        '[tv-notif] reconcile done session=${session != null} '
+        'channel=${session?.channelName} appKey=${session?.reverb.appKey.isNotEmpty}',
+      );
       if (_notificationSessionGeneration.isStale(notificationGeneration)) {
+        debugPrint('[tv-notif] generation stale after reconcile, bailing');
         return;
       }
       await _drainPendingPushActivations();
@@ -821,7 +831,12 @@ class AppStateController extends ChangeNotifier {
       }
       // Older server versions don't return Reverb config — skip WebSocket setup
       // rather than hammering a connection that can never succeed.
-      if (session == null) return;
+      if (session == null) {
+        debugPrint(
+          '[tv-notif] no session (no Reverb config) - skipping socket',
+        );
+        return;
+      }
       final ownsDvr = _captureDvrOwnership(
         credentials,
         notificationGeneration: notificationGeneration,
@@ -846,8 +861,9 @@ class AppStateController extends ChangeNotifier {
           _refreshActiveDvrRecordings(credentials, ownsDvr),
         ),
       );
-    } on Object catch (_) {
+    } on Object catch (error, stack) {
       // TV notifications are best-effort; a failure here must not crash the app.
+      debugPrint('[tv-notif] connect FAILED: $error\n$stack');
     }
   }
 
@@ -866,14 +882,23 @@ class AppStateController extends ChangeNotifier {
       credentials: credentials,
       notificationGeneration: notificationGeneration,
     );
-    if (!ownsNotification()) return null;
+    if (!ownsNotification()) {
+      debugPrint('[tv-notif] reconcile: lost ownership before fetch');
+      return null;
+    }
     final (session, unread) = await _tvNotificationService.fetchUnread(
       credentials,
+    );
+    debugPrint(
+      '[tv-notif] fetchUnread ok: unread=${unread.length} '
+      'channel=${session.channelName} appKey=${session.reverb.appKey.isNotEmpty} '
+      'wsUri=${session.reverb.appKey.isNotEmpty ? session.reverb.wsUri : "n/a"}',
     );
     if (!ownsNotification()) return null;
     if (session.deviceRevoked) {
       // An admin revoked this install in the editor. Drop to the pairing
       // screen; the credential itself still works so the user can re-pair.
+      debugPrint('[tv-notif] device_revoked=true -> disconnecting');
       unawaited(disconnect());
       return null;
     }
@@ -882,6 +907,7 @@ class AppStateController extends ChangeNotifier {
       accountPrincipal: accountPrincipal,
       session: session,
     )) {
+      debugPrint('[tv-notif] selectOwner rejected -> clearing owner');
       _clearNotificationOwner();
       return null;
     }
@@ -922,6 +948,11 @@ class AppStateController extends ChangeNotifier {
     }
     if (!ownsNotification()) return null;
     if (session.channelName.isEmpty || session.reverb.appKey.isEmpty) {
+      debugPrint(
+        '[tv-notif] server returned no Reverb config '
+        '(channel="${session.channelName}" appKey empty=${session.reverb.appKey.isEmpty}) '
+        '- socket will NOT connect',
+      );
       return null;
     }
     return session;

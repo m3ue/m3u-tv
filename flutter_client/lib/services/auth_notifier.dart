@@ -87,18 +87,23 @@ class AuthNotifier extends ChangeNotifier {
     bool persistCredentials = true,
     bool publishSession = true,
   }) async {
+    // A bare host typed on the connect form (scheme loosened) must be resolved
+    // to an absolute URL here so every downstream consumer of the credentials
+    // (notification owner key, Reverb config, etc.) sees the same value the
+    // Xtream client normalizes to internally.
+    final normalized = credentials.normalized();
     final connectionGeneration = ++_connectionGeneration;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await xtreamService.authenticate(credentials);
+      final response = await xtreamService.authenticate(normalized);
       if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
         _finishStaleConnection(connectionGeneration);
         return false;
       }
-      if (persistCredentials) await _persistCredentials(credentials);
+      if (persistCredentials) await _persistCredentials(normalized);
       if (!_isCurrentConnection(connectionGeneration, isCurrent)) {
         _finishStaleConnection(connectionGeneration);
         return false;
@@ -106,7 +111,7 @@ class AuthNotifier extends ChangeNotifier {
 
       _isConfigured = true;
       _authResponse = response;
-      _credentials = credentials;
+      _credentials = normalized;
       _isLoading = false;
       if (publishSession) notifyListeners();
       return true;
@@ -115,7 +120,7 @@ class AuthNotifier extends ChangeNotifier {
         _finishStaleConnection(connectionGeneration);
         return false;
       }
-      _error = _redact(e.message, credentials);
+      _error = _redact(e.message, normalized);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -124,7 +129,7 @@ class AuthNotifier extends ChangeNotifier {
         _finishStaleConnection(connectionGeneration);
         return false;
       }
-      _error = _redact(userFacingXtreamError(e), credentials);
+      _error = _redact(userFacingXtreamError(e), normalized);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -190,7 +195,7 @@ class AuthNotifier extends ChangeNotifier {
         server: '${json['server'] ?? ''}',
         username: '${json['username'] ?? ''}',
         password: '${json['password'] ?? ''}',
-      );
+      ).normalized();
       _credentials = credentials;
       xtreamService.hydrateCredentials(credentials);
       return credentials;

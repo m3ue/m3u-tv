@@ -72,11 +72,13 @@ class DeviceIdentityService {
 
     final existing = await _storage.read(_deviceIdKey);
     if (existing != null && existing.trim().isNotEmpty) {
+      debugPrint('[device-id] loaded existing id from storage');
       return _cachedId = existing.trim();
     }
 
     final generated = _uuidV4();
     await _storage.write(_deviceIdKey, generated);
+    debugPrint('[device-id] generated + stored new id');
     return _cachedId = generated;
   }
 

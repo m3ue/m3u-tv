@@ -46,6 +46,35 @@ void main() {
       );
     },
   );
+
+  test(
+    'connect resolves a bare-host server to an absolute URL',
+    () async {
+      final storage = _DelayedFirstWriteStorage()..releaseFirstWrite.complete();
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _authenticate),
+        secureStorage: storage,
+      );
+
+      // Regression: a bare host used to reach the notification owner key and
+      // Reverb config unresolved, so `Uri.parse` produced no host and the
+      // socket silently never connected.
+      final connected = await notifier.connect(
+        const UserCredentials(
+          server: 'm3ueditor.test',
+          username: 'user1',
+          password: 'pass1',
+        ),
+      );
+
+      expect(connected, isTrue);
+      expect(notifier.credentials?.server, 'http://m3ueditor.test');
+      expect(
+        jsonDecode((await storage.read('m3ue_tv_credentials'))!),
+        containsPair('server', 'http://m3ueditor.test'),
+      );
+    },
+  );
 }
 
 Future<Object?> _authenticate(XtreamRequest request) async => <String, Object?>{

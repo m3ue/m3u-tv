@@ -24,11 +24,15 @@ class UserCredentials {
   final String username;
   final String password;
 
-  UserCredentials normalized() => UserCredentials(
-    server: normalizeServerUrl(server),
-    username: username,
-    password: password,
-  );
+  UserCredentials normalized() {
+    final normalizedServer = normalizeServerUrl(server);
+    if (normalizedServer == server) return this;
+    return UserCredentials(
+      server: normalizedServer,
+      username: username,
+      password: password,
+    );
+  }
 }
 
 class Category {
