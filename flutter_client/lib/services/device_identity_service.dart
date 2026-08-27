@@ -122,7 +122,9 @@ Future<DeviceMeta> _defaultMetaResolver() async {
   try {
     final info = DeviceInfoPlugin();
     if (!kIsWeb && Platform.operatingSystem == 'tvos') {
-      name = null; // device_info_plus has no tvOS channel; fall through.
+      // device_info_plus has no tvOS channel; leave name null here and let
+      // _fallbackName() below supply it (localHostname / "Apple TV").
+      name = null;
     } else if (Platform.isIOS) {
       name = (await info.iosInfo).name;
     } else if (Platform.isAndroid) {
