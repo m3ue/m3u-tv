@@ -36,7 +36,7 @@ enum _IntroDbSegmentKind { intro, credits }
 
 /// How long TheIntroDB's skip prompt stays up before fading (with a
 /// countdown bar showing the time remaining).
-const _kIntroDbPromptCountdown = Duration(seconds: 5);
+const _kIntroDbPromptCountdown = Duration(seconds: 15);
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
@@ -660,7 +660,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_introDbMatchedKind != matched) _startIntroDbCountdown(matched);
   }
 
-  /// Enters a new segment kind and plays its one-time 5s countdown. After it
+  /// Enters a new segment kind and plays its one-time 15s countdown. After it
   /// elapses, `_introDbCountdownActive` simply goes false — the prompt then
   /// only shows/hides in lockstep with the OSD (`_introDbPromptVisible`),
   /// with no further timer and no restart on subsequent OSD toggles.

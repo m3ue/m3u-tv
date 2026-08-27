@@ -147,7 +147,7 @@ class AppShellState extends ConsumerState<AppShell>
   // so this is gated to DeviceType.tv. The grace period keeps brief
   // interruptions (voice assistant overlay, a permission dialog) from
   // resetting the user.
-  static const Duration _tvForegroundResetGrace = Duration(seconds: 10);
+  static const Duration _tvForegroundResetGrace = Duration(seconds: 5);
   DateTime? _backgroundedAt;
   int _lastNavMs = 0;
   int _lastNavIndex = -1;
