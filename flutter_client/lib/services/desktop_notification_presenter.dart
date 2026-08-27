@@ -253,6 +253,18 @@ class MacosDesktopNotificationBackend implements DesktopNotificationBackend {
     if (initialized == false) {
       throw StateError('macOS notification initialization failed');
     }
+    // macOS silently drops notifications when the app lacks permission (common
+    // for a dev-signed build, Focus mode, or a denied prompt). Treat that as an
+    // init failure so the dispatcher falls back to the in-app toast instead of
+    // showing nothing.
+    final granted = await _plugin
+        .resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
+    if (granted != true) {
+      throw StateError('macOS notification permission not granted');
+    }
   }
 
   @override
