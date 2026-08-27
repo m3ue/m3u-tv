@@ -333,6 +333,7 @@ class _NoopReverbService extends ReverbService {
     void Function(DvrRecording)? onDvrStatus,
     void Function(MediaRequestSummary)? onRequestStatus,
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function(String)? onDeviceDeregister,
     void Function()? onConnected,
   }) async {}
 
@@ -353,6 +354,7 @@ class _CapturingReverbService extends _NoopReverbService {
     void Function(DvrRecording)? onDvrStatus,
     void Function(MediaRequestSummary)? onRequestStatus,
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function(String)? onDeviceDeregister,
     void Function()? onConnected,
   }) async {
     if (onRequestStatus != null) requestStatusCallbacks.add(onRequestStatus);

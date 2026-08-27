@@ -256,7 +256,7 @@
   "pairingScanQr": "Scan to open the pairing page on your phone",
   "pairingOpenBrowser": "Open in browser",
   "pairingPendingGoTo": "On your phone or computer, go to:",
-  "pairingPendingEnterCode": "Then enter this code:",
+  "pairingPendingEnterCode": "Pairing code:",
   "pairingPendingWaiting": "Waiting for approval…",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",

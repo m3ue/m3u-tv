@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
@@ -48,11 +49,16 @@ class SettingsScreen extends StatefulWidget {
     this.proxyPlaybackSettings,
     this.comskipSettings,
     this.viewSettingsService,
+    this.deviceType,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final DevicePairingService? devicePairingService;
+
+  /// Used to decide whether the pairing URL should be a tappable link with an
+  /// "open in browser" affordance (every non-TV device) or plain text (TV).
+  final DeviceType? deviceType;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
@@ -135,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               widget.sourceError ??
               widget.authNotifier.error,
           devicePairingService: widget.devicePairingService,
+          deviceType: widget.deviceType,
         ),
       );
     }
@@ -208,12 +215,14 @@ class _ConnectionFormBody extends StatefulWidget {
     this.initialValues,
     this.error,
     this.devicePairingService,
+    this.deviceType,
   });
 
   final Future<void> Function(UserCredentials credentials) onConnect;
   final UserCredentials? initialValues;
   final String? error;
   final DevicePairingService? devicePairingService;
+  final DeviceType? deviceType;
 
   @override
   State<_ConnectionFormBody> createState() => _ConnectionFormBodyState();
@@ -319,6 +328,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
           child: _DevicePairingBody(
             service: service,
             onCancel: _cancelPairing,
+            linksAreTappable: widget.deviceType != DeviceType.tv,
           ),
         ),
       );
@@ -506,10 +516,20 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
 // ---------------------------------------------------------------------------
 
 class _DevicePairingBody extends StatelessWidget {
-  const _DevicePairingBody({required this.service, required this.onCancel});
+  const _DevicePairingBody({
+    required this.service,
+    required this.onCancel,
+    this.linksAreTappable = true,
+  });
 
   final DevicePairingService service;
   final VoidCallback onCancel;
+
+  /// True on every non-TV device: the pairing URL becomes a real link with an
+  /// "open in browser" button, so a server admin setting up the device doesn't
+  /// have to retype it. On a TV there's no browser and no pointer, so it stays
+  /// plain text next to the QR code.
+  final bool linksAreTappable;
 
   static Widget get _logo =>
       SvgPicture.asset('assets/icons/editor-logo.svg', height: 40);
@@ -541,11 +561,13 @@ class _DevicePairingBody extends StatelessWidget {
                 uri: uri,
                 userCode: userCode,
                 onCancel: onCancel,
+                linksAreTappable: linksAreTappable,
               )
             : _DevicePairingNarrow(
                 uri: uri,
                 userCode: userCode,
                 onCancel: onCancel,
+                linksAreTappable: linksAreTappable,
               ),
       );
     }
@@ -567,20 +589,43 @@ class _DevicePairingWide extends StatelessWidget {
     required this.uri,
     required this.userCode,
     required this.onCancel,
+    this.linksAreTappable = true,
   });
 
   final String uri;
   final String userCode;
   final VoidCallback onCancel;
+  final bool linksAreTappable;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: _DevicePairingInstructions(uri: uri, userCode: userCode),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DevicePairingInstructions(
+                uri: uri,
+                userCode: userCode,
+                uriTappable: linksAreTappable,
+              ),
+              if (linksAreTappable && uri.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                AppButton(
+                  icon: Icons.open_in_new,
+                  label: l.pairingOpenBrowser,
+                  onPressed: () => launchUrl(
+                    Uri.parse(uri),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         const SizedBox(width: 24),
         Column(
@@ -596,7 +641,7 @@ class _DevicePairingWide extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              AppLocalizations.of(context).pairingScanQr,
+              l.pairingScanQr,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -604,7 +649,7 @@ class _DevicePairingWide extends StatelessWidget {
             const SizedBox(height: 12),
             AppButton(
               autofocus: true,
-              label: AppLocalizations.of(context).cancel,
+              label: l.cancel,
               onPressed: onCancel,
             ),
           ],
@@ -619,11 +664,13 @@ class _DevicePairingNarrow extends StatelessWidget {
     required this.uri,
     required this.userCode,
     required this.onCancel,
+    this.linksAreTappable = true,
   });
 
   final String uri;
   final String userCode;
   final VoidCallback onCancel;
+  final bool linksAreTappable;
 
   @override
   Widget build(BuildContext context) {
@@ -633,10 +680,10 @@ class _DevicePairingNarrow extends StatelessWidget {
         _DevicePairingInstructions(
           uri: uri,
           userCode: userCode,
-          uriTappable: true,
+          uriTappable: linksAreTappable,
         ),
         const SizedBox(height: 20),
-        if (uri.isNotEmpty)
+        if (linksAreTappable && uri.isNotEmpty)
           SizedBox(
             width: double.infinity,
             child: AppButton(

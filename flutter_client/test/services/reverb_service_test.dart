@@ -268,6 +268,64 @@ void main() {
       });
     },
   );
+
+  test('device.deregister invokes the callback with the device id', () async {
+    final sockets = <_ControlledWebSocket>[];
+    final service = ReverbService(
+      notificationApi: _FakeNotificationApi(),
+      channelFactory: (_) {
+        final socket = _ControlledWebSocket();
+        sockets.add(socket);
+        return socket;
+      },
+    );
+    addTearDown(service.disconnect);
+
+    String? deregisteredId;
+    await service.connect(
+      session: _session('tv.playlist.uuid-123'),
+      credentials: _credentials('user'),
+      onNotification: (_) {},
+      onDeviceDeregister: (id) => deregisteredId = id,
+    );
+    sockets.single.addConnectionEstablished('socket-a');
+    await Future<void>.delayed(Duration.zero);
+    sockets.single.addSubscriptionSucceeded();
+    await Future<void>.delayed(Duration.zero);
+
+    sockets.single.addEvent('device.deregister', {'device_id': 'device-abc'});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(deregisteredId, 'device-abc');
+  });
+
+  test('device.deregister before subscription is ignored', () async {
+    final sockets = <_ControlledWebSocket>[];
+    final service = ReverbService(
+      notificationApi: _FakeNotificationApi(),
+      channelFactory: (_) {
+        final socket = _ControlledWebSocket();
+        sockets.add(socket);
+        return socket;
+      },
+    );
+    addTearDown(service.disconnect);
+
+    var called = false;
+    await service.connect(
+      session: _session('tv.playlist.uuid-123'),
+      credentials: _credentials('user'),
+      onNotification: (_) {},
+      onDeviceDeregister: (_) => called = true,
+    );
+    sockets.single.addConnectionEstablished('socket-a');
+    await Future<void>.delayed(Duration.zero);
+
+    sockets.single.addEvent('device.deregister', {'device_id': 'device-abc'});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(called, isFalse);
+  });
 }
 
 const _reverb = ReverbConfig(
@@ -354,6 +412,10 @@ class _ControlledWebSocket implements WebSocketChannel {
         'data': <String, Object?>{},
       }),
     );
+  }
+
+  void addEvent(String event, Map<String, Object?> data) {
+    _incoming.add(jsonEncode(<String, Object?>{'event': event, 'data': data}));
   }
 
   @override

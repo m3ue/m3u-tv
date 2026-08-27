@@ -1973,6 +1973,54 @@ void main() {
       ]);
     });
   });
+
+  group('remote device revocation', () {
+    test(
+      'a device_revoked notifications response signs the app out',
+      () async {
+        final fixture = _Fixture(
+          notificationApi: _RevokedTvNotificationService(),
+          reverbService: _RecordingReverbService(),
+        );
+        addTearDown(fixture.controller.dispose);
+
+        expect(
+          await fixture.controller.connectXtream(_firstCredentials),
+          isTrue,
+        );
+
+        // The revoked flag is handled on the (unawaited) notifications
+        // reconcile kicked off by connectXtream.
+        await fixture.controller.reconcileNotifications();
+        await pumpEventQueue();
+
+        expect(fixture.auth.credentials, isNull);
+      },
+    );
+  });
+}
+
+class _RevokedTvNotificationService extends TvNotificationService {
+  @override
+  Future<(TvPlaylistSession, List<TvNotificationItem>)> fetchUnread(
+    UserCredentials creds, {
+    List<String>? channels,
+  }) async => (
+    const TvPlaylistSession(
+      notifiableId: 1,
+      notifiableType: 'playlist',
+      isAdmin: false,
+      channelName: 'private-tv.playlist.fixture',
+      reverb: ReverbConfig(
+        host: 'fixture.invalid',
+        port: 443,
+        scheme: 'wss',
+        appKey: 'fixture-key',
+      ),
+      deviceRevoked: true,
+    ),
+    const <TvNotificationItem>[],
+  );
 }
 
 const _firstCredentials = UserCredentials(
@@ -2098,6 +2146,8 @@ class _FakePushNotificationService extends PushNotificationService {
     UserCredentials creds, {
     required String token,
     required String platform,
+    String? deviceId,
+    String? deviceName,
   }) async {
     events.add('register:${creds.username}:$token');
   }
@@ -2446,6 +2496,7 @@ class _RecordingReverbService extends ReverbService {
     void Function(DvrRecording)? onDvrStatus,
     void Function(MediaRequestSummary)? onRequestStatus,
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function(String)? onDeviceDeregister,
     void Function()? onConnected,
   }) async {
     connectedUsers.add(credentials.username);

@@ -539,7 +539,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pairingPendingGoTo => '在您的手机或电脑上，访问：';
 
   @override
-  String get pairingPendingEnterCode => '然后输入此代码：';
+  String get pairingPendingEnterCode => '配对代码：';
 
   @override
   String get pairingPendingWaiting => '等待批准…';

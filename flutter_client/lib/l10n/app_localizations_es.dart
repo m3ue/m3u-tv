@@ -561,7 +561,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pairingPendingGoTo => 'En tu teléfono u ordenador, ve a:';
 
   @override
-  String get pairingPendingEnterCode => 'Luego ingresa este código:';
+  String get pairingPendingEnterCode => 'Código de emparejamiento:';
 
   @override
   String get pairingPendingWaiting => 'Esperando aprobación…';

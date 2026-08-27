@@ -556,7 +556,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairingPendingGoTo => 'On your phone or computer, go to:';
 
   @override
-  String get pairingPendingEnterCode => 'Then enter this code:';
+  String get pairingPendingEnterCode => 'Pairing code:';
 
   @override
   String get pairingPendingWaiting => 'Waiting for approval…';

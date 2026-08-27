@@ -230,7 +230,7 @@
   "pairingScanQr": "扫描以在手机上打开配对页面",
   "pairingOpenBrowser": "在浏览器中打开",
   "pairingPendingGoTo": "在您的手机或电脑上，访问：",
-  "pairingPendingEnterCode": "然后输入此代码：",
+  "pairingPendingEnterCode": "配对代码：",
   "pairingPendingWaiting": "等待批准…",
   "settingsContentCache": "内容缓存",
   "settingsCacheSubtitle": "缓存内容即时加载，数据在后台自动刷新。",

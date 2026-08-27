@@ -562,7 +562,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Sur votre téléphone ou ordinateur, allez sur :';
 
   @override
-  String get pairingPendingEnterCode => 'Puis entrez ce code :';
+  String get pairingPendingEnterCode => 'Code d\'appairage :';
 
   @override
   String get pairingPendingWaiting => 'En attente d\'approbation…';

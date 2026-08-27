@@ -230,7 +230,7 @@
   "pairingScanQr": "Scanne, um die Kopplungsseite auf deinem Handy zu öffnen",
   "pairingOpenBrowser": "Im Browser öffnen",
   "pairingPendingGoTo": "Gehe auf deinem Telefon oder Computer zu:",
-  "pairingPendingEnterCode": "Gib dann diesen Code ein:",
+  "pairingPendingEnterCode": "Kopplungscode:",
   "pairingPendingWaiting": "Warte auf Bestätigung…",
   "settingsContentCache": "Inhaltscache",
   "settingsCacheSubtitle": "Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.",

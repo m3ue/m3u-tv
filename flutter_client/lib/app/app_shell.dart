@@ -1292,6 +1292,7 @@ class AppShellState extends ConsumerState<AppShell>
         listenable: _appState,
         builder: (_, _) => SettingsScreen(
           authNotifier: _appState.authNotifier,
+          deviceType: widget.deviceType,
           activeViewer: _appState.activeViewer,
           viewers: _appState.viewers,
           sourceLabel: _appState.sourceLabel,

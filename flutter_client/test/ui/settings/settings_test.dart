@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/backend_capabilities.dart';
 import 'package:m3u_tv/features/settings/connection_form.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
@@ -808,6 +809,55 @@ void main() {
       pairingService.dispose();
     });
 
+    Future<DevicePairingService> startedPairing(
+      WidgetTester tester,
+      DeviceType deviceType,
+    ) async {
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(transport: _FakeTransport({}).call),
+        secureStorage: InMemorySecureStorage(),
+      );
+      final transport = _FakeDevicePairingTransport([
+        const DevicePairingResponse(200, <String, Object?>{
+          'device_code': 'DEVICE-CODE',
+          'user_code': 'ABCD-1234',
+          'verification_uri': 'http://x.com/pdt?code=ABCD-1234',
+          'interval': 3600,
+          'expires_in': 600,
+        }),
+      ]);
+      final pairingService = DevicePairingService(transport: transport.call);
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          devicePairingService: pairingService,
+          deviceType: deviceType,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'x.com');
+      await tester.tap(find.text('Pair with code'));
+      await tester.pump();
+      await tester.pump();
+      return pairingService;
+    }
+
+    testWidgets('pairing URL is launchable on non-TV devices', (tester) async {
+      final pairingService = await startedPairing(tester, DeviceType.desktop);
+
+      expect(find.text('Open in browser'), findsOneWidget);
+
+      pairingService.dispose();
+    });
+
+    testWidgets('pairing URL stays plain text on TV', (tester) async {
+      final pairingService = await startedPairing(tester, DeviceType.tv);
+
+      expect(find.text('Open in browser'), findsNothing);
+
+      pairingService.dispose();
+    });
+
     testWidgets('connects automatically once pairing is approved', (
       tester,
     ) async {
@@ -1059,6 +1109,7 @@ Widget _settingsApp(
   VoidCallback? onClearCache,
   VoidCallback? onDisconnect,
   DevicePairingService? devicePairingService,
+  DeviceType? deviceType,
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
@@ -1069,6 +1120,7 @@ Widget _settingsApp(
         authNotifier: notifier,
         traktService: TraktService(storage: InMemorySecureStorage()),
         devicePairingService: devicePairingService,
+        deviceType: deviceType,
         activeViewer: activeViewer,
         sourceError: sourceError,
         isConfiguredOverride: isConfiguredOverride,

@@ -1115,7 +1115,7 @@ abstract class AppLocalizations {
   /// No description provided for @pairingPendingEnterCode.
   ///
   /// In en, this message translates to:
-  /// **'Then enter this code:'**
+  /// **'Pairing code:'**
   String get pairingPendingEnterCode;
 
   /// No description provided for @pairingPendingWaiting.

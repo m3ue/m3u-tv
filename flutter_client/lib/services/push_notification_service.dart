@@ -153,12 +153,20 @@ class PushNotificationService {
     UserCredentials creds, {
     required String token,
     required String platform,
+    String? deviceId,
+    String? deviceName,
   }) async {
     final base = _baseUri(creds.server);
     final u = Uri.encodeComponent(creds.username);
     final p = Uri.encodeComponent(creds.password);
     final uri = base.replace(path: '${base.path}/api/tv/$u/$p/push/subscribe');
-    await _post(uri, {'token': token, 'platform': platform});
+    await _post(uri, {
+      'token': token,
+      'platform': platform,
+      if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+      if (deviceName != null && deviceName.isNotEmpty)
+        'device_name': deviceName,
+    });
   }
 
   Future<void> unregisterToken(

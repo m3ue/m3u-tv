@@ -560,7 +560,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pairingPendingGoTo => 'Gehe auf deinem Telefon oder Computer zu:';
 
   @override
-  String get pairingPendingEnterCode => 'Gib dann diesen Code ein:';
+  String get pairingPendingEnterCode => 'Kopplungscode:';
 
   @override
   String get pairingPendingWaiting => 'Warte auf Bestätigung…';

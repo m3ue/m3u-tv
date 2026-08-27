@@ -230,7 +230,7 @@
   "pairingScanQr": "Scannez pour ouvrir la page de couplage sur votre téléphone",
   "pairingOpenBrowser": "Ouvrir dans le navigateur",
   "pairingPendingGoTo": "Sur votre téléphone ou ordinateur, allez sur :",
-  "pairingPendingEnterCode": "Puis entrez ce code :",
+  "pairingPendingEnterCode": "Code d'appairage :",
   "pairingPendingWaiting": "En attente d'approbation…",
   "settingsContentCache": "Cache de contenu",
   "settingsCacheSubtitle": "Le contenu en cache se charge instantanément. Les données se rafraîchissent automatiquement en arrière-plan.",

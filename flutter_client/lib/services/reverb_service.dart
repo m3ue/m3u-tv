@@ -33,6 +33,7 @@ class ReverbService {
   void Function(DvrRecording)? _onDvrStatus;
   void Function(MediaRequestSummary)? _onRequestStatus;
   void Function(FavoriteToggleEvent)? _onFavoriteToggled;
+  void Function(String deviceId)? _onDeviceDeregister;
   void Function()? _onConnected;
 
   WebSocketChannel? _ws;
@@ -63,6 +64,7 @@ class ReverbService {
     void Function(DvrRecording)? onDvrStatus,
     void Function(MediaRequestSummary)? onRequestStatus,
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function(String deviceId)? onDeviceDeregister,
     void Function()? onConnected,
   }) async {
     final connectionGeneration = _connectionGeneration.advance();
@@ -84,6 +86,7 @@ class ReverbService {
     _onDvrStatus = onDvrStatus;
     _onRequestStatus = onRequestStatus;
     _onFavoriteToggled = onFavoriteToggled;
+    _onDeviceDeregister = onDeviceDeregister;
     _onConnected = onConnected;
     _disposed = false;
     _paused = false;
@@ -248,6 +251,13 @@ class ReverbService {
         final favoriteEvent = FavoriteToggleEvent.tryFromJson(payload);
         if (favoriteEvent == null) return;
         _onFavoriteToggled?.call(favoriteEvent);
+
+      case 'device.deregister':
+        if (!_connected) return;
+        final payload = _parseData(msg['data']);
+        final deviceId = '${payload['device_id'] ?? ''}';
+        if (deviceId.isEmpty) return;
+        _onDeviceDeregister?.call(deviceId);
     }
   }
 

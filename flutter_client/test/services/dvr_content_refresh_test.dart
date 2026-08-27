@@ -1230,6 +1230,7 @@ class _RecordingReverbService extends ReverbService {
     void Function(DvrRecording)? onDvrStatus,
     void Function(MediaRequestSummary)? onRequestStatus,
     void Function(FavoriteToggleEvent)? onFavoriteToggled,
+    void Function(String)? onDeviceDeregister,
     void Function()? onConnected,
   }) async {
     _onDvrStatus = onDvrStatus;

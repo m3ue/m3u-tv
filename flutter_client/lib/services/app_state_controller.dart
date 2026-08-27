@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
@@ -84,6 +85,7 @@ class AppStateController extends ChangeNotifier {
     ComskipSettings? comskipSettings,
     PushNotificationService? pushNotificationService,
     DevicePairingService? devicePairingService,
+    DeviceIdentityService? deviceIdentityService,
     ViewSettingsService? viewSettingsService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
@@ -105,6 +107,9 @@ class AppStateController extends ChangeNotifier {
         xtreamService ??
         authNotifier?.xtreamService ??
         XtreamService(cache: resolvedCacheService);
+    final resolvedDeviceIdentityService =
+        deviceIdentityService ??
+        DeviceIdentityService(storage: resolvedSecureStorage);
     return AppStateController._(
       authNotifier:
           authNotifier ??
@@ -129,7 +134,10 @@ class AppStateController extends ChangeNotifier {
       epgService: epgService ?? EpgService(),
       traktService: TraktService(storage: resolvedSecureStorage),
       devicePairingService: devicePairingService ?? DevicePairingService(),
-      tvNotificationService: tvNotificationService ?? TvNotificationService(),
+      deviceIdentityService: resolvedDeviceIdentityService,
+      tvNotificationService:
+          tvNotificationService ??
+          TvNotificationService(deviceIdentity: resolvedDeviceIdentityService),
       notificationStore:
           tvNotificationStore ?? TvNotificationStore(store: store),
       reverbService: reverbService ?? ReverbService(),
@@ -160,6 +168,7 @@ class AppStateController extends ChangeNotifier {
     required this.epgService,
     required this.traktService,
     required this.devicePairingService,
+    required this.deviceIdentityService,
     required this._tvNotificationService,
     required this.notificationStore,
     required this._reverbService,
@@ -201,6 +210,7 @@ class AppStateController extends ChangeNotifier {
 
   final AuthNotifier authNotifier;
   final XtreamService xtreamService;
+  final DeviceIdentityService deviceIdentityService;
 
   /// The app-state file (credentials, settings, favorites, resume progress)
   /// and the content-cache file. Equal when a test forces a single store; a
@@ -829,6 +839,7 @@ class AppStateController extends ChangeNotifier {
         onRequestStatus: (request) =>
             _onRequestStatusPush(request, ownsRequests),
         onFavoriteToggled: _onFavoriteTogglePush,
+        onDeviceDeregister: _onDeviceDeregisterPush,
         // Reconciles any status pushes missed while disconnected (app
         // suspended, network drop) — cheap, status-filtered fetch, not a poll.
         onConnected: () => unawaited(
@@ -860,6 +871,12 @@ class AppStateController extends ChangeNotifier {
       credentials,
     );
     if (!ownsNotification()) return null;
+    if (session.deviceRevoked) {
+      // An admin revoked this install in the editor. Drop to the pairing
+      // screen; the credential itself still works so the user can re-pair.
+      unawaited(disconnect());
+      return null;
+    }
     if (!notificationStore.selectOwner(
       server: credentials.server,
       accountPrincipal: accountPrincipal,
@@ -1014,10 +1031,13 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     try {
+      final identity = await _bestEffortIdentity();
       await _pushNotificationService.registerToken(
         credentials,
         token: token,
         platform: Platform.isIOS ? 'ios' : 'android',
+        deviceId: identity?.deviceId,
+        deviceName: identity?.deviceName,
       );
       _registeredPushCredentials = credentials;
       _registeredPushToken = token;
@@ -1560,6 +1580,26 @@ class AppStateController extends ChangeNotifier {
         shouldCommit: ownsMutation,
       ),
     );
+  }
+
+  /// Handles a `device.deregister` push. The event is broadcast to the whole
+  /// playlist channel, so every device sees it — only the one whose id matches
+  /// signs out and returns to the pairing screen.
+  void _onDeviceDeregisterPush(String deviceId) {
+    unawaited(() async {
+      final myId = await _bestEffortIdentity().then((i) => i?.deviceId);
+      if (myId != null && myId == deviceId) {
+        await disconnect();
+      }
+    }());
+  }
+
+  Future<DeviceIdentity?> _bestEffortIdentity() async {
+    try {
+      return await deviceIdentityService.resolve();
+    } on Object catch (_) {
+      return null;
+    }
   }
 
   AIOStreamsFavoriteItem? _aioItemFromEvent(FavoriteToggleEvent event) {
