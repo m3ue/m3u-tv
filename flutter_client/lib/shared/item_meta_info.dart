@@ -24,6 +24,7 @@ class ItemMetaInfo extends StatelessWidget {
     required this.onPlay,
     this.chips = const [],
     this.fullWidthButton = false,
+    this.hidePrimaryAction = false,
     this.progressValue,
     this.onStartOver,
     this.isLoading = false,
@@ -42,6 +43,11 @@ class ItemMetaInfo extends StatelessWidget {
   final String buttonLabel;
   final VoidCallback? onPlay;
   final bool fullWidthButton;
+
+  /// Suppresses the built-in play/resume + start-over button row. The caller
+  /// renders those actions itself elsewhere (the series detail lays them on
+  /// the same line as its season picker).
+  final bool hidePrimaryAction;
 
   /// Watched fraction (0-1). When set, renders inside the primary button as
   /// an inline progress track next to [buttonLabel] instead of a plain
@@ -113,9 +119,12 @@ class ItemMetaInfo extends StatelessWidget {
             runSpacing: MediaBrowsingMetrics.chipGap,
             children: chips.map((label) => MetadataChip(label: label)).toList(),
           ),
-        const SizedBox(height: MediaBrowsingMetrics.contentPadding),
-        buttonRow,
-        const SizedBox(height: MediaBrowsingMetrics.pagePadding),
+        if (!hidePrimaryAction) ...[
+          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
+          buttonRow,
+          const SizedBox(height: MediaBrowsingMetrics.pagePadding),
+        ] else
+          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
         if (isLoading) ...[
           const LinearProgressIndicator(),
           const SizedBox(height: MediaBrowsingMetrics.contentPadding),

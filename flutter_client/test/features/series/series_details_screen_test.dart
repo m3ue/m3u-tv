@@ -5,6 +5,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 Episode _ep(int season, int number) => Episode(
   id: '${season}0$number',
@@ -119,6 +120,56 @@ void main() {
     // Runtime shows on the card overlay and as an average chip in the meta.
     expect(find.text('45m'), findsOneWidget);
     expect(find.text('~45m'), findsOneWidget);
+  });
+
+  testWidgets('poster falls through season -> series -> backdrop', (
+    tester,
+  ) async {
+    const info = SeriesInfo(
+      series: Series(
+        id: 7,
+        name: 'Fixture Show',
+        coverUrl: 'http://example.com/series-cover.jpg',
+        backdropUrl: 'http://example.com/backdrop.jpg',
+      ),
+      seasons: [Season(number: 1, name: 'Season 1')], // no cover
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Pilot',
+            containerExtension: 'mp4',
+            seasonNumber: 1,
+            streamUrl: 'http://example.com/s1/e1.mp4',
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    final poster = tester.widget<ResilientMediaImage>(
+      find.byWidgetPredicate(
+        (w) => w is ResilientMediaImage && w.borderRadius != 0,
+      ),
+    );
+    expect(poster.imageUrl, 'http://example.com/series-cover.jpg');
+    expect(poster.fallbackImageUrls, ['http://example.com/backdrop.jpg']);
+
+    // Flush the palette-generator timeout timer the backdrop kicks off.
+    await tester.pump(const Duration(seconds: 16));
+  });
+
+  testWidgets('play button takes focus once the series loads', (tester) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'seriesPlayButton',
+    );
   });
 
   testWidgets('defaults to season 1 and its overview when nothing is watched', (

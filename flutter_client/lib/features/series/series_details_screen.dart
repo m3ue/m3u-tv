@@ -89,11 +89,24 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           ),
         );
         unawaited(_loadSeriesProgress());
+        // The body (and its play button) only mounts once this resolves, by
+        // which point the scaffold back button has already taken default
+        // focus - move it to the play/resume action instead.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _playFocusNode.requestFocus();
+        });
         return info;
       });
   int? _selectedSeason;
   SeriesInfo? _seriesInfo;
   Color? _dominantColor;
+  final FocusNode _playFocusNode = FocusNode(debugLabel: 'seriesPlayButton');
+
+  @override
+  void dispose() {
+    _playFocusNode.dispose();
+    super.dispose();
+  }
 
   /// Authoritative per-series episode progress from `get_series_progress`.
   /// Null until the first fetch resolves (or forever, when there is no
@@ -192,6 +205,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             progressList: _effectiveProgress,
             dominantColor: _dominantColor,
             canMarkWatched: widget.onMarkEpisodeWatched != null,
+            playFocusNode: _playFocusNode,
             onSeasonSelected: (season) =>
                 setState(() => _selectedSeason = season),
             onEpisodeSelected: _playEpisode,
@@ -298,6 +312,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     required this.progressList,
     required this.dominantColor,
     required this.canMarkWatched,
+    required this.playFocusNode,
     required this.onSeasonSelected,
     required this.onEpisodeSelected,
     required this.onMarkEpisode,
@@ -309,6 +324,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final List<Progress> progressList;
   final Color? dominantColor;
   final bool canMarkWatched;
+  final FocusNode playFocusNode;
   final ValueChanged<int> onSeasonSelected;
   final void Function(Episode episode, {double? startPosition})
   onEpisodeSelected;
@@ -522,17 +538,14 @@ class _SeriesDetailsBody extends StatelessWidget {
     final seasonNumber = _resolvedSeason;
     final episodes = _episodes(seasonNumber);
     final backdrop = info.series.backdropUrl;
-    // Season poster when the provider gives one, else the series poster, else
-    // the backdrop (better than a bare placeholder icon).
-    final poster =
-        [
-          season?.coverUrl,
-          info.series.coverUrl,
-          backdrop,
-        ].firstWhere(
-          (url) => url != null && url.trim().isNotEmpty,
-          orElse: () => null,
-        );
+    // Season poster first, then the series poster, then the backdrop. Passed
+    // as a chain so a season cover that 404s actually falls through at load
+    // time (not just when it's null) rather than sticking on a placeholder.
+    final posterChain = <String>[
+      ?_trimmedOrNull(season?.coverUrl),
+      ?_trimmedOrNull(info.series.coverUrl),
+      ?_trimmedOrNull(backdrop),
+    ];
     final description = (season?.overview?.trim().isNotEmpty ?? false)
         ? season!.overview!.trim()
         : (info.series.plot ?? '');
@@ -568,7 +581,8 @@ class _SeriesDetailsBody extends StatelessWidget {
                 child: AspectRatio(
                   aspectRatio: 0.68,
                   child: ResilientMediaImage(
-                    imageUrl: poster,
+                    imageUrl: posterChain.isEmpty ? null : posterChain.first,
+                    fallbackImageUrls: posterChain.skip(1).toList(),
                     fallbackIcon: Icons.tv,
                     borderRadius: MediaBrowsingMetrics.cardRadius,
                     fallbackTitle: info.series.name,
@@ -587,13 +601,23 @@ class _SeriesDetailsBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _SeasonPicker(
-            seasons: info.seasons,
-            selectedSeason: seasonNumber,
-            canMarkWatched: canMarkWatched && episodes.isNotEmpty,
-            onSeasonSelected: onSeasonSelected,
-            onMarkSeason: (watched) =>
-                onMarkSeason(_episodes(seasonNumber), watched: watched),
+          // Play / Start-from-beginning sit on the same line as the season
+          // picker (wrapping to a second run on a phone).
+          Wrap(
+            spacing: MediaBrowsingMetrics.itemGap,
+            runSpacing: MediaBrowsingMetrics.chipGap,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ..._primaryActions(context, target),
+              _SeasonPicker(
+                seasons: info.seasons,
+                selectedSeason: seasonNumber,
+                canMarkWatched: canMarkWatched && episodes.isNotEmpty,
+                onSeasonSelected: onSeasonSelected,
+                onMarkSeason: (watched) =>
+                    onMarkSeason(_episodes(seasonNumber), watched: watched),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -679,42 +703,67 @@ class _SeriesDetailsBody extends StatelessWidget {
       ?avgRuntime,
     ];
 
+    // The play / start-over buttons are rendered separately (on the season
+    // picker's line), so this only carries title + chips + synopsis.
+    return ItemMetaInfo(
+      name: info.series.name,
+      chips: chips,
+      hidePrimaryAction: true,
+      buttonLabel: '',
+      onPlay: null,
+      plot: description,
+      plotMaxWidth: plotMaxWidth,
+      plotMaxLines: 4,
+    );
+  }
+
+  /// The play/resume + start-from-beginning buttons, laid out on the season
+  /// picker's line. Mirrors what `ItemMetaInfo` renders on the VOD screen.
+  List<Widget> _primaryActions(
+    BuildContext context,
+    ({Episode episode, Progress? progress})? target,
+  ) {
+    final l = AppLocalizations.of(context);
     if (target == null) {
-      return ItemMetaInfo(
-        name: info.series.name,
-        chips: chips,
-        buttonLabel: l.seriesPlayEpisode(1, 1),
-        onPlay: null,
-        plot: description,
-        plotMaxWidth: plotMaxWidth,
-        plotMaxLines: 4,
-      );
+      return [
+        AppButton(
+          focusNode: playFocusNode,
+          variant: AppButtonVariant.primaryInverted,
+          icon: Icons.play_arrow,
+          label: l.seriesPlayEpisode(1, 1),
+          onPressed: null,
+        ),
+      ];
     }
 
     final progress = target.progress;
     final progressValue = _progressFraction(progress);
     final s = target.episode.seasonNumber;
     final e = target.episode.episodeNumber;
-    final buttonLabel = progressValue != null
+    final label = progressValue != null
         ? (_timeLeftLabel(context, progress) ?? l.seriesResumeEpisode(s, e))
         : l.seriesPlayEpisode(s, e);
 
-    return ItemMetaInfo(
-      name: info.series.name,
-      chips: chips,
-      buttonLabel: buttonLabel,
-      onPlay: () => onEpisodeSelected(
-        target.episode,
-        startPosition: progress?.positionSeconds.toDouble(),
+    return [
+      AppButton(
+        focusNode: playFocusNode,
+        autofocus: true,
+        variant: AppButtonVariant.primaryInverted,
+        icon: Icons.play_arrow,
+        label: label,
+        inlineProgressValue: progressValue,
+        onPressed: () => onEpisodeSelected(
+          target.episode,
+          startPosition: progress?.positionSeconds.toDouble(),
+        ),
       ),
-      onStartOver: progressValue == null
-          ? null
-          : () => onEpisodeSelected(target.episode, startPosition: 0),
-      progressValue: progressValue,
-      plot: description,
-      plotMaxWidth: plotMaxWidth,
-      plotMaxLines: 4,
-    );
+      if (progressValue != null)
+        AppButton(
+          icon: Icons.replay,
+          label: l.playerStartFromBeginning,
+          onPressed: () => onEpisodeSelected(target.episode, startPosition: 0),
+        ),
+    ];
   }
 
   /// Mean episode runtime across the whole series, rendered as a "~45m" chip.
@@ -736,6 +785,11 @@ class _SeriesDetailsBody extends StatelessWidget {
     }
     return '~${avg}m';
   }
+}
+
+String? _trimmedOrNull(String? value) {
+  final trimmed = value?.trim();
+  return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
 }
 
 /// Parses the loose runtime strings the editor emits ("45m", "1h 2m",
@@ -883,16 +937,15 @@ class _SeasonPicker extends StatelessWidget {
     if (seasons.isEmpty) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
     final current = selectedSeason;
-    return SizedBox(
-      height: 44,
-      child: AppButton(
-        label: current != null ? l.homeSeason(current) : l.seriesSeasons,
-        icon: Icons.arrow_drop_down,
-        onPressed: () => _showPicker(context),
-        onLongPress: canMarkWatched && current != null
-            ? () => unawaited(_showMarkSeasonSheet(context, current))
-            : null,
-      ),
+    // No size overrides - shares AppButton's default metrics so it lines up
+    // with the play / start-over buttons beside it.
+    return AppButton(
+      label: current != null ? l.homeSeason(current) : l.seriesSeasons,
+      icon: Icons.arrow_drop_down,
+      onPressed: () => _showPicker(context),
+      onLongPress: canMarkWatched && current != null
+          ? () => unawaited(_showMarkSeasonSheet(context, current))
+          : null,
     );
   }
 
@@ -1107,6 +1160,17 @@ class _EpisodeCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final imageHeight = width * 9 / 16;
     final runtime = episode.duration;
+    final titleBase = theme.textTheme.titleSmall;
+    // ~60% larger than the stock card title.
+    final titleStyle = titleBase?.copyWith(
+      fontSize: (titleBase.fontSize ?? 14) * 1.6,
+      height: 1.15,
+      color: Colors.white,
+      fontWeight: FontWeight.w700,
+      shadows: const [
+        Shadow(blurRadius: 4, color: Colors.black87, offset: Offset(0, 1)),
+      ],
+    );
 
     return SizedBox(
       width: width,
@@ -1173,17 +1237,7 @@ class _EpisodeCard extends StatelessWidget {
                           episode.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            shadows: const [
-                              Shadow(
-                                blurRadius: 4,
-                                color: Colors.black87,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
+                          style: titleStyle,
                         ),
                         const SizedBox(height: 4),
                         Wrap(

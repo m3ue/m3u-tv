@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
@@ -360,6 +361,7 @@ class ResilientMediaImage extends StatefulWidget {
   const ResilientMediaImage({
     required this.imageUrl,
     required this.fallbackIcon,
+    this.fallbackImageUrls = const <String>[],
     this.width,
     this.height,
     this.fit = BoxFit.cover,
@@ -371,6 +373,11 @@ class ResilientMediaImage extends StatefulWidget {
   });
 
   final String? imageUrl;
+
+  /// Alternate URLs to try, in order, once [imageUrl] has failed its retries
+  /// (a season poster that 404s falling back to the series poster, then the
+  /// backdrop). Only the icon fallback shows once every URL is exhausted.
+  final List<String> fallbackImageUrls;
   final IconData fallbackIcon;
   final double? width;
   final double? height;
@@ -399,17 +406,55 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
   int _attempt = 0;
   bool _retryScheduled = false;
 
+  /// Index into [_urlChain] currently being displayed.
+  int _urlIndex = 0;
+
+  List<String> get _urlChain => [
+    ?_nonEmpty(widget.imageUrl),
+    ...widget.fallbackImageUrls.map(_nonEmpty).whereType<String>(),
+  ];
+
+  static String? _nonEmpty(String? value) =>
+      (value == null || value.trim().isEmpty) ? null : value;
+
+  String? get _currentUrl {
+    final chain = _urlChain;
+    return _urlIndex < chain.length ? chain[_urlIndex] : null;
+  }
+
   @override
   void didUpdateWidget(covariant ResilientMediaImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        !listEquals(oldWidget.fallbackImageUrls, widget.fallbackImageUrls)) {
       _attempt = 0;
+      _urlIndex = 0;
       _retryScheduled = false;
     }
   }
 
   void _scheduleRetry() {
-    if (_retryScheduled || _attempt >= _maxRetries) return;
+    if (_retryScheduled) return;
+    final hasNextUrl = _urlIndex < _urlChain.length - 1;
+    // Give the last URL the full retry budget (transient-failure recovery);
+    // when a better candidate is waiting, fail over after a single quick retry.
+    final retryBudget = hasNextUrl ? 1 : _maxRetries;
+    if (_attempt >= retryBudget) {
+      if (!hasNextUrl) return;
+      _retryScheduled = true;
+      unawaited(
+        Future.microtask(() {
+          _retryScheduled = false;
+          if (mounted) {
+            setState(() {
+              _urlIndex++;
+              _attempt = 0;
+            });
+          }
+        }),
+      );
+      return;
+    }
     _retryScheduled = true;
     final delay = Duration(milliseconds: 500 * (1 << _attempt));
     _attempt++;
@@ -426,7 +471,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
       icon: widget.fallbackIcon,
       title: widget.fallbackTitle,
     );
-    final url = widget.imageUrl;
+    final url = _currentUrl;
     // Oversample beyond raw pixel density so detailed logos (thin
     // text/wordmarks) survive downscaling instead of being crushed to a
     // blocky, aliased decode that no display-time FilterQuality can recover.
