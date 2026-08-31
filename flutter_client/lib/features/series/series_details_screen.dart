@@ -146,10 +146,24 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           palette.darkMutedColor ??
           palette.darkVibrantColor ??
           palette.dominantColor;
-      if (swatch != null) setState(() => _dominantColor = swatch.color);
+      if (swatch != null) {
+        setState(() => _dominantColor = _deepBackdropTone(swatch.color));
+      }
     } on Object catch (_) {
       // Fall back to the theme surface.
     }
+  }
+
+  /// Forces an extracted swatch down to a deep tone: light-backdrop shows
+  /// (e.g. a near-white kitchen still) otherwise bleed a pale colour behind
+  /// the page and make the light body text unreadable. Hue is kept so the
+  /// Nuvio-style colour wash survives.
+  Color _deepBackdropTone(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withLightness(hsl.lightness.clamp(0.06, 0.20))
+        .withSaturation((hsl.saturation * 0.85).clamp(0.0, 0.55))
+        .toColor();
   }
 
   @override
@@ -508,15 +522,20 @@ class _SeriesDetailsBody extends StatelessWidget {
     final seasonNumber = _resolvedSeason;
     final episodes = _episodes(seasonNumber);
     final backdrop = info.series.backdropUrl;
-    final poster = (season?.coverUrl?.isNotEmpty ?? false)
-        ? season!.coverUrl
-        : info.series.coverUrl;
-    var description = (season?.overview?.trim().isNotEmpty ?? false)
+    // Season poster when the provider gives one, else the series poster, else
+    // the backdrop (better than a bare placeholder icon).
+    final poster =
+        [
+          season?.coverUrl,
+          info.series.coverUrl,
+          backdrop,
+        ].firstWhere(
+          (url) => url != null && url.trim().isNotEmpty,
+          orElse: () => null,
+        );
+    final description = (season?.overview?.trim().isNotEmpty ?? false)
         ? season!.overview!.trim()
         : (info.series.plot ?? '');
-    if (description.length > 260) {
-      description = '${description.substring(0, 257)}...';
-    }
     final target = _primaryTarget;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
@@ -603,17 +622,20 @@ class _SeriesDetailsBody extends StatelessWidget {
       children: [
         ColoredBox(color: bg),
         if (backdrop != null) CachedBackdropImage(backdrop),
+        // Scrim over the backdrop. Kept heavy enough that a bright still
+        // (near-white kitchen shots etc.) still leaves the body text legible,
+        // while the top stays translucent so the art reads through.
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                bg.withValues(alpha: 0.1),
-                bg.withValues(alpha: 0.85),
+                bg.withValues(alpha: 0.35),
+                bg.withValues(alpha: 0.92),
                 bg,
               ],
-              stops: const [0.0, 0.55, 1.0],
+              stops: const [0.0, 0.5, 1.0],
             ),
           ),
         ),
@@ -665,6 +687,7 @@ class _SeriesDetailsBody extends StatelessWidget {
         onPlay: null,
         plot: description,
         plotMaxWidth: plotMaxWidth,
+        plotMaxLines: 4,
       );
     }
 
@@ -690,6 +713,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       progressValue: progressValue,
       plot: description,
       plotMaxWidth: plotMaxWidth,
+      plotMaxLines: 4,
     );
   }
 

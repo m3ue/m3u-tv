@@ -29,6 +29,7 @@ class ItemMetaInfo extends StatelessWidget {
     this.isLoading = false,
     this.plot,
     this.plotMaxWidth,
+    this.plotMaxLines,
     this.credits = const [],
   });
 
@@ -59,6 +60,10 @@ class ItemMetaInfo extends StatelessWidget {
   /// (today's behavior); detail screens on wide layouts pass a value to keep
   /// the text to a readable measure.
   final double? plotMaxWidth;
+
+  /// Caps the synopsis height. Null shows the full text (today's behavior);
+  /// a value clamps it with a trailing ellipsis.
+  final int? plotMaxLines;
   final List<MetaCreditLine> credits;
 
   @override
@@ -122,6 +127,8 @@ class ItemMetaInfo extends StatelessWidget {
             ),
             child: Text(
               plot!,
+              maxLines: plotMaxLines,
+              overflow: plotMaxLines == null ? null : TextOverflow.ellipsis,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
