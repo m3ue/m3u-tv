@@ -1713,7 +1713,9 @@ void main() {
     // The episode strip is bottom-aligned; bring it into view before tapping.
     await tester.ensureVisible(find.textContaining('Pilot').first);
     await _pumpAppFrame(tester);
-    await tester.tap(find.textContaining('Pilot').first);
+    // The title renders over the thumbnail scrim; the card's tap handler still
+    // receives the press at that point.
+    await tester.tap(find.textContaining('Pilot').first, warnIfMissed: false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 

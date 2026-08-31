@@ -28,6 +28,7 @@ class ItemMetaInfo extends StatelessWidget {
     this.onStartOver,
     this.isLoading = false,
     this.plot,
+    this.plotMaxWidth,
     this.credits = const [],
   });
 
@@ -53,6 +54,11 @@ class ItemMetaInfo extends StatelessWidget {
 
   final bool isLoading;
   final String? plot;
+
+  /// Caps the synopsis line length. Null lets it run the full column width
+  /// (today's behavior); detail screens on wide layouts pass a value to keep
+  /// the text to a readable measure.
+  final double? plotMaxWidth;
   final List<MetaCreditLine> credits;
 
   @override
@@ -110,10 +116,15 @@ class ItemMetaInfo extends StatelessWidget {
           const SizedBox(height: MediaBrowsingMetrics.contentPadding),
         ],
         if (hasPlot)
-          Text(
-            plot!,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: plotMaxWidth ?? double.infinity,
+            ),
+            child: Text(
+              plot!,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         if (credits.isNotEmpty) ...[

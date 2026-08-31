@@ -87,6 +87,40 @@ Progress _prog(
 );
 
 void main() {
+  testWidgets('episode cards show plot, formatted date and runtime', (
+    tester,
+  ) async {
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Fixture Show'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Pilot',
+            containerExtension: 'mp4',
+            seasonNumber: 1,
+            plot: 'A drifter arrives in a quiet town.',
+            duration: '45m',
+            rating: 8.1,
+            releaseDate: '2025-10-01',
+            streamUrl: 'http://example.com/s1/e1.mp4',
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    expect(find.text('A drifter arrives in a quiet town.'), findsOneWidget);
+    expect(find.text('Oct 1, 2025'), findsOneWidget);
+    // Runtime shows on the card overlay and as an average chip in the meta.
+    expect(find.text('45m'), findsOneWidget);
+    expect(find.text('~45m'), findsOneWidget);
+  });
+
   testWidgets('defaults to season 1 and its overview when nothing is watched', (
     tester,
   ) async {
@@ -271,7 +305,9 @@ void main() {
     final card = find.textContaining('S1E1 Title', findRichText: true).first;
     await tester.ensureVisible(card);
     await tester.pumpAndSettle();
-    await tester.longPress(card);
+    // The title sits under the thumbnail scrim; the card's DpadInkWell still
+    // receives the press at that point, so the miss warning is expected.
+    await tester.longPress(card, warnIfMissed: false);
     await tester.pumpAndSettle();
 
     // A confirmation modal gates the change.

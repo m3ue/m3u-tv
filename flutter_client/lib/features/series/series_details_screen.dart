@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -11,11 +12,21 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:palette_generator_master/palette_generator_master.dart';
+
+/// Below this window width the series detail lays out for a phone: smaller
+/// poster, full-width description, narrower episode cards.
+const double _kSeriesCompactBreakpoint = 700;
+const double _kEpisodeCardWidthWide = 340;
+const double _kEpisodeCardWidthCompact = 250;
+
+/// Text area under an episode thumbnail (3-line plot + date + padding).
+const double _kEpisodeCardTextHeight = 96;
 
 /// Marks one series episode watched / unwatched for the active viewer.
 /// Structurally matches `ContentActions.onMarkEpisodeWatched`.
@@ -508,6 +519,17 @@ class _SeriesDetailsBody extends StatelessWidget {
     }
     final target = _primaryTarget;
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < _kSeriesCompactBreakpoint;
+    final posterWidth = compact ? 120.0 : 200.0;
+    // Keep the synopsis to a comfortable measure on TV/desktop (Nuvio-style);
+    // let it run full width on a phone.
+    final plotMaxWidth = compact ? double.infinity : screenWidth * 0.6;
+    final cardWidth = compact
+        ? _kEpisodeCardWidthCompact
+        : _kEpisodeCardWidthWide;
+    final stripHeight = cardWidth * 9 / 16 + _kEpisodeCardTextHeight;
+
     // Bottom-aligned over a full-bleed backdrop, mirroring the VOD detail
     // page: poster + meta (with resume progress) on top, season picker, then
     // a horizontal strip of episode thumbnail cards.
@@ -523,7 +545,7 @@ class _SeriesDetailsBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               SizedBox(
-                width: 200,
+                width: posterWidth,
                 child: AspectRatio(
                   aspectRatio: 0.68,
                   child: ResilientMediaImage(
@@ -535,7 +557,14 @@ class _SeriesDetailsBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-              Expanded(child: _seriesMetaInfo(context, target, description)),
+              Expanded(
+                child: _seriesMetaInfo(
+                  context,
+                  target,
+                  description,
+                  plotMaxWidth,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -549,7 +578,7 @@ class _SeriesDetailsBody extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: MediaBrowsingMetrics.landscapeCardHeight + 16,
+            height: stripHeight,
             child: episodes.isEmpty
                 ? const Align(
                     alignment: Alignment.centerLeft,
@@ -560,6 +589,7 @@ class _SeriesDetailsBody extends StatelessWidget {
                     progressList: progressList,
                     autofocusFirst: target == null,
                     canMarkWatched: canMarkWatched,
+                    cardWidth: cardWidth,
                     onEpisodeSelected: onEpisodeSelected,
                     onMarkEpisode: onMarkEpisode,
                   ),
@@ -614,14 +644,17 @@ class _SeriesDetailsBody extends StatelessWidget {
     BuildContext context,
     ({Episode episode, Progress? progress})? target,
     String description,
+    double plotMaxWidth,
   ) {
     final l = AppLocalizations.of(context);
     final seasonCount = info.seasons.isNotEmpty
         ? info.seasons.length
         : info.episodesBySeason.length;
+    final avgRuntime = _averageRuntimeLabel;
     final chips = <String>[
       if (seasonCount > 0) '$seasonCount ${l.seriesSeasons}',
       if (info.series.rating != null) '★ ${info.series.rating}',
+      ?avgRuntime,
     ];
 
     if (target == null) {
@@ -631,6 +664,7 @@ class _SeriesDetailsBody extends StatelessWidget {
         buttonLabel: l.seriesPlayEpisode(1, 1),
         onPlay: null,
         plot: description,
+        plotMaxWidth: plotMaxWidth,
       );
     }
 
@@ -655,7 +689,64 @@ class _SeriesDetailsBody extends StatelessWidget {
           : () => onEpisodeSelected(target.episode, startPosition: 0),
       progressValue: progressValue,
       plot: description,
+      plotMaxWidth: plotMaxWidth,
     );
+  }
+
+  /// Mean episode runtime across the whole series, rendered as a "~45m" chip.
+  /// Null when no episode carries a parseable duration.
+  String? get _averageRuntimeLabel {
+    final minutes = <int>[];
+    for (final list in info.episodesBySeason.values) {
+      for (final episode in list) {
+        final value = _durationTextToMinutes(episode.duration);
+        if (value != null && value > 0) minutes.add(value);
+      }
+    }
+    if (minutes.isEmpty) return null;
+    final avg = (minutes.reduce((a, b) => a + b) / minutes.length).round();
+    if (avg >= 60) {
+      final h = avg ~/ 60;
+      final m = avg % 60;
+      return m == 0 ? '~${h}h' : '~${h}h ${m}m';
+    }
+    return '~${avg}m';
+  }
+}
+
+/// Parses the loose runtime strings the editor emits ("45m", "1h 2m",
+/// "45:00", "2700", "45 min") into whole minutes. Null when nothing usable.
+int? _durationTextToMinutes(String? raw) {
+  if (raw == null) return null;
+  final text = raw.trim().toLowerCase();
+  if (text.isEmpty) return null;
+  final h = RegExp(r'(\d+)\s*h').firstMatch(text);
+  final m = RegExp(r'(\d+)\s*m').firstMatch(text);
+  if (h != null || m != null) {
+    return (int.tryParse(h?.group(1) ?? '0') ?? 0) * 60 +
+        (int.tryParse(m?.group(1) ?? '0') ?? 0);
+  }
+  if (text.contains(':')) {
+    final parts = text.split(':').map(int.tryParse).toList();
+    if (!parts.contains(null)) {
+      final nums = parts.cast<int>();
+      if (nums.length == 3) return nums[0] * 60 + nums[1];
+      if (nums.length == 2) return nums[0];
+    }
+  }
+  return int.tryParse(text); // bare number: assume minutes
+}
+
+/// Formats an episode air date ("2025-10-01") as "Oct 1, 2025". Falls back to
+/// the raw string when it will not parse.
+String? _formatEpisodeDate(String? raw, String localeTag) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final parsed = DateTime.tryParse(raw.trim());
+  if (parsed == null) return raw.trim();
+  try {
+    return DateFormat.yMMMd(localeTag).format(parsed);
+  } on Object catch (_) {
+    return DateFormat.yMMMd().format(parsed);
   }
 }
 
@@ -837,17 +928,17 @@ class _SeasonPicker extends StatelessWidget {
   }
 }
 
-/// Horizontal strip of episode thumbnail cards, styled like the home
-/// "Continue Watching" row: each card carries the SxEy badge and, when the
-/// viewer has partial progress, an inline progress bar + percent. A finished
-/// episode shows a check badge instead. Long-pressing a card toggles its
-/// watched state.
+/// Horizontal strip of episode thumbnail cards: a 16:9 still with the title,
+/// SxEy, rating and runtime overlaid, the plot synopsis below, and a progress
+/// bar / watched check when the viewer has history. Long-pressing a card
+/// toggles its watched state.
 class _EpisodeStrip extends StatefulWidget {
   const _EpisodeStrip({
     required this.episodes,
     required this.progressList,
     required this.onEpisodeSelected,
     required this.onMarkEpisode,
+    required this.cardWidth,
     this.canMarkWatched = false,
     this.autofocusFirst = true,
   });
@@ -857,6 +948,7 @@ class _EpisodeStrip extends StatefulWidget {
   final void Function(Episode episode, {double? startPosition})
   onEpisodeSelected;
   final void Function(Episode episode, {required bool watched}) onMarkEpisode;
+  final double cardWidth;
   final bool canMarkWatched;
   final bool autofocusFirst;
 
@@ -873,7 +965,21 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
     super.dispose();
   }
 
-  MediaPreviewItem _item(Episode episode) {
+  Future<void> _confirmEpisode(
+    Episode episode, {
+    required bool watched,
+  }) async {
+    final choice = await _confirmMarkWatched(
+      context,
+      title: 'S${episode.seasonNumber}E${episode.episodeNumber}',
+      message: episode.title,
+      presetWatched: watched,
+    );
+    if (choice != null) widget.onMarkEpisode(episode, watched: choice);
+  }
+
+  Widget _card(BuildContext context, int index) {
+    final episode = widget.episodes[index];
     final streamId = int.tryParse(episode.id);
     final progress = streamId == null
         ? null
@@ -887,36 +993,21 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
         ? (progress.positionSeconds / progress.durationSeconds!).clamp(0.0, 1.0)
         : null;
 
-    return MediaPreviewItem(
-      title: episode.title,
-      subtitle: episode.releaseDate ?? episode.duration,
-      imageUrl: episode.thumbnailUrl,
-      fallbackIcon: Icons.tv,
-      fallbackTitle: episode.title,
-      overlayLabel: 'S${episode.seasonNumber}E${episode.episodeNumber}',
-      overlayBadges: <String>[
-        if (completed) '✓',
-        if (episode.rating != null) '★ ${episode.rating!.toStringAsFixed(1)}',
-      ],
+    return _EpisodeCard(
+      episode: episode,
+      width: widget.cardWidth,
+      completed: completed,
       progressFraction: fraction,
+      dateLabel: _formatEpisodeDate(
+        episode.releaseDate,
+        Localizations.localeOf(context).toLanguageTag(),
+      ),
+      autofocus: widget.autofocusFirst && index == 0,
       onTap: () => widget.onEpisodeSelected(episode),
       onLongTap: widget.canMarkWatched
           ? () => unawaited(_confirmEpisode(episode, watched: !completed))
           : null,
     );
-  }
-
-  Future<void> _confirmEpisode(
-    Episode episode, {
-    required bool watched,
-  }) async {
-    final choice = await _confirmMarkWatched(
-      context,
-      title: 'S${episode.seasonNumber}E${episode.episodeNumber}',
-      message: episode.title,
-      presetWatched: watched,
-    );
-    if (choice != null) widget.onMarkEpisode(episode, watched: choice);
   }
 
   @override
@@ -933,11 +1024,212 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
           itemCount: widget.episodes.length,
           separatorBuilder: (_, _) =>
               const SizedBox(width: MediaBrowsingMetrics.itemGap),
-          itemBuilder: (context, index) => MediaPreviewCard(
-            item: _item(widget.episodes[index]),
-            landscapeStyle: true,
-            autofocus: widget.autofocusFirst && index == 0,
-          ),
+          itemBuilder: _card,
+        ),
+      ),
+    );
+  }
+}
+
+/// A single episode card: 16:9 still with title + SxEy + rating + runtime
+/// overlaid over a bottom-up scrim, plot synopsis (max 3 lines) and air date
+/// beneath.
+class _EpisodeCard extends StatelessWidget {
+  const _EpisodeCard({
+    required this.episode,
+    required this.width,
+    required this.completed,
+    required this.progressFraction,
+    required this.dateLabel,
+    required this.autofocus,
+    required this.onTap,
+    this.onLongTap,
+  });
+
+  final Episode episode;
+  final double width;
+  final bool completed;
+  final double? progressFraction;
+  final String? dateLabel;
+  final bool autofocus;
+  final VoidCallback onTap;
+  final VoidCallback? onLongTap;
+
+  Widget _pill(BuildContext context, Widget child) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.6),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      child: child,
+    ),
+  );
+
+  Widget _pillText(BuildContext context, String text) => _pill(
+    context,
+    Text(
+      text,
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final imageHeight = width * 9 / 16;
+    final runtime = episode.duration;
+
+    return SizedBox(
+      width: width,
+      child: DpadInkWell(
+        autofocus: autofocus,
+        onTap: onTap,
+        onLongTap: onLongTap,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: width,
+              height: imageHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ResilientMediaImage(
+                    imageUrl: episode.thumbnailUrl,
+                    fallbackIcon: Icons.tv,
+                    width: width,
+                    height: imageHeight,
+                    fallbackTitle: episode.title,
+                    borderRadius: 0,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.transparent,
+                          Color(0xE0000000),
+                        ],
+                        stops: [0.0, 0.35, 1.0],
+                      ),
+                    ),
+                  ),
+                  if (completed)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _pill(
+                        context,
+                        const Icon(
+                          Icons.check,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: progressFraction != null ? 8 : 6,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          episode.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            shadows: const [
+                              Shadow(
+                                blurRadius: 4,
+                                color: Colors.black87,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            _pillText(
+                              context,
+                              'S${episode.seasonNumber}E${episode.episodeNumber}',
+                            ),
+                            if (episode.rating != null)
+                              _pillText(
+                                context,
+                                '★ ${episode.rating!.toStringAsFixed(1)}',
+                              ),
+                            if (runtime != null && runtime.isNotEmpty)
+                              _pillText(context, runtime),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (progressFraction != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: LinearProgressIndicator(
+                        value: progressFraction,
+                        minHeight: 3,
+                        backgroundColor: Colors.white24,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (episode.plot != null && episode.plot!.trim().isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          episode.plot!.trim(),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    if (dateLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        dateLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
