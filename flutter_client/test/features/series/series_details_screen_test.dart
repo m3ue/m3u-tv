@@ -1,0 +1,288 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/series/series_details_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
+
+Episode _ep(int season, int number) => Episode(
+  id: '${season}0$number',
+  episodeNumber: number,
+  title: 'S${season}E$number Title',
+  containerExtension: 'mp4',
+  seasonNumber: season,
+  streamUrl: 'http://example.com/s$season/e$number.mp4',
+);
+
+class _FakeSeriesService extends XtreamService {
+  _FakeSeriesService(this.info, {this.seriesProgress = const []});
+
+  final SeriesInfo info;
+  final List<Progress> seriesProgress;
+
+  @override
+  Future<SeriesInfo> getSeriesInfo(int seriesId) async => info;
+
+  @override
+  Future<List<Progress>> getSeriesProgress(
+    String viewerId,
+    int seriesId,
+  ) async => seriesProgress;
+}
+
+Widget _app(
+  SeriesInfo info, {
+  List<Progress> progressList = const [],
+  List<Progress> seriesProgress = const [],
+  String? viewerId,
+  void Function(PlayerArgs)? onPlay,
+  MarkEpisodeWatched? onMarkEpisodeWatched,
+}) => MaterialApp(
+  theme: ThemeData.dark(useMaterial3: true),
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: SeriesDetailsScreen(
+    seriesId: 7,
+    seriesName: 'Fixture Show',
+    xtreamService: _FakeSeriesService(info, seriesProgress: seriesProgress),
+    viewerId: viewerId,
+    progressList: progressList,
+    onPlay: onPlay,
+    onMarkEpisodeWatched: onMarkEpisodeWatched,
+  ),
+);
+
+SeriesInfo _info() => SeriesInfo(
+  series: const Series(id: 7, name: 'Fixture Show', plot: 'Series-level plot'),
+  seasons: const [
+    Season(number: 1, name: 'Season 1', overview: 'First season synopsis'),
+    Season(number: 2, name: 'Season 2'),
+    Season(number: 3, name: 'Season 3', overview: 'Third season synopsis'),
+  ],
+  episodesBySeason: {
+    1: [_ep(1, 1), _ep(1, 2), _ep(1, 3)],
+    2: [_ep(2, 1)],
+    3: [_ep(3, 1), _ep(3, 2)],
+  },
+);
+
+Progress _prog(
+  int streamId, {
+  required int season,
+  required int episode,
+  int position = 0,
+  int duration = 2700,
+  bool completed = false,
+}) => Progress(
+  viewerId: 'v1',
+  contentType: ContentType.episode,
+  streamId: streamId,
+  positionSeconds: position,
+  durationSeconds: duration,
+  completed: completed,
+  seriesId: 7,
+  seasonNumber: season,
+  episodeNumber: episode,
+);
+
+void main() {
+  testWidgets('defaults to season 1 and its overview when nothing is watched', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('S1E1 Title', findRichText: true), findsWidgets);
+    expect(find.textContaining('S3E1 Title', findRichText: true), findsNothing);
+    expect(find.text('First season synopsis'), findsOneWidget);
+    expect(find.text('Series-level plot'), findsNothing);
+    // No watch history -> the lowest season, first episode.
+    expect(find.text('Play S1E1'), findsOneWidget);
+  });
+
+  testWidgets('play button follows the selected season', (tester) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Play S1E1'), findsOneWidget);
+
+    await tester.tap(find.text('Season 1').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Season 3').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Play S3E1'), findsOneWidget);
+    expect(find.text('Play S1E1'), findsNothing);
+  });
+
+  testWidgets('season picker switches the visible episode list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Season 1').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Season 3').last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('S3E1 Title', findRichText: true), findsWidgets);
+    expect(find.textContaining('S1E1 Title', findRichText: true), findsNothing);
+    expect(find.text('Third season synopsis'), findsOneWidget);
+  });
+
+  testWidgets('falls back to series plot when the season has no overview', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Season 1').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Season 2').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Series-level plot'), findsOneWidget);
+  });
+
+  testWidgets('lands on the season of the furthest-along episode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        _info(),
+        viewerId: 'v1',
+        seriesProgress: [
+          _prog(101, season: 1, episode: 1, position: 2700, completed: true),
+          _prog(103, season: 1, episode: 3, position: 2700, completed: true),
+          _prog(301, season: 3, episode: 1, position: 600),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Furthest along is S3E1 (in progress) -> land on Season 3 and resume it.
+    expect(find.text('Season 3'), findsOneWidget);
+    expect(find.text('35 min left'), findsOneWidget);
+    expect(find.text('Start from Beginning'), findsOneWidget);
+    expect(find.textContaining('S3E1 Title', findRichText: true), findsWidgets);
+  });
+
+  SeriesInfo infoS1x4() => SeriesInfo(
+    series: const Series(id: 7, name: 'Fixture Show'),
+    seasons: const [Season(number: 1, name: 'Season 1')],
+    episodesBySeason: {
+      1: [_ep(1, 1), _ep(1, 2), _ep(1, 3), _ep(1, 4)],
+    },
+  );
+
+  testWidgets('play target is the episode after the last finished one', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        infoS1x4(),
+        viewerId: 'v1',
+        seriesProgress: [
+          _prog(101, season: 1, episode: 1, position: 2700, completed: true),
+          _prog(102, season: 1, episode: 2, position: 2700, completed: true),
+          _prog(103, season: 1, episode: 3, position: 2700, completed: true),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Play S1E4'), findsOneWidget);
+  });
+
+  testWidgets('a zeroed (un-marked) row does not advance the play target', (
+    tester,
+  ) async {
+    // E3's row is present but completed:false / position:0 - what "mark
+    // unwatched" leaves behind. The target must stay at S1E3, not jump to E4.
+    await tester.pumpWidget(
+      _app(
+        infoS1x4(),
+        viewerId: 'v1',
+        seriesProgress: [
+          _prog(101, season: 1, episode: 1, position: 2700, completed: true),
+          _prog(102, season: 1, episode: 2, position: 2700, completed: true),
+          _prog(103, season: 1, episode: 3),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Play S1E3'), findsOneWidget);
+    expect(find.text('Play S1E4'), findsNothing);
+  });
+
+  testWidgets('primary button resumes an in-progress episode with time left', (
+    tester,
+  ) async {
+    PlayerArgs? played;
+    await tester.pumpWidget(
+      _app(
+        _info(),
+        onPlay: (args) => played = args,
+        progressList: [_prog(102, season: 1, episode: 2, position: 600)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('35 min left'), findsOneWidget);
+    expect(find.text('Start from Beginning'), findsOneWidget);
+
+    await tester.tap(find.text('35 min left'));
+    await tester.pump();
+    expect(played?.type, 'series');
+    expect(played?.streamId, 102);
+    expect(played?.startPosition, 600);
+
+    await tester.tap(find.text('Start from Beginning'));
+    await tester.pump();
+    expect(played?.startPosition, 0);
+  });
+
+  testWidgets('long-pressing an episode card confirms before marking watched', (
+    tester,
+  ) async {
+    final calls = <({int streamId, bool watched})>[];
+    await tester.pumpWidget(
+      _app(
+        _info(),
+        viewerId: 'v1',
+        onMarkEpisodeWatched:
+            ({
+              required streamId,
+              required seriesId,
+              required seasonNumber,
+              required episodeNumber,
+              durationSeconds,
+              seriesName,
+              episodeTitle,
+              required watched,
+            }) async {
+              calls.add((streamId: streamId, watched: watched));
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.textContaining('S1E1 Title', findRichText: true).first;
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+    await tester.longPress(card);
+    await tester.pumpAndSettle();
+
+    // A confirmation modal gates the change.
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(calls, isEmpty);
+
+    await tester.tap(find.text('Mark watched'));
+    await tester.pumpAndSettle();
+
+    expect(calls, isNotEmpty);
+    expect(calls.first.streamId, 101);
+    expect(calls.first.watched, isTrue);
+  });
+}

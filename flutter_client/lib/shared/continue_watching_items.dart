@@ -6,11 +6,12 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Whether [progress] belongs in "Continue Watching": not live, not
 /// completed, and far enough in to be a meaningful resume point rather than
-/// an accidental few-second tap.
+/// an accidental few-second tap. Synthetic "up next" entries are always
+/// eligible - they have no position of their own.
 bool isContinueWatchingEligible(Progress progress) {
-  return progress.contentType != ContentType.live &&
-      progress.positionSeconds >= 30 &&
-      !progress.completed;
+  if (progress.contentType == ContentType.live) return false;
+  if (progress.upNext) return true;
+  return progress.positionSeconds >= 30 && !progress.completed;
 }
 
 /// Builds the full eligible "Continue Watching" list as [MediaPreviewItem]s.
@@ -133,7 +134,10 @@ MediaPreviewItem? _resumePreviewItem(
             seriesFallback?.coverUrl,
         fallbackIcon: Icons.tv,
         fallbackTitle: displayTitle,
-        progressFraction: fraction,
+        progressFraction: progress.upNext ? null : fraction,
+        upNextLabel: progress.upNext
+            ? AppLocalizations.of(context).homeUpNext
+            : null,
         overlayLabel: progress.seasonNumber != null
             ? 'S${progress.seasonNumber}${progress.episodeNumber != null ? ' E${progress.episodeNumber}' : ''}'
             : null,

@@ -10,7 +10,9 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
+import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
@@ -56,6 +58,7 @@ class PlayerScreen extends StatefulWidget {
     this.onPlaybackFailure,
     this.onNextChannel,
     this.onPreviousChannel,
+    this.onReplaceItem,
     this.onRecordProgram,
     this.onTrackDialogVisibilityChanged,
     this.isRecordingCurrentChannel = false,
@@ -79,6 +82,12 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onPlaybackFailure;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
+
+  /// Swaps the currently playing item for `args` on the same player session
+  /// (no route push/pop). Used by the "up next" overlay to roll straight into
+  /// the next series episode. Mirrors how live TV reuses the player for
+  /// channel skip - see `didUpdateWidget`.
+  final void Function(PlayerArgs args)? onReplaceItem;
   final void Function(EpgProgram program)? onRecordProgram;
   final ValueChanged<bool>? onTrackDialogVisibilityChanged;
   final bool isRecordingCurrentChannel;
@@ -161,6 +170,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   _IntroDbSegmentKind? _introDbPendingSkipKind;
   int? _introDbPendingSkipEndMs;
   Timer? _introDbPendingSkipTimer;
+
+  // ── Up next (series only) ──────────────────────────────────────────────
+  // Populated once per episode from get_series_info: the next episode to roll
+  // into, shown as a bottom-right card from the credits mark (or ~90% in when
+  // TheIntroDB has no credits segment) until the user dismisses it.
+  Series? _upNextSeries;
+  Episode? _nextEpisode;
+  bool _upNextVisible = false;
+  bool _upNextDismissed = false;
 
   /// Whether the skip prompt should be on screen right now: either the
   /// one-time countdown is still running, or the OSD is up and the play-head
@@ -290,6 +308,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _scheduleOverlayHide();
     unawaited(_initComskip(widget.args));
     unawaited(_initIntroDb(widget.args));
+    unawaited(_initUpNext(widget.args));
   }
 
   // Live-TV skip-previous/skip-next replaces `args` on an already-mounted
@@ -340,6 +359,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _introDbCountdownShownAt = null;
       _introDbPendingSkipKind = null;
       _introDbPendingSkipEndMs = null;
+      _upNextVisible = false;
+      _upNextDismissed = false;
+      _nextEpisode = null;
+      _upNextSeries = null;
     });
 
     _openSource(widget.args);
@@ -347,6 +370,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _scheduleOverlayHide();
     unawaited(_initComskip(widget.args));
     unawaited(_initIntroDb(widget.args));
+    unawaited(_initUpNext(widget.args));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
     });
@@ -378,6 +402,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       });
       _checkComskip();
       _checkIntroDb();
+      _checkUpNext();
     });
   }
 
@@ -714,6 +739,77 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(Duration(milliseconds: endMs)));
   }
 
+  // ── Up next (series only) ──────────────────────────────────────────────
+
+  /// Resolves the next episode for the currently playing series episode from
+  /// `get_series_info` (already cached client-side). Fire-and-forget, like
+  /// `_initIntroDb`: a missing series id, a non-series item, or any fetch
+  /// failure just leaves `_nextEpisode` null and the overlay never appears.
+  Future<void> _initUpNext(PlayerArgs args) async {
+    if (args.type != 'series') return;
+    final seriesId = args.seriesId;
+    final service = widget.xtreamService;
+    if (seriesId == null || service == null) return;
+
+    final season = args.seasonNumber ?? args.metadata['season_number'] as int?;
+    final episode = args.metadata['episode_number'] as int?;
+    if (season == null || episode == null) return;
+
+    try {
+      final info = await service.getSeriesInfo(seriesId);
+      if (!mounted || !identical(args, widget.args)) return;
+      setState(() {
+        _upNextSeries = info.series;
+        _nextEpisode = nextEpisodeInSeries(
+          info,
+          seasonNumber: season,
+          episodeNumber: episode,
+        );
+      });
+    } on Object catch (_) {
+      // No "up next" affordance if the series info can't be fetched.
+    }
+  }
+
+  /// Shows the overlay once the play-head reaches the credits mark (or ~90%
+  /// in when TheIntroDB has no credits segment, mirroring the editor's
+  /// `completed` threshold). Stays until dismissed or the episode ends;
+  /// seeking back before the threshold hides it again.
+  void _checkUpNext() {
+    if (_disposed || !mounted || _upNextDismissed || _nextEpisode == null) {
+      return;
+    }
+    final creditsStartMs = _introDbSegments?.credits?.startMs;
+    final shouldShow = creditsStartMs != null
+        ? _currentPosition.inMilliseconds >= creditsStartMs
+        : _duration > Duration.zero && _currentPosition >= _duration * 0.9;
+    if (shouldShow != _upNextVisible) {
+      setState(() => _upNextVisible = shouldShow);
+    }
+  }
+
+  void _dismissUpNext() {
+    setState(() {
+      _upNextVisible = false;
+      _upNextDismissed = true;
+    });
+  }
+
+  void _playNextEpisode() {
+    final next = _nextEpisode;
+    final seriesId = widget.args.seriesId;
+    final onReplace = widget.onReplaceItem;
+    if (next == null || seriesId == null || onReplace == null) return;
+    final args = episodePlayerArgs(
+      episode: next,
+      seriesId: seriesId,
+      seriesName:
+          (widget.args.metadata['series_name'] as String?) ?? widget.args.title,
+      series: _upNextSeries,
+    );
+    if (args != null) onReplace(args);
+  }
+
   /// The one active skip prompt (comskip or TheIntroDB — the two never
   /// overlap since comskip is DVR-only and TheIntroDB is VOD/series-only),
   /// or null when neither is active. `context` is only needed for
@@ -973,6 +1069,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _checkComskip();
     _checkIntroDb();
+    _checkUpNext();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
     // pausing cancels it (keeping the overlay up), resuming restarts the
@@ -1571,6 +1668,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         left: edgePadding,
                         bottom: edgePadding,
                         child: skipPrompt,
+                      ),
+
+                    // "Up next" card (series only) - bottom-right, clear of the
+                    // skip prompt's bottom-left corner.
+                    if (_upNextVisible && _nextEpisode != null)
+                      Positioned(
+                        right: mediaQuery.padding.right + edgePadding,
+                        bottom: mediaQuery.padding.bottom + edgePadding,
+                        child: UpNextOverlay(
+                          eyebrowLabel: AppLocalizations.of(
+                            context,
+                          ).playerUpNext,
+                          title: _nextEpisode!.title,
+                          subtitle:
+                              AppLocalizations.of(
+                                context,
+                              ).playerNowPlayingSeasonEpisode(
+                                _nextEpisode!.seasonNumber,
+                                _nextEpisode!.episodeNumber,
+                              ),
+                          plot: _nextEpisode!.plot,
+                          thumbnailUrl: _nextEpisode!.thumbnailUrl,
+                          playLabel: AppLocalizations.of(
+                            context,
+                          ).playerUpNextPlay,
+                          dismissLabel: AppLocalizations.of(
+                            context,
+                          ).playerUpNextDismiss,
+                          onPlay: _playNextEpisode,
+                          onDismiss: _dismissUpNext,
+                        ),
                       ),
                   ],
                 );

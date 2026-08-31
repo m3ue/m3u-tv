@@ -798,6 +798,7 @@ class MediaPreviewItem {
     this.overlayBadges = const <String>[],
     this.overlayLabel,
     this.emphasisLabel,
+    this.upNextLabel,
   });
 
   final String title;
@@ -815,6 +816,12 @@ class MediaPreviewItem {
 
   /// 0.0-1.0 progress shown as a bar along the bottom of the image.
   final double? progressFraction;
+
+  /// When non-null, landscape cards show this text as a primary-colour badge in
+  /// the top-right corner (where the progress percent normally sits) and
+  /// suppress the bottom progress bar. Used for synthetic "up next" episode
+  /// entries; the caller supplies the localized string.
+  final String? upNextLabel;
 
   /// Short text labels rendered as chips overlaid on the image (right-aligned).
   final List<String> overlayBadges;
@@ -1193,6 +1200,31 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
                       minHeight: 3,
                       backgroundColor: Colors.white24,
                       color: colorScheme.primary,
+                    ),
+                  ),
+                if (widget.item.upNextLabel != null)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          widget.item.upNextLabel!,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
                     ),
                   ),
               ],

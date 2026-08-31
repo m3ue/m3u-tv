@@ -291,6 +291,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerSkipIntro => 'Intro überspringen';
 
   @override
+  String get playerUpNext => 'Als Nächstes';
+
+  @override
+  String get playerUpNextPlay => 'Nächste Folge';
+
+  @override
+  String get playerUpNextDismiss => 'Schließen';
+
+  @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
 
   @override
@@ -589,6 +598,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get homeUpNext => 'Als Nächstes';
+
+  @override
   String get homeNoLiveTv => 'Kein Live-TV verfügbar';
 
   @override
@@ -673,6 +685,36 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String homeSeason(int number) {
     return 'Staffel $number';
+  }
+
+  @override
+  String get seriesSeasons => 'Staffeln';
+
+  @override
+  String seriesPlayEpisode(int season, int episode) {
+    return 'S${season}E$episode abspielen';
+  }
+
+  @override
+  String seriesResumeEpisode(int season, int episode) {
+    return 'S${season}E$episode fortsetzen';
+  }
+
+  @override
+  String get seriesMarkWatched => 'Als gesehen markieren';
+
+  @override
+  String get seriesMarkUnwatched => 'Als ungesehen markieren';
+
+  @override
+  String get seriesMarkedWatched => 'Als gesehen markiert';
+
+  @override
+  String get seriesMarkedUnwatched => 'Als ungesehen markiert';
+
+  @override
+  String seriesMarkSeasonPrompt(int number) {
+    return 'Den Gesehen-Status für jede Folge von Staffel $number aktualisieren?';
   }
 
   @override

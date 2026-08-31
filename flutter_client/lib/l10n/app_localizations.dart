@@ -614,6 +614,24 @@ abstract class AppLocalizations {
   /// **'Skip Intro'**
   String get playerSkipIntro;
 
+  /// No description provided for @playerUpNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Up next'**
+  String get playerUpNext;
+
+  /// No description provided for @playerUpNextPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play next'**
+  String get playerUpNextPlay;
+
+  /// No description provided for @playerUpNextDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get playerUpNextDismiss;
+
   /// No description provided for @searchHint.
   ///
   /// In en, this message translates to:
@@ -1154,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{+1 more} other{+{count} more}}'**
   String homeContinueWatchingMoreCount(int count);
 
+  /// No description provided for @homeUpNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Up next'**
+  String get homeUpNext;
+
   /// No description provided for @homeNoLiveTv.
   ///
   /// In en, this message translates to:
@@ -1297,6 +1321,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Season {number}'**
   String homeSeason(int number);
+
+  /// No description provided for @seriesSeasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Seasons'**
+  String get seriesSeasons;
+
+  /// No description provided for @seriesPlayEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'Play S{season}E{episode}'**
+  String seriesPlayEpisode(int season, int episode);
+
+  /// No description provided for @seriesResumeEpisode.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume S{season}E{episode}'**
+  String seriesResumeEpisode(int season, int episode);
+
+  /// No description provided for @seriesMarkWatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark watched'**
+  String get seriesMarkWatched;
+
+  /// No description provided for @seriesMarkUnwatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark unwatched'**
+  String get seriesMarkUnwatched;
+
+  /// No description provided for @seriesMarkedWatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as watched'**
+  String get seriesMarkedWatched;
+
+  /// No description provided for @seriesMarkedUnwatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as unwatched'**
+  String get seriesMarkedUnwatched;
+
+  /// No description provided for @seriesMarkSeasonPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the watched status for every episode in Season {number}?'**
+  String seriesMarkSeasonPrompt(int number);
 
   /// No description provided for @traktWatchHistory.
   ///

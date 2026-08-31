@@ -1685,8 +1685,8 @@ void main() {
     await tester.tap(find.text('Route Series').last);
     await _pumpAppFrame(tester);
 
-    expect(find.text('Season 1'), findsOneWidget);
-    expect(find.textContaining('Pilot'), findsOneWidget);
+    expect(find.text('Season 1'), findsWidgets);
+    expect(find.textContaining('Pilot'), findsWidgets);
     expect(find.text('Route Series'), findsWidgets);
   });
 
@@ -1710,7 +1710,10 @@ void main() {
     await _pumpAppFrame(tester);
     await tester.tap(find.text('Route Series').last);
     await _pumpAppFrame(tester);
-    await tester.tap(find.textContaining('Pilot'));
+    // The episode strip is bottom-aligned; bring it into view before tapping.
+    await tester.ensureVisible(find.textContaining('Pilot').first);
+    await _pumpAppFrame(tester);
+    await tester.tap(find.textContaining('Pilot').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -2536,4 +2539,10 @@ class _NavigationXtreamService extends XtreamService {
       .where((progress) => type == null || progress.contentType == type)
       .take(limit)
       .toList(growable: false);
+
+  @override
+  Future<List<Progress>> getSeriesProgress(
+    String viewerId,
+    int seriesId,
+  ) async => const <Progress>[];
 }

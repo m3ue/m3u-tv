@@ -1038,6 +1038,43 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  /// Marks a single series episode watched / unwatched for the active viewer.
+  /// "Unwatched" zeroes the progress row (position 0, not completed) rather
+  /// than deleting it - the Xtream API has no delete verb, and a zeroed row
+  /// reads as unwatched everywhere (Continue Watching filters it out, the
+  /// series detail no longer counts it as finished).
+  Future<void> _markEpisodeWatched({
+    required int streamId,
+    required int seriesId,
+    required int seasonNumber,
+    required int episodeNumber,
+    int? durationSeconds,
+    String? seriesName,
+    String? episodeTitle,
+    required bool watched,
+  }) async {
+    final viewer = _appState.activeViewer;
+    if (viewer == null) return;
+    final progress = Progress(
+      viewerId: viewer.ulid,
+      contentType: ContentType.episode,
+      streamId: streamId,
+      positionSeconds: watched ? (durationSeconds ?? 0) : 0,
+      durationSeconds: durationSeconds,
+      completed: watched,
+      seriesId: seriesId,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      seriesName: seriesName,
+      episodeTitle: episodeTitle,
+    );
+    if (_appState.sourceType == AppSourceType.xtream) {
+      await _appState.xtreamService.updateProgress(progress).catchError((_) {});
+    }
+    await _appState.resumeService.save(progress);
+    if (mounted) _appState.updateProgressEntry(progress);
+  }
+
   void _openAioSearch() {
     unawaited(
       _pushDetail(RouteNames.aiostreamsSearchPath, fullScreen: true),
@@ -1345,6 +1382,7 @@ class AppShellState extends ConsumerState<AppShell>
       onDeleteSeriesRule: _deleteDvrSeriesRule,
       onScheduleEpisode: _scheduleDvrAiring,
       onScheduleEpisodes: _scheduleDvrAirings,
+      onMarkEpisodeWatched: _markEpisodeWatched,
       buildTabScreen: _buildTabScreen,
       child: FocusScope(
         node: _contentFocusNode,
@@ -1442,6 +1480,9 @@ class AppShellState extends ConsumerState<AppShell>
                   onNextChannel: args.type == 'live' ? _openNextChannel : null,
                   onPreviousChannel: args.type == 'live'
                       ? _openPreviousChannel
+                      : null,
+                  onReplaceItem: args.type == 'series'
+                      ? _openPlayerDirect
                       : null,
                   onRecordProgram:
                       args.type == 'live' && _appState.hasDvrFeature

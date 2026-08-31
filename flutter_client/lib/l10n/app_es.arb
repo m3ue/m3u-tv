@@ -151,6 +151,9 @@
   "playerSkipCommercial": "Omitir anuncio",
   "playerSkipCredits": "Omitir créditos",
   "playerSkipIntro": "Omitir introducción",
+  "playerUpNext": "A continuación",
+  "playerUpNextPlay": "Reproducir siguiente",
+  "playerUpNextDismiss": "Descartar",
   "searchHint": "Buscar Televisión en vivo, cine y series…",
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",
@@ -270,6 +273,7 @@
       }
     }
   },
+  "homeUpNext": "A continuación",
   "homeNoLiveTv": "No hay Televisión en vivo disponible",
   "homeFavoriteChannels": "Canales favoritos",
   "homeNoFavoriteChannels": "No hay canales favoritos disponibles",
@@ -330,6 +334,41 @@
   "homeNoSeries": "No hay series disponibles",
   "homeSeason": "Temporada {number}",
   "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesSeasons": "Temporadas",
+  "seriesPlayEpisode": "Reproducir T{season}E{episode}",
+  "@seriesPlayEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesResumeEpisode": "Reanudar T{season}E{episode}",
+  "@seriesResumeEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesMarkWatched": "Marcar como visto",
+  "seriesMarkUnwatched": "Marcar como no visto",
+  "seriesMarkedWatched": "Marcado como visto",
+  "seriesMarkedUnwatched": "Marcado como no visto",
+  "seriesMarkSeasonPrompt": "¿Actualizar el estado de visto de todos los episodios de la temporada {number}?",
+  "@seriesMarkSeasonPrompt": {
     "placeholders": {
       "number": {
         "type": "int"

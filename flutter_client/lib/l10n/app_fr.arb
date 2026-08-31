@@ -151,6 +151,9 @@
   "playerSkipCommercial": "Ignorer la publicité",
   "playerSkipCredits": "Ignorer le générique",
   "playerSkipIntro": "Ignorer l'intro",
+  "playerUpNext": "À suivre",
+  "playerUpNextPlay": "Lire la suite",
+  "playerUpNextDismiss": "Ignorer",
   "searchHint": "Rechercher Télévision en direct, films et séries…",
   "searchSectionLiveTv": "Télévision en direct",
   "searchSectionMovies": "Films",
@@ -270,6 +273,7 @@
       }
     }
   },
+  "homeUpNext": "À suivre",
   "homeNoLiveTv": "Pas de Télévision en direct disponible",
   "homeFavoriteChannels": "Chaînes favorites",
   "homeNoFavoriteChannels": "Aucune chaîne favorite disponible",
@@ -330,6 +334,41 @@
   "homeNoSeries": "Pas de séries disponibles",
   "homeSeason": "Saison {number}",
   "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesSeasons": "Saisons",
+  "seriesPlayEpisode": "Lire S{season}E{episode}",
+  "@seriesPlayEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesResumeEpisode": "Reprendre S{season}E{episode}",
+  "@seriesResumeEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesMarkWatched": "Marquer comme vu",
+  "seriesMarkUnwatched": "Marquer comme non vu",
+  "seriesMarkedWatched": "Marqué comme vu",
+  "seriesMarkedUnwatched": "Marqué comme non vu",
+  "seriesMarkSeasonPrompt": "Mettre à jour le statut vu pour tous les épisodes de la saison {number} ?",
+  "@seriesMarkSeasonPrompt": {
     "placeholders": {
       "number": {
         "type": "int"

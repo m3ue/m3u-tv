@@ -287,11 +287,22 @@ class Season {
     required this.number,
     required this.name,
     this.episodeCount = 0,
+    this.coverUrl,
+    this.overview,
+    this.releaseDate,
   });
 
   final int number;
   final String name;
   final int episodeCount;
+
+  /// Season-specific poster, when the provider supplies one. Falls back to the
+  /// series cover at the call site.
+  final String? coverUrl;
+
+  /// Season-specific synopsis; falls back to the series plot at the call site.
+  final String? overview;
+  final String? releaseDate;
 
   factory Season.fromXtream(Map<String, Object?> json) {
     final number = _asInt(json['season_number']);
@@ -299,6 +310,13 @@ class Season {
       number: number,
       name: '${json['name'] ?? 'Season $number'}',
       episodeCount: _asInt(json['episode_count']),
+      coverUrl: _asNullableString(
+        json['cover_big'] ?? json['cover'] ?? json['cover_tmdb'],
+      ),
+      overview: _asNullableString(json['overview']),
+      releaseDate: _asNullableString(
+        json['releaseDate'] ?? json['air_date'],
+      ),
     );
   }
 }
@@ -893,6 +911,7 @@ class Progress {
     this.year,
     this.aioItemId,
     this.aioIntegrationId,
+    this.upNext = false,
   });
 
   final String viewerId;
@@ -901,6 +920,11 @@ class Progress {
   final int positionSeconds;
   final int? durationSeconds;
   final bool completed;
+
+  /// Synthetic entry from the editor (`get_recently_watched&include_up_next=1`):
+  /// the next unwatched episode of a series whose last-watched episode is
+  /// finished. Has `positionSeconds == 0` and no progress row of its own.
+  final bool upNext;
   final int? seriesId;
   final int? seasonNumber;
   final int? episodeNumber;
@@ -953,6 +977,7 @@ class Progress {
     aioIntegrationId: json.containsKey('aio_integration_id')
         ? _asIntOrNull(json['aio_integration_id'])
         : null,
+    upNext: json['up_next'] == true || json['up_next'] == 1,
   );
 
   Map<String, Object?> toJson() => {

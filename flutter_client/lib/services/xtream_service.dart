@@ -1030,6 +1030,9 @@ class XtreamService {
         'viewer_id': viewerId,
         'limit': '$limit',
         if (type != null) 'type': type.wireName,
+        // Opt in to synthetic "up next" episode entries (editor >= build that
+        // supports it; older editors ignore the param).
+        'include_up_next': '1',
       },
     );
     return _asList(response)

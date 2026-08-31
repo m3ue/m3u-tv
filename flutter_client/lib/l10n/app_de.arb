@@ -151,6 +151,9 @@
   "playerSkipCommercial": "Werbung überspringen",
   "playerSkipCredits": "Abspann überspringen",
   "playerSkipIntro": "Intro überspringen",
+  "playerUpNext": "Als Nächstes",
+  "playerUpNextPlay": "Nächste Folge",
+  "playerUpNextDismiss": "Schließen",
   "searchHint": "Live-TV, Filme und Serien durchsuchen …",
   "searchSectionLiveTv": "Live-TV",
   "searchSectionMovies": "Filme",
@@ -270,6 +273,7 @@
       }
     }
   },
+  "homeUpNext": "Als Nächstes",
   "homeNoLiveTv": "Kein Live-TV verfügbar",
   "homeFavoriteChannels": "Lieblingssender",
   "homeNoFavoriteChannels": "Keine Lieblingssender verfügbar",
@@ -330,6 +334,41 @@
   "homeNoSeries": "Keine Serien verfügbar",
   "homeSeason": "Staffel {number}",
   "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesSeasons": "Staffeln",
+  "seriesPlayEpisode": "S{season}E{episode} abspielen",
+  "@seriesPlayEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesResumeEpisode": "S{season}E{episode} fortsetzen",
+  "@seriesResumeEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesMarkWatched": "Als gesehen markieren",
+  "seriesMarkUnwatched": "Als ungesehen markieren",
+  "seriesMarkedWatched": "Als gesehen markiert",
+  "seriesMarkedUnwatched": "Als ungesehen markiert",
+  "seriesMarkSeasonPrompt": "Den Gesehen-Status für jede Folge von Staffel {number} aktualisieren?",
+  "@seriesMarkSeasonPrompt": {
     "placeholders": {
       "number": {
         "type": "int"

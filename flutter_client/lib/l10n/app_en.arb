@@ -152,6 +152,9 @@
   "playerSkipCommercial": "Skip commercial",
   "playerSkipCredits": "Skip Credits",
   "playerSkipIntro": "Skip Intro",
+  "playerUpNext": "Up next",
+  "playerUpNextPlay": "Play next",
+  "playerUpNextDismiss": "Dismiss",
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
@@ -271,6 +274,7 @@
       }
     }
   },
+  "homeUpNext": "Up next",
   "homeNoLiveTv": "No Live TV available",
   "homeFavoriteChannels": "Favorite Channels",
   "homeNoFavoriteChannels": "No favorite channels available",
@@ -331,6 +335,41 @@
   "homeNoSeries": "No Series available",
   "homeSeason": "Season {number}",
   "@homeSeason": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesSeasons": "Seasons",
+  "seriesPlayEpisode": "Play S{season}E{episode}",
+  "@seriesPlayEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesResumeEpisode": "Resume S{season}E{episode}",
+  "@seriesResumeEpisode": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesMarkWatched": "Mark watched",
+  "seriesMarkUnwatched": "Mark unwatched",
+  "seriesMarkedWatched": "Marked as watched",
+  "seriesMarkedUnwatched": "Marked as unwatched",
+  "seriesMarkSeasonPrompt": "Update the watched status for every episode in Season {number}?",
+  "@seriesMarkSeasonPrompt": {
     "placeholders": {
       "number": {
         "type": "int"

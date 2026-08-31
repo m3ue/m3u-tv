@@ -289,6 +289,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerSkipIntro => 'Skip Intro';
 
   @override
+  String get playerUpNext => 'Up next';
+
+  @override
+  String get playerUpNextPlay => 'Play next';
+
+  @override
+  String get playerUpNextDismiss => 'Dismiss';
+
+  @override
   String get searchHint => 'Search live TV, movies, and series...';
 
   @override
@@ -585,6 +594,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get homeUpNext => 'Up next';
+
+  @override
   String get homeNoLiveTv => 'No Live TV available';
 
   @override
@@ -669,6 +681,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String homeSeason(int number) {
     return 'Season $number';
+  }
+
+  @override
+  String get seriesSeasons => 'Seasons';
+
+  @override
+  String seriesPlayEpisode(int season, int episode) {
+    return 'Play S${season}E$episode';
+  }
+
+  @override
+  String seriesResumeEpisode(int season, int episode) {
+    return 'Resume S${season}E$episode';
+  }
+
+  @override
+  String get seriesMarkWatched => 'Mark watched';
+
+  @override
+  String get seriesMarkUnwatched => 'Mark unwatched';
+
+  @override
+  String get seriesMarkedWatched => 'Marked as watched';
+
+  @override
+  String get seriesMarkedUnwatched => 'Marked as unwatched';
+
+  @override
+  String seriesMarkSeasonPrompt(int number) {
+    return 'Update the watched status for every episode in Season $number?';
   }
 
   @override

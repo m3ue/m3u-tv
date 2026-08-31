@@ -282,6 +282,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerSkipIntro => '跳过片头';
 
   @override
+  String get playerUpNext => '即将播放';
+
+  @override
+  String get playerUpNextPlay => '播放下一集';
+
+  @override
+  String get playerUpNextDismiss => '关闭';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override
@@ -562,6 +571,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get homeUpNext => '即将播放';
+
+  @override
   String get homeNoLiveTv => '暂无直播电视';
 
   @override
@@ -643,6 +655,36 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String homeSeason(int number) {
     return '第$number季';
+  }
+
+  @override
+  String get seriesSeasons => '剧集季';
+
+  @override
+  String seriesPlayEpisode(int season, int episode) {
+    return '播放 S${season}E$episode';
+  }
+
+  @override
+  String seriesResumeEpisode(int season, int episode) {
+    return '继续观看 S${season}E$episode';
+  }
+
+  @override
+  String get seriesMarkWatched => '标记为已观看';
+
+  @override
+  String get seriesMarkUnwatched => '标记为未观看';
+
+  @override
+  String get seriesMarkedWatched => '已标记为已观看';
+
+  @override
+  String get seriesMarkedUnwatched => '已标记为未观看';
+
+  @override
+  String seriesMarkSeasonPrompt(int number) {
+    return '更新第 $number 季所有剧集的观看状态？';
   }
 
   @override

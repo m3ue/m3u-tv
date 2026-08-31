@@ -29,6 +29,7 @@ dependencies:
   flutter_svg: ^2.3.0
   go_router: ^17.3.0
   intl: ^0.20.2
+  palette_generator_master: ^1.1.0
   path_provider: ^2.1.0
   path_provider_tvos: ^0.0.3
   qr_flutter: ^4.1.0

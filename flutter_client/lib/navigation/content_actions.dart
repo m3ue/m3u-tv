@@ -23,6 +23,7 @@ class ContentActions extends InheritedWidget {
     required this.onDeleteSeriesRule,
     this.onScheduleEpisode,
     this.onScheduleEpisodes,
+    this.onMarkEpisodeWatched,
     required this.buildTabScreen,
     required super.child,
   });
@@ -87,6 +88,23 @@ class ContentActions extends InheritedWidget {
     List<EpgShowEpisode>,
   )?
   onScheduleEpisodes;
+
+  /// Marks a single series episode watched or unwatched for the active viewer.
+  /// Wired by AppShell against `AppStateController` (server `update_progress` +
+  /// local resume store). The series detail route passes it through so the
+  /// long-press affordances on the season picker and episode cards have a
+  /// target. Null hides those affordances (non-Xtream sources / no viewer).
+  final Future<void> Function({
+    required int streamId,
+    required int seriesId,
+    required int seasonNumber,
+    required int episodeNumber,
+    int? durationSeconds,
+    String? seriesName,
+    String? episodeTitle,
+    required bool watched,
+  })?
+  onMarkEpisodeWatched;
 
   /// Builds the full tab screen for the given routeName.
   /// Provided by AppShell so go_router branch builders don't need to import
