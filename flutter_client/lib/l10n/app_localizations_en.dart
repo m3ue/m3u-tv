@@ -709,6 +709,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seriesMarkedUnwatched => 'Marked as unwatched';
 
   @override
+  String get seriesMarkSyncFailed => 'Couldn\'t sync watched status';
+
+  @override
   String seriesMarkSeasonPrompt(int number) {
     return 'Update the watched status for every episode in Season $number?';
   }

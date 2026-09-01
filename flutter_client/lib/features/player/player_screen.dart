@@ -40,6 +40,10 @@ enum _IntroDbSegmentKind { intro, credits }
 /// countdown bar showing the time remaining).
 const _kIntroDbPromptCountdown = Duration(seconds: 15);
 
+/// How far past the credits mark to wait before raising the "up next" card,
+/// so it doesn't fight the skip-credits prompt for the screen (and focus).
+const _kUpNextDelayAfterCredits = Duration(seconds: 5);
+
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
 class PlayerScreen extends StatefulWidget {
@@ -179,6 +183,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Episode? _nextEpisode;
   bool _upNextVisible = false;
   bool _upNextDismissed = false;
+
+  /// Focus target for the up-next card's Play button - the player moves focus
+  /// here the moment the card appears so the remote lands on it, not the
+  /// transport bar.
+  final FocusNode _upNextFocusNode = FocusNode(debugLabel: 'playerUpNext');
 
   /// Whether the skip prompt should be on screen right now: either the
   /// one-time countdown is still running, or the OSD is up and the play-head
@@ -776,16 +785,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// `completed` threshold). Stays until dismissed or the episode ends;
   /// seeking back before the threshold hides it again.
   void _checkUpNext() {
-    if (_disposed || !mounted || _upNextDismissed || _nextEpisode == null) {
+    if (_disposed ||
+        !mounted ||
+        _upNextDismissed ||
+        _upNextVisible ||
+        _nextEpisode == null) {
       return;
     }
     final creditsStartMs = _introDbSegments?.credits?.startMs;
     final shouldShow = creditsStartMs != null
-        ? _currentPosition.inMilliseconds >= creditsStartMs
+        // Hold off until the skip-credits prompt has had its moment.
+        ? _currentPosition.inMilliseconds >=
+              creditsStartMs + _kUpNextDelayAfterCredits.inMilliseconds
         : _duration > Duration.zero && _currentPosition >= _duration * 0.9;
-    if (shouldShow != _upNextVisible) {
-      setState(() => _upNextVisible = shouldShow);
-    }
+    if (!shouldShow) return;
+
+    // The card lives inside the control overlay (so it's D-pad reachable), so
+    // force the OSD up and pin it there while the card is showing, then drop
+    // focus onto the card's Play button once it's laid out.
+    setState(() {
+      _upNextVisible = true;
+      _overlayVisible = true;
+    });
+    _overlayHideTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _upNextVisible) _upNextFocusNode.requestFocus();
+    });
   }
 
   void _dismissUpNext() {
@@ -793,6 +818,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _upNextVisible = false;
       _upNextDismissed = true;
     });
+    // Hand focus back to the transport controls rather than letting Flutter
+    // reparent it wherever after the card unmounts.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+    });
+    _scheduleOverlayHide();
   }
 
   void _playNextEpisode() {
@@ -800,6 +831,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final seriesId = widget.args.seriesId;
     final onReplace = widget.onReplaceItem;
     if (next == null || seriesId == null || onReplace == null) return;
+    // No startPosition: "up next" always begins the next episode from the
+    // top, even if the viewer had previously sampled it. The in-place swap
+    // path (_openPlayerDirect) doesn't consult the resume store, and that's
+    // the intended behaviour here - not an oversight.
     final args = episodePlayerArgs(
       episode: next,
       seriesId: seriesId,
@@ -821,7 +856,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         onSkip: _confirmComskipSkip,
       );
     }
-    if (_introDbPromptVisible) {
+    // Once the "up next" card is up it takes over the end-of-episode moment;
+    // a redundant "skip credits" button beside it just competes for focus.
+    if (_introDbPromptVisible && !_upNextVisible) {
       return _SkipSegmentPrompt(
         label: _introDbMatchedKind == _IntroDbSegmentKind.intro
             ? AppLocalizations.of(context).playerSkipIntro
@@ -893,6 +930,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
+    _upNextFocusNode.dispose();
     unawaited(_stateSubscription?.cancel());
     unawaited(_errorSubscription?.cancel());
     unawaited(_nativePlaneSubscription?.cancel());
@@ -973,6 +1011,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _scheduleOverlayHide() {
     _overlayHideTimer?.cancel();
+    // Keep the OSD pinned while the up-next card is riding inside it.
+    if (_upNextVisible) return;
     // While paused, keep the overlay up indefinitely - there's no reason to
     // hide info the user is deliberately looking at. Playback resuming (or
     // the initial load reaching `playing`) reschedules the timer below.
@@ -1320,6 +1360,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _goBack();
       return;
     }
+    // Back while the up-next card is up dismisses the card first (same as its
+    // Dismiss button), which also unpins the OSD.
+    if (_upNextVisible) {
+      _dismissUpNext();
+      return;
+    }
     if (_overlayVisible) {
       _hideOverlay();
     } else {
@@ -1443,6 +1489,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           (diagnosticsWidth > 0 ? diagnosticsWidth + 12 : 0)
                     : 420.0;
                 final skipPrompt = _buildSkipPrompt(context);
+                final upNextPrompt = (_upNextVisible && _nextEpisode != null)
+                    ? UpNextOverlay(
+                        eyebrowLabel: AppLocalizations.of(context).playerUpNext,
+                        title: _nextEpisode!.title,
+                        subtitle:
+                            AppLocalizations.of(
+                              context,
+                            ).playerNowPlayingSeasonEpisode(
+                              _nextEpisode!.seasonNumber,
+                              _nextEpisode!.episodeNumber,
+                            ),
+                        plot: _nextEpisode!.plot,
+                        thumbnailUrl: _nextEpisode!.thumbnailUrl,
+                        playLabel: AppLocalizations.of(
+                          context,
+                        ).playerUpNextPlay,
+                        dismissLabel: AppLocalizations.of(
+                          context,
+                        ).playerUpNextDismiss,
+                        playFocusNode: _upNextFocusNode,
+                        onPlay: _playNextEpisode,
+                        onDismiss: _dismissUpNext,
+                      )
+                    : null;
 
                 return Stack(
                   children: [
@@ -1577,6 +1647,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 : null,
                             isRecording: widget.isRecordingCurrentChannel,
                             skipPrompt: skipPrompt,
+                            upNextPrompt: upNextPrompt,
                           ),
                         ),
                       ),
@@ -1670,36 +1741,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         child: skipPrompt,
                       ),
 
-                    // "Up next" card (series only) - bottom-right, clear of the
-                    // skip prompt's bottom-left corner.
-                    if (_upNextVisible && _nextEpisode != null)
-                      Positioned(
-                        right: mediaQuery.padding.right + edgePadding,
-                        bottom: mediaQuery.padding.bottom + edgePadding,
-                        child: UpNextOverlay(
-                          eyebrowLabel: AppLocalizations.of(
-                            context,
-                          ).playerUpNext,
-                          title: _nextEpisode!.title,
-                          subtitle:
-                              AppLocalizations.of(
-                                context,
-                              ).playerNowPlayingSeasonEpisode(
-                                _nextEpisode!.seasonNumber,
-                                _nextEpisode!.episodeNumber,
-                              ),
-                          plot: _nextEpisode!.plot,
-                          thumbnailUrl: _nextEpisode!.thumbnailUrl,
-                          playLabel: AppLocalizations.of(
-                            context,
-                          ).playerUpNextPlay,
-                          dismissLabel: AppLocalizations.of(
-                            context,
-                          ).playerUpNextDismiss,
-                          onPlay: _playNextEpisode,
-                          onDismiss: _dismissUpNext,
-                        ),
-                      ),
+                    // The "up next" card renders inside [PlaybackControls]
+                    // (see `upNextPrompt:` above) - never as a bare sibling -
+                    // so it sits in the same DpadRegion as the transport bar
+                    // and is reachable / focusable by the remote. `_checkUpNext`
+                    // force-shows the OSD so that path is always live while the
+                    // card is up.
                   ],
                 );
               },

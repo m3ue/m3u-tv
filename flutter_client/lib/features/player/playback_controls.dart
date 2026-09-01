@@ -71,6 +71,7 @@ class PlaybackControls extends StatelessWidget {
     this.onRecordNow,
     this.isRecording = false,
     this.skipPrompt,
+    this.upNextPrompt,
     super.key,
   });
 
@@ -110,6 +111,11 @@ class PlaybackControls extends StatelessWidget {
   /// widget entirely.
   final Widget? skipPrompt;
 
+  /// The "up next" card (see `UpNextOverlay`), rendered above the controls
+  /// bar, right-aligned. Inside this widget's [DpadRegion] for the same
+  /// reason as [skipPrompt] - so the remote can actually move onto it.
+  final Widget? upNextPrompt;
+
   static const Duration seekStep = Duration(seconds: 10);
 
   @override
@@ -142,6 +148,10 @@ class PlaybackControls extends StatelessWidget {
               children: [
                 _buildHeader(colorScheme),
                 const Spacer(),
+                if (upNextPrompt != null) ...[
+                  Align(alignment: Alignment.centerRight, child: upNextPrompt),
+                  SizedBox(height: compact ? 8 : 14),
+                ],
                 if (skipPrompt != null) ...[
                   Align(alignment: Alignment.centerLeft, child: skipPrompt),
                   SizedBox(height: compact ? 8 : 14),

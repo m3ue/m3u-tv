@@ -683,6 +683,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get seriesMarkedUnwatched => '已标记为未观看';
 
   @override
+  String get seriesMarkSyncFailed => '无法同步观看状态';
+
+  @override
   String seriesMarkSeasonPrompt(int number) {
     return '更新第 $number 季所有剧集的观看状态？';
   }

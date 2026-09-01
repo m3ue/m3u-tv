@@ -367,6 +367,7 @@
   "seriesMarkUnwatched": "Als ungesehen markieren",
   "seriesMarkedWatched": "Als gesehen markiert",
   "seriesMarkedUnwatched": "Als ungesehen markiert",
+  "seriesMarkSyncFailed": "Gesehen-Status konnte nicht synchronisiert werden",
   "seriesMarkSeasonPrompt": "Den Gesehen-Status für jede Folge von Staffel {number} aktualisieren?",
   "@seriesMarkSeasonPrompt": {
     "placeholders": {

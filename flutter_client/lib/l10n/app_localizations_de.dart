@@ -713,6 +713,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get seriesMarkedUnwatched => 'Als ungesehen markiert';
 
   @override
+  String get seriesMarkSyncFailed =>
+      'Gesehen-Status konnte nicht synchronisiert werden';
+
+  @override
   String seriesMarkSeasonPrompt(int number) {
     return 'Den Gesehen-Status für jede Folge von Staffel $number aktualisieren?';
   }

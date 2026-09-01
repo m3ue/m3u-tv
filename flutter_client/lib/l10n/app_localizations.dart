@@ -1364,6 +1364,12 @@ abstract class AppLocalizations {
   /// **'Marked as unwatched'**
   String get seriesMarkedUnwatched;
 
+  /// No description provided for @seriesMarkSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t sync watched status'**
+  String get seriesMarkSyncFailed;
+
   /// No description provided for @seriesMarkSeasonPrompt.
   ///
   /// In en, this message translates to:

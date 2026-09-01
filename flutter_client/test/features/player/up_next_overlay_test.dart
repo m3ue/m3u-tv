@@ -55,4 +55,27 @@ void main() {
     expect(played, 1);
     expect(dismissed, 1);
   });
+
+  testWidgets('play button adopts the supplied focus node', (tester) async {
+    final node = FocusNode(debugLabel: 'upNextPlay');
+    addTearDown(node.dispose);
+
+    await tester.pumpWidget(
+      _host(
+        UpNextOverlay(
+          eyebrowLabel: 'Up next',
+          title: 'Next',
+          playLabel: 'Play next',
+          dismissLabel: 'Dismiss',
+          playFocusNode: node,
+          onPlay: () {},
+          onDismiss: () {},
+        ),
+      ),
+    );
+
+    node.requestFocus();
+    await tester.pump();
+    expect(node.hasFocus, isTrue);
+  });
 }

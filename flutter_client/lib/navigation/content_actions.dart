@@ -94,7 +94,9 @@ class ContentActions extends InheritedWidget {
   /// local resume store). The series detail route passes it through so the
   /// long-press affordances on the season picker and episode cards have a
   /// target. Null hides those affordances (non-Xtream sources / no viewer).
-  final Future<void> Function({
+  /// Resolves to whether the server write landed (local state updates either
+  /// way) so a bulk "mark season" can report partial failure.
+  final Future<bool> Function({
     required int streamId,
     required int seriesId,
     required int seasonNumber,

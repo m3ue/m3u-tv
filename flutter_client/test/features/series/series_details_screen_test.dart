@@ -122,6 +122,34 @@ void main() {
     expect(find.text('~45m'), findsOneWidget);
   });
 
+  testWidgets('a bare-seconds duration reads as seconds, not minutes', (
+    tester,
+  ) async {
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Fixture Show'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Pilot',
+            containerExtension: 'mp4',
+            seasonNumber: 1,
+            duration: '5400', // 90 minutes expressed as raw seconds
+            streamUrl: 'http://example.com/s1/e1.mp4',
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    expect(find.text('~1h 30m'), findsOneWidget);
+    expect(find.text('~90h'), findsNothing);
+  });
+
   testWidgets('poster falls through season -> series -> backdrop', (
     tester,
   ) async {
@@ -348,6 +376,7 @@ void main() {
               required watched,
             }) async {
               calls.add((streamId: streamId, watched: watched));
+              return true;
             },
       ),
     );
@@ -371,5 +400,40 @@ void main() {
     expect(calls, isNotEmpty);
     expect(calls.first.streamId, 101);
     expect(calls.first.watched, isTrue);
+  });
+
+  testWidgets('mark-season reports partial sync failure', (tester) async {
+    var writes = 0;
+    await tester.pumpWidget(
+      _app(
+        _info(), // Season 1 has 3 episodes
+        viewerId: 'v1',
+        onMarkEpisodeWatched:
+            ({
+              required streamId,
+              required seriesId,
+              required seasonNumber,
+              required episodeNumber,
+              durationSeconds,
+              seriesName,
+              episodeTitle,
+              required watched,
+            }) async {
+              writes++;
+              return writes != 2; // second episode "fails" to sync
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Nothing watched -> the picker defaults to Season 1 (3 episodes).
+    await tester.longPress(find.text('Season 1'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mark watched'));
+    await tester.pumpAndSettle();
+
+    expect(writes, 3); // sequential, one per episode
+    expect(find.text("Couldn't sync watched status"), findsOneWidget);
+    expect(find.text('Marked as watched'), findsNothing);
   });
 }

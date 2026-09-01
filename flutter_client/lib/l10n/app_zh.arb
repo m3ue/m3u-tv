@@ -367,6 +367,7 @@
   "seriesMarkUnwatched": "标记为未观看",
   "seriesMarkedWatched": "已标记为已观看",
   "seriesMarkedUnwatched": "已标记为未观看",
+  "seriesMarkSyncFailed": "无法同步观看状态",
   "seriesMarkSeasonPrompt": "更新第 {number} 季所有剧集的观看状态？",
   "@seriesMarkSeasonPrompt": {
     "placeholders": {

@@ -714,6 +714,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get seriesMarkedUnwatched => 'Marcado como no visto';
 
   @override
+  String get seriesMarkSyncFailed =>
+      'No se pudo sincronizar el estado de visto';
+
+  @override
   String seriesMarkSeasonPrompt(int number) {
     return '¿Actualizar el estado de visto de todos los episodios de la temporada $number?';
   }

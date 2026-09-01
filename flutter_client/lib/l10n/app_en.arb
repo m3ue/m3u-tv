@@ -368,6 +368,7 @@
   "seriesMarkUnwatched": "Mark unwatched",
   "seriesMarkedWatched": "Marked as watched",
   "seriesMarkedUnwatched": "Marked as unwatched",
+  "seriesMarkSyncFailed": "Couldn't sync watched status",
   "seriesMarkSeasonPrompt": "Update the watched status for every episode in Season {number}?",
   "@seriesMarkSeasonPrompt": {
     "placeholders": {

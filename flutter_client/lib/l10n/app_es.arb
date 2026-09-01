@@ -367,6 +367,7 @@
   "seriesMarkUnwatched": "Marcar como no visto",
   "seriesMarkedWatched": "Marcado como visto",
   "seriesMarkedUnwatched": "Marcado como no visto",
+  "seriesMarkSyncFailed": "No se pudo sincronizar el estado de visto",
   "seriesMarkSeasonPrompt": "¿Actualizar el estado de visto de todos los episodios de la temporada {number}?",
   "@seriesMarkSeasonPrompt": {
     "placeholders": {

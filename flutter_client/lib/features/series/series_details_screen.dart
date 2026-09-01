@@ -29,9 +29,10 @@ const double _kEpisodeCardWidthCompact = 250;
 const double _kEpisodeCardTextHeight = 96;
 
 /// Marks one series episode watched / unwatched for the active viewer.
-/// Structurally matches `ContentActions.onMarkEpisodeWatched`.
+/// Structurally matches `ContentActions.onMarkEpisodeWatched`. Resolves to
+/// whether the server write succeeded (local state updates regardless).
 typedef MarkEpisodeWatched =
-    Future<void> Function({
+    Future<bool> Function({
       required int streamId,
       required int seriesId,
       required int seasonNumber,
@@ -239,13 +240,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     if (args != null) widget.onPlay?.call(args);
   }
 
-  Future<void> _markEpisode(Episode episode, {required bool watched}) async {
-    final mark = widget.onMarkEpisodeWatched;
+  Future<bool> _markOne(
+    MarkEpisodeWatched mark,
+    Episode episode, {
+    required bool watched,
+  }) {
     final streamId = int.tryParse(episode.id);
-    if (mark == null || streamId == null) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final l = AppLocalizations.of(context);
-    await mark(
+    if (streamId == null) return Future.value(false);
+    return mark(
       streamId: streamId,
       seriesId: widget.seriesId,
       seasonNumber: episode.seasonNumber,
@@ -254,8 +256,16 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
       episodeTitle: episode.title,
       watched: watched,
     );
+  }
+
+  Future<void> _markEpisode(Episode episode, {required bool watched}) async {
+    final mark = widget.onMarkEpisodeWatched;
+    if (mark == null || int.tryParse(episode.id) == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l = AppLocalizations.of(context);
+    final ok = await _markOne(mark, episode, watched: watched);
     await _loadSeriesProgress();
-    _showMarkedSnack(messenger, l, watched: watched);
+    _showMarkedSnack(messenger, l, watched: watched, failed: !ok);
   }
 
   Future<void> _markSeason(
@@ -266,29 +276,21 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     if (mark == null) return;
     final messenger = ScaffoldMessenger.of(context);
     final l = AppLocalizations.of(context);
-    await Future.wait(
-      episodes.map((episode) {
-        final streamId = int.tryParse(episode.id);
-        if (streamId == null) return Future<void>.value();
-        return mark(
-          streamId: streamId,
-          seriesId: widget.seriesId,
-          seasonNumber: episode.seasonNumber,
-          episodeNumber: episode.episodeNumber,
-          seriesName: widget.seriesName,
-          episodeTitle: episode.title,
-          watched: watched,
-        );
-      }),
-    );
+    // Sequential, not Future.wait: a 20+ episode season would otherwise fire
+    // that many concurrent progress writes at the editor at once.
+    var failures = 0;
+    for (final episode in episodes) {
+      if (!await _markOne(mark, episode, watched: watched)) failures++;
+    }
     await _loadSeriesProgress();
-    _showMarkedSnack(messenger, l, watched: watched);
+    _showMarkedSnack(messenger, l, watched: watched, failed: failures > 0);
   }
 
   void _showMarkedSnack(
     ScaffoldMessengerState messenger,
     AppLocalizations l, {
     required bool watched,
+    required bool failed,
   }) {
     if (!mounted) return;
     messenger
@@ -298,7 +300,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
           content: Text(
-            watched ? l.seriesMarkedWatched : l.seriesMarkedUnwatched,
+            failed
+                ? l.seriesMarkSyncFailed
+                : (watched ? l.seriesMarkedWatched : l.seriesMarkedUnwatched),
           ),
         ),
       );
@@ -793,7 +797,8 @@ String? _trimmedOrNull(String? value) {
 }
 
 /// Parses the loose runtime strings the editor emits ("45m", "1h 2m",
-/// "45:00", "2700", "45 min") into whole minutes. Null when nothing usable.
+/// "45 min", "45:00", "01:02:00", "2700") into whole minutes. Null when
+/// nothing usable.
 int? _durationTextToMinutes(String? raw) {
   if (raw == null) return null;
   final text = raw.trim().toLowerCase();
@@ -812,7 +817,11 @@ int? _durationTextToMinutes(String? raw) {
       if (nums.length == 2) return nums[0];
     }
   }
-  return int.tryParse(text); // bare number: assume minutes
+  final bare = int.tryParse(text);
+  if (bare == null) return null;
+  // Match `_durationText`'s own convention (domain_models.dart): a bare count
+  // over 300 is seconds, otherwise minutes.
+  return bare > 300 ? (bare / 60).round() : bare;
 }
 
 /// Formats an episode air date ("2025-10-01") as "Oct 1, 2025". Falls back to

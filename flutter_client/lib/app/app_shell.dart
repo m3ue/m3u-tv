@@ -561,6 +561,26 @@ class AppShellState extends ConsumerState<AppShell>
   void _openPlayerDirect(PlayerArgs rawArgs) {
     ref.read(playerOverlayActiveProvider.notifier).state = true;
     final args = _applyProxyPlayback(rawArgs);
+    unawaited(_systemUiPolicy.applyPlayer());
+
+    if (_playerOrchestrator != null) {
+      // A player is already open (skip-previous/skip-next, or the up-next
+      // overlay swapping episodes) - reuse its orchestrator/session rather
+      // than building a new one. PlayerScreen's key is unchanged, so the
+      // framework updates the existing State via didUpdateWidget instead of
+      // disposing it, keeping exactly one native player instance alive for
+      // the whole session. Deliberately do NOT re-capture _focusBeforePlayer
+      // here: primary focus is inside the player now, so it'd null out the
+      // real pre-player node (the originating card) and lose the restore
+      // target for when the session finally closes.
+      setState(() {
+        _playerArgs = args;
+        _playerHasFailed = false;
+        _playerNativePlaneActive = _playerOrchestrator!.isNativePlaneActive;
+      });
+      return;
+    }
+
     // Save the focused node so we can restore it precisely after the player
     // closes. _contentFocusNode.requestFocus() alone is unreliable: when
     // PlayerScreen disposes _screenFocusNode, Flutter's _willDisposeFocusNode
@@ -570,21 +590,6 @@ class AppShellState extends ConsumerState<AppShell>
     // gets a chance to run.
     final focus = FocusManager.instance.primaryFocus;
     _focusBeforePlayer = _isInContentScope(focus) ? focus : null;
-    unawaited(_systemUiPolicy.applyPlayer());
-
-    if (_playerOrchestrator != null) {
-      // A player is already open (e.g. skip-previous/skip-next) - reuse its
-      // orchestrator/session rather than building a new one. PlayerScreen's
-      // key is unchanged, so the framework updates the existing State via
-      // didUpdateWidget instead of disposing it, keeping exactly one native
-      // player instance alive for the whole session.
-      setState(() {
-        _playerArgs = args;
-        _playerHasFailed = false;
-        _playerNativePlaneActive = _playerOrchestrator!.isNativePlaneActive;
-      });
-      return;
-    }
 
     _playerSessionId += 1;
     final newOrch =
@@ -1043,7 +1048,11 @@ class AppShellState extends ConsumerState<AppShell>
   /// than deleting it - the Xtream API has no delete verb, and a zeroed row
   /// reads as unwatched everywhere (Continue Watching filters it out, the
   /// series detail no longer counts it as finished).
-  Future<void> _markEpisodeWatched({
+  /// Returns true when the change was fully persisted. The local resume store
+  /// and in-memory list are always updated (offline-friendly); the boolean
+  /// only reflects whether the server write also landed, so a "mark season"
+  /// caller can tell the user if some episodes did not sync.
+  Future<bool> _markEpisodeWatched({
     required int streamId,
     required int seriesId,
     required int seasonNumber,
@@ -1054,7 +1063,7 @@ class AppShellState extends ConsumerState<AppShell>
     required bool watched,
   }) async {
     final viewer = _appState.activeViewer;
-    if (viewer == null) return;
+    if (viewer == null) return false;
     final progress = Progress(
       viewerId: viewer.ulid,
       contentType: ContentType.episode,
@@ -1068,11 +1077,17 @@ class AppShellState extends ConsumerState<AppShell>
       seriesName: seriesName,
       episodeTitle: episodeTitle,
     );
+    var serverOk = true;
     if (_appState.sourceType == AppSourceType.xtream) {
-      await _appState.xtreamService.updateProgress(progress).catchError((_) {});
+      try {
+        await _appState.xtreamService.updateProgress(progress);
+      } on Object {
+        serverOk = false;
+      }
     }
     await _appState.resumeService.save(progress);
     if (mounted) _appState.updateProgressEntry(progress);
+    return serverOk;
   }
 
   void _openAioSearch() {
