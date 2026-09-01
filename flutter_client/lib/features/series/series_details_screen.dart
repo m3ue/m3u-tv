@@ -1048,9 +1048,6 @@ class _SeasonPicker extends StatelessWidget {
         autofocus: autofocus,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
-        color: selected
-            ? scheme.primaryContainer.withValues(alpha: 0.35)
-            : null,
         onTap: () {
           onSeasonSelected(season.number);
           Navigator.of(context).pop();
@@ -1090,9 +1087,7 @@ class _SeasonPicker extends StatelessWidget {
                         season.name.isNotEmpty
                             ? season.name
                             : l.homeSeason(season.number),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: selected ? scheme.primary : null,
-                        ),
+                        style: theme.textTheme.titleMedium,
                       ),
                       if (count > 0)
                         Padding(
@@ -1100,9 +1095,7 @@ class _SeasonPicker extends StatelessWidget {
                           child: Text(
                             l.seriesEpisodeCount(count),
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: selected
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -1122,6 +1115,14 @@ class _SeasonPicker extends StatelessWidget {
                   ),
                 ),
               ),
+              // A plain checkmark (not primary-tinted text) marks the active
+              // season, so it reads as "this one is selected" rather than
+              // being mistaken for the D-pad cursor.
+              if (selected)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, top: 2),
+                  child: Icon(Icons.check, size: 22, color: scheme.primary),
+                ),
             ],
           ),
         ),
