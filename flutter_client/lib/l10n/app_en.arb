@@ -262,6 +262,18 @@
       }
     }
   },
+  "seriesSeasonPillLabel": "Season {season} · {count, plural, =0{no episodes} =1{1 episode} other{{count} episodes}}",
+  "@seriesSeasonPillLabel": {
+    "description": "Compact label for the season selector pill on the Series Details screen, e.g. 'Season 3 · 12 episodes'.",
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "traktWatchHistory": "Watch History",
   "traktWatchHistorySubtitle": "Sync your watch history with Trakt to track progress across apps and services.",
   "traktNotConfigured": "Trakt client credentials are not configured.",

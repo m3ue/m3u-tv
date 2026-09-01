@@ -262,6 +262,18 @@
       }
     }
   },
+  "seriesSeasonPillLabel": "Staffel {season} · {count, plural, =0{keine Folgen} =1{1 Folge} other{{count} Folgen}}",
+  "@seriesSeasonPillLabel": {
+    "description": "Compact label for the season selector pill on the Series Details screen, e.g. 'Staffel 3 · 12 Folgen'.",
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "traktWatchHistory": "Wiedergabeverlauf",
   "traktWatchHistorySubtitle": "Synchronisiere deinen Wiedergabeverlauf mit Trakt, um den Fortschritt über Apps und Dienste hinweg zu verfolgen.",
   "traktNotConfigured": "Trakt-Client-Anmeldedaten sind nicht konfiguriert.",
