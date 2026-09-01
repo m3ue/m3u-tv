@@ -44,6 +44,9 @@ void main() {
       expect(find.text('Movie details'), findsNothing);
       expect(find.text('Ready to play in-app.'), findsNothing);
       expect(find.text('Play movie'), findsOneWidget);
+
+      // Flush the palette-generator timeout timer the cover kicks off.
+      await tester.pump(const Duration(seconds: 16));
     });
 
     testWidgets('keeps play action in app with metadata fallback', (

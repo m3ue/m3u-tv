@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -11,13 +9,13 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:palette_generator_master/palette_generator_master.dart';
 
 /// Below this window width the series detail lays out for a phone: smaller
 /// poster, full-width description, narrower episode cards.
@@ -148,36 +146,8 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   /// can bleed it past the image edge (Nuvio-style). Any failure just leaves
   /// the theme surface as the background.
   Future<void> _resolveDominantColor(String? url) async {
-    if (url == null || url.isEmpty) return;
-    try {
-      final palette = await PaletteGeneratorMaster.fromImageProvider(
-        CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
-        size: const Size(220, 124),
-        maximumColorCount: 8,
-      );
-      if (!mounted) return;
-      final swatch =
-          palette.darkMutedColor ??
-          palette.darkVibrantColor ??
-          palette.dominantColor;
-      if (swatch != null) {
-        setState(() => _dominantColor = _deepBackdropTone(swatch.color));
-      }
-    } on Object catch (_) {
-      // Fall back to the theme surface.
-    }
-  }
-
-  /// Forces an extracted swatch down to a deep tone: light-backdrop shows
-  /// (e.g. a near-white kitchen still) otherwise bleed a pale colour behind
-  /// the page and make the light body text unreadable. Hue is kept so the
-  /// Nuvio-style colour wash survives.
-  Color _deepBackdropTone(Color color) {
-    final hsl = HSLColor.fromColor(color);
-    return hsl
-        .withLightness(hsl.lightness.clamp(0.06, 0.20))
-        .withSaturation((hsl.saturation * 0.85).clamp(0.0, 0.55))
-        .toColor();
+    final color = await resolveDominantBackdropColor(url);
+    if (color != null && mounted) setState(() => _dominantColor = color);
   }
 
   @override
@@ -675,48 +645,56 @@ class _SeriesDetailsBody extends StatelessWidget {
       ),
     );
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: bg),
-        if (backdrop != null) CachedBackdropImage(backdrop),
-        // Scrim over the backdrop. Kept heavy enough that a bright still
-        // (near-white kitchen shots etc.) still leaves the body text legible,
-        // while the top stays translucent so the art reads through.
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                bg.withValues(alpha: 0.35),
-                bg.withValues(alpha: 0.92),
-                bg,
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-          ),
-        ),
-        // Bottom-aligned when it fits; scrolls up when the content is taller
-        // than the viewport (short windows) so the poster/title stay reachable.
-        LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    top: 24,
-                    bottom: constraints.maxHeight * 0.05,
-                  ),
-                  child: content,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    // On mobile the backdrop only sets the scene - a full-height image would
+    // push the poster/title/episodes below the fold. Cap it to half the
+    // viewport and let the rest of the page scroll on solid background
+    // colour underneath, like the VOD detail page's narrow layout.
+    if (compact) {
+      return _buildCompact(context, bg, backdrop, content);
+    }
+
+    // Scrim over the backdrop. Kept heavy enough that a bright still
+    // (near-white kitchen shots etc.) still leaves the body text legible,
+    // while the top stays translucent so the art reads through. Bottom-
+    // aligned when it fits; scrolls up when the content is taller than the
+    // viewport (short windows) so the poster/title stay reachable.
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      scrollWhenTall: true,
+      contentPaddingBuilder: (constraints) => EdgeInsets.only(
+        top: 24,
+        bottom: constraints.maxHeight * 0.05,
+      ),
+      content: content,
+    );
+  }
+
+  Widget _buildCompact(
+    BuildContext context,
+    Color bg,
+    String? backdrop,
+    Widget content,
+  ) {
+    final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
+    // The band stays fixed (it lives outside the scroll view, not stacked
+    // above it) while `content` scrolls over/past it - same mechanic as the
+    // wide layout below, just top-aligned instead of bottom-pinned.
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      backdropHeight: bandHeight,
+      contentAlignment: Alignment.topLeft,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      // Let the poster/title ride well up into the lower half of the
+      // backdrop (standard mobile hero look) rather than clearing it.
+      contentPadding: EdgeInsets.only(top: bandHeight * 0.55, bottom: 24),
+      content: content,
     );
   }
 

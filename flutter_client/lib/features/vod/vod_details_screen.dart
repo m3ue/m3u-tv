@@ -6,7 +6,8 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
-import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
+import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -32,9 +33,39 @@ class VodDetailsScreen extends StatefulWidget {
 }
 
 class _VodDetailsScreenState extends State<VodDetailsScreen> {
-  late final Future<VodInfo?>? _future = widget.xtreamService?.getVodInfo(
-    widget.item.id,
-  );
+  late final Future<VodInfo?>? _future = widget.xtreamService
+      ?.getVodInfo(widget.item.id)
+      .then((info) {
+        unawaited(
+          _resolveDominantColor(
+            _notEmpty(info.backdropUrl) ??
+                _notEmpty(info.coverUrl) ??
+                widget.item.logoUrl,
+          ),
+        );
+        return info;
+      });
+
+  Color? _dominantColor;
+
+  @override
+  void initState() {
+    super.initState();
+    // No xtreamService means the FutureBuilder branch never runs (and never
+    // resolves a colour from fetched VodInfo) - fall back to the item's own
+    // poster so this path still gets the colour-match treatment.
+    if (_future == null) {
+      unawaited(_resolveDominantColor(widget.item.logoUrl));
+    }
+  }
+
+  /// Extracts a dominant tone from the backdrop (or poster, if no backdrop)
+  /// so the hero can bleed it past the image edge, matching the Series
+  /// detail page. Any failure just leaves the theme surface as-is.
+  Future<void> _resolveDominantColor(String? url) async {
+    final color = await resolveDominantBackdropColor(url);
+    if (color != null && mounted) setState(() => _dominantColor = color);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +77,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
               item: widget.item,
               progressList: widget.progressList,
               onPlay: widget.onPlay,
+              dominantColor: _dominantColor,
             )
           : FutureBuilder<VodInfo?>(
               future: _future,
@@ -56,6 +88,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   isLoading: snapshot.connectionState != ConnectionState.done,
                   progressList: widget.progressList,
                   onPlay: widget.onPlay,
+                  dominantColor: _dominantColor,
                 );
               },
             ),
@@ -70,6 +103,7 @@ class _VodDetailsBody extends StatelessWidget {
     this.isLoading = false,
     this.progressList = const [],
     this.onPlay,
+    this.dominantColor,
   });
 
   final VodItem item;
@@ -78,19 +112,24 @@ class _VodDetailsBody extends StatelessWidget {
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
 
+  /// Palette-extracted tone from the backdrop/poster; falls back to the
+  /// theme surface. Matches the Series detail page's colour-match treatment.
+  final Color? dominantColor;
+
   static const double _wideBreakpoint = 600;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bg = dominantColor ?? theme.colorScheme.surface;
     final details = _ResolvedVodDetails(item, info);
     final progress = _resumeProgress;
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < _wideBreakpoint) {
-          return _buildNarrow(context, theme, details, progress);
+          return _buildNarrow(context, theme, bg, details, progress);
         }
-        return _buildWide(context, theme, details, progress);
+        return _buildWide(context, theme, bg, details, progress);
       },
     );
   }
@@ -110,6 +149,7 @@ class _VodDetailsBody extends StatelessWidget {
   Widget _buildWide(
     BuildContext context,
     ThemeData theme,
+    Color bg,
     _ResolvedVodDetails details,
     Progress? progress,
   ) {
@@ -143,100 +183,70 @@ class _VodDetailsBody extends StatelessWidget {
 
     // Always use the backdrop Stack layout so the poster stays bottom-aligned
     // before and after the backdrop URL loads in, avoiding a layout jump.
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (backdrop != null) CachedBackdropImage(backdrop),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.2),
-                Colors.black.withValues(alpha: 0.85),
-                theme.colorScheme.surface,
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.bottomLeft,
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.sizeOf(context).height * 0.1,
-            ),
-            child: content,
-          ),
-        ),
-      ],
+    // Colour-matched scrim, same treatment as the Series detail page.
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.sizeOf(context).height * 0.1,
+      ),
+      content: content,
     );
   }
 
   Widget _buildNarrow(
     BuildContext context,
     ThemeData theme,
+    Color bg,
     _ResolvedVodDetails details,
     Progress? progress,
   ) {
     final backdrop = details.backdropUrl;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 220,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Backdrop fills the area when available; otherwise the
-              // gradient alone provides the surface transition.
-              if (backdrop != null) CachedBackdropImage(backdrop),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, theme.colorScheme.surface],
-                      stops: const [0.4, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-              // Always show the poster thumbnail at the same position so it
-              // stays stable before and after the backdrop loads.
-              Positioned(
-                left: 16,
-                bottom: 16,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: ResilientMediaImage(
-                    imageUrl: details.coverUrl,
-                    fallbackIcon: Icons.movie,
-                    width: 80,
-                    height: 118,
-                    borderRadius: 0,
-                    fallbackTitle: details.name,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    final poster = SizedBox(
+      width: 120,
+      child: AspectRatio(
+        aspectRatio: 0.68,
+        child: ResilientMediaImage(
+          imageUrl: details.coverUrl,
+          fallbackIcon: Icons.movie,
+          borderRadius: MediaBrowsingMetrics.cardRadius,
+          fallbackTitle: details.name,
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: _infoColumn(
-              context,
-              theme,
-              details,
-              progress,
-              fullWidthButton: true,
-            ),
-          ),
-        ),
-      ],
+      ),
+    );
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          poster,
+          const SizedBox(height: 16),
+          _infoColumn(context, theme, details, progress, fullWidthButton: true),
+        ],
+      ),
+    );
+
+    // Backdrop capped to half the viewport (not full height) so the poster/
+    // title/synopsis aren't pushed below the fold, and stays fixed in place
+    // - `content` scrolls over/past it - matching the Series detail page's
+    // mobile layout.
+    final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      backdropHeight: bandHeight,
+      contentAlignment: Alignment.topLeft,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      // Let the poster/title ride well up into the lower half of the
+      // backdrop (standard mobile hero look) rather than clearing it.
+      contentPadding: EdgeInsets.only(top: bandHeight * 0.55, bottom: 24),
+      content: content,
     );
   }
 
