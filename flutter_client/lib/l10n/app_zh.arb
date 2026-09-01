@@ -341,6 +341,14 @@
     }
   },
   "seriesSeasons": "剧集季",
+  "seriesEpisodeCount": "{count, plural, =1{1 集} other{{count} 集}}",
+  "@seriesEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "seriesPlayEpisode": "播放 S{season}E{episode}",
   "@seriesPlayEpisode": {
     "placeholders": {

@@ -245,6 +245,26 @@ void main() {
     expect(find.text('Third season synopsis'), findsOneWidget);
   });
 
+  testWidgets('season picker shows an episode count badge and per-season '
+      'counts in the pick-list', (tester) async {
+    await tester.pumpWidget(_app(_info()));
+    await tester.pumpAndSettle();
+
+    // Default season (1) has 3 episodes -> badge on the picker button.
+    expect(find.text('3'), findsOneWidget);
+
+    await tester.tap(find.text('Season 1').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 episodes'), findsOneWidget);
+    expect(find.text('1 episode'), findsOneWidget);
+    expect(find.text('2 episodes'), findsOneWidget);
+    // Season overview rides under the count in the pick-list row (season 1's
+    // also shows in the page body since it is the default season).
+    expect(find.text('First season synopsis'), findsNWidgets(2));
+    expect(find.text('Third season synopsis'), findsOneWidget);
+  });
+
   testWidgets('falls back to series plot when the season has no overview', (
     tester,
   ) async {

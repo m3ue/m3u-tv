@@ -342,6 +342,14 @@
     }
   },
   "seriesSeasons": "Seasons",
+  "seriesEpisodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+  "@seriesEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "seriesPlayEpisode": "Play S{season}E{episode}",
   "@seriesPlayEpisode": {
     "placeholders": {

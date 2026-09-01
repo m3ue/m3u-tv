@@ -661,6 +661,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get seriesSeasons => '剧集季';
 
   @override
+  String seriesEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 集',
+      one: '1 集',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String seriesPlayEpisode(int season, int episode) {
     return '播放 S${season}E$episode';
   }

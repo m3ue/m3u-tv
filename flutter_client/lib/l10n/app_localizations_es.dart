@@ -692,6 +692,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get seriesSeasons => 'Temporadas';
 
   @override
+  String seriesEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count episodios',
+      one: '1 episodio',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String seriesPlayEpisode(int season, int episode) {
     return 'Reproducir T${season}E$episode';
   }

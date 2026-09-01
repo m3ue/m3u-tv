@@ -341,6 +341,14 @@
     }
   },
   "seriesSeasons": "Saisons",
+  "seriesEpisodeCount": "{count, plural, =1{1 épisode} other{{count} épisodes}}",
+  "@seriesEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "seriesPlayEpisode": "Lire S{season}E{episode}",
   "@seriesPlayEpisode": {
     "placeholders": {

@@ -1328,6 +1328,12 @@ abstract class AppLocalizations {
   /// **'Seasons'**
   String get seriesSeasons;
 
+  /// No description provided for @seriesEpisodeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 episode} other{{count} episodes}}'**
+  String seriesEpisodeCount(int count);
+
   /// No description provided for @seriesPlayEpisode.
   ///
   /// In en, this message translates to:

@@ -369,6 +369,17 @@ class _SeriesDetailsBody extends StatelessWidget {
       _episodes(seasonNumber).toList()
         ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
 
+  /// Episode tally for a season: the loaded episode list when we have it,
+  /// otherwise the count the provider reported on the season record.
+  int _episodeCountFor(int seasonNumber) {
+    final loaded = _episodes(seasonNumber).length;
+    if (loaded > 0) return loaded;
+    return info.seasons
+            .firstWhereOrNull((s) => s.number == seasonNumber)
+            ?.episodeCount ??
+        0;
+  }
+
   Episode? _episodeByStreamId(int streamId) {
     for (final list in info.episodesBySeason.values) {
       for (final episode in list) {
@@ -617,6 +628,8 @@ class _SeriesDetailsBody extends StatelessWidget {
                 seasons: info.seasons,
                 selectedSeason: seasonNumber,
                 canMarkWatched: canMarkWatched && episodes.isNotEmpty,
+                episodeCountFor: _episodeCountFor,
+                fallbackPosterUrl: _trimmedOrNull(info.series.coverUrl),
                 onSeasonSelected: onSeasonSelected,
                 onMarkSeason: (watched) =>
                     onMarkSeason(_episodes(seasonNumber), watched: watched),
@@ -931,6 +944,8 @@ class _SeasonPicker extends StatelessWidget {
     required this.seasons,
     required this.selectedSeason,
     required this.canMarkWatched,
+    required this.episodeCountFor,
+    required this.fallbackPosterUrl,
     required this.onSeasonSelected,
     required this.onMarkSeason,
   });
@@ -938,6 +953,12 @@ class _SeasonPicker extends StatelessWidget {
   final List<Season> seasons;
   final int? selectedSeason;
   final bool canMarkWatched;
+
+  /// Episode tally for a given season number (0 when unknown).
+  final int Function(int seasonNumber) episodeCountFor;
+
+  /// Series poster, shown in the pick-list when a season has no art of its own.
+  final String? fallbackPosterUrl;
   final ValueChanged<int> onSeasonSelected;
   final ValueChanged<bool> onMarkSeason;
 
@@ -945,12 +966,19 @@ class _SeasonPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     if (seasons.isEmpty) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final current = selectedSeason;
+    final count = current != null ? episodeCountFor(current) : 0;
     // No size overrides - shares AppButton's default metrics so it lines up
     // with the play / start-over buttons beside it.
     return AppButton(
       label: current != null ? l.homeSeason(current) : l.seriesSeasons,
       icon: Icons.arrow_drop_down,
+      badgeCount: count > 0 ? count : null,
+      // Muted, not the default error red - this is an episode tally, not an
+      // unwatched/new alert.
+      badgeColor: scheme.surfaceContainerHighest,
+      badgeTextColor: scheme.onSurfaceVariant,
       onPressed: () => _showPicker(context),
       onLongPress: canMarkWatched && current != null
           ? () => unawaited(_showMarkSeasonSheet(context, current))
@@ -965,37 +993,110 @@ class _SeasonPicker extends StatelessWidget {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(l.seriesSeasons),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
           content: SizedBox(
-            width: double.maxFinite,
+            width: 460,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.65,
               ),
               child: Scrollbar(
                 thumbVisibility: true,
                 child: ListView(
                   shrinkWrap: true,
                   children: seasons
-                      .map(
-                        (season) => ListTile(
-                          title: Text(
-                            season.name.isNotEmpty
-                                ? season.name
-                                : l.homeSeason(season.number),
-                          ),
-                          selected: season.number == selectedSeason,
-                          onTap: () {
-                            onSeasonSelected(season.number);
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      )
+                      .map((season) => _seasonTile(context, season))
                       .toList(growable: false),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _seasonTile(BuildContext context, Season season) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final count = episodeCountFor(season.number);
+    final seasonCover = _trimmedOrNull(season.coverUrl);
+    final overview = _trimmedOrNull(season.overview);
+    final selected = season.number == selectedSeason;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      selected: selected,
+      onTap: () {
+        onSeasonSelected(season.number);
+        Navigator.of(context).pop();
+      },
+      // Poster + text laid out by hand (not `leading`/`subtitle`) so ListTile
+      // can't crush the poster down to fit a short two-line row.
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: AspectRatio(
+              aspectRatio: 0.68,
+              child: ResilientMediaImage(
+                imageUrl: seasonCover ?? fallbackPosterUrl,
+                fallbackImageUrls:
+                    seasonCover != null && fallbackPosterUrl != null
+                    ? <String>[fallbackPosterUrl!]
+                    : const <String>[],
+                fallbackIcon: Icons.tv,
+                borderRadius: 6,
+                fallbackTitle: season.name,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    season.name.isNotEmpty
+                        ? season.name
+                        : l.homeSeason(season.number),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: selected ? scheme.primary : null,
+                    ),
+                  ),
+                  if (count > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        l.seriesEpisodeCount(count),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: selected
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  if (overview != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        overview,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

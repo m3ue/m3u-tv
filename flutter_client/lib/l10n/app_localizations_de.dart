@@ -691,6 +691,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get seriesSeasons => 'Staffeln';
 
   @override
+  String seriesEpisodeCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Folgen',
+      one: '1 Folge',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String seriesPlayEpisode(int season, int episode) {
     return 'S${season}E$episode abspielen';
   }

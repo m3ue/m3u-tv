@@ -196,6 +196,8 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.badgeCount,
+    this.badgeColor,
+    this.badgeTextColor,
     this.variant = AppButtonVariant.tonal,
     this.autofocus = false,
     this.focusNode,
@@ -216,6 +218,12 @@ class AppButton extends StatelessWidget {
   /// Small count badge overlaid on the button's corner (e.g. active
   /// Multiview tile count) instead of appending the count to [label].
   final int? badgeCount;
+
+  /// Badge background / text colours. Default to the theme error colours
+  /// (an attention cue, e.g. Multiview); pass a muted pair for a badge that
+  /// is just informational (e.g. an episode tally).
+  final Color? badgeColor;
+  final Color? badgeTextColor;
   final VoidCallback? onPressed;
 
   /// Fires on D-pad long-select and touch long-press, alongside [onPressed]'s
@@ -418,16 +426,26 @@ class AppButton extends StatelessWidget {
       fit: StackFit.passthrough,
       children: [
         result,
-        Positioned(top: -6, right: -6, child: _CountBadge(count: count)),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: _CountBadge(
+            count: count,
+            color: badgeColor,
+            textColor: badgeTextColor,
+          ),
+        ),
       ],
     );
   }
 }
 
 class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
+  const _CountBadge({required this.count, this.color, this.textColor});
 
   final int count;
+  final Color? color;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -436,7 +454,7 @@ class _CountBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: ShapeDecoration(
-        color: scheme.error,
+        color: color ?? scheme.error,
         shape: const StadiumBorder(),
       ),
       alignment: Alignment.center,
@@ -444,7 +462,7 @@ class _CountBadge extends StatelessWidget {
         '$count',
         style: Theme.of(
           context,
-        ).textTheme.labelSmall?.copyWith(color: scheme.onError),
+        ).textTheme.labelSmall?.copyWith(color: textColor ?? scheme.onError),
       ),
     );
   }

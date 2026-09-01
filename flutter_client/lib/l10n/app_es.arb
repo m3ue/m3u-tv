@@ -341,6 +341,14 @@
     }
   },
   "seriesSeasons": "Temporadas",
+  "seriesEpisodeCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
+  "@seriesEpisodeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "seriesPlayEpisode": "Reproducir T{season}E{episode}",
   "@seriesPlayEpisode": {
     "placeholders": {
