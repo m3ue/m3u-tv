@@ -190,6 +190,42 @@ void main() {
     await tester.pump(const Duration(seconds: 16));
   });
 
+  testWidgets('phone layout stacks the poster and uses a vertical episode '
+      'list', (tester) async {
+    tester.view.physicalSize = const Size(420, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Fixture Show'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Pilot',
+            containerExtension: 'mp4',
+            seasonNumber: 1,
+            duration: '45m',
+            rating: 8.1,
+            streamUrl: 'http://example.com/s1/e1.mp4',
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    // Vertical cards render a single joined meta line rather than separate
+    // overlaid pills.
+    expect(find.text('S1E1  ·  ★ 8.1  ·  45m'), findsOneWidget);
+    // No horizontal strip -> no episode Scrollbar.
+    expect(find.byType(Scrollbar), findsNothing);
+  });
+
   testWidgets('play button takes focus once the series loads', (tester) async {
     await tester.pumpWidget(_app(_info()));
     await tester.pumpAndSettle();

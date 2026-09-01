@@ -577,9 +577,40 @@ class _SeriesDetailsBody extends StatelessWidget {
         : _kEpisodeCardWidthWide;
     final stripHeight = cardWidth * 9 / 16 + _kEpisodeCardTextHeight;
 
+    final poster = SizedBox(
+      width: posterWidth,
+      child: AspectRatio(
+        aspectRatio: 0.68,
+        child: ResilientMediaImage(
+          imageUrl: posterChain.isEmpty ? null : posterChain.first,
+          fallbackImageUrls: posterChain.skip(1).toList(),
+          fallbackIcon: Icons.tv,
+          borderRadius: MediaBrowsingMetrics.cardRadius,
+          fallbackTitle: info.series.name,
+        ),
+      ),
+    );
+    final meta = _seriesMetaInfo(context, target, description, plotMaxWidth);
+    // Phone: poster stacked above the title / chips / description. TV and
+    // desktop: poster beside them.
+    final header = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [poster, const SizedBox(height: 16), meta],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              poster,
+              const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+              Expanded(child: meta),
+            ],
+          );
+
     // Bottom-aligned over a full-bleed backdrop, mirroring the VOD detail
     // page: poster + meta (with resume progress) on top, season picker, then
-    // a horizontal strip of episode thumbnail cards.
+    // the episode cards (a horizontal strip on TV, a vertical list on a phone).
     final content = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: MediaBrowsingMetrics.pagePadding,
@@ -588,33 +619,7 @@ class _SeriesDetailsBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              SizedBox(
-                width: posterWidth,
-                child: AspectRatio(
-                  aspectRatio: 0.68,
-                  child: ResilientMediaImage(
-                    imageUrl: posterChain.isEmpty ? null : posterChain.first,
-                    fallbackImageUrls: posterChain.skip(1).toList(),
-                    fallbackIcon: Icons.tv,
-                    borderRadius: MediaBrowsingMetrics.cardRadius,
-                    fallbackTitle: info.series.name,
-                  ),
-                ),
-              ),
-              const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-              Expanded(
-                child: _seriesMetaInfo(
-                  context,
-                  target,
-                  description,
-                  plotMaxWidth,
-                ),
-              ),
-            ],
-          ),
+          header,
           const SizedBox(height: 20),
           // Play / Start-from-beginning sit on the same line as the season
           // picker (wrapping to a second run on a phone).
@@ -637,23 +642,35 @@ class _SeriesDetailsBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: stripHeight,
-            child: episodes.isEmpty
-                ? const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('No episodes available'),
-                  )
-                : _EpisodeStrip(
-                    episodes: episodes,
-                    progressList: progressList,
-                    autofocusFirst: target == null,
-                    canMarkWatched: canMarkWatched,
-                    cardWidth: cardWidth,
-                    onEpisodeSelected: onEpisodeSelected,
-                    onMarkEpisode: onMarkEpisode,
-                  ),
-          ),
+          if (episodes.isEmpty)
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('No episodes available'),
+            )
+          else if (compact)
+            _EpisodeStrip(
+              episodes: episodes,
+              progressList: progressList,
+              autofocusFirst: target == null,
+              canMarkWatched: canMarkWatched,
+              cardWidth: cardWidth,
+              horizontal: false,
+              onEpisodeSelected: onEpisodeSelected,
+              onMarkEpisode: onMarkEpisode,
+            )
+          else
+            SizedBox(
+              height: stripHeight,
+              child: _EpisodeStrip(
+                episodes: episodes,
+                progressList: progressList,
+                autofocusFirst: target == null,
+                canMarkWatched: canMarkWatched,
+                cardWidth: cardWidth,
+                onEpisodeSelected: onEpisodeSelected,
+                onMarkEpisode: onMarkEpisode,
+              ),
+            ),
         ],
       ),
     );
@@ -1128,6 +1145,7 @@ class _EpisodeStrip extends StatefulWidget {
     required this.cardWidth,
     this.canMarkWatched = false,
     this.autofocusFirst = true,
+    this.horizontal = true,
   });
 
   final List<Episode> episodes;
@@ -1138,6 +1156,9 @@ class _EpisodeStrip extends StatefulWidget {
   final double cardWidth;
   final bool canMarkWatched;
   final bool autofocusFirst;
+
+  /// Horizontal thumbnail strip (TV/desktop) vs. a vertical list (phone).
+  final bool horizontal;
 
   @override
   State<_EpisodeStrip> createState() => _EpisodeStripState();
@@ -1183,6 +1204,7 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
     return _EpisodeCard(
       episode: episode,
       width: widget.cardWidth,
+      horizontal: widget.horizontal,
       completed: completed,
       progressFraction: fraction,
       dateLabel: _formatEpisodeDate(
@@ -1199,6 +1221,21 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.horizontal) {
+      // Phone: a plain vertical column - the page's own scroll view drives it,
+      // so no inner ListView / ScrollController.
+      return DpadRegion(
+        verticalEdge: DpadEdgeBehavior.stop,
+        child: Column(
+          children: [
+            for (var i = 0; i < widget.episodes.length; i++) ...[
+              if (i > 0) const SizedBox(height: MediaBrowsingMetrics.itemGap),
+              _card(context, i),
+            ],
+          ],
+        ),
+      );
+    }
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
       child: Scrollbar(
@@ -1218,9 +1255,10 @@ class _EpisodeStripState extends State<_EpisodeStrip> {
   }
 }
 
-/// A single episode card: 16:9 still with title + SxEy + rating + runtime
-/// overlaid over a bottom-up scrim, plot synopsis (max 3 lines) and air date
-/// beneath.
+/// A single episode card. Horizontal (TV/desktop): a fixed-width 16:9 still
+/// with title + SxEy + rating + runtime overlaid over a bottom-up scrim, plot
+/// synopsis and air date beneath. Vertical (phone): a full-width row with a
+/// small thumbnail on the left and the title / meta / plot / date beside it.
 class _EpisodeCard extends StatelessWidget {
   const _EpisodeCard({
     required this.episode,
@@ -1231,6 +1269,7 @@ class _EpisodeCard extends StatelessWidget {
     required this.autofocus,
     required this.onTap,
     this.onLongTap,
+    this.horizontal = true,
   });
 
   final Episode episode;
@@ -1241,6 +1280,7 @@ class _EpisodeCard extends StatelessWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback? onLongTap;
+  final bool horizontal;
 
   Widget _pill(BuildContext context, Widget child) => DecoratedBox(
     decoration: BoxDecoration(
@@ -1268,8 +1308,13 @@ class _EpisodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final imageHeight = width * 9 / 16;
     final runtime = episode.duration;
+
+    if (!horizontal) {
+      return _buildVertical(context, theme, colorScheme, runtime);
+    }
+
+    final imageHeight = width * 9 / 16;
     final titleBase = theme.textTheme.titleSmall;
     // ~60% larger than the stock card title.
     final titleStyle = titleBase?.copyWith(
@@ -1415,6 +1460,130 @@ class _EpisodeCard extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVertical(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String? runtime,
+  ) {
+    const thumbWidth = 132.0;
+    const thumbHeight = thumbWidth * 9 / 16;
+    final metaParts = <String>[
+      'S${episode.seasonNumber}E${episode.episodeNumber}',
+      if (episode.rating != null) '★ ${episode.rating!.toStringAsFixed(1)}',
+      if (runtime != null && runtime.isNotEmpty) runtime,
+    ];
+
+    return DpadInkWell(
+      autofocus: autofocus,
+      onTap: onTap,
+      onLongTap: onLongTap,
+      color: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: thumbWidth,
+                height: thumbHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ResilientMediaImage(
+                      imageUrl: episode.thumbnailUrl,
+                      fallbackIcon: Icons.tv,
+                      width: thumbWidth,
+                      height: thumbHeight,
+                      fallbackTitle: episode.title,
+                      borderRadius: 0,
+                    ),
+                    if (completed)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: _pill(
+                          context,
+                          const Icon(
+                            Icons.check,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    if (progressFraction != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: LinearProgressIndicator(
+                          value: progressFraction,
+                          minHeight: 3,
+                          backgroundColor: Colors.white24,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    episode.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    metaParts.join('  ·  '),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (episode.plot != null &&
+                      episode.plot!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      episode.plot!.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (dateLabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      dateLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
