@@ -983,10 +983,14 @@ class _SeasonPicker extends StatelessWidget {
 
   void _showPicker(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Focus lands on the current season (or the first one) so the list is
+    // immediately drivable by D-pad.
+    final focusSeason = selectedSeason ?? seasons.first.number;
     unawaited(
       showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
+          clipBehavior: Clip.antiAlias,
           title: Text(l.seriesSeasons),
           contentPadding: const EdgeInsets.symmetric(vertical: 12),
           content: SizedBox(
@@ -997,11 +1001,26 @@ class _SeasonPicker extends StatelessWidget {
               ),
               child: Scrollbar(
                 thumbVisibility: true,
-                child: ListView(
-                  shrinkWrap: true,
-                  children: seasons
-                      .map((season) => _seasonTile(context, season))
-                      .toList(growable: false),
+                // Contain D-pad traversal to the list - up/down moves between
+                // rows and stops at the ends instead of escaping the dialog.
+                child: DpadRegion(
+                  verticalEdge: DpadEdgeBehavior.stop,
+                  horizontalEdge: DpadEdgeBehavior.stop,
+                  child: ListView(
+                    shrinkWrap: true,
+                    // Inset so a focused row's gradient border sits inside the
+                    // dialog's rounded corners and clear of the scrollbar.
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    children: seasons
+                        .map(
+                          (season) => _seasonTile(
+                            context,
+                            season,
+                            autofocus: season.number == focusSeason,
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
                 ),
               ),
             ),
@@ -1011,7 +1030,11 @@ class _SeasonPicker extends StatelessWidget {
     );
   }
 
-  Widget _seasonTile(BuildContext context, Season season) {
+  Widget _seasonTile(
+    BuildContext context,
+    Season season, {
+    required bool autofocus,
+  }) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -1019,79 +1042,89 @@ class _SeasonPicker extends StatelessWidget {
     final seasonCover = _trimmedOrNull(season.coverUrl);
     final overview = _trimmedOrNull(season.overview);
     final selected = season.number == selectedSeason;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      selected: selected,
-      onTap: () {
-        onSeasonSelected(season.number);
-        Navigator.of(context).pop();
-      },
-      // Poster + text laid out by hand (not `leading`/`subtitle`) so ListTile
-      // can't crush the poster down to fit a short two-line row.
-      title: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 84,
-            child: AspectRatio(
-              aspectRatio: 0.68,
-              child: ResilientMediaImage(
-                imageUrl: seasonCover ?? fallbackPosterUrl,
-                fallbackImageUrls:
-                    seasonCover != null && fallbackPosterUrl != null
-                    ? <String>[fallbackPosterUrl!]
-                    : const <String>[],
-                fallbackIcon: Icons.tv,
-                borderRadius: 6,
-                fallbackTitle: season.name,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    season.name.isNotEmpty
-                        ? season.name
-                        : l.homeSeason(season.number),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: selected ? scheme.primary : null,
-                    ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: DpadInkWell(
+        autofocus: autofocus,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        color: selected
+            ? scheme.primaryContainer.withValues(alpha: 0.35)
+            : null,
+        onTap: () {
+          onSeasonSelected(season.number);
+          Navigator.of(context).pop();
+        },
+        // Poster + text laid out by hand (not a ListTile) so nothing gets
+        // crushed to fit a short two-line row.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 84,
+                child: AspectRatio(
+                  aspectRatio: 0.68,
+                  child: ResilientMediaImage(
+                    imageUrl: seasonCover ?? fallbackPosterUrl,
+                    fallbackImageUrls:
+                        seasonCover != null && fallbackPosterUrl != null
+                        ? <String>[fallbackPosterUrl!]
+                        : const <String>[],
+                    fallbackIcon: Icons.tv,
+                    borderRadius: 6,
+                    fallbackTitle: season.name,
                   ),
-                  if (count > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        l.seriesEpisodeCount(count),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: selected
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  if (overview != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        overview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        season.name.isNotEmpty
+                            ? season.name
+                            : l.homeSeason(season.number),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: selected ? scheme.primary : null,
+                        ),
+                      ),
+                      if (count > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            l.seriesEpisodeCount(count),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      if (overview != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            overview,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

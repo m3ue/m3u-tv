@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
@@ -5,6 +6,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 Episode _ep(int season, int number) => Episode(
@@ -273,6 +275,27 @@ void main() {
 
     await tester.tap(find.text('Season 1').last);
     await tester.pumpAndSettle();
+
+    // Pick-list rows are D-pad targets, and the current season's row takes
+    // focus so the list is drivable by remote the moment it opens.
+    final rows = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(DpadInkWell),
+    );
+    expect(rows, findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(DpadRegion),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<DpadInkWell>(rows.first).autofocus,
+      isTrue,
+      reason: 'Season 1 (the selected season) row should autofocus',
+    );
+
     await tester.tap(find.text('Season 3').last);
     await tester.pumpAndSettle();
 
