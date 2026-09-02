@@ -1325,12 +1325,11 @@ class XtreamService {
   ///
   /// Omit-to-inherit ON UPDATE differs from create: absent fields keep their
   /// current value (they are never nulled out). Only fields the caller passes
-  /// here are sent. [channelId] is special — null means "any channel", so it is
-  /// always sent (as an empty value) to distinguish an explicit switch to
-  /// any-channel from "leave unchanged".
+  /// here are sent. [channelUpdate] controls whether the channel scope is
+  /// unchanged, set to a channel, or cleared to any channel.
   Future<void> updateDvrSeriesRule({
     required int ruleId,
-    int? channelId,
+    DvrChannelScopeUpdate channelUpdate = const DvrChannelScopeUnchanged(),
     DvrMatchMode? matchMode,
     DvrSeriesMode? seriesMode,
     int? keepLast,
@@ -1340,7 +1339,6 @@ class XtreamService {
   }) async {
     final params = <String, String>{
       'rule_id': '$ruleId',
-      if (channelId == null) 'channel_id': '' else 'channel_id': '$channelId',
       if (matchMode != null) 'match_mode': matchMode.wireValue,
       if (seriesMode != null) 'series_mode': seriesMode.wireValue,
       if (keepLast != null) 'keep_last': '$keepLast',
@@ -1349,6 +1347,14 @@ class XtreamService {
         'start_early_seconds': '$startEarlySeconds',
       if (endLateSeconds != null) 'end_late_seconds': '$endLateSeconds',
     };
+    switch (channelUpdate) {
+      case DvrChannelScopeSet(:final channelId):
+        params['channel_id'] = '$channelId';
+      case DvrChannelScopeClear():
+        params['channel_id'] = '';
+      case DvrChannelScopeUnchanged():
+        break;
+    }
     await _request(
       'update_dvr_series_rule',
       params: params,

@@ -931,7 +931,7 @@ class AppShellState extends ConsumerState<AppShell>
   ) async {
     await _appState.xtreamService.updateDvrSeriesRule(
       ruleId: rule.id,
-      channelId: options.channelId,
+      channelUpdate: options.channelUpdate,
       matchMode: options.matchMode,
       seriesMode: options.seriesMode,
       keepLast: options.keepLast,
