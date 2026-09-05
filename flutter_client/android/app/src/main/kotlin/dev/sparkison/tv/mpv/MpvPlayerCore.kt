@@ -6,10 +6,10 @@ import android.os.Looper
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import dev.jdtech.mpv.EndFileReason
-import dev.jdtech.mpv.MpvEvent
-import dev.jdtech.mpv.MpvException
-import dev.jdtech.mpv.MpvPlayer
+import dev.sparkison.tv.libmpv.EndFileReason
+import dev.sparkison.tv.libmpv.MpvEvent
+import dev.sparkison.tv.libmpv.MpvException
+import dev.sparkison.tv.libmpv.MpvPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -23,12 +23,14 @@ import kotlinx.coroutines.sync.withLock
  *
  * Modeled on `macos/Runner/MpvPlayer/MpvPlayerCore.swift` and
  * `ios/Runner/MpvPlayer/MpvPlayerCore.swift`, adapted for Android's
- * `SurfaceView`/`Surface` embedding and the `dev.jdtech.mpv` libmpv Kotlin
- * bindings (github.com/edde746/libmpv-android, itself based on
- * mpv-android/mpv-android, LGPL/GPL-2.0-or-later) instead of raw libmpv C
- * calls -- the open-source Plezy player (github.com/edde746/plezy,
- * GPL-3.0), whose Apple mpv cores this codebase's own Apple backends are
- * modeled on, uses the same `dev.jdtech.mpv` bindings for its own Android
+ * `SurfaceView`/`Surface` embedding and the `dev.sparkison.tv.libmpv` libmpv
+ * Kotlin bindings instead of raw libmpv C calls -- vendored in-project under
+ * `android/libmpv/` (imported from the libmpv-android fork,
+ * github.com/edde746/libmpv-android, itself based on mpv-android/mpv-android,
+ * LGPL/GPL-2.0-or-later) with the native `libmpv`/FFmpeg binaries supplied by
+ * the pinned `mpv-build` tarballs, the same approach the open-source Plezy
+ * player (github.com/edde746/plezy, GPL-3.0), whose Apple mpv cores this
+ * codebase's own Apple backends are modeled on, uses for its own Android
  * core.
  *
  * Renders through `vo=gpu-next,gpu` + `gpu-context=android` +
@@ -37,7 +39,7 @@ import kotlinx.coroutines.sync.withLock
  * itself, rather than going through a Flutter texture/SurfaceTexture
  * bridge. Subtitles are rendered natively (mpv's own libass compositing).
  *
- * Unlike the Apple/macOS cores, the underlying `dev.jdtech.mpv.MpvPlayer` is
+ * Unlike the Apple/macOS cores, the underlying `dev.sparkison.tv.libmpv.MpvPlayer` is
  * a process-wide singleton (one native mpv handle via static JNI bindings) --
  * [MpvPlayerPlugin] enforces that only one [MpvPlayerCore] is ever attached
  * at a time, fully closing any previous instance before creating the next.
@@ -51,11 +53,12 @@ class MpvPlayerCore(
         fun mpvPlayerCore(core: MpvPlayerCore, event: Map<String, Any?>)
     }
 
-    // dev.jdtech.mpv's `suspend fun command()`/`setProperty()`/etc. are not
+    // dev.sparkison.tv.libmpv's `suspend fun command()`/`setProperty()`/etc. are not
     // real suspend functions -- they call their blocking native JNI
     // counterpart directly on whatever thread invokes them, with no internal
-    // dispatcher hop (confirmed by decompiling the AAR: no Dispatchers
-    // reference anywhere in their bytecode). Running this scope on
+    // dispatcher hop (see the comment on `MpvPlayer.create` in
+    // android/libmpv/ for why that's load-bearing, not incidental). Running
+    // this scope on
     // Dispatchers.Main, as this class previously did, meant every mpv
     // command/property/create/attach call -- including `loadfile`, which can
     // block for several seconds opening a slow live stream -- executed
@@ -80,7 +83,7 @@ class MpvPlayerCore(
 
     // mpv's EndFileReason enum carries no detail beyond the reason code
     // (unlike the raw C API's mpv_event_end_file, which also has an error
-    // code) -- dev.jdtech.mpv's Kotlin binding doesn't expose it. Tracking
+    // code) -- dev.sparkison.tv.libmpv's Kotlin binding doesn't expose it. Tracking
     // the most recent log line here (mirroring the Windows/Linux C++ cores'
     // own `last_log_message` pattern) is the only way to surface mpv's own
     // diagnostic text (e.g. "No format found, try lowering probescore or
