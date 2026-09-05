@@ -28,11 +28,12 @@ int _nextViewId = 0;
 /// Flutter texture bridge -- same architecture family as
 /// `MacMpvNativeBackend`/`AppleMpvNativeBackend`, modeled on the open-source
 /// Plezy player (github.com/edde746/plezy, GPL-3.0), whose Android core uses
-/// the same `dev.jdtech.mpv` libmpv bindings this backend's native side
+/// the same vendored `dev.sparkison.tv.libmpv` libmpv bindings this backend's
+/// native side
 /// (`android/app/src/main/kotlin/dev/sparkison/tv/mpv/MpvPlayerCore.kt`) uses.
 ///
 /// Unlike `MacMpvNativeBackend`/`AppleMpvNativeBackend`, the native
-/// `dev.jdtech.mpv.MpvPlayer` this backend wraps is a process-wide singleton
+/// `dev.sparkison.tv.libmpv.MpvPlayer` this backend wraps is a process-wide singleton
 /// (it owns one native mpv handle via static JNI bindings) -- only one
 /// `AndroidMpvBackend` instance can be attached at a time. It is therefore
 /// only registered as the single-player primary backend in

@@ -190,7 +190,7 @@
 			mainGroup = 97C146E51CF9000082B4168C;
 			packageReferences = (
 				AAF40000000000000000F00D /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
-				5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */,
+				5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "mpv-build" */,
 			);
 			productRefGroup = 97C146EF1CF9000082B41690 /* Products */;
 			projectDirPath = "";
@@ -631,12 +631,12 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */ = {
+		5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "mpv-build" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/edde746/MPVKit.git";
+			repositoryURL = "https://github.com/edde746/mpv-build";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				kind = revision;
+				revision = d7c3d559c91b689407daafe580b758f8b7df6078;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -644,7 +644,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		9E4D82C06F21F34506FFF59A /* MPVKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "MPVKit" */;
+			package = 5F7E5F4B570DE6FCB2877AAC /* XCRemoteSwiftPackageReference "mpv-build" */;
 			productName = MPVKit;
 		};
 		AAF30000000000000000F00D /* FlutterGeneratedPluginSwiftPackage */ = {

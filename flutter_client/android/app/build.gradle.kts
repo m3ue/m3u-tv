@@ -1,9 +1,4 @@
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import java.util.Properties
-import java.util.UUID
 
 plugins {
     id("com.android.application")
@@ -18,70 +13,15 @@ plugins {
 val media3Version = "1.10.1"
 val lifecycleVersion = "2.9.4"
 
-// Downloads the prebuilt libmpv-android AAR (dev.jdtech.mpv Kotlin/JNI
-// bindings over libmpv, used by AndroidMpvBackend's native side --
-// android/app/src/main/kotlin/dev/sparkison/tv/mpv/MpvPlayerCore.kt). Same
-// source and hash-pinning approach the open-source Plezy player
-// (github.com/edde746/plezy, GPL-3.0) uses for its own Android mpv core.
-fun verifySha256(file: File, expected: String, identity: String) {
-    val digest = MessageDigest.getInstance("SHA-256")
-    file.inputStream().buffered().use { input ->
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (true) {
-            val count = input.read(buffer)
-            if (count < 0) break
-            digest.update(buffer, 0, count)
-        }
-    }
-    val actual = digest.digest().joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
-    if (actual != expected) {
-        throw GradleException("SHA-256 mismatch for $identity: expected $expected, got $actual")
-    }
-}
-
-val mpvVersion = "v1.0.7"
-val mpvSha256 = "d55d440e587b2a9ffb91874d93069460a987be05fe72af8394849983f0df2d7a"
-val mpvDir = layout.buildDirectory.dir("libmpv").get().asFile
-val mpvAar = "libmpv-release.aar"
-val mpvUrl = "https://github.com/edde746/libmpv-android/releases/download/$mpvVersion/$mpvAar"
-
-val downloadLibmpv = tasks.register("downloadLibmpv") {
-    val aar = File(mpvDir, mpvAar)
-    val manifest = File(mpvDir, ".manifest")
-    inputs.property("version", mpvVersion)
-    inputs.property("sourceUrl", mpvUrl)
-    inputs.property("sha256", mpvSha256)
-    outputs.files(aar, manifest)
-    doLast {
-        mpvDir.parentFile.mkdirs()
-        val staging = File(mpvDir.parentFile, "${mpvDir.name}.staging-${UUID.randomUUID()}")
-        try {
-            staging.mkdirs()
-            val stagedAar = File(staging, mpvAar)
-            try {
-                providers.exec {
-                    commandLine("curl", "-sfL", mpvUrl, "-o", stagedAar.absolutePath)
-                }.result.get().assertNormalExitValue()
-            } catch (error: Exception) {
-                throw GradleException("Failed to download $mpvAar $mpvVersion", error)
-            }
-            verifySha256(stagedAar, mpvSha256, "$mpvAar $mpvVersion")
-            File(staging, ".manifest").writeText("version=$mpvVersion\nsha256=$mpvSha256\n")
-
-            val backup = File(mpvDir.parentFile, "${mpvDir.name}.backup-${UUID.randomUUID()}")
-            val hadDestination = mpvDir.exists()
-            if (hadDestination) Files.move(mpvDir.toPath(), backup.toPath(), StandardCopyOption.ATOMIC_MOVE)
-            Files.move(staging.toPath(), mpvDir.toPath(), StandardCopyOption.ATOMIC_MOVE)
-            if (hadDestination) backup.deleteRecursively()
-        } finally {
-            staging.deleteRecursively()
-        }
-    }
-}
-
-tasks.matching { it.name.startsWith("pre") && it.name.endsWith("Build") }.configureEach {
-    dependsOn(downloadLibmpv)
-}
+// The mpv-build tarballs' libc++_shared.so (extracted by :libmpv's own
+// extractLibmpvNative task into its build dir, but deliberately left out of
+// that module's own jniLibs -- see android/libmpv/build.gradle.kts) needs to
+// win the merge over whatever default NDK libc++_shared.so AGP would
+// otherwise auto-package for :libmpv's CMake-built glue library, so the
+// runtime STL matches the toolchain generation libmpv.so/libavcodec.so were
+// actually built against. Packaged here, at PROJECT scope, per the
+// packaging{}/sourceSets{} blocks below.
+val libmpvLibcxxJniDir = File(project(":libmpv").layout.buildDirectory.dir("libmpv").get().asFile, "libcxx/jni")
 
 // Reads from (in priority order):
 //   1. Gradle properties  (-PANDROID_KEYSTORE_PATH=...)
@@ -137,9 +77,9 @@ android {
 
     defaultConfig {
         applicationId = "dev.sparkison.tv"
-        // Overridden ahead of flutter.minSdkVersion (24): libmpv-android's
-        // AndroidManifest.xml declares minSdkVersion=26, and the manifest
-        // merger fails the build if the app's own minSdk is lower.
+        // Overridden ahead of flutter.minSdkVersion (24): kept at 26 as the
+        // app's existing floor (the :libmpv module itself only requires 25,
+        // see android/libmpv/build.gradle.kts).
         minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -168,12 +108,37 @@ android {
             }
         }
     }
+
+    packaging {
+        jniLibs {
+            // pickFirst only suppresses the duplicate libc++ merge error; the
+            // sourceSets rule below makes the runtime :libmpv extracts from
+            // the mpv-build tarballs win.
+            pickFirsts.add("lib/*/libc++_shared.so")
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            // PROJECT-scope jniLibs merge ahead of subprojects/AARs, so
+            // dependency order cannot accidentally select an older libc++
+            // copy. The directory is :libmpv's extractLibmpvNative output,
+            // wired below via the JniLibFolders task dependency.
+            jniLibs.srcDir(libmpvLibcxxJniDir)
+        }
+    }
 }
 
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+// Gradle snapshots jniLibs source dirs before task execution; this keeps the
+// extracted mpv-build libc++ directory present during input discovery.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }.configureEach {
+    dependsOn(":libmpv:extractLibmpvNative")
 }
 
 dependencies {
@@ -184,8 +149,9 @@ dependencies {
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    // libmpv-android (dev.jdtech.mpv) -- see downloadLibmpv above.
-    implementation(files(File(mpvDir, mpvAar)))
+    // mpv Kotlin API + JNI glue, built in-project against the pinned
+    // mpv-build native tarballs -- see android/libmpv/build.gradle.kts.
+    implementation(project(":libmpv"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     testImplementation("junit:junit:4.13.2")
 }

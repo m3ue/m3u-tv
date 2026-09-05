@@ -6,57 +6,43 @@ project(m3u_tv LANGUAGES CXX)
 # the on-disk name of your application.
 set(BINARY_NAME "m3u_tv")
 
-# gpu-next/D3D11-capable libmpv, fetched the same way the open-source Plezy
-# player (github.com/edde746/plezy, GPL-3.0, windows/CMakeLists.txt) fetches
-# it, since that is the reference this project's native mpv backend
-# (windows/runner/desktop_libmpv_backend.cpp) is modeled on. Only the DLL is
-# consumed (windows/runner/CMakeLists.txt copies it into the runner output
-# directory as "libmpv-gpu-2.dll", not "libmpv-2.dll" -- see the comment
-# beside that copy step for why) -- unlike Plezy, this project deliberately
-# does not link against libmpv.dll.a or include mpv/client.h at build time
-# (see the ABI structs hand-declared in desktop_libmpv_backend.cpp); it
-# dlopens the DLL at runtime instead, so MPV_INCLUDE_DIR is unused here.
-set(MPV_VERSION "20260809")
-set(MPV_GIT_HASH "dd5d17d328")
+# gpu-next/D3D11-capable libmpv, fetched from our unified build repository
+# (https://github.com/edde746/mpv-build), which publishes per-commit,
+# content-addressed dev packages in the classic mpv-dev shape (libmpv-2.dll,
+# libmpv.dll.a and include/mpv/*.h at the archive root) for every platform,
+# replacing the unpinned SourceForge mpv-dev 7z this project fetched before.
+# The key below is derived from the pinned sources (mpv v0.41.0, ffmpeg
+# n8.0.1, the winbuild toolchain) at mpv-build commit d7c3d559; checksums
+# come from that commit's mpv-build.lock.json / artifacts.json. Only the DLL
+# is consumed (windows/runner/CMakeLists.txt copies it into the runner
+# output directory as "libmpv-gpu-2.dll", not "libmpv-2.dll" -- see the
+# comment beside that copy step for why) -- this project deliberately does
+# not link against libmpv.dll.a or include mpv/client.h at build time (see
+# the ABI structs hand-declared in desktop_libmpv_backend.cpp); it dlopens
+# the DLL at runtime instead, so MPV_INCLUDE_DIR is unused here.
+set(MPV_KEY "1da76841036d")
+set(MPV_ASSET_BASE "https://github.com/edde746/mpv-build/releases/download/binaries-windows")
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64")
-  set(MPV_FILENAME "mpv-dev-aarch64-${MPV_VERSION}-git-${MPV_GIT_HASH}.7z")
-  set(MPV_URL "https://sourceforge.net/projects/mpv-player-windows/files/libmpv/${MPV_FILENAME}/download")
-  set(MPV_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/mpv-dev-arm64")
-  set(MPV_ARCHIVE "${MPV_DOWNLOAD_DIR}/${MPV_FILENAME}")
-
-  if(NOT EXISTS "${MPV_DOWNLOAD_DIR}/libmpv-2.dll")
-    message(STATUS "Downloading MPV for ARM64...")
-    file(DOWNLOAD "${MPV_URL}" "${MPV_ARCHIVE}" SHOW_PROGRESS STATUS MPV_DL_STATUS)
-    list(GET MPV_DL_STATUS 0 MPV_DL_RESULT)
-    if(NOT MPV_DL_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to download MPV: ${MPV_DL_STATUS}")
-    endif()
-
-    # CMake's built-in libarchive can't handle LZMA2 on ARM64.
-    find_program(7Z_EXECUTABLE 7z REQUIRED HINTS "C:/Program Files/7-Zip")
-    message(STATUS "Extracting MPV with ${7Z_EXECUTABLE}...")
-    execute_process(
-      COMMAND "${7Z_EXECUTABLE}" x "${MPV_ARCHIVE}" "-o${MPV_DOWNLOAD_DIR}" -y
-      RESULT_VARIABLE MPV_EXTRACT_RESULT
-    )
-    if(NOT MPV_EXTRACT_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to extract MPV archive")
-    endif()
-    file(REMOVE "${MPV_ARCHIVE}")
-  endif()
-
-  set(MPV_LIB_DIR "${MPV_DOWNLOAD_DIR}")
+  set(MPV_ARCH "aarch64")
+  set(MPV_SHA256 "94c0e4d27794fb3bb754b0c62409c6b0cf17161fbafa16c3213d0239821a6836")
 else()
-  include(FetchContent)
-  FetchContent_Declare(
-    mpv_dev
-    URL https://sourceforge.net/projects/mpv-player-windows/files/libmpv/mpv-dev-x86_64-${MPV_VERSION}-git-${MPV_GIT_HASH}.7z/download
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-  )
-  FetchContent_MakeAvailable(mpv_dev)
-
-  set(MPV_LIB_DIR "${mpv_dev_SOURCE_DIR}")
+  set(MPV_ARCH "x86_64")
+  set(MPV_SHA256 "6a927cbbb7d44ecbefa3643ef0b435e3fa521b6a1123bb8c5d6349441ed3a760")
 endif()
+
+# Plain zips extract with CMake's built-in libarchive on every host arch, so
+# both arches share the FetchContent path (the old mpv-dev 7z needed a
+# 7-Zip binary on ARM64, whose libarchive lacks LZMA2).
+include(FetchContent)
+FetchContent_Declare(
+  mpv_dev
+  URL "${MPV_ASSET_BASE}/libmpv-windows-${MPV_KEY}-${MPV_ARCH}.zip"
+  URL_HASH SHA256=${MPV_SHA256}
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(mpv_dev)
+
+set(MPV_LIB_DIR "${mpv_dev_SOURCE_DIR}")
 
 # ANGLE (GL->D3D11 translation), fetched for the GPU-texture rendering path
 # (windows/runner/angle_surface_manager.{h,cc}): mpv renders through its
@@ -97,10 +83,9 @@ endif()
 if(NOT EXISTS "${ANGLE_LIB_DIR}/libEGL.dll")
   message(STATUS "Extracting ANGLE...")
   make_directory("${ANGLE_LIB_DIR}")
-  # CMake's built-in tar handles this archive fine (unlike the ARM64 libmpv
-  # archive above, which needs 7z.exe for its LZMA2 compression) -- verified
-  # against media_kit_libs_windows_video's own equivalent extraction step,
-  # which uses the same command for the same archive.
+  # CMake's built-in tar handles this archive fine -- verified against
+  # media_kit_libs_windows_video's own equivalent extraction step, which
+  # uses the same command for the same archive.
   execute_process(
     COMMAND "${CMAKE_COMMAND}" -E tar xzf "${ANGLE_ARCHIVE}"
     WORKING_DIRECTORY "${ANGLE_LIB_DIR}"
