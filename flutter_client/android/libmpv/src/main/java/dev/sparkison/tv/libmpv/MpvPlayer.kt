@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 class MpvPlayer private constructor() : AutoCloseable {
 
@@ -28,10 +28,21 @@ class MpvPlayer private constructor() : AutoCloseable {
 
     private val instance = AtomicReference<MpvPlayer?>(null)
 
+    // Not real suspend functions: every native call below runs directly,
+    // blocking, on whatever thread invokes it, with no internal dispatcher
+    // hop. That's deliberate -- this class's sole caller
+    // (android/app/.../mpv/MpvPlayerCore.kt) confines all of these calls to
+    // its own single-thread-at-a-time dispatcher
+    // (Dispatchers.IO.limitedParallelism(1)) precisely to get strict
+    // single-thread ordering for the native mpv handle and for its own
+    // unsynchronized fields; an internal withContext(Dispatchers.IO) here
+    // would hand execution to a *different*, multi-threaded pool mid-call,
+    // silently freeing up that single-thread slot for another queued call
+    // to run concurrently and breaking that ordering guarantee.
     suspend fun create(
       context: Context,
       configure: MpvPlayerConfig.() -> Unit = {}
-    ): MpvPlayer = withContext(Dispatchers.IO) {
+    ): MpvPlayer {
       val player = MpvPlayer()
       // Atomically replace; mark old as closed so its background close() skips nativeDestroy
       instance.getAndSet(player)?.also { it.closed = true }
@@ -40,8 +51,8 @@ class MpvPlayer private constructor() : AutoCloseable {
         nativeCreate(context.applicationContext)
         MpvPlayerConfig().apply(configure)
         nativeInit()
-        ensureActive()
-        player
+        coroutineContext.ensureActive()
+        return player
       } catch (e: Throwable) {
         instance.compareAndSet(player, null)
         try {
@@ -198,7 +209,7 @@ class MpvPlayer private constructor() : AutoCloseable {
 
   suspend fun command(vararg args: String) {
     checkNotClosed()
-    withContext(Dispatchers.IO) { nativeCommand(args) }
+    nativeCommand(args)
   }
 
   // Surface — not suspend, called from SurfaceHolder.Callback
@@ -228,44 +239,44 @@ class MpvPlayer private constructor() : AutoCloseable {
 
   suspend fun getInt(name: String): Int? {
     checkNotClosed()
-    return withContext(Dispatchers.IO) { nativeGetPropertyInt(name) }
+    return nativeGetPropertyInt(name)
   }
 
   suspend fun getDouble(name: String): Double? {
     checkNotClosed()
-    return withContext(Dispatchers.IO) { nativeGetPropertyDouble(name) }
+    return nativeGetPropertyDouble(name)
   }
 
   suspend fun getFlag(name: String): Boolean? {
     checkNotClosed()
-    return withContext(Dispatchers.IO) { nativeGetPropertyBoolean(name) }
+    return nativeGetPropertyBoolean(name)
   }
 
   suspend fun getString(name: String): String? {
     checkNotClosed()
-    return withContext(Dispatchers.IO) { nativeGetPropertyString(name) }
+    return nativeGetPropertyString(name)
   }
 
   // Property setters
 
   suspend fun setProperty(name: String, value: Int) {
     checkNotClosed()
-    withContext(Dispatchers.IO) { nativeSetPropertyInt(name, value) }
+    nativeSetPropertyInt(name, value)
   }
 
   suspend fun setProperty(name: String, value: Double) {
     checkNotClosed()
-    withContext(Dispatchers.IO) { nativeSetPropertyDouble(name, value) }
+    nativeSetPropertyDouble(name, value)
   }
 
   suspend fun setProperty(name: String, value: Boolean) {
     checkNotClosed()
-    withContext(Dispatchers.IO) { nativeSetPropertyBoolean(name, value) }
+    nativeSetPropertyBoolean(name, value)
   }
 
   suspend fun setProperty(name: String, value: String) {
     checkNotClosed()
-    withContext(Dispatchers.IO) { nativeSetPropertyString(name, value) }
+    nativeSetPropertyString(name, value)
   }
 
   // Property observation

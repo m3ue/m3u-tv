@@ -11,10 +11,15 @@ set(BINARY_NAME "m3u_tv")
 # content-addressed dev packages in the classic mpv-dev shape (libmpv-2.dll,
 # libmpv.dll.a and include/mpv/*.h at the archive root) for every platform,
 # replacing the unpinned SourceForge mpv-dev 7z this project fetched before.
-# The key below is derived from the pinned sources (mpv v0.41.0, ffmpeg
-# n8.0.1, the winbuild toolchain) at mpv-build commit d7c3d559; checksums
-# come from that commit's mpv-build.lock.json / artifacts.json. Only the DLL
-# is consumed (windows/runner/CMakeLists.txt copies it into the runner
+# The key and checksums below are copied from the "windows" section of the
+# repo-root mpv-build.lock.json (itself generated from that commit's
+# artifacts.json) -- CMake has no JSON parser available without an extra
+# dependency, so unlike the Android module (android/libmpv/build.gradle.kts,
+# which reads the lock file directly), this is a manual mirror. Bumping the
+# pin means updating mpv-build.lock.json AND these four values together;
+# nothing here reads the lock file or otherwise enforces the two staying in
+# sync. Only the DLL is consumed (windows/runner/CMakeLists.txt copies it
+# into the runner
 # output directory as "libmpv-gpu-2.dll", not "libmpv-2.dll" -- see the
 # comment beside that copy step for why) -- this project deliberately does
 # not link against libmpv.dll.a or include mpv/client.h at build time (see

@@ -56,8 +56,9 @@ class MpvPlayerCore(
     // dev.sparkison.tv.libmpv's `suspend fun command()`/`setProperty()`/etc. are not
     // real suspend functions -- they call their blocking native JNI
     // counterpart directly on whatever thread invokes them, with no internal
-    // dispatcher hop (confirmed by decompiling the AAR: no Dispatchers
-    // reference anywhere in their bytecode). Running this scope on
+    // dispatcher hop (see the comment on `MpvPlayer.create` in
+    // android/libmpv/ for why that's load-bearing, not incidental). Running
+    // this scope on
     // Dispatchers.Main, as this class previously did, meant every mpv
     // command/property/create/attach call -- including `loadfile`, which can
     // block for several seconds opening a slow live stream -- executed

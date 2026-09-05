@@ -243,8 +243,9 @@ android {
           "-DANDROID_STL=c++_shared",
           "-DMPV_PREBUILT_ROOT=${mpvNativeDir.absolutePath}"
         )
-        cFlags += "-Werror"
-        cppFlags += "-std=c++11"
+        // All glue sources are .cpp -- cFlags never applies to them, so
+        // -Werror belongs on cppFlags or it silently never takes effect.
+        cppFlags += listOf("-std=c++11", "-Werror")
       }
     }
   }

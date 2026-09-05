@@ -45,7 +45,6 @@ static void sendEndFileToJava(JNIEnv* env, mpv_event* event) {
 static inline bool invalid_utf8(unsigned char c) { return c == 0xc0 || c == 0xc1 || c >= 0xf5; }
 
 static void sendLogMessageToJava(JNIEnv* env, mpv_event_log_message* msg) {
-  const auto invalid_utf8 = [](unsigned char c) { return c == 0xc0 || c == 0xc1 || c >= 0xf5; };
   for (int i = 0; msg->text[i]; i++) {
     if (invalid_utf8(static_cast<unsigned char>(msg->text[i]))) return;
   }

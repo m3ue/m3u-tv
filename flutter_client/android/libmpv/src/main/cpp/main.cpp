@@ -55,13 +55,19 @@ std::atomic<bool> g_event_thread_request_exit(false);
 static pthread_t event_thread_id;
 static std::mutex g_lifecycle_mutex;
 
+// Owns the one global ref av_jni_set_android_app_ctx holds onto; freed
+// before creating the next one so nativeCreate's leaked-instance recreate
+// path (below) doesn't leak one app-context global ref per recreate.
+static jobject g_appctx_global_ref = NULL;
+
 static void prepare_environment(JNIEnv* env, jobject appctx) {
   setlocale(LC_NUMERIC, "C");
 
   if (!env->GetJavaVM(&g_vm) && g_vm) av_jni_set_java_vm(g_vm, NULL);
 
-  jobject global_appctx = env->NewGlobalRef(appctx);
-  if (global_appctx) av_jni_set_android_app_ctx(global_appctx, NULL);
+  if (g_appctx_global_ref) env->DeleteGlobalRef(g_appctx_global_ref);
+  g_appctx_global_ref = env->NewGlobalRef(appctx);
+  if (g_appctx_global_ref) av_jni_set_android_app_ctx(g_appctx_global_ref, NULL);
 
   init_methods_cache(env);
 }
@@ -136,17 +142,22 @@ jni_func(void, nativeCommand, jobjectArray jarray) {
   CHECK_MPV_INIT();
 
   const char* arguments[128] = {0};
+  jstring jarguments[ARRAYLEN(arguments)] = {0};
   int len = env->GetArrayLength(jarray);
   if (len >= ARRAYLEN(arguments)) {
     die("too many command arguments");
     return;
   }
 
-  for (int i = 0; i < len; ++i)
-    arguments[i] = env->GetStringUTFChars((jstring)env->GetObjectArrayElement(jarray, i), NULL);
+  for (int i = 0; i < len; ++i) {
+    jarguments[i] = (jstring)env->GetObjectArrayElement(jarray, i);
+    arguments[i] = env->GetStringUTFChars(jarguments[i], NULL);
+  }
 
   mpv_command(g_mpv, arguments);
 
-  for (int i = 0; i < len; ++i)
-    env->ReleaseStringUTFChars((jstring)env->GetObjectArrayElement(jarray, i), arguments[i]);
+  for (int i = 0; i < len; ++i) {
+    env->ReleaseStringUTFChars(jarguments[i], arguments[i]);
+    env->DeleteLocalRef(jarguments[i]);
+  }
 }
