@@ -3,6 +3,14 @@
 /local.properties
 GeneratedPluginRegistrant.java
 
+# Gradle/CMake build output -- every module (app, libmpv, ...), plus the
+# root project's own build/ (Gradle reports etc.). .cxx/ in particular
+# embeds absolute local paths (toolchain binaries under $ANDROID_SDK_ROOT)
+# and compiled object files -- never worth tracking.
+/build/
+*/build/
+*/.cxx/
+
 # Remember to never publicly share your keystore.
 # See https://flutter.dev/to/reference-keystore
 key.properties
