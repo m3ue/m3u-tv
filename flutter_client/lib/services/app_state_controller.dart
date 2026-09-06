@@ -602,8 +602,9 @@ class AppStateController extends ChangeNotifier {
       credentials,
       isCurrent: () => !_sourceOperationGeneration.isStale(sourceGeneration),
     );
-    if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration))
+    if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
       return;
+    }
     if (!connected) {
       _error = authNotifier.error;
       notifyListeners();
