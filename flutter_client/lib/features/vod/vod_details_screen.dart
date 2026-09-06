@@ -50,6 +50,11 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
 
   Color? _dominantColor;
 
+  /// True once the palette extraction has resolved (with a colour or not).
+  /// Gates the hero's backdrop reveal so the art and its colour-match fade
+  /// in together instead of the backdrop popping and the tint snapping after.
+  bool _colorMatchResolved = false;
+
   /// Wired into the wide-layout cast row so pressing up off the cast cards
   /// returns focus to the primary Play button (the raw-`Focus` [CastStrip]
   /// consumes every arrow key, so it must hand vertical navigation back
@@ -78,7 +83,11 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
   /// detail page. Any failure just leaves the theme surface as-is.
   Future<void> _resolveDominantColor(String? url) async {
     final color = await resolveDominantBackdropColor(url);
-    if (color != null && mounted) setState(() => _dominantColor = color);
+    if (!mounted) return;
+    setState(() {
+      if (color != null) _dominantColor = color;
+      _colorMatchResolved = true;
+    });
   }
 
   @override
@@ -92,6 +101,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
               progressList: widget.progressList,
               onPlay: widget.onPlay,
               dominantColor: _dominantColor,
+              colorMatchReady: _colorMatchResolved,
               playFocusNode: _playFocusNode,
             )
           : FutureBuilder<VodInfo?>(
@@ -104,6 +114,9 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   progressList: widget.progressList,
                   onPlay: widget.onPlay,
                   dominantColor: _dominantColor,
+                  // A failed info fetch means no backdrop and no palette step
+                  // will run - reveal the (surface) hero rather than holding.
+                  colorMatchReady: _colorMatchResolved || snapshot.hasError,
                   playFocusNode: _playFocusNode,
                 );
               },
@@ -121,6 +134,7 @@ class _VodDetailsBody extends StatelessWidget {
     this.progressList = const [],
     this.onPlay,
     this.dominantColor,
+    this.colorMatchReady = false,
   });
 
   final VodItem item;
@@ -128,6 +142,11 @@ class _VodDetailsBody extends StatelessWidget {
   final bool isLoading;
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
+
+  /// Passed straight to [BackdropDetailHero.colorMatchReady] - true once the
+  /// palette extraction has resolved, so the hero can fade the backdrop and
+  /// its colour-match in together.
+  final bool colorMatchReady;
 
   /// Focus target for the wide cast row's "up" hop - the primary Play button.
   final FocusNode playFocusNode;
@@ -242,6 +261,7 @@ class _VodDetailsBody extends StatelessWidget {
       showBackgroundColorLayer: true,
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      colorMatchReady: colorMatchReady,
       contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
       content: content,
     );
@@ -302,6 +322,7 @@ class _VodDetailsBody extends StatelessWidget {
       showBackgroundColorLayer: true,
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.2), bg.withValues(alpha: 0.8), bg],
+      colorMatchReady: colorMatchReady,
       // Let the poster/title ride well up into the lower half of the
       // backdrop (standard mobile hero look) rather than clearing it.
       contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),

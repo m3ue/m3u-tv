@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +12,6 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
-import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
@@ -111,6 +109,11 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   int? _displayedSeason;
   SeriesInfo? _seriesInfo;
   Color? _dominantColor;
+
+  /// True once the palette extraction has resolved (with a colour or not).
+  /// Gates the hero's backdrop reveal so the art and its colour-match fade
+  /// in together instead of the backdrop popping and the tint snapping after.
+  bool _colorMatchResolved = false;
   final FocusNode _playFocusNode = FocusNode(debugLabel: 'seriesPlayButton');
 
   @override
@@ -159,7 +162,11 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   /// the theme surface as the background.
   Future<void> _resolveDominantColor(String? url) async {
     final color = await resolveDominantBackdropColor(url);
-    if (color != null && mounted) setState(() => _dominantColor = color);
+    if (!mounted) return;
+    setState(() {
+      if (color != null) _dominantColor = color;
+      _colorMatchResolved = true;
+    });
   }
 
   @override
@@ -190,6 +197,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             selectedSeason: _selectedSeason,
             progressList: _effectiveProgress,
             dominantColor: _dominantColor,
+            colorMatchReady: _colorMatchResolved,
             canMarkWatched: widget.onMarkEpisodeWatched != null,
             playFocusNode: _playFocusNode,
             onSeasonSelected: (season) =>
@@ -209,56 +217,13 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   }
 
   Widget _buildLoading(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: surface),
-        if (widget.coverUrl != null) ...[
-          // The poster is low-res and gets stretched to fill the screen, so
-          // heavily blur it (its detail no longer matters) and let it read as
-          // an ambient wash rather than a picture. `decal` keeps the blur from
-          // smearing the edge pixels outward.
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(
-              sigmaX: 32,
-              sigmaY: 32,
-              tileMode: TileMode.decal,
-            ),
-            child: CachedBackdropImage(widget.coverUrl!),
-          ),
-          // Vignette + top-down wash fading the blur into the page surface so
-          // only a soft tint frames the spinner.
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                radius: 1.1,
-                colors: [
-                  surface.withValues(alpha: 0.2),
-                  surface.withValues(alpha: 0.75),
-                  surface,
-                ],
-                stops: const [0.0, 0.6, 1.0],
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  surface.withValues(alpha: 0.1),
-                  surface.withValues(alpha: 0.5),
-                  surface,
-                ],
-                stops: const [0.0, 0.55, 1.0],
-              ),
-            ),
-          ),
-        ],
-        const Center(child: CircularProgressIndicator()),
-      ],
+    // Plain surface behind the spinner - no blurred-poster wash. The detail
+    // hero already holds this same surface colour until the backdrop and its
+    // colour-match are ready, so the load reads as one continuous surface
+    // rather than poster-wash -> surface -> backdrop.
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 
@@ -348,6 +313,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     required this.selectedSeason,
     required this.progressList,
     required this.dominantColor,
+    required this.colorMatchReady,
     required this.canMarkWatched,
     required this.playFocusNode,
     required this.onSeasonSelected,
@@ -361,6 +327,11 @@ class _SeriesDetailsBody extends StatelessWidget {
   final int? selectedSeason;
   final List<Progress> progressList;
   final Color? dominantColor;
+
+  /// Passed straight to [BackdropDetailHero.colorMatchReady] - true once the
+  /// palette extraction has resolved, so the hero can fade the backdrop and
+  /// its colour-match in together.
+  final bool colorMatchReady;
   final bool canMarkWatched;
   final FocusNode playFocusNode;
   final ValueChanged<int> onSeasonSelected;
@@ -820,30 +791,23 @@ class _SeriesDetailsBody extends StatelessWidget {
 
     // Scrim over the backdrop. Kept heavy enough that a bright still
     // (near-white kitchen shots etc.) still leaves the body text legible,
-    // while the top stays translucent so the art reads through. The
-    // background tone cross-fades from the theme surface to the resolved
-    // dominant colour (and between seasons) so it does not snap in.
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(begin: theme.colorScheme.surface, end: bg),
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOut,
-      builder: (context, animatedBg, child) {
-        final tone = animatedBg ?? bg;
-        return BackdropDetailHero(
-          backdropUrl: backdrop,
-          alwaysShowScrim: true,
-          showBackgroundColorLayer: true,
-          backgroundColor: tone,
-          scrimColors: [
-            tone.withValues(alpha: 0.35),
-            tone.withValues(alpha: 0.92),
-            tone,
-          ],
-          contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
-          content: child!,
-        );
-      },
-      child: wideContent,
+    // while the top stays translucent so the art reads through. The hero
+    // holds a flat surface until the backdrop has decoded and the dominant
+    // colour has resolved, then fades the art + wash + scrim in as one
+    // (BackdropDetailHero.colorMatchReady) so nothing snaps in piecemeal.
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [
+        bg.withValues(alpha: 0.35),
+        bg.withValues(alpha: 0.92),
+        bg,
+      ],
+      colorMatchReady: colorMatchReady,
+      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
+      content: wideContent,
     );
   }
 
@@ -858,33 +822,25 @@ class _SeriesDetailsBody extends StatelessWidget {
     // above it) while `content` scrolls over/past it - same mechanic as the
     // wide layout below, just top-aligned instead of bottom-pinned. Lighter
     // top/mid scrim than the wide layout so the real backdrop colour still
-    // reads in the band on a portrait screen. The tone cross-fades in (see
-    // the wide layout) rather than snapping.
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(begin: Theme.of(context).colorScheme.surface, end: bg),
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOut,
-      builder: (context, animatedBg, child) {
-        final tone = animatedBg ?? bg;
-        return BackdropDetailHero(
-          backdropUrl: backdrop,
-          backdropHeight: bandHeight,
-          contentAlignment: Alignment.topLeft,
-          alwaysShowScrim: true,
-          showBackgroundColorLayer: true,
-          backgroundColor: tone,
-          scrimColors: [
-            tone.withValues(alpha: 0.2),
-            tone.withValues(alpha: 0.8),
-            tone,
-          ],
-          // Let the poster/title ride well up into the lower half of the
-          // backdrop (standard mobile hero look) rather than clearing it.
-          contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
-          content: child!,
-        );
-      },
-      child: content,
+    // reads in the band on a portrait screen. Same held-then-fade reveal as
+    // the wide layout (BackdropDetailHero.colorMatchReady).
+    return BackdropDetailHero(
+      backdropUrl: backdrop,
+      backdropHeight: bandHeight,
+      contentAlignment: Alignment.topLeft,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [
+        bg.withValues(alpha: 0.2),
+        bg.withValues(alpha: 0.8),
+        bg,
+      ],
+      colorMatchReady: colorMatchReady,
+      // Let the poster/title ride well up into the lower half of the
+      // backdrop (standard mobile hero look) rather than clearing it.
+      contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+      content: content,
     );
   }
 

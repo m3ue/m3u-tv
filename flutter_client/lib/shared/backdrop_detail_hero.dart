@@ -23,7 +23,16 @@ import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 /// returned bare with no Stack/scrim at all (VOD/AIOStreams movie default).
 /// Series always wants its dominant-color background even without a
 /// backdrop image, so it passes `alwaysShowScrim: true`.
-class BackdropDetailHero extends StatelessWidget {
+///
+/// Colour-match reveal: callers doing the palette-extraction treatment
+/// (VOD, Series) pass [colorMatchReady] - false while the dominant colour is
+/// still resolving, true once it has (or has definitively failed). Until
+/// that is true *and* the backdrop image has decoded, the hero shows a flat
+/// theme-surface background; then the whole composite (image + colour wash +
+/// scrim) cross-fades in as one over [revealDuration], so nothing snaps in
+/// piecemeal. Callers with no palette step (AIOStreams) leave
+/// [colorMatchReady] null and the backdrop renders immediately as before.
+class BackdropDetailHero extends StatefulWidget {
   const BackdropDetailHero({
     super.key,
     required this.content,
@@ -36,6 +45,8 @@ class BackdropDetailHero extends StatelessWidget {
     this.scrimStops = const [0.0, 0.5, 1.0],
     this.contentAlignment = Alignment.bottomLeft,
     this.contentPadding = EdgeInsets.zero,
+    this.colorMatchReady,
+    this.revealDuration = const Duration(milliseconds: 420),
   });
 
   final Widget content;
@@ -75,59 +86,111 @@ class BackdropDetailHero extends StatelessWidget {
   /// the (fixed) backdrop band - typically `top: backdropHeight - overlap`.
   final EdgeInsetsGeometry contentPadding;
 
+  /// Null (default) = render the backdrop as soon as it decodes, no hold and
+  /// no fade (AIOStreams). Non-null = the palette-extraction treatment: false
+  /// while the dominant colour is still resolving, true once it has resolved
+  /// or failed. See the class doc for the reveal behaviour it drives.
+  final bool? colorMatchReady;
+
+  /// How long the composite takes to cross-fade in once it is revealed.
+  final Duration revealDuration;
+
+  @override
+  State<BackdropDetailHero> createState() => _BackdropDetailHeroState();
+}
+
+class _BackdropDetailHeroState extends State<BackdropDetailHero> {
+  bool _imageLoaded = false;
+
+  @override
+  void didUpdateWidget(BackdropDetailHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.backdropUrl != widget.backdropUrl) _imageLoaded = false;
+  }
+
+  void _handleImageLoaded() {
+    if (!_imageLoaded && mounted) setState(() => _imageLoaded = true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (backdropUrl == null && !alwaysShowScrim) return content;
+    final w = widget;
+    if (w.backdropUrl == null && !w.alwaysShowScrim) return w.content;
 
     final theme = Theme.of(context);
-    final bg = backgroundColor ?? theme.colorScheme.surface;
+    final bg = w.backgroundColor ?? theme.colorScheme.surface;
     final colors =
-        scrimColors ??
+        w.scrimColors ??
         [
           Colors.black.withValues(alpha: 0.2),
           Colors.black.withValues(alpha: 0.85),
           bg,
         ];
 
-    Widget backdropLayer = Stack(
+    Widget imageAndScrim = Stack(
       fit: StackFit.expand,
       children: [
-        if (backdropUrl != null) CachedBackdropImage(backdropUrl!),
+        if (w.backdropUrl != null)
+          CachedBackdropImage(w.backdropUrl!, onLoaded: _handleImageLoaded),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: colors,
-              stops: scrimStops,
+              stops: w.scrimStops,
             ),
           ),
         ),
       ],
     );
-    final bandHeight = backdropHeight;
+    final bandHeight = w.backdropHeight;
     if (bandHeight != null) {
-      backdropLayer = Align(
+      imageAndScrim = Align(
         alignment: Alignment.topCenter,
-        child: SizedBox(height: bandHeight, child: backdropLayer),
+        child: SizedBox(height: bandHeight, child: imageAndScrim),
       );
     }
 
-    final isTopAligned = contentAlignment == Alignment.topLeft;
+    // The dominant-colour wash spans the full hero (below a capped band too),
+    // so it sits outside [imageAndScrim] but inside the same fade.
+    final backdropComposite = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (w.showBackgroundColorLayer) ColoredBox(color: bg),
+        imageAndScrim,
+      ],
+    );
 
-    final paddedContent = Padding(padding: contentPadding, child: content);
-
+    final isTopAligned = w.contentAlignment == Alignment.topLeft;
+    final paddedContent = Padding(padding: w.contentPadding, child: w.content);
     final contentLayer = isTopAligned
         // Content lives outside the (fixed) backdrop layer entirely, so
         // scrolling it never moves the band underneath.
         ? SingleChildScrollView(child: paddedContent)
-        : Align(alignment: contentAlignment, child: paddedContent);
+        : Align(alignment: w.contentAlignment, child: paddedContent);
 
+    final gated = w.colorMatchReady != null;
+    if (!gated) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [backdropComposite, contentLayer],
+      );
+    }
+
+    final imageReady = w.backdropUrl == null || _imageLoaded;
+    final revealed = w.colorMatchReady! && imageReady;
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (showBackgroundColorLayer) ColoredBox(color: bg),
-        backdropLayer,
+        // Flat hold until the art and its colour-match are both ready.
+        ColoredBox(color: theme.colorScheme.surface),
+        AnimatedOpacity(
+          opacity: revealed ? 1 : 0,
+          duration: w.revealDuration,
+          curve: Curves.easeOut,
+          child: backdropComposite,
+        ),
         contentLayer,
       ],
     );
