@@ -376,7 +376,10 @@ class _VodDetailsBody extends StatelessWidget {
           credits: [
             if (details.director != null)
               MetaCreditLine(label: 'Director', value: details.director!),
-            if (details.cast != null)
+            // The comma-separated `cast` string only earns a credit line when
+            // there is no rich cast row (wide: below the poster; narrow: the
+            // picker chip under the synopsis) - otherwise it just repeats it.
+            if (details.cast != null && (richCast == null || richCast.isEmpty))
               MetaCreditLine(label: 'Cast', value: details.cast!),
           ],
         ),
