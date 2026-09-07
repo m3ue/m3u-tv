@@ -2283,6 +2283,12 @@ class _HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<_HomeScreen> {
+  /// The home rows are previews - [MediaPreviewSection] itself only renders
+  /// the first 12 items. Capping before the `.map` keeps a provider tick
+  /// (progress, EPG, favorites) from allocating a fresh MediaPreviewItem for
+  /// every entry in a multi-thousand-item VOD/Series catalog on each rebuild.
+  static const int _rowItemLimit = 12;
+
   Set<int> _favoriteChannelIds = {};
   Set<int> _favoriteVodIds = {};
   Set<int> _favoriteSeriesIds = {};
@@ -2415,7 +2421,10 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       titleIcon: favoriteChannels.isEmpty ? Icons.live_tv : Icons.star,
       emptyLabel: l.homeNoLiveTv,
-      items: liveSectionChannels.map(liveChannelItem).toList(growable: false),
+      items: liveSectionChannels
+          .take(_rowItemLimit)
+          .map(liveChannelItem)
+          .toList(growable: false),
       useSidebarLayout: widget.useSidebarLayout,
       onSidebarActivate: widget.onSidebarActivate,
     );
@@ -2425,6 +2434,7 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       emptyLabel: l.homeNoMovies,
       posterStyle: true,
       items: vodItems
+          .take(_rowItemLimit)
           .map(
             (item) => MediaPreviewItem(
               title: item.name,
@@ -2451,6 +2461,7 @@ class _HomeScreenState extends ConsumerState<_HomeScreen> {
       emptyLabel: l.homeNoSeries,
       posterStyle: true,
       items: seriesList
+          .take(_rowItemLimit)
           .map(
             (series) => MediaPreviewItem(
               title: series.name,

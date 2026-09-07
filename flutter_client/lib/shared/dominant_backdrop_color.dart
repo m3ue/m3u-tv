@@ -14,8 +14,18 @@ import 'package:palette_generator_master/palette_generator_master.dart';
 /// themselves once they know the layout, because the tone that reads well
 /// full-bleed on a TV (very deep) just looks black on a phone, where the
 /// wash sits behind a short band with the page scrolling over it.
+///
+/// The result is memoized per URL: detail screens re-run this on every visit,
+/// and without the cache, revisiting a title (the common in/out-of-detail
+/// navigation pattern) re-decodes the backdrop a second time just for palette
+/// extraction. The `null` sentinel is cached too so known failures don't retry.
+// Bounded so a long browsing session can't grow the map without limit.
+const int _maxCachedSwatches = 128;
+final Map<String, Color?> _swatchCache = <String, Color?>{};
+
 Future<Color?> resolveDominantBackdropColor(String? url) async {
   if (url == null || url.isEmpty) return null;
+  if (_swatchCache.containsKey(url)) return _swatchCache[url];
   try {
     final palette = await PaletteGeneratorMaster.fromImageProvider(
       CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
@@ -26,10 +36,19 @@ Future<Color?> resolveDominantBackdropColor(String? url) async {
         palette.darkMutedColor ??
         palette.darkVibrantColor ??
         palette.dominantColor;
+    _rememberSwatch(url, swatch?.color);
     return swatch?.color;
   } on Object catch (_) {
+    _rememberSwatch(url, null);
     return null;
   }
+}
+
+void _rememberSwatch(String url, Color? color) {
+  if (_swatchCache.length >= _maxCachedSwatches) {
+    _swatchCache.remove(_swatchCache.keys.first);
+  }
+  _swatchCache[url] = color;
 }
 
 /// Shapes an extracted swatch into a background wash. Hue is always kept so

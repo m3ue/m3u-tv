@@ -26,6 +26,7 @@ import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _configureImageCache();
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
@@ -51,6 +52,22 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+/// Raises Flutter's decoded-image memory cache well above the 100 MB / 1000
+/// entry default. Posters and channel logos are disk-cached via
+/// [MediaImageCacheManager], but the decoded bitmaps live in this in-memory
+/// [ImageCache]; on a 4K TV a single poster grid can't fit one screenful in
+/// 100 MB, so browsing (and every trip in and out of a detail screen) evicts
+/// entries and forces a visible re-decode from disk. A larger ceiling keeps a
+/// full library of recently browsed art resident so revisiting a screen is
+/// instant.
+void _configureImageCache() {
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes =
+        384 <<
+        20 // 384 MB
+    ..maximumSize = 1500;
 }
 
 bool get _isDesktop =>

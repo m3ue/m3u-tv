@@ -28,12 +28,12 @@ class CachedMediaThumbnail extends StatelessWidget {
   final double? height;
   final BoxFit? fit;
 
-  /// Decode at extra resolution beyond the display's raw pixel density so
-  /// detailed logos (thin text/wordmarks) survive downscaling instead of
-  /// being crushed to a blocky, aliased decode that no amount of display-time
-  /// [FilterQuality] can recover. [ResizeImage] never upscales past the
-  /// source's intrinsic size, so this is free when the source is small.
-  static const double _oversample = 2;
+  /// Decode multiplier on top of the display's raw pixel density. Kept at 1
+  /// (decode at display size): on a 4K TV the earlier 2x oversample made each
+  /// decoded bitmap ~4x larger in memory, so the poster grid could not keep a
+  /// screenful resident in the image cache and thrashed on every navigation.
+  /// [ResizeImage] never upscales past the source's intrinsic size.
+  static const double _oversample = 1;
 
   @override
   Widget build(BuildContext context) {

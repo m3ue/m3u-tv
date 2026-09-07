@@ -472,13 +472,13 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
       title: widget.fallbackTitle,
     );
     final url = _currentUrl;
-    // Oversample beyond raw pixel density so detailed logos (thin
-    // text/wordmarks) survive downscaling instead of being crushed to a
-    // blocky, aliased decode that no display-time FilterQuality can recover.
-    // ResizeImage never upscales past the source's intrinsic size, so this
-    // is free when the source is already small.
+    // Decode at display size (raw pixel density only). An earlier 2x
+    // oversample here quadrupled each decoded bitmap's memory footprint on a
+    // 4K TV, so a poster grid could not keep a screenful resident in the
+    // image cache and re-decoded from disk on every navigation. ResizeImage
+    // never upscales past the source's intrinsic size.
     final devicePixelRatio =
-        MediaQuery.devicePixelRatioOf(context) * 2 * TvZoomScale.of(context);
+        MediaQuery.devicePixelRatioOf(context) * TvZoomScale.of(context);
     final cacheWidth = widget.width == null
         ? null
         : (widget.width! * devicePixelRatio).round();
