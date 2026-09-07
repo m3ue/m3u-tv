@@ -249,6 +249,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       return _buildEmptyState('No results found');
     }
 
+    final l = AppLocalizations.of(context);
+    // Flatten every section into one addressable row list so the whole tab
+    // scrolls through a single lazy ListView.builder. The previous
+    // `ListView(children: [...maps])` mounted every match at once - hundreds
+    // of ListTiles, each firing a network image request - the instant a
+    // broad query landed. Entries are either a section-title String or a
+    // domain object; the builder switches on the runtime type.
+    final rows = <Object>[
+      if (onNowEntries.isNotEmpty) ...[l.liveTvOnNow, ...onNowEntries],
+      if (upcomingEntries.isNotEmpty) ...[
+        l.liveTvUpcomingAirings,
+        ...upcomingEntries,
+      ],
+      if (channels.isNotEmpty) ...[l.searchSectionLiveTv, ...channels],
+      if (vodItems.isNotEmpty) ...[l.searchSectionMovies, ...vodItems],
+      if (seriesList.isNotEmpty) ...[l.searchSectionSeries, ...seriesList],
+    ];
+
     return DpadRegion(
       memoryKey: 'search/all',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -257,72 +275,46 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           widget.onSidebarActivate?.call();
         }
       },
-      child: ListView(
-        children: [
-          if (onNowEntries.isNotEmpty) ...[
-            _SectionHeader(title: AppLocalizations.of(context).liveTvOnNow),
-            ...onNowEntries.map(
-              (entry) => ShowResultRow(
-                entry: entry,
-                channel: channelsById[entry.channelId],
-                onNowChannels: onNowChannels,
-                onChannelSelect: widget.onChannelSelect,
-                onChannelContextChanged: widget.onChannelContextChanged,
-                onShowSelect: widget.onShowSelect,
-                languageTag: languageTag,
-              ),
-            ),
-          ],
-          if (upcomingEntries.isNotEmpty) ...[
-            _SectionHeader(
-              title: AppLocalizations.of(context).liveTvUpcomingAirings,
-            ),
-            ...upcomingEntries.map(
-              (entry) => ShowResultRow(
-                entry: entry,
-                channel: channelsById[entry.channelId],
-                onNowChannels: onNowChannels,
-                onChannelSelect: widget.onChannelSelect,
-                onChannelContextChanged: widget.onChannelContextChanged,
-                onShowSelect: widget.onShowSelect,
-                languageTag: languageTag,
-              ),
-            ),
-          ],
-          if (channels.isNotEmpty) ...[
-            _SectionHeader(
-              title: AppLocalizations.of(context).searchSectionLiveTv,
-            ),
-            ...channels.map(
-              (c) => _ChannelListTile(
-                channel: c,
-                onTap: () {
-                  widget.onChannelContextChanged?.call(channels);
-                  widget.onChannelSelect(c);
-                },
-              ),
-            ),
-          ],
-          if (vodItems.isNotEmpty) ...[
-            _SectionHeader(
-              title: AppLocalizations.of(context).searchSectionMovies,
-            ),
-            ...vodItems.map(
-              (v) => _VodListTile(item: v, onTap: () => widget.onVodSelect(v)),
-            ),
-          ],
-          if (seriesList.isNotEmpty) ...[
-            _SectionHeader(
-              title: AppLocalizations.of(context).searchSectionSeries,
-            ),
-            ...seriesList.map(
-              (s) => _SeriesListTile(
-                item: s,
-                onTap: () => widget.onSeriesSelect(s),
-              ),
-            ),
-          ],
-        ],
+      child: ListView.builder(
+        itemCount: rows.length,
+        itemBuilder: (context, index) {
+          final row = rows[index];
+          if (row is String) return _SectionHeader(title: row);
+          if (row is ShowResultEntry) {
+            return ShowResultRow(
+              entry: row,
+              channel: channelsById[row.channelId],
+              onNowChannels: onNowChannels,
+              onChannelSelect: widget.onChannelSelect,
+              onChannelContextChanged: widget.onChannelContextChanged,
+              onShowSelect: widget.onShowSelect,
+              languageTag: languageTag,
+            );
+          }
+          if (row is Channel) {
+            return _ChannelListTile(
+              channel: row,
+              onTap: () {
+                widget.onChannelContextChanged?.call(channels);
+                widget.onChannelSelect(row);
+              },
+            );
+          }
+          if (row is VodItem) {
+            return _VodListTile(
+              item: row,
+              onTap: () => widget.onVodSelect(row),
+            );
+          }
+          if (row is Series) {
+            return _SeriesListTile(
+              item: row,
+              onTap: () => widget.onSeriesSelect(row),
+            );
+          }
+          assert(false, 'Unhandled search row type: ${row.runtimeType}');
+          return const SizedBox.shrink();
+        },
       ),
     );
   }
@@ -470,6 +462,7 @@ class _ChannelListTile extends StatelessWidget {
           width: MediaBrowsingMetrics.logoSize,
           height: MediaBrowsingMetrics.logoSize,
           fit: BoxFit.contain,
+          oversample: 2,
         ),
         title: Text(channel.name),
         onTap: onTap,
@@ -500,6 +493,7 @@ class _VodListTile extends StatelessWidget {
           width: MediaBrowsingMetrics.logoSize,
           height: MediaBrowsingMetrics.logoSize,
           fit: BoxFit.contain,
+          oversample: 2,
         ),
         title: Text(item.name),
         subtitle: item.rating != null ? Text('★ ${item.rating}') : null,
@@ -531,6 +525,7 @@ class _SeriesListTile extends StatelessWidget {
           width: MediaBrowsingMetrics.logoSize,
           height: MediaBrowsingMetrics.logoSize,
           fit: BoxFit.contain,
+          oversample: 2,
         ),
         title: Text(item.name),
         subtitle: item.rating != null ? Text('★ ${item.rating}') : null,

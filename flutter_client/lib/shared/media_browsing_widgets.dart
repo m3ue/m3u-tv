@@ -8,11 +8,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
-import 'package:m3u_tv/main.dart' show TvZoomScale;
 import 'package:m3u_tv/shared/app_button.dart' show kStadiumFocusEffects;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -369,6 +369,7 @@ class ResilientMediaImage extends StatefulWidget {
     this.fallbackTitle,
     this.borderRadius = MediaBrowsingMetrics.posterRadius,
     this.backgroundColor,
+    this.oversample = 1,
     super.key,
   });
 
@@ -386,6 +387,15 @@ class ResilientMediaImage extends StatefulWidget {
   final String? fallbackTitle;
   final double borderRadius;
   final Color? backgroundColor;
+
+  /// Decode multiplier on top of the display's raw pixel density. Leave at 1
+  /// (decode at display size) for photographic art - posters, backdrops, cast
+  /// photos - where a 2x oversample just quadruples each decoded bitmap and
+  /// makes the image cache thrash on a 4K TV. Pass 2 for small channel logos
+  /// with thin text/wordmarks, where the box is tiny (memory cost negligible)
+  /// but a display-size decode of a large source looks blocky and aliased.
+  /// [ResizeImage] never upscales past the source's intrinsic size.
+  final double oversample;
 
   @override
   State<ResilientMediaImage> createState() => _ResilientMediaImageState();
@@ -472,13 +482,15 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
       title: widget.fallbackTitle,
     );
     final url = _currentUrl;
-    // Decode at display size (raw pixel density only). An earlier 2x
-    // oversample here quadrupled each decoded bitmap's memory footprint on a
-    // 4K TV, so a poster grid could not keep a screenful resident in the
-    // image cache and re-decoded from disk on every navigation. ResizeImage
-    // never upscales past the source's intrinsic size.
+    // Decode at display size by default (see [ResilientMediaImage.oversample]).
+    // An unconditional 2x oversample here quadrupled each decoded bitmap's
+    // memory footprint on a 4K TV, so a poster grid could not keep a screenful
+    // resident in the image cache and re-decoded from disk on every
+    // navigation. ResizeImage never upscales past the source's intrinsic size.
     final devicePixelRatio =
-        MediaQuery.devicePixelRatioOf(context) * TvZoomScale.of(context);
+        MediaQuery.devicePixelRatioOf(context) *
+        widget.oversample *
+        TvZoomScale.of(context);
     final cacheWidth = widget.width == null
         ? null
         : (widget.width! * devicePixelRatio).round();
@@ -920,6 +932,13 @@ class MediaPreviewSection extends StatefulWidget {
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
 
+  /// A preview row renders at most this many cards regardless of how many
+  /// [items] it is handed. Callers building [items] from a large catalog
+  /// should `.take(MediaPreviewSection.maxVisibleItems)` before mapping so a
+  /// provider tick doesn't allocate a [MediaPreviewItem] per catalog entry on
+  /// every rebuild.
+  static const int maxVisibleItems = 12;
+
   @override
   State<MediaPreviewSection> createState() => _MediaPreviewSectionState();
 }
@@ -940,7 +959,9 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = widget.items.take(12).toList(growable: false);
+    final visibleItems = widget.items
+        .take(MediaPreviewSection.maxVisibleItems)
+        .toList(growable: false);
     final double baseWidth;
     final double baseHeight;
     if (widget.landscapeStyle) {

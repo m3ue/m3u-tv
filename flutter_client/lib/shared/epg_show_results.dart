@@ -208,6 +208,7 @@ class ShowResultRow extends StatelessWidget {
               height: MediaBrowsingMetrics.logoSize,
               fit: BoxFit.contain,
               backgroundColor: Colors.transparent,
+              oversample: 2,
             ),
             const SizedBox(width: MediaBrowsingMetrics.itemGap),
             Expanded(

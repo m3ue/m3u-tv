@@ -1157,6 +1157,7 @@ class _ChannelRow extends StatelessWidget {
                   width: MediaBrowsingMetrics.logoSize,
                   height: MediaBrowsingMetrics.logoSize,
                   fit: BoxFit.contain,
+                  oversample: 2,
                 ),
                 const SizedBox(width: 14),
                 // Channel info
@@ -1289,6 +1290,7 @@ class _ChannelGridItem extends StatelessWidget {
             width: MediaBrowsingMetrics.logoSize,
             height: MediaBrowsingMetrics.logoSize,
             fit: BoxFit.contain,
+            oversample: 2,
           ),
           const SizedBox(height: 4),
           Row(

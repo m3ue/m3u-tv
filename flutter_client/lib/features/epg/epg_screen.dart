@@ -117,6 +117,7 @@ class _EpgScreenState extends State<EpgScreen> {
                       url: channel.logoUrl!,
                       width: 48,
                       height: 48,
+                      oversample: 2,
                       fallback: const Icon(Icons.tv, size: 48),
                     ),
                   )

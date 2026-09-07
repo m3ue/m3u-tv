@@ -157,10 +157,15 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           },
           child: ListTile(
             leading: channel.logoUrl != null && channel.logoUrl!.isNotEmpty
-                ? CircleAvatar(
-                    backgroundImage: NetworkImage(channel.logoUrl!),
-                    onBackgroundImageError: (_, _) {},
-                    child: const Icon(Icons.tv),
+                ? ClipOval(
+                    child: CachedMediaThumbnail(
+                      url: channel.logoUrl!,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      oversample: 2,
+                      fallback: const CircleAvatar(child: Icon(Icons.tv)),
+                    ),
                   )
                 : const CircleAvatar(child: Icon(Icons.tv)),
             title: Text(channel.name),

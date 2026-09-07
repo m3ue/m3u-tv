@@ -23,9 +23,24 @@ import 'package:palette_generator_master/palette_generator_master.dart';
 const int _maxCachedSwatches = 128;
 final Map<String, Color?> _swatchCache = <String, Color?>{};
 
-Future<Color?> resolveDominantBackdropColor(String? url) async {
-  if (url == null || url.isEmpty) return null;
-  if (_swatchCache.containsKey(url)) return _swatchCache[url];
+/// In-flight extractions keyed by URL, so two screens (or a fast back/forward
+/// on the same title) that ask before the first decode resolves share one
+/// palette computation instead of both running it.
+final Map<String, Future<Color?>> _pendingSwatches = <String, Future<Color?>>{};
+
+Future<Color?> resolveDominantBackdropColor(String? url) {
+  if (url == null || url.isEmpty) return Future<Color?>.value();
+  if (_swatchCache.containsKey(url)) {
+    return Future<Color?>.value(_swatchCache[url]);
+  }
+  final pending = _pendingSwatches[url];
+  if (pending != null) return pending;
+  final future = _extractSwatch(url);
+  _pendingSwatches[url] = future;
+  return future;
+}
+
+Future<Color?> _extractSwatch(String url) async {
   try {
     final palette = await PaletteGeneratorMaster.fromImageProvider(
       CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
@@ -41,6 +56,10 @@ Future<Color?> resolveDominantBackdropColor(String? url) async {
   } on Object catch (_) {
     _rememberSwatch(url, null);
     return null;
+  } finally {
+    // remove() hands back the stored Future; nothing awaits it here.
+    // ignore: unawaited_futures
+    _pendingSwatches.remove(url);
   }
 }
 

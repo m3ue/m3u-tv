@@ -20,6 +20,7 @@ import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
@@ -54,20 +55,36 @@ Future<void> main() async {
   );
 }
 
-/// Raises Flutter's decoded-image memory cache well above the 100 MB / 1000
-/// entry default. Posters and channel logos are disk-cached via
+/// Raises Flutter's decoded-image memory cache above the 100 MB / 1000 entry
+/// default. Posters and channel logos are disk-cached via
 /// [MediaImageCacheManager], but the decoded bitmaps live in this in-memory
 /// [ImageCache]; on a 4K TV a single poster grid can't fit one screenful in
 /// 100 MB, so browsing (and every trip in and out of a detail screen) evicts
-/// entries and forces a visible re-decode from disk. A larger ceiling keeps a
-/// full library of recently browsed art resident so revisiting a screen is
-/// instant.
+/// entries and forces a visible re-decode from disk. A larger ceiling keeps
+/// recently browsed art resident so revisiting a screen is instant.
+///
+/// Sized per platform: Android TV boxes and sticks can sit on ~1 GB of RAM
+/// with an aggressive low-memory killer, so they get the smallest ceiling;
+/// tvOS has more headroom but still hard-caps per-app memory; desktop is
+/// effectively unconstrained.
 void _configureImageCache() {
+  final int maximumSizeBytes;
+  final int maximumSize;
+  if (_isDesktop) {
+    maximumSizeBytes = 384 * 1024 * 1024;
+    maximumSize = 1500;
+  } else if (Platform.isIOS) {
+    // tvOS
+    maximumSizeBytes = 256 * 1024 * 1024;
+    maximumSize = 1200;
+  } else {
+    // Android TV - tightest RAM budget
+    maximumSizeBytes = 160 * 1024 * 1024;
+    maximumSize = 900;
+  }
   PaintingBinding.instance.imageCache
-    ..maximumSizeBytes =
-        384 <<
-        20 // 384 MB
-    ..maximumSize = 1500;
+    ..maximumSizeBytes = maximumSizeBytes
+    ..maximumSize = maximumSize;
 }
 
 bool get _isDesktop =>
@@ -346,30 +363,6 @@ class _MyAppState extends State<MyApp> {
       themeMode: ThemeMode.dark,
     );
   }
-}
-
-/// The extra scale factor [_TvZoom] applies on top of the real screen's
-/// devicePixelRatio. Image cache-dimension widgets (`CachedBackdropImage`,
-/// `CachedMediaThumbnail`, `ResilientMediaImage`) multiply
-/// `MediaQuery.devicePixelRatioOf(context)` by this when sizing their
-/// `ResizeImage`, since they compute cache dimensions from local widget
-/// size/constraints in the shrunk virtual canvas -- unlike code that reads
-/// devicePixelRatio together with `localToGlobal()`, which already lands in
-/// real-space coordinates via the FittedBox's paint transform and needs no
-/// correction. Defaults to 1 outside the TV zoom (non-TV devices, or any
-/// context above `_TvZoom` in the tree).
-class TvZoomScale extends InheritedWidget {
-  const TvZoomScale({required this.scale, required super.child, super.key});
-
-  final double scale;
-
-  static double of(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<TvZoomScale>()?.scale ??
-        1;
-  }
-
-  @override
-  bool updateShouldNotify(TvZoomScale oldWidget) => scale != oldWidget.scale;
 }
 
 /// Renders the app on a smaller virtual canvas and stretches it to fill the

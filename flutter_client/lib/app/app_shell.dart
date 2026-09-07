@@ -2283,11 +2283,12 @@ class _HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<_HomeScreen> {
-  /// The home rows are previews - [MediaPreviewSection] itself only renders
-  /// the first 12 items. Capping before the `.map` keeps a provider tick
-  /// (progress, EPG, favorites) from allocating a fresh MediaPreviewItem for
-  /// every entry in a multi-thousand-item VOD/Series catalog on each rebuild.
-  static const int _rowItemLimit = 12;
+  /// The home rows are previews - [MediaPreviewSection] only renders its first
+  /// [MediaPreviewSection.maxVisibleItems]. Capping before the `.map` keeps a
+  /// provider tick (progress, EPG, favorites) from allocating a fresh
+  /// MediaPreviewItem for every entry in a multi-thousand-item VOD/Series
+  /// catalog on each rebuild.
+  static const int _rowItemLimit = MediaPreviewSection.maxVisibleItems;
 
   Set<int> _favoriteChannelIds = {};
   Set<int> _favoriteVodIds = {};
