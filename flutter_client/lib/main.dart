@@ -15,6 +15,7 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
@@ -27,6 +28,8 @@ import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await DevicePerformance.ensureDetected();
+  if (kDebugMode) debugPrint(DevicePerformance.describe());
   _configureImageCache();
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
@@ -68,8 +71,8 @@ Future<void> main() async {
 /// tvOS has more headroom but still hard-caps per-app memory; desktop is
 /// effectively unconstrained.
 void _configureImageCache() {
-  final int maximumSizeBytes;
-  final int maximumSize;
+  int maximumSizeBytes;
+  int maximumSize;
   if (_isDesktop) {
     maximumSizeBytes = 384 * 1024 * 1024;
     maximumSize = 1500;
@@ -81,6 +84,14 @@ void _configureImageCache() {
     // Android TV - tightest RAM budget
     maximumSizeBytes = 160 * 1024 * 1024;
     maximumSize = 900;
+  }
+  // Low-end Android hardware (32-bit, low-RAM flag, <= ~2.2 GiB): halve the
+  // ceiling so a poster-grid decode burst can't push RSS into LMK range
+  // before the watchdog samples. The watchdog is the backstop, this is the
+  // budget.
+  if (DevicePerformance.isReduced) {
+    maximumSizeBytes = (maximumSizeBytes * 0.5).round();
+    maximumSize = (maximumSize * 0.6).round();
   }
   PaintingBinding.instance.imageCache
     ..maximumSizeBytes = maximumSizeBytes

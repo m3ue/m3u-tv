@@ -32,6 +32,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
@@ -133,6 +134,7 @@ class AppShellState extends ConsumerState<AppShell>
   bool get _fullScreenDetailActive => _fullScreenDetailDepth > 0;
   late final AppStateController _appState;
   late final bool _ownsAppState;
+  final MemoryWatchdog _memoryWatchdog = MemoryWatchdog();
   late final SystemUiPolicy _systemUiPolicy;
   int _unreadCount = 0;
 
@@ -209,6 +211,7 @@ class AppShellState extends ConsumerState<AppShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _memoryWatchdog.start();
     _appState = widget.appState ?? AppStateController();
     _ownsAppState = widget.appState == null;
     _systemUiPolicy = widget.systemUiPolicy ?? SystemUiPolicy();
@@ -341,6 +344,7 @@ class AppShellState extends ConsumerState<AppShell>
     _tvNotificationSub?.cancel().ignore();
     _notificationActivationSub?.cancel().ignore();
     _desktopNotificationDispatcher.dispose();
+    _memoryWatchdog.stop();
     WidgetsBinding.instance.removeObserver(this);
     _playerOrchestrator?.dispose().ignore();
     _playerNativePlaneSub?.cancel().ignore();
@@ -352,6 +356,12 @@ class AppShellState extends ConsumerState<AppShell>
     _appState.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
     super.dispose();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    _memoryWatchdog.notifyMemoryPressure();
   }
 
   @override
