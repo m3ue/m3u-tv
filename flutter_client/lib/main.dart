@@ -215,7 +215,9 @@ Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
     try {
       return await _openAndProbeCatalog(dataDir);
     } on Object catch (error, stackTrace) {
-      debugPrint('[Catalog] on-disk catalog unavailable, using in-memory: $error');
+      debugPrint(
+        '[Catalog] on-disk catalog unavailable, using in-memory: $error',
+      );
       if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
       return CatalogRepository(CatalogDatabase.memory());
     }
