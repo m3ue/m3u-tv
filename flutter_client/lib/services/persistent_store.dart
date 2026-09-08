@@ -261,7 +261,14 @@ class PersistentJsonStore {
     return true;
   }
 
-  static String _defaultPath(String fileName) {
+  static String _defaultPath(String fileName) =>
+      '${defaultDirectoryPath()}/$fileName';
+
+  /// The directory the default-constructed store writes into. Exposed so
+  /// siblings that must live next to `app_state.json` / `cache.json` on the
+  /// desktop path (e.g. the SQLite catalog database) can resolve the same
+  /// location without duplicating the per-OS rules.
+  static String defaultDirectoryPath() {
     final env = Platform.environment;
     final base = switch (Platform.operatingSystem) {
       'windows' =>
@@ -273,7 +280,7 @@ class PersistentJsonStore {
             '${env['HOME'] ?? Directory.systemTemp.path}/.local/share',
       _ => '${env['HOME'] ?? Directory.systemTemp.path}/.m3u_tv',
     };
-    return '$base/m3u_tv/$fileName';
+    return '$base/m3u_tv';
   }
 }
 

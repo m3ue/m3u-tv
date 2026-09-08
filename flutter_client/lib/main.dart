@@ -15,6 +15,9 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_import.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
@@ -146,7 +149,9 @@ Future<void> _initPushNotifications(AppStateController appState) async {
 
 Future<AppStateController> _buildAppState() async {
   final operatingSystem = Platform.operatingSystem;
-  final (store, cacheStore) = await _createAppStateStores(operatingSystem);
+  final (store, cacheStore, dataDir) = await _createAppStateStores(
+    operatingSystem,
+  );
   final storage = createProductionStorage(
     operatingSystem: operatingSystem,
     persistentStore: store,
@@ -157,20 +162,62 @@ Future<AppStateController> _buildAppState() async {
       credentialStorage: storage.credentialStorage,
     );
   }
+  // Pull any legacy `m3ue_cache_*` catalog blob still sitting in app_state.json
+  // (installs predating the cache.json split) into the cache store first, so
+  // the SQLite import below finds it in one pass. boot()'s own adoptKeysFrom
+  // call then no-ops.
+  if (!identical(storage.appStateStore, cacheStore)) {
+    try {
+      await cacheStore.adoptKeysFrom(
+        storage.appStateStore,
+        (key) => key.startsWith('m3ue_cache_'),
+      );
+    } on Object catch (error) {
+      debugPrint('Content cache pre-split deferred: $error');
+    }
+  }
+  final catalogRepository = await _openCatalogRepository(dataDir, cacheStore);
   return AppStateController(
     persistentStore: storage.appStateStore,
     cacheStore: cacheStore,
+    catalogRepository: catalogRepository,
     secureStorage: storage.credentialStorage,
   );
 }
 
-/// Returns the app-state store and the content-cache store as a pair. The
-/// cache (whole channel/VOD/series catalog) is a sibling `cache.json` so a
-/// small single-key write to `app_state.json` - e.g. the resume tracker every
-/// ~10s during playback - never has to re-serialize the catalog.
-Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
-  String operatingSystem,
+/// Opens the SQLite catalog database in [dataDir] and moves any legacy
+/// `cache.json` catalog blob into it (one-time, idempotent). Returns null if
+/// the database can't be opened so the app falls back to the JSON cache path.
+Future<CatalogRepository?> _openCatalogRepository(
+  Directory dataDir,
+  PersistentJsonStore cacheStore,
 ) async {
+  try {
+    await dataDir.create(recursive: true);
+    final repository = CatalogRepository(CatalogDatabase.open(dataDir));
+    final imported = await CatalogImporter(
+      repository: repository,
+      cacheStore: cacheStore,
+      sourceKey: 'active',
+    ).run();
+    if (kDebugMode && imported) {
+      debugPrint('[Catalog] migrated legacy cache.json blob into SQLite');
+    }
+    return repository;
+  } on Object catch (error, stackTrace) {
+    debugPrint('[Catalog] SQLite open failed, using JSON cache: $error');
+    if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+    return null;
+  }
+}
+
+/// Returns the app-state store, the content-cache store, and the directory
+/// both live in. The cache (whole channel/VOD/series catalog) is a sibling
+/// `cache.json` so a small single-key write to `app_state.json` - e.g. the
+/// resume tracker every ~10s during playback - never has to re-serialize the
+/// catalog.
+Future<(PersistentJsonStore, PersistentJsonStore, Directory)>
+_createAppStateStores(String operatingSystem) async {
   if (operatingSystem == 'tvos') {
     // Documents exists but is read-only on a physical Apple TV; only
     // Library/Caches and tmp are writable there. See path_provider_tvos's
@@ -189,6 +236,7 @@ Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
     return (
       PersistentJsonStore(file: File('${dir.path}/app_state.json')),
       PersistentJsonStore(file: File('${dir.path}/cache.json')),
+      dir,
     );
   }
   if (operatingSystem == 'android' || operatingSystem == 'ios') {
@@ -196,11 +244,13 @@ Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
     return (
       PersistentJsonStore(file: File('${dir.path}/app_state.json')),
       PersistentJsonStore(file: File('${dir.path}/cache.json')),
+      dir,
     );
   }
   return (
     PersistentJsonStore(),
     PersistentJsonStore(fileName: 'cache.json'),
+    Directory(PersistentJsonStore.defaultDirectoryPath()),
   );
 }
 

@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
@@ -69,6 +70,7 @@ class AppStateController extends ChangeNotifier {
     XtreamService? xtreamService,
     SecureStorage? secureStorage,
     CacheService? cacheService,
+    CatalogRepository? catalogRepository,
     FavoritesService? favoritesService,
     FavoritesService? vodFavoritesService,
     FavoritesService? seriesFavoritesService,
@@ -102,7 +104,11 @@ class AppStateController extends ChangeNotifier {
             ? PersistentJsonStore(fileName: 'cache.json')
             : store);
     final resolvedCacheService =
-        cacheService ?? CacheService(store: resolvedCacheStore);
+        cacheService ??
+        CacheService(
+          store: resolvedCacheStore,
+          catalogRepository: catalogRepository,
+        );
     final resolvedXtreamService =
         xtreamService ??
         authNotifier?.xtreamService ??
@@ -120,6 +126,7 @@ class AppStateController extends ChangeNotifier {
       xtreamService: resolvedXtreamService,
       secureStorage: resolvedSecureStorage,
       cacheService: resolvedCacheService,
+      catalogRepository: catalogRepository,
       appStateStore: store,
       cacheStore: resolvedCacheStore,
       favoritesService: favoritesService ?? FavoritesService(store: store),
@@ -158,6 +165,7 @@ class AppStateController extends ChangeNotifier {
     required this.xtreamService,
     required this.secureStorage,
     required this.cacheService,
+    required this._catalogRepository,
     required this._appStateStore,
     required this._cacheStore,
     required this.favoritesService,
@@ -219,6 +227,11 @@ class AppStateController extends ChangeNotifier {
   final PersistentJsonStore _cacheStore;
   final SecureStorage secureStorage;
   final CacheService cacheService;
+
+  /// SQLite-backed catalog store (null when running on the legacy JSON cache
+  /// path, e.g. under tests or if the database failed to open). Owned here so
+  /// [dispose] can close it.
+  final CatalogRepository? _catalogRepository;
   final FavoritesService favoritesService;
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
@@ -3482,6 +3495,7 @@ class AppStateController extends ChangeNotifier {
     unawaited(_tvNotificationController.close());
     unawaited(_notificationActivationController.close());
     unawaited(_pushNotificationService.dispose());
+    unawaited(_catalogRepository?.close());
     super.dispose();
   }
 }
