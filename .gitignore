@@ -40,6 +40,10 @@ flutter_client/screenshots/store
 # Dart/Flutter generated
 flutter_client/**/*.g.dart
 flutter_client/**/*.freezed.dart
+# ...except the drift schema: it is the project's only build_runner output and
+# no CI job runs `dart run build_runner build`, so it is checked in. Regenerate
+# with build_runner after editing catalog_database.dart.
+!flutter_client/lib/services/catalog_db/catalog_database.g.dart
 
 # Docs exceptions
 !docs/
