@@ -283,7 +283,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
   final int streamId;
   final String name;
 
-  /// Case-folded, accent-stripped [name] for `LIKE` search and ordering.
+  /// Lower-cased [name] for case-insensitive `LIKE` search and ordering.
   final String nameFold;
 
   /// Primary category id (provider order). Null for uncategorized rows.

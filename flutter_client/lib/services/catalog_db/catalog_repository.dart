@@ -78,13 +78,24 @@ class CatalogRepository {
       await (_db.delete(_db.catalogItems)
             ..where((t) => t.sourceKey.equals(sourceKey) & t.kind.equals(kind)))
           .go();
+      // The PK is (sourceKey, kind, streamId). Provider payloads are not
+      // guaranteed unique on stream_id - a missing id decodes to 0, and merged
+      // / multi-playlist / AIOStreams sources can repeat ids - and
+      // insertOrReplace would silently collapse every clash into one row. Give
+      // any clashing element a negative, position-derived surrogate id (real
+      // provider ids are positive) so every element survives the round trip.
+      // Nothing reads a row back by this column; the decoded `.id` comes from
+      // the json payload.
+      final usedIds = <int>{};
       await _db.batch((batch) {
         for (var i = 0; i < items.length; i++) {
-          batch.insert(
-            _db.catalogItems,
-            _rowFor(sourceKey, kind, items[i], i),
-            mode: InsertMode.insertOrReplace,
-          );
+          var row = _rowFor(sourceKey, kind, items[i], i);
+          if (row.streamId.value <= 0 || !usedIds.add(row.streamId.value)) {
+            final surrogate = -(i + 1);
+            usedIds.add(surrogate);
+            row = row.copyWith(streamId: Value(surrogate));
+          }
+          batch.insert(_db.catalogItems, row, mode: InsertMode.insertOrReplace);
         }
       });
     });
@@ -372,7 +383,7 @@ class CatalogRepository {
   );
 
   // -------------------------------------------------------------------------
-  // Key/value slots (+ getIfFresh)
+  // Key/value slots
   // -------------------------------------------------------------------------
 
   Future<String?> kvGet(String key) async {
@@ -380,16 +391,6 @@ class CatalogRepository {
       _db.kvCache,
     )..where((t) => t.key.equals(key))).getSingleOrNull();
     return row?.value;
-  }
-
-  /// [kvGet] gated on write age: null when missing or older than [maxAge].
-  Future<String?> kvGetIfFresh(String key, Duration maxAge) async {
-    final row = await (_db.select(
-      _db.kvCache,
-    )..where((t) => t.key.equals(key))).getSingleOrNull();
-    if (row == null) return null;
-    final age = DateTime.now().millisecondsSinceEpoch - row.updatedAtMs;
-    return age <= maxAge.inMilliseconds ? row.value : null;
   }
 
   Future<void> kvPut(String key, String value) async {

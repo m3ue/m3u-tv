@@ -51,6 +51,31 @@ void main() {
     },
   );
 
+  test(
+    'replaceItems keeps every element when stream ids are missing or duplicated',
+    () async {
+      await repo.replaceItems(
+        sourceKey: 's1',
+        kind: kCatalogKindVod,
+        items: [
+          _vod(0, 'No id A'),
+          _vod(0, 'No id B'),
+          _vod(50, 'Real'),
+          _vod(50, 'Dup of real'),
+        ],
+      );
+
+      final items = await repo.allItems<VodItem>('s1', kCatalogKindVod);
+      expect(items.map((v) => v.name), [
+        'No id A',
+        'No id B',
+        'Real',
+        'Dup of real',
+      ]);
+      expect(await repo.countItems(sourceKey: 's1', kind: kCatalogKindVod), 4);
+    },
+  );
+
   test('replaceItems fully swaps the previous catalog for that kind', () async {
     await repo.replaceItems(
       sourceKey: 's1',
@@ -242,16 +267,12 @@ void main() {
     },
   );
 
-  test('kvGetIfFresh honours the max age', () async {
+  test('kv slots round-trip and delete', () async {
     await repo.kvPut('sourceType', 'xtream');
     expect(await repo.kvGet('sourceType'), 'xtream');
-    expect(
-      await repo.kvGetIfFresh('sourceType', const Duration(minutes: 5)),
-      'xtream',
-    );
-    expect(
-      await repo.kvGetIfFresh('sourceType', Duration.zero),
-      isNull,
-    );
+    await repo.kvPut('sourceType', 'xtream-2');
+    expect(await repo.kvGet('sourceType'), 'xtream-2');
+    await repo.kvDelete('sourceType');
+    expect(await repo.kvGet('sourceType'), isNull);
   });
 }

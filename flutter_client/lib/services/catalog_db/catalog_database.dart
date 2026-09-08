@@ -24,7 +24,7 @@ class CatalogItems extends Table {
 
   TextColumn get name => text()();
 
-  /// Case-folded, accent-stripped [name] for `LIKE` search and ordering.
+  /// Lower-cased [name] for case-insensitive `LIKE` search and ordering.
   TextColumn get nameFold => text()();
 
   /// Primary category id (provider order). Null for uncategorized rows.
@@ -104,7 +104,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   /// callers resolve the same way `_createAppStateStores` resolves the JSON
   /// stores (Caches on tvOS, Documents on mobile, app-support on desktop).
   factory CatalogDatabase.open(Directory directory) {
-    final file = File(p.join(directory.path, _databaseFile));
+    final file = File(p.join(directory.path, databaseFileName));
     return CatalogDatabase(
       NativeDatabase.createInBackground(
         file,
@@ -117,7 +117,14 @@ class CatalogDatabase extends _$CatalogDatabase {
     );
   }
 
-  static const _databaseFile = 'm3u_tv_catalog.db';
+  /// The database file plus its WAL sidecars, so a caller that needs to
+  /// discard a corrupt / stale-schema catalog can delete all of them.
+  static const String databaseFileName = 'm3u_tv_catalog.db';
+  static const List<String> databaseFileNames = <String>[
+    databaseFileName,
+    '$databaseFileName-wal',
+    '$databaseFileName-shm',
+  ];
 
   @override
   int get schemaVersion => 1;

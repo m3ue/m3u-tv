@@ -132,7 +132,7 @@ class CacheService {
     }
     // replace() wipes every cache key not in [values]; mirror that for the
     // repo-backed keys the caller left out.
-    for (final key in _repoKeys) {
+    for (final key in catalogKeys) {
       if (!values.containsKey(key)) await _clearRepoKey(key);
     }
     await _store?.replaceWhere(
@@ -164,7 +164,11 @@ class CacheService {
     await _repo.clearAll();
   }
 
-  static Iterable<String> get _repoKeys => <String>[
+  /// The cache keys backed by the SQLite [CatalogRepository] rather than the
+  /// JSON store. `main` uses this to purge only the pre-SQLite catalog blobs
+  /// from the legacy JSON stores, without touching the scalar keys
+  /// (`sourceType`, `viewers`) that still legitimately live there.
+  static List<String> get catalogKeys => <String>[
     ..._itemKinds.keys,
     ..._categoryKinds.keys,
     _epgKey,

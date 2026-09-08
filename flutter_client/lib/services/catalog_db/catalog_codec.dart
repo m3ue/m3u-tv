@@ -1,20 +1,14 @@
 import 'package:m3u_tv/services/domain_models.dart';
 
 /// Single source of truth for the on-storage JSON shape of catalog domain
-/// objects. Used by both the legacy `CacheService` JSON blobs and the SQLite
-/// `CatalogDatabase` row payloads, so a value written by one path decodes
-/// identically through the other (which is what makes the one-time JSON ->
-/// SQLite import a straight re-key).
+/// objects. The `encode*` helpers produce the payload stored in the
+/// `CatalogItems.json` column; the `decode*` helpers rebuild the domain object
+/// from it. Categories and EPG programmes are reconstructed straight from their
+/// promoted columns, so only [decodeCategory] is needed on that side.
 
 const String kCatalogKindLive = 'live';
 const String kCatalogKindVod = 'vod';
 const String kCatalogKindSeries = 'series';
-
-Map<String, Object?> encodeCategory(Category category) => <String, Object?>{
-  'category_id': category.id,
-  'category_name': category.name,
-  'parent_id': category.parentId,
-};
 
 Category decodeCategory(Map<String, Object?> json) => Category.fromXtream(json);
 
@@ -82,29 +76,6 @@ Map<String, Object?> encodeSeries(Series series) => <String, Object?>{
 };
 
 Series decodeSeries(Map<String, Object?> json) => Series.fromXtream(json);
-
-Map<String, Object?> encodeEpgProgram(EpgProgram program) => <String, Object?>{
-  'channel_id': program.channelId,
-  'title': program.title,
-  'description': program.description,
-  'start': program.start.toIso8601String(),
-  'end': program.end.toIso8601String(),
-  if (program.subtitle != null) 'subtitle': program.subtitle,
-};
-
-EpgProgram? decodeEpgProgram(Map<String, Object?> json) {
-  final start = DateTime.tryParse('${json['start']}');
-  final end = DateTime.tryParse('${json['end']}');
-  if (start == null || end == null) return null;
-  return EpgProgram(
-    channelId: '${json['channel_id'] ?? ''}',
-    title: '${json['title'] ?? ''}',
-    description: '${json['description'] ?? ''}',
-    start: start,
-    end: end,
-    subtitle: nullableString(json['subtitle']),
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Loose-value coercion shared by every decoder above (provider payloads mix

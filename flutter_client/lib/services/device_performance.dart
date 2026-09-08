@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// User override for the performance tier, persisted by the view settings
-/// service. `auto` defers to hardware detection.
+/// Override for the auto-detected performance tier. `auto` defers to hardware
+/// detection; `full` / `reduced` force it. Passed to [DevicePerformance
+/// .ensureDetected]; there is no user-facing setting wired to it yet, so
+/// production always passes `auto`. Tests use it to exercise both tiers.
 enum PerformanceTierSetting { auto, full, reduced }
 
 /// Detects whether the current device is too weak for the full memory /
@@ -15,7 +17,7 @@ enum PerformanceTierSetting { auto, full, reduced }
 /// The reduced tier auto-triggers only on low-end Android hardware: a 32-bit
 /// process (cheap TV boxes and sticks run 32-bit userspace), the platform
 /// low-RAM flag, or <= ~2.2 GiB total memory. Every other platform is full
-/// tier unless the user forces `reduced`.
+/// tier unless [ensureDetected] is passed an explicit `reduced` override.
 ///
 /// Call [ensureDetected] once during app start (before the image cache is
 /// configured). The sync getters are safe before that completes - they report
@@ -38,8 +40,9 @@ class DevicePerformance {
   static int? _totalMemBytes;
 
   /// Detect the hardware signals. Idempotent; a second call is a no-op unless
-  /// [force] is set (used by tests). [override] is the persisted user
-  /// preference.
+  /// [force] is set (used by tests). Pass [override] again on every call - it
+  /// is applied even when detection is skipped, so a later preference change
+  /// takes effect without re-hitting the platform channel.
   static Future<void> ensureDetected({
     PerformanceTierSetting override = PerformanceTierSetting.auto,
     bool force = false,
@@ -65,11 +68,6 @@ class DevicePerformance {
     } on PlatformException {
       // Signal query failed - stay on the full tier.
     }
-  }
-
-  /// Apply a changed user preference without re-hitting the platform channel.
-  static void applyOverride(PerformanceTierSetting override) {
-    _override = override;
   }
 
   static bool get _isAndroid =>

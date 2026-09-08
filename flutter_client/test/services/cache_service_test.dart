@@ -130,6 +130,25 @@ void main() {
     },
   );
 
+  test('catalogKeys lists only the SQLite-backed blobs, not the scalars', () {
+    expect(
+      CacheService.catalogKeys.toSet(),
+      <String>{
+        'liveStreams',
+        'vodStreams',
+        'seriesStreams',
+        'liveCategories',
+        'vodCategories',
+        'seriesCategories',
+        'epgGuide',
+      },
+    );
+    // `sourceType` / `viewers` still live in the JSON store; `main`'s legacy
+    // purge keys off this list, so they must not appear here.
+    expect(CacheService.catalogKeys, isNot(contains('sourceType')));
+    expect(CacheService.catalogKeys, isNot(contains('viewers')));
+  });
+
   group('with a CatalogRepository', () {
     test(
       'catalog keys round-trip through SQLite, non-catalog keys do not',

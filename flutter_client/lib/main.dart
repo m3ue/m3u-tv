@@ -15,6 +15,7 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/device_performance.dart';
@@ -163,12 +164,18 @@ Future<AppStateController> _buildAppState() async {
   }
   final catalogRepository = await _openCatalogRepository(dataDir);
   // The catalog is a disposable cache - it's re-fetched from the source on
-  // every load - so there is nothing to migrate. Just drop any legacy
-  // `m3ue_cache_*` blob from the JSON stores; SQLite fills itself on the next
-  // source load. Best-effort: a failure here only leaves dead bytes behind.
+  // every load - so there is nothing to migrate. Drop only the pre-SQLite
+  // catalog blobs (`m3ue_cache_liveStreams`, ...) from the JSON stores;
+  // SQLite fills itself on the next source load. The other `m3ue_cache_*`
+  // keys (`sourceType`, `viewers`) still live in the JSON store and must be
+  // left alone or the cached-content fast path in boot() never fires. Best
+  // effort: a failure here only leaves dead bytes behind.
+  final legacyCatalogKeys = <String>{
+    for (final key in CacheService.catalogKeys) 'm3ue_cache_$key',
+  };
   for (final legacyStore in {storage.appStateStore, cacheStore}) {
     try {
-      await legacyStore.removeWhere((key) => key.startsWith('m3ue_cache_'));
+      await legacyStore.removeWhere(legacyCatalogKeys.contains);
     } on Object catch (error) {
       debugPrint('[Catalog] legacy cache purge deferred: $error');
     }
@@ -182,20 +189,39 @@ Future<AppStateController> _buildAppState() async {
 }
 
 /// Opens the SQLite catalog database in [dataDir] and probes it with a trivial
-/// query. There is no JSON fallback: if the database can't be opened, the probe
-/// fails, or it doesn't answer within a few seconds, this throws and the app
-/// fails to start rather than silently running a second, divergent code path.
+/// query. There is no JSON fallback.
+///
+/// The catalog is a disposable cache, so a file that won't open or answer -
+/// corruption, or an older schema (there are no migrations) - is recoverable:
+/// the file is deleted and reopened once, and SQLite refills from the source
+/// on the next load. Only a second, back-to-back failure throws and aborts
+/// startup.
 Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
-  CatalogRepository? repository;
+  await dataDir.create(recursive: true);
   try {
-    await dataDir.create(recursive: true);
-    repository = CatalogRepository(CatalogDatabase.open(dataDir));
+    return await _openAndProbeCatalog(dataDir);
+  } on Object catch (error, stackTrace) {
+    debugPrint('[Catalog] discarding unusable catalog database: $error');
+    if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+    for (final name in CatalogDatabase.databaseFileNames) {
+      final file = File('${dataDir.path}/$name');
+      try {
+        if (file.existsSync()) await file.delete();
+      } on Object {
+        // Best effort - a leftover sidecar is harmless once the main file is gone.
+      }
+    }
+    return _openAndProbeCatalog(dataDir);
+  }
+}
+
+Future<CatalogRepository> _openAndProbeCatalog(Directory dataDir) async {
+  final repository = CatalogRepository(CatalogDatabase.open(dataDir));
+  try {
     await repository.isEmpty().timeout(const Duration(seconds: 5));
     return repository;
-  } on Object catch (error, stackTrace) {
-    debugPrint('[Catalog] SQLite catalog database failed to open: $error');
-    if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
-    await repository?.close().catchError((_) {});
+  } on Object {
+    await repository.close().catchError((_) {});
     rethrow;
   }
 }
