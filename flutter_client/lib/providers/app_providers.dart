@@ -94,9 +94,9 @@ final vodCategoriesProvider = Provider<List<Category>>((ref) {
   return ref.watch(appStateControllerProvider).appState.vodCategories;
 });
 
-/// SQLite catalog store, or null on the legacy JSON cache path. Surfaces that
-/// have moved to windowed loading read pages from here.
-final catalogRepositoryProvider = Provider<CatalogRepository?>((ref) {
+/// SQLite catalog store (always present). Surfaces that have moved to windowed
+/// loading read pages from here.
+final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   return ref.watch(appStateControllerProvider).appState.catalogRepository;
 });
 

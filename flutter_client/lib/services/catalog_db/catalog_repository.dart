@@ -14,10 +14,21 @@ class CatalogRepository {
   CatalogRepository(this._db);
 
   final CatalogDatabase _db;
+  bool _closed = false;
 
   CatalogDatabase get database => _db;
 
-  Future<void> close() => _db.close();
+  /// True once [close] has run. Callers touching the repository from a
+  /// fire-and-forget path (e.g. a debounced EPG persist that can land after the
+  /// owning controller is disposed) check this to skip the work instead of
+  /// hitting drift's "can't use a closed database" error.
+  bool get isClosed => _closed;
+
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await _db.close();
+  }
 
   /// The one `sourceKey` in use today. The column is multi-source-ready but a
   /// source switch swaps every row wholesale, so callers that only ever touch
@@ -352,8 +363,11 @@ class CatalogRepository {
     channelId: row.channelId,
     title: row.title,
     description: row.description,
-    start: DateTime.fromMillisecondsSinceEpoch(row.startMs),
-    end: DateTime.fromMillisecondsSinceEpoch(row.endMs),
+    // EPG times are absolute schedule instants; the rest of the app treats
+    // them as UTC (see domain_models `_asDateTimeOrNull`), so rebuild them
+    // that way rather than in the host's local zone.
+    start: DateTime.fromMillisecondsSinceEpoch(row.startMs, isUtc: true),
+    end: DateTime.fromMillisecondsSinceEpoch(row.endMs, isUtc: true),
     subtitle: row.subtitle,
   );
 

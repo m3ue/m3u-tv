@@ -1,12 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
-import 'package:m3u_tv/services/catalog_db/catalog_import.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/persistent_store.dart';
 
 VodItem _vod(int id, String name, {String? category, double? rating}) =>
     VodItem(
@@ -256,103 +252,6 @@ void main() {
     expect(
       await repo.kvGetIfFresh('sourceType', Duration.zero),
       isNull,
-    );
-  });
-
-  group('CatalogImporter', () {
-    late Directory tempDir;
-    late PersistentJsonStore cacheStore;
-
-    setUp(() {
-      tempDir = Directory.systemTemp.createTempSync('catalog_import_test');
-      cacheStore = PersistentJsonStore(
-        file: File('${tempDir.path}/cache.json'),
-      );
-    });
-
-    tearDown(() => tempDir.deleteSync(recursive: true));
-
-    Future<void> seedLegacyBlob() async {
-      await cacheStore.write('m3ue_cache_vodStreams', {
-        'timestamp': DateTime(2026).toIso8601String(),
-        'data': [encodeVod(_vod(1, 'Legacy Movie', category: 'a'))],
-      });
-      await cacheStore.write('m3ue_cache_vodCategories', {
-        'timestamp': DateTime(2026).toIso8601String(),
-        'data': [encodeCategory(const Category(id: 'a', name: 'Action'))],
-      });
-      await cacheStore.write('m3ue_cache_epgGuide', {
-        'timestamp': DateTime(2026).toIso8601String(),
-        'data': [
-          encodeEpgProgram(
-            EpgProgram(
-              channelId: 'c1',
-              title: 'Show',
-              description: '',
-              start: DateTime(2026, 1, 1, 20),
-              end: DateTime(2026, 1, 1, 21),
-            ),
-          ),
-        ],
-      });
-    }
-
-    CatalogImporter importer() => CatalogImporter(
-      repository: repo,
-      cacheStore: cacheStore,
-      sourceKey: 's1',
-    );
-
-    test(
-      'imports the legacy blob into rows and deletes the source keys',
-      () async {
-        await seedLegacyBlob();
-
-        expect(await importer().run(), isTrue);
-
-        final items = await repo.allItems<VodItem>('s1', kCatalogKindVod);
-        expect(items.single.name, 'Legacy Movie');
-        expect(
-          (await repo.allCategories('s1', kCatalogKindVod)).single.name,
-          'Action',
-        );
-        expect(
-          (await repo.programmesEndingAfter(DateTime(2000))).single.title,
-          'Show',
-        );
-
-        final snapshot = await cacheStore.snapshot();
-        expect(
-          snapshot.keys.where((k) => k.startsWith('m3ue_cache_')),
-          isEmpty,
-        );
-      },
-    );
-
-    test('is a no-op when nothing legacy is present', () async {
-      expect(await importer().run(), isFalse);
-    });
-
-    test(
-      'sweeps stragglers without re-importing when rows already exist',
-      () async {
-        await repo.replaceItems(
-          sourceKey: 's1',
-          kind: kCatalogKindVod,
-          items: [_vod(99, 'Already here')],
-        );
-        await seedLegacyBlob();
-
-        expect(await importer().run(), isFalse);
-
-        final items = await repo.allItems<VodItem>('s1', kCatalogKindVod);
-        expect(items.single.id, 99); // not overwritten by the legacy blob
-        final snapshot = await cacheStore.snapshot();
-        expect(
-          snapshot.keys.where((k) => k.startsWith('m3ue_cache_')),
-          isEmpty,
-        );
-      },
     );
   });
 }

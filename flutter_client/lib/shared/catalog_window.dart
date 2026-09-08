@@ -54,10 +54,16 @@ class CatalogWindow<T> extends ChangeNotifier {
 
   int _totalCount = 0;
   bool _loadingCount = false;
+  bool _loadedOnce = false;
   Object? _error;
 
   int get totalCount => _totalCount;
   bool get isLoadingCount => _loadingCount;
+
+  /// True once a [load] has successfully returned a count. Callers use this to
+  /// stay on a fallback UI until the window is demonstrably working (a hung or
+  /// failed database must not strand them on a spinner).
+  bool get hasLoadedOnce => _loadedOnce;
   Object? get error => _error;
   int get residentCount => _items.length;
 
@@ -91,6 +97,7 @@ class CatalogWindow<T> extends ChangeNotifier {
       if (_generation.isStale(generation)) return;
       _totalCount = count;
       _loadingCount = false;
+      _loadedOnce = true;
       notifyListeners();
       await _fetchPageAt(0, generation);
     } on Object catch (error) {

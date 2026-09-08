@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -17,18 +18,22 @@ class CacheSnapshot {
 
   final Map<String, Object?> _memory;
   final Map<String, Object?> _persisted;
-  final CatalogSnapshot? _catalog;
+  final CatalogSnapshot _catalog;
 }
 
 /// Layered cache for the source catalog.
 ///
-/// Small scalar/`Viewer` keys still live in memory + the [PersistentJsonStore]
-/// blob. When a [CatalogRepository] is supplied, the large catalog keys
-/// (`liveStreams` / `vodStreams` / `seriesStreams`, the three `*Categories`
-/// keys, and `epgGuide`) are backed by SQLite instead: reads hit the database
-/// (no full-list copy held here) and writes swap the relevant rows, so a cold
-/// start no longer parses a multi-MB JSON blob and a catalog refresh no longer
-/// re-serializes one.
+/// Small scalar/`Viewer` keys live in memory + the [PersistentJsonStore] blob.
+/// The large catalog keys (`liveStreams` / `vodStreams` / `seriesStreams`, the
+/// three `*Categories` keys, and `epgGuide`) are always backed by the SQLite
+/// [CatalogRepository]: reads hit the database (no full-list copy held here)
+/// and writes swap the relevant rows, so a cold start never parses a multi-MB
+/// JSON blob and a catalog refresh never re-serializes one.
+///
+/// There is no JSON code path for those keys. Production injects the on-disk
+/// repository (and app startup hard-fails if it can't be opened); a caller
+/// that omits one - only tests do - gets a private in-memory SQLite database,
+/// so the catalog always exercises the exact same code, just unpersisted.
 class CacheService {
   CacheService({
     Map<String, Object?>? memory,
@@ -37,11 +42,11 @@ class CacheService {
     this.refreshInterval = const Duration(hours: 1),
   }) : _memory = memory ?? <String, Object?>{},
        _store = store,
-       _repo = catalogRepository;
+       _repo = catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? _store;
-  final CatalogRepository? _repo;
+  final CatalogRepository _repo;
   Duration refreshInterval;
 
   static const String _sourceKey = CatalogRepository.activeSource;
@@ -59,10 +64,9 @@ class CacheService {
   static const String _epgKey = 'epgGuide';
 
   bool _isRepoKey(String key) =>
-      _repo != null &&
-      (_itemKinds.containsKey(key) ||
-          _categoryKinds.containsKey(key) ||
-          key == _epgKey);
+      _itemKinds.containsKey(key) ||
+      _categoryKinds.containsKey(key) ||
+      key == _epgKey;
 
   String _tsKey(String key) => '__ts_$key';
 
@@ -104,7 +108,7 @@ class CacheService {
     final persisted = Map<String, Object?>.from(
       await _store?.snapshot() ?? const <String, Object?>{},
     )..removeWhere((key, _) => !key.startsWith('m3ue_cache_'));
-    return CacheSnapshot._(memory, persisted, await _repo?.snapshot());
+    return CacheSnapshot._(memory, persisted, await _repo.snapshot());
   }
 
   Future<void> replace(Map<String, Object?> values) async {
@@ -128,10 +132,8 @@ class CacheService {
     }
     // replace() wipes every cache key not in [values]; mirror that for the
     // repo-backed keys the caller left out.
-    if (_repo != null) {
-      for (final key in _repoKeys) {
-        if (!values.containsKey(key)) await _clearRepoKey(key);
-      }
+    for (final key in _repoKeys) {
+      if (!values.containsKey(key)) await _clearRepoKey(key);
     }
     await _store?.replaceWhere(
       (key) => key.startsWith('m3ue_cache_'),
@@ -150,8 +152,7 @@ class CacheService {
         snapshot._persisted,
       );
     }
-    final catalog = snapshot._catalog;
-    if (_repo != null && catalog != null) await _repo.restore(catalog);
+    await _repo.restore(snapshot._catalog);
     _memory
       ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
       ..addAll(snapshot._memory);
@@ -160,7 +161,7 @@ class CacheService {
   Future<void> clear() async {
     _memory.removeWhere((key, _) => key.startsWith('m3ue_cache_'));
     await _store?.removeWhere((key) => key.startsWith('m3ue_cache_'));
-    await _repo?.clearAll();
+    await _repo.clearAll();
   }
 
   static Iterable<String> get _repoKeys => <String>[
@@ -174,7 +175,10 @@ class CacheService {
     Object? data,
     DateTime timestamp,
   ) async {
-    final repo = _repo!;
+    final repo = _repo;
+    // A debounced catalog/EPG persist can land after the owning controller was
+    // disposed and closed the database; drop it rather than throw.
+    if (repo.isClosed) return;
     final itemKind = _itemKinds[key];
     if (itemKind != null) {
       await repo.replaceItems(
@@ -197,7 +201,8 @@ class CacheService {
   }
 
   Future<void> _clearRepoKey(String key) async {
-    final repo = _repo!;
+    final repo = _repo;
+    if (repo.isClosed) return;
     if (_itemKinds.containsKey(key)) {
       await repo.replaceItems(
         sourceKey: _sourceKey,
@@ -217,7 +222,8 @@ class CacheService {
   }
 
   Future<CacheEntry<T>?> _readRepoKey<T>(String key) async {
-    final repo = _repo!;
+    final repo = _repo;
+    if (repo.isClosed) return null;
     final rawTs = await repo.kvGet(_tsKey(key));
     if (rawTs == null) return null;
     final writtenMs = int.tryParse(rawTs);
@@ -254,22 +260,9 @@ class _StampedValue<T> {
   final DateTime timestamp;
 }
 
+// Only the small non-catalog keys reach the JSON store now (`sourceType`,
+// `viewers`); the catalog lists are owned by the SQLite [CatalogRepository].
 Object? _encodeCacheData(String key, Object? data) {
-  if (data is List<Category>) {
-    return data.map(encodeCategory).toList(growable: false);
-  }
-  if (data is List<Channel>) {
-    return data.map(encodeChannel).toList(growable: false);
-  }
-  if (data is List<VodItem>) {
-    return data.map(encodeVod).toList(growable: false);
-  }
-  if (data is List<Series>) {
-    return data.map(encodeSeries).toList(growable: false);
-  }
-  if (data is List<EpgProgram>) {
-    return data.map(encodeEpgProgram).toList(growable: false);
-  }
   if (data is List<Viewer>) {
     return data.map((viewer) => viewer.toJson()).toList(growable: false);
   }
@@ -295,21 +288,8 @@ _StampedValue<T>? _decodeStampedValue<T>(String key, Object? raw) {
 Object? _decodeCacheData(String key, Object? raw) {
   final list = raw is List ? raw.cast<Object?>() : null;
   return switch (key) {
-    'liveCategories' || 'vodCategories' || 'seriesCategories' =>
-      list?.map((item) => decodeCategory(asMap(item))).toList(growable: false),
-    'liveStreams' =>
-      list?.map((item) => decodeChannel(asMap(item))).toList(growable: false),
-    'vodStreams' =>
-      list?.map((item) => decodeVod(asMap(item))).toList(growable: false),
-    'seriesStreams' =>
-      list?.map((item) => decodeSeries(asMap(item))).toList(growable: false),
     'viewers' =>
       list?.map((item) => Viewer.fromJson(asMap(item))).toList(growable: false),
-    'epgGuide' =>
-      list
-          ?.map((item) => decodeEpgProgram(asMap(item)))
-          .whereType<EpgProgram>()
-          .toList(growable: false),
     _ => raw,
   };
 }

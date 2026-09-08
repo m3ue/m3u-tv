@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
@@ -103,11 +104,16 @@ class AppStateController extends ChangeNotifier {
         (persistentStore == null && cacheService == null
             ? PersistentJsonStore(fileName: 'cache.json')
             : store);
+    // The catalog is always SQLite-backed. Production passes the on-disk repo;
+    // when a caller (chiefly tests) omits it, fall back to a private in-memory
+    // database so there is exactly one catalog code path - never a JSON one.
+    final resolvedCatalogRepository =
+        catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
     final resolvedCacheService =
         cacheService ??
         CacheService(
           store: resolvedCacheStore,
-          catalogRepository: catalogRepository,
+          catalogRepository: resolvedCatalogRepository,
         );
     final resolvedXtreamService =
         xtreamService ??
@@ -126,7 +132,7 @@ class AppStateController extends ChangeNotifier {
       xtreamService: resolvedXtreamService,
       secureStorage: resolvedSecureStorage,
       cacheService: resolvedCacheService,
-      catalogRepository: catalogRepository,
+      catalogRepository: resolvedCatalogRepository,
       appStateStore: store,
       cacheStore: resolvedCacheStore,
       favoritesService: favoritesService ?? FavoritesService(store: store),
@@ -228,10 +234,10 @@ class AppStateController extends ChangeNotifier {
   final SecureStorage secureStorage;
   final CacheService cacheService;
 
-  /// SQLite-backed catalog store (null when running on the legacy JSON cache
-  /// path, e.g. under tests or if the database failed to open). Owned here so
-  /// [dispose] can close it.
-  final CatalogRepository? _catalogRepository;
+  /// SQLite-backed catalog store. Always present - production opens it on disk,
+  /// tests get a private in-memory database. Owned here so [dispose] can close
+  /// it.
+  final CatalogRepository _catalogRepository;
   final FavoritesService favoritesService;
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
@@ -473,10 +479,10 @@ class AppStateController extends ChangeNotifier {
   List<Channel> get channels => _channels;
   List<VodItem> get vodItems => _vodItems;
 
-  /// SQLite catalog store, or null on the legacy JSON cache path (tests, or a
-  /// database that failed to open). Surfaces migrating to windowed loading
-  /// read pages from here instead of [vodItems] / [channels] / [seriesList].
-  CatalogRepository? get catalogRepository => _catalogRepository;
+  /// SQLite catalog store (always present). Surfaces migrating to windowed
+  /// loading read pages from here instead of [vodItems] / [channels] /
+  /// [seriesList].
+  CatalogRepository get catalogRepository => _catalogRepository;
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
   DvrStorageInfo? get dvrStorageInfo => _dvrStorageInfo;
@@ -3500,7 +3506,7 @@ class AppStateController extends ChangeNotifier {
     unawaited(_tvNotificationController.close());
     unawaited(_notificationActivationController.close());
     unawaited(_pushNotificationService.dispose());
-    unawaited(_catalogRepository?.close());
+    unawaited(_catalogRepository.close());
     super.dispose();
   }
 }

@@ -16,7 +16,6 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
-import 'package:m3u_tv/services/catalog_db/catalog_import.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -162,21 +161,18 @@ Future<AppStateController> _buildAppState() async {
       credentialStorage: storage.credentialStorage,
     );
   }
-  // Pull any legacy `m3ue_cache_*` catalog blob still sitting in app_state.json
-  // (installs predating the cache.json split) into the cache store first, so
-  // the SQLite import below finds it in one pass. boot()'s own adoptKeysFrom
-  // call then no-ops.
-  if (!identical(storage.appStateStore, cacheStore)) {
+  final catalogRepository = await _openCatalogRepository(dataDir);
+  // The catalog is a disposable cache - it's re-fetched from the source on
+  // every load - so there is nothing to migrate. Just drop any legacy
+  // `m3ue_cache_*` blob from the JSON stores; SQLite fills itself on the next
+  // source load. Best-effort: a failure here only leaves dead bytes behind.
+  for (final legacyStore in {storage.appStateStore, cacheStore}) {
     try {
-      await cacheStore.adoptKeysFrom(
-        storage.appStateStore,
-        (key) => key.startsWith('m3ue_cache_'),
-      );
+      await legacyStore.removeWhere((key) => key.startsWith('m3ue_cache_'));
     } on Object catch (error) {
-      debugPrint('Content cache pre-split deferred: $error');
+      debugPrint('[Catalog] legacy cache purge deferred: $error');
     }
   }
-  final catalogRepository = await _openCatalogRepository(dataDir, cacheStore);
   return AppStateController(
     persistentStore: storage.appStateStore,
     cacheStore: cacheStore,
@@ -185,29 +181,22 @@ Future<AppStateController> _buildAppState() async {
   );
 }
 
-/// Opens the SQLite catalog database in [dataDir] and moves any legacy
-/// `cache.json` catalog blob into it (one-time, idempotent). Returns null if
-/// the database can't be opened so the app falls back to the JSON cache path.
-Future<CatalogRepository?> _openCatalogRepository(
-  Directory dataDir,
-  PersistentJsonStore cacheStore,
-) async {
+/// Opens the SQLite catalog database in [dataDir] and probes it with a trivial
+/// query. There is no JSON fallback: if the database can't be opened, the probe
+/// fails, or it doesn't answer within a few seconds, this throws and the app
+/// fails to start rather than silently running a second, divergent code path.
+Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
+  CatalogRepository? repository;
   try {
     await dataDir.create(recursive: true);
-    final repository = CatalogRepository(CatalogDatabase.open(dataDir));
-    final imported = await CatalogImporter(
-      repository: repository,
-      cacheStore: cacheStore,
-      sourceKey: 'active',
-    ).run();
-    if (kDebugMode && imported) {
-      debugPrint('[Catalog] migrated legacy cache.json blob into SQLite');
-    }
+    repository = CatalogRepository(CatalogDatabase.open(dataDir));
+    await repository.isEmpty().timeout(const Duration(seconds: 5));
     return repository;
   } on Object catch (error, stackTrace) {
-    debugPrint('[Catalog] SQLite open failed, using JSON cache: $error');
+    debugPrint('[Catalog] SQLite catalog database failed to open: $error');
     if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
-    return null;
+    await repository?.close().catchError((_) {});
+    rethrow;
   }
 }
 
