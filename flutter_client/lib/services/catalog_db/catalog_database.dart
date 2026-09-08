@@ -131,4 +131,19 @@ class CatalogDatabase extends _$CatalogDatabase {
 
   @override
   int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    // The catalog is a disposable cache - there is nothing to migrate. On any
+    // schema change, drop every table and recreate at the new version; it
+    // refills from the source on the next load. (`_openCatalogRepository` in
+    // main.dart is the belt-and-braces path for a file too corrupt to even
+    // reach this.)
+    onUpgrade: (m, from, to) async {
+      for (final table in allTables) {
+        await m.deleteTable(table.actualTableName);
+      }
+      await m.createAll();
+    },
+  );
 }

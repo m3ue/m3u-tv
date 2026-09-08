@@ -189,13 +189,14 @@ Future<AppStateController> _buildAppState() async {
 }
 
 /// Opens the SQLite catalog database in [dataDir] and probes it with a trivial
-/// query. There is no JSON fallback.
+/// query. There is no JSON fallback - the catalog is always a `CatalogRepository`.
 ///
-/// The catalog is a disposable cache, so a file that won't open or answer -
-/// corruption, or an older schema (there are no migrations) - is recoverable:
-/// the file is deleted and reopened once, and SQLite refills from the source
-/// on the next load. Only a second, back-to-back failure throws and aborts
-/// startup.
+/// The catalog is a disposable cache (it refills from the source on every
+/// load), so a file that won't open or answer - corruption, a schema mismatch -
+/// is recoverable: delete the file and reopen once. If even a fresh file can't
+/// be opened (the platform has no usable sqlite3), fall back to an in-memory
+/// database: still the same code path, just not persisted, so the app runs and
+/// rebuilds the catalog each launch instead of failing to start.
 Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
   await dataDir.create(recursive: true);
   try {
@@ -211,7 +212,13 @@ Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
         // Best effort - a leftover sidecar is harmless once the main file is gone.
       }
     }
-    return _openAndProbeCatalog(dataDir);
+    try {
+      return await _openAndProbeCatalog(dataDir);
+    } on Object catch (error, stackTrace) {
+      debugPrint('[Catalog] on-disk catalog unavailable, using in-memory: $error');
+      if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+      return CatalogRepository(CatalogDatabase.memory());
+    }
   }
 }
 
