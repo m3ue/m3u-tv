@@ -44,10 +44,7 @@ class CacheService {
   final CatalogRepository? _repo;
   Duration refreshInterval;
 
-  /// Single active source. The `sourceKey` column exists to let a future
-  /// multi-source setup share one database; today a source switch swaps every
-  /// row wholesale so one fixed key is enough.
-  static const String _sourceKey = 'active';
+  static const String _sourceKey = CatalogRepository.activeSource;
 
   static const Map<String, String> _itemKinds = {
     'liveStreams': kCatalogKindLive,

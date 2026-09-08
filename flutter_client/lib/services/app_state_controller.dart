@@ -472,6 +472,11 @@ class AppStateController extends ChangeNotifier {
   List<Category> get seriesCategories => _seriesCategories;
   List<Channel> get channels => _channels;
   List<VodItem> get vodItems => _vodItems;
+
+  /// SQLite catalog store, or null on the legacy JSON cache path (tests, or a
+  /// database that failed to open). Surfaces migrating to windowed loading
+  /// read pages from here instead of [vodItems] / [channels] / [seriesList].
+  CatalogRepository? get catalogRepository => _catalogRepository;
   List<Series> get seriesList => _seriesList;
   List<DvrRecording> get dvrRecordings => _dvrRecordings;
   DvrStorageInfo? get dvrStorageInfo => _dvrStorageInfo;

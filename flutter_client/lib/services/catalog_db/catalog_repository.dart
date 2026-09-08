@@ -19,6 +19,37 @@ class CatalogRepository {
 
   Future<void> close() => _db.close();
 
+  /// The one `sourceKey` in use today. The column is multi-source-ready but a
+  /// source switch swaps every row wholesale, so callers that only ever touch
+  /// the live source use the `*Active` helpers below and never see it.
+  static const String activeSource = 'active';
+
+  Future<List<T>> pageActiveItems<T>({
+    required String kind,
+    String? categoryId,
+    String? search,
+    required int offset,
+    required int limit,
+  }) => pageItems<T>(
+    sourceKey: activeSource,
+    kind: kind,
+    categoryId: categoryId,
+    search: search,
+    offset: offset,
+    limit: limit,
+  );
+
+  Future<int> countActiveItems({
+    required String kind,
+    String? categoryId,
+    String? search,
+  }) => countItems(
+    sourceKey: activeSource,
+    kind: kind,
+    categoryId: categoryId,
+    search: search,
+  );
+
   // -------------------------------------------------------------------------
   // Catalog items
   // -------------------------------------------------------------------------
