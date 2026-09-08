@@ -208,13 +208,13 @@ void main() {
       await cache.set<List<VodItem>>('vodStreams', const <VodItem>[]);
       expect((await cache.get<List<VodItem>>('vodStreams'))!.isStale, isFalse);
 
-      // Backdate the timestamp row past the refresh interval.
+      // Backdate the marker row past the refresh interval.
       await repo.kvPut(
         '__ts_vodStreams',
-        DateTime.now()
+        '',
+        updatedAtMs: DateTime.now()
             .subtract(const Duration(hours: 2))
-            .millisecondsSinceEpoch
-            .toString(),
+            .millisecondsSinceEpoch,
       );
       expect((await cache.get<List<VodItem>>('vodStreams'))!.isStale, isTrue);
     });

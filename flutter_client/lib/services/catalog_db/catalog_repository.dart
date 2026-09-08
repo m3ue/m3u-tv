@@ -393,14 +393,24 @@ class CatalogRepository {
     return row?.value;
   }
 
-  Future<void> kvPut(String key, String value) async {
+  /// The `updatedAtMs` recorded for [key]'s slot, or null when it has never
+  /// been written. `CacheService` reads this back as the write time for the
+  /// SQLite-backed catalog keys' staleness check.
+  Future<int?> kvUpdatedAt(String key) async {
+    final row = await (_db.select(
+      _db.kvCache,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
+    return row?.updatedAtMs;
+  }
+
+  Future<void> kvPut(String key, String value, {int? updatedAtMs}) async {
     await _db
         .into(_db.kvCache)
         .insertOnConflictUpdate(
           KvCacheCompanion.insert(
             key: key,
             value: value,
-            updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+            updatedAtMs: updatedAtMs ?? DateTime.now().millisecondsSinceEpoch,
           ),
         );
   }

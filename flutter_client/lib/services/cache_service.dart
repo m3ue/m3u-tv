@@ -201,7 +201,14 @@ class CacheService {
         (data as List?)?.cast<EpgProgram>() ?? const <EpgProgram>[],
       );
     }
-    await repo.kvPut(_tsKey(key), timestamp.millisecondsSinceEpoch.toString());
+    // One marker row per catalog key: its presence means "cached", and its
+    // `updatedAtMs` (read back via kvUpdatedAt) is the write time the staleness
+    // check in _readRepoKey uses. The value column is unused for these rows.
+    await repo.kvPut(
+      _tsKey(key),
+      '',
+      updatedAtMs: timestamp.millisecondsSinceEpoch,
+    );
   }
 
   Future<void> _clearRepoKey(String key) async {
@@ -228,9 +235,7 @@ class CacheService {
   Future<CacheEntry<T>?> _readRepoKey<T>(String key) async {
     final repo = _repo;
     if (repo.isClosed) return null;
-    final rawTs = await repo.kvGet(_tsKey(key));
-    if (rawTs == null) return null;
-    final writtenMs = int.tryParse(rawTs);
+    final writtenMs = await repo.kvUpdatedAt(_tsKey(key));
     if (writtenMs == null) return null;
 
     final Object data;

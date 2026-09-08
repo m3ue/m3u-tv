@@ -79,8 +79,11 @@ class EpgProgrammes extends Table {
   Set<Column> get primaryKey => {channelId, startMs};
 }
 
-/// Small key/value slots that used to live as individual `CacheService` keys
-/// (`sourceType`, `viewers`, ...). [updatedAtMs] backs `getIfFresh`.
+/// Small key/value slots: the scalars that used to live as individual
+/// `CacheService` keys (`sourceType`, `viewers`), plus one `__ts_*` marker row
+/// per SQLite-backed catalog key. [updatedAtMs] is the row's last write time;
+/// `CacheService` reads it back via `kvUpdatedAt` as the catalog key's age for
+/// the staleness check.
 @DataClassName('KvCacheRow')
 class KvCache extends Table {
   TextColumn get key => text()();

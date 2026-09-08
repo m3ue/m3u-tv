@@ -275,4 +275,15 @@ void main() {
     await repo.kvDelete('sourceType');
     expect(await repo.kvGet('sourceType'), isNull);
   });
+
+  test(
+    'kvUpdatedAt returns the recorded write time, null when absent',
+    () async {
+      expect(await repo.kvUpdatedAt('__ts_liveStreams'), isNull);
+      await repo.kvPut('__ts_liveStreams', '', updatedAtMs: 1234);
+      expect(await repo.kvUpdatedAt('__ts_liveStreams'), 1234);
+      await repo.kvDelete('__ts_liveStreams');
+      expect(await repo.kvUpdatedAt('__ts_liveStreams'), isNull);
+    },
+  );
 }
