@@ -2446,20 +2446,24 @@ class AppStateController extends ChangeNotifier {
   }
 
   void updateProgressEntry(Progress updated) {
-    final idx = _progressList.indexWhere((p) {
+    bool sameItem(Progress p) {
       if (p.contentType != updated.contentType) return false;
       if (updated.contentType == ContentType.aiostreams) {
         return p.aioItemId == updated.aioItemId;
       }
       return p.streamId == updated.streamId;
-    });
-    if (idx >= 0) {
-      final next = List<Progress>.of(_progressList);
-      next[idx] = updated;
-      _progressList = next;
-    } else {
-      _progressList = [updated, ..._progressList];
     }
+
+    // Whatever's playing is now the most-recently-watched item, so it moves to
+    // the front - matching the order a fresh launch gets from the server's
+    // recently-watched list. Updating an existing entry in place left it
+    // wherever it was (often down in the "See All" overflow) until the next
+    // hard reload re-sorted it.
+    _progressList = [
+      updated,
+      for (final p in _progressList)
+        if (!sameItem(p)) p,
+    ];
     notifyListeners();
   }
 
