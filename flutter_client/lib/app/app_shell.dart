@@ -1370,6 +1370,14 @@ class AppShellState extends ConsumerState<AppShell>
           favoritesService: _appState.aioFavoritesService,
           progressList: _appState.progressList,
           onSidebarActivate: _activateSidebar,
+          useSidebarLayout: shouldUseSidebar(widget.deviceType),
+          onSetWatchState: (progress, {required watched}) => _setWatchState(
+            progress,
+            watched: watched,
+            message: watched
+                ? AppLocalizations.of(context).seriesMarkedWatched
+                : AppLocalizations.of(context).playerProgressCleared,
+          ),
         ),
       ),
       RouteNames.dvr => ListenableBuilder(

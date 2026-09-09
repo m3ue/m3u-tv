@@ -1421,3 +1421,34 @@ extension _IterableX<T> on Iterable<T> {
     return null;
   }
 }
+
+/// Card-shuffle transition for the season poster. The incoming poster slides
+/// up into place from the top-right with a slight counter-rotation and scale
+/// settle; run in reverse (the outgoing poster) it deals the old card back
+/// off toward the same corner. Mirrors the fade + slide the episode strip
+/// plays on a season change so the two move together. Shared by the Series
+/// detail screen and the AIOStreams series detail body so the poster flip
+/// stays identical between them.
+Widget posterShuffleTransition(Widget child, Animation<double> animation) {
+  final eased = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+  return FadeTransition(
+    opacity: eased,
+    child: SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0.22, -0.16),
+        end: Offset.zero,
+      ).animate(eased),
+      child: RotationTransition(
+        turns: Tween<double>(begin: 0.025, end: 0).animate(eased),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1).animate(eased),
+          child: child,
+        ),
+      ),
+    ),
+  );
+}

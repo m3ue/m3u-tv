@@ -12,6 +12,7 @@ import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_reveal_slot.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
+import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
@@ -41,13 +42,46 @@ class AIOStreamsDetailScreen extends StatefulWidget {
 }
 
 class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
-  late final Future<AIOStreamsItem?> _metaFuture = widget.apiService.getMeta(
-    widget.integrationId,
-    widget.item.type,
-    widget.item.id,
-  );
+  late final Future<AIOStreamsItem?> _metaFuture = widget.apiService
+      .getMeta(widget.integrationId, widget.item.type, widget.item.id)
+      .then((meta) {
+        unawaited(
+          _resolveDominantColor(
+            meta?.background ??
+                meta?.poster ??
+                widget.item.background ??
+                widget.item.poster,
+          ),
+        );
+        return meta;
+      });
+
+  /// Palette-extracted tone from the backdrop (or poster), so the hero can
+  /// bleed a matching colour past the image edge and cross-fade it in with
+  /// the art - identical treatment to VodDetailsScreen / SeriesDetailsScreen.
+  Color? _dominantColor;
+  bool _colorMatchResolved = false;
 
   bool get _isSeries => widget.item.type == 'series';
+
+  @override
+  void initState() {
+    super.initState();
+    // Best-effort colour match from the data we already have, so the reveal
+    // starts before getMeta returns (and still works if it fails).
+    unawaited(
+      _resolveDominantColor(widget.item.background ?? widget.item.poster),
+    );
+  }
+
+  Future<void> _resolveDominantColor(String? url) async {
+    final color = await resolveDominantBackdropColor(url);
+    if (!mounted) return;
+    setState(() {
+      if (color != null) _dominantColor = color;
+      _colorMatchResolved = true;
+    });
+  }
 
   void _openStreamPicker({
     required AIOStreamsItem item,
@@ -133,6 +167,9 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
         builder: (context, snapshot) {
           final item = snapshot.data ?? widget.item;
           final isLoading = snapshot.connectionState != ConnectionState.done;
+          // A failed meta fetch means no palette step will resolve from it -
+          // reveal the (surface) hero rather than holding on the flat colour.
+          final colorMatchReady = _colorMatchResolved || snapshot.hasError;
           if (_isSeries) {
             if (isLoading) {
               return const Center(child: CircularProgressIndicator());
@@ -140,6 +177,8 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
             return _SeriesBody(
               item: item,
               appStateController: widget.appStateController,
+              dominantColor: _dominantColor,
+              colorMatchReady: colorMatchReady,
               onEpisodeSelected: (video) => _openStreamPicker(
                 item: item,
                 type: 'series',
@@ -152,6 +191,8 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
           return _MovieBody(
             item: item,
             isLoading: isLoading,
+            dominantColor: _dominantColor,
+            colorMatchReady: colorMatchReady,
             onGetStreams: () => _openStreamPicker(
               item: item,
               type: 'movie',
@@ -174,11 +215,18 @@ class _MovieBody extends StatefulWidget {
     required this.item,
     required this.isLoading,
     required this.onGetStreams,
+    this.dominantColor,
+    this.colorMatchReady = false,
   });
 
   final AIOStreamsItem item;
   final bool isLoading;
   final VoidCallback onGetStreams;
+
+  /// Palette-extracted backdrop tone + whether it has resolved. Drives the
+  /// same colour-matched, cross-faded hero as VodDetailsScreen.
+  final Color? dominantColor;
+  final bool colorMatchReady;
 
   @override
   State<_MovieBody> createState() => _MovieBodyState();
@@ -217,6 +265,10 @@ class _MovieBodyState extends State<_MovieBody> {
   Widget _buildWide(BuildContext context, ThemeData theme) {
     final l = AppLocalizations.of(context);
     final richCast = _item.richCast;
+    final swatch = widget.dominantColor;
+    final bg = swatch != null
+        ? deepBackdropTone(swatch)
+        : theme.colorScheme.surface;
     // Poster + scrolling info column fill the height; the rich cast strip is
     // pinned full-width below, out of that scroll view so left/right card
     // navigation never drags the page - identical to VodDetailsScreen._buildWide.
@@ -270,12 +322,21 @@ class _MovieBodyState extends State<_MovieBody> {
 
     return BackdropDetailHero(
       backdropUrl: _item.background,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      colorMatchReady: widget.colorMatchReady,
       contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
       content: content,
     );
   }
 
   Widget _buildNarrow(BuildContext context, ThemeData theme) {
+    final swatch = widget.dominantColor;
+    final bg = swatch != null
+        ? deepBackdropTone(swatch, vivid: true)
+        : theme.colorScheme.surface;
     final poster = SizedBox(
       width: 120,
       child: AspectRatio(
@@ -306,6 +367,11 @@ class _MovieBodyState extends State<_MovieBody> {
       backdropUrl: _item.background,
       backdropHeight: bandHeight,
       contentAlignment: Alignment.topLeft,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.2), bg.withValues(alpha: 0.8), bg],
+      colorMatchReady: widget.colorMatchReady,
       contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
       content: content,
     );
@@ -319,6 +385,12 @@ class _MovieBodyState extends State<_MovieBody> {
   }) {
     final l = AppLocalizations.of(context);
     final richCast = _item.richCast;
+    // Keep the synopsis to a comfortable measure on TV/desktop, full width on
+    // a phone - same treatment as SeriesDetailsScreen / the AIOStreams series
+    // body.
+    final plotMaxWidth = compact
+        ? double.infinity
+        : MediaQuery.sizeOf(context).width * 0.6;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -337,6 +409,8 @@ class _MovieBodyState extends State<_MovieBody> {
           fullWidthButton: fullWidthButton,
           isLoading: widget.isLoading,
           plot: _item.description,
+          plotMaxWidth: plotMaxWidth,
+          plotMaxLines: 4,
           credits: [
             if (_item.director != null)
               MetaCreditLine(label: 'Director', value: _item.director!),
@@ -389,11 +463,18 @@ class _SeriesBody extends StatefulWidget {
     required this.item,
     required this.onEpisodeSelected,
     this.appStateController,
+    this.dominantColor,
+    this.colorMatchReady = false,
   });
 
   final AIOStreamsItem item;
   final void Function(AIOStreamsVideo video) onEpisodeSelected;
   final AppStateController? appStateController;
+
+  /// Palette-extracted backdrop tone + whether it has resolved. Drives the
+  /// same colour-matched, cross-faded hero as SeriesDetailsScreen.
+  final Color? dominantColor;
+  final bool colorMatchReady;
 
   @override
   State<_SeriesBody> createState() => _SeriesBodyState();
@@ -433,10 +514,17 @@ class _SeriesBodyState extends State<_SeriesBody> {
   /// Season numbers that either the meta's `videos` or the enriched `seasons`
   /// array know about, low to high.
   List<int> get _seasonNumbers {
-    final numbers = <int>{
-      ...widget.item.seasons.map((s) => s.number),
-      ..._videosBySeason.keys,
-    }.toList()..sort();
+    final numbers =
+        <int>{
+          ...widget.item.seasons.map((s) => s.number),
+          ..._videosBySeason.keys,
+        }.toList()..sort((a, b) {
+          // Season 0 is the "specials" bucket - always sort it last so the
+          // picker defaults to a real season (usually 1).
+          if (a == 0) return 1;
+          if (b == 0) return -1;
+          return a.compareTo(b);
+        });
     return numbers;
   }
 
@@ -541,8 +629,24 @@ class _SeriesBodyState extends State<_SeriesBody> {
   }
 
   Widget _buildLayout(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final item = widget.item;
-    final seasons = _seasons;
+    // Relabel the season 0 bucket as "Specials" for the picker list. Ordering
+    // (last) is handled in _seasonNumbers, which _seasons maps over.
+    final seasons = [
+      for (final s in _seasons)
+        if (s.number == 0)
+          Season(
+            number: 0,
+            name: l.requestsSeasonSpecials,
+            episodeCount: s.episodeCount,
+            coverUrl: s.coverUrl,
+            overview: s.overview,
+            releaseDate: s.releaseDate,
+          )
+        else
+          s,
+    ];
     final seasonNumber = _resolvedSeason;
     final seasonObj = _resolvedSeasonObj;
     final episodes = _episodesForSeason(seasonNumber);
@@ -557,7 +661,12 @@ class _SeriesBodyState extends State<_SeriesBody> {
         : kEpisodeCardWidthWide;
     final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
 
-    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    // Phone gets a lighter, more saturated wash; TV/desktop the deep tone -
+    // identical split to SeriesDetailsScreen.
+    final bg = widget.dominantColor != null
+        ? deepBackdropTone(widget.dominantColor!, vivid: compact)
+        : theme.colorScheme.surface;
     final richCast = item.richCast;
     final seasonCover = seasonObj?.coverUrl;
     final description = (seasonObj?.overview?.trim().isNotEmpty ?? false)
@@ -568,16 +677,27 @@ class _SeriesBodyState extends State<_SeriesBody> {
       width: posterWidth,
       child: AspectRatio(
         aspectRatio: 0.68,
-        child: ResilientMediaImage(
-          key: ValueKey<String>('aio-season-$seasonNumber'),
-          imageUrl: seasonCover ?? item.poster,
-          fallbackImageUrls: <String>[
-            if (seasonCover != null && item.poster != null) item.poster!,
-            if (item.background != null) item.background!,
-          ],
-          fallbackIcon: Icons.tv,
-          borderRadius: MediaBrowsingMetrics.cardRadius,
-          fallbackTitle: item.name,
+        // Card-shuffle flip on season change, shared with SeriesDetailsScreen.
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          transitionBuilder: posterShuffleTransition,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.center,
+            children: <Widget>[?currentChild, ...previousChildren],
+          ),
+          child: ResilientMediaImage(
+            key: ValueKey<String>(
+              'aio-season-$seasonNumber-${seasonCover ?? item.poster ?? ''}',
+            ),
+            imageUrl: seasonCover ?? item.poster,
+            fallbackImageUrls: <String>[
+              if (seasonCover != null && item.poster != null) item.poster!,
+              if (item.background != null) item.background!,
+            ],
+            fallbackIcon: Icons.tv,
+            borderRadius: MediaBrowsingMetrics.cardRadius,
+            fallbackTitle: item.name,
+          ),
         ),
       ),
     );
@@ -690,6 +810,15 @@ class _SeriesBodyState extends State<_SeriesBody> {
         backdropUrl: item.background,
         backdropHeight: bandHeight,
         contentAlignment: Alignment.topLeft,
+        alwaysShowScrim: true,
+        showBackgroundColorLayer: true,
+        backgroundColor: bg,
+        scrimColors: [
+          bg.withValues(alpha: 0.2),
+          bg.withValues(alpha: 0.8),
+          bg,
+        ],
+        colorMatchReady: widget.colorMatchReady,
         contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
         content: content,
       );
@@ -732,6 +861,15 @@ class _SeriesBodyState extends State<_SeriesBody> {
 
     return BackdropDetailHero(
       backdropUrl: item.background,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [
+        bg.withValues(alpha: 0.35),
+        bg.withValues(alpha: 0.92),
+        bg,
+      ],
+      colorMatchReady: widget.colorMatchReady,
       contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
       content: wideContent,
     );

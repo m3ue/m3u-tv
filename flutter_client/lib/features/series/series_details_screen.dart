@@ -587,7 +587,7 @@ class _SeriesDetailsBody extends StatelessWidget {
         aspectRatio: 0.68,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 320),
-          transitionBuilder: _posterShuffleTransition,
+          transitionBuilder: posterShuffleTransition,
           // Keep the outgoing poster painted on top so it reads as the old
           // card being dealt off the deck to reveal the new one sliding in
           // underneath (the default stacks the incoming child on top).
@@ -933,35 +933,6 @@ class _SeriesDetailsBody extends StatelessWidget {
     }
     return '~${avg}m';
   }
-}
-
-/// Card-shuffle transition for the season poster. The incoming poster slides
-/// up into place from the top-right with a slight counter-rotation and scale
-/// settle; run in reverse (the outgoing poster) it deals the old card back
-/// off toward the same corner. Mirrors the fade + slide the episode strip
-/// plays on a season change so the two move together.
-Widget _posterShuffleTransition(Widget child, Animation<double> animation) {
-  final eased = CurvedAnimation(
-    parent: animation,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
-  );
-  return FadeTransition(
-    opacity: eased,
-    child: SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0.22, -0.16),
-        end: Offset.zero,
-      ).animate(eased),
-      child: RotationTransition(
-        turns: Tween<double>(begin: 0.025, end: 0).animate(eased),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.94, end: 1).animate(eased),
-          child: child,
-        ),
-      ),
-    ),
-  );
 }
 
 /// Parses the loose runtime strings the editor emits ("45m", "1h 2m",

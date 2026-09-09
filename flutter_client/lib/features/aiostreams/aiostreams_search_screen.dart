@@ -243,27 +243,38 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
         child: Text(l.aiostreamsNoResults, style: theme.textTheme.bodyLarge),
       );
     }
+    // Poster grid sized to match the Movies / Series listing pages (see
+    // VodScreen / SeriesScreen): cards up to 220 wide at a 0.6 aspect ratio,
+    // rendered with the shared MediaPreviewCard.
     return GridView.builder(
       padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 160,
+        maxCrossAxisExtent: 220,
         mainAxisSpacing: MediaBrowsingMetrics.itemGap,
         crossAxisSpacing: MediaBrowsingMetrics.itemGap,
-        childAspectRatio: 2 / 3,
+        childAspectRatio: 0.6,
       ),
       itemCount: results.length,
       itemBuilder: (context, index) {
         final result = results[index];
-        return DpadInkWell(
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
+        return MediaPreviewCard(
+          posterStyle: true,
+          keepAlive: false,
           autofocus: index == 0,
-          onTap: () => widget.onItemSelect(result.item, result.integrationId),
-          onLongTap: widget.favoritesService == null
-              ? null
-              : () => unawaited(_toggleFavorite(result)),
-          child: _ResultCard(
-            item: result.item,
+          item: MediaPreviewItem(
+            title: result.item.name,
+            imageUrl: result.item.poster,
+            subtitle: result.item.year ?? result.item.type,
+            ratingLabel: result.item.imdbRating == null
+                ? null
+                : '★ ${result.item.imdbRating}',
+            fallbackIcon: result.item.type == 'series' ? Icons.tv : Icons.movie,
+            fallbackTitle: result.item.name,
             isFavorite: _favoriteIds.contains(result.item.id),
+            onTap: () => widget.onItemSelect(result.item, result.integrationId),
+            onLongTap: widget.favoritesService == null
+                ? null
+                : () => unawaited(_toggleFavorite(result)),
           ),
         );
       },
@@ -276,50 +287,4 @@ class _SearchResult {
 
   final AIOStreamsItem item;
   final int integrationId;
-}
-
-class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.item, this.isFavorite = false});
-
-  final AIOStreamsItem item;
-  final bool isFavorite;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ResilientMediaImage(
-                imageUrl: item.poster,
-                fallbackIcon: item.type == 'series' ? Icons.tv : Icons.movie,
-              ),
-              if (isFavorite)
-                Positioned(
-                  top: 4,
-                  left: 4,
-                  child: Icon(
-                    Icons.star,
-                    color: theme.colorScheme.primary,
-                    size: 20,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          item.name,
-          style: theme.textTheme.bodySmall,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
 }
