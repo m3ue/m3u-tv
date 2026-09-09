@@ -505,6 +505,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAppScanQr => '扫描以在手机上打开';
 
   @override
+  String get settingsReleaseNotesTab => '最近更新';
+
+  @override
+  String get settingsReleaseNotesLoading => '正在加载版本说明…';
+
+  @override
+  String get settingsReleaseNotesError => '无法加载版本说明。请检查网络连接后重试。';
+
+  @override
+  String get settingsReleaseNotesRetry => '重试';
+
+  @override
+  String get settingsReleaseNotesCurrentBadge => '当前';
+
+  @override
+  String get settingsReleaseNotesNewBadge => '新';
+
+  @override
+  String settingsReleaseNotesYouAreOn(String version) {
+    return '你的版本为 $version';
+  }
+
+  @override
+  String settingsReleaseNotesLatestIs(String version) {
+    return '最新：$version';
+  }
+
+  @override
+  String settingsReleaseNotesNewerCount(int count) {
+    return '$count 个更新版本';
+  }
+
+  @override
+  String get settingsReleaseNotesUpToDate => '你使用的是最新版本';
+
+  @override
+  String get settingsReleaseNotesViewOnGithub => '在 GitHub 上查看全部';
+
+  @override
+  String get settingsReleaseNotesNoneForVersion => '此版本没有说明。';
+
+  @override
   String get settingsFillAllFields => '请填写所有字段';
 
   @override

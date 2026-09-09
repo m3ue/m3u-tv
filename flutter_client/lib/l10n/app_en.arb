@@ -245,6 +245,39 @@
   },
   "settingsAppViewRelease": "View release",
   "settingsAppScanQr": "Scan to open on your phone",
+  "settingsReleaseNotesTab": "What's New",
+  "settingsReleaseNotesLoading": "Loading release notes…",
+  "settingsReleaseNotesError": "Couldn't load release notes. Check your connection and try again.",
+  "settingsReleaseNotesRetry": "Retry",
+  "settingsReleaseNotesCurrentBadge": "Current",
+  "settingsReleaseNotesNewBadge": "New",
+  "settingsReleaseNotesYouAreOn": "You're on {version}",
+  "@settingsReleaseNotesYouAreOn": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesLatestIs": "Latest: {version}",
+  "@settingsReleaseNotesLatestIs": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesNewerCount": "{count} newer",
+  "@settingsReleaseNotesNewerCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesUpToDate": "You're on the latest version",
+  "settingsReleaseNotesViewOnGithub": "View all on GitHub",
+  "settingsReleaseNotesNoneForVersion": "No notes for this release.",
   "settingsFillAllFields": "Please fill in all fields",
   "settingsConnectionSettings": "Connection Settings",
   "settingsConnectionSettingsSubtitle": "Enter your Xtream codes details",

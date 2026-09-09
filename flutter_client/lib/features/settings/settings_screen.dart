@@ -5,6 +5,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
+import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
@@ -841,7 +842,7 @@ class _ConnectedView extends StatefulWidget {
 
 class _ConnectedViewState extends State<_ConnectedView>
     with SingleTickerProviderStateMixin {
-  late final _tabController = TabController(length: 2, vsync: this);
+  late final _tabController = TabController(length: 3, vsync: this);
 
   @override
   void dispose() {
@@ -906,6 +907,7 @@ class _ConnectedViewState extends State<_ConnectedView>
           tabs: [
             AppLocalizations.of(context).settingsGeneral,
             AppLocalizations.of(context).settingsIntegrations,
+            AppLocalizations.of(context).settingsReleaseNotesTab,
           ],
         ),
         Expanded(
@@ -919,6 +921,10 @@ class _ConnectedViewState extends State<_ConnectedView>
               SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: _buildIntegrationsTab(context),
+              ),
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: ReleaseNotesView(),
               ),
             ],
           ),

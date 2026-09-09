@@ -1046,6 +1046,78 @@ abstract class AppLocalizations {
   /// **'Scan to open on your phone'**
   String get settingsAppScanQr;
 
+  /// No description provided for @settingsReleaseNotesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s New'**
+  String get settingsReleaseNotesTab;
+
+  /// No description provided for @settingsReleaseNotesLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading release notes…'**
+  String get settingsReleaseNotesLoading;
+
+  /// No description provided for @settingsReleaseNotesError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load release notes. Check your connection and try again.'**
+  String get settingsReleaseNotesError;
+
+  /// No description provided for @settingsReleaseNotesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get settingsReleaseNotesRetry;
+
+  /// No description provided for @settingsReleaseNotesCurrentBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get settingsReleaseNotesCurrentBadge;
+
+  /// No description provided for @settingsReleaseNotesNewBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get settingsReleaseNotesNewBadge;
+
+  /// No description provided for @settingsReleaseNotesYouAreOn.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re on {version}'**
+  String settingsReleaseNotesYouAreOn(String version);
+
+  /// No description provided for @settingsReleaseNotesLatestIs.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest: {version}'**
+  String settingsReleaseNotesLatestIs(String version);
+
+  /// No description provided for @settingsReleaseNotesNewerCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} newer'**
+  String settingsReleaseNotesNewerCount(int count);
+
+  /// No description provided for @settingsReleaseNotesUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re on the latest version'**
+  String get settingsReleaseNotesUpToDate;
+
+  /// No description provided for @settingsReleaseNotesViewOnGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'View all on GitHub'**
+  String get settingsReleaseNotesViewOnGithub;
+
+  /// No description provided for @settingsReleaseNotesNoneForVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'No notes for this release.'**
+  String get settingsReleaseNotesNoneForVersion;
+
   /// No description provided for @settingsFillAllFields.
   ///
   /// In en, this message translates to:
