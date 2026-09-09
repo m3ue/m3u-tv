@@ -51,6 +51,7 @@ class SettingsScreen extends StatefulWidget {
     this.comskipSettings,
     this.viewSettingsService,
     this.deviceType,
+    this.onSidebarActivate,
   });
 
   final AuthNotifier authNotifier;
@@ -82,6 +83,9 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onConnected;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
+
+  /// Activates the shell sidebar (left-edge press from tab content).
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -169,6 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
         comskipSettings: widget.comskipSettings,
         viewSettingsService: widget.viewSettingsService,
+        onSidebarActivate: widget.onSidebarActivate,
       ),
     );
   }
@@ -814,10 +819,12 @@ class _ConnectedView extends StatefulWidget {
     this.proxyPlaybackSettings,
     this.comskipSettings,
     this.viewSettingsService,
+    this.onSidebarActivate,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final VoidCallback? onSidebarActivate;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
@@ -922,9 +929,11 @@ class _ConnectedViewState extends State<_ConnectedView>
                 padding: const EdgeInsets.all(24),
                 child: _buildIntegrationsTab(context),
               ),
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: ReleaseNotesView(),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: ReleaseNotesView(
+                  onSidebarActivate: widget.onSidebarActivate,
+                ),
               ),
             ],
           ),

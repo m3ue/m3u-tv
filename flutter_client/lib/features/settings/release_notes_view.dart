@@ -23,11 +23,16 @@ class ReleaseNotesView extends StatefulWidget {
     super.key,
     this.releaseNotesService,
     this.appVersionService,
+    this.onSidebarActivate,
   });
 
   /// Injectable for tests; a real [ReleaseNotesService] is used otherwise.
   final ReleaseNotesService? releaseNotesService;
   final AppVersionService? appVersionService;
+
+  /// Left-edge press on the version rail activates the shell sidebar, matching
+  /// every other content screen.
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<ReleaseNotesView> createState() => _ReleaseNotesViewState();
@@ -41,10 +46,13 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
   late final AppVersionService _versionService =
       widget.appVersionService ?? AppVersionService();
 
-  // Lets the notes pane hand focus back to the rail on a Left press (spatial
-  // traversal from the tall notes pane otherwise skips past the narrow rail
-  // up to the settings tab bar). The rail owns the per-row focus nodes.
+  // Rail <-> notes focus is wired explicitly through DpadRegion.onEdge (see
+  // build) rather than left to spatial traversal: the tab content sits inside
+  // the shell's PageView, and an unhandled horizontal edge press there falls
+  // through to a page swipe (previous/next settings tab) instead of moving
+  // between the two columns.
   final _railKey = GlobalKey<_VersionRailState>();
+  final _notesFocusNode = FocusNode(debugLabel: 'release-notes/notes-pane');
 
   // Holding Down through the rail must not re-render the notes on every step
   // (that steals focus and stutters). The row under focus is applied after a
@@ -67,6 +75,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
   @override
   void dispose() {
     _selectionDebounce?.cancel();
+    _notesFocusNode.dispose();
     super.dispose();
   }
 
@@ -157,31 +166,31 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: DpadRegion(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 300,
-                  child: _VersionRail(
-                    key: _railKey,
-                    releases: _releases,
-                    selectedIndex: _selectedIndex,
-                    autofocusIndex: _autofocusIndex,
-                    currentVersion: _currentVersion,
-                    onRowFocused: _requestSelection,
-                  ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 300,
+                child: _VersionRail(
+                  key: _railKey,
+                  releases: _releases,
+                  selectedIndex: _selectedIndex,
+                  autofocusIndex: _autofocusIndex,
+                  currentVersion: _currentVersion,
+                  onRowFocused: _requestSelection,
+                  onSidebarActivate: widget.onSidebarActivate,
+                  onFocusNotes: _notesFocusNode.requestFocus,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _NotesPane(
-                    note: selected,
-                    onFocusRail: () =>
-                        _railKey.currentState?.focusSelectedRow(),
-                  ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _NotesPane(
+                  note: selected,
+                  focusNode: _notesFocusNode,
+                  onFocusRail: () => _railKey.currentState?.focusSelectedRow(),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
@@ -392,6 +401,8 @@ class _VersionRail extends StatefulWidget {
     required this.autofocusIndex,
     required this.currentVersion,
     required this.onRowFocused,
+    required this.onFocusNotes,
+    this.onSidebarActivate,
   });
 
   final List<ReleaseNote> releases;
@@ -401,6 +412,12 @@ class _VersionRail extends StatefulWidget {
 
   /// Called with the row index whenever a row gains focus or is tapped.
   final ValueChanged<int> onRowFocused;
+
+  /// Right-edge press: hand focus to the notes pane.
+  final VoidCallback onFocusNotes;
+
+  /// Left-edge press: activate the shell sidebar.
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<_VersionRail> createState() => _VersionRailState();
@@ -477,6 +494,16 @@ class _VersionRailState extends State<_VersionRail> {
   @override
   Widget build(BuildContext context) {
     return DpadRegion(
+      // Trap horizontal edges so a Left/Right press never falls through to
+      // the enclosing tab PageView; route them explicitly instead.
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.right) {
+          widget.onFocusNotes();
+        } else if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
       child: ListView.builder(
         controller: _controller,
         itemExtent: _rowExtent,
@@ -626,9 +653,16 @@ class _VersionRow extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _NotesPane extends StatefulWidget {
-  const _NotesPane({required this.note, required this.onFocusRail});
+  const _NotesPane({
+    required this.note,
+    required this.focusNode,
+    required this.onFocusRail,
+  });
 
   final ReleaseNote note;
+
+  /// The rail's right-edge press focuses this.
+  final FocusNode focusNode;
 
   /// Invoked on a Left press to hand focus back to the version rail.
   final VoidCallback onFocusRail;
@@ -654,14 +688,10 @@ class _NotesPaneState extends State<_NotesPane> {
     super.dispose();
   }
 
-  /// Left hands focus back to the rail; Up/Down scroll the notes and only
-  /// release focus (return false) once scrolled to that end; Right is left
-  /// to normal traversal.
+  /// Up/Down scroll the notes and only release focus (return false) once
+  /// scrolled to that end. Left/Right are left unconsumed so the enclosing
+  /// DpadRegion's onEdge routes them (Left -> rail).
   bool _onDirection(TraversalDirection direction) {
-    if (direction == TraversalDirection.left) {
-      widget.onFocusRail();
-      return true;
-    }
     if (!_scrollController.hasClients) return false;
     final position = _scrollController.position;
     const step = 160.0;
@@ -697,47 +727,53 @@ class _NotesPaneState extends State<_NotesPane> {
     final theme = Theme.of(context);
     final body = widget.note.body.trim();
 
-    return DpadFocusable(
-      onDirection: _onDirection,
-      // The pane always fills the visible right half; revealing it would only
-      // nudge the enclosing tab PageView and bounce.
-      autoScroll: false,
-      builder: (context, state, child) => DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: state.focused
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant,
-            width: state.focused ? 2 : 1,
+    return DpadRegion(
+      // Trap horizontal edges (Left -> back to the rail) so they never fall
+      // through to a settings-tab page swipe.
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) widget.onFocusRail();
+      },
+      child: DpadFocusable(
+        focusNode: widget.focusNode,
+        onDirection: _onDirection,
+        // The pane always fills the visible right half; revealing it would
+        // only nudge the enclosing tab PageView and bounce.
+        autoScroll: false,
+        builder: (context, state, child) => DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: state.focused
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant,
+              width: state.focused ? 2 : 1,
+            ),
           ),
+          child: child,
         ),
-        child: child,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.note.name,
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              if (body.isEmpty)
-                Text(
-                  l.settingsReleaseNotesNoneForVersion,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              else
-                _MarkdownBody(text: body),
-            ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.note.name, style: theme.textTheme.titleLarge),
+                const SizedBox(height: 12),
+                if (body.isEmpty)
+                  Text(
+                    l.settingsReleaseNotesNoneForVersion,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  _MarkdownBody(text: body),
+              ],
+            ),
           ),
         ),
       ),
