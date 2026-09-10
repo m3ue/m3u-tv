@@ -7,12 +7,9 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
-import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
-import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
-import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
 
 /// Below this window width the series detail lays out for a phone: smaller
@@ -317,7 +314,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final List<Progress> progressList;
   final Color? dominantColor;
 
-  /// Passed straight to [BackdropDetailHero.colorMatchReady] - true once the
+  /// Passed straight to the shared body's colour-match reveal - true once the
   /// palette extraction has resolved, so the hero can fade the backdrop and
   /// its colour-match in together.
   final bool colorMatchReady;
@@ -546,14 +543,13 @@ class _SeriesDetailsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final season = _selectedSeasonObj;
     final seasonNumber = _resolvedSeason;
     final episodes = _episodes(seasonNumber);
     final backdrop = info.series.backdropUrl;
     // Season poster first, then the series poster, then the backdrop. Passed
-    // as a chain so a season cover that 404s actually falls through at load
-    // time (not just when it's null) rather than sticking on a placeholder.
+    // as a chain so a season cover that 404s falls through at load time (not
+    // just when it's null) rather than sticking on a placeholder.
     final posterChain = <String>[
       ?trimmedOrNull(season?.coverUrl),
       ?trimmedOrNull(info.series.coverUrl),
@@ -563,273 +559,38 @@ class _SeriesDetailsBody extends StatelessWidget {
         ? season!.overview!.trim()
         : (info.series.plot ?? '');
     final target = _primaryTarget;
-
     final screenWidth = MediaQuery.sizeOf(context).width;
     final compact = screenWidth < _kSeriesCompactBreakpoint;
-    // Phone gets a lighter, more saturated wash - the deep full-bleed tone
-    // that reads as "a colour" on a TV just looks black on a small portrait
-    // screen where the backdrop is only a short band.
-    final bg = dominantColor != null
-        ? deepBackdropTone(dominantColor!, vivid: compact)
-        : theme.colorScheme.surface;
-    final posterWidth = compact ? 120.0 : 200.0;
     // Keep the synopsis to a comfortable measure on TV/desktop (Nuvio-style);
-    // let it run full width on a phone.
+    // full width on a phone.
     final plotMaxWidth = compact ? double.infinity : screenWidth * 0.6;
-    final cardWidth = compact
-        ? kEpisodeCardWidthCompact
-        : kEpisodeCardWidthWide;
-    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
 
-    final poster = SizedBox(
-      width: posterWidth,
-      child: AspectRatio(
-        aspectRatio: 0.68,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
-          transitionBuilder: posterShuffleTransition,
-          // Keep the outgoing poster painted on top so it reads as the old
-          // card being dealt off the deck to reveal the new one sliding in
-          // underneath (the default stacks the incoming child on top).
-          layoutBuilder: (currentChild, previousChildren) => Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              ?currentChild,
-              ...previousChildren,
-            ],
-          ),
-          child: ResilientMediaImage(
-            key: ValueKey<String>(
-              'season-$seasonNumber-'
-              '${posterChain.isEmpty ? '' : posterChain.first}',
-            ),
-            imageUrl: posterChain.isEmpty ? null : posterChain.first,
-            fallbackImageUrls: posterChain.skip(1).toList(),
-            fallbackIcon: Icons.tv,
-            borderRadius: MediaBrowsingMetrics.cardRadius,
-            fallbackTitle: info.series.name,
-          ),
-        ),
-      ),
-    );
-    final meta = _seriesMetaInfo(context, target, description, plotMaxWidth);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      onSeasonResolved(seasonNumber);
-    });
-    // Phone: poster stacked above the title / chips / description. TV and
-    // desktop: poster beside them.
-    final header = compact
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [poster, const SizedBox(height: 16), meta],
-          )
-        : Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              poster,
-              const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-              Expanded(child: meta),
-            ],
-          );
-
-    // poster + meta (with resume progress) and the play / season-picker row
-    // form the "upper" block; the episode cards sit directly below it (a
-    // horizontal strip on TV, a vertical list on a phone).
-    final upper = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        header,
-        const SizedBox(height: 20),
-        // Play / Start-from-beginning sit on the same line as the season
-        // picker (wrapping to a second run on a phone). On the narrow
-        // breakpoint the cast picker chip joins this row beside the
-        // season picker.
-        Wrap(
-          spacing: MediaBrowsingMetrics.itemGap,
-          runSpacing: MediaBrowsingMetrics.chipGap,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            ..._primaryActions(context, target),
-            SeasonPicker(
-              seasons: info.seasons,
-              selectedSeason: seasonNumber,
-              canMarkWatched: canMarkWatched && episodes.isNotEmpty,
-              compact: compact,
-              episodeCountFor: _episodeCountFor,
-              fallbackPosterUrl: trimmedOrNull(info.series.coverUrl),
-              onSeasonSelected: onSeasonSelected,
-              onMarkSeason: (watched) =>
-                  onMarkSeason(_episodes(seasonNumber), watched: watched),
-            ),
-            if (compact &&
-                info.series.richCast != null &&
-                info.series.richCast!.isNotEmpty)
-              CastMemberRow(
-                members: info.series.richCast,
-                semanticLabel: AppLocalizations.of(context).seriesCast,
-                compact: true,
-                onShowAll: () => showAllCast(context, info.series.richCast!),
-                allCastSemanticLabel: AppLocalizations.of(context).castShowAll,
-              ),
-          ],
-        ),
-      ],
-    );
-
-    final Widget episodeSection;
-    if (episodes.isEmpty) {
-      episodeSection = const Align(
-        alignment: Alignment.centerLeft,
-        child: Text('No episodes available'),
-      );
-    } else if (compact) {
-      episodeSection = EpisodeStrip(
-        episodes: episodes,
-        progressList: progressList,
-        autofocusFirst: target == null,
-        canMarkWatched: canMarkWatched,
-        cardWidth: cardWidth,
-        horizontal: false,
-        onEpisodeSelected: onEpisodeSelected,
-        onMarkEpisode: onMarkEpisode,
-      );
-    } else {
-      episodeSection = SizedBox(
-        height: stripHeight,
-        child: EpisodeStrip(
-          episodes: episodes,
-          progressList: progressList,
-          autofocusFirst: target == null,
-          canMarkWatched: canMarkWatched,
-          cardWidth: cardWidth,
-          onEpisodeSelected: onEpisodeSelected,
-          onMarkEpisode: onMarkEpisode,
-        ),
-      );
-    }
-
-    // On mobile the backdrop only sets the scene - a full-height image would
-    // push the poster/title/episodes below the fold. Cap it to half the
-    // viewport and let the rest of the page scroll on solid background
-    // colour underneath, like the VOD detail page's narrow layout.
-    if (compact) {
-      final content = Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: MediaBrowsingMetrics.pagePadding,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            upper,
-            const SizedBox(height: 12),
-            episodeSection,
-          ],
-        ),
-      );
-      return _buildCompact(context, bg, backdrop, content);
-    }
-
-    // TV / desktop: a fixed header (poster + meta + Play / season row) over a
-    // vertical scroll region that stacks the episode strip and, when the
-    // server resolved a cast, the cast row. Each row is a single dpad stop
-    // (see _EpisodeStrip / _CastStrip) - left/right stay inside the row,
-    // up/down hand focus to the neighbouring row and dpad's own padded
-    // auto-scroll reveals the newly focused row. There are no per-card focus
-    // nodes for dpad's ensure-visible to chase, so horizontal navigation
-    // never drags the page - the regression the old pinned-strip layout
-    // worked around. The compact cast chip stays on the narrow layout.
-    final richCast = info.series.richCast;
-    final l = AppLocalizations.of(context);
-    final wideContent = Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: MediaBrowsingMetrics.pagePadding,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          upper,
-          const SizedBox(height: 12),
-          Expanded(
-            child: RowScrollRegion(
-              onExitTop: playFocusNode.requestFocus,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  episodeSection,
-                  if (richCast != null && richCast.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      l.seriesCast,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    CastRow(members: richCast),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    // Scrim over the backdrop. Kept heavy enough that a bright still
-    // (near-white kitchen shots etc.) still leaves the body text legible,
-    // while the top stays translucent so the art reads through. The hero
-    // holds a flat surface until the backdrop has decoded and the dominant
-    // colour has resolved, then fades the art + wash + scrim in as one
-    // (BackdropDetailHero.colorMatchReady) so nothing snaps in piecemeal.
-    return BackdropDetailHero(
+    return SeriesDetailBody(
+      seriesName: info.series.name,
+      posterChain: posterChain,
       backdropUrl: backdrop,
-      alwaysShowScrim: true,
-      showBackgroundColorLayer: true,
-      backgroundColor: bg,
-      scrimColors: [
-        bg.withValues(alpha: 0.35),
-        bg.withValues(alpha: 0.92),
-        bg,
-      ],
+      seasons: info.seasons,
+      selectedSeason: selectedSeason,
+      resolvedSeason: seasonNumber,
+      episodes: episodes,
+      episodeCountFor: _episodeCountFor,
+      fallbackPosterUrl: trimmedOrNull(info.series.coverUrl),
+      meta: _seriesMetaInfo(context, target, description, plotMaxWidth),
+      primaryActions: _primaryActions(context, target),
+      richCast: info.series.richCast,
+      castSemanticLabel: AppLocalizations.of(context).seriesCast,
+      progressList: progressList,
+      canMarkWatched: canMarkWatched,
+      emptyEpisodesLabel: 'No episodes available',
+      dominantColor: dominantColor,
       colorMatchReady: colorMatchReady,
-      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
-      content: wideContent,
-    );
-  }
-
-  Widget _buildCompact(
-    BuildContext context,
-    Color bg,
-    String? backdrop,
-    Widget content,
-  ) {
-    final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
-    // The band stays fixed (it lives outside the scroll view, not stacked
-    // above it) while `content` scrolls over/past it - same mechanic as the
-    // wide layout below, just top-aligned instead of bottom-pinned. Lighter
-    // top/mid scrim than the wide layout so the real backdrop colour still
-    // reads in the band on a portrait screen. Same held-then-fade reveal as
-    // the wide layout (BackdropDetailHero.colorMatchReady).
-    return BackdropDetailHero(
-      backdropUrl: backdrop,
-      backdropHeight: bandHeight,
-      contentAlignment: Alignment.topLeft,
-      alwaysShowScrim: true,
-      showBackgroundColorLayer: true,
-      backgroundColor: bg,
-      scrimColors: [
-        bg.withValues(alpha: 0.2),
-        bg.withValues(alpha: 0.8),
-        bg,
-      ],
-      colorMatchReady: colorMatchReady,
-      // Let the poster/title ride well up into the lower half of the
-      // backdrop (standard mobile hero look) rather than clearing it.
-      contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
-      content: content,
+      autofocusFirstEpisode: target == null,
+      onSeasonSelected: onSeasonSelected,
+      onSeasonResolved: onSeasonResolved,
+      onEpisodeSelected: onEpisodeSelected,
+      onMarkEpisode: onMarkEpisode,
+      onMarkSeason: onMarkSeason,
+      onExitTop: playFocusNode.requestFocus,
     );
   }
 

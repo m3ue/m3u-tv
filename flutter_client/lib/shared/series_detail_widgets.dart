@@ -9,7 +9,10 @@ import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
+import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
+import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
@@ -1451,4 +1454,297 @@ Widget posterShuffleTransition(Widget child, Animation<double> animation) {
       ),
     ),
   );
+}
+
+/// Shared layout scaffold for a series-style detail page - poster + meta +
+/// season picker over a colour-matched [BackdropDetailHero], with the episode
+/// strip (and, on TV/desktop, the cast row) stacked in a [RowScrollRegion]
+/// below. Used by both the Xtream Series detail and the AIOStreams series body
+/// so the two cannot drift on poster sizing, the poster card-flip, breakpoint,
+/// scrim, or the season / episode / cast composition. Per-source behaviour
+/// (hero-button targeting, mark-watched plumbing, progress matching, the
+/// season-0 relabel, the stream-picker sheet) stays with the caller: the
+/// primary-action buttons arrive as [primaryActions] and the meta block as a
+/// pre-built [meta] widget.
+class SeriesDetailBody extends StatelessWidget {
+  const SeriesDetailBody({
+    super.key,
+    required this.seriesName,
+    required this.posterChain,
+    required this.backdropUrl,
+    required this.seasons,
+    required this.selectedSeason,
+    required this.resolvedSeason,
+    required this.episodes,
+    required this.episodeCountFor,
+    required this.fallbackPosterUrl,
+    required this.meta,
+    required this.primaryActions,
+    required this.richCast,
+    required this.castSemanticLabel,
+    required this.progressList,
+    required this.canMarkWatched,
+    required this.emptyEpisodesLabel,
+    required this.colorMatchReady,
+    required this.onSeasonSelected,
+    required this.onEpisodeSelected,
+    required this.onMarkEpisode,
+    required this.onMarkSeason,
+    required this.onExitTop,
+    this.progressResolver,
+    this.onSeasonResolved,
+    this.seasonPickerFocusNode,
+    this.autofocusFirstEpisode = true,
+    this.dominantColor,
+    this.compactBreakpoint = 700,
+  });
+
+  final String seriesName;
+
+  /// Season cover -> series cover -> backdrop. Passed as a chain so a season
+  /// cover that 404s falls through at load time rather than sticking.
+  final List<String> posterChain;
+  final String? backdropUrl;
+
+  final List<Season> seasons;
+  final int? selectedSeason;
+
+  /// Season currently shown (user pick or the caller's auto-resolved default);
+  /// keys the poster and drives which [episodes] were passed.
+  final int? resolvedSeason;
+
+  /// Episodes for [resolvedSeason], already sorted / adapted by the caller.
+  final List<Episode> episodes;
+  final int Function(int seasonNumber) episodeCountFor;
+  final String? fallbackPosterUrl;
+
+  /// The caller's `ItemMetaInfo` (Xtream: Play label + resume bar; AIOStreams:
+  /// `hidePrimaryAction: true`).
+  final Widget meta;
+
+  /// Play / Start-over buttons on the same line as the season picker. Empty
+  /// for AIOStreams (no hero play button).
+  final List<Widget> primaryActions;
+
+  final List<CastMember>? richCast;
+  final String castSemanticLabel;
+
+  final List<Progress> progressList;
+  final Progress? Function(Episode episode)? progressResolver;
+
+  final bool canMarkWatched;
+  final bool autofocusFirstEpisode;
+  final String emptyEpisodesLabel;
+  final double compactBreakpoint;
+
+  final Color? dominantColor;
+  final bool colorMatchReady;
+
+  final FocusNode? seasonPickerFocusNode;
+
+  final ValueChanged<int> onSeasonSelected;
+  final ValueChanged<int?>? onSeasonResolved;
+  final void Function(Episode episode, {double? startPosition})
+  onEpisodeSelected;
+  final void Function(Episode episode, {required bool watched}) onMarkEpisode;
+  final void Function(List<Episode> episodes, {required bool watched})
+  onMarkSeason;
+
+  /// Where focus goes on "up" out of the top row (Xtream: the play button;
+  /// AIOStreams: the season picker).
+  final VoidCallback onExitTop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < compactBreakpoint;
+    final bg = dominantColor != null
+        ? deepBackdropTone(dominantColor!, vivid: compact)
+        : theme.colorScheme.surface;
+    final posterWidth = compact ? 120.0 : 200.0;
+    final cardWidth = compact
+        ? kEpisodeCardWidthCompact
+        : kEpisodeCardWidthWide;
+    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
+    final firstPoster = posterChain.isEmpty ? '' : posterChain.first;
+
+    final poster = SizedBox(
+      width: posterWidth,
+      child: AspectRatio(
+        aspectRatio: 0.68,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          transitionBuilder: posterShuffleTransition,
+          // Keep the outgoing poster painted on top so it reads as the old
+          // card being dealt off the deck to reveal the new one underneath.
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.center,
+            children: <Widget>[?currentChild, ...previousChildren],
+          ),
+          child: ResilientMediaImage(
+            key: ValueKey<String>('season-$resolvedSeason-$firstPoster'),
+            imageUrl: posterChain.isEmpty ? null : posterChain.first,
+            fallbackImageUrls: posterChain.skip(1).toList(),
+            fallbackIcon: Icons.tv,
+            borderRadius: MediaBrowsingMetrics.cardRadius,
+            fallbackTitle: seriesName,
+          ),
+        ),
+      ),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      onSeasonResolved?.call(resolvedSeason);
+    });
+
+    final header = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [poster, const SizedBox(height: 16), meta],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              poster,
+              const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+              Expanded(child: meta),
+            ],
+          );
+
+    final upper = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        header,
+        const SizedBox(height: 20),
+        Wrap(
+          spacing: MediaBrowsingMetrics.itemGap,
+          runSpacing: MediaBrowsingMetrics.chipGap,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ...primaryActions,
+            SeasonPicker(
+              seasons: seasons,
+              selectedSeason: resolvedSeason,
+              canMarkWatched: canMarkWatched && episodes.isNotEmpty,
+              compact: compact,
+              focusNode: seasonPickerFocusNode,
+              episodeCountFor: episodeCountFor,
+              fallbackPosterUrl: fallbackPosterUrl,
+              onSeasonSelected: onSeasonSelected,
+              onMarkSeason: (watched) =>
+                  onMarkSeason(episodes, watched: watched),
+            ),
+            if (compact && richCast != null && richCast!.isNotEmpty)
+              CastMemberRow(
+                members: richCast,
+                semanticLabel: l.seriesCast,
+                compact: true,
+                onShowAll: () => showAllCast(context, richCast!),
+                allCastSemanticLabel: l.castShowAll,
+              ),
+          ],
+        ),
+      ],
+    );
+
+    final Widget episodeSection;
+    if (episodes.isEmpty) {
+      episodeSection = Align(
+        alignment: Alignment.centerLeft,
+        child: Text(emptyEpisodesLabel),
+      );
+    } else {
+      final strip = EpisodeStrip(
+        episodes: episodes,
+        progressList: progressList,
+        progressResolver: progressResolver,
+        autofocusFirst: autofocusFirstEpisode,
+        canMarkWatched: canMarkWatched,
+        cardWidth: cardWidth,
+        horizontal: !compact,
+        onEpisodeSelected: onEpisodeSelected,
+        onMarkEpisode: onMarkEpisode,
+      );
+      episodeSection = compact
+          ? strip
+          : SizedBox(height: stripHeight, child: strip);
+    }
+
+    if (compact) {
+      final content = Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: MediaBrowsingMetrics.pagePadding,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [upper, const SizedBox(height: 12), episodeSection],
+        ),
+      );
+      final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
+      return BackdropDetailHero(
+        backdropUrl: backdropUrl,
+        backdropHeight: bandHeight,
+        contentAlignment: Alignment.topLeft,
+        alwaysShowScrim: true,
+        showBackgroundColorLayer: true,
+        backgroundColor: bg,
+        scrimColors: [bg.withValues(alpha: 0.2), bg.withValues(alpha: 0.8), bg],
+        colorMatchReady: colorMatchReady,
+        contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+        content: content,
+      );
+    }
+
+    final richCastList = richCast;
+    final wideContent = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: MediaBrowsingMetrics.pagePadding,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          upper,
+          const SizedBox(height: 12),
+          Expanded(
+            child: RowScrollRegion(
+              onExitTop: onExitTop,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  episodeSection,
+                  if (richCastList != null && richCastList.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      l.seriesCast,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    CastRow(members: richCastList),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return BackdropDetailHero(
+      backdropUrl: backdropUrl,
+      alwaysShowScrim: true,
+      showBackgroundColorLayer: true,
+      backgroundColor: bg,
+      scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
+      colorMatchReady: colorMatchReady,
+      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
+      content: wideContent,
+    );
+  }
 }
