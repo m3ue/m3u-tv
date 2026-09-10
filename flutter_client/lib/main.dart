@@ -17,8 +17,10 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -30,6 +32,14 @@ Future<void> main() async {
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
+  // In speed mode, cap the decoded image cache at 50 MB to prevent memory
+  // accumulation during long browsing sessions on low-RAM devices.
+  final optimizeFor = await appState.viewSettingsService.optimizeFor();
+  if (optimizeFor == OptimizeFor.speed) {
+    PaintingBinding.instance.imageCache.maximumSizeBytes =
+        50 * 1024 * 1024; // 50 MB
+    PaintingBinding.instance.imageCache.maximumSize = 200;
+  }
   if (_isDesktop) {
     await _configureDesktopWindow(appState);
   }
@@ -37,6 +47,12 @@ Future<void> main() async {
   if (_isMobilePushCapable(nativeTelevisionHint)) {
     unawaited(_initPushNotifications(appState));
   }
+  // Pre-load persisted view settings into the in-memory cache so the
+  // synchronous getters (fontSizeSync, optimizeForSync) return the correct
+  // values on the very first build — without this, fontSizeSync defaults to
+  // AppFontSize.normal and the user's saved choice is ignored until the
+  // settings screen opens and triggers an async refresh.
+  await appState.viewSettingsService.fontSize();
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.
   final startPage = await appState.viewSettingsService.defaultStartPage();
@@ -189,6 +205,7 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     widget.appState?.addListener(_onAppStateChanged);
+    widget.appState?.viewSettingsService.addListener(_onAppStateChanged);
   }
 
   @override
@@ -196,17 +213,35 @@ class _MyAppState extends State<MyApp> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.appState != widget.appState) {
       oldWidget.appState?.removeListener(_onAppStateChanged);
+      oldWidget.appState?.viewSettingsService
+          .removeListener(_onAppStateChanged);
       widget.appState?.addListener(_onAppStateChanged);
+      widget.appState?.viewSettingsService.addListener(_onAppStateChanged);
     }
   }
 
   @override
   void dispose() {
+    widget.appState?.viewSettingsService.removeListener(_onAppStateChanged);
     widget.appState?.removeListener(_onAppStateChanged);
     super.dispose();
   }
 
   void _onAppStateChanged() {
+    // Update the image cache cap whenever the optimize-for setting changes.
+    final optimizeFor = widget.appState?.viewSettingsService.optimizeForSync;
+    if (optimizeFor == OptimizeFor.speed) {
+      PaintingBinding.instance.imageCache.maximumSizeBytes =
+          50 * 1024 * 1024;
+      PaintingBinding.instance.imageCache.maximumSize = 200;
+    } else {
+      PaintingBinding.instance.imageCache.maximumSizeBytes =
+          100 * 1024 * 1024;
+      PaintingBinding.instance.imageCache.maximumSize = 1000;
+    }
+    // Clear cached images so they re-decode at the new oversample/filter
+    // quality — stale entries from the previous mode waste GPU memory.
+    PaintingBinding.instance.imageCache.clear();
     // boot() calls notifyListeners() synchronously from AppShellState.initState,
     // which fires mid-build. Deferring to post-frame avoids the setState-during-
     // build assertion in all phases (idle mount, persistent-callbacks frame, etc.)
@@ -235,6 +270,10 @@ class _MyAppState extends State<MyApp> {
           nativeTelevisionHint: widget.nativeTelevisionHint,
         );
         final isTvOrDesktop = shouldUseSidebar(deviceType);
+        final viewSettings = widget.appState?.viewSettingsService;
+        final optimizeFor = viewSettings?.optimizeForSync ?? OptimizeFor.quality;
+        final fontSize = viewSettings?.fontSizeSync ?? AppFontSize.normal;
+        final routerChild = child ?? const SizedBox.shrink();
         return Dpad(
           theme: const DpadThemeData(
             effects: [
@@ -274,7 +313,24 @@ class _MyAppState extends State<MyApp> {
               : null,
           child: _TvZoom(
             deviceType: deviceType,
-            child: child ?? const SizedBox.shrink(),
+            child: ImageQualityScope(
+              optimizeFor: optimizeFor,
+              child: FontSizeScope(
+                fontSize: fontSize,
+                child: Builder(
+                  builder: (context) {
+                    final scale = FontSizeScope.scaleOf(context);
+                    if (scale == 1) return routerChild;
+                    return MediaQuery(
+                      data: MediaQuery.of(
+                        context,
+                      ).copyWith(textScaler: TextScaler.linear(scale)),
+                      child: routerChild,
+                    );
+                  },
+                ),
+              ),
+            ),
           ),
         );
       },

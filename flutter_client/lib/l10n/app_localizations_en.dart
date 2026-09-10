@@ -45,6 +45,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appBackToExit => 'Press back again to exit';
 
   @override
+  String get appRecordingScheduling => 'Recording is being scheduled…';
+
+  @override
   String appRecordingScheduled(String title) {
     return 'Recording scheduled: $title';
   }
@@ -1368,4 +1371,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsToggleOff => 'Off';
+
+  @override
+  String get settingsOptimizeFor => 'Optimize for';
+
+  @override
+  String get settingsOptimizeForQuality => 'Quality';
+
+  @override
+  String get settingsOptimizeForQualityHint =>
+      'Sharper images, higher memory usage.';
+
+  @override
+  String get settingsOptimizeForSpeed => 'Speed';
+
+  @override
+  String get settingsOptimizeForSpeedHint =>
+      'Faster loading, lower image quality.';
+
+  @override
+  String get settingsFontSize => 'Font size';
+
+  @override
+  String get settingsFontSizeNormal => 'Normal';
+
+  @override
+  String get settingsFontSizeLarge => 'Large';
+
+  @override
+  String get settingsFontSizeVeryLarge => 'Very Large';
 }

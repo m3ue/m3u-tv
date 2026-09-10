@@ -9,9 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:m3u_tv/main.dart' show TvZoomScale;
+import 'package:m3u_tv/services/view_settings_service.dart' show OptimizeFor;
 import 'package:m3u_tv/shared/app_button.dart' show kStadiumFocusEffects;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
 class CategoryTabData {
@@ -401,7 +403,6 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
   // until something (e.g. a manual app reload) asks for it again. Retrying
   // here with backoff closes that gap without needing to touch the shared
   // cache manager's concurrency settings.
-  static const _maxRetries = 3;
 
   int _attempt = 0;
   bool _retryScheduled = false;
@@ -436,9 +437,14 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
   void _scheduleRetry() {
     if (_retryScheduled) return;
     final hasNextUrl = _urlIndex < _urlChain.length - 1;
+    // In speed mode, cap retries at 1 to avoid redundant decode storms;
+    // quality mode keeps the full 3-retry budget for transient-failure recovery.
+    final isSpeed =
+        ImageQualityScope.of(context)?.optimizeFor == OptimizeFor.speed;
+    final maxRetries = isSpeed ? 1 : 3;
     // Give the last URL the full retry budget (transient-failure recovery);
     // when a better candidate is waiting, fail over after a single quick retry.
-    final retryBudget = hasNextUrl ? 1 : _maxRetries;
+    final retryBudget = hasNextUrl ? 1 : maxRetries;
     if (_attempt >= retryBudget) {
       if (!hasNextUrl) return;
       _retryScheduled = true;
@@ -472,13 +478,10 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
       title: widget.fallbackTitle,
     );
     final url = _currentUrl;
-    // Oversample beyond raw pixel density so detailed logos (thin
-    // text/wordmarks) survive downscaling instead of being crushed to a
-    // blocky, aliased decode that no display-time FilterQuality can recover.
-    // ResizeImage never upscales past the source's intrinsic size, so this
-    // is free when the source is already small.
+    final oversample = ImageQualityScope.oversampleOf(context);
+    final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
-        MediaQuery.devicePixelRatioOf(context) * 2 * TvZoomScale.of(context);
+        MediaQuery.devicePixelRatioOf(context) * oversample * TvZoomScale.of(context);
     final cacheWidth = widget.width == null
         ? null
         : (widget.width! * devicePixelRatio).round();
@@ -516,7 +519,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
                   fit: widget.fit,
                   width: widget.width,
                   height: widget.height,
-                  filterQuality: FilterQuality.high,
+                  filterQuality: filterQuality,
                   gaplessPlayback: true,
                   frameBuilder:
                       (context, child, frame, wasSynchronouslyLoaded) {
@@ -1089,13 +1092,14 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
       !widget.landscapeStyle || item.emphasisLabel == null,
       'MediaPreviewItem.emphasisLabel is not rendered by landscape cards.',
     );
-    final width =
+    final baseWidth =
         widget.cardWidth ??
         (widget.landscapeStyle
             ? MediaBrowsingMetrics.landscapeCardWidth
             : widget.posterStyle
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
+    final width = baseWidth * FontSizeScope.scaleOf(context);
 
     return SizedBox(
       width: width,

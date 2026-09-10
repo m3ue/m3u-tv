@@ -72,6 +72,37 @@ enum ChannelColumnLayout {
       );
 }
 
+/// Whether to optimize image rendering for visual quality or performance.
+enum OptimizeFor {
+  quality('quality'),
+  speed('speed');
+
+  const OptimizeFor(this.value);
+  final String value;
+
+  static OptimizeFor fromValue(String? value) =>
+      OptimizeFor.values.firstWhere(
+        (opt) => opt.value == value,
+        orElse: () => OptimizeFor.quality,
+      );
+}
+
+/// Base font size multiplier for the UI.
+enum AppFontSize {
+  normal('normal', 1.0),
+  large('large', 1.2),
+  veryLarge('veryLarge', 1.5);
+
+  const AppFontSize(this.value, this.scale);
+  final String value;
+  final double scale;
+
+  static AppFontSize fromValue(String? value) => AppFontSize.values.firstWhere(
+    (size) => size.value == value,
+    orElse: () => AppFontSize.normal,
+  );
+}
+
 /// Persists non-credential view preferences such as the Live TV default layout
 /// and the EPG default starting view.
 class ViewSettingsService extends ChangeNotifier {
@@ -87,6 +118,8 @@ class ViewSettingsService extends ChangeNotifier {
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
+  static const optimizeForKey = 'm3ue_tv_optimize_for';
+  static const fontSizeKey = 'm3ue_tv_font_size';
 
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
@@ -209,6 +242,36 @@ class ViewSettingsService extends ChangeNotifier {
     await _write(windowBoundsKey, bounds.toJson());
   }
 
+  Future<OptimizeFor> optimizeFor() async {
+    final raw = await _read(optimizeForKey);
+    return OptimizeFor.fromValue(raw as String?);
+  }
+
+  /// Synchronous access to the in-memory cached optimize-for setting.
+  OptimizeFor get optimizeForSync =>
+      OptimizeFor.fromValue(_memory[optimizeForKey] as String?);
+
+  Future<void> setOptimizeFor(OptimizeFor value) async {
+    await _write(optimizeForKey, value.value);
+    notifyListeners();
+  }
+
+  Future<AppFontSize> fontSize() async {
+    final raw = await _read(fontSizeKey);
+    debugPrint('VIEW_SETTINGS: fontSize read raw="$raw" → ${AppFontSize.fromValue(raw as String?)}');
+    return AppFontSize.fromValue(raw);
+  }
+
+  /// Synchronous access to the in-memory cached font size setting.
+  AppFontSize get fontSizeSync =>
+      AppFontSize.fromValue(_memory[fontSizeKey] as String?);
+
+  Future<void> setFontSize(AppFontSize value) async {
+    await _write(fontSizeKey, value.value);
+    debugPrint('VIEW_SETTINGS: setFontSize wrote ${value.value} → memory=${_memory[fontSizeKey]}');
+    notifyListeners();
+  }
+
   Future<Object?> _read(String key) async {
     final store = this.store;
     if (store == null) return _memory[key];
@@ -219,6 +282,7 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> _write(String key, Object? value) async {
     _memory[key] = value;
+    debugPrint('VIEW_SETTINGS: _write key="$key" value="$value" store=${store != null ? "present" : "NULL"}');
     await store?.write(key, value);
   }
 }

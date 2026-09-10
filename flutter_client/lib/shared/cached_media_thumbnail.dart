@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart'
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/main.dart' show TvZoomScale;
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
 /// Fixed-size thumbnail (channel logo, episode/video preview, favorites
@@ -28,18 +29,13 @@ class CachedMediaThumbnail extends StatelessWidget {
   final double? height;
   final BoxFit? fit;
 
-  /// Decode at extra resolution beyond the display's raw pixel density so
-  /// detailed logos (thin text/wordmarks) survive downscaling instead of
-  /// being crushed to a blocky, aliased decode that no amount of display-time
-  /// [FilterQuality] can recover. [ResizeImage] never upscales past the
-  /// source's intrinsic size, so this is free when the source is small.
-  static const double _oversample = 2;
-
   @override
   Widget build(BuildContext context) {
+    final oversample = ImageQualityScope.oversampleOf(context);
+    final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
         MediaQuery.devicePixelRatioOf(context) *
-        _oversample *
+        oversample *
         TvZoomScale.of(context);
     final provider = CachedNetworkImageProvider(
       url,
@@ -63,7 +59,7 @@ class CachedMediaThumbnail extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
-      filterQuality: FilterQuality.high,
+      filterQuality: filterQuality,
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => fallback,
     );

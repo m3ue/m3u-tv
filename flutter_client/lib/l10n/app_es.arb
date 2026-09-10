@@ -12,6 +12,7 @@
   "navMore": "Más",
   "notificationsDesktopOpen": "Abrir",
   "appBackToExit": "Pulse atrás de nuevo para salir",
+  "appRecordingScheduling": "Grabación en programación\u2026",
   "appRecordingScheduled": "Grabación programada: {title}",
   "@appRecordingScheduled": {
     "placeholders": {
@@ -761,5 +762,14 @@
   "settingsMatchRefreshRate": "Ajustar frecuencia de actualización",
   "settingsMatchRefreshRateHint": "Cambia el monitor a la frecuencia de fotogramas del vídeo al iniciar la reproducción. Puede dejar la pantalla en negro un instante. Solo Windows.",
   "settingsToggleOn": "Activado",
-  "settingsToggleOff": "Desactivado"
+  "settingsToggleOff": "Desactivado",
+  "settingsOptimizeFor": "Optimizar para",
+  "settingsOptimizeForQuality": "Calidad",
+  "settingsOptimizeForQualityHint": "Imágenes más nítidas, mayor uso de memoria.",
+  "settingsOptimizeForSpeed": "Velocidad",
+  "settingsOptimizeForSpeedHint": "Carga más rápida, menor calidad de imagen.",
+  "settingsFontSize": "Tamaño de fuente",
+  "settingsFontSizeNormal": "Normal",
+  "settingsFontSizeLarge": "Grande",
+  "settingsFontSizeVeryLarge": "Muy grande"
 }

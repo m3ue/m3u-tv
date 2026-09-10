@@ -11,11 +11,12 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart'
-    show ChannelColumnLayout, EpgStartView;
+    show ChannelColumnLayout, EpgStartView, OptimizeFor;
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
@@ -33,17 +34,38 @@ const double _kTimeHeaderH = 28;
 const double _kRowH = 60;
 const double _kPxPerMin = 5; // 300 px per hour
 
+/// Scaled row height that grows with the user's font-size preference.
+double _scaledRowH(BuildContext context) =>
+    _kRowH * FontSizeScope.scaleOf(context);
+
+/// EPG text gets an extra boost on top of the base font-size scale because
+/// labelSmall/labelMedium are very small by default and unreadable from couch
+/// distance even at 1.2×.
+TextStyle _epgStyle(
+  BuildContext context,
+  TextStyle? base, {
+  Color? color,
+  FontWeight? fontWeight,
+}) {
+  final extra = FontSizeScope.isLargeOf(context) ? 1.4 : 1.0;
+  return (base ?? const TextStyle()).copyWith(
+    fontSize: (base?.fontSize ?? 12) * extra,
+    color: color,
+    fontWeight: fontWeight,
+  );
+}
+
 // When a row builds, also request EPG for this many channels past it so a
 // downward scroll lands on already-loaded data instead of waiting on a lazy
 // fetch. [onEnsureEpg] is debounced and de-duped, so the widened slice just
-// coalesces into one batched request.
-const int _kEpgPrefetchAhead = 12;
+// coalesces into one batched request. Reduced in speed mode to cut bandwidth.
+const int _kEpgPrefetchAheadQuality = 12;
+const int _kEpgPrefetchAheadSpeed = 6;
 
 // Build (and therefore prefetch) roughly this many rows beyond the viewport in
-// each direction.
-const ScrollCacheExtent _kEpgCacheExtent = ScrollCacheExtent.pixels(
-  _kRowH * 10,
-);
+// each direction. Scaled at point of use to match the font-size setting.
+ScrollCacheExtent _scaledCacheExtent(BuildContext context) =>
+    ScrollCacheExtent.pixels(_scaledRowH(context) * 10);
 
 /// Horizontal TV-guide style EPG with channels on Y and time on X.
 ///
@@ -514,10 +536,11 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         AppLocalizations.of(context).epgChannels,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        style: _epgStyle(
+                          context,
+                          Theme.of(context).textTheme.labelSmall,
                           color: colorScheme.onSurfaceVariant,
-                          letterSpacing: 1.2,
-                        ),
+                        ).copyWith(letterSpacing: 1.2),
                       ),
                     ),
                     // Channel name/logo list (synced vertically with program rows)
@@ -546,7 +569,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                           child: ListView.builder(
                             controller: _leftVCtrl,
                             itemCount: widget.channels.length,
-                            itemExtent: _kRowH,
+                            itemExtent: _scaledRowH(context),
                             itemBuilder: (_, i) => _ChannelCell(
                               channel: widget.channels[i],
                               columnLayout: widget.channelColumnLayout,
@@ -639,8 +662,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                           ListView.builder(
                             controller: _rightVCtrl,
                             itemCount: widget.channels.length,
-                            itemExtent: _kRowH,
-                            scrollCacheExtent: _kEpgCacheExtent,
+                            itemExtent: _scaledRowH(context),
+                            scrollCacheExtent: _scaledCacheExtent(context),
                             itemBuilder: (_, i) {
                               final channel = widget.channels[i];
                               final catchupRetentionDays =
@@ -651,9 +674,16 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                               // Request this row plus a look-ahead window so a
                               // downward scroll hits loaded EPG. The call is
                               // debounced and de-duped downstream.
+                              final isSpeed = ImageQualityScope.of(
+                                    context,
+                                  )?.optimizeFor ==
+                                  OptimizeFor.speed;
                               final prefetchEnd = math.min(
                                 widget.channels.length,
-                                i + 1 + _kEpgPrefetchAhead,
+                                i + 1 +
+                                    (isSpeed
+                                        ? _kEpgPrefetchAheadSpeed
+                                        : _kEpgPrefetchAheadQuality),
                               );
                               widget.onEnsureEpg?.call(
                                 widget.channels.sublist(i, prefetchEnd),
@@ -685,7 +715,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                                     windowEnd: _windowEnd,
                                     pixelsPerMinute: _kPxPerMin,
                                     totalWidth: _totalW,
-                                    rowHeight: _kRowH,
+                                    rowHeight: _scaledRowH(context),
                                     catchupRetentionDays: catchupRetentionDays,
                                     now: now,
                                     nowFocusNode: i < _nowFocusNodes.length
@@ -868,7 +898,7 @@ class _DayControls extends StatelessWidget {
                   Localizations.localeOf(context).toLanguageTag(),
                 ).format(selectedDate),
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelMedium,
+                style: _epgStyle(context, Theme.of(context).textTheme.labelMedium),
               ),
             ),
           ),
@@ -884,7 +914,9 @@ class _DayControls extends StatelessWidget {
               child: Center(
                 child: Text(
                   l10n.epgNow,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  style: _epgStyle(
+                    context,
+                    Theme.of(context).textTheme.labelMedium,
                     color: colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w600,
                   ),
@@ -987,7 +1019,7 @@ class _ChannelCell extends StatelessWidget {
       onFocusChange: onFocusChange,
       borderRadius: BorderRadius.zero,
       child: Container(
-        height: _kRowH,
+        height: _scaledRowH(context),
         decoration: BoxDecoration(
           color: colorScheme.surface,
           border: Border(
