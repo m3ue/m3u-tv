@@ -315,6 +315,40 @@ class AppShellState extends ConsumerState<AppShell>
     unawaited(_desktopNotificationDispatcher.dispatch(item));
   }
 
+  /// A live stream ended unexpectedly (e.g. evicted by a DVR recording). The
+  /// push channel may be down, so fetch the persisted notifications directly
+  /// and surface them as toasts while the player holds on screen. Returns the
+  /// eviction message (if a "DVR recording has taken precedence" notification
+  /// exists) so the player can show WHY the stream ended.
+  Future<String?> _handleLiveStreamEnded() async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final items = await _appState.fetchUnreadNotifications();
+        String? evictionMessage;
+        for (final item in items) {
+          final isEviction =
+              item.title.contains('DVR Recording') &&
+              (item.body?.contains('taken precedence') ?? false);
+          if (isEviction) {
+            evictionMessage = item.body ?? item.title;
+          }
+          if (!mounted) return evictionMessage;
+          unawaited(_desktopNotificationDispatcher.dispatch(item));
+        }
+        debugPrint('DVR-DEBUG: stream-end eviction message: $evictionMessage');
+        return evictionMessage;
+      } on Object catch (error) {
+        debugPrint('DVR-DEBUG: stream-end notification fetch failed: $error');
+        // The notification endpoint is rate-limited (429) — retry after a
+        // brief delay while the player is still holding on screen.
+        if (attempt < 2) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
+      }
+    }
+    return null;
+  }
+
   void _enqueueNotificationToast(TvNotificationItem item) {
     if (!mounted) return;
     _toastKey.currentState?.enqueue(item);
@@ -769,7 +803,7 @@ class AppShellState extends ConsumerState<AppShell>
     _openChannel(channels[nextIndex]);
   }
 
-  void _handleRecordButtonTap(EpgProgram program) {
+  Future<void> _handleRecordButtonTap(EpgProgram program) async {
     final args = _playerArgs;
     if (args == null || args.type != 'live') return;
     final channels = _playerChannelContext.isNotEmpty
@@ -782,10 +816,37 @@ class AppShellState extends ConsumerState<AppShell>
       (r) => r.channelId == channel.id && r.isInProgress,
     );
     if (activeRecording != null) {
-      unawaited(_confirmStopRecording(context, activeRecording));
+      await _confirmStopRecording(context, activeRecording);
       return;
     }
-    unawaited(_scheduleDvr(context, channel, program));
+    // The channel's red dot may be showing from a stale or optimistic state
+    // while the full recording row hasn't landed locally (missed push, poll
+    // not yet ticked). Fetch the authoritative list once — if the server has
+    // it in-progress, show the stop options instead of "being scheduled".
+    if (_appState.recordingChannelIds.contains(channel.id)) {
+      await _appState.refreshDvrRecordings();
+      if (!context.mounted) return;
+      final refreshed = _appState.dvrRecordings.firstWhereOrNull(
+        (r) => r.channelId == channel.id && r.isInProgress,
+      );
+      if (refreshed != null) {
+        await _confirmStopRecording(context, refreshed);
+        return;
+      }
+    }
+    // The channel may already be in recordingChannelIds (optimistic
+    // update) while the full recording object hasn't landed in
+    // dvrRecordings yet — don't try to schedule a duplicate.
+    if (_appState.recordingChannelIds.contains(channel.id)) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).appRecordingScheduling),
+        ),
+      );
+      return;
+    }
+    await _scheduleDvr(context, channel, program);
   }
 
   /// Same choice offered on the Recordings screen for an in-progress
@@ -1569,6 +1630,8 @@ class AppShellState extends ConsumerState<AppShell>
                   hasDvrFeature: _appState.hasDvrFeature,
                   viewerId: viewerId,
                   viewSettingsService: _appState.viewSettingsService,
+                  onLiveStreamEnded:
+                      args.type == 'live' ? _handleLiveStreamEnded : null,
                   onNextChannel: args.type == 'live' ? _openNextChannel : null,
                   onPreviousChannel: args.type == 'live'
                       ? _openPreviousChannel
@@ -1991,60 +2054,62 @@ class NavigationSidebar extends StatelessWidget {
             }
             return KeyEventResult.ignored;
           },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 72,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
-                  child: OverflowBox(
-                    maxWidth: 200,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset(
-                          'assets/icons/logo.svg',
-                          width: 36,
-                          height: 36,
-                        ),
-                        if (expanded) ...[
-                          const SizedBox(width: 12),
-                          Text(
-                            'M3U TV',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 72,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
+                    child: OverflowBox(
+                      maxWidth: 200,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/icons/logo.svg',
+                            width: 36,
+                            height: 36,
                           ),
+                          if (expanded) ...[
+                            const SizedBox(width: 12),
+                            Text(
+                              'M3U TV',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              ...List.generate(routes.length, (index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  child: SidebarDestinationItem(
-                    label: _routeLabel(context, routes[index]),
-                    icon: _routeIcon(routes[index]),
-                    selected: index == currentIndex,
-                    expanded: expanded,
-                    focusNode: focusNodes[index],
-                    badgeCount: routes[index] == RouteNames.notifications
-                        ? unreadNotificationCount
-                        : 0,
-                    onTap: () => onNavigate(index),
-                  ),
-                );
-              }),
-            ],
+                const SizedBox(height: 12),
+                ...List.generate(routes.length, (index) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    child: SidebarDestinationItem(
+                      label: _routeLabel(context, routes[index]),
+                      icon: _routeIcon(routes[index]),
+                      selected: index == currentIndex,
+                      expanded: expanded,
+                      focusNode: focusNodes[index],
+                      badgeCount: routes[index] == RouteNames.notifications
+                          ? unreadNotificationCount
+                          : 0,
+                      onTap: () => onNavigate(index),
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
       ),
@@ -2138,6 +2203,8 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
       foregroundColor = colorScheme.onSurface;
     }
 
+    final hPad = 12.0;
+    const itemHeight = 48.0;
     return MouseRegion(
       onEnter: (_) => _setHovered(true),
       onExit: (_) => _setHovered(false),
@@ -2171,8 +2238,8 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
             fit: StackFit.passthrough,
             children: [
               Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                height: itemHeight,
+                padding: EdgeInsets.symmetric(horizontal: hPad),
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
@@ -2193,7 +2260,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                         ),
                       ),
                       if (widget.expanded) ...[
-                        const SizedBox(width: 12),
+                        SizedBox(width: hPad),
                         Flexible(
                           child: Text(
                             widget.label,

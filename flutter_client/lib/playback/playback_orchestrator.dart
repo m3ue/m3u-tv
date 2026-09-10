@@ -1,6 +1,8 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:m3u_tv/playback/decoder_failure.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -48,6 +50,65 @@ class PlaybackOrchestrator {
   /// backend can't route around anyway.
   static const int _streamUnavailableMaxRetries = 2;
   static const Duration _streamUnavailableRetryDelay = Duration(seconds: 3);
+
+  /// Fetch the actual error message from the server when a stream probe
+  /// fails. The server now returns JSON errors for stream routes, so we
+  /// can read the specific reason (capacity exceeded, provider rejected,
+  /// etc.) instead of showing a generic "stream unavailable" message.
+  static Future<String?> _fetchStreamError(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      try {
+        final request = await client.getUrl(uri);
+        final response = await request.close().timeout(const Duration(seconds: 5));
+        final body = await response.transform(utf8.decoder).join();
+        client.close();
+        // Server returns JSON like {"message": "...", "status": 503}
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        return json['message'] as String?;
+      } on Object {
+        client.close();
+        return null;
+      }
+    } on Object {
+      return null;
+    }
+  }
+
+  /// Check a live stream URL up front for a server-side rejection (capacity,
+  /// auth, provider error). The server returns JSON errors for stream routes,
+  /// but the native player surfaces them as a generic "Source error" — so ask
+  /// first and surface the server's own message, matching DVR scheduling
+  /// errors. Redirects (3xx) and success (2xx) return null so playback
+  /// proceeds normally.
+  static Future<String?> _preflightLiveStream(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 4);
+      try {
+        final request = await client.getUrl(uri);
+        request.followRedirects = false;
+        final response =
+            await request.close().timeout(const Duration(seconds: 4));
+        if (response.statusCode < 400) {
+          client.close();
+          return null;
+        }
+        final body = await response.transform(utf8.decoder).join();
+        client.close();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        return json['message'] as String? ??
+            'Playback error (${response.statusCode})';
+      } on Object {
+        client.close();
+        return null;
+      }
+    } on Object {
+      return null;
+    }
+  }
 
   /// See the comment at its use in [_fallBackToNextBackend]: a settle
   /// window between releasing one Hybrid Composition platform view and
@@ -136,6 +197,22 @@ class PlaybackOrchestrator {
     await _cleanupSessions();
     if (!_isCurrentGeneration(generation)) return;
     _clearActiveAdapter();
+
+    if (source.isLive) {
+      final rejection = await _preflightLiveStream(source.uri);
+      if (!_isCurrentGeneration(generation)) return;
+      if (rejection != null && rejection.isNotEmpty) {
+        _emitError(
+          PlaybackError(
+            backend: _nativeBackends().first,
+            message: rejection,
+            code: 'stream_rejected',
+            recoverable: false,
+          ),
+        );
+        return;
+      }
+    }
 
     await _tryBackendsThenTranscode(_nativeBackends(), source, generation);
   }
@@ -270,6 +347,26 @@ class PlaybackOrchestrator {
       } on PlaybackException catch (error) {
         final isStreamUnavailable =
             source.isLive && looksLikeStreamProbeFailure(error.message);
+        // For live content, ask the server whether it rejected this stream
+        // (capacity etc.). The server returns JSON for stream routes, so we
+        // surface that message IMMEDIATELY instead of retrying for ~6s and
+        // then showing a generic "Source error".
+        if (source.isLive) {
+          final serverMessage = await _fetchStreamError(source.uri);
+          if (serverMessage != null && serverMessage.isNotEmpty) {
+            if (identical(_activeAdapter, adapter) &&
+                _activeBackend == backend &&
+                identical(_activeSource, source)) {
+              _clearActiveAdapter();
+            }
+            return PlaybackException(
+              message: serverMessage,
+              backend: error.backend,
+              code: 'stream_unavailable',
+              recoverable: error.recoverable,
+            );
+          }
+        }
         if (isStreamUnavailable &&
             streamUnavailableAttempt < _streamUnavailableMaxRetries) {
           streamUnavailableAttempt++;
@@ -316,6 +413,22 @@ class PlaybackOrchestrator {
                 recoverable: error.recoverable,
               )
             : error;
+
+        // For live content, try to fetch the actual error message from the
+        // server (now returns JSON for stream routes). This surfaces capacity
+        // errors ("Playlist has reached maximum stream limit") instead of a
+        // generic "Source error" — the player can't parse the JSON itself.
+        if (source.isLive) {
+          final serverMessage = await _fetchStreamError(source.uri);
+          if (serverMessage != null && serverMessage.isNotEmpty) {
+            return PlaybackException(
+              message: serverMessage,
+              backend: error.backend,
+              code: 'stream_unavailable',
+              recoverable: error.recoverable,
+            );
+          }
+        }
         _diagnostics.add(
           'load-failed:${backend.name}:${reportedError.code}:${reportedError.message}',
         );
