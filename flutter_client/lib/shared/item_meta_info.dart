@@ -6,6 +6,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
 /// A single "Label: value" credit row (e.g. Director, Cast).
 class MetaCreditLine {
@@ -202,9 +203,25 @@ class _TitleHeading extends StatelessWidget {
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Image(
-            image: CachedNetworkImageProvider(
-              logo,
-              cacheManager: MediaImageCacheManager(),
+            image: ResizeImage(
+              CachedNetworkImageProvider(
+                logo,
+                cacheManager: MediaImageCacheManager(),
+              ),
+              // Bound the decode to the display cap: a wordmark clearlogo can
+              // ship at 1500px+ wide and would otherwise decode at full source
+              // resolution just to be scaled down into a 350x120 box.
+              width:
+                  (_logoMaxWidth *
+                          MediaQuery.devicePixelRatioOf(context) *
+                          TvZoomScale.of(context))
+                      .round(),
+              height:
+                  (_logoMaxHeight *
+                          MediaQuery.devicePixelRatioOf(context) *
+                          TvZoomScale.of(context))
+                      .round(),
+              policy: ResizeImagePolicy.fit,
             ),
             semanticLabel: name,
             gaplessPlayback: true,

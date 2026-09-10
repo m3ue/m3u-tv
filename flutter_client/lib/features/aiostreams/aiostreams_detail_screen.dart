@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -10,13 +9,14 @@ import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
-import 'package:m3u_tv/shared/cached_backdrop_image.dart';
-import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
+import 'package:m3u_tv/shared/cast_member_row.dart';
+import 'package:m3u_tv/shared/cast_reveal_slot.dart';
+import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/series_detail_widgets.dart';
 
 class AIOStreamsDetailScreen extends StatefulWidget {
   const AIOStreamsDetailScreen({
@@ -169,7 +169,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
 // Movie body — mirrors VodDetailsScreen layout
 // ---------------------------------------------------------------------------
 
-class _MovieBody extends StatelessWidget {
+class _MovieBody extends StatefulWidget {
   const _MovieBody({
     required this.item,
     required this.isLoading,
@@ -180,82 +180,134 @@ class _MovieBody extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onGetStreams;
 
+  @override
+  State<_MovieBody> createState() => _MovieBodyState();
+}
+
+class _MovieBodyState extends State<_MovieBody> {
   static const double _wideBreakpoint = 600;
+
+  /// Focus node for the "Get Streams" button, so the wide-layout cast strip
+  /// can hop back up to it (mirrors VodDetailsScreen's playFocusNode).
+  final FocusNode _getStreamsFocusNode = FocusNode(
+    debugLabel: 'aioGetStreams',
+  );
+
+  @override
+  void dispose() {
+    _getStreamsFocusNode.dispose();
+    super.dispose();
+  }
+
+  AIOStreamsItem get _item => widget.item;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final theme = Theme.of(context);
         if (constraints.maxWidth < _wideBreakpoint) {
-          return _buildNarrow(context);
+          return _buildNarrow(context, theme);
         }
-        return _buildWide(context);
+        return _buildWide(context, theme);
       },
     );
   }
 
-  Widget _buildWide(BuildContext context) {
-    final theme = Theme.of(context);
-    final backdrop = item.background;
+  Widget _buildWide(BuildContext context, ThemeData theme) {
+    final l = AppLocalizations.of(context);
+    final richCast = _item.richCast;
+    // Poster + scrolling info column fill the height; the rich cast strip is
+    // pinned full-width below, out of that scroll view so left/right card
+    // navigation never drags the page - identical to VodDetailsScreen._buildWide.
     final content = Padding(
       padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 220,
-            child: AspectRatio(
-              aspectRatio: 0.68,
-              child: ResilientMediaImage(
-                imageUrl: item.poster,
-                fallbackIcon: Icons.movie,
-                borderRadius: MediaBrowsingMetrics.cardRadius,
-                fallbackTitle: item.name,
-              ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SizedBox(
+                  width: 220,
+                  child: AspectRatio(
+                    aspectRatio: 0.68,
+                    child: ResilientMediaImage(
+                      imageUrl: _item.poster,
+                      fallbackIcon: Icons.movie,
+                      borderRadius: MediaBrowsingMetrics.cardRadius,
+                      fallbackTitle: _item.name,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _infoColumn(context, theme),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-          Expanded(
-            child: SingleChildScrollView(
-              child: _infoColumn(context, theme),
-            ),
+          CastRevealSlot(
+            topPadding: MediaBrowsingMetrics.contentPadding,
+            castRow: (richCast == null || richCast.isEmpty)
+                ? null
+                : Semantics(
+                    label: l.vodCast,
+                    container: true,
+                    child: CastStrip(
+                      members: richCast,
+                      onNavigateUp: _getStreamsFocusNode.requestFocus,
+                    ),
+                  ),
           ),
         ],
       ),
     );
 
     return BackdropDetailHero(
-      backdropUrl: backdrop,
-      contentPadding: EdgeInsets.only(
-        bottom: MediaQuery.sizeOf(context).height * 0.1,
-      ),
+      backdropUrl: _item.background,
+      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
       content: content,
     );
   }
 
-  Widget _buildNarrow(BuildContext context) {
-    final theme = Theme.of(context);
-    final backdrop = item.background;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        CompactBackdropBand(
-          height: 220,
-          backdropUrl: backdrop,
-          backdropFallback: ResilientMediaImage(
-            imageUrl: item.poster,
-            fallbackIcon: Icons.movie,
-            borderRadius: 0,
-            fallbackTitle: item.name,
-          ),
+  Widget _buildNarrow(BuildContext context, ThemeData theme) {
+    final poster = SizedBox(
+      width: 120,
+      child: AspectRatio(
+        aspectRatio: 0.68,
+        child: ResilientMediaImage(
+          imageUrl: _item.poster,
+          fallbackIcon: Icons.movie,
+          borderRadius: MediaBrowsingMetrics.cardRadius,
+          fallbackTitle: _item.name,
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: _infoColumn(context, theme, fullWidthButton: true),
-          ),
-        ),
-      ],
+      ),
+    );
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          poster,
+          const SizedBox(height: 16),
+          _infoColumn(context, theme, fullWidthButton: true, compact: true),
+        ],
+      ),
+    );
+
+    final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
+    return BackdropDetailHero(
+      backdropUrl: _item.background,
+      backdropHeight: bandHeight,
+      contentAlignment: Alignment.topLeft,
+      contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+      content: content,
     );
   }
 
@@ -263,27 +315,74 @@ class _MovieBody extends StatelessWidget {
     BuildContext context,
     ThemeData theme, {
     bool fullWidthButton = false,
+    bool compact = false,
   }) {
     final l = AppLocalizations.of(context);
-    return ItemMetaInfo(
-      name: item.name,
-      chips: [
-        if (item.year != null) item.year!,
-        if (item.imdbRating != null) '★ ${item.imdbRating}',
-        ...item.genres.take(3),
+    final richCast = _item.richCast;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ItemMetaInfo(
+          name: _item.name,
+          clearLogoUrl: _item.clearLogoUrl,
+          primaryActionFocusNode: _getStreamsFocusNode,
+          chips: [
+            if (_item.year != null) _item.year!,
+            if (_item.imdbRating != null) '★ ${_item.imdbRating}',
+            ?_runtimeChip(_item.runtime),
+            ..._item.genres.take(3),
+          ],
+          buttonLabel: l.aiostreamsGetStreams,
+          onPlay: widget.onGetStreams,
+          fullWidthButton: fullWidthButton,
+          isLoading: widget.isLoading,
+          plot: _item.description,
+          credits: [
+            if (_item.director != null)
+              MetaCreditLine(label: 'Director', value: _item.director!),
+            if (_item.writer != null)
+              MetaCreditLine(label: 'Writer', value: _item.writer!),
+            // The comma-separated `cast` string only earns a credit line when
+            // there is no rich cast row - otherwise it just repeats it.
+            if ((richCast == null || richCast.isEmpty) && _item.cast != null)
+              MetaCreditLine(label: 'Cast', value: _item.cast!),
+          ],
+        ),
+        // Wide renders the cast strip full-width below the poster (see
+        // _buildWide); narrow keeps it inline here as a compact picker chip.
+        if (compact)
+          CastRevealSlot(
+            topPadding: MediaBrowsingMetrics.contentPadding,
+            castRow: (richCast == null || richCast.isEmpty)
+                ? null
+                : CastMemberRow(
+                    members: richCast,
+                    semanticLabel: l.vodCast,
+                    compact: true,
+                    onShowAll: () => showAllCast(context, richCast),
+                    allCastSemanticLabel: l.castShowAll,
+                  ),
+          ),
       ],
-      buttonLabel: l.aiostreamsGetStreams,
-      onPlay: onGetStreams,
-      fullWidthButton: fullWidthButton,
-      isLoading: isLoading,
-      plot: item.description,
     );
   }
 }
 
+/// Renders a runtime value ("136", "136 min") as a "136m" chip, or null when
+/// there is nothing parseable.
+String? _runtimeChip(String? runtime) {
+  if (runtime == null) return null;
+  final match = RegExp(r'(\d+)').firstMatch(runtime);
+  if (match == null) return null;
+  return '${match.group(1)}m';
+}
+
 // ---------------------------------------------------------------------------
-// Series body — mirrors SeriesDetailsScreen layout
+// Series body - shares SeriesDetailsScreen's season picker + episode strip +
+// cast row (lib/shared/series_detail_widgets.dart), adapted to AIOStreams data.
 // ---------------------------------------------------------------------------
+
+const double _kAioSeriesCompactBreakpoint = 700;
 
 class _SeriesBody extends StatefulWidget {
   const _SeriesBody({
@@ -302,6 +401,13 @@ class _SeriesBody extends StatefulWidget {
 
 class _SeriesBodyState extends State<_SeriesBody> {
   int? _selectedSeason;
+  final FocusNode _seasonFocusNode = FocusNode(debugLabel: 'aioSeasonPicker');
+
+  @override
+  void dispose() {
+    _seasonFocusNode.dispose();
+    super.dispose();
+  }
 
   List<Progress> get _progressForSeries =>
       widget.appStateController?.progressList
@@ -313,33 +419,114 @@ class _SeriesBodyState extends State<_SeriesBody> {
           .toList() ??
       const [];
 
-  Map<int, List<AIOStreamsVideo>> get _episodesBySeason {
+  Map<int, List<AIOStreamsVideo>> get _videosBySeason {
     final map = <int, List<AIOStreamsVideo>>{};
     for (final v in widget.item.videos) {
       map.putIfAbsent(v.season, () => []).add(v);
     }
-    for (final episodes in map.values) {
-      episodes.sort((a, b) => a.episode.compareTo(b.episode));
+    for (final list in map.values) {
+      list.sort((a, b) => a.episode.compareTo(b.episode));
     }
     return map;
   }
 
-  List<int> get _sortedSeasons => _episodesBySeason.keys.toList()..sort();
+  /// Season numbers that either the meta's `videos` or the enriched `seasons`
+  /// array know about, low to high.
+  List<int> get _seasonNumbers {
+    final numbers = <int>{
+      ...widget.item.seasons.map((s) => s.number),
+      ..._videosBySeason.keys,
+    }.toList()..sort();
+    return numbers;
+  }
+
+  /// One [Season] record per number in [_seasonNumbers], using the enriched
+  /// poster/overview when the editor supplied it and a bare placeholder
+  /// otherwise, so [SeasonPicker] always has something to render.
+  List<Season> get _seasons => _seasonNumbers
+      .map((n) {
+        return widget.item.seasons.firstWhere(
+          (s) => s.number == n,
+          orElse: () => Season(number: n, name: 'Season $n'),
+        );
+      })
+      .toList(growable: false);
 
   int? get _resolvedSeason {
-    final seasons = _sortedSeasons;
-    if (seasons.isEmpty) return null;
-    return _selectedSeason ?? seasons.first;
+    final numbers = _seasonNumbers;
+    if (numbers.isEmpty) return null;
+    return _selectedSeason ?? numbers.first;
   }
 
-  List<AIOStreamsVideo> _episodes(int? season) =>
-      season == null ? const [] : _episodesBySeason[season] ?? const [];
+  Season? get _resolvedSeasonObj {
+    final n = _resolvedSeason;
+    if (n == null) return null;
+    return widget.item.seasons.firstWhere(
+      (s) => s.number == n,
+      orElse: () => Season(number: n, name: 'Season $n'),
+    );
+  }
 
-  void _onEpisodeTap(AIOStreamsVideo video) {
+  int _episodeCountFor(int seasonNumber) {
+    final loaded = _videosBySeason[seasonNumber]?.length ?? 0;
+    if (loaded > 0) return loaded;
+    return widget.item.seasons
+        .firstWhere(
+          (s) => s.number == seasonNumber,
+          orElse: () => const Season(number: -1, name: ''),
+        )
+        .episodeCount;
+  }
+
+  /// AIOStreams episodes for a season, mapped onto the shared [Episode] shape
+  /// the episode strip renders. `containerExtension` is irrelevant here (the
+  /// stream is chosen later in the picker sheet).
+  List<Episode> _episodesForSeason(int? seasonNumber) {
+    final videos = seasonNumber == null
+        ? const <AIOStreamsVideo>[]
+        : _videosBySeason[seasonNumber] ?? const <AIOStreamsVideo>[];
+    return videos
+        .map(
+          (v) => Episode(
+            id: v.id,
+            episodeNumber: v.episode,
+            title: v.title,
+            containerExtension: '',
+            seasonNumber: v.season,
+            plot: v.description,
+            thumbnailUrl: v.thumbnail,
+            rating: v.rating,
+            releaseDate: v.released,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// AIOStreams progress rows are keyed by season + episode number, not by a
+  /// numeric stream id, so the strip needs this instead of its default
+  /// id-based match.
+  Progress? _progressForEpisode(Episode episode) {
+    for (final p in _progressForSeries) {
+      if (p.seasonNumber == episode.seasonNumber &&
+          p.episodeNumber == episode.episodeNumber) {
+        return p;
+      }
+    }
+    return null;
+  }
+
+  void _selectEpisode(Episode episode) {
+    final video = widget.item.videos.firstWhere(
+      (v) => v.id == episode.id,
+      orElse: () => widget.item.videos.firstWhere(
+        (v) =>
+            v.season == episode.seasonNumber &&
+            v.episode == episode.episodeNumber,
+        orElse: () => throw StateError('no video for ${episode.id}'),
+      ),
+    );
     widget.onEpisodeSelected(video);
   }
-
-  static const double _wideBreakpoint = 600;
 
   @override
   Widget build(BuildContext context) {
@@ -354,601 +541,199 @@ class _SeriesBodyState extends State<_SeriesBody> {
   }
 
   Widget _buildLayout(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < _wideBreakpoint) {
-          return _buildNarrow(context);
-        }
-        return _buildWide(context);
-      },
-    );
-  }
-
-  Widget _buildWide(BuildContext context) {
-    final theme = Theme.of(context);
-    final seasons = _sortedSeasons;
-    final seasonNumber = _resolvedSeason;
-    final episodes = _episodes(seasonNumber);
     final item = widget.item;
-    final backdrop = item.background;
+    final seasons = _seasons;
+    final seasonNumber = _resolvedSeason;
+    final seasonObj = _resolvedSeasonObj;
+    final episodes = _episodesForSeason(seasonNumber);
+    final progress = _progressForSeries;
 
-    final content = Padding(
-      padding: const EdgeInsets.all(24),
-      child: Row(
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < _kAioSeriesCompactBreakpoint;
+    final posterWidth = compact ? 120.0 : 200.0;
+    final plotMaxWidth = compact ? double.infinity : screenWidth * 0.6;
+    final cardWidth = compact
+        ? kEpisodeCardWidthCompact
+        : kEpisodeCardWidthWide;
+    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
+
+    final l = AppLocalizations.of(context);
+    final richCast = item.richCast;
+    final seasonCover = seasonObj?.coverUrl;
+    final description = (seasonObj?.overview?.trim().isNotEmpty ?? false)
+        ? seasonObj!.overview!.trim()
+        : item.description;
+
+    final poster = SizedBox(
+      width: posterWidth,
+      child: AspectRatio(
+        aspectRatio: 0.68,
+        child: ResilientMediaImage(
+          key: ValueKey<String>('aio-season-$seasonNumber'),
+          imageUrl: seasonCover ?? item.poster,
+          fallbackImageUrls: <String>[
+            if (seasonCover != null && item.poster != null) item.poster!,
+            if (item.background != null) item.background!,
+          ],
+          fallbackIcon: Icons.tv,
+          borderRadius: MediaBrowsingMetrics.cardRadius,
+          fallbackTitle: item.name,
+        ),
+      ),
+    );
+
+    final chips = <String>[
+      if (seasons.isNotEmpty) '${seasons.length} ${l.seriesSeasons}',
+      if (item.imdbRating != null) '★ ${item.imdbRating}',
+      ?_runtimeChip(item.runtime),
+    ];
+
+    final meta = ItemMetaInfo(
+      name: item.name,
+      clearLogoUrl: item.clearLogoUrl,
+      chips: chips,
+      hidePrimaryAction: true,
+      buttonLabel: '',
+      onPlay: null,
+      plot: description,
+      plotMaxWidth: plotMaxWidth,
+      plotMaxLines: 4,
+      credits: [
+        if (item.director != null)
+          MetaCreditLine(label: 'Director', value: item.director!),
+        if (item.writer != null)
+          MetaCreditLine(label: 'Writer', value: item.writer!),
+        if ((richCast == null || richCast.isEmpty) && item.cast != null)
+          MetaCreditLine(label: 'Cast', value: item.cast!),
+      ],
+    );
+
+    final header = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [poster, const SizedBox(height: 16), meta],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              poster,
+              const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+              Expanded(child: meta),
+            ],
+          );
+
+    final upper = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        header,
+        const SizedBox(height: 20),
+        Wrap(
+          spacing: MediaBrowsingMetrics.itemGap,
+          runSpacing: MediaBrowsingMetrics.chipGap,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SeasonPicker(
+              seasons: seasons,
+              selectedSeason: seasonNumber,
+              canMarkWatched: false,
+              compact: compact,
+              focusNode: _seasonFocusNode,
+              episodeCountFor: _episodeCountFor,
+              fallbackPosterUrl: item.poster,
+              onSeasonSelected: (s) => setState(() => _selectedSeason = s),
+              onMarkSeason: (_) {},
+            ),
+            if (compact && richCast != null && richCast.isNotEmpty)
+              CastMemberRow(
+                members: richCast,
+                semanticLabel: l.seriesCast,
+                compact: true,
+                onShowAll: () => showAllCast(context, richCast),
+                allCastSemanticLabel: l.castShowAll,
+              ),
+          ],
+        ),
+      ],
+    );
+
+    final episodeSection = episodes.isEmpty
+        ? Align(
+            alignment: Alignment.centerLeft,
+            child: Text(l.aiostreamsNoStreams),
+          )
+        : EpisodeStrip(
+            episodes: episodes,
+            progressList: progress,
+            progressResolver: _progressForEpisode,
+            cardWidth: cardWidth,
+            horizontal: !compact,
+            onEpisodeSelected: (episode, {startPosition}) =>
+                _selectEpisode(episode),
+            onMarkEpisode: (_, {required watched}) {},
+          );
+
+    if (compact) {
+      final content = Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: MediaBrowsingMetrics.pagePadding,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [upper, const SizedBox(height: 12), episodeSection],
+        ),
+      );
+      final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
+      return BackdropDetailHero(
+        backdropUrl: item.background,
+        backdropHeight: bandHeight,
+        contentAlignment: Alignment.topLeft,
+        contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+        content: content,
+      );
+    }
+
+    final wideContent = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: MediaBrowsingMetrics.pagePadding,
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 220,
-            child: AspectRatio(
-              aspectRatio: 0.68,
-              child: ResilientMediaImage(
-                imageUrl: item.poster,
-                fallbackIcon: Icons.tv,
-                borderRadius: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 32),
+          upper,
+          const SizedBox(height: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: theme.textTheme.headlineMedium),
-                if (item.imdbRating != null) ...[
-                  const SizedBox(height: 8),
-                  Chip(
-                    label: Text('★ ${item.imdbRating}'),
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    side: BorderSide(color: theme.colorScheme.outlineVariant),
-                  ),
-                ],
-                if (item.description != null &&
-                    item.description!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    item.description!,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+            child: RowScrollRegion(
+              onExitTop: _seasonFocusNode.requestFocus,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: stripHeight, child: episodeSection),
+                  if (richCast != null && richCast.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      l.seriesCast,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    CastRow(members: richCast),
+                  ],
                 ],
-                const SizedBox(height: 20),
-                if (seasons.isNotEmpty)
-                  _AIOSeasonChips(
-                    seasons: seasons,
-                    selectedSeason: seasonNumber,
-                    onSeasonSelected: (s) =>
-                        setState(() => _selectedSeason = s),
-                  ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: episodes.isEmpty
-                      ? Center(
-                          child: Text(
-                            AppLocalizations.of(context).aiostreamsNoStreams,
-                          ),
-                        )
-                      : _AIOEpisodeList(
-                          episodes: episodes,
-                          progressList: _progressForSeries,
-                          itemId: widget.item.id,
-                          onEpisodeSelected: _onEpisodeTap,
-                        ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
       ),
     );
 
-    if (backdrop == null) return content;
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Align(
-          alignment: Alignment.topRight,
-          child: FractionallySizedBox(
-            widthFactor: 0.7,
-            heightFactor: 0.4,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CachedBackdropImage(backdrop),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerRight,
-                        end: Alignment.centerLeft,
-                        colors: [
-                          Colors.transparent,
-                          theme.colorScheme.surface,
-                        ],
-                        stops: const [0.1, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          theme.colorScheme.surface,
-                        ],
-                        stops: const [0.1, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        content,
-      ],
-    );
-  }
-
-  Widget _buildNarrow(BuildContext context) {
-    final theme = Theme.of(context);
-    final seasons = _sortedSeasons;
-    final seasonNumber = _resolvedSeason;
-    final episodes = _episodes(seasonNumber);
-    final item = widget.item;
-    final backdrop = item.background;
-
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Stack(
-            children: [
-              if (backdrop != null)
-                SizedBox(
-                  height: 200,
-                  width: double.infinity,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedBackdropImage(backdrop),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                theme.colorScheme.surface,
-                              ],
-                              stops: const [0.4, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Padding(
-                padding: EdgeInsets.only(
-                  top: backdrop != null ? 120 : 16,
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: ResilientMediaImage(
-                        imageUrl: item.poster,
-                        fallbackIcon: Icons.tv,
-                        width: 100,
-                        height: 148,
-                        borderRadius: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            item.name,
-                            style: theme.textTheme.titleLarge,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (item.imdbRating != null) ...[
-                            const SizedBox(height: 4),
-                            Chip(
-                              label: Text('★ ${item.imdbRating}'),
-                              backgroundColor:
-                                  theme.colorScheme.surfaceContainerHighest,
-                              side: BorderSide(
-                                color: theme.colorScheme.outlineVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (item.description != null && item.description!.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                item.description!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: _AIOSeasonChips(
-              seasons: seasons,
-              selectedSeason: seasonNumber,
-              onSeasonSelected: (s) => setState(() => _selectedSeason = s),
-            ),
-          ),
-        ),
-        if (episodes.isEmpty)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: Text('No episodes available')),
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            sliver: SliverList.separated(
-              itemCount: episodes.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final ep = episodes[index];
-                final progress = _progressForSeries
-                    .where(
-                      (p) =>
-                          p.aioItemId == widget.item.id &&
-                          p.seasonNumber == ep.season &&
-                          p.episodeNumber == ep.episode,
-                    )
-                    .firstOrNull;
-                return _AIOEpisodeTile(
-                  video: ep,
-                  progress: progress,
-                  autofocus: index == 0,
-                  onTap: () => _onEpisodeTap(ep),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Season chip row — mirrors _SeasonChips from series_details_screen.dart
-// ---------------------------------------------------------------------------
-
-class _AIOSeasonChips extends StatefulWidget {
-  const _AIOSeasonChips({
-    required this.seasons,
-    required this.selectedSeason,
-    required this.onSeasonSelected,
-  });
-
-  final List<int> seasons;
-  final int? selectedSeason;
-  final ValueChanged<int> onSeasonSelected;
-
-  @override
-  State<_AIOSeasonChips> createState() => _AIOSeasonChipsState();
-}
-
-class _AIOSeasonChipsState extends State<_AIOSeasonChips> {
-  final ScrollController _controller = ScrollController();
-
-  void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent || !_controller.hasClients) return;
-    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
-        ? event.scrollDelta.dx
-        : event.scrollDelta.dy;
-    if (delta == 0) return;
-    final position = _controller.position;
-    _controller.jumpTo(
-      (_controller.offset + delta).clamp(
-        position.minScrollExtent,
-        position.maxScrollExtent,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.seasons.isEmpty) return const SizedBox.shrink();
-    final l = AppLocalizations.of(context);
-    return Listener(
-      onPointerSignal: _handlePointerSignal,
-      child: Scrollbar(
-        controller: _controller,
-        child: SingleChildScrollView(
-          controller: _controller,
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: widget.seasons
-                .map(
-                  (season) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: CategoryFilterChip(
-                      label: l.homeSeason(season),
-                      isSelected: season == widget.selectedSeason,
-                      onTap: () => widget.onSeasonSelected(season),
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Episode list — scrollable wrapper for wide layout
-// ---------------------------------------------------------------------------
-
-class _AIOEpisodeList extends StatelessWidget {
-  const _AIOEpisodeList({
-    required this.episodes,
-    required this.onEpisodeSelected,
-    this.progressList = const [],
-    this.itemId,
-  });
-
-  final List<AIOStreamsVideo> episodes;
-  final ValueChanged<AIOStreamsVideo> onEpisodeSelected;
-  final List<Progress> progressList;
-  final String? itemId;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: episodes.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final ep = episodes[index];
-        final progress = progressList
-            .where(
-              (p) =>
-                  p.aioItemId == itemId &&
-                  p.seasonNumber == ep.season &&
-                  p.episodeNumber == ep.episode,
-            )
-            .firstOrNull;
-        return _AIOEpisodeTile(
-          video: ep,
-          progress: progress,
-          autofocus: index == 0,
-          onTap: () => onEpisodeSelected(ep),
-        );
-      },
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Episode tile — mirrors _EpisodeTile without progress bar
-// ---------------------------------------------------------------------------
-
-class _AIOEpisodeTile extends StatefulWidget {
-  const _AIOEpisodeTile({
-    required this.video,
-    required this.autofocus,
-    required this.onTap,
-    this.progress,
-  });
-
-  final AIOStreamsVideo video;
-  final bool autofocus;
-  final VoidCallback onTap;
-  final Progress? progress;
-
-  @override
-  State<_AIOEpisodeTile> createState() => _AIOEpisodeTileState();
-}
-
-class _AIOEpisodeTileState extends State<_AIOEpisodeTile> {
-  final FocusNode _focusNode = FocusNode();
-  bool _hovered = false;
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _setHovered(bool v) {
-    if (_hovered == v) return;
-    setState(() => _hovered = v);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final video = widget.video;
-    final p = widget.progress;
-    final progressValue =
-        p != null && p.durationSeconds != null && p.durationSeconds! > 0
-        ? (p.positionSeconds / p.durationSeconds!).clamp(0.0, 1.0)
-        : null;
-
-    final tile = MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: DpadFocusable(
-        autofocus: widget.autofocus,
-        focusNode: _focusNode,
-        onSelect: widget.onTap,
-        builder: (context, state, child) => DpadEffect.wrap(
-          context,
-          const [
-            GradientBorderEffect(
-              borderRadius: BorderRadius.all(Radius.circular(16)),
-            ),
-          ],
-          DpadFocusState(
-            focused: state.focused || _hovered,
-            pressed: state.pressed,
-          ),
-          child,
-        ),
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              _focusNode.requestFocus();
-              widget.onTap();
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: SizedBox(
-                      width: 120,
-                      height: 68,
-                      child: video.thumbnail != null
-                          ? CachedMediaThumbnail(
-                              url: video.thumbnail!,
-                              width: 120,
-                              height: 68,
-                              fit: BoxFit.cover,
-                              fallback: _episodeNumberBadge(colorScheme),
-                            )
-                          : _episodeNumberBadge(colorScheme),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text.rich(
-                                TextSpan(
-                                  style: theme.textTheme.titleSmall,
-                                  children: [
-                                    TextSpan(
-                                      text: 'E${video.episode} · ',
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                    TextSpan(text: video.title),
-                                  ],
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.play_arrow, size: 20),
-                          ],
-                        ),
-                        if (video.released != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            video.released!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                        if (video.description != null &&
-                            video.description!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            video.description!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (progressValue == null) return tile;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        tile,
-        LinearProgressIndicator(
-          value: progressValue,
-          minHeight: 3,
-          backgroundColor: colorScheme.surfaceContainerHighest,
-          valueColor: AlwaysStoppedAnimation(colorScheme.primary),
-        ),
-      ],
-    );
-  }
-
-  Widget _episodeNumberBadge(ColorScheme colorScheme) {
-    return ColoredBox(
-      color: colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Text(
-          'E${widget.video.episode}',
-          style: TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-      ),
+    return BackdropDetailHero(
+      backdropUrl: item.background,
+      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
+      content: wideContent,
     );
   }
 }

@@ -977,6 +977,7 @@ class _ChannelCell extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        oversample: 2,
         fallback: Icon(Icons.tv, size: size - 4),
       );
     }

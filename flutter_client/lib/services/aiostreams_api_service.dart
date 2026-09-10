@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:m3u_tv/services/domain_models.dart' show CastMember, Season;
 import 'package:m3u_tv/services/xtream_service.dart';
 
 /// A stream option returned by AIOStreams for a given IMDb/TMDB content ID.
@@ -42,6 +43,7 @@ class AIOStreamsVideo {
     this.thumbnail,
     this.description,
     this.released,
+    this.rating,
   });
 
   factory AIOStreamsVideo.fromJson(Map<String, dynamic> json) =>
@@ -56,7 +58,8 @@ class AIOStreamsVideo {
             : (json['description'] is String
                   ? json['description'] as String
                   : null),
-        released: json['released'] as String?,
+        released: json['released'] as String? ?? json['firstAired'] as String?,
+        rating: _parseDouble(json['rating']),
       );
 
   final String id;
@@ -66,6 +69,9 @@ class AIOStreamsVideo {
   final String? thumbnail;
   final String? description;
   final String? released;
+
+  /// Episode rating (0-10), when the Stremio meta addon supplies one.
+  final double? rating;
 }
 
 /// A catalog item (movie or series) from AIOStreams.
@@ -81,6 +87,13 @@ class AIOStreamsItem {
     this.imdbRating,
     this.genres = const <String>[],
     this.videos = const <AIOStreamsVideo>[],
+    this.clearLogoUrl,
+    this.cast,
+    this.richCast,
+    this.director,
+    this.writer,
+    this.runtime,
+    this.seasons = const <Season>[],
   });
 
   factory AIOStreamsItem.fromJson(Map<String, dynamic> json) {
@@ -96,6 +109,13 @@ class AIOStreamsItem {
               .where((v) => v.id.isNotEmpty && v.season > 0)
               .toList(growable: false)
         : <AIOStreamsVideo>[];
+    final rawSeasons = json['seasons'];
+    final seasons = rawSeasons is List
+        ? rawSeasons
+              .whereType<Map<String, dynamic>>()
+              .map((s) => Season.fromXtream(s.cast<String, Object?>()))
+              .toList(growable: false)
+        : const <Season>[];
     return AIOStreamsItem(
       id: '${json['id'] ?? ''}',
       type: '${json['type'] ?? ''}',
@@ -107,6 +127,15 @@ class AIOStreamsItem {
       imdbRating: json['imdbRating'] as String?,
       genres: genres,
       videos: videos,
+      // Transparent title logo. The editor's TMDB-enrichment proxy adds
+      // `clearlogo`; a plain Stremio/Cinemeta meta only carries `logo`.
+      clearLogoUrl: json['clearlogo'] as String? ?? json['logo'] as String?,
+      cast: _joinNames(json['cast']),
+      richCast: _parseCastList(json['cast_list']),
+      director: _joinNames(json['director']),
+      writer: _joinNames(json['writer']),
+      runtime: json['runtime'] == null ? null : '${json['runtime']}',
+      seasons: seasons,
     );
   }
 
@@ -120,6 +149,27 @@ class AIOStreamsItem {
   final String? imdbRating;
   final List<String> genres;
   final List<AIOStreamsVideo> videos;
+
+  /// Transparent title logo (`clearlogo`, falling back to Stremio `logo`).
+  final String? clearLogoUrl;
+
+  /// Comma-joined cast names from the Stremio `cast` array - the display-only
+  /// fallback shown when [richCast] is absent.
+  final String? cast;
+
+  /// Structured cast ({id, name, character, photo}) from the editor's
+  /// TMDB-enriched `cast_list`. Null on a plain Stremio meta.
+  final List<CastMember>? richCast;
+  final String? director;
+  final String? writer;
+
+  /// Runtime as supplied by the meta addon (e.g. "136 min" or a bare minute
+  /// count), rendered verbatim as a chip / credit line.
+  final String? runtime;
+
+  /// Season poster / overview metadata from the editor's TMDB enrichment,
+  /// keyed by season number at the call site. Empty on a plain Stremio meta.
+  final List<Season> seasons;
 }
 
 int? _parseInt(dynamic value) {
@@ -127,6 +177,40 @@ int? _parseInt(dynamic value) {
   if (value is double) return value.toInt();
   if (value is String) return int.tryParse(value);
   return null;
+}
+
+double? _parseDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
+/// Flattens a Stremio credit field - which may be a single string, a list of
+/// name strings, or a list of `{name: ...}` objects - into one comma-joined
+/// string, or null when empty.
+String? _joinNames(dynamic value) {
+  if (value == null) return null;
+  final list = value is List ? value : [value];
+  final names = list
+      .map((e) {
+        if (e is Map) return '${e['name'] ?? ''}'.trim();
+        return '$e'.trim();
+      })
+      .where((s) => s.isNotEmpty)
+      .toList(growable: false);
+  return names.isEmpty ? null : names.join(', ');
+}
+
+/// Parses the editor's `cast_list` payload into [CastMember]s. Mirrors the
+/// private reader in domain_models.dart (kept local so that file's helper can
+/// stay private).
+List<CastMember>? _parseCastList(dynamic raw) {
+  if (raw is! List) return null;
+  final parsed = raw
+      .map(CastMember.fromXtream)
+      .whereType<CastMember>()
+      .toList(growable: false);
+  return parsed.isEmpty ? null : parsed;
 }
 
 const _kCacheTtl = Duration(minutes: 10);
