@@ -211,7 +211,6 @@ class PlaybackOrchestrator {
             backend: _nativeBackends().first,
             message: rejection,
             code: 'stream_rejected',
-            recoverable: false,
           ),
         );
         return;

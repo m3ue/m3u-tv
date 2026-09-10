@@ -1401,7 +1401,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _handleBack() {
     if (_trackDialogVisible) {
-      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      Navigator.of(context, rootNavigator: true).maybePop();
       return;
     }
     if (_liveEndHold) {
@@ -1622,9 +1622,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                     ),
                               ),
                               const SizedBox(height: 8),
-                              Text(
+                              const Text(
                                 'Returning to the menu…',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Colors.white70,
                                   fontSize: 14,
                                 ),

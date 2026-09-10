@@ -1738,7 +1738,7 @@ class AppStateController extends ChangeNotifier {
         await _markFavoritesMigrated(viewer.ulid, isCurrent: isCurrent);
         return isCurrent();
       }
-      return _pullFavorites(viewer, isCurrent: isCurrent);
+      return await _pullFavorites(viewer, isCurrent: isCurrent);
     } on Object catch (error) {
       debugPrint('Favorites: sync failed for viewer ${viewer.ulid}: $error');
       return false;

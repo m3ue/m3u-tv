@@ -88,7 +88,7 @@ enum OptimizeFor {
 
 /// Base font size multiplier for the UI.
 enum AppFontSize {
-  normal('normal', 1.0),
+  normal('normal', 1),
   large('large', 1.2),
   veryLarge('veryLarge', 1.5);
 

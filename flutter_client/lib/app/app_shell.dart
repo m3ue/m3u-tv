@@ -751,7 +751,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   bool _handleShortcutBack() {
     if (_playerModalDialogVisible) {
-      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      Navigator.of(context, rootNavigator: true).maybePop();
       return true;
     }
     return _handleBackPress();
@@ -825,7 +825,7 @@ class AppShellState extends ConsumerState<AppShell>
     // it in-progress, show the stop options instead of "being scheduled".
     if (_appState.recordingChannelIds.contains(channel.id)) {
       await _appState.refreshDvrRecordings();
-      if (!context.mounted) return;
+      if (!mounted) return;
       final refreshed = _appState.dvrRecordings.firstWhereOrNull(
         (r) => r.channelId == channel.id && r.isInProgress,
       );
@@ -838,7 +838,7 @@ class AppShellState extends ConsumerState<AppShell>
     // update) while the full recording object hasn't landed in
     // dvrRecordings yet — don't try to schedule a duplicate.
     if (_appState.recordingChannelIds.contains(channel.id)) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context).appRecordingScheduling),
@@ -2204,7 +2204,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
       foregroundColor = colorScheme.onSurface;
     }
 
-    final hPad = 12.0;
+    const hPad = 12.0;
     const itemHeight = 48.0;
     return MouseRegion(
       onEnter: (_) => _setHovered(true),
