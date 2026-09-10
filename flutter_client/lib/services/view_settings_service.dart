@@ -80,11 +80,10 @@ enum OptimizeFor {
   const OptimizeFor(this.value);
   final String value;
 
-  static OptimizeFor fromValue(String? value) =>
-      OptimizeFor.values.firstWhere(
-        (opt) => opt.value == value,
-        orElse: () => OptimizeFor.quality,
-      );
+  static OptimizeFor fromValue(String? value) => OptimizeFor.values.firstWhere(
+    (opt) => opt.value == value,
+    orElse: () => OptimizeFor.quality,
+  );
 }
 
 /// Base font size multiplier for the UI.
@@ -258,7 +257,9 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<AppFontSize> fontSize() async {
     final raw = await _read(fontSizeKey);
-    debugPrint('VIEW_SETTINGS: fontSize read raw="$raw" → ${AppFontSize.fromValue(raw as String?)}');
+    debugPrint(
+      'VIEW_SETTINGS: fontSize read raw="$raw" → ${AppFontSize.fromValue(raw as String?)}',
+    );
     return AppFontSize.fromValue(raw);
   }
 
@@ -268,7 +269,9 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setFontSize(AppFontSize value) async {
     await _write(fontSizeKey, value.value);
-    debugPrint('VIEW_SETTINGS: setFontSize wrote ${value.value} → memory=${_memory[fontSizeKey]}');
+    debugPrint(
+      'VIEW_SETTINGS: setFontSize wrote ${value.value} → memory=${_memory[fontSizeKey]}',
+    );
     notifyListeners();
   }
 
@@ -282,7 +285,9 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> _write(String key, Object? value) async {
     _memory[key] = value;
-    debugPrint('VIEW_SETTINGS: _write key="$key" value="$value" store=${store != null ? "present" : "NULL"}');
+    debugPrint(
+      'VIEW_SETTINGS: _write key="$key" value="$value" store=${store != null ? "present" : "NULL"}',
+    );
     await store?.write(key, value);
   }
 }

@@ -927,7 +927,9 @@ class AppStateController extends ChangeNotifier {
     if (credentials == null) return const [];
     try {
       final (_, unread) = await _tvNotificationService.fetchUnread(credentials);
-      debugPrint('DVR-DEBUG: stream-end fetch returned ${unread.length} unread');
+      debugPrint(
+        'DVR-DEBUG: stream-end fetch returned ${unread.length} unread',
+      );
       return unread;
     } on Object catch (error) {
       debugPrint('DVR-DEBUG: fetch unread after stream end failed: $error');
@@ -2153,9 +2155,11 @@ class AppStateController extends ChangeNotifier {
       // processing), keep the optimistic placeholder so the stop dialog
       // can find it.
       final foundInServer = recordings.any(
-        (r) => r.channelId == channelId &&
+        (r) =>
+            r.channelId == channelId &&
             r.scheduledStart != null &&
-            startTime.difference(r.scheduledStart!).abs() <= const Duration(minutes: 1),
+            startTime.difference(r.scheduledStart!).abs() <=
+                const Duration(minutes: 1),
       );
       debugPrint(
         'DVR-DEBUG: post-schedule refresh foundInServer=$foundInServer '
@@ -2164,7 +2168,10 @@ class AppStateController extends ChangeNotifier {
       _dvrRecordings = foundInServer
           ? recordings
           : [...recordings, placeholder];
-      _recordingChannelIds = {..._extractRecordingChannelIds(_dvrRecordings), channelId};
+      _recordingChannelIds = {
+        ..._extractRecordingChannelIds(_dvrRecordings),
+        channelId,
+      };
     } on Object catch (error, stackTrace) {
       if (!ownsWork()) return null;
       debugPrint('DVR: refresh after schedule failed: $error');

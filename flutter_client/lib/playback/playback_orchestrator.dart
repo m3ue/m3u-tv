@@ -58,10 +58,13 @@ class PlaybackOrchestrator {
   static Future<String?> _fetchStreamError(String url) async {
     try {
       final uri = Uri.parse(url);
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
       try {
         final request = await client.getUrl(uri);
-        final response = await request.close().timeout(const Duration(seconds: 5));
+        final response = await request.close().timeout(
+          const Duration(seconds: 5),
+        );
         final body = await response.transform(utf8.decoder).join();
         client.close();
         // Server returns JSON like {"message": "...", "status": 503}
@@ -90,8 +93,9 @@ class PlaybackOrchestrator {
       try {
         final request = await client.getUrl(uri);
         request.followRedirects = false;
-        final response =
-            await request.close().timeout(const Duration(seconds: 4));
+        final response = await request.close().timeout(
+          const Duration(seconds: 4),
+        );
         if (response.statusCode < 400) {
           client.close();
           return null;

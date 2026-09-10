@@ -247,8 +247,9 @@ class _MyAppState extends State<MyApp> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.appState != widget.appState) {
       oldWidget.appState?.removeListener(_onAppStateChanged);
-      oldWidget.appState?.viewSettingsService
-          .removeListener(_onAppStateChanged);
+      oldWidget.appState?.viewSettingsService.removeListener(
+        _onAppStateChanged,
+      );
       widget.appState?.addListener(_onAppStateChanged);
       widget.appState?.viewSettingsService.addListener(_onAppStateChanged);
     }
@@ -265,12 +266,10 @@ class _MyAppState extends State<MyApp> {
     // Update the image cache cap whenever the optimize-for setting changes.
     final optimizeFor = widget.appState?.viewSettingsService.optimizeForSync;
     if (optimizeFor == OptimizeFor.speed) {
-      PaintingBinding.instance.imageCache.maximumSizeBytes =
-          50 * 1024 * 1024;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
       PaintingBinding.instance.imageCache.maximumSize = 200;
     } else {
-      PaintingBinding.instance.imageCache.maximumSizeBytes =
-          100 * 1024 * 1024;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
       PaintingBinding.instance.imageCache.maximumSize = 1000;
     }
     // Clear cached images so they re-decode at the new oversample/filter
@@ -305,7 +304,8 @@ class _MyAppState extends State<MyApp> {
         );
         final isTvOrDesktop = shouldUseSidebar(deviceType);
         final viewSettings = widget.appState?.viewSettingsService;
-        final optimizeFor = viewSettings?.optimizeForSync ?? OptimizeFor.quality;
+        final optimizeFor =
+            viewSettings?.optimizeForSync ?? OptimizeFor.quality;
         final fontSize = viewSettings?.fontSizeSync ?? AppFontSize.normal;
         final routerChild = child ?? const SizedBox.shrink();
         return Dpad(

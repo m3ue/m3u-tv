@@ -674,13 +674,15 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                               // Request this row plus a look-ahead window so a
                               // downward scroll hits loaded EPG. The call is
                               // debounced and de-duped downstream.
-                              final isSpeed = ImageQualityScope.of(
+                              final isSpeed =
+                                  ImageQualityScope.of(
                                     context,
                                   )?.optimizeFor ==
                                   OptimizeFor.speed;
                               final prefetchEnd = math.min(
                                 widget.channels.length,
-                                i + 1 +
+                                i +
+                                    1 +
                                     (isSpeed
                                         ? _kEpgPrefetchAheadSpeed
                                         : _kEpgPrefetchAheadQuality),
@@ -898,7 +900,10 @@ class _DayControls extends StatelessWidget {
                   Localizations.localeOf(context).toLanguageTag(),
                 ).format(selectedDate),
                 textAlign: TextAlign.center,
-                style: _epgStyle(context, Theme.of(context).textTheme.labelMedium),
+                style: _epgStyle(
+                  context,
+                  Theme.of(context).textTheme.labelMedium,
+                ),
               ),
             ),
           ),

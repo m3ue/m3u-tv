@@ -338,7 +338,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.didUpdateWidget(oldWidget);
     // Trigger a rebuild so PlaybackControls shows the correct record/stop icon
     // whenever the recording state changes.
-    if (oldWidget.isRecordingCurrentChannel != widget.isRecordingCurrentChannel) {
+    if (oldWidget.isRecordingCurrentChannel !=
+        widget.isRecordingCurrentChannel) {
       if (mounted) setState(() {});
     }
     if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;

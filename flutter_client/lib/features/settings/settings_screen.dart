@@ -2332,8 +2332,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                 _IntervalChip(
                   label: l.settingsOptimizeForSpeed,
                   isSelected: _optimizeFor == OptimizeFor.speed,
-                  onTap: () =>
-                      widget.service.setOptimizeFor(OptimizeFor.speed),
+                  onTap: () => widget.service.setOptimizeFor(OptimizeFor.speed),
                 ),
               ],
             ),

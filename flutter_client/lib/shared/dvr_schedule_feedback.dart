@@ -13,7 +13,9 @@ String _userFacingMessage(Object error) {
   }
   final text = error.toString();
   // Strip "Xtream HTTP ..." prefix if present
-  final match = RegExp(r'Xtream HTTP \d+\w* for \w+ \S+:\s*(.+)').firstMatch(text);
+  final match = RegExp(
+    r'Xtream HTTP \d+\w* for \w+ \S+:\s*(.+)',
+  ).firstMatch(text);
   if (match != null) return match.group(1)!;
   return text;
 }

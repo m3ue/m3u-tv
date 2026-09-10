@@ -77,12 +77,10 @@ class FontSizeScope extends InheritedWidget {
 
   /// Returns the font size scale from the nearest [FontSizeScope].
   /// Falls back to 1.0 (normal) if no scope is found.
-  static double scaleOf(BuildContext context) =>
-      of(context)?.scale ?? 1.0;
+  static double scaleOf(BuildContext context) => of(context)?.scale ?? 1.0;
 
   /// Returns whether large font size is active.
-  static bool isLargeOf(BuildContext context) =>
-      of(context)?.isLarge ?? false;
+  static bool isLargeOf(BuildContext context) => of(context)?.isLarge ?? false;
 
   @override
   bool updateShouldNotify(FontSizeScope oldWidget) =>
