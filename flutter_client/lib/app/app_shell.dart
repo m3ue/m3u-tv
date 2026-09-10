@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -138,8 +139,32 @@ class AppShellState extends ConsumerState<AppShell>
   late final SystemUiPolicy _systemUiPolicy;
   int _unreadCount = 0;
 
+  // Snapshot of the sidebar/bottom-nav destinations last painted. The visible
+  // set grows after boot as gated features resolve (AIOStreams integrations
+  // load, DVR/Requests capability comes back from player_api) - each flips an
+  // `_appState` flag and fires `_onAppStateChanged`, but nothing else rebuilds
+  // AppShell (`build` only watches `isConfiguredProvider`). Without an explicit
+  // diff here the new destinations don't appear until some unrelated setState
+  // (a focus/hover on the sidebar) repaints it, which is the "nav items pop in
+  // late" behavior.
+  List<String> _visibleRoutes = const <String>[];
+
   DateTime? _lastBackPress;
   Timer? _backExitTimer;
+
+  // A single hardware Back on Android TV is delivered twice: once as a
+  // LogicalKeyboardKey.goBack key event (-> _handleShortcutBack) and once as
+  // the platform popRoute message (-> _handleSystemBack). The first pops the
+  // current detail route; without this guard the near-simultaneous echo from
+  // the other path then falls through _handleBackPress to _activateSidebar.
+  // Desktop only ever delivers the key-event path (there is no
+  // BackButtonListener/popRoute for a desktop Escape), which is why it was
+  // never affected. Only a back from the *other* delivery path within this
+  // window is treated as an echo - two backs from the same path are a genuine
+  // rapid double-press (e.g. double-back-to-exit) and are always handled.
+  static const Duration _backEchoWindow = Duration(milliseconds: 250);
+  _BackSource? _lastBackSource;
+  int _lastBackHandledMs = 0;
 
   // TV-only: when the app returns to the foreground after having been
   // backgrounded for at least this long, navigate back to the user's
@@ -230,6 +255,7 @@ class AppShellState extends ConsumerState<AppShell>
     if (!_appState.isConfigured) {
       unawaited(_appState.boot());
     }
+    _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
   }
 
@@ -246,7 +272,23 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  // True when this Back is the echo of one just handled from the other
+  // delivery path (see `_backEchoWindow`). Called from both back entry points
+  // so the guard also covers their player-modal-dismiss branches, not just
+  // `_handleBackPress`.
+  bool _isBackEcho(_BackSource source) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final isEcho =
+        _lastBackSource != null &&
+        _lastBackSource != source &&
+        nowMs - _lastBackHandledMs < _backEchoWindow.inMilliseconds;
+    _lastBackSource = source;
+    _lastBackHandledMs = nowMs;
+    return isEcho;
+  }
+
   Future<bool> _handleSystemBack() async {
+    if (_isBackEcho(_BackSource.system)) return true;
     if (_playerModalDialogVisible) {
       final popped = await Navigator.of(
         context,
@@ -288,14 +330,19 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _onAppStateChanged() {
     if (!mounted) return;
-    _syncSidebarFocusNodes();
+    final newRoutes = _mainRoutes;
+    _syncSidebarFocusNodes(newRoutes);
     final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
-    if (!_mainRoutes.contains(route)) {
+    if (!newRoutes.contains(route)) {
       widget.navigationShell.goBranch(0, initialLocation: true);
     }
     final newCount = _appState.unreadNotificationCount;
-    if (_unreadCount != newCount) {
-      setState(() => _unreadCount = newCount);
+    final routesChanged = !listEquals(_visibleRoutes, newRoutes);
+    if (routesChanged || _unreadCount != newCount) {
+      setState(() {
+        _visibleRoutes = newRoutes;
+        _unreadCount = newCount;
+      });
     }
   }
 
@@ -726,6 +773,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   bool _handleShortcutBack() {
+    if (_isBackEcho(_BackSource.shortcut)) return true;
     if (_playerModalDialogVisible) {
       unawaited(Navigator.of(context, rootNavigator: true).maybePop());
       return true;
@@ -2546,6 +2594,11 @@ extension _FirstWhereOrNull<T> on Iterable<T> {
     return null;
   }
 }
+
+// Which of AppShell's two Back delivery paths a press arrived on, so a
+// key-event Back and the platform popRoute it pairs with on Android TV are
+// collapsed to one action. See AppShellState._isBackEcho.
+enum _BackSource { shortcut, system }
 
 // --- Intent and Action classes for keyboard shortcuts ---
 
