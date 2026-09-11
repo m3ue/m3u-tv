@@ -335,11 +335,9 @@ class AppShellState extends ConsumerState<AppShell>
           if (!mounted) return evictionMessage;
           unawaited(_desktopNotificationDispatcher.dispatch(item));
         }
-        debugPrint('DVR-DEBUG: stream-end eviction message: $evictionMessage');
         return evictionMessage;
-      } on Object catch (error) {
-        debugPrint('DVR-DEBUG: stream-end notification fetch failed: $error');
-        // The notification endpoint is rate-limited (429) — retry after a
+      } on Object {
+        // The notification endpoint is rate-limited (429) - retry after a
         // brief delay while the player is still holding on screen.
         if (attempt < 2) {
           await Future<void>.delayed(const Duration(seconds: 2));
@@ -751,7 +749,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   bool _handleShortcutBack() {
     if (_playerModalDialogVisible) {
-      Navigator.of(context, rootNavigator: true).maybePop();
+      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
       return true;
     }
     return _handleBackPress();
@@ -821,7 +819,7 @@ class AppShellState extends ConsumerState<AppShell>
     }
     // The channel's red dot may be showing from a stale or optimistic state
     // while the full recording row hasn't landed locally (missed push, poll
-    // not yet ticked). Fetch the authoritative list once — if the server has
+    // not yet ticked). Fetch the authoritative list once - if the server has
     // it in-progress, show the stop options instead of "being scheduled".
     if (_appState.recordingChannelIds.contains(channel.id)) {
       await _appState.refreshDvrRecordings();
@@ -836,7 +834,7 @@ class AppShellState extends ConsumerState<AppShell>
     }
     // The channel may already be in recordingChannelIds (optimistic
     // update) while the full recording object hasn't landed in
-    // dvrRecordings yet — don't try to schedule a duplicate.
+    // dvrRecordings yet - don't try to schedule a duplicate.
     if (_appState.recordingChannelIds.contains(channel.id)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2240,7 +2238,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
             children: [
               Container(
                 height: itemHeight,
-                padding: EdgeInsets.symmetric(horizontal: hPad),
+                padding: const EdgeInsets.symmetric(horizontal: hPad),
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
@@ -2261,7 +2259,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                         ),
                       ),
                       if (widget.expanded) ...[
-                        SizedBox(width: hPad),
+                        const SizedBox(width: hPad),
                         Flexible(
                           child: Text(
                             widget.label,

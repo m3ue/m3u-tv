@@ -257,10 +257,7 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<AppFontSize> fontSize() async {
     final raw = await _read(fontSizeKey);
-    debugPrint(
-      'VIEW_SETTINGS: fontSize read raw="$raw" → ${AppFontSize.fromValue(raw as String?)}',
-    );
-    return AppFontSize.fromValue(raw);
+    return AppFontSize.fromValue(raw as String?);
   }
 
   /// Synchronous access to the in-memory cached font size setting.
@@ -269,9 +266,6 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setFontSize(AppFontSize value) async {
     await _write(fontSizeKey, value.value);
-    debugPrint(
-      'VIEW_SETTINGS: setFontSize wrote ${value.value} → memory=${_memory[fontSizeKey]}',
-    );
     notifyListeners();
   }
 
@@ -285,9 +279,6 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> _write(String key, Object? value) async {
     _memory[key] = value;
-    debugPrint(
-      'VIEW_SETTINGS: _write key="$key" value="$value" store=${store != null ? "present" : "NULL"}',
-    );
     await store?.write(key, value);
   }
 }

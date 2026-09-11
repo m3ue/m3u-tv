@@ -51,7 +51,7 @@ Future<void> main() async {
   }
   // Pre-load persisted view settings into the in-memory cache so the
   // synchronous getters (fontSizeSync, optimizeForSync) return the correct
-  // values on the very first build — without this, fontSizeSync defaults to
+  // values on the very first build - without this, fontSizeSync defaults to
   // AppFontSize.normal and the user's saved choice is ignored until the
   // settings screen opens and triggers an async refresh.
   await appState.viewSettingsService.fontSize();
@@ -234,6 +234,7 @@ class _MyAppState extends State<MyApp> {
     systemUiPolicy: widget.systemUiPolicy,
     initialLocation: widget.initialLocation,
   );
+  OptimizeFor? _lastOptimizeFor;
 
   @override
   void initState() {
@@ -263,18 +264,25 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _onAppStateChanged() {
-    // Update the image cache cap whenever the optimize-for setting changes.
+    // Update the image cache cap only when the optimize-for setting actually
+    // changes -- this listener also fires on unrelated AppStateController
+    // notifications (e.g. the 30s DVR poll), and clearing the cache on every
+    // one of those would force live logos/posters to re-decode constantly.
     final optimizeFor = widget.appState?.viewSettingsService.optimizeForSync;
-    if (optimizeFor == OptimizeFor.speed) {
-      PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
-      PaintingBinding.instance.imageCache.maximumSize = 200;
-    } else {
-      PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
-      PaintingBinding.instance.imageCache.maximumSize = 1000;
+    if (optimizeFor != _lastOptimizeFor) {
+      _lastOptimizeFor = optimizeFor;
+      if (optimizeFor == OptimizeFor.speed) {
+        PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
+        PaintingBinding.instance.imageCache.maximumSize = 200;
+      } else {
+        PaintingBinding.instance.imageCache.maximumSizeBytes =
+            100 * 1024 * 1024;
+        PaintingBinding.instance.imageCache.maximumSize = 1000;
+      }
+      // Clear cached images so they re-decode at the new oversample/filter
+      // quality - stale entries from the previous mode waste GPU memory.
+      PaintingBinding.instance.imageCache.clear();
     }
-    // Clear cached images so they re-decode at the new oversample/filter
-    // quality — stale entries from the previous mode waste GPU memory.
-    PaintingBinding.instance.imageCache.clear();
     // boot() calls notifyListeners() synchronously from AppShellState.initState,
     // which fires mid-build. Deferring to post-frame avoids the setState-during-
     // build assertion in all phases (idle mount, persistent-callbacks frame, etc.)

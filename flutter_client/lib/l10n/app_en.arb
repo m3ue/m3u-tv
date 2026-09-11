@@ -158,6 +158,8 @@
   "playerUpNext": "Up next",
   "playerUpNextPlay": "Play next",
   "playerUpNextDismiss": "Dismiss",
+  "playerLiveStreamEnded": "Stream ended",
+  "playerReturningToMenu": "Returning to the menu…",
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",

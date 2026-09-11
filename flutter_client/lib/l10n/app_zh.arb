@@ -157,6 +157,8 @@
   "playerUpNext": "即将播放",
   "playerUpNextPlay": "播放下一集",
   "playerUpNextDismiss": "关闭",
+  "playerLiveStreamEnded": "直播已结束",
+  "playerReturningToMenu": "正在返回菜单…",
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",

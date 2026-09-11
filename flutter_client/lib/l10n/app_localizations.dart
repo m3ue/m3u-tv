@@ -650,6 +650,18 @@ abstract class AppLocalizations {
   /// **'Dismiss'**
   String get playerUpNextDismiss;
 
+  /// No description provided for @playerLiveStreamEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream ended'**
+  String get playerLiveStreamEnded;
+
+  /// No description provided for @playerReturningToMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Returning to the menu…'**
+  String get playerReturningToMenu;
+
   /// No description provided for @searchHint.
   ///
   /// In en, this message translates to:

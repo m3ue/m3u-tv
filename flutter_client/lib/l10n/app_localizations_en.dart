@@ -307,6 +307,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerUpNextDismiss => 'Dismiss';
 
   @override
+  String get playerLiveStreamEnded => 'Stream ended';
+
+  @override
+  String get playerReturningToMenu => 'Returning to the menu…';
+
+  @override
   String get searchHint => 'Search live TV, movies, and series...';
 
   @override

@@ -434,7 +434,7 @@ class AppStateController extends ChangeNotifier {
   /// Periodic DVR-status poll while connected. Self-heals the recording
   /// badges (red dots) and stop-buttons from the server's authoritative
   /// `status=recording` list even when the Reverb push channel is down or a
-  /// push is missed — a recording that failed to start still shows as
+  /// push is missed - a recording that failed to start still shows as
   /// recording until this next tick.
   Timer? _activeDvrPollTimer;
   Set<_DvrContentRefreshTarget> _dvrContentRefreshPending =
@@ -868,12 +868,12 @@ class AppStateController extends ChangeNotifier {
       );
 
       // Start the DVR-status poll REGARDLESS of WebSocket health. Pushes are
-      // best-effort (reverb can be down/never connected — the reconnect loop
+      // best-effort (reverb can be down/never connected - the reconnect loop
       // keeps trying), but the poll is the reliable path: it reconciles the
       // recording badges and list statuses from the server's authoritative
       // status=recording list, so a recording that started (or failed) a
       // moment after a refresh still self-heals within the next tick.
-      // (The reverb onConnected callback below also runs a refresh — the
+      // (The reverb onConnected callback below also runs a refresh - the
       // poll only starts here so it keeps ticking even if WebSocket setup
       // never completes.)
       _ensureActiveDvrPoll();
@@ -901,7 +901,7 @@ class AppStateController extends ChangeNotifier {
 
   /// Ensures the 30-second DVR-status poll is running. Called from every DVR
   /// touchpoint (notification connect, schedule, refresh) so a failure in any
-  /// one path — e.g. the notification session fetch timing out — can't leave
+  /// one path - e.g. the notification session fetch timing out - can't leave
   /// the app without its self-healing poll.
   void _ensureActiveDvrPoll() {
     if (_activeDvrPollTimer != null) return;
@@ -916,25 +916,17 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
-  /// Fetches the server's authoritative unread list, syncs it into the local
-  /// store (surfacing genuinely new items as toasts), and returns the
-  /// playlist session — or `null` if the server has no Reverb config to
-  /// connect a WebSocket to.
   /// Fetches the server's unread notification list. Used on live-stream end so
-  /// an eviction notice ("A DVR recording has taken precedence…") can be shown
-  /// as a toast even when the Reverb push channel is down — the notification
+  /// an eviction notice ("A DVR recording has taken precedence...") can be shown
+  /// as a toast even when the Reverb push channel is down - the notification
   /// is persisted server-side and only the push delivery is unreliable.
   Future<List<TvNotificationItem>> fetchUnreadNotifications() async {
     final credentials = authNotifier.credentials;
     if (credentials == null) return const [];
     try {
       final (_, unread) = await _tvNotificationService.fetchUnread(credentials);
-      debugPrint(
-        'DVR-DEBUG: stream-end fetch returned ${unread.length} unread',
-      );
       return unread;
-    } on Object catch (error) {
-      debugPrint('DVR-DEBUG: fetch unread after stream end failed: $error');
+    } on Object {
       return const [];
     }
   }
@@ -1326,11 +1318,6 @@ class AppStateController extends ChangeNotifier {
     UserCredentials credentials,
     bool Function() ownsWork,
   ) {
-    debugPrint(
-      'DVR-DEBUG: push received uuid=${recording.uuid} '
-      'channel=${recording.channelId} status=${recording.status.name} '
-      'title=${recording.title}',
-    );
     if (!ownsWork()) return;
     final channelId = recording.channelId;
     if (channelId != null) {
@@ -1393,10 +1380,6 @@ class AppStateController extends ChangeNotifier {
     try {
       final detail = await xtreamService.getDvrRecordingFor(credentials, uuid);
       if (!ownsWork()) return;
-      debugPrint(
-        'DVR-DEBUG: detail fetch uuid=$uuid → status=${detail.status.name} '
-        'channel=${detail.channelId} title=${detail.title}',
-      );
       final next = [..._dvrRecordings];
       final index = next.indexWhere((r) => r.uuid == uuid);
       if (index >= 0) {
@@ -1988,10 +1971,6 @@ class AppStateController extends ChangeNotifier {
       if (!ownsWork()) return;
       final recordingChannelIds = _extractRecordingChannelIds(recordings);
       if (!ownsWork()) return;
-      debugPrint(
-        'DVR-DEBUG: full refresh got ${recordings.length} recordings: '
-        '${recordings.map((r) => '${r.channelId}:${r.status.name}').toList()}',
-      );
       _dvrRecordings = recordings;
       if (!ownsWork()) return;
       _recordingChannelIds = recordingChannelIds;
@@ -2118,23 +2097,16 @@ class AppStateController extends ChangeNotifier {
         startTime: startTime,
         endTime: endTime,
       );
-      debugPrint(
-        'DVR-DEBUG: schedule OK channel=$channelId '
-        'previousRecordingChannelIds=$previousRecordingChannelIds',
-      );
-    } on Object catch (error) {
-      debugPrint(
-        'DVR-DEBUG: schedule FAILED channel=$channelId error=$error',
-      );
+    } on Object {
       // Roll back the optimistic channel id on failure so the dot and
-      // stop-button revert immediately — the caller rethrows after this.
+      // stop-button revert immediately - the caller rethrows after this.
       _recordingChannelIds = previousRecordingChannelIds;
       notifyListeners();
       rethrow;
     }
     if (!ownsWork()) return null;
     // Optimistically add a placeholder with 'recording' status so the stop
-    // button works immediately (isInProgress must be true) — before the
+    // button works immediately (isInProgress must be true) - before the
     // (slow) full-list refresh completes.
     final placeholder = DvrRecording(
       uuid: 'optimistic-$channelId-${startTime.millisecondsSinceEpoch}',
@@ -2148,7 +2120,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     // Now fetch the real list in the background; it will replace the
     // placeholder. Since the schedule succeeded we know the recording
-    // will appear eventually — always keep the optimistic channel id so
+    // will appear eventually - always keep the optimistic channel id so
     // the dot and stop-button stay visible until the push transitions it.
     try {
       final recordings = await xtreamService.getDvrRecordingsFor(credentials);
@@ -2162,10 +2134,6 @@ class AppStateController extends ChangeNotifier {
             r.scheduledStart != null &&
             startTime.difference(r.scheduledStart!).abs() <=
                 const Duration(minutes: 1),
-      );
-      debugPrint(
-        'DVR-DEBUG: post-schedule refresh foundInServer=$foundInServer '
-        'channel=$channelId localList=${_dvrRecordings.map((r) => '${r.channelId}:${r.status.name}').toList()}',
       );
       _dvrRecordings = foundInServer
           ? recordings
@@ -2442,11 +2410,7 @@ class AppStateController extends ChangeNotifier {
       );
       if (!ownsWork()) return;
 
-      debugPrint(
-        'DVR-DEBUG: active poll got ${active.length}: '
-        '${active.map((r) => '${r.channelId}:${r.status.name}:${r.uuid.length >= 8 ? r.uuid.substring(0, 8) : r.uuid}').toList()}',
-      );
-      // Fetch the server's scheduled list too. Reconcile against BOTH —
+      // Fetch the server's scheduled list too. Reconcile against BOTH -
       // otherwise a recording that FAILED while its local row still said
       // "scheduled" keeps its red dot forever (the active-only poll never
       // learns the row is gone).
@@ -2456,18 +2420,12 @@ class AppStateController extends ChangeNotifier {
         limit: 200,
       );
       if (!ownsWork()) return;
-      debugPrint(
-        'DVR-DEBUG: scheduled poll got ${scheduled.length}: '
-        '${scheduled.map((r) => '${r.channelId}:${r.status.name}').toList()}',
-      );
 
+      // _recordingChannelIds drives the "currently recording" indicator, so
+      // it must stay limited to in-progress channels -- a channel with only
+      // a future scheduled recording is not currently recording.
       final ids = _extractRecordingChannelIds(active);
-      final scheduledIds = scheduled
-          .map((r) => r.channelId)
-          .whereType<int>()
-          .toSet();
-      final mergedIds = {...ids, ...scheduledIds};
-      final idsChanged = !setEquals(_recordingChannelIds, mergedIds);
+      final idsChanged = !setEquals(_recordingChannelIds, ids);
       // Active entries are authoritative for the same uuid (a recording that
       // started must not be downgraded back to Scheduled by the stale
       // scheduled-side row), so the merge processes scheduled first and
@@ -2476,7 +2434,7 @@ class AppStateController extends ChangeNotifier {
 
       if (!idsChanged && merged == null) return;
       if (!ownsWork()) return;
-      if (idsChanged) _recordingChannelIds = mergedIds;
+      if (idsChanged) _recordingChannelIds = ids;
       if (merged != null) _dvrRecordings = merged;
       if (!ownsWork()) return;
       notifyListeners();

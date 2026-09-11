@@ -157,6 +157,8 @@
   "playerUpNext": "À suivre",
   "playerUpNextPlay": "Lire la suite",
   "playerUpNextDismiss": "Ignorer",
+  "playerLiveStreamEnded": "Diffusion terminée",
+  "playerReturningToMenu": "Retour au menu…",
   "searchHint": "Rechercher Télévision en direct, films et séries…",
   "searchSectionLiveTv": "Télévision en direct",
   "searchSectionMovies": "Films",

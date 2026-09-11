@@ -157,6 +157,8 @@
   "playerUpNext": "A continuación",
   "playerUpNextPlay": "Reproducir siguiente",
   "playerUpNextDismiss": "Descartar",
+  "playerLiveStreamEnded": "Transmisión finalizada",
+  "playerReturningToMenu": "Volviendo al menú…",
   "searchHint": "Buscar Televisión en vivo, cine y series…",
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",

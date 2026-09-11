@@ -300,6 +300,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerUpNextDismiss => '关闭';
 
   @override
+  String get playerLiveStreamEnded => '直播已结束';
+
+  @override
+  String get playerReturningToMenu => '正在返回菜单…';
+
+  @override
   String get searchHint => '搜索直播电视、电影和剧集…';
 
   @override

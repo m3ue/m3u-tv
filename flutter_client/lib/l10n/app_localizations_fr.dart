@@ -309,6 +309,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerUpNextDismiss => 'Ignorer';
 
   @override
+  String get playerLiveStreamEnded => 'Diffusion terminée';
+
+  @override
+  String get playerReturningToMenu => 'Retour au menu…';
+
+  @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
 
   @override

@@ -309,6 +309,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerUpNextDismiss => 'Descartar';
 
   @override
+  String get playerLiveStreamEnded => 'Transmisión finalizada';
+
+  @override
+  String get playerReturningToMenu => 'Volviendo al menú…';
+
+  @override
   String get searchHint => 'Buscar Televisión en vivo, cine y series…';
 
   @override

@@ -157,6 +157,8 @@
   "playerUpNext": "Als Nächstes",
   "playerUpNextPlay": "Nächste Folge",
   "playerUpNextDismiss": "Schließen",
+  "playerLiveStreamEnded": "Übertragung beendet",
+  "playerReturningToMenu": "Rückkehr zum Menü…",
   "searchHint": "Live-TV, Filme und Serien durchsuchen …",
   "searchSectionLiveTv": "Live-TV",
   "searchSectionMovies": "Filme",
