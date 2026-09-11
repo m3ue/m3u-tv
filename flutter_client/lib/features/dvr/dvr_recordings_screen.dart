@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
@@ -1382,6 +1382,3 @@ class _SelectionRail extends StatelessWidget {
     );
   }
 }
-
-
-
