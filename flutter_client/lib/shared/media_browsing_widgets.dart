@@ -935,8 +935,8 @@ class MediaPreviewSection extends StatefulWidget {
   final bool landscapeStyle;
 
   /// Whether this row is hosted inside `AppShell`'s TV/desktop sidebar
-  /// layout, where the content pane sits at a fixed `left: 64` (the
-  /// collapsed rail's width - see [_kSidebarRailInset]) instead of filling
+  /// layout, where the content pane sits at a `left` inset equal to the
+  /// collapsed rail's width (see [_kSidebarRailInset]) instead of filling
   /// the full window width.
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
@@ -994,7 +994,9 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     // steady state without reintroducing that per-frame dependency.
     final availableWidth =
         MediaQuery.sizeOf(context).width -
-        (widget.useSidebarLayout ? _kSidebarRailInset : 0) -
+        (widget.useSidebarLayout
+            ? _kSidebarRailInset * FontSizeScope.scaleOf(context)
+            : 0) -
         MediaBrowsingMetrics.pagePadding * 2;
     final scale = _previewCardScale(availableWidth);
     final cardWidth = baseWidth * scale;

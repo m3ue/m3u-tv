@@ -1450,7 +1450,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Carga más rápida, menor calidad de imagen.';
 
   @override
-  String get settingsFontSize => 'Tamaño de fuente';
+  String get settingsFontSize => 'Tamaño de pantalla';
 
   @override
   String get settingsFontSizeNormal => 'Normal';

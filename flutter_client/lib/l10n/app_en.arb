@@ -804,7 +804,7 @@
   "settingsOptimizeForQualityHint": "Sharper images, higher memory usage.",
   "settingsOptimizeForSpeed": "Speed",
   "settingsOptimizeForSpeedHint": "Faster loading, lower image quality.",
-  "settingsFontSize": "Font size",
+  "settingsFontSize": "Display size",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Large",
   "settingsFontSizeVeryLarge": "Very Large"

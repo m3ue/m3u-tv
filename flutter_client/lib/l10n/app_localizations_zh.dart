@@ -1397,7 +1397,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOptimizeForSpeedHint => '加载更快，图像质量降低。';
 
   @override
-  String get settingsFontSize => '字体大小';
+  String get settingsFontSize => '显示大小';
 
   @override
   String get settingsFontSizeNormal => '标准';

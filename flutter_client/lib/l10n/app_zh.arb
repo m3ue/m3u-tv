@@ -803,7 +803,7 @@
   "settingsOptimizeForQualityHint": "图像更清晰，内存占用更高。",
   "settingsOptimizeForSpeed": "速度",
   "settingsOptimizeForSpeedHint": "加载更快，图像质量降低。",
-  "settingsFontSize": "字体大小",
+  "settingsFontSize": "显示大小",
   "settingsFontSizeNormal": "标准",
   "settingsFontSizeLarge": "大",
   "settingsFontSizeVeryLarge": "特大"

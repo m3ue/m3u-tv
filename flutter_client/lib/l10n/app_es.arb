@@ -803,7 +803,7 @@
   "settingsOptimizeForQualityHint": "Imágenes más nítidas, mayor uso de memoria.",
   "settingsOptimizeForSpeed": "Velocidad",
   "settingsOptimizeForSpeedHint": "Carga más rápida, menor calidad de imagen.",
-  "settingsFontSize": "Tamaño de fuente",
+  "settingsFontSize": "Tamaño de pantalla",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Grande",
   "settingsFontSizeVeryLarge": "Muy grande"
