@@ -10,6 +10,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -579,7 +580,13 @@ class _SeriesDetailsBody extends StatelessWidget {
     final cardWidth = compact
         ? kEpisodeCardWidthCompact
         : kEpisodeCardWidthWide;
-    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
+    // The episode title/subtitle text below the thumbnail is scaled up by
+    // the user's font-size setting (global TextScaler in main.dart), but the
+    // thumbnail itself is not, so only the text budget needs to grow with it
+    // or a larger font setting clips/overflows the card's text block.
+    final stripHeight =
+        cardWidth * 9 / 16 +
+        kEpisodeCardTextHeight * FontSizeScope.scaleOf(context);
 
     final poster = SizedBox(
       width: posterWidth,

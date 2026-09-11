@@ -13,6 +13,7 @@ import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_reveal_slot.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -555,7 +556,11 @@ class _SeriesBodyState extends State<_SeriesBody> {
     final cardWidth = compact
         ? kEpisodeCardWidthCompact
         : kEpisodeCardWidthWide;
-    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
+    // See series_details_screen.dart: only the text budget scales with the
+    // font-size setting, since the thumbnail width does not.
+    final stripHeight =
+        cardWidth * 9 / 16 +
+        kEpisodeCardTextHeight * FontSizeScope.scaleOf(context);
 
     final l = AppLocalizations.of(context);
     final richCast = item.richCast;
