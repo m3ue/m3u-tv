@@ -985,9 +985,11 @@ class _RecordingCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onSelect;
 
-  // NOTE(cj): row height is tuned for touch/desktop; scaling to 88 for TV
-  // is tracked as follow-up work, not done here.
-  static const double _rowHeight = 72;
+  // Row height adapts to text scale so larger fonts don't overflow.
+  double _rowHeight(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
+    return (72.0 * scale).clamp(72.0, 140.0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1002,7 +1004,7 @@ class _RecordingCard extends StatelessWidget {
         (onPlay != null || canSelect || onStop != null || onDelete != null);
 
     return SizedBox(
-      height: _rowHeight,
+      height: _rowHeight(context),
       child: Material(
         color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
