@@ -44,6 +44,12 @@ class ItemDetailScaffold extends StatelessWidget {
         appBar: AppBar(
           title: Text(title),
           automaticallyImplyLeading: false,
+          // AppBar's default toolbarHeight (kToolbarHeight, 56) is fixed and
+          // unscaled - without scaling it too, the leading button's now
+          // larger padding + icon (below) get squeezed into that fixed
+          // height, and the GradientBorderEffect stadium border sizes to
+          // the squeezed/clipped bounds instead of the button's real size.
+          toolbarHeight: kToolbarHeight * scale,
           leadingWidth: 56 * scale,
           leading: Padding(
             padding: EdgeInsets.all(8 * scale),

@@ -121,12 +121,17 @@ Future<DeviceMeta> _defaultMetaResolver() async {
   String? name;
   try {
     final info = DeviceInfoPlugin();
-    if (!kIsWeb && Platform.operatingSystem == 'tvos') {
-      // device_info_plus has no tvOS channel; leave name null here and let
-      // _fallbackName() below supply it (localHostname / "Apple TV").
+    // This app has no real-iPhone/iPad target (Android TV + tvOS only) - on
+    // the tvOS-patched engine, Platform.operatingSystem does not reliably
+    // report 'tvos' (see main.dart's image-cache sizing, which treats
+    // Platform.isIOS as tvOS for the same reason), so a Platform.isIOS
+    // branch here would actually run on tvOS. device_info_plus's iOS
+    // implementation calls into package:objective_c's ffigen bindings,
+    // which need a native asset that isn't bundled for tvOS and crashes
+    // the whole app at startup - so both cases skip device_info_plus
+    // entirely and let _fallbackName() below supply "Apple TV" / hostname.
+    if (!kIsWeb && (Platform.operatingSystem == 'tvos' || Platform.isIOS)) {
       name = null;
-    } else if (Platform.isIOS) {
-      name = (await info.iosInfo).name;
     } else if (Platform.isAndroid) {
       final android = await info.androidInfo;
       name = '${android.manufacturer} ${android.model}'.trim();
