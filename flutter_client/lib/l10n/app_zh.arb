@@ -222,6 +222,39 @@
   },
   "settingsAppViewRelease": "查看版本",
   "settingsAppScanQr": "扫描以在手机上打开",
+  "settingsReleaseNotesTab": "最近更新",
+  "settingsReleaseNotesLoading": "正在加载版本说明…",
+  "settingsReleaseNotesError": "无法加载版本说明。请检查网络连接后重试。",
+  "settingsReleaseNotesRetry": "重试",
+  "settingsReleaseNotesCurrentBadge": "当前",
+  "settingsReleaseNotesNewBadge": "新",
+  "settingsReleaseNotesYouAreOn": "你的版本为 {version}",
+  "@settingsReleaseNotesYouAreOn": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesLatestIs": "最新：{version}",
+  "@settingsReleaseNotesLatestIs": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesNewerCount": "{count} 个更新版本",
+  "@settingsReleaseNotesNewerCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesUpToDate": "你使用的是最新版本",
+  "settingsReleaseNotesViewOnGithub": "在 GitHub 上查看全部",
+  "settingsReleaseNotesNoneForVersion": "此版本没有说明。",
   "settingsFillAllFields": "请填写所有字段",
   "settingsConnectionSettings": "连接设置",
   "settingsConnectionSettingsSubtitle": "输入您的 Xtream Codes 信息",

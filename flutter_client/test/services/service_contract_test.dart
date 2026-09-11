@@ -4,6 +4,8 @@ import 'dart:io' as io;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -1420,7 +1422,12 @@ void main() {
         if (await file.exists()) await file.delete();
       });
       final store = PersistentJsonStore(file: file);
-      final cache = CacheService(store: store);
+      // Catalog keys live in SQLite now, so a cold-hydrate check has to share
+      // the repository across the two CacheService instances the way it shares
+      // the JSON file for scalar keys.
+      final repo = CatalogRepository(CatalogDatabase.memory());
+      addTearDown(repo.close);
+      final cache = CacheService(store: store, catalogRepository: repo);
       await cache.set('liveStreams', const <Channel>[
         Channel(
           id: 101,
@@ -1434,6 +1441,7 @@ void main() {
 
       final restored = await CacheService(
         store: PersistentJsonStore(file: file),
+        catalogRepository: repo,
       ).get<List<Channel>>('liveStreams');
 
       expect(restored?.data.single.catchupSupported, isTrue);

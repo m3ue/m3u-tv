@@ -222,6 +222,39 @@
   },
   "settingsAppViewRelease": "Voir la version",
   "settingsAppScanQr": "Scanner pour ouvrir sur votre téléphone",
+  "settingsReleaseNotesTab": "Nouveautés",
+  "settingsReleaseNotesLoading": "Chargement des notes de version…",
+  "settingsReleaseNotesError": "Impossible de charger les notes de version. Vérifiez votre connexion et réessayez.",
+  "settingsReleaseNotesRetry": "Réessayer",
+  "settingsReleaseNotesCurrentBadge": "Actuelle",
+  "settingsReleaseNotesNewBadge": "Nouvelle",
+  "settingsReleaseNotesYouAreOn": "Vous utilisez la version {version}",
+  "@settingsReleaseNotesYouAreOn": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesLatestIs": "Dernière : {version}",
+  "@settingsReleaseNotesLatestIs": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesNewerCount": "{count} plus récentes",
+  "@settingsReleaseNotesNewerCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesUpToDate": "Vous utilisez la dernière version",
+  "settingsReleaseNotesViewOnGithub": "Tout voir sur GitHub",
+  "settingsReleaseNotesNoneForVersion": "Aucune note pour cette version.",
   "settingsFillAllFields": "Veuillez remplir tous les champs",
   "settingsConnectionSettings": "Paramètres de connexion",
   "settingsConnectionSettingsSubtitle": "Entrez vos identifiants Xtream Codes",

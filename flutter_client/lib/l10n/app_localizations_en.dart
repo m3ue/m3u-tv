@@ -528,6 +528,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppScanQr => 'Scan to open on your phone';
 
   @override
+  String get settingsReleaseNotesTab => 'What\'s New';
+
+  @override
+  String get settingsReleaseNotesLoading => 'Loading release notes…';
+
+  @override
+  String get settingsReleaseNotesError =>
+      'Couldn\'t load release notes. Check your connection and try again.';
+
+  @override
+  String get settingsReleaseNotesRetry => 'Retry';
+
+  @override
+  String get settingsReleaseNotesCurrentBadge => 'Current';
+
+  @override
+  String get settingsReleaseNotesNewBadge => 'New';
+
+  @override
+  String settingsReleaseNotesYouAreOn(String version) {
+    return 'You\'re on $version';
+  }
+
+  @override
+  String settingsReleaseNotesLatestIs(String version) {
+    return 'Latest: $version';
+  }
+
+  @override
+  String settingsReleaseNotesNewerCount(int count) {
+    return '$count newer';
+  }
+
+  @override
+  String get settingsReleaseNotesUpToDate => 'You\'re on the latest version';
+
+  @override
+  String get settingsReleaseNotesViewOnGithub => 'View all on GitHub';
+
+  @override
+  String get settingsReleaseNotesNoneForVersion => 'No notes for this release.';
+
+  @override
   String get settingsFillAllFields => 'Please fill in all fields';
 
   @override

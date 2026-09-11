@@ -222,6 +222,39 @@
   },
   "settingsAppViewRelease": "Release ansehen",
   "settingsAppScanQr": "Scannen, um auf deinem Handy zu öffnen",
+  "settingsReleaseNotesTab": "Neuigkeiten",
+  "settingsReleaseNotesLoading": "Versionshinweise werden geladen…",
+  "settingsReleaseNotesError": "Versionshinweise konnten nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.",
+  "settingsReleaseNotesRetry": "Erneut versuchen",
+  "settingsReleaseNotesCurrentBadge": "Aktuell",
+  "settingsReleaseNotesNewBadge": "Neu",
+  "settingsReleaseNotesYouAreOn": "Du nutzt {version}",
+  "@settingsReleaseNotesYouAreOn": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesLatestIs": "Neueste: {version}",
+  "@settingsReleaseNotesLatestIs": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesNewerCount": "{count} neuere",
+  "@settingsReleaseNotesNewerCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesUpToDate": "Du nutzt die neueste Version",
+  "settingsReleaseNotesViewOnGithub": "Alle auf GitHub ansehen",
+  "settingsReleaseNotesNoneForVersion": "Keine Hinweise für diese Version.",
   "settingsFillAllFields": "Bitte fülle alle Felder aus",
   "settingsConnectionSettings": "Verbindungseinstellungen",
   "settingsConnectionSettingsSubtitle": "Gib deine Xtream-Codes-Daten ein",

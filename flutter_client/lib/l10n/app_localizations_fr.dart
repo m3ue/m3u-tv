@@ -532,6 +532,51 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAppScanQr => 'Scanner pour ouvrir sur votre téléphone';
 
   @override
+  String get settingsReleaseNotesTab => 'Nouveautés';
+
+  @override
+  String get settingsReleaseNotesLoading => 'Chargement des notes de version…';
+
+  @override
+  String get settingsReleaseNotesError =>
+      'Impossible de charger les notes de version. Vérifiez votre connexion et réessayez.';
+
+  @override
+  String get settingsReleaseNotesRetry => 'Réessayer';
+
+  @override
+  String get settingsReleaseNotesCurrentBadge => 'Actuelle';
+
+  @override
+  String get settingsReleaseNotesNewBadge => 'Nouvelle';
+
+  @override
+  String settingsReleaseNotesYouAreOn(String version) {
+    return 'Vous utilisez la version $version';
+  }
+
+  @override
+  String settingsReleaseNotesLatestIs(String version) {
+    return 'Dernière : $version';
+  }
+
+  @override
+  String settingsReleaseNotesNewerCount(int count) {
+    return '$count plus récentes';
+  }
+
+  @override
+  String get settingsReleaseNotesUpToDate =>
+      'Vous utilisez la dernière version';
+
+  @override
+  String get settingsReleaseNotesViewOnGithub => 'Tout voir sur GitHub';
+
+  @override
+  String get settingsReleaseNotesNoneForVersion =>
+      'Aucune note pour cette version.';
+
+  @override
   String get settingsFillAllFields => 'Veuillez remplir tous les champs';
 
   @override

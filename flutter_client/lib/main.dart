@@ -15,6 +15,10 @@ import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -29,6 +33,8 @@ import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await DevicePerformance.ensureDetected();
+  if (kDebugMode) debugPrint(DevicePerformance.describe());
   _configureImageCache();
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
@@ -84,8 +90,8 @@ Future<void> main() async {
 /// tvOS has more headroom but still hard-caps per-app memory; desktop is
 /// effectively unconstrained.
 void _configureImageCache() {
-  final int maximumSizeBytes;
-  final int maximumSize;
+  int maximumSizeBytes;
+  int maximumSize;
   if (_isDesktop) {
     maximumSizeBytes = 384 * 1024 * 1024;
     maximumSize = 1500;
@@ -97,6 +103,14 @@ void _configureImageCache() {
     // Android TV - tightest RAM budget
     maximumSizeBytes = 160 * 1024 * 1024;
     maximumSize = 900;
+  }
+  // Low-end Android hardware (32-bit, low-RAM flag, <= ~2.2 GiB): halve the
+  // ceiling so a poster-grid decode burst can't push RSS into LMK range
+  // before the watchdog samples. The watchdog is the backstop, this is the
+  // budget.
+  if (DevicePerformance.isReduced) {
+    maximumSizeBytes = (maximumSizeBytes * 0.5).round();
+    maximumSize = (maximumSize * 0.6).round();
   }
   PaintingBinding.instance.imageCache
     ..maximumSizeBytes = maximumSizeBytes
@@ -151,7 +165,9 @@ Future<void> _initPushNotifications(AppStateController appState) async {
 
 Future<AppStateController> _buildAppState() async {
   final operatingSystem = Platform.operatingSystem;
-  final (store, cacheStore) = await _createAppStateStores(operatingSystem);
+  final (store, cacheStore, dataDir) = await _createAppStateStores(
+    operatingSystem,
+  );
   final storage = createProductionStorage(
     operatingSystem: operatingSystem,
     persistentStore: store,
@@ -162,20 +178,86 @@ Future<AppStateController> _buildAppState() async {
       credentialStorage: storage.credentialStorage,
     );
   }
+  final catalogRepository = await _openCatalogRepository(dataDir);
+  // The catalog is a disposable cache - it's re-fetched from the source on
+  // every load - so there is nothing to migrate. Drop only the pre-SQLite
+  // catalog blobs (`m3ue_cache_liveStreams`, ...) from the JSON stores;
+  // SQLite fills itself on the next source load. The other `m3ue_cache_*`
+  // keys (`sourceType`, `viewers`) still live in the JSON store and must be
+  // left alone or the cached-content fast path in boot() never fires. Best
+  // effort: a failure here only leaves dead bytes behind.
+  final legacyCatalogKeys = <String>{
+    for (final key in CacheService.catalogKeys) 'm3ue_cache_$key',
+  };
+  for (final legacyStore in {storage.appStateStore, cacheStore}) {
+    try {
+      await legacyStore.removeWhere(legacyCatalogKeys.contains);
+    } on Object catch (error) {
+      debugPrint('[Catalog] legacy cache purge deferred: $error');
+    }
+  }
   return AppStateController(
     persistentStore: storage.appStateStore,
     cacheStore: cacheStore,
+    catalogRepository: catalogRepository,
     secureStorage: storage.credentialStorage,
   );
 }
 
-/// Returns the app-state store and the content-cache store as a pair. The
-/// cache (whole channel/VOD/series catalog) is a sibling `cache.json` so a
-/// small single-key write to `app_state.json` - e.g. the resume tracker every
-/// ~10s during playback - never has to re-serialize the catalog.
-Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
-  String operatingSystem,
-) async {
+/// Opens the SQLite catalog database in [dataDir] and probes it with a trivial
+/// query. There is no JSON fallback - the catalog is always a `CatalogRepository`.
+///
+/// The catalog is a disposable cache (it refills from the source on every
+/// load), so a file that won't open or answer - corruption, a schema mismatch -
+/// is recoverable: delete the file and reopen once. If even a fresh file can't
+/// be opened (the platform has no usable sqlite3), fall back to an in-memory
+/// database: still the same code path, just not persisted, so the app runs and
+/// rebuilds the catalog each launch instead of failing to start.
+Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
+  await dataDir.create(recursive: true);
+  try {
+    return await _openAndProbeCatalog(dataDir);
+  } on Object catch (error, stackTrace) {
+    debugPrint('[Catalog] discarding unusable catalog database: $error');
+    if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+    for (final name in CatalogDatabase.databaseFileNames) {
+      final file = File('${dataDir.path}/$name');
+      try {
+        if (file.existsSync()) await file.delete();
+      } on Object {
+        // Best effort - a leftover sidecar is harmless once the main file is gone.
+      }
+    }
+    try {
+      return await _openAndProbeCatalog(dataDir);
+    } on Object catch (error, stackTrace) {
+      debugPrint(
+        '[Catalog] on-disk catalog unavailable, using in-memory: $error',
+      );
+      if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+      return CatalogRepository(CatalogDatabase.memory());
+    }
+  }
+}
+
+Future<CatalogRepository> _openAndProbeCatalog(Directory dataDir) async {
+  final repository = CatalogRepository(CatalogDatabase.open(dataDir));
+  try {
+    await repository.isEmpty().timeout(const Duration(seconds: 5));
+    return repository;
+  } on Object {
+    await repository.close().catchError((_) {});
+    rethrow;
+  }
+}
+
+/// Returns the app-state store, the content-cache store, and the directory
+/// both live in. The cache (whole channel/VOD/series catalog) is a sibling
+/// `cache.json` so a small single-key write to `app_state.json` - e.g. the
+/// resume tracker every ~10s during playback - never has to re-serialize the
+/// catalog.
+Future<(PersistentJsonStore, PersistentJsonStore, Directory)>
+_createAppStateStores(String operatingSystem) async {
   if (operatingSystem == 'tvos') {
     // Documents exists but is read-only on a physical Apple TV; only
     // Library/Caches and tmp are writable there. See path_provider_tvos's
@@ -194,6 +276,7 @@ Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
     return (
       PersistentJsonStore(file: File('${dir.path}/app_state.json')),
       PersistentJsonStore(file: File('${dir.path}/cache.json')),
+      dir,
     );
   }
   if (operatingSystem == 'android' || operatingSystem == 'ios') {
@@ -201,11 +284,13 @@ Future<(PersistentJsonStore, PersistentJsonStore)> _createAppStateStores(
     return (
       PersistentJsonStore(file: File('${dir.path}/app_state.json')),
       PersistentJsonStore(file: File('${dir.path}/cache.json')),
+      dir,
     );
   }
   return (
     PersistentJsonStore(),
     PersistentJsonStore(fileName: 'cache.json'),
+    Directory(PersistentJsonStore.defaultDirectoryPath()),
   );
 }
 
