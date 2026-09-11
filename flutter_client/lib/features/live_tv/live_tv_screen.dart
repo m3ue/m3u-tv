@@ -687,12 +687,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
     final filtered = _filteredChannels(channels);
     final channelsById = {for (final c in channels) c.id: c};
-    // Defer EPG loading to a post-frame callback instead of running the O(n)
-    // lookup synchronously inside build(). This keeps the frame pipeline
-    // responsive when switching categories.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadEpgForChannels(filtered, epgService);
-    });
+    _loadEpgForChannels(filtered, epgService);
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
     // stacking above it) once a qualifying show search is active - mirrors

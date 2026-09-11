@@ -873,8 +873,10 @@ class AppStateController extends ChangeNotifier {
       // recording badges and list statuses from the server's authoritative
       // status=recording list, so a recording that started (or failed) a
       // moment after a refresh still self-heals within the next tick.
+      // (The reverb onConnected callback below also runs a refresh — the
+      // poll only starts here so it keeps ticking even if WebSocket setup
+      // never completes.)
       _ensureActiveDvrPoll();
-      unawaited(_refreshActiveDvrRecordings(credentials, ownsDvr));
 
       await _reverbService.connect(
         session: session,
@@ -2442,7 +2444,7 @@ class AppStateController extends ChangeNotifier {
 
       debugPrint(
         'DVR-DEBUG: active poll got ${active.length}: '
-        '${active.map((r) => '${r.channelId}:${r.status.name}:${r.uuid.substring(0, 8)}').toList()}',
+        '${active.map((r) => '${r.channelId}:${r.status.name}:${r.uuid.length >= 8 ? r.uuid.substring(0, 8) : r.uuid}').toList()}',
       );
       // Fetch the server's scheduled list too. Reconcile against BOTH —
       // otherwise a recording that FAILED while its local row still said
@@ -2466,7 +2468,11 @@ class AppStateController extends ChangeNotifier {
           .toSet();
       final mergedIds = {...ids, ...scheduledIds};
       final idsChanged = !setEquals(_recordingChannelIds, mergedIds);
-      final merged = _mergeActiveDvrRecordings([...active, ...scheduled]);
+      // Active entries are authoritative for the same uuid (a recording that
+      // started must not be downgraded back to Scheduled by the stale
+      // scheduled-side row), so the merge processes scheduled first and
+      // lets the active list win for overlapping uuids.
+      final merged = _mergeActiveDvrRecordings([...scheduled, ...active]);
 
       if (!idsChanged && merged == null) return;
       if (!ownsWork()) return;

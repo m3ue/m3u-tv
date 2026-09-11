@@ -65,6 +65,13 @@ class PlaybackOrchestrator {
         final response = await request.close().timeout(
           const Duration(seconds: 5),
         );
+        // 4xx responses are typed by the player backends' own probe
+        // (expired_token, stream_not_found); only 5xx (capacity, provider
+        // errors) carry the JSON message worth surfacing here.
+        if (response.statusCode < 500) {
+          client.close();
+          return null;
+        }
         final body = await response.transform(utf8.decoder).join();
         client.close();
         // Server returns JSON like {"message": "...", "status": 503}
@@ -97,6 +104,14 @@ class PlaybackOrchestrator {
           const Duration(seconds: 4),
         );
         if (response.statusCode < 400) {
+          client.close();
+          return null;
+        }
+        // 403 (auth/token) and 404 (stream gone) are typed by the player
+        // backends' own probe (expired_token / stream_not_found) — don't
+        // swallow them into the generic rejection path here.
+        if (response.statusCode == HttpStatus.forbidden ||
+            response.statusCode == HttpStatus.notFound) {
           client.close();
           return null;
         }
@@ -348,6 +363,7 @@ class PlaybackOrchestrator {
         _syncNativePlaneComposition();
         break;
       } on PlaybackException catch (error) {
+        var effectiveError = error;
         final isStreamUnavailable =
             source.isLive && looksLikeStreamProbeFailure(error.message);
         // For live content, ask the server whether it rejected this stream
@@ -362,7 +378,7 @@ class PlaybackOrchestrator {
                 identical(_activeSource, source)) {
               _clearActiveAdapter();
             }
-            return PlaybackException(
+            effectiveError = PlaybackException(
               message: serverMessage,
               backend: error.backend,
               code: 'stream_unavailable',
@@ -406,7 +422,7 @@ class PlaybackOrchestrator {
           // layer while the native core is still attached to it.
           await (adapter as PlatformViewProvider).releaseNativeView();
         }
-        final reportedError = isStreamUnavailable
+        var reportedError = isStreamUnavailable
             ? PlaybackException(
                 message:
                     "This channel's stream is currently unavailable from "
@@ -415,16 +431,16 @@ class PlaybackOrchestrator {
                 code: 'stream_unavailable',
                 recoverable: error.recoverable,
               )
-            : error;
+            : effectiveError;
 
         // For live content, try to fetch the actual error message from the
         // server (now returns JSON for stream routes). This surfaces capacity
         // errors ("Playlist has reached maximum stream limit") instead of a
         // generic "Source error" — the player can't parse the JSON itself.
-        if (source.isLive) {
+        if (source.isLive && reportedError.code != 'stream_unavailable') {
           final serverMessage = await _fetchStreamError(source.uri);
           if (serverMessage != null && serverMessage.isNotEmpty) {
-            return PlaybackException(
+            reportedError = PlaybackException(
               message: serverMessage,
               backend: error.backend,
               code: 'stream_unavailable',
