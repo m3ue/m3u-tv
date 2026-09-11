@@ -1564,17 +1564,15 @@ class SeriesDetailBody extends StatelessWidget {
     final bg = dominantColor != null
         ? deepBackdropTone(dominantColor!, vivid: compact)
         : theme.colorScheme.surface;
-    final posterWidth = compact ? 120.0 : 200.0;
-    final cardWidth = compact
-        ? kEpisodeCardWidthCompact
-        : kEpisodeCardWidthWide;
-    // The episode title/subtitle text below the thumbnail is scaled up by
-    // the user's font-size setting (global TextScaler in main.dart), but the
-    // thumbnail itself is not, so only the text budget needs to grow with it
-    // or a larger font setting clips/overflows the card's text block.
-    final stripHeight =
-        cardWidth * 9 / 16 +
-        kEpisodeCardTextHeight * FontSizeScope.scaleOf(context);
+    final scale = FontSizeScope.scaleOf(context);
+    final posterWidth = (compact ? 120.0 : 200.0) * scale;
+    final cardWidth =
+        (compact ? kEpisodeCardWidthCompact : kEpisodeCardWidthWide) * scale;
+    // The episode title/subtitle text below the thumbnail grows with the
+    // user's font-size setting (global TextScaler in main.dart) on top of
+    // the `cardWidth` multiplication above, so it needs its own (larger)
+    // budget or a larger setting clips/overflows the card's text block.
+    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight * scale;
     final firstPoster = posterChain.isEmpty ? '' : posterChain.first;
 
     final poster = SizedBox(

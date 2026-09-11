@@ -936,7 +936,7 @@ class MediaPreviewSection extends StatefulWidget {
 
   /// Whether this row is hosted inside `AppShell`'s TV/desktop sidebar
   /// layout, where the content pane sits at a `left` inset equal to the
-  /// collapsed rail's width (see [_kSidebarRailInset]) instead of filling
+  /// collapsed rail's width (see [kSidebarRailInset]) instead of filling
   /// the full window width.
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
@@ -952,10 +952,12 @@ class MediaPreviewSection extends StatefulWidget {
   State<MediaPreviewSection> createState() => _MediaPreviewSectionState();
 }
 
-/// Mirrors the collapsed-state width of `NavigationSidebar` and the fixed
+/// Base (unscaled) width of `NavigationSidebar`'s collapsed rail and the
 /// `left` inset `AppShell._buildTvLayout` gives its content pane outside of
 /// the full-screen-detail transition (see [_MediaPreviewSectionState.build]).
-const double _kSidebarRailInset = 64;
+/// The single source of truth for this value - shared with `app_shell.dart`
+/// so the rail and the content pane it insets can't independently drift.
+const double kSidebarRailInset = 64;
 
 class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   final ScrollController _controller = ScrollController();
@@ -968,6 +970,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
 
   @override
   Widget build(BuildContext context) {
+    final fontScale = FontSizeScope.scaleOf(context);
     final visibleItems = widget.items
         .take(MediaPreviewSection.maxVisibleItems)
         .toList(growable: false);
@@ -994,9 +997,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     // steady state without reintroducing that per-frame dependency.
     final availableWidth =
         MediaQuery.sizeOf(context).width -
-        (widget.useSidebarLayout
-            ? _kSidebarRailInset * FontSizeScope.scaleOf(context)
-            : 0) -
+        (widget.useSidebarLayout ? kSidebarRailInset * fontScale : 0) -
         MediaBrowsingMetrics.pagePadding * 2;
     final scale = _previewCardScale(availableWidth);
     final cardWidth = baseWidth * scale;
@@ -1005,7 +1006,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     // must grow by the same factor or a larger font setting overflows the
     // card's Column (bigger image + taller scaled-up text in a row height
     // that never grew to match).
-    final cardHeight = baseHeight * scale * FontSizeScope.scaleOf(context);
+    final cardHeight = baseHeight * scale * fontScale;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
@@ -1018,7 +1019,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               if (widget.titleIcon != null) ...[
                 Icon(
                   widget.titleIcon,
-                  size: 20 * FontSizeScope.scaleOf(context),
+                  size: 20 * fontScale,
                   color: Theme.of(context).textTheme.titleLarge?.color,
                 ),
                 const SizedBox(width: 8),

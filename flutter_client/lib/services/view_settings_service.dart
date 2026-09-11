@@ -100,6 +100,18 @@ enum AppFontSize {
     (size) => size.value == value,
     orElse: () => AppFontSize.normal,
   );
+
+  /// The effective size to render/show as selected: [stored] when the user
+  /// has explicitly chosen one, otherwise a device-aware default. TV starts
+  /// at [veryLarge] - content read from couch distance needs to start
+  /// bigger than the desktop/mobile default. The single source of truth for
+  /// this fallback - `main.dart` (drives the actual render scale) and the
+  /// Settings screen (drives which chip shows as selected) both call this so
+  /// they can't drift apart.
+  static AppFontSize resolveDefault({
+    required AppFontSize? stored,
+    required bool isTv,
+  }) => stored ?? (isTv ? AppFontSize.veryLarge : AppFontSize.normal);
 }
 
 /// Persists non-credential view preferences such as the Live TV default layout

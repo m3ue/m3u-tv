@@ -10,6 +10,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Edge padding for [PlaybackControls]' back-button corner. tvOS gets a
 /// much smaller value since `SafeArea` already insets for its focus-safe
@@ -145,7 +146,7 @@ class PlaybackControls extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _buildHeader(colorScheme),
+                _buildHeader(context, colorScheme),
                 const Spacer(),
                 // The "up next" card eases in from the right + fades rather
                 // than snapping into place, and slides back out the same way
@@ -188,7 +189,8 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
+  Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
+    final scale = FontSizeScope.scaleOf(context);
     return Row(
       children: [
         DpadFocusable(
@@ -201,7 +203,7 @@ class PlaybackControls extends StatelessWidget {
           child: GestureDetector(
             onTap: onBack,
             child: Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(10 * scale),
               decoration: const BoxDecoration(
                 color: Colors.black54,
                 shape: BoxShape.circle,
@@ -209,12 +211,12 @@ class PlaybackControls extends StatelessWidget {
               child: Icon(
                 Icons.arrow_back,
                 color: colorScheme.onSurface,
-                size: 24,
+                size: 24 * scale,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12 * scale),
         if (fallbackReason != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -337,12 +339,15 @@ class PlaybackControls extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scale = FontSizeScope.scaleOf(context);
         final trackControlsWidth = _hasTrackControls
-            ? TrackSelector.controlsWidth
+            ? TrackSelector.controlsWidth * scale
             : 0.0;
-        final transportWidth = isLive
-            ? (_hasChannelControls ? _liveButtonCount * 56.0 : 56.0)
-            : 168.0;
+        final transportWidth =
+            (isLive
+                ? (_hasChannelControls ? _liveButtonCount * 56.0 : 56.0)
+                : 168.0) *
+            scale;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >= transportWidth + (trackControlsWidth * 2);
 
@@ -365,7 +370,7 @@ class PlaybackControls extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: SizedBox(
-                  width: TrackSelector.controlsWidth,
+                  width: trackControlsWidth,
                   child: _buildTrackControls(),
                 ),
               ),

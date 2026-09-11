@@ -54,12 +54,6 @@ import 'package:window_manager/window_manager.dart';
 /// color rather than transparent.
 const double _kMacTitlebarInset = 28;
 
-/// Base (unscaled) width of the collapsed sidebar rail. Multiplied by
-/// [FontSizeScope.scaleOf] wherever it's used - the content pane's left
-/// inset (here) and [NavigationSidebar]'s own layout must agree, or the
-/// content pane either overlaps the rail or leaves a gap next to it.
-const double _kCollapsedSidebarWidth = 64;
-
 /// Duration for the sidebar-hide/content-expand transition when a
 /// full-screen detail route (VOD/series/AIOStreams item) pushes or pops —
 /// matched to _slidePage's default CustomTransitionPage duration in
@@ -1897,7 +1891,7 @@ class AppShellState extends ConsumerState<AppShell>
               : 0.0;
           final fullScreenDetail = _fullScreenDetailActive;
           final collapsedSidebarWidth =
-              _kCollapsedSidebarWidth * FontSizeScope.scaleOf(context);
+              kSidebarRailInset * FontSizeScope.scaleOf(context);
 
           // The sidebar physically slides off-screen to the left and the
           // content pane's left edge animates out to meet it, both on the
@@ -2119,7 +2113,7 @@ class NavigationSidebar extends StatelessWidget {
     final theme = Theme.of(context);
     final expanded = sidebarActive;
     final scale = FontSizeScope.scaleOf(context);
-    final width = (expanded ? 200.0 : _kCollapsedSidebarWidth) * scale;
+    final width = (expanded ? 200.0 : kSidebarRailInset) * scale;
 
     return MouseRegion(
       onEnter: (_) => onActivateSidebar(),

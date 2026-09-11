@@ -1275,6 +1275,8 @@ class _ChannelGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final logoSize = MediaBrowsingMetrics.logoSize * scale;
     return DpadInkWell(
       autofocus: autofocus,
       onTap: onTap,
@@ -1288,8 +1290,8 @@ class _ChannelGridItem extends StatelessWidget {
           ResilientMediaImage(
             imageUrl: channel.logoUrl,
             fallbackIcon: Icons.tv,
-            width: MediaBrowsingMetrics.logoSize,
-            height: MediaBrowsingMetrics.logoSize,
+            width: logoSize,
+            height: logoSize,
             fit: BoxFit.contain,
             oversample: 2,
           ),
@@ -1313,7 +1315,7 @@ class _ChannelGridItem extends StatelessWidget {
             ],
           ),
           if (isFavorite)
-            Icon(Icons.star, color: colorScheme.tertiary, size: 16),
+            Icon(Icons.star, color: colorScheme.tertiary, size: 16 * scale),
         ],
       ),
     );

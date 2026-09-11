@@ -398,15 +398,10 @@ class _MyAppState extends State<MyApp> {
         final viewSettings = widget.appState?.viewSettingsService;
         final optimizeFor =
             viewSettings?.optimizeForSync ?? OptimizeFor.quality;
-        // TV defaults to Large: it drives the app's whole visual scale now
-        // (text, icons, posters), and content read from couch distance needs
-        // to start bigger than the desktop/mobile default. Only applies when
-        // the user has never explicitly chosen a size.
-        final fontSize =
-            viewSettings?.fontSizeSyncOrNull ??
-            (deviceType == DeviceType.tv
-                ? AppFontSize.large
-                : AppFontSize.normal);
+        final fontSize = AppFontSize.resolveDefault(
+          stored: viewSettings?.fontSizeSyncOrNull,
+          isTv: deviceType == DeviceType.tv,
+        );
         final routerChild = child ?? const SizedBox.shrink();
         return Dpad(
           theme: const DpadThemeData(

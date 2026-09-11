@@ -2185,11 +2185,10 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final matchRefreshRate = await widget.service.matchRefreshRate();
     final optimizeFor = await widget.service.optimizeFor();
     final storedFontSize = await widget.service.fontSizeOrNull();
-    final fontSize =
-        storedFontSize ??
-        (widget.deviceType == DeviceType.tv
-            ? AppFontSize.large
-            : AppFontSize.normal);
+    final fontSize = AppFontSize.resolveDefault(
+      stored: storedFontSize,
+      isTv: widget.deviceType == DeviceType.tv,
+    );
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;
