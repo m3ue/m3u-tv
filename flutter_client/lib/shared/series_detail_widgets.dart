@@ -16,6 +16,7 @@ import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Shared building blocks for the series-style detail screens (Xtream Series
@@ -1567,7 +1568,13 @@ class SeriesDetailBody extends StatelessWidget {
     final cardWidth = compact
         ? kEpisodeCardWidthCompact
         : kEpisodeCardWidthWide;
-    final stripHeight = cardWidth * 9 / 16 + kEpisodeCardTextHeight;
+    // The episode title/subtitle text below the thumbnail is scaled up by
+    // the user's font-size setting (global TextScaler in main.dart), but the
+    // thumbnail itself is not, so only the text budget needs to grow with it
+    // or a larger font setting clips/overflows the card's text block.
+    final stripHeight =
+        cardWidth * 9 / 16 +
+        kEpisodeCardTextHeight * FontSizeScope.scaleOf(context);
     final firstPoster = posterChain.isEmpty ? '' : posterChain.first;
 
     final poster = SizedBox(

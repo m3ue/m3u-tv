@@ -45,8 +45,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get appBackToExit => 'Appuyez à nouveau sur Retour pour quitter';
 
   @override
+  String get appRecordingScheduling =>
+      'Enregistrement en cours de programmation…';
+
+  @override
   String appRecordingScheduled(String title) {
-    return 'Enregistrement programmé : $title';
+    return 'Enregistrement programmé : $title';
   }
 
   @override
@@ -303,6 +307,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get playerUpNextDismiss => 'Ignorer';
+
+  @override
+  String get playerLiveStreamEnded => 'Diffusion terminée';
+
+  @override
+  String get playerReturningToMenu => 'Retour au menu…';
 
   @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
@@ -1425,4 +1435,33 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsToggleOff => 'Désactivé';
+
+  @override
+  String get settingsOptimizeFor => 'Optimiser pour';
+
+  @override
+  String get settingsOptimizeForQuality => 'Qualité';
+
+  @override
+  String get settingsOptimizeForQualityHint =>
+      'Images plus nettes, utilisation mémoire accrue.';
+
+  @override
+  String get settingsOptimizeForSpeed => 'Vitesse';
+
+  @override
+  String get settingsOptimizeForSpeedHint =>
+      'Chargement plus rapide, qualité image réduite.';
+
+  @override
+  String get settingsFontSize => 'Taille du texte';
+
+  @override
+  String get settingsFontSizeNormal => 'Normal';
+
+  @override
+  String get settingsFontSizeLarge => 'Grand';
+
+  @override
+  String get settingsFontSizeVeryLarge => 'Très grand';
 }

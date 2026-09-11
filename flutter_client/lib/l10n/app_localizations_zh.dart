@@ -45,6 +45,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appBackToExit => '再次按返回键退出';
 
   @override
+  String get appRecordingScheduling => '正在安排录制…';
+
+  @override
   String appRecordingScheduled(String title) {
     return '录制已安排：$title';
   }
@@ -295,6 +298,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerUpNextDismiss => '关闭';
+
+  @override
+  String get playerLiveStreamEnded => '直播已结束';
+
+  @override
+  String get playerReturningToMenu => '正在返回菜单…';
 
   @override
   String get searchHint => '搜索直播电视、电影和剧集…';
@@ -1371,4 +1380,31 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsToggleOff => '关';
+
+  @override
+  String get settingsOptimizeFor => '优化目标';
+
+  @override
+  String get settingsOptimizeForQuality => '画质';
+
+  @override
+  String get settingsOptimizeForQualityHint => '图像更清晰，内存占用更高。';
+
+  @override
+  String get settingsOptimizeForSpeed => '速度';
+
+  @override
+  String get settingsOptimizeForSpeedHint => '加载更快，图像质量降低。';
+
+  @override
+  String get settingsFontSize => '字体大小';
+
+  @override
+  String get settingsFontSizeNormal => '标准';
+
+  @override
+  String get settingsFontSizeLarge => '大';
+
+  @override
+  String get settingsFontSizeVeryLarge => '特大';
 }

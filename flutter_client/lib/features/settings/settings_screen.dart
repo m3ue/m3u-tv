@@ -2148,6 +2148,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
   bool _hdrEnabled = true;
   bool _matchRefreshRate = false;
+  OptimizeFor _optimizeFor = OptimizeFor.quality;
+  AppFontSize _fontSize = AppFontSize.normal;
 
   // The mpv HDR override ships on the Linux and Windows desktop backends
   // only; refresh-rate matching is Windows-only (see DisplayModeManager).
@@ -2174,6 +2176,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final defaultStartPage = await widget.service.defaultStartPage();
     final hdrEnabled = await widget.service.hdrEnabled();
     final matchRefreshRate = await widget.service.matchRefreshRate();
+    final optimizeFor = await widget.service.optimizeFor();
+    final fontSize = await widget.service.fontSize();
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;
@@ -2182,6 +2186,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
       _defaultStartPage = defaultStartPage;
       _hdrEnabled = hdrEnabled;
       _matchRefreshRate = matchRefreshRate;
+      _optimizeFor = optimizeFor;
+      _fontSize = fontSize;
     });
   }
 
@@ -2316,6 +2322,62 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                 onChanged: widget.service.setMatchRefreshRate,
               ),
             ],
+            const SizedBox(height: 16),
+            Text(
+              l.settingsOptimizeFor,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l.settingsOptimizeForSpeedHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _IntervalChip(
+                  label: l.settingsOptimizeForQuality,
+                  isSelected: _optimizeFor == OptimizeFor.quality,
+                  onTap: () =>
+                      widget.service.setOptimizeFor(OptimizeFor.quality),
+                ),
+                _IntervalChip(
+                  label: l.settingsOptimizeForSpeed,
+                  isSelected: _optimizeFor == OptimizeFor.speed,
+                  onTap: () => widget.service.setOptimizeFor(OptimizeFor.speed),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l.settingsFontSize,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _IntervalChip(
+                  label: l.settingsFontSizeNormal,
+                  isSelected: _fontSize == AppFontSize.normal,
+                  onTap: () => widget.service.setFontSize(AppFontSize.normal),
+                ),
+                _IntervalChip(
+                  label: l.settingsFontSizeLarge,
+                  isSelected: _fontSize == AppFontSize.large,
+                  onTap: () => widget.service.setFontSize(AppFontSize.large),
+                ),
+                _IntervalChip(
+                  label: l.settingsFontSizeVeryLarge,
+                  isSelected: _fontSize == AppFontSize.veryLarge,
+                  onTap: () =>
+                      widget.service.setFontSize(AppFontSize.veryLarge),
+                ),
+              ],
+            ),
           ],
         ),
       ),

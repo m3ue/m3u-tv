@@ -176,6 +176,12 @@ abstract class AppLocalizations {
   /// **'Press back again to exit'**
   String get appBackToExit;
 
+  /// No description provided for @appRecordingScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording is being scheduled…'**
+  String get appRecordingScheduling;
+
   /// No description provided for @appRecordingScheduled.
   ///
   /// In en, this message translates to:
@@ -643,6 +649,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get playerUpNextDismiss;
+
+  /// No description provided for @playerLiveStreamEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream ended'**
+  String get playerLiveStreamEnded;
+
+  /// No description provided for @playerReturningToMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Returning to the menu…'**
+  String get playerReturningToMenu;
 
   /// No description provided for @searchHint.
   ///
@@ -2527,6 +2545,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get settingsToggleOff;
+
+  /// No description provided for @settingsOptimizeFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Optimize for'**
+  String get settingsOptimizeFor;
+
+  /// No description provided for @settingsOptimizeForQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get settingsOptimizeForQuality;
+
+  /// No description provided for @settingsOptimizeForQualityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharper images, higher memory usage.'**
+  String get settingsOptimizeForQualityHint;
+
+  /// No description provided for @settingsOptimizeForSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get settingsOptimizeForSpeed;
+
+  /// No description provided for @settingsOptimizeForSpeedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Faster loading, lower image quality.'**
+  String get settingsOptimizeForSpeedHint;
+
+  /// No description provided for @settingsFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get settingsFontSize;
+
+  /// No description provided for @settingsFontSizeNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get settingsFontSizeNormal;
+
+  /// No description provided for @settingsFontSizeLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Large'**
+  String get settingsFontSizeLarge;
+
+  /// No description provided for @settingsFontSizeVeryLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Very Large'**
+  String get settingsFontSizeVeryLarge;
 }
 
 class _AppLocalizationsDelegate

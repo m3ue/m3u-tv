@@ -45,6 +45,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get appBackToExit => 'Zum Beenden erneut Zurück drücken';
 
   @override
+  String get appRecordingScheduling => 'Aufnahme wird geplant…';
+
+  @override
   String appRecordingScheduled(String title) {
     return 'Aufnahme geplant: $title';
   }
@@ -304,6 +307,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get playerUpNextDismiss => 'Schließen';
+
+  @override
+  String get playerLiveStreamEnded => 'Übertragung beendet';
+
+  @override
+  String get playerReturningToMenu => 'Rückkehr zum Menü…';
 
   @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
@@ -1420,4 +1429,33 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsToggleOff => 'Aus';
+
+  @override
+  String get settingsOptimizeFor => 'Optimierung';
+
+  @override
+  String get settingsOptimizeForQuality => 'Qualität';
+
+  @override
+  String get settingsOptimizeForQualityHint =>
+      'Schärfere Bilder, höherer Speicherverbrauch.';
+
+  @override
+  String get settingsOptimizeForSpeed => 'Geschwindigkeit';
+
+  @override
+  String get settingsOptimizeForSpeedHint =>
+      'Schnelleres Laden, niedrigere Bildqualität.';
+
+  @override
+  String get settingsFontSize => 'Schriftgröße';
+
+  @override
+  String get settingsFontSizeNormal => 'Normal';
+
+  @override
+  String get settingsFontSizeLarge => 'Groß';
+
+  @override
+  String get settingsFontSizeVeryLarge => 'Sehr groß';
 }

@@ -12,6 +12,7 @@
   "navMore": "More",
   "notificationsDesktopOpen": "Open",
   "appBackToExit": "Press back again to exit",
+  "appRecordingScheduling": "Recording is being scheduled\u2026",
   "appRecordingScheduled": "Recording scheduled: {title}",
   "@appRecordingScheduled": {
     "placeholders": {
@@ -157,6 +158,8 @@
   "playerUpNext": "Up next",
   "playerUpNextPlay": "Play next",
   "playerUpNextDismiss": "Dismiss",
+  "playerLiveStreamEnded": "Stream ended",
+  "playerReturningToMenu": "Returning to the menu…",
   "searchHint": "Search live TV, movies, and series...",
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
@@ -795,5 +798,14 @@
   "settingsMatchRefreshRate": "Match display refresh rate",
   "settingsMatchRefreshRateHint": "Switch the monitor to the video's frame rate when playback starts. Can briefly blank the screen. Windows only.",
   "settingsToggleOn": "On",
-  "settingsToggleOff": "Off"
+  "settingsToggleOff": "Off",
+  "settingsOptimizeFor": "Optimize for",
+  "settingsOptimizeForQuality": "Quality",
+  "settingsOptimizeForQualityHint": "Sharper images, higher memory usage.",
+  "settingsOptimizeForSpeed": "Speed",
+  "settingsOptimizeForSpeedHint": "Faster loading, lower image quality.",
+  "settingsFontSize": "Font size",
+  "settingsFontSizeNormal": "Normal",
+  "settingsFontSizeLarge": "Large",
+  "settingsFontSizeVeryLarge": "Very Large"
 }

@@ -726,16 +726,22 @@ class XtreamService {
     UserCredentials credentials,
     String uuid,
   ) async {
-    final response = await _requestWithCredentials(
-      credentials,
-      'cancel_dvr_recording',
-      method: 'POST',
-      body: {'recording_id': uuid},
-    );
-    final map = _asMap(response);
-    final errorMessage = map['error'];
-    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
-      throw XtreamDvrScheduleException('$errorMessage');
+    try {
+      final response = await _requestWithCredentials(
+        credentials,
+        'cancel_dvr_recording',
+        method: 'POST',
+        body: {'recording_id': uuid},
+      );
+      final map = _asMap(response);
+      final errorMessage = map['error'];
+      if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+        throw XtreamDvrScheduleException('$errorMessage');
+      }
+    } on XtreamHttpException catch (e) {
+      throw XtreamDvrScheduleException(
+        e.serverMessage ?? 'Recording not found or not cancellable',
+      );
     }
   }
 
@@ -752,16 +758,22 @@ class XtreamService {
     UserCredentials credentials,
     String uuid,
   ) async {
-    final response = await _requestWithCredentials(
-      credentials,
-      'delete_dvr_recording',
-      method: 'POST',
-      body: {'recording_id': uuid},
-    );
-    final map = _asMap(response);
-    final errorMessage = map['error'];
-    if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
-      throw XtreamDvrScheduleException('$errorMessage');
+    try {
+      final response = await _requestWithCredentials(
+        credentials,
+        'delete_dvr_recording',
+        method: 'POST',
+        body: {'recording_id': uuid},
+      );
+      final map = _asMap(response);
+      final errorMessage = map['error'];
+      if (errorMessage != null && '$errorMessage'.trim().isNotEmpty) {
+        throw XtreamDvrScheduleException('$errorMessage');
+      }
+    } on XtreamHttpException catch (e) {
+      throw XtreamDvrScheduleException(
+        e.serverMessage ?? 'Recording not found or not deletable',
+      );
     }
   }
 

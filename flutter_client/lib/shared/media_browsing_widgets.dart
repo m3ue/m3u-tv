@@ -8,9 +8,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
+import 'package:m3u_tv/services/view_settings_service.dart' show OptimizeFor;
 import 'package:m3u_tv/shared/app_button.dart' show kStadiumFocusEffects;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
@@ -411,7 +413,6 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
   // until something (e.g. a manual app reload) asks for it again. Retrying
   // here with backoff closes that gap without needing to touch the shared
   // cache manager's concurrency settings.
-  static const _maxRetries = 3;
 
   int _attempt = 0;
   bool _retryScheduled = false;
@@ -446,9 +447,14 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
   void _scheduleRetry() {
     if (_retryScheduled) return;
     final hasNextUrl = _urlIndex < _urlChain.length - 1;
+    // In speed mode, cap retries at 1 to avoid redundant decode storms;
+    // quality mode keeps the full 3-retry budget for transient-failure recovery.
+    final isSpeed =
+        ImageQualityScope.of(context)?.optimizeFor == OptimizeFor.speed;
+    final maxRetries = isSpeed ? 1 : 3;
     // Give the last URL the full retry budget (transient-failure recovery);
     // when a better candidate is waiting, fail over after a single quick retry.
-    final retryBudget = hasNextUrl ? 1 : _maxRetries;
+    final retryBudget = hasNextUrl ? 1 : maxRetries;
     if (_attempt >= retryBudget) {
       if (!hasNextUrl) return;
       _retryScheduled = true;
@@ -483,13 +489,15 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
     );
     final url = _currentUrl;
     // Decode at display size by default (see [ResilientMediaImage.oversample]).
-    // An unconditional 2x oversample here quadrupled each decoded bitmap's
-    // memory footprint on a 4K TV, so a poster grid could not keep a screenful
-    // resident in the image cache and re-decoded from disk on every
-    // navigation. ResizeImage never upscales past the source's intrinsic size.
+    // The user's quality scope multiplies the per-widget oversample: speed
+    // mode keeps the memory footprint low, quality mode sharpens fixed-size
+    // logos. ResizeImage never upscales past the source's intrinsic size.
+    final oversample =
+        ImageQualityScope.oversampleOf(context) * widget.oversample;
+    final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
         MediaQuery.devicePixelRatioOf(context) *
-        widget.oversample *
+        oversample *
         TvZoomScale.of(context);
     final cacheWidth = widget.width == null
         ? null
@@ -528,7 +536,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
                   fit: widget.fit,
                   width: widget.width,
                   height: widget.height,
-                  filterQuality: FilterQuality.high,
+                  filterQuality: filterQuality,
                   gaplessPlayback: true,
                   frameBuilder:
                       (context, child, frame, wasSynchronouslyLoaded) {
@@ -989,7 +997,12 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
         MediaBrowsingMetrics.pagePadding * 2;
     final scale = _previewCardScale(availableWidth);
     final cardWidth = baseWidth * scale;
-    final cardHeight = baseHeight * scale;
+    // MediaPreviewCard multiplies its own width by FontSizeScope.scaleOf
+    // (see below) on top of `cardWidth`, so the row height reserved for it
+    // must grow by the same factor or a larger font setting overflows the
+    // card's Column (bigger image + taller scaled-up text in a row height
+    // that never grew to match).
+    final cardHeight = baseHeight * scale * FontSizeScope.scaleOf(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
@@ -1110,13 +1123,14 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
       !widget.landscapeStyle || item.emphasisLabel == null,
       'MediaPreviewItem.emphasisLabel is not rendered by landscape cards.',
     );
-    final width =
+    final baseWidth =
         widget.cardWidth ??
         (widget.landscapeStyle
             ? MediaBrowsingMetrics.landscapeCardWidth
             : widget.posterStyle
             ? MediaBrowsingMetrics.posterCardWidth
             : MediaBrowsingMetrics.previewCardWidth);
+    final width = baseWidth * FontSizeScope.scaleOf(context);
 
     return SizedBox(
       width: width,

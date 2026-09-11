@@ -12,6 +12,7 @@
   "navMore": "更多",
   "notificationsDesktopOpen": "打开",
   "appBackToExit": "再次按返回键退出",
+  "appRecordingScheduling": "正在安排录制\u2026",
   "appRecordingScheduled": "录制已安排：{title}",
   "@appRecordingScheduled": {
     "placeholders": {
@@ -156,6 +157,8 @@
   "playerUpNext": "即将播放",
   "playerUpNextPlay": "播放下一集",
   "playerUpNextDismiss": "关闭",
+  "playerLiveStreamEnded": "直播已结束",
+  "playerReturningToMenu": "正在返回菜单…",
   "searchHint": "搜索直播电视、电影和剧集…",
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",
@@ -794,5 +797,14 @@
   "settingsMatchRefreshRate": "匹配显示器刷新率",
   "settingsMatchRefreshRateHint": "播放开始时将显示器切换为视频的帧率。可能会使屏幕短暂黑屏。仅限 Windows。",
   "settingsToggleOn": "开",
-  "settingsToggleOff": "关"
+  "settingsToggleOff": "关",
+  "settingsOptimizeFor": "优化目标",
+  "settingsOptimizeForQuality": "画质",
+  "settingsOptimizeForQualityHint": "图像更清晰，内存占用更高。",
+  "settingsOptimizeForSpeed": "速度",
+  "settingsOptimizeForSpeedHint": "加载更快，图像质量降低。",
+  "settingsFontSize": "字体大小",
+  "settingsFontSizeNormal": "标准",
+  "settingsFontSizeLarge": "大",
+  "settingsFontSizeVeryLarge": "特大"
 }
