@@ -1145,7 +1145,7 @@ class _ChannelRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: SizedBox(
-          height: (72 * MediaQuery.textScalerOf(context).scale(1.0)).clamp(
+          height: (72 * MediaQuery.textScalerOf(context).scale(1)).clamp(
             72,
             140,
           ),
