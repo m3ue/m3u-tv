@@ -450,12 +450,6 @@ class AppStateController extends ChangeNotifier {
   // single re-fetch of VOD/Series. Mirrors the [_epgFetchDebounce] pattern.
   Timer? _dvrContentRefreshDebounce;
 
-  /// Periodic DVR-status poll while connected. Self-heals the recording
-  /// badges (red dots) and stop-buttons from the server's authoritative
-  /// `status=recording` list even when the Reverb push channel is down or a
-  /// push is missed - a recording that failed to start still shows as
-  /// recording until this next tick.
-  Timer? _activeDvrPollTimer;
   Set<_DvrContentRefreshTarget> _dvrContentRefreshPending =
       const <_DvrContentRefreshTarget>{};
   // Guards against a second flush starting while one is already awaiting its
@@ -891,17 +885,6 @@ class AppStateController extends ChangeNotifier {
         notificationGeneration: notificationGeneration,
       );
 
-      // Start the DVR-status poll REGARDLESS of WebSocket health. Pushes are
-      // best-effort (reverb can be down/never connected - the reconnect loop
-      // keeps trying), but the poll is the reliable path: it reconciles the
-      // recording badges and list statuses from the server's authoritative
-      // status=recording list, so a recording that started (or failed) a
-      // moment after a refresh still self-heals within the next tick.
-      // (The reverb onConnected callback below also runs a refresh - the
-      // poll only starts here so it keeps ticking even if WebSocket setup
-      // never completes.)
-      _ensureActiveDvrPoll();
-
       await _reverbService.connect(
         session: session,
         credentials: credentials,
@@ -921,23 +904,6 @@ class AppStateController extends ChangeNotifier {
     } on Object catch (_) {
       // TV notifications are best-effort; a failure here must not crash the app.
     }
-  }
-
-  /// Ensures the 30-second DVR-status poll is running. Called from every DVR
-  /// touchpoint (notification connect, schedule, refresh) so a failure in any
-  /// one path - e.g. the notification session fetch timing out - can't leave
-  /// the app without its self-healing poll.
-  void _ensureActiveDvrPoll() {
-    if (_activeDvrPollTimer != null) return;
-    _activeDvrPollTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) {
-        final credentials = authNotifier.credentials;
-        if (credentials == null) return;
-        final ownsWork = _captureDvrOwnership(credentials);
-        unawaited(_refreshActiveDvrRecordings(credentials, ownsWork));
-      },
-    );
   }
 
   /// Fetches the server's unread notification list. Used on live-stream end so
@@ -1989,7 +1955,6 @@ class AppStateController extends ChangeNotifier {
     if (credentials == null) return;
     final ownsWork = _captureDvrOwnership(credentials);
     if (!ownsWork()) return;
-    _ensureActiveDvrPoll();
     try {
       final recordings = await xtreamService.getDvrRecordingsFor(credentials);
       if (!ownsWork()) return;
@@ -2107,7 +2072,6 @@ class AppStateController extends ChangeNotifier {
     }
     final ownsWork = _captureDvrOwnership(credentials);
     if (!ownsWork()) return null;
-    _ensureActiveDvrPoll();
     // Optimistically mark the channel as recording *before* the (slow)
     // network call so the red dot and stop-button appear instantly.
     final previousRecordingChannelIds = _recordingChannelIds;
@@ -2409,11 +2373,15 @@ class AppStateController extends ChangeNotifier {
     unawaited(refreshDvrStorage());
   }
 
-  /// Lightweight poll for which channels are currently recording, used to
-  /// mark Live TV tiles without waiting for a full app refresh. Callers
-  /// (e.g. LiveTvScreen) are expected to invoke this on a short timer only
-  /// while the screen is visible — `status=recording` keeps the request
-  /// small regardless of total recording history.
+  /// One-shot reconciliation of which channels are currently recording,
+  /// fetched from the server's authoritative `status=recording`/`scheduled`
+  /// lists. DVR status otherwise arrives entirely via WebSocket push (see
+  /// [_onDvrStatusPush]) — there is no background poll — so callers invoke
+  /// this on-demand at the points a push might plausibly have been missed:
+  /// opening the DVR tab (`AppShell.didUpdateWidget`) and an unexpected live
+  /// stream end (`AppShell._handleLiveStreamEnded`), on top of the
+  /// WebSocket's own reconnect-time reconciliation (`onConnected` in
+  /// [_connectTvNotifications]).
   Future<void> refreshActiveDvrRecordings() async {
     final credentials = authNotifier.credentials;
     if (credentials == null) return;
@@ -3645,7 +3613,6 @@ class AppStateController extends ChangeNotifier {
     _epgFetchDebounce?.cancel();
     _epgGuidePersistDebounce?.cancel();
     _dvrContentRefreshDebounce?.cancel();
-    _activeDvrPollTimer?.cancel();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());
     unawaited(_notificationActivationController.close());

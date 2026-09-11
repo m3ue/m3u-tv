@@ -272,6 +272,23 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // DVR status arrives via WebSocket push in real time (see
+    // AppStateController._onDvrStatusPush) - there is no background poll to
+    // fall back on, so refresh once on-demand whenever the user actually
+    // opens the DVR tab. The branch navigator keeps DvrRecordingsScreen alive
+    // across visits (IndexedStack), so its own initState only fires once;
+    // this catches every subsequent re-visit.
+    final oldIndex = oldWidget.navigationShell.currentIndex;
+    final newIndex = widget.navigationShell.currentIndex;
+    if (oldIndex != newIndex &&
+        RouteNames.mainRoutes[newIndex] == RouteNames.dvr) {
+      unawaited(_appState.refreshActiveDvrRecordings());
+    }
+  }
+
   // True when this Back is the echo of one just handled from the other
   // delivery path (see `_backEchoWindow`). Called from both back entry points
   // so the guard also covers their player-modal-dismiss branches, not just
@@ -371,6 +388,10 @@ class AppShellState extends ConsumerState<AppShell>
   /// eviction message (if a "DVR recording has taken precedence" notification
   /// exists) so the player can show WHY the stream ended.
   Future<String?> _handleLiveStreamEnded() async {
+    // A live stream ending unexpectedly is itself the signal that DVR state
+    // may be stale (e.g. an eviction just started a recording) - refresh
+    // on-demand rather than waiting on a background poll.
+    unawaited(_appState.refreshActiveDvrRecordings());
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final items = await _appState.fetchUnreadNotifications();
