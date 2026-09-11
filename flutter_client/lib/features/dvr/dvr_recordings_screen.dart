@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
@@ -21,13 +21,13 @@ import 'package:m3u_tv/shared/row_action_menu.dart';
 /// the tap-to-open overflow menu (touch/mobile), used only when
 /// [DvrRecordingsScreen.useInlineRowActions] isn't supplied (previews,
 /// tests). The real app always passes it explicitly from `AppShell`, which
-/// resolves `DeviceType` via `resolveDeviceType`/`shouldUseSidebar` —
+/// resolves `DeviceType` via `resolveDeviceType`/`shouldUseSidebar` â€”
 /// including the Android-TV `nativeTelevisionHint` case this local check
 /// can't see, since it isn't threaded through `MediaQuery`/`Platform`.
 ///
 /// Mirrors the tv-or-desktop split `device_type_resolver.dart`'s
 /// `deviceTypeForView` computes, duplicated narrowly here rather than
-/// importing `app_shell.dart`'s `DeviceType`/`shouldUseSidebar` — that file
+/// importing `app_shell.dart`'s `DeviceType`/`shouldUseSidebar` â€” that file
 /// imports this one transitively (via this screen), so importing it back
 /// would cycle. Same precedent as `_isRemoteDrivenEnvironment` in
 /// `dvr_series_rule_options_screen.dart`.
@@ -94,7 +94,7 @@ class DvrRecordingsScreen extends StatefulWidget {
   /// `_exitFullScreenDetail`. The Series Rules tab opens the DVR Options
   /// screen via a plain `Navigator.push`, not a go_router route, so it
   /// doesn't get the immersive sidebar/bottom-nav-hiding treatment for
-  /// free the way `onOpenShowDetail`'s route push does — these let
+  /// free the way `onOpenShowDetail`'s route push does â€” these let
   /// `_openEdit` opt into the same state manually for the duration of
   /// that push.
   final VoidCallback? onEnterFullScreenDetail;
@@ -115,7 +115,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
     with SingleTickerProviderStateMixin {
   // 0 = Recordings, 1 = Series Rules, 2 = Shows. The Shows tab's search
   // field attaches to [_showsSearchFocus] so we can hand focus to it only
-  // when the tab is selected — TabBarView builds every child up front, so
+  // when the tab is selected â€” TabBarView builds every child up front, so
   // a plain autofocus on the field would steal focus from whichever tab
   // the user actually opened on.
   static const int _showsTabIndex = 2;
@@ -612,7 +612,7 @@ class _SeriesRuleCard extends StatelessWidget {
 
 /// Non-interactive DVR storage meter, shown in the screen header. `info` is
 /// only ever passed when the server supports `get_dvr_storage`, so this
-/// widget doesn't need its own "unsupported" state — the caller simply
+/// widget doesn't need its own "unsupported" state â€” the caller simply
 /// omits it. The bar is color-coded by percent used, matching the
 /// success/warning/danger thresholds (<75% / 75-89% / >=90%) used by
 /// m3u-editor's admin-side DvrStorageOverviewWidget.
@@ -1149,7 +1149,7 @@ class _MetaLine extends StatelessWidget {
     final bool statusWordIsError;
     switch (recording.status) {
       case DvrRecordingStatus.recording:
-        statusWord = '● ${l10n.dvrStatusRecording}';
+        statusWord = 'â— ${l10n.dvrStatusRecording}';
         statusWordIsError = false;
       case DvrRecordingStatus.scheduled:
         statusWord = l10n.dvrStatusScheduled;
@@ -1194,7 +1194,7 @@ class _MetaLine extends StatelessWidget {
     }
     void appendSeparator() {
       if (spans.isNotEmpty) {
-        spans.add(TextSpan(text: ' · ', style: muted));
+        spans.add(TextSpan(text: ' Â· ', style: muted));
       }
     }
 
@@ -1289,7 +1289,7 @@ class _SelectionActionBar extends StatelessWidget {
                   icon: Icons.delete,
                   variant: AppButtonVariant.destructive,
                   onPressed: onDelete,
-                  // Always on-screen once the selection bar is showing —
+                  // Always on-screen once the selection bar is showing â€”
                   // see the matching comment in row_action_menu.dart.
                   autoScroll: false,
                 ),
@@ -1304,7 +1304,7 @@ class _SelectionActionBar extends StatelessWidget {
 /// TV/desktop counterpart to [_SelectionActionBar]: a rail docked to the
 /// list's right edge instead of a bar below it. A bottom bar only exists
 /// after the last row, so reaching it with a d-pad means holding Down
-/// through every row above it first — fine for a short touch scroll, a
+/// through every row above it first â€” fine for a short touch scroll, a
 /// real barrier on a long list navigated one focus stop at a time. Docking
 /// beside the list instead means it's always exactly one Right press away
 /// from whichever row currently has focus, regardless of scroll position.
@@ -1351,7 +1351,7 @@ class _SelectionRail extends StatelessWidget {
                 tooltip: l10n.dvrExitSelection,
                 onPressed: onExit,
                 focusNode: onDelete == null ? focusNode : null,
-                // Docked rail is always on-screen — see the matching
+                // Docked rail is always on-screen â€” see the matching
                 // comment in row_action_menu.dart.
                 autoScroll: false,
               ),
@@ -1383,5 +1383,5 @@ class _SelectionRail extends StatelessWidget {
   }
 }
 
-/ /   c i   t r i g g e r  
+ 
  
