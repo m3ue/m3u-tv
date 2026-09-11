@@ -174,6 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         comskipSettings: widget.comskipSettings,
         viewSettingsService: widget.viewSettingsService,
         onSidebarActivate: widget.onSidebarActivate,
+        deviceType: widget.deviceType,
       ),
     );
   }
@@ -820,6 +821,7 @@ class _ConnectedView extends StatefulWidget {
     this.comskipSettings,
     this.viewSettingsService,
     this.onSidebarActivate,
+    this.deviceType,
   });
 
   final AuthNotifier authNotifier;
@@ -828,6 +830,7 @@ class _ConnectedView extends StatefulWidget {
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
+  final DeviceType? deviceType;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -1121,7 +1124,10 @@ class _ConnectedViewState extends State<_ConnectedView>
         ],
 
         if (widget.viewSettingsService != null) ...[
-          _ViewSettingsSection(service: widget.viewSettingsService!),
+          _ViewSettingsSection(
+            service: widget.viewSettingsService!,
+            deviceType: widget.deviceType,
+          ),
           const SizedBox(height: 20),
         ],
 
@@ -2133,9 +2139,10 @@ class _ProxyProfilePicker extends StatelessWidget {
 }
 
 class _ViewSettingsSection extends StatefulWidget {
-  const _ViewSettingsSection({required this.service});
+  const _ViewSettingsSection({required this.service, this.deviceType});
 
   final ViewSettingsService service;
+  final DeviceType? deviceType;
 
   @override
   State<_ViewSettingsSection> createState() => _ViewSettingsSectionState();
@@ -2177,7 +2184,12 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final hdrEnabled = await widget.service.hdrEnabled();
     final matchRefreshRate = await widget.service.matchRefreshRate();
     final optimizeFor = await widget.service.optimizeFor();
-    final fontSize = await widget.service.fontSize();
+    final storedFontSize = await widget.service.fontSizeOrNull();
+    final fontSize =
+        storedFontSize ??
+        (widget.deviceType == DeviceType.tv
+            ? AppFontSize.large
+            : AppFontSize.normal);
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;

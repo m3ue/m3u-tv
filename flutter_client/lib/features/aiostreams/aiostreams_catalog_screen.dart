@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Returns a display-friendly title for a catalog, appending the media type
@@ -782,7 +783,7 @@ class _CatalogRowSkeleton extends StatelessWidget {
             children: [
               Icon(
                 titleIcon,
-                size: 20,
+                size: 20 * FontSizeScope.scaleOf(context),
                 color: theme.textTheme.titleLarge?.color,
               ),
               const SizedBox(width: 8),
@@ -796,8 +797,11 @@ class _CatalogRowSkeleton extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final scale = _scale(constraints.maxWidth);
-              final cardWidth = MediaBrowsingMetrics.posterCardWidth * scale;
-              final cardHeight = MediaBrowsingMetrics.posterCardHeight * scale;
+              final fontScale = FontSizeScope.scaleOf(context);
+              final cardWidth =
+                  MediaBrowsingMetrics.posterCardWidth * scale * fontScale;
+              final cardHeight =
+                  MediaBrowsingMetrics.posterCardHeight * scale * fontScale;
               return SizedBox(
                 height: cardHeight + 16,
                 child: ListView.separated(

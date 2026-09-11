@@ -260,9 +260,28 @@ class ViewSettingsService extends ChangeNotifier {
     return AppFontSize.fromValue(raw as String?);
   }
 
+  /// The persisted font size, or null if the user has never chosen one. See
+  /// [fontSizeSyncOrNull] for why this differs from [fontSize].
+  Future<AppFontSize?> fontSizeOrNull() async {
+    final raw = await _read(fontSizeKey);
+    return raw == null ? null : AppFontSize.fromValue(raw as String?);
+  }
+
   /// Synchronous access to the in-memory cached font size setting.
   AppFontSize get fontSizeSync =>
       AppFontSize.fromValue(_memory[fontSizeKey] as String?);
+
+  /// Synchronous access to the persisted font size, or null if the user has
+  /// never chosen one. Lets callers apply a device-specific default (e.g. TV
+  /// defaults to [AppFontSize.large]) only on first launch, instead of the
+  /// fixed [AppFontSize.normal] fallback [fontSizeSync] always returns.
+  /// Only meaningful after [fontSize] has been awaited at least once (see the
+  /// preload in `main.dart`) - before that the key is simply absent from the
+  /// in-memory cache and this also returns null.
+  AppFontSize? get fontSizeSyncOrNull {
+    final raw = _memory[fontSizeKey] as String?;
+    return raw == null ? null : AppFontSize.fromValue(raw);
+  }
 
   Future<void> setFontSize(AppFontSize value) async {
     await _write(fontSizeKey, value.value);

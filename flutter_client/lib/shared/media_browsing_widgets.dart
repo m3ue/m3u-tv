@@ -14,7 +14,6 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -496,9 +495,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
         ImageQualityScope.oversampleOf(context) * widget.oversample;
     final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
-        MediaQuery.devicePixelRatioOf(context) *
-        oversample *
-        TvZoomScale.of(context);
+        MediaQuery.devicePixelRatioOf(context) * oversample;
     final cacheWidth = widget.width == null
         ? null
         : (widget.width! * devicePixelRatio).round();
@@ -576,7 +573,11 @@ class _MediaImageFallback extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         Center(
-          child: Icon(icon, size: 48, color: colorScheme.onSurfaceVariant),
+          child: Icon(
+            icon,
+            size: 48 * FontSizeScope.scaleOf(context),
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
         if (fallbackTitle != null && fallbackTitle.isNotEmpty)
           Align(
@@ -1015,7 +1016,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               if (widget.titleIcon != null) ...[
                 Icon(
                   widget.titleIcon,
-                  size: 20,
+                  size: 20 * FontSizeScope.scaleOf(context),
                   color: Theme.of(context).textTheme.titleLarge?.color,
                 ),
                 const SizedBox(width: 8),

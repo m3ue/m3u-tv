@@ -8,6 +8,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/category_browse_filter.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 
@@ -202,7 +203,10 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       builder: (context, constraints) {
         final availableWidth =
             constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2;
-        final columnCount = _posterColumnCount(availableWidth);
+        final columnCount = _posterColumnCount(
+          availableWidth,
+          FontSizeScope.scaleOf(context),
+        );
 
         return FocusScope(
           node: _gridFocusNode,
@@ -257,14 +261,16 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     );
   }
 
-  int _posterColumnCount(double availableWidth) {
+  int _posterColumnCount(double availableWidth, double scale) {
+    final maxCardWidth = _maxPosterCardWidth * scale;
+    final minCardWidth = _minPosterCardWidth * scale;
     final minimumColumns =
         ((availableWidth + MediaBrowsingMetrics.itemGap) /
-                (_maxPosterCardWidth + MediaBrowsingMetrics.itemGap))
+                (maxCardWidth + MediaBrowsingMetrics.itemGap))
             .ceil();
     final maximumColumns =
         ((availableWidth + MediaBrowsingMetrics.itemGap) /
-                (_minPosterCardWidth + MediaBrowsingMetrics.itemGap))
+                (minCardWidth + MediaBrowsingMetrics.itemGap))
             .floor();
     return minimumColumns.clamp(1, maximumColumns.clamp(1, 100));
   }
