@@ -988,7 +988,7 @@ class _RecordingCard extends StatelessWidget {
   // Row height adapts to text scale so larger fonts don't overflow.
   double _rowHeight(BuildContext context) {
     final scale = MediaQuery.textScalerOf(context).scale(1.0);
-    return (72.0 * scale).clamp(72.0, 140.0);
+    return (72 * scale).clamp(72, 140);
   }
 
   @override
