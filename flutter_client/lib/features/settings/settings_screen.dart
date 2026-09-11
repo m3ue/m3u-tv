@@ -5,6 +5,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
+import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
@@ -50,6 +51,7 @@ class SettingsScreen extends StatefulWidget {
     this.comskipSettings,
     this.viewSettingsService,
     this.deviceType,
+    this.onSidebarActivate,
   });
 
   final AuthNotifier authNotifier;
@@ -81,6 +83,9 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onConnected;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
+
+  /// Activates the shell sidebar (left-edge press from tab content).
+  final VoidCallback? onSidebarActivate;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -168,6 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
         comskipSettings: widget.comskipSettings,
         viewSettingsService: widget.viewSettingsService,
+        onSidebarActivate: widget.onSidebarActivate,
       ),
     );
   }
@@ -813,10 +819,12 @@ class _ConnectedView extends StatefulWidget {
     this.proxyPlaybackSettings,
     this.comskipSettings,
     this.viewSettingsService,
+    this.onSidebarActivate,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final VoidCallback? onSidebarActivate;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
@@ -841,7 +849,7 @@ class _ConnectedView extends StatefulWidget {
 
 class _ConnectedViewState extends State<_ConnectedView>
     with SingleTickerProviderStateMixin {
-  late final _tabController = TabController(length: 2, vsync: this);
+  late final _tabController = TabController(length: 3, vsync: this);
 
   @override
   void dispose() {
@@ -906,6 +914,7 @@ class _ConnectedViewState extends State<_ConnectedView>
           tabs: [
             AppLocalizations.of(context).settingsGeneral,
             AppLocalizations.of(context).settingsIntegrations,
+            AppLocalizations.of(context).settingsReleaseNotesTab,
           ],
         ),
         Expanded(
@@ -919,6 +928,12 @@ class _ConnectedViewState extends State<_ConnectedView>
               SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: _buildIntegrationsTab(context),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: ReleaseNotesView(
+                  onSidebarActivate: widget.onSidebarActivate,
+                ),
               ),
             ],
           ),

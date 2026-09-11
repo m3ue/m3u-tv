@@ -2,11 +2,19 @@ import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
+import 'package:m3u_tv/services/device_performance.dart';
+import 'package:m3u_tv/shared/media_image_http_file_service.dart';
+
 /// Disk cache for media poster/thumbnail images.
 ///
-/// Holds up to 300 files for 30 days. At ~100 KB average per poster this
-/// stays well under 30 MB on device while covering a full library of recently
-/// browsed content.
+/// Holds up to [_maxCacheObjects] files for 30 days. At ~40-80 KB per
+/// (right-sized) poster a full 2000-object cache is ~100-150 MB on disk, which
+/// is the point: a poster-dense TV UI blows through 300 objects in a couple of
+/// screens and then re-fetches art the user just scrolled past. Low-end
+/// hardware gets a smaller ceiling.
+///
+/// Network fetches go through [MediaImageHttpFileService] (pooled keep-alive
+/// client, tier-scaled concurrency) instead of flutter_cache_manager's default.
 class MediaImageCacheManager extends CacheManager with ImageCacheManager {
   factory MediaImageCacheManager() => _instance;
 
@@ -15,16 +23,20 @@ class MediaImageCacheManager extends CacheManager with ImageCacheManager {
         Platform.operatingSystem == 'tvos'
             ? Config(
                 _key,
-                maxNrOfCacheObjects: 300,
+                maxNrOfCacheObjects: _maxCacheObjects,
                 stalePeriod: const Duration(days: 30),
                 repo: _tvosRepo(),
+                fileService: MediaImageHttpFileService(),
               )
             : Config(
                 _key,
-                maxNrOfCacheObjects: 300,
+                maxNrOfCacheObjects: _maxCacheObjects,
                 stalePeriod: const Duration(days: 30),
+                fileService: MediaImageHttpFileService(),
               ),
       );
+
+  static int get _maxCacheObjects => DevicePerformance.isReduced ? 800 : 2000;
 
   static const _key = 'm3uMediaImages';
   static final MediaImageCacheManager _instance = MediaImageCacheManager._();

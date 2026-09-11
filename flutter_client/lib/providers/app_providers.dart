@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -91,6 +92,12 @@ final vodItemsProvider = Provider<List<VodItem>>((ref) {
 
 final vodCategoriesProvider = Provider<List<Category>>((ref) {
   return ref.watch(appStateControllerProvider).appState.vodCategories;
+});
+
+/// SQLite catalog store (always present). Surfaces that have moved to windowed
+/// loading read pages from here.
+final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
+  return ref.watch(appStateControllerProvider).appState.catalogRepository;
 });
 
 final seriesListProvider = Provider<List<Series>>((ref) {

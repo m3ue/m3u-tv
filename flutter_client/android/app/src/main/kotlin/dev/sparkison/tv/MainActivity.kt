@@ -1,11 +1,13 @@
 package dev.sparkison.tv
 
+import android.app.ActivityManager
 import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
+import android.os.Process
 import android.util.DisplayMetrics
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -68,6 +70,7 @@ class MainActivity : FlutterActivity() {
             channel.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isTelevision" -> result.success(isTelevisionDevice())
+                    "getPerformanceSignals" -> result.success(performanceSignals())
                     else -> result.notImplemented()
                 }
             }
@@ -116,6 +119,24 @@ class MainActivity : FlutterActivity() {
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
             insetsController.show(systemBars)
         }
+    }
+
+    /// Hardware signals the Dart-side [DevicePerformance] uses to pick the
+    /// reduced tier: a 32-bit process (cheap TV sticks run 32-bit userspace),
+    /// the platform low-RAM flag, and total physical memory.
+    private fun performanceSignals(): Map<String, Any> {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
+        val is64Bit = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Process.is64Bit()
+        } else {
+            Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
+        }
+        return mapOf(
+            "is64Bit" to is64Bit,
+            "isLowRamDevice" to (activityManager?.isLowRamDevice ?: false),
+            "totalMemBytes" to memInfo.totalMem,
+        )
     }
 
     private fun isTelevisionDevice(): Boolean {

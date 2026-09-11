@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -29,6 +30,11 @@ String _catalogDisplayTitle(AppLocalizations l, AIOStreamsCatalog catalog) {
   final suffix = catalog.type == 'series' ? l.navSeries : l.navVod;
   return '$name $suffix';
 }
+
+/// Row-header icon for a catalog: the series glyph for series catalogs, the
+/// movie glyph otherwise - matching the fallback icons used on the cards.
+IconData _catalogTypeIcon(AIOStreamsCatalog catalog) =>
+    catalog.type == 'series' ? Icons.tv : Icons.movie;
 
 /// Full-screen catalog browser for a single AIOStreams catalog.
 /// Supports lazy pagination and optional text search.
@@ -203,26 +209,39 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                 padding: const EdgeInsets.symmetric(
                   horizontal: MediaBrowsingMetrics.contentPadding,
                 ),
+                // Poster grid sized to match the Movies / Series listing pages
+                // (see VodScreen / SeriesScreen): cards up to 220 wide at a
+                // 0.6 aspect ratio, rendered with the shared MediaPreviewCard.
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     childCount: _items.length,
                     (context, index) {
                       final item = _items[index];
-                      return DpadInkWell(
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(8),
-                        ),
-                        onTap: () => widget.onItemSelect(item),
+                      return MediaPreviewCard(
+                        posterStyle: true,
+                        keepAlive: false,
                         autofocus: index == 0,
-                        child: _CatalogItemCard(item: item),
+                        item: MediaPreviewItem(
+                          title: item.name,
+                          imageUrl: item.poster,
+                          subtitle: item.year ?? item.type,
+                          ratingLabel: item.imdbRating == null
+                              ? null
+                              : '★ ${item.imdbRating}',
+                          fallbackIcon: item.type == 'series'
+                              ? Icons.tv
+                              : Icons.movie,
+                          fallbackTitle: item.name,
+                          onTap: () => widget.onItemSelect(item),
+                        ),
                       );
                     },
                   ),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 160,
+                    maxCrossAxisExtent: 220,
                     mainAxisSpacing: MediaBrowsingMetrics.itemGap,
                     crossAxisSpacing: MediaBrowsingMetrics.itemGap,
-                    childAspectRatio: 2 / 3,
+                    childAspectRatio: 0.6,
                   ),
                 ),
               ),
@@ -293,36 +312,6 @@ class _AIOStreamsSearchEntry extends StatelessWidget {
   }
 }
 
-class _CatalogItemCard extends StatelessWidget {
-  const _CatalogItemCard({required this.item});
-
-  final AIOStreamsItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: ResilientMediaImage(
-            imageUrl: item.poster,
-            fallbackIcon: item.type == 'series' ? Icons.tv : Icons.movie,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          item.name,
-          style: theme.textTheme.bodySmall,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-}
-
 /// Top-level screen for the AIOStreams nav tab.
 /// Shows all integrations with their catalogs as horizontal rows,
 /// plus optional Continue Watching, My Favorites, and Search sections.
@@ -337,6 +326,8 @@ class AIOStreamsHomeScreen extends StatefulWidget {
     this.favoritesService,
     this.progressList = const [],
     this.onSidebarActivate,
+    this.onSetWatchState,
+    this.useSidebarLayout = false,
   });
 
   final List<AIOStreamsIntegration> integrations;
@@ -347,6 +338,16 @@ class AIOStreamsHomeScreen extends StatefulWidget {
   final AIOStreamsFavoritesService? favoritesService;
   final List<Progress> progressList;
   final VoidCallback? onSidebarActivate;
+
+  /// Flips a Continue Watching entry to watched / unwatched from the resume
+  /// modal's manage actions. Mirrors the Home row and player flows.
+  final Future<void> Function(Progress progress, {required bool watched})?
+  onSetWatchState;
+
+  /// Whether this tab is hosted inside AppShell's TV/desktop sidebar layout,
+  /// so the child [MediaPreviewSection]s size their cards identically to the
+  /// Home screen's rows (see [MediaPreviewSection.useSidebarLayout]).
+  final bool useSidebarLayout;
 
   @override
   State<AIOStreamsHomeScreen> createState() => _AIOStreamsHomeScreenState();
@@ -398,18 +399,30 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     required int integrationId,
     required bool isSeries,
   }) async {
-    // 1. Resume modal when there is meaningful progress.
+    // 1. Resume modal when there is meaningful progress. Mirrors the Home row
+    //    and player flows: manage actions ("Clear progress" / "Mark watched")
+    //    are offered and handled here too.
     double startPosition = 0;
     if (progress.positionSeconds > 0 && !progress.completed) {
       final chosen = await showResumeModal(
         context,
         title: progress.title ?? itemId,
         positionSeconds: progress.positionSeconds,
+        showManageActions: true,
       );
       if (chosen == null) return; // dismissed
-      startPosition = chosen.action == ResumeAction.resume
-          ? chosen.startPositionSeconds
-          : 0;
+      switch (chosen.action) {
+        case ResumeAction.resume:
+          startPosition = chosen.startPositionSeconds;
+        case ResumeAction.startOver:
+          startPosition = 0;
+        case ResumeAction.clearProgress:
+          await widget.onSetWatchState?.call(progress, watched: false);
+          return;
+        case ResumeAction.markWatched:
+          await widget.onSetWatchState?.call(progress, watched: true);
+          return;
+      }
     }
 
     if (!context.mounted) return;
@@ -503,7 +516,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     }
 
     final continueWatching = widget.progressList
-        .where((p) => p.aioItemId != null && !p.completed)
+        .where((p) => p.aioItemId != null && isContinueWatchingEligible(p))
         .toList(growable: false);
 
     return Scaffold(
@@ -532,6 +545,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                 titleIcon: Icons.history,
                 emptyLabel: '',
                 landscapeStyle: true,
+                useSidebarLayout: widget.useSidebarLayout,
                 items: continueWatching
                     .map((p) {
                       final fraction =
@@ -555,7 +569,8 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                         overlayLabel: seOverlay ?? p.year,
                         fallbackIcon: isSeries ? Icons.tv : Icons.movie,
                         fallbackTitle: p.title ?? itemId,
-                        progressFraction: fraction,
+                        progressFraction: p.upNext ? null : fraction,
+                        upNextLabel: p.upNext ? l.homeUpNext : null,
                         isFavorite: _favoriteIds.contains(itemId),
                         overlayBadges: <String>[
                           if (p.rating != null) '★ ${p.rating}',
@@ -593,6 +608,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                 title: l.aiostreamsMyFavorites,
                 emptyLabel: '',
                 posterStyle: true,
+                useSidebarLayout: widget.useSidebarLayout,
                 items: _favorites
                     .map(
                       (fav) => MediaPreviewItem(
@@ -641,6 +657,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                   apiService: widget.apiService,
                   favoritesService: widget.favoritesService,
                   favoriteIds: _favoriteIds,
+                  useSidebarLayout: widget.useSidebarLayout,
                   onItemSelect: (item) =>
                       widget.onItemSelect(item, integration.id),
                   onSidebarActivate: widget.onSidebarActivate,
@@ -663,6 +680,7 @@ class AIOStreamsCatalogRow extends StatefulWidget {
     this.favoritesService,
     this.favoriteIds = const {},
     this.onSidebarActivate,
+    this.useSidebarLayout = false,
   });
 
   final AIOStreamsCatalog catalog;
@@ -672,6 +690,7 @@ class AIOStreamsCatalogRow extends StatefulWidget {
   final AIOStreamsFavoritesService? favoritesService;
   final Set<String> favoriteIds;
   final VoidCallback? onSidebarActivate;
+  final bool useSidebarLayout;
 
   @override
   State<AIOStreamsCatalogRow> createState() => _AIOStreamsCatalogRowState();
@@ -694,13 +713,16 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _CatalogRowSkeleton(
             title: _catalogDisplayTitle(l, widget.catalog),
+            titleIcon: _catalogTypeIcon(widget.catalog),
           );
         }
         final items = snapshot.data ?? const [];
         return MediaPreviewSection(
           title: _catalogDisplayTitle(l, widget.catalog),
+          titleIcon: _catalogTypeIcon(widget.catalog),
           emptyLabel: AppLocalizations.of(context).aiostrreamsCatalogEmpty,
           posterStyle: true,
+          useSidebarLayout: widget.useSidebarLayout,
           items: items
               .map(
                 (item) => MediaPreviewItem(
@@ -735,9 +757,10 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
 }
 
 class _CatalogRowSkeleton extends StatelessWidget {
-  const _CatalogRowSkeleton({required this.title});
+  const _CatalogRowSkeleton({required this.title, required this.titleIcon});
 
   final String title;
+  final IconData titleIcon;
 
   // Mirrors MediaPreviewSection._previewCardScale.
   double _scale(double availableWidth) {
@@ -754,9 +777,20 @@ class _CatalogRowSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                titleIcon,
+                size: 20,
+                color: theme.textTheme.titleLarge?.color,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+              ),
+            ],
           ),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
           LayoutBuilder(

@@ -355,9 +355,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _comskipBadgeTimer?.cancel();
     _introDbPromptTimer?.cancel();
     _introDbPendingSkipTimer?.cancel();
+    _liveEndHoldTimer?.cancel();
 
     setState(() {
       _status = PlaybackStatus.idle;
+      _liveEndHold = false;
+      _liveEndReason = null;
       _currentPosition = Duration.zero;
       _duration = Duration.zero;
       _errorMessage = null;
@@ -1302,7 +1305,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// Fetches the reason the live stream ended (via the shell, which queries
-  /// persisted notifications — the push channel can be down) and swaps the
+  /// persisted notifications - the push channel can be down) and swaps the
   /// generic "Stream ended" for the real message.
   Future<void> _loadLiveEndReason() async {
     String? reason;
@@ -1405,7 +1408,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
     if (_liveEndHold) {
-      // User pressed back during the post-stream hold — leave immediately.
+      // User pressed back during the post-stream hold - leave immediately.
       _liveEndHoldTimer?.cancel();
       _liveEndHold = false;
       _goBack();
@@ -1614,7 +1617,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _liveEndReason ?? 'Stream ended',
+                                _liveEndReason ??
+                                    AppLocalizations.of(
+                                      context,
+                                    ).playerLiveStreamEnded,
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       color: Colors.white,
@@ -1622,9 +1628,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                     ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
-                                'Returning to the menu…',
-                                style: TextStyle(
+                              Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).playerReturningToMenu,
+                                style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 14,
                                 ),

@@ -28,6 +28,7 @@ class DpadInkWell extends StatefulWidget {
     this.color,
     this.borderRadius,
     this.scrollPadding,
+    this.autoScroll = true,
     this.clipBehavior = Clip.none,
     this.focusNode,
     this.onFocusChange,
@@ -43,6 +44,12 @@ class DpadInkWell extends StatefulWidget {
   final Color? color;
   final BorderRadius? borderRadius;
   final double? scrollPadding;
+
+  /// Forwarded to [DpadFocusable.autoScroll]. Set `false` for a row that is
+  /// always on-screen (e.g. inside a fixed-height rail) so focusing it never
+  /// nudges a scrolling ancestor such as a tab's `PageView`.
+  final bool autoScroll;
+
   final Clip clipBehavior;
 
   /// Supplies an external [FocusNode] instead of letting this widget manage
@@ -220,6 +227,7 @@ class _DpadInkWellState extends State<DpadInkWell> {
         },
         autofocus: widget.autofocus,
         entry: widget.entry,
+        autoScroll: widget.autoScroll,
         scrollPadding: widget.scrollPadding,
         child: Material(
           color: widget.color ?? Colors.transparent,

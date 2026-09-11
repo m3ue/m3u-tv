@@ -69,16 +69,16 @@ class PlaybackOrchestrator {
         // (expired_token, stream_not_found); only 5xx (capacity, provider
         // errors) carry the JSON message worth surfacing here.
         if (response.statusCode < 500) {
-          client.close();
+          client.close(force: true);
           return null;
         }
         final body = await response.transform(utf8.decoder).join();
-        client.close();
+        client.close(force: true);
         // Server returns JSON like {"message": "...", "status": 503}
         final json = jsonDecode(body) as Map<String, dynamic>;
         return json['message'] as String?;
       } on Object {
-        client.close();
+        client.close(force: true);
         return null;
       }
     } on Object {
@@ -88,7 +88,7 @@ class PlaybackOrchestrator {
 
   /// Check a live stream URL up front for a server-side rejection (capacity,
   /// auth, provider error). The server returns JSON errors for stream routes,
-  /// but the native player surfaces them as a generic "Source error" — so ask
+  /// but the native player surfaces them as a generic "Source error" - so ask
   /// first and surface the server's own message, matching DVR scheduling
   /// errors. Redirects (3xx) and success (2xx) return null so playback
   /// proceeds normally.
@@ -104,24 +104,27 @@ class PlaybackOrchestrator {
           const Duration(seconds: 4),
         );
         if (response.statusCode < 400) {
-          client.close();
+          // force:true: a healthy response here is the live stream body
+          // itself, which never completes on its own -- close(false) would
+          // wait for it and leak the socket (and a server-side stream slot).
+          client.close(force: true);
           return null;
         }
         // 403 (auth/token) and 404 (stream gone) are typed by the player
-        // backends' own probe (expired_token / stream_not_found) — don't
+        // backends' own probe (expired_token / stream_not_found) - don't
         // swallow them into the generic rejection path here.
         if (response.statusCode == HttpStatus.forbidden ||
             response.statusCode == HttpStatus.notFound) {
-          client.close();
+          client.close(force: true);
           return null;
         }
         final body = await response.transform(utf8.decoder).join();
-        client.close();
+        client.close(force: true);
         final json = jsonDecode(body) as Map<String, dynamic>;
         return json['message'] as String? ??
             'Playback error (${response.statusCode})';
       } on Object {
-        client.close();
+        client.close(force: true);
         return null;
       }
     } on Object {
@@ -422,32 +425,23 @@ class PlaybackOrchestrator {
           // layer while the native core is still attached to it.
           await (adapter as PlatformViewProvider).releaseNativeView();
         }
-        var reportedError = isStreamUnavailable
-            ? PlaybackException(
-                message:
-                    "This channel's stream is currently unavailable from "
-                    'your provider. Please try again in a moment.',
-                backend: error.backend,
-                code: 'stream_unavailable',
-                recoverable: error.recoverable,
-              )
-            : effectiveError;
-
-        // For live content, try to fetch the actual error message from the
-        // server (now returns JSON for stream routes). This surfaces capacity
-        // errors ("Playlist has reached maximum stream limit") instead of a
-        // generic "Source error" — the player can't parse the JSON itself.
-        if (source.isLive && reportedError.code != 'stream_unavailable') {
-          final serverMessage = await _fetchStreamError(source.uri);
-          if (serverMessage != null && serverMessage.isNotEmpty) {
-            reportedError = PlaybackException(
-              message: serverMessage,
-              backend: error.backend,
-              code: 'stream_unavailable',
-              recoverable: error.recoverable,
-            );
-          }
-        }
+        // Prefer the real server message (e.g. capacity errors like
+        // "Playlist has reached maximum stream limit") fetched above over
+        // the generic probe-failure text — otherwise the capacity message
+        // this surfaces gets silently discarded in favor of boilerplate.
+        final reportedError = effectiveError.code == 'stream_unavailable'
+            ? effectiveError
+            : (isStreamUnavailable
+                  ? PlaybackException(
+                      message:
+                          "This channel's stream is currently unavailable "
+                          'from your provider. Please try again in a '
+                          'moment.',
+                      backend: error.backend,
+                      code: 'stream_unavailable',
+                      recoverable: error.recoverable,
+                    )
+                  : effectiveError);
         _diagnostics.add(
           'load-failed:${backend.name}:${reportedError.code}:${reportedError.message}',
         );

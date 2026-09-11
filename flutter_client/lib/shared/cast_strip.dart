@@ -8,11 +8,16 @@ import 'package:flutter/services.dart'
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 const double _kCardWidth = 150;
-const double _kCardHeight = 152;
 const double _kAvatarSize = 72;
+const double _kAvatarGap = 8;
+// Name + role text below the avatar (each maxLines: 1). This grows with the
+// user's font-size setting (global TextScaler in main.dart) while the
+// avatar above it does not, so only this budget is scaled - see CastStripState.build.
+const double _kCardTextHeight = 72;
 const double _kCardGap = 12;
 
 /// A "locked focus" horizontal cast row for TV / desktop detail screens.
@@ -189,7 +194,10 @@ class CastStripState extends State<CastStrip> {
       descendantsAreFocusable: false,
       onKeyEvent: _handleKeyEvent,
       child: SizedBox(
-        height: _kCardHeight,
+        height:
+            _kAvatarSize +
+            _kAvatarGap +
+            _kCardTextHeight * FontSizeScope.scaleOf(context),
         // Desktop mouse users get hover arrows here (the scrollbar is hidden);
         // TV / phone pass straight through.
         child: HoverScrollArrows(
@@ -242,7 +250,7 @@ class _CastStripCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: _kAvatarGap),
           Text(
             member.name,
             maxLines: 1,

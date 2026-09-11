@@ -157,6 +157,8 @@
   "playerUpNext": "A continuación",
   "playerUpNextPlay": "Reproducir siguiente",
   "playerUpNextDismiss": "Descartar",
+  "playerLiveStreamEnded": "Transmisión finalizada",
+  "playerReturningToMenu": "Volviendo al menú…",
   "searchHint": "Buscar Televisión en vivo, cine y series…",
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",
@@ -220,6 +222,39 @@
   },
   "settingsAppViewRelease": "Ver versión",
   "settingsAppScanQr": "Escanear para abrir en tu teléfono",
+  "settingsReleaseNotesTab": "Novedades",
+  "settingsReleaseNotesLoading": "Cargando notas de la versión…",
+  "settingsReleaseNotesError": "No se pudieron cargar las notas de la versión. Comprueba tu conexión e inténtalo de nuevo.",
+  "settingsReleaseNotesRetry": "Reintentar",
+  "settingsReleaseNotesCurrentBadge": "Actual",
+  "settingsReleaseNotesNewBadge": "Nueva",
+  "settingsReleaseNotesYouAreOn": "Tienes la versión {version}",
+  "@settingsReleaseNotesYouAreOn": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesLatestIs": "Última: {version}",
+  "@settingsReleaseNotesLatestIs": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsReleaseNotesNewerCount": "{count} más recientes",
+  "@settingsReleaseNotesNewerCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesUpToDate": "Tienes la última versión",
+  "settingsReleaseNotesViewOnGithub": "Ver todo en GitHub",
+  "settingsReleaseNotesNoneForVersion": "No hay notas para esta versión.",
   "settingsFillAllFields": "Por favor completa todos los campos",
   "settingsConnectionSettings": "Configuración de conexión",
   "settingsConnectionSettingsSubtitle": "Ingresa los datos de tu Xtream Codes",

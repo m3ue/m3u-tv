@@ -997,7 +997,12 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
         MediaBrowsingMetrics.pagePadding * 2;
     final scale = _previewCardScale(availableWidth);
     final cardWidth = baseWidth * scale;
-    final cardHeight = baseHeight * scale;
+    // MediaPreviewCard multiplies its own width by FontSizeScope.scaleOf
+    // (see below) on top of `cardWidth`, so the row height reserved for it
+    // must grow by the same factor or a larger font setting overflows the
+    // card's Column (bigger image + taller scaled-up text in a row height
+    // that never grew to match).
+    final cardHeight = baseHeight * scale * FontSizeScope.scaleOf(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),

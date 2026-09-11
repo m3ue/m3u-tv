@@ -309,6 +309,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerUpNextDismiss => 'Schließen';
 
   @override
+  String get playerLiveStreamEnded => 'Übertragung beendet';
+
+  @override
+  String get playerReturningToMenu => 'Rückkehr zum Menü…';
+
+  @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
 
   @override
@@ -523,6 +529,50 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAppScanQr => 'Scannen, um auf deinem Handy zu öffnen';
+
+  @override
+  String get settingsReleaseNotesTab => 'Neuigkeiten';
+
+  @override
+  String get settingsReleaseNotesLoading => 'Versionshinweise werden geladen…';
+
+  @override
+  String get settingsReleaseNotesError =>
+      'Versionshinweise konnten nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.';
+
+  @override
+  String get settingsReleaseNotesRetry => 'Erneut versuchen';
+
+  @override
+  String get settingsReleaseNotesCurrentBadge => 'Aktuell';
+
+  @override
+  String get settingsReleaseNotesNewBadge => 'Neu';
+
+  @override
+  String settingsReleaseNotesYouAreOn(String version) {
+    return 'Du nutzt $version';
+  }
+
+  @override
+  String settingsReleaseNotesLatestIs(String version) {
+    return 'Neueste: $version';
+  }
+
+  @override
+  String settingsReleaseNotesNewerCount(int count) {
+    return '$count neuere';
+  }
+
+  @override
+  String get settingsReleaseNotesUpToDate => 'Du nutzt die neueste Version';
+
+  @override
+  String get settingsReleaseNotesViewOnGithub => 'Alle auf GitHub ansehen';
+
+  @override
+  String get settingsReleaseNotesNoneForVersion =>
+      'Keine Hinweise für diese Version.';
 
   @override
   String get settingsFillAllFields => 'Bitte fülle alle Felder aus';

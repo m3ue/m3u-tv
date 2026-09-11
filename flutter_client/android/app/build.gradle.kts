@@ -154,6 +154,18 @@ dependencies {
     implementation(project(":libmpv"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     testImplementation("junit:junit:4.13.2")
+
+    // Workaround for the Flutter dev-dependency plugin release bug
+    // (flutter/flutter#166636): the Flutter Gradle plugin keeps
+    // `integration_test` off the release classpath because it is a
+    // dev_dependency, yet still emits a hard `new
+    // dev.flutter.plugins.integration_test.IntegrationTestPlugin()` reference in
+    // GeneratedPluginRegistrant.java, so `flutter build appbundle --release`
+    // fails javac with "package ... does not exist". Re-add it for compilation
+    // on release too; it is a few KB and never invoked outside a test harness.
+    if (rootProject.findProject(":integration_test") != null) {
+        "releaseImplementation"(project(":integration_test"))
+    }
 }
 
 flutter {

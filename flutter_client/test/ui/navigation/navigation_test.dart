@@ -326,6 +326,44 @@ void main() {
       expect(find.text('Route Recording'), findsOneWidget);
     });
 
+    testWidgets(
+      'sidebar reveals a feature that resolves after the shell is mounted',
+      (tester) async {
+        final service = _NavigationXtreamService();
+        final appState = _testAppState(xtreamService: service);
+        addTearDown(appState.dispose);
+        await appState.connectXtream(
+          const UserCredentials(
+            server: 'http://example.com',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+
+        await tester.pumpWidget(
+          _TestApp(deviceType: DeviceType.tv, appState: appState),
+        );
+        await _pumpAppFrame(tester);
+        expect(_sidebarText('DVR'), findsNothing);
+
+        // DVR capability comes back on a later player_api round-trip. The
+        // shell is already mounted and nothing touches the sidebar (no focus
+        // or hover) between the flag flipping and this assertion.
+        service.features = const <String>['progress', 'dvr'];
+        await appState.connectXtream(
+          const UserCredentials(
+            server: 'http://example.com',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+        await _pumpAppFrame(tester);
+
+        expect(_sidebarText('DVR'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
     testWidgets('hides Requests navigation when backend lacks requests', (
       tester,
     ) async {
@@ -1873,6 +1911,55 @@ void main() {
       expect(find.byType(NavigationSidebar), findsOneWidget);
     });
 
+    testWidgets(
+      'single hardware back on TV pops the detail without opening the sidebar',
+      (tester) async {
+        final appState = _testAppState(
+          xtreamService: _NavigationXtreamService(),
+        );
+        addTearDown(appState.dispose);
+        await appState.connectXtream(
+          const UserCredentials(
+            server: 'http://example.com',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+
+        await tester.pumpWidget(
+          _TestApp(deviceType: DeviceType.tv, appState: appState),
+        );
+        await _pumpAppFrame(tester);
+
+        await tester.tap(_sidebarText('Movies'));
+        await _pumpAppFrame(tester);
+        await tester.tap(find.text('Route Movie').last);
+        await _pumpAppFrame(tester);
+        expect(find.text('Play movie'), findsOneWidget);
+
+        // Android TV delivers one Back press on both paths: a goBack key event
+        // (routed like Escape through _BackIntent -> _handleShortcutBack) and
+        // the platform popRoute message (-> _handleSystemBack). The pair must
+        // pop the detail once and leave the sidebar collapsed.
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await _sendPlatformNavigationMethod(
+          tester,
+          const MethodCall('popRoute'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Play movie'), findsNothing);
+        expect(find.text('Route Movie'), findsWidgets);
+        expect(
+          tester
+              .widget<NavigationSidebar>(find.byType(NavigationSidebar))
+              .sidebarActive,
+          isFalse,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
     testWidgets('back on phone pops detail route', (tester) async {
       final appState = _testAppState(xtreamService: _NavigationXtreamService());
       addTearDown(appState.dispose);
@@ -2442,7 +2529,9 @@ class _NavigationXtreamService extends XtreamService {
   final List<VodItem> vodItems;
   final List<Series> seriesList;
   final List<Progress> recentlyWatched;
-  final List<String> features;
+  // Mutable so a test can model a capability that only resolves on a later
+  // player_api round-trip, after the shell is already mounted.
+  List<String> features;
   final List<DvrRecording> dvrRecordings;
 
   @override

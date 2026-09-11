@@ -1072,11 +1072,13 @@ void main() {
           transport.secondSourcePostCommitEvents.every((event) => event.$2),
           isTrue,
         );
-        final persisted = jsonEncode(
-          await PersistentJsonStore(file: stateFile).snapshot(),
-        );
-        expect(persisted, contains('Server B Channel'));
-        expect(persisted, contains('/second/'));
+        // The catalog is durable in SQLite (asserted above via cache.get);
+        // the JSON store still carries the second source's credentials.
+        final persisted = await PersistentJsonStore(file: stateFile).snapshot();
+        final persistedCredentials =
+            jsonDecode(persisted['m3ue_tv_credentials']! as String)
+                as Map<String, Object?>;
+        expect(persistedCredentials['username'], 'second');
       },
     );
 
@@ -1146,12 +1148,11 @@ void main() {
           'Server A Channel',
         );
 
+        // Catalog lives in SQLite (asserted above via cache.get); the JSON
+        // store still holds the rolled-back viewer/credentials/source.
         final persisted = await PersistentJsonStore(file: stateFile).snapshot();
         final persistedText = jsonEncode(persisted);
-        expect(persistedText, contains('Server A Channel'));
         expect(persistedText, contains('viewer-server-a'));
-        expect(persistedText, isNot(contains('Server B Channel')));
-        expect(persistedText, isNot(contains('Server C Channel')));
         final persistedCredentials =
             jsonDecode(persisted['m3ue_tv_credentials']! as String)
                 as Map<String, Object?>;
@@ -1329,11 +1330,11 @@ void main() {
           'Server C Channel',
         );
 
+        // Catalog lives in SQLite (asserted above via cache.get); the JSON
+        // store still carries the winning viewer/credentials/source.
         final persisted = await PersistentJsonStore(file: stateFile).snapshot();
         final persistedText = jsonEncode(persisted);
-        expect(persistedText, contains('Server C Channel'));
         expect(persistedText, contains('viewer-server-c'));
-        expect(persistedText, isNot(contains('Server B Channel')));
         final persistedCredentials =
             jsonDecode(persisted['m3ue_tv_credentials']! as String)
                 as Map<String, Object?>;
@@ -2778,7 +2779,10 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
     Map<String, Object?> replacement,
   ) async {
     await super.replaceWhere(test, replacement);
-    if (jsonEncode(replacement).contains('Server B Channel') &&
+    // The catalog itself is written to SQLite, not this JSON store, but the
+    // second source's `viewers` blob still lands here in the same atomic
+    // CacheService.replace() call - gate on that to know B has been staged.
+    if (jsonEncode(replacement).contains('viewer-server-b') &&
         !secondCachePersisted.isCompleted) {
       secondCachePersisted.complete();
       await releaseSecondCache.future;
