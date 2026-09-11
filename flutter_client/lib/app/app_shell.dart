@@ -751,7 +751,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   bool _handleShortcutBack() {
     if (_playerModalDialogVisible) {
-      Navigator.of(context, rootNavigator: true).maybePop();
+      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
       return true;
     }
     return _handleBackPress();
@@ -2240,7 +2240,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
             children: [
               Container(
                 height: itemHeight,
-                padding: EdgeInsets.symmetric(horizontal: hPad),
+                padding: const EdgeInsets.symmetric(horizontal: hPad),
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
@@ -2261,7 +2261,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                         ),
                       ),
                       if (widget.expanded) ...[
-                        SizedBox(width: hPad),
+                        const SizedBox(width: hPad),
                         Flexible(
                           child: Text(
                             widget.label,
