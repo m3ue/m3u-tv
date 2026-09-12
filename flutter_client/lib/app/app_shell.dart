@@ -2152,7 +2152,20 @@ class NavigationSidebar extends StatelessWidget {
                 SizedBox(
                   height: 72 * scale,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
+                    // Horizontal (14) scales to keep the logo centered in
+                    // the collapsed rail, matching how SidebarDestinationItem
+                    // centers its icons (outer + inner padding + icon size
+                    // summing symmetrically around the rail's midpoint) - at
+                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
+                    // = 14, so left inset equals right space. Leaving this
+                    // unscaled while the logo itself scaled was the bug: the
+                    // logo drifted off-center as scale grew.
+                    padding: EdgeInsets.fromLTRB(
+                      14 * scale,
+                      20,
+                      14 * scale,
+                      16,
+                    ),
                     child: OverflowBox(
                       maxWidth: 200 * scale,
                       alignment: Alignment.centerLeft,
