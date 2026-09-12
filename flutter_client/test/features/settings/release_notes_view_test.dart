@@ -4,7 +4,9 @@ import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/release_notes_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 class _FakeReleaseNotesService extends ReleaseNotesService {
   _FakeReleaseNotesService(this._releases);
@@ -118,5 +120,44 @@ void main() {
       findsNothing,
     );
     expect(find.text(l.settingsReleaseNotesRetry), findsOneWidget);
+  });
+
+  testWidgets('version rail rows do not overflow at Very Large display size', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: FontSizeScope(
+            fontSize: AppFontSize.veryLarge,
+            child: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(
+                    FontSizeScope.scaleOf(context),
+                  ),
+                ),
+                child: SizedBox(
+                  width: 900,
+                  height: 600,
+                  child: ReleaseNotesView(
+                    releaseNotesService: _FakeReleaseNotesService([
+                      _note('v1.4.0', "## What's Changed\n- Added subtitles"),
+                      _note('v1.3.0', '- Older fix'),
+                    ]),
+                    appVersionService: _FakeVersionService('1.3.0'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
   });
 }
