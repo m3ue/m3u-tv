@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -93,10 +95,30 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
     debugLabel: 'movieDetailPrimary',
   );
 
+  /// Owned externally (rather than left to RowScrollRegion to create its own)
+  /// so this state can drive it directly - see [_scrollToTop] - mirroring
+  /// SeriesDetailBody's `_SeriesScrollHost`.
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void dispose() {
     _primaryFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// The poster/title/meta block is always the very top of the page, so any
+  /// focus landing anywhere inside it (including the Play button) means
+  /// "show the top of the page" - matches SeriesDetailBody's `_scrollToTop`.
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    unawaited(
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   @override
@@ -122,37 +144,53 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
     final richRelated = widget.richRelated;
     final hasRelated = richRelated != null && richRelated.isNotEmpty;
     final scale = FontSizeScope.scaleOf(context);
+    final upper = Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 220 * scale),
+          child: AspectRatio(
+            aspectRatio: 0.68,
+            child: ResilientMediaImage(
+              imageUrl: widget.posterUrl,
+              fallbackIcon: widget.fallbackIcon,
+              borderRadius: MediaBrowsingMetrics.cardRadius,
+              fallbackTitle: widget.name,
+            ),
+          ),
+        ),
+        const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+        Expanded(child: _infoColumn(context, theme)),
+      ],
+    );
+
     // The whole page (poster + meta + cast + related) scrolls together via
     // RowScrollRegion, matching SeriesDetailBody - the poster/meta block
     // renders at its natural size and the page grows to fit a taller
     // footer, rather than the footer squeezing the poster into less height
-    // than its aspect ratio wants.
+    // than its aspect ratio wants. No contentPadding on BackdropDetailHero
+    // (unlike the narrow layout below) - the top/bottom insets live *inside*
+    // the scrolled column instead, so they scroll away with everything else
+    // rather than clipping the first/last row against a fixed boundary, and
+    // the hero/poster can run all the way up behind the transparent AppBar.
     final content = Padding(
-      padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+      padding: const EdgeInsets.symmetric(
+        horizontal: MediaBrowsingMetrics.pagePadding,
+      ),
       child: RowScrollRegion(
+        controller: _scrollController,
         onExitTop: _primaryFocusNode.requestFocus,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 220 * scale),
-                  child: AspectRatio(
-                    aspectRatio: 0.68,
-                    child: ResilientMediaImage(
-                      imageUrl: widget.posterUrl,
-                      fallbackIcon: widget.fallbackIcon,
-                      borderRadius: MediaBrowsingMetrics.cardRadius,
-                      fallbackTitle: widget.name,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-                Expanded(child: _infoColumn(context, theme)),
-              ],
+            SizedBox(height: detailAppBarHeight(context) + 32),
+            Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onFocusChange: (hasFocus) {
+                if (hasFocus) _scrollToTop();
+              },
+              child: upper,
             ),
             CastRevealSlot(
               topPadding: MediaBrowsingMetrics.contentPadding,
@@ -181,6 +219,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
                       ],
                     ),
             ),
+            SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
           ],
         ),
       ),
@@ -193,10 +232,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
       colorMatchReady: widget.colorMatchReady,
-      contentPadding: EdgeInsets.only(
-        top: 24 + detailAppBarHeight(context),
-        bottom: 24,
-      ),
+      scrollController: _scrollController,
       content: content,
     );
   }
