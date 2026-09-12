@@ -869,16 +869,22 @@ class EpisodeCard extends StatelessWidget {
   final VoidCallback? onLongTap;
   final bool horizontal;
 
-  Widget _pill(BuildContext context, Widget child) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      child: child,
-    ),
-  );
+  Widget _pill(BuildContext context, Widget child) {
+    final scale = FontSizeScope.scaleOf(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(4 * scale),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 5 * scale,
+          vertical: 2 * scale,
+        ),
+        child: child,
+      ),
+    );
+  }
 
   Widget _pillText(BuildContext context, String text) => _pill(
     context,
@@ -961,13 +967,13 @@ class EpisodeCard extends StatelessWidget {
                   ),
                   if (completed)
                     Positioned(
-                      top: 6,
-                      right: 6,
+                      top: 6 * FontSizeScope.scaleOf(context),
+                      right: 6 * FontSizeScope.scaleOf(context),
                       child: _pill(
                         context,
-                        const Icon(
+                        Icon(
                           Icons.check,
-                          size: 13,
+                          size: 13 * FontSizeScope.scaleOf(context),
                           color: Colors.white,
                         ),
                       ),
@@ -1110,13 +1116,13 @@ class EpisodeCard extends StatelessWidget {
                     ),
                     if (completed)
                       Positioned(
-                        top: 4,
-                        right: 4,
+                        top: 4 * FontSizeScope.scaleOf(context),
+                        right: 4 * FontSizeScope.scaleOf(context),
                         child: _pill(
                           context,
-                          const Icon(
+                          Icon(
                             Icons.check,
-                            size: 12,
+                            size: 12 * FontSizeScope.scaleOf(context),
                             color: Colors.white,
                           ),
                         ),

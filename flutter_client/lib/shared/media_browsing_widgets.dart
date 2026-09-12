@@ -1414,6 +1414,7 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
       backgroundColor: item.imageBackgroundColor,
       borderRadius: MediaBrowsingMetrics.cardRadius,
     );
+    final scale = FontSizeScope.scaleOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1426,18 +1427,18 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
                 mediaImage,
                 if (item.isFavorite)
                   Positioned(
-                    top: 4,
-                    left: 4,
+                    top: 4 * scale,
+                    left: 4 * scale,
                     child: Container(
-                      padding: const EdgeInsets.all(3),
+                      padding: EdgeInsets.all(3 * scale),
                       decoration: BoxDecoration(
                         color: colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.star,
                         color: Colors.white,
-                        size: 14,
+                        size: 14 * scale,
                       ),
                     ),
                   ),
