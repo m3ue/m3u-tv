@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +10,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 void main() {
   group('DvrRecordingsScreen', () {
@@ -911,6 +915,264 @@ void main() {
       },
     );
 
+    testWidgets('real edit can explicitly clear a pinned channel', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? saved;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) async => [_channelShow()],
+          onUpdateSeriesRule: (_, options) async => saved = options,
+        ),
+      );
+      await _openRuleEdit(tester);
+      expect(find.text('Any channel'), findsOneWidget);
+      await tester.tap(find.text('Any channel'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(saved!.channelId, isNull);
+      expect(saved!.channelUpdate, isA<DvrChannelScopeClear>());
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('real edit loads matching show channels and can set another', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? saved;
+      final queries = <String>[];
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (query) async {
+            queries.add(query);
+            return [_channelShow()];
+          },
+          onUpdateSeriesRule: (_, options) async => saved = options,
+        ),
+      );
+      await _openRuleEdit(tester);
+      expect(queries, ['Test Series Alpha']);
+      await tester.tap(find.text('Channel Nine'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(saved!.channelId, 9);
+      expect(
+        saved!.channelUpdate,
+        isA<DvrChannelScopeSet>().having(
+          (scope) => scope.channelId,
+          'channelId',
+          9,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'real edit uses keyboard selection to pin an Any Channel rule',
+      (
+        tester,
+      ) async {
+        DvrSeriesRuleOptions? saved;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: const [],
+            seriesRules: [_seriesRule(channelId: null)],
+            onSearchShows: (_) async => [_channelShow()],
+            onUpdateSeriesRule: (_, options) async => saved = options,
+          ),
+        );
+        await _openRuleEdit(tester);
+        tester
+            .widget<DpadFocusable>(
+              find
+                  .ancestor(
+                    of: find.text('Channel Nine'),
+                    matching: find.byType(DpadFocusable),
+                  )
+                  .first,
+            )
+            .focusNode!
+            .requestFocus();
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Save'));
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(saved!.channelId, 9);
+        expect(
+          saved!.channelUpdate,
+          isA<DvrChannelScopeSet>().having(
+            (scope) => scope.channelId,
+            'channelId',
+            9,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final channelId in <int?>[8, null]) {
+      for (final searchResult in ['empty', 'error', 'unrelated']) {
+        testWidgets('real edit preserves $channelId on $searchResult search', (
+          tester,
+        ) async {
+          DvrSeriesRuleOptions? saved;
+          await tester.pumpWidget(
+            _TestApp(
+              recordings: const [],
+              seriesRules: [_seriesRule(channelId: channelId)],
+              onSearchShows: (_) async {
+                if (searchResult == 'error') throw StateError('search failed');
+                return searchResult == 'empty'
+                    ? []
+                    : [_channelShow(title: 'unrelated show')];
+              },
+              onUpdateSeriesRule: (_, options) async => saved = options,
+            ),
+          );
+          await _openRuleEdit(tester);
+          expect(find.text('Channel Nine'), findsNothing);
+          final selected = tester
+              .widget<ScrollableCategoryBar>(
+                find.byType(ScrollableCategoryBar).last,
+              )
+              .selectedId;
+          expect(selected, channelId?.toString() ?? '__any__');
+          await tester.enterText(find.byType(TextField).at(1), '80');
+          await tester.ensureVisible(find.text('Save'));
+          await tester.tap(find.text('Save'));
+          await tester.pumpAndSettle();
+          expect(saved!.priority, 80);
+          expect(saved!.channelId, channelId);
+          expect(saved!.channelUpdate, isA<DvrChannelScopeUnchanged>());
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('real edit can clear with no channel candidates', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? saved;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) async => [],
+          onUpdateSeriesRule: (_, options) async => saved = options,
+        ),
+      );
+      await _openRuleEdit(tester);
+      expect(find.text('Channel Eight'), findsOneWidget);
+      await tester.tap(find.text('Any channel'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(saved!.channelUpdate, isA<DvrChannelScopeClear>());
+    });
+
+    testWidgets('real edit filters invalid and duplicate matching channels', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) async => [
+            _channelShow(title: 'unrelated show'),
+            _channelShow(
+              title: ' TEST SERIES ALPHA ',
+              channels: const [
+                EpgShowChannel(channelId: 9, channelName: 'Valid channel'),
+                EpgShowChannel(channelId: 9, channelName: 'Valid channel'),
+                EpgShowChannel(channelId: 0, channelName: 'Zero'),
+                EpgShowChannel(channelId: -1, channelName: 'Negative'),
+              ],
+            ),
+          ],
+          onUpdateSeriesRule: (_, _) async {},
+        ),
+      );
+      await _openRuleEdit(tester);
+      expect(find.text('Valid channel'), findsOneWidget);
+      expect(find.text('Channel Eight'), findsOneWidget);
+      expect(find.text('Channel Nine'), findsNothing);
+      expect(find.text('Zero'), findsNothing);
+      expect(find.text('Negative'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('real edit falls back after search timeout', (tester) async {
+      final pending = Completer<List<EpgShow>>();
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) => pending.future,
+          onUpdateSeriesRule: (_, _) async {},
+        ),
+      );
+      await _openRuleEdit(tester);
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      expect(find.text('Options: Test Series Alpha'), findsOneWidget);
+      expect(find.text('Channel Eight'), findsOneWidget);
+      pending.complete([_channelShow()]);
+      await tester.pumpAndSettle();
+      expect(find.text('Channel Nine'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('real edit does not open after disposal during search', (
+      tester,
+    ) async {
+      final pending = Completer<List<EpgShow>>();
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) => pending.future,
+          onUpdateSeriesRule: (_, _) async {},
+        ),
+      );
+      await _openRuleEdit(tester);
+      await tester.pumpWidget(const SizedBox.shrink());
+      pending.complete([_channelShow()]);
+      await tester.pumpAndSettle();
+      expect(find.text('Options: Test Series Alpha'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('real edit Back discards an explicit channel change', (
+      tester,
+    ) async {
+      DvrSeriesRuleOptions? saved;
+      await tester.pumpWidget(
+        _TestApp(
+          recordings: const [],
+          seriesRules: [_seriesRule()],
+          onSearchShows: (_) async => [_channelShow()],
+          onUpdateSeriesRule: (_, options) async => saved = options,
+        ),
+      );
+      await _openRuleEdit(tester);
+      await tester.tap(find.text('Channel Nine'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+      expect(saved, isNull);
+      expect(find.text('Options: Test Series Alpha'), findsNothing);
+    });
+
     testWidgets(
       'long-press on a series rule enters select mode and morphs the tile',
       (tester) async {
@@ -1072,6 +1334,33 @@ void main() {
   });
 }
 
+Future<void> _openRuleEdit(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Series Rules'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.more_vert).first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Edit rule'));
+  await tester.pumpAndSettle();
+}
+
+EpgShow _channelShow({
+  String title = 'test series alpha',
+  List<EpgShowChannel>? channels,
+}) => EpgShow(
+  normalizedTitle: title,
+  displayTitle: 'Test Series Alpha',
+  channelCount: 2,
+  channels:
+      channels ??
+      const [
+        EpgShowChannel(channelId: 8, channelName: 'Channel Eight'),
+        EpgShowChannel(channelId: 9, channelName: 'Channel Nine'),
+      ],
+  episodeCount: 0,
+  recentEpisodes: [],
+);
+
 class _TestApp extends StatelessWidget {
   const _TestApp({
     required this.recordings,
@@ -1083,6 +1372,7 @@ class _TestApp extends StatelessWidget {
     this.seriesRules = const <DvrSeriesRule>[],
     this.onDeleteSeriesRule,
     this.onUpdateSeriesRule,
+    this.onSearchShows,
     this.navigationMode,
   });
 
@@ -1096,6 +1386,7 @@ class _TestApp extends StatelessWidget {
   final Future<void> Function(DvrSeriesRule)? onDeleteSeriesRule;
   final Future<void> Function(DvrSeriesRule, DvrSeriesRuleOptions)?
   onUpdateSeriesRule;
+  final Future<List<EpgShow>> Function(String query)? onSearchShows;
 
   /// Forces `NavigationMode.directional`, which `_useInlineRowActions`
   /// (dvr_recordings_screen.dart) treats as TV — the same signal
@@ -1141,6 +1432,7 @@ class _TestApp extends StatelessWidget {
           seriesRules: seriesRules,
           onDeleteSeriesRule: onDeleteSeriesRule,
           onUpdateSeriesRule: onUpdateSeriesRule,
+          onSearchShows: onSearchShows,
         ),
       ),
     );
@@ -1209,10 +1501,10 @@ DvrRecording _cancelledRecording() => DvrRecording(
   scheduledEnd: DateTime.utc(2026, 6, 20, 22),
 );
 
-DvrSeriesRule _seriesRule() => const DvrSeriesRule(
+DvrSeriesRule _seriesRule({int? channelId = 8}) => DvrSeriesRule(
   id: 7,
-  channelId: 8,
-  channelName: 'Channel Eight',
+  channelId: channelId,
+  channelName: channelId == null ? null : 'Channel Eight',
   seriesTitle: 'Test Series Alpha',
   matchMode: DvrMatchMode.contains,
   seriesMode: DvrSeriesMode.all,

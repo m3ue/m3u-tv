@@ -1200,6 +1200,28 @@ DvrMatchMode dvrMatchModeFromWire(String? value) {
   }
 }
 
+sealed class DvrChannelScopeUpdate {
+  const DvrChannelScopeUpdate();
+}
+
+final class DvrChannelScopeUnchanged extends DvrChannelScopeUpdate {
+  const DvrChannelScopeUnchanged();
+}
+
+final class DvrChannelScopeSet extends DvrChannelScopeUpdate {
+  DvrChannelScopeSet(this.channelId) {
+    if (channelId <= 0) {
+      throw ArgumentError.value(channelId, 'channelId', 'must be positive');
+    }
+  }
+
+  final int channelId;
+}
+
+final class DvrChannelScopeClear extends DvrChannelScopeUpdate {
+  const DvrChannelScopeClear();
+}
+
 class DvrSeriesRule {
   const DvrSeriesRule({
     required this.id,
@@ -1220,7 +1242,7 @@ class DvrSeriesRule {
   });
 
   final int id;
-  final int channelId;
+  final int? channelId;
   final String? channelName;
   final String seriesTitle;
   final DvrMatchMode matchMode;
@@ -1255,7 +1277,7 @@ class DvrSeriesRule {
         v is String ? DateTime.tryParse(v)?.toUtc() : null;
     return DvrSeriesRule(
       id: asIntOrNull(json['id']) ?? 0,
-      channelId: asIntOrNull(json['channel_id']) ?? 0,
+      channelId: _positiveOrNull(asIntOrNull(json['channel_id'])),
       channelName: json['channel_name'] as String?,
       seriesTitle: (json['series_title'] as String?) ?? '',
       matchMode: dvrMatchModeFromWire(json['match_mode'] as String?),
@@ -1273,6 +1295,8 @@ class DvrSeriesRule {
   }
 }
 
+int? _positiveOrNull(int? value) => value != null && value > 0 ? value : null;
+
 /// The seven tunable options exposed by the series-rule configure sheet.
 /// All fields are nullable - null means "use server default / omit from request".
 /// Passed to `XtreamService.createDvrSeriesRule` via AppShell's
@@ -1280,6 +1304,7 @@ class DvrSeriesRule {
 class DvrSeriesRuleOptions {
   const DvrSeriesRuleOptions({
     this.channelId,
+    this.channelUpdate = const DvrChannelScopeUnchanged(),
     this.matchMode,
     this.seriesMode,
     this.keepLast,
@@ -1290,6 +1315,9 @@ class DvrSeriesRuleOptions {
 
   /// Pin to a specific channel; null means "any channel".
   final int? channelId;
+
+  /// Controls channel scope updates; unchanged by default.
+  final DvrChannelScopeUpdate channelUpdate;
 
   /// null = server default.
   final DvrMatchMode? matchMode;

@@ -254,6 +254,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
       rules: widget.seriesRules,
       onDelete: widget.onDeleteSeriesRule,
       onUpdate: widget.onUpdateSeriesRule,
+      onSearchShows: widget.onSearchShows,
       onSidebarActivate: widget.onSidebarActivate,
       onEnterFullScreenDetail: widget.onEnterFullScreenDetail,
       onExitFullScreenDetail: widget.onExitFullScreenDetail,
@@ -279,6 +280,7 @@ class _SeriesRulesList extends StatefulWidget {
     required this.inline,
     this.onDelete,
     this.onUpdate,
+    this.onSearchShows,
     this.onSidebarActivate,
     this.onEnterFullScreenDetail,
     this.onExitFullScreenDetail,
@@ -289,6 +291,7 @@ class _SeriesRulesList extends StatefulWidget {
   final Future<void> Function(DvrSeriesRule)? onDelete;
   final Future<void> Function(DvrSeriesRule rule, DvrSeriesRuleOptions options)?
   onUpdate;
+  final Future<List<EpgShow>> Function(String query)? onSearchShows;
   final VoidCallback? onSidebarActivate;
   final VoidCallback? onEnterFullScreenDetail;
   final VoidCallback? onExitFullScreenDetail;
@@ -298,6 +301,7 @@ class _SeriesRulesList extends StatefulWidget {
 }
 
 class _SeriesRulesListState extends State<_SeriesRulesList> {
+  bool _openingEdit = false;
   final Set<int> _selectedIds = <int>{};
   final FocusNode _railFocusNode = FocusNode(
     debugLabel: 'dvr/series-rules-rail-entry',
@@ -328,18 +332,26 @@ class _SeriesRulesListState extends State<_SeriesRulesList> {
   }
 
   Future<void> _openEdit(BuildContext context, DvrSeriesRule rule) async {
+    if (_openingEdit) return;
+    _openingEdit = true;
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    widget.onEnterFullScreenDetail?.call();
     final DvrSeriesRuleOptions? options;
     try {
-      options = await openDvrSeriesRuleOptions(
-        context,
-        show: _showForRule(rule),
-        initialRule: rule,
-      );
+      final show = await _showForRule(rule);
+      if (!context.mounted) return;
+      widget.onEnterFullScreenDetail?.call();
+      try {
+        options = await openDvrSeriesRuleOptions(
+          context,
+          show: show,
+          initialRule: rule,
+        );
+      } finally {
+        widget.onExitFullScreenDetail?.call();
+      }
     } finally {
-      widget.onExitFullScreenDetail?.call();
+      _openingEdit = false;
     }
     if (options == null || !context.mounted) return;
     try {
@@ -382,16 +394,28 @@ class _SeriesRulesListState extends State<_SeriesRulesList> {
     _exitSelectMode();
   }
 
-  /// Builds a minimal EpgShow from the rule for the sheet's channel picker.
-  /// channelCount 1 keeps the picker hidden; the rule's channel is preserved
-  /// via the sheet's initialRule pre-fill, so this show is only a shape
-  /// requirement.
-  static EpgShow _showForRule(DvrSeriesRule rule) {
+  Future<EpgShow> _showForRule(DvrSeriesRule rule) async {
+    var channels = <EpgShowChannel>[];
+    final search = widget.onSearchShows;
+    final title = rule.seriesTitle.trim().toLowerCase();
+    if (search != null && title.isNotEmpty) {
+      try {
+        final shows = await search(rule.seriesTitle).timeout(
+          const Duration(seconds: 10),
+        );
+        channels = shows
+            .where((show) => show.normalizedTitle.trim().toLowerCase() == title)
+            .expand((show) => show.channels)
+            .toList();
+      } on Object {
+        // Search is optional enrichment; never lose the stored scope on failure.
+      }
+    }
     return EpgShow(
       normalizedTitle: rule.seriesTitle,
       displayTitle: rule.seriesTitle,
-      channelCount: 1,
-      channels: const [],
+      channelCount: channels.length,
+      channels: channels,
       episodeCount: 0,
       recentEpisodes: const [],
     );
