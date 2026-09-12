@@ -2398,6 +2398,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               spacing: 8,
               children: [
                 _IntervalChip(
+                  icon: Icons.smartphone,
                   label: l.settingsFontSizeNormal,
                   isSelected: _fontSize == AppFontSize.normal,
                   onTap: () => widget.service.setFontSize(AppFontSize.normal),
@@ -2408,6 +2409,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                   onTap: () => widget.service.setFontSize(AppFontSize.large),
                 ),
                 _IntervalChip(
+                  icon: Icons.tv,
                   label: l.settingsFontSizeVeryLarge,
                   isSelected: _fontSize == AppFontSize.veryLarge,
                   onTap: () =>
@@ -2514,50 +2516,56 @@ class _IntervalChip extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.icon,
   });
 
   final String label;
   final bool isSelected;
   final VoidCallback? onTap;
 
+  /// Optional leading icon, shown before the label (e.g. a device glyph on
+  /// the font-size chips). Null (default) omits it, as every other caller
+  /// of this shared chip still wants.
+  final IconData? icon;
+
   static const double _radius = 20;
-  static const _effects = [
-    GradientBorderEffect(
-      borderRadius: BorderRadius.all(Radius.circular(_radius)),
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    const radius = BorderRadius.all(Radius.circular(_radius));
+    final scale = FontSizeScope.scaleOf(context);
+    final radius = BorderRadius.all(Radius.circular(_radius * scale));
+    final contentColor = isSelected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
     return DpadInkWell(
       onTap: onTap,
-      effects: _effects,
+      effects: [GradientBorderEffect(borderRadius: radius)],
       color: isSelected
           ? colorScheme.primaryContainer
           : colorScheme.surfaceContainerHigh,
       borderRadius: radius,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12 * scale,
+          vertical: 6 * scale,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16 * scale, color: contentColor),
+              SizedBox(width: 4 * scale),
+            ],
             if (isSelected) ...[
-              Icon(
-                Icons.check,
-                size: 16,
-                color: colorScheme.onPrimaryContainer,
-              ),
-              const SizedBox(width: 4),
+              Icon(Icons.check, size: 16 * scale, color: contentColor),
+              SizedBox(width: 4 * scale),
             ],
             Text(
               label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: isSelected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: contentColor),
             ),
           ],
         ),
