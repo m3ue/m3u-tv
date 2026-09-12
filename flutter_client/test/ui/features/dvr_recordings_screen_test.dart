@@ -1119,6 +1119,7 @@ class _TestApp extends StatelessWidget {
       ],
       child: MaterialApp(
         theme: ThemeData.dark(useMaterial3: true),
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) {
