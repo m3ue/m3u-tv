@@ -182,6 +182,7 @@ class VodInfo {
     this.containerExtension,
     this.tmdbId,
     this.edlUrl,
+    this.related,
   });
 
   final int id;
@@ -197,6 +198,10 @@ class VodInfo {
   final double? rating;
   final String? coverUrl;
   final String? backdropUrl;
+
+  /// TMDB recommendations already in the user's library. Rendered as the
+  /// "Related" row below the cast row.
+  final List<RelatedItem>? related;
 
   /// Transparent title logo (clearlogo). m3u-editor emits this as a `clearlogo`
   /// wire key in `get_vod_info`, distinct from the poster `cover_big`.
@@ -253,6 +258,7 @@ class VodInfo {
       ),
       tmdbId: _asIntOrNull(pick(['tmdb_id', 'tmdb'])),
       edlUrl: _asNullableString(pick(['edl_url'])),
+      related: _parseRelatedList(pick(['related'])),
     );
   }
 }
@@ -308,6 +314,90 @@ List<CastMember>? _parseCastList(Object? raw) {
   return parsed.isEmpty ? null : parsed;
 }
 
+/// A recommended title shown in the "Related" row below the cast row on a
+/// VOD/series detail screen.
+///
+/// Two wire shapes carry this, both keyed on m3u-editor's TMDB
+/// recommendations filtered down to titles already in the user's library:
+///  * Xtream `get_vod_info` / `get_series_info` `related`: `{type, id, name,
+///    cover, tmdb_id?}`, where `id` is the library's own Channel/Series id -
+///    exactly what VodDetailsScreen/SeriesDetailsScreen already navigate
+///    with. See [fromXtream].
+///  * AIOStreams meta `related`: `{id, type, name, poster}`, where `id` is a
+///    Stremio-style `tmdb:{id}` string - exactly what AIOStreamsDetailScreen
+///    already navigates with. See [fromAiostreams].
+///
+/// [id] is kept opaque here; the caller (not this class) knows which
+/// navigation scheme applies to it.
+class RelatedItem {
+  const RelatedItem({
+    required this.id,
+    required this.type,
+    required this.title,
+    this.posterUrl,
+  });
+
+  final String id;
+
+  /// `"movie"` or `"series"`.
+  final String type;
+  final String title;
+  final String? posterUrl;
+
+  bool get isSeries => type == 'series';
+
+  /// Xtream `related` entry: `{type, id, name, cover}`.
+  static RelatedItem? fromXtream(Object? json) {
+    if (json is! Map) return null;
+    final map = json.cast<String, Object?>();
+    final id = _asIntOrNull(map['id']);
+    final type = _asNullableString(map['type']);
+    final title = _asNullableString(map['name'])?.trim();
+    if (id == null || type == null || title == null || title.isEmpty) {
+      return null;
+    }
+    return RelatedItem(
+      id: '$id',
+      type: type,
+      title: title,
+      posterUrl: _asNullableString(map['cover']),
+    );
+  }
+
+  /// AIOStreams `related` entry: `{id, type, name, poster}`. `id` is already
+  /// the Stremio-style `tmdb:{id}` string other AIOStreams items use.
+  static RelatedItem? fromAiostreams(Object? json) {
+    if (json is! Map) return null;
+    final map = json.cast<String, Object?>();
+    final id = _asNullableString(map['id']);
+    final type = _asNullableString(map['type']);
+    final title = _asNullableString(map['name'])?.trim();
+    if (id == null ||
+        id.isEmpty ||
+        title == null ||
+        title.isEmpty ||
+        (type != 'movie' && type != 'series')) {
+      return null;
+    }
+    return RelatedItem(
+      id: id,
+      type: type!,
+      title: title,
+      posterUrl: _asNullableString(map['poster']),
+    );
+  }
+}
+
+List<RelatedItem>? _parseRelatedList(Object? raw) {
+  if (raw is! List) return null;
+  final parsed = raw
+      .whereType<Map<Object?, Object?>>()
+      .map(RelatedItem.fromXtream)
+      .whereType<RelatedItem>()
+      .toList(growable: false);
+  return parsed.isEmpty ? null : parsed;
+}
+
 class Series {
   const Series({
     required this.id,
@@ -322,6 +412,7 @@ class Series {
     this.tmdbId,
     this.richCast,
     this.year,
+    this.related,
   });
 
   final int id;
@@ -348,6 +439,10 @@ class Series {
   /// `releaseDate` field (a date string) or a bare `year` when present.
   final String? year;
 
+  /// TMDB recommendations already in the user's library. Rendered as the
+  /// "Related" row below the cast row.
+  final List<RelatedItem>? related;
+
   factory Series.fromXtream(Map<String, Object?> json) => Series(
     id: _asInt(json['series_id']),
     name: '${json['name'] ?? ''}',
@@ -363,6 +458,7 @@ class Series {
     year: _yearString(
       json['releaseDate'] ?? json['release_date'] ?? json['year'],
     ),
+    related: _parseRelatedList(json['related']),
   );
 }
 

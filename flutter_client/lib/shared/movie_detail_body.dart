@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -5,13 +7,14 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_reveal_slot.dart';
-import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/series_detail_widgets.dart'
+    show CastRow, RelatedRow, RowScrollRegion;
 
 /// Shared layout scaffold for a movie-style detail page - poster + meta +
 /// cast strip over a colour-matched BackdropDetailHero. Used by both the
@@ -37,6 +40,8 @@ class MovieDetailBody extends StatefulWidget {
     this.clearLogoUrl,
     this.plot,
     this.richCast,
+    this.richRelated,
+    this.onRelatedTap,
     this.onStartOver,
     this.progressValue,
     this.dominantColor,
@@ -52,6 +57,15 @@ class MovieDetailBody extends StatefulWidget {
   final List<MetaCreditLine> credits;
   final List<CastMember>? richCast;
   final String castSemanticLabel;
+
+  /// TMDB recommendations already in the user's library, shown as the
+  /// "Related" row directly below the cast row. Null/empty renders nothing.
+  final List<RelatedItem>? richRelated;
+
+  /// Required whenever [richRelated] is non-empty - opens that item's own
+  /// detail screen. The caller (Xtream vs AIOStreams) owns the navigation,
+  /// this widget only reports the tap.
+  final ValueChanged<RelatedItem>? onRelatedTap;
 
   final String primaryButtonLabel;
   final VoidCallback onPrimary;
@@ -75,15 +89,36 @@ class MovieDetailBody extends StatefulWidget {
 class _MovieDetailBodyState extends State<MovieDetailBody> {
   static const double _wideBreakpoint = 600;
 
-  /// Focus target for the wide cast strip's "up" hop - the primary button.
+  /// Focus target for the wide layout's top-row exit (RowScrollRegion's
+  /// onExitTop) - the primary button.
   final FocusNode _primaryFocusNode = FocusNode(
     debugLabel: 'movieDetailPrimary',
   );
 
+  /// Owned externally (rather than left to RowScrollRegion to create its own)
+  /// so this state can drive it directly - see [_scrollToTop] - mirroring
+  /// SeriesDetailBody's `_SeriesScrollHost`.
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void dispose() {
     _primaryFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// The poster/title/meta block is always the very top of the page, so any
+  /// focus landing anywhere inside it (including the Play button) means
+  /// "show the top of the page" - matches SeriesDetailBody's `_scrollToTop`.
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    unawaited(
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   @override
@@ -104,56 +139,106 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
   }
 
   Widget _buildWide(BuildContext context, ThemeData theme, Color bg) {
+    final l = AppLocalizations.of(context);
     final richCast = widget.richCast;
+    final hasCast = richCast != null && richCast.isNotEmpty;
+    final richRelated = widget.richRelated;
+    final hasRelated = richRelated != null && richRelated.isNotEmpty;
     final scale = FontSizeScope.scaleOf(context);
-    // Poster + scrolling info column fill the height; the rich cast strip is
-    // pinned full-width below, out of that scroll view so left/right card
-    // navigation never drags the page.
-    final content = Padding(
-      padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                SizedBox(
-                  width: 220 * scale,
-                  child: AspectRatio(
-                    aspectRatio: 0.68,
-                    child: ResilientMediaImage(
-                      imageUrl: widget.posterUrl,
-                      fallbackIcon: widget.fallbackIcon,
-                      borderRadius: MediaBrowsingMetrics.cardRadius,
-                      fallbackTitle: widget.name,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: _infoColumn(context, theme),
-                  ),
-                ),
-              ],
+    final upper = Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 220 * scale),
+          child: AspectRatio(
+            aspectRatio: 0.68,
+            child: ResilientMediaImage(
+              imageUrl: widget.posterUrl,
+              fallbackIcon: widget.fallbackIcon,
+              borderRadius: MediaBrowsingMetrics.cardRadius,
+              fallbackTitle: widget.name,
             ),
           ),
-          CastRevealSlot(
-            topPadding: MediaBrowsingMetrics.contentPadding,
-            castRow: (richCast == null || richCast.isEmpty)
-                ? null
-                : Semantics(
-                    label: widget.castSemanticLabel,
-                    container: true,
-                    child: CastStrip(
-                      members: richCast,
-                      onNavigateUp: _primaryFocusNode.requestFocus,
+        ),
+        const SizedBox(width: MediaBrowsingMetrics.pagePadding),
+        Expanded(child: _infoColumn(context, theme)),
+      ],
+    );
+
+    // The whole page (poster + meta + cast + related) scrolls together via
+    // RowScrollRegion, matching SeriesDetailBody - the poster/meta block
+    // renders at its natural size and the page grows to fit a taller
+    // footer, rather than the footer squeezing the poster into less height
+    // than its aspect ratio wants. No contentPadding on BackdropDetailHero
+    // (unlike the narrow layout below) - the top/bottom insets live *inside*
+    // the scrolled column instead, so they scroll away with everything else
+    // rather than clipping the first/last row against a fixed boundary, and
+    // the hero/poster can run all the way up behind the transparent AppBar.
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: MediaBrowsingMetrics.pagePadding,
+      ),
+      child: RowScrollRegion(
+        controller: _scrollController,
+        onExitTop: _primaryFocusNode.requestFocus,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: detailAppBarHeight(context) + 32),
+            Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onFocusChange: (hasFocus) {
+                if (hasFocus) _scrollToTop();
+              },
+              child: upper,
+            ),
+            CastRevealSlot(
+              topPadding: MediaBrowsingMetrics.contentPadding,
+              castRow: (!hasCast && !hasRelated)
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasCast)
+                          Semantics(
+                            label: widget.castSemanticLabel,
+                            container: true,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                DetailRowHeader(
+                                  icon: Icons.people,
+                                  label: widget.castSemanticLabel,
+                                ),
+                                const SizedBox(height: 8),
+                                CastRow(members: richCast),
+                              ],
+                            ),
+                          ),
+                        if (hasRelated) ...[
+                          if (hasCast)
+                            const SizedBox(
+                              height: MediaBrowsingMetrics.contentPadding,
+                            ),
+                          DetailRowHeader(
+                            icon: Icons.recommend,
+                            label: l.relatedTitle,
+                          ),
+                          const SizedBox(height: 8),
+                          RelatedRow(
+                            items: richRelated,
+                            onTap: (item) => widget.onRelatedTap?.call(item),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-          ),
-        ],
+            ),
+            SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
+          ],
+        ),
       ),
     );
 
@@ -164,10 +249,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
       colorMatchReady: widget.colorMatchReady,
-      contentPadding: EdgeInsets.only(
-        top: 24 + detailAppBarHeight(context),
-        bottom: 24,
-      ),
+      scrollController: _scrollController,
       content: content,
     );
   }
@@ -263,6 +345,29 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
                     onShowAll: () => showAllCast(context, richCast),
                     allCastSemanticLabel: l.castShowAll,
                   ),
+          ),
+        if (compact &&
+            widget.richRelated != null &&
+            widget.richRelated!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(
+              top: MediaBrowsingMetrics.contentPadding,
+            ),
+            child: MediaPreviewSection(
+              title: l.relatedTitle,
+              titleIcon: Icons.recommend,
+              emptyLabel: '',
+              posterStyle: true,
+              items: [
+                for (final item in widget.richRelated!)
+                  MediaPreviewItem(
+                    title: item.title,
+                    imageUrl: item.posterUrl,
+                    fallbackIcon: item.isSeries ? Icons.tv : Icons.movie,
+                    onTap: () => widget.onRelatedTap?.call(item),
+                  ),
+              ],
+            ),
           ),
       ],
     );

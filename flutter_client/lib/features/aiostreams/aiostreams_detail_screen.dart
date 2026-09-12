@@ -24,6 +24,7 @@ class AIOStreamsDetailScreen extends StatefulWidget {
     required this.onPlay,
     this.onSidebarActivate,
     this.appStateController,
+    this.onOpenRelated,
   });
 
   final AIOStreamsItem item;
@@ -32,6 +33,10 @@ class AIOStreamsDetailScreen extends StatefulWidget {
   final void Function(PlayerArgs) onPlay;
   final VoidCallback? onSidebarActivate;
   final AppStateController? appStateController;
+
+  /// Opens a related item's own detail screen. Null hides the row's actions
+  /// (the row itself still renders informationally when this is null).
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   @override
   State<AIOStreamsDetailScreen> createState() => _AIOStreamsDetailScreenState();
@@ -206,6 +211,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
                 title: video.title.isNotEmpty ? video.title : item.name,
                 video: video,
               ),
+              onOpenRelated: widget.onOpenRelated,
             );
           }
           return _MovieBody(
@@ -219,6 +225,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               id: item.id,
               title: item.name,
             ),
+            onOpenRelated: widget.onOpenRelated,
           );
         },
       ),
@@ -237,11 +244,13 @@ class _MovieBody extends StatelessWidget {
     required this.onGetStreams,
     this.dominantColor,
     this.colorMatchReady = false,
+    this.onOpenRelated,
   });
 
   final AIOStreamsItem item;
   final bool isLoading;
   final VoidCallback onGetStreams;
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   /// Palette-extracted backdrop tone + whether it has resolved. Drives the
   /// same colour-matched, cross-faded hero as the Xtream VOD detail.
@@ -276,6 +285,8 @@ class _MovieBody extends StatelessWidget {
       ],
       richCast: richCast,
       castSemanticLabel: l.vodCast,
+      richRelated: item.related,
+      onRelatedTap: onOpenRelated,
       primaryButtonLabel: l.aiostreamsGetStreams,
       onPrimary: onGetStreams,
       isLoading: isLoading,
@@ -309,12 +320,14 @@ class _SeriesBody extends StatefulWidget {
     this.dominantColor,
     this.colorMatchReady = false,
     this.scrollController,
+    this.onOpenRelated,
   });
 
   final AIOStreamsItem item;
   final void Function(AIOStreamsVideo video) onEpisodeSelected;
   final AppStateController? appStateController;
   final ScrollController? scrollController;
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   /// Palette-extracted backdrop tone + whether it has resolved. Drives the
   /// same colour-matched, cross-faded hero as SeriesDetailsScreen.
@@ -554,6 +567,8 @@ class _SeriesBodyState extends State<_SeriesBody> {
       primaryActions: const [],
       richCast: richCast,
       castSemanticLabel: l.seriesCast,
+      richRelated: item.related,
+      onRelatedTap: widget.onOpenRelated,
       progressList: progress,
       progressResolver: _progressForEpisode,
       canMarkWatched: false,

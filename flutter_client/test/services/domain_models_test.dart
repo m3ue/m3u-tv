@@ -380,4 +380,128 @@ void main() {
       expect(series.categoryIds, <String>['30', '900000002']);
     });
   });
+
+  group('RelatedItem', () {
+    test('fromXtream parses a movie entry', () {
+      final item = RelatedItem.fromXtream(<String, Object?>{
+        'type': 'movie',
+        'id': 42,
+        'name': 'Pulp Fiction',
+        'cover': 'https://example.com/pulp.jpg',
+        'tmdb_id': 680,
+      });
+
+      expect(item, isNotNull);
+      expect(item!.id, '42');
+      expect(item.type, 'movie');
+      expect(item.isSeries, isFalse);
+      expect(item.title, 'Pulp Fiction');
+      expect(item.posterUrl, 'https://example.com/pulp.jpg');
+    });
+
+    test('fromXtream parses a series entry with no cover', () {
+      final item = RelatedItem.fromXtream(<String, Object?>{
+        'type': 'series',
+        'id': 7,
+        'name': 'Better Call Saul',
+      });
+
+      expect(item, isNotNull);
+      expect(item!.id, '7');
+      expect(item.isSeries, isTrue);
+      expect(item.posterUrl, isNull);
+    });
+
+    test('fromXtream returns null when id or name is missing', () {
+      expect(
+        RelatedItem.fromXtream(<String, Object?>{'type': 'movie', 'id': 1}),
+        isNull,
+      );
+      expect(
+        RelatedItem.fromXtream(<String, Object?>{
+          'type': 'movie',
+          'name': 'Untitled',
+        }),
+        isNull,
+      );
+    });
+
+    test('VodInfo.fromXtream parses the related array', () {
+      final info = VodInfo.fromXtream(<String, Object?>{
+        'info': {
+          'related': [
+            {'type': 'movie', 'id': 42, 'name': 'Pulp Fiction'},
+          ],
+        },
+        'movie_data': {'stream_id': 1, 'name': 'Reservoir Dogs'},
+      });
+
+      expect(info.related, hasLength(1));
+      expect(info.related!.single.title, 'Pulp Fiction');
+    });
+
+    test('VodInfo.fromXtream related is null when absent', () {
+      final info = VodInfo.fromXtream(<String, Object?>{
+        'movie_data': {'stream_id': 1, 'name': 'Reservoir Dogs'},
+      });
+
+      expect(info.related, isNull);
+    });
+
+    test('Series.fromXtream parses the related array', () {
+      final series = Series.fromXtream(<String, Object?>{
+        'series_id': 7,
+        'name': 'Better Call Saul',
+        'related': [
+          {'type': 'series', 'id': 99, 'name': 'Breaking Bad'},
+        ],
+      });
+
+      expect(series.related, hasLength(1));
+      expect(series.related!.single.isSeries, isTrue);
+    });
+
+    test('fromAiostreams parses the tmdb: id form', () {
+      final item = RelatedItem.fromAiostreams(<String, Object?>{
+        'id': 'tmdb:680',
+        'type': 'movie',
+        'name': 'Pulp Fiction',
+        'poster': 'https://example.com/pulp.jpg',
+      });
+
+      expect(item, isNotNull);
+      expect(item!.id, 'tmdb:680');
+      expect(item.type, 'movie');
+      expect(item.posterUrl, 'https://example.com/pulp.jpg');
+    });
+
+    test('fromAiostreams returns null when type is absent or invalid', () {
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{
+          'id': 'tmdb:680',
+          'name': 'Pulp Fiction',
+        }),
+        isNull,
+      );
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{
+          'id': 'tmdb:680',
+          'type': 'episode',
+          'name': 'Pulp Fiction',
+        }),
+        isNull,
+      );
+    });
+
+    test('fromAiostreams returns null when id or name is missing', () {
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{'name': 'No Id'}),
+        isNull,
+      );
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{'id': 'tmdb:1'}),
+        isNull,
+      );
+    });
+  });
 }

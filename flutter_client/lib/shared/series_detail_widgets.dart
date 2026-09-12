@@ -21,6 +21,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/related_strip.dart';
 
 /// Shared building blocks for the series-style detail screens (Xtream Series
 /// and the AIOStreams series body): the season picker, the locked-focus
@@ -1449,6 +1450,57 @@ class _CastRowState extends State<CastRow> implements LockedRow {
   }
 }
 
+/// Bridges the shared [RelatedStrip] to a [RowScrollRegion]: registers as a
+/// [LockedRow] so the cast row can hop down into it (and it can hop back up),
+/// and routes the strip's reveal through the region.
+class RelatedRow extends StatefulWidget {
+  const RelatedRow({super.key, required this.items, required this.onTap});
+
+  final List<RelatedItem> items;
+  final ValueChanged<RelatedItem> onTap;
+
+  @override
+  State<RelatedRow> createState() => _RelatedRowState();
+}
+
+class _RelatedRowState extends State<RelatedRow> implements LockedRow {
+  final GlobalKey<RelatedStripState> _stripKey = GlobalKey<RelatedStripState>();
+  RowScrollRegionState? _region;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final region = RowScrollRegion.of(context);
+    if (region != _region) {
+      _region?.unregisterRow(this);
+      _region = region;
+      _region?.registerRow(this);
+    }
+  }
+
+  @override
+  void dispose() {
+    _region?.unregisterRow(this);
+    super.dispose();
+  }
+
+  @override
+  void focusRow() => _stripKey.currentState?.focusRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return RelatedStrip(
+      key: _stripKey,
+      items: widget.items,
+      onTap: widget.onTap,
+      onNavigateUp: () => _region?.navigateVertical(this, up: true),
+      // Consume down so focus never escapes below the related row.
+      onNavigateDown: () => _region?.navigateVertical(this, up: false),
+      onReveal: (ctx) => _region?.reveal(ctx),
+    );
+  }
+}
+
 extension _IterableX<T> on Iterable<T> {
   T? _firstWhereOrNull(bool Function(T element) test) {
     for (final element in this) {
@@ -1515,6 +1567,8 @@ class SeriesDetailBody extends StatelessWidget {
     required this.primaryActions,
     required this.richCast,
     required this.castSemanticLabel,
+    this.richRelated,
+    this.onRelatedTap,
     required this.progressList,
     required this.canMarkWatched,
     required this.emptyEpisodesLabel,
@@ -1562,6 +1616,15 @@ class SeriesDetailBody extends StatelessWidget {
 
   final List<CastMember>? richCast;
   final String castSemanticLabel;
+
+  /// TMDB recommendations already in the user's library, shown as the
+  /// "Related" row directly below the cast row. Null/empty renders nothing.
+  final List<RelatedItem>? richRelated;
+
+  /// Required whenever [richRelated] is non-empty - opens that item's own
+  /// detail screen. The caller (Xtream vs AIOStreams) owns the navigation,
+  /// this widget only reports the tap.
+  final ValueChanged<RelatedItem>? onRelatedTap;
 
   final List<Progress> progressList;
   final Progress? Function(Episode episode)? progressResolver;
@@ -1719,6 +1782,29 @@ class SeriesDetailBody extends StatelessWidget {
           : SizedBox(height: stripHeight, child: strip);
     }
 
+    final richRelatedList = richRelated;
+    final compactRelatedSection =
+        (compact && richRelatedList != null && richRelatedList.isNotEmpty)
+        ? Padding(
+            padding: const EdgeInsets.only(top: 20),
+            child: MediaPreviewSection(
+              title: l.relatedTitle,
+              titleIcon: Icons.recommend,
+              emptyLabel: '',
+              posterStyle: true,
+              items: [
+                for (final item in richRelatedList)
+                  MediaPreviewItem(
+                    title: item.title,
+                    imageUrl: item.posterUrl,
+                    fallbackIcon: item.isSeries ? Icons.tv : Icons.movie,
+                    onTap: () => onRelatedTap?.call(item),
+                  ),
+              ],
+            ),
+          )
+        : null;
+
     if (compact) {
       final content = Padding(
         padding: const EdgeInsets.symmetric(
@@ -1727,7 +1813,12 @@ class SeriesDetailBody extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
-          children: [upper, const SizedBox(height: 12), episodeSection],
+          children: [
+            upper,
+            const SizedBox(height: 12),
+            episodeSection,
+            ?compactRelatedSection,
+          ],
         ),
       );
       final bandHeight = MediaQuery.sizeOf(context).height * 0.5;
@@ -1754,14 +1845,25 @@ class SeriesDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                l.seriesCast,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              DetailRowHeader(icon: Icons.people, label: l.seriesCast),
               const SizedBox(height: 8),
               CastRow(members: richCastList),
+            ],
+          )
+        : null;
+
+    final relatedSection =
+        (richRelatedList != null && richRelatedList.isNotEmpty)
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DetailRowHeader(icon: Icons.recommend, label: l.relatedTitle),
+              const SizedBox(height: 8),
+              RelatedRow(
+                items: richRelatedList,
+                onTap: (item) => onRelatedTap?.call(item),
+              ),
             ],
           )
         : null;
@@ -1774,6 +1876,7 @@ class SeriesDetailBody extends StatelessWidget {
       upper: upper,
       episodeSection: episodeSection,
       castSection: castSection,
+      relatedSection: relatedSection,
       scrollController: scrollController,
     );
   }
@@ -1796,6 +1899,7 @@ class _SeriesScrollHost extends StatefulWidget {
     required this.upper,
     required this.episodeSection,
     required this.castSection,
+    this.relatedSection,
     this.scrollController,
   });
 
@@ -1806,6 +1910,7 @@ class _SeriesScrollHost extends StatefulWidget {
   final Widget upper;
   final Widget episodeSection;
   final Widget? castSection;
+  final Widget? relatedSection;
 
   /// External controller (see [SeriesDetailBody.scrollController]) so the
   /// caller can also snap to top from outside, e.g. the AppBar back button
@@ -1883,6 +1988,10 @@ class _SeriesScrollHostState extends State<_SeriesScrollHost> {
               if (widget.castSection != null) ...[
                 const SizedBox(height: 24),
                 widget.castSection!,
+              ],
+              if (widget.relatedSection != null) ...[
+                const SizedBox(height: 24),
+                widget.relatedSection!,
               ],
               SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
             ],

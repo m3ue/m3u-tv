@@ -40,6 +40,38 @@ CustomTransitionPage<void> _slidePage(Widget screen) =>
       ),
     );
 
+/// Opens a Related-row tap's own detail screen, reusing the same
+/// `onVodSelect`/`onSeriesSelect` callbacks every other VOD/series entry
+/// point (grids, Continue Watching) already navigates through - a related
+/// item is guaranteed to already exist in the user's library, so it only
+/// needs resolving to the matching [VodItem]/[Series] by id.
+void _openRelated(ContentActions actions, RelatedItem related) {
+  final targetId = int.tryParse(related.id);
+  if (targetId == null) {
+    debugPrint('_openRelated: unparseable id "${related.id}"');
+    return;
+  }
+  if (related.isSeries) {
+    final series = actions.appState.seriesList.firstWhereOrNull(
+      (s) => s.id == targetId,
+    );
+    if (series != null) {
+      actions.onSeriesSelect(series);
+    } else {
+      debugPrint('_openRelated: series #$targetId not found in library');
+    }
+  } else {
+    final vod = actions.appState.vodItems.firstWhereOrNull(
+      (v) => v.id == targetId,
+    );
+    if (vod != null) {
+      actions.onVodSelect(vod);
+    } else {
+      debugPrint('_openRelated: VOD #$targetId not found in library');
+    }
+  }
+}
+
 GoRouter createGoRouter({
   required AppStateController appState,
   required bool nativeTelevisionHint,
@@ -163,6 +195,8 @@ GoRouter createGoRouter({
                             onPlay: actions.onOpenPlayer,
                             progressList: actions.progressList,
                             onSidebarActivate: actions.onSidebarActivate,
+                            onOpenRelated: (related) =>
+                                _openRelated(actions, related),
                           ),
                         ),
                       );
@@ -218,6 +252,8 @@ GoRouter createGoRouter({
                             progressList: actions.progressList,
                             onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
                             onSidebarActivate: actions.onSidebarActivate,
+                            onOpenRelated: (related) =>
+                                _openRelated(actions, related),
                           ),
                         ),
                       );
@@ -283,6 +319,29 @@ GoRouter createGoRouter({
                           appStateController: actions.appState,
                           onPlay: actions.onOpenPlayer,
                           onSidebarActivate: actions.onSidebarActivate,
+                          // push (not go) - a related item lands on the same
+                          // route pattern this screen is already on, and go()
+                          // to a same-pattern location updates this State in
+                          // place rather than creating a fresh one, so the
+                          // (late final) meta fetch never re-runs and the
+                          // pushed-detail sidebar-depth tracking every other
+                          // detail screen relies on never fires. push() gives
+                          // it a real, freshly-initialized instance and a
+                          // normal one-level pop on back, matching how
+                          // VOD/Series related items navigate.
+                          onOpenRelated: (related) => context.push(
+                            RouteNames.aiostreamsDetailsFor(
+                              integrationId,
+                              related.type,
+                              related.id,
+                            ),
+                            extra: AIOStreamsItem(
+                              id: related.id,
+                              type: related.type,
+                              name: related.title,
+                              poster: related.posterUrl,
+                            ),
+                          ),
                         ),
                       );
                     },

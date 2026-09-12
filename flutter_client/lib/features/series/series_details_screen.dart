@@ -44,6 +44,7 @@ class SeriesDetailsScreen extends StatefulWidget {
     this.progressList = const [],
     this.onMarkEpisodeWatched,
     this.onSidebarActivate,
+    this.onOpenRelated,
   });
 
   final int seriesId;
@@ -63,6 +64,10 @@ class SeriesDetailsScreen extends StatefulWidget {
   final List<Progress> progressList;
   final MarkEpisodeWatched? onMarkEpisodeWatched;
   final VoidCallback? onSidebarActivate;
+
+  /// Opens a related item's own detail screen. Null hides the row's actions
+  /// (the row itself still renders informationally when this is null).
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -215,6 +220,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             onEpisodeSelected: _playEpisode,
             onMarkEpisode: _markEpisode,
             onMarkSeason: _markSeason,
+            onOpenRelated: widget.onOpenRelated,
           );
         },
       ),
@@ -326,6 +332,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     required this.onEpisodeSelected,
     required this.onMarkEpisode,
     required this.onMarkSeason,
+    this.onOpenRelated,
     this.scrollController,
   });
 
@@ -352,6 +359,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final void Function(Episode episode, {required bool watched}) onMarkEpisode;
   final void Function(List<Episode> episodes, {required bool watched})
   onMarkSeason;
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   List<int> get _seasonNumbers {
     final numbers = <int>{
@@ -600,6 +608,8 @@ class _SeriesDetailsBody extends StatelessWidget {
       primaryActions: _primaryActions(context, target),
       richCast: info.series.richCast,
       castSemanticLabel: AppLocalizations.of(context).seriesCast,
+      richRelated: info.series.related,
+      onRelatedTap: onOpenRelated,
       progressList: progressList,
       canMarkWatched: canMarkWatched,
       emptyEpisodesLabel: 'No episodes available',

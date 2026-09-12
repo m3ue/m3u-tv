@@ -19,6 +19,7 @@ class VodDetailsScreen extends StatefulWidget {
     this.progressList = const [],
     this.onPlay,
     this.onSidebarActivate,
+    this.onOpenRelated,
   });
 
   final VodItem item;
@@ -26,6 +27,10 @@ class VodDetailsScreen extends StatefulWidget {
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
   final VoidCallback? onSidebarActivate;
+
+  /// Opens a related item's own detail screen. Null hides the row's actions
+  /// (the row itself still renders informationally when this is null).
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   @override
   State<VodDetailsScreen> createState() => _VodDetailsScreenState();
@@ -85,6 +90,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
               item: widget.item,
               progressList: widget.progressList,
               onPlay: widget.onPlay,
+              onOpenRelated: widget.onOpenRelated,
               dominantColor: _dominantColor,
               colorMatchReady: _colorMatchResolved,
             )
@@ -97,6 +103,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   isLoading: snapshot.connectionState != ConnectionState.done,
                   progressList: widget.progressList,
                   onPlay: widget.onPlay,
+                  onOpenRelated: widget.onOpenRelated,
                   dominantColor: _dominantColor,
                   // A failed info fetch means no backdrop and no palette step
                   // will run - reveal the (surface) hero rather than holding.
@@ -115,6 +122,7 @@ class _VodDetailsBody extends StatelessWidget {
     this.isLoading = false,
     this.progressList = const [],
     this.onPlay,
+    this.onOpenRelated,
     this.dominantColor,
     this.colorMatchReady = false,
   });
@@ -124,6 +132,7 @@ class _VodDetailsBody extends StatelessWidget {
   final bool isLoading;
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
+  final ValueChanged<RelatedItem>? onOpenRelated;
 
   /// Passed straight to the shared body's colour-match reveal - true once the
   /// palette extraction has resolved.
@@ -166,6 +175,8 @@ class _VodDetailsBody extends StatelessWidget {
       ],
       richCast: richCast,
       castSemanticLabel: l.vodCast,
+      richRelated: details.related,
+      onRelatedTap: onOpenRelated,
       primaryButtonLabel: buttonLabel,
       onPrimary: () =>
           _play(details, startPosition: progress?.positionSeconds.toDouble()),
@@ -247,6 +258,7 @@ class _ResolvedVodDetails {
   String? get director => _notEmpty(info?.director);
   String? get cast => _notEmpty(info?.cast);
   List<CastMember>? get richCast => info?.richCast;
+  List<RelatedItem>? get related => info?.related;
   String? get year => _notEmpty(info?.year) ?? _notEmpty(info?.releaseDate);
   String? get duration => _notEmpty(info?.duration);
   double? get rating => info?.rating ?? item.rating;

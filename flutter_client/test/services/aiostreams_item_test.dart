@@ -102,5 +102,28 @@ void main() {
       expect(item.clearLogoUrl, isNull);
       expect(item.richCast, isNull);
     });
+
+    test('parses the related array (tmdb: id form)', () {
+      final json = movieMeta()
+        ..['related'] = [
+          {
+            'id': 'tmdb:680',
+            'type': 'movie',
+            'name': 'Pulp Fiction',
+            'poster': 'https://img/pulp.jpg',
+          },
+        ];
+      final item = AIOStreamsItem.fromJson(json);
+
+      expect(item.related, hasLength(1));
+      expect(item.related!.single.id, 'tmdb:680');
+      expect(item.related!.single.title, 'Pulp Fiction');
+      expect(item.related!.single.posterUrl, 'https://img/pulp.jpg');
+    });
+
+    test('related is null when absent (no TMDB recommendations)', () {
+      final item = AIOStreamsItem.fromJson(movieMeta());
+      expect(item.related, isNull);
+    });
   });
 }
