@@ -28,6 +28,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 const bool _showPlaybackDiagnostics = bool.fromEnvironment(
   'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
@@ -1511,24 +1512,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // [isHandheldLayout].
                 final isCompact = isHandheldLayout(context);
                 final edgePadding = overlayEdgePaddingFor(context);
-                // Compact/handheld now sits to the right of the back
-                // button, the same corner PlaybackControls itself uses --
-                // mirroring tvOS's existing placement below. It used to sit
-                // below the back button instead, which ate a big chunk of
-                // vertical space that's especially scarce in the short
-                // landscape orientation the player locks to on phones.
+                final fontScale = FontSizeScope.scaleOf(context);
+                // Sits to the right of the back button on every platform --
+                // mirroring tvOS's original placement, now applied uniformly
+                // instead of a separate flat desktop constant. It used to sit
+                // below the back button on handheld instead, which ate a big
+                // chunk of vertical space that's especially scarce in the
+                // short landscape orientation the player locks to on phones.
                 // Derive the offset from the actual button geometry instead
                 // of a magic constant: safe-area inset + PlaybackControls'
                 // own padding (edgePadding, shared with it so the two can't
-                // drift apart) + the ~44px circular back button + a gap.
-                final rightOfBackButton =
-                    isCompact || Platform.operatingSystem == 'tvos';
-                final overlayLeft = rightOfBackButton
-                    ? mediaQuery.padding.left +
-                          edgePadding +
-                          44.0 +
-                          (isCompact ? 12.0 : 16.0)
-                    : 104.0;
+                // drift apart) + the circular back button (44px at the
+                // normal display-size scale - see PlaybackControls._
+                // buildHeader's icon size + padding, which this must track
+                // or a larger display-size setting grows the real button
+                // past this reserved space) + a gap. The desktop gap (20)
+                // matches the old flat 104.0 constant at scale 1
+                // (40 edgePadding + 44 button + 20 gap).
+                final gap = isCompact
+                    ? 12.0
+                    : (Platform.operatingSystem == 'tvos' ? 16.0 : 20.0);
+                final overlayLeft =
+                    mediaQuery.padding.left +
+                    edgePadding +
+                    44.0 * fontScale +
+                    gap;
                 // Must match PlaybackControls' own edgePadding or the
                 // back button and this overlay's top edges drift apart.
                 final overlayTop = mediaQuery.padding.top + edgePadding;
