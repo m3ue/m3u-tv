@@ -308,11 +308,27 @@ GoRouter createGoRouter({
                           appStateController: actions.appState,
                           onPlay: actions.onOpenPlayer,
                           onSidebarActivate: actions.onSidebarActivate,
-                          onOpenRelated: (related) => context.go(
+                          // push (not go) - a related item lands on the same
+                          // route pattern this screen is already on, and go()
+                          // to a same-pattern location updates this State in
+                          // place rather than creating a fresh one, so the
+                          // (late final) meta fetch never re-runs and the
+                          // pushed-detail sidebar-depth tracking every other
+                          // detail screen relies on never fires. push() gives
+                          // it a real, freshly-initialized instance and a
+                          // normal one-level pop on back, matching how
+                          // VOD/Series related items navigate.
+                          onOpenRelated: (related) => context.push(
                             RouteNames.aiostreamsDetailsFor(
                               integrationId,
                               related.type,
                               related.id,
+                            ),
+                            extra: AIOStreamsItem(
+                              id: related.id,
+                              type: related.type,
+                              name: related.title,
+                              poster: related.posterUrl,
                             ),
                           ),
                         ),
