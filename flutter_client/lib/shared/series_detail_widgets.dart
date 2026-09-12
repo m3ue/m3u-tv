@@ -14,9 +14,12 @@ import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/dpad_tab_bar.dart' show isDesktopPlatform;
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart'
+    show detailAppBarHeight;
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Shared building blocks for the series-style detail screens (Xtream Series
@@ -1206,12 +1209,22 @@ abstract class LockedRow {
 ///    this region's own box + controller and run over two frames so a slower
 ///    tvOS layout pass cannot strand it.
 class RowScrollRegion extends StatefulWidget {
-  const RowScrollRegion({super.key, required this.child, this.onExitTop});
+  const RowScrollRegion({
+    super.key,
+    required this.child,
+    this.onExitTop,
+    this.controller,
+  });
 
   final Widget child;
 
   /// Called when up is pressed on the top row - focus the Play button.
   final VoidCallback? onExitTop;
+
+  /// External controller (e.g. so an ancestor can drive a parallax backdrop
+  /// off the same offset). The caller owns disposal in that case; when null,
+  /// the region creates and disposes its own.
+  final ScrollController? controller;
 
   /// Never returns null spuriously the way an inherited-widget lookup can when
   /// the scope is not wired yet (a tvOS-vs-desktop tree-timing difference that
@@ -1224,7 +1237,9 @@ class RowScrollRegion extends StatefulWidget {
 }
 
 class RowScrollRegionState extends State<RowScrollRegion> {
-  final ScrollController _controller = ScrollController();
+  late final ScrollController _controller =
+      widget.controller ?? ScrollController();
+  bool get _ownsController => widget.controller == null;
 
   /// Rows in registration order, which is mount order, which is top-to-bottom
   /// (the episode strip builds before the cast strip).
@@ -1305,13 +1320,25 @@ class RowScrollRegionState extends State<RowScrollRegion> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(controller: _controller, child: widget.child);
+    // Gesture/momentum scrolling is disabled on TV/D-pad navigation so the
+    // vertical offset can only move via our own reveal()/navigateVertical()
+    // calls - nothing ambient left to fight the rails' own horizontal
+    // centering, which is what caused the scroll-drift jank previously.
+    // Desktop mouse/trackpad keeps default physics for ambient wheel-scroll.
+    final physics = isDesktopPlatform(context)
+        ? null
+        : const NeverScrollableScrollPhysics();
+    return SingleChildScrollView(
+      controller: _controller,
+      physics: physics,
+      child: widget.child,
+    );
   }
 }
 
@@ -1498,6 +1525,7 @@ class SeriesDetailBody extends StatelessWidget {
     this.autofocusFirstEpisode = true,
     this.dominantColor,
     this.compactBreakpoint = 700,
+    this.scrollController,
   });
 
   final String seriesName;
@@ -1542,6 +1570,13 @@ class SeriesDetailBody extends StatelessWidget {
   final bool colorMatchReady;
 
   final FocusNode? seasonPickerFocusNode;
+
+  /// Page-level scroll controller for the wide/TV layout (owned by the
+  /// caller so it can also snap the page back to top when the AppBar's back
+  /// button takes focus - see `ItemDetailScaffold.onBackButtonFocused`).
+  /// Null lets [_SeriesScrollHost] create and own its own; ignored on
+  /// compact.
+  final ScrollController? scrollController;
 
   final ValueChanged<int> onSeasonSelected;
   final ValueChanged<int?>? onSeasonResolved;
@@ -1700,56 +1735,155 @@ class SeriesDetailBody extends StatelessWidget {
         backgroundColor: bg,
         scrimColors: [bg.withValues(alpha: 0.2), bg.withValues(alpha: 0.8), bg],
         colorMatchReady: colorMatchReady,
-        contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+        contentPadding: EdgeInsets.only(
+          top: bandHeight * 0.44 + detailAppBarHeight(context),
+          bottom: 24,
+        ),
         content: content,
       );
     }
 
     final richCastList = richCast;
-    final wideContent = Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: MediaBrowsingMetrics.pagePadding,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          upper,
-          const SizedBox(height: 12),
-          Expanded(
-            child: RowScrollRegion(
-              onExitTop: onExitTop,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  episodeSection,
-                  if (richCastList != null && richCastList.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text(
-                      l.seriesCast,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    CastRow(members: richCastList),
-                  ],
-                ],
+    final castSection = (richCastList != null && richCastList.isNotEmpty)
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l.seriesCast,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ),
-        ],
+              const SizedBox(height: 8),
+              CastRow(members: richCastList),
+            ],
+          )
+        : null;
+
+    return _SeriesScrollHost(
+      backdropUrl: backdropUrl,
+      bg: bg,
+      colorMatchReady: colorMatchReady,
+      onExitTop: onExitTop,
+      upper: upper,
+      episodeSection: episodeSection,
+      castSection: castSection,
+      scrollController: scrollController,
+    );
+  }
+}
+
+/// Owns the single [ScrollController] shared by the whole wide/TV Series
+/// detail page: [RowScrollRegion] drives it (D-pad reveal/hop), and
+/// [BackdropDetailHero] reads it for the backdrop parallax. Split out as its
+/// own [StatefulWidget] because [SeriesDetailBody] is stateless and the
+/// controller must survive rebuilds without a state to live in - and because
+/// the hero (which paints the backdrop) is a sibling of the content it reads
+/// the offset from, not an ancestor, so it can't discover the controller any
+/// other way.
+class _SeriesScrollHost extends StatefulWidget {
+  const _SeriesScrollHost({
+    required this.backdropUrl,
+    required this.bg,
+    required this.colorMatchReady,
+    required this.onExitTop,
+    required this.upper,
+    required this.episodeSection,
+    required this.castSection,
+    this.scrollController,
+  });
+
+  final String? backdropUrl;
+  final Color bg;
+  final bool colorMatchReady;
+  final VoidCallback onExitTop;
+  final Widget upper;
+  final Widget episodeSection;
+  final Widget? castSection;
+
+  /// External controller (see [SeriesDetailBody.scrollController]) so the
+  /// caller can also snap to top from outside, e.g. the AppBar back button
+  /// taking focus. Null creates and owns one internally.
+  final ScrollController? scrollController;
+
+  @override
+  State<_SeriesScrollHost> createState() => _SeriesScrollHostState();
+}
+
+class _SeriesScrollHostState extends State<_SeriesScrollHost> {
+  late final ScrollController _controller =
+      widget.scrollController ?? ScrollController();
+  bool get _ownsController => widget.scrollController == null;
+
+  @override
+  void dispose() {
+    if (_ownsController) _controller.dispose();
+    super.dispose();
+  }
+
+  /// The upper block (poster/title/meta/buttons) is always the very top of
+  /// the page, so any focus landing anywhere inside it means "show the top
+  /// of the page," not just whichever widget happens to hold focus - a
+  /// partial reveal would otherwise leave the poster/title still clipped
+  /// above the viewport even once the play button is visible.
+  void _scrollToTop() {
+    if (!_controller.hasClients) return;
+    unawaited(
+      _controller.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
       ),
     );
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.bg;
     return BackdropDetailHero(
-      backdropUrl: backdropUrl,
+      backdropUrl: widget.backdropUrl,
       alwaysShowScrim: true,
       showBackgroundColorLayer: true,
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
-      colorMatchReady: colorMatchReady,
-      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
-      content: wideContent,
+      colorMatchReady: widget.colorMatchReady,
+      scrollController: _controller,
+      // No contentPadding here (unlike every other BackdropDetailHero call
+      // site) - the top/bottom insets below live *inside* RowScrollRegion's
+      // scrolled column instead, so they scroll away with everything else
+      // and the hero/poster can run all the way up behind the transparent
+      // AppBar rather than stopping at a fixed, never-scrolling gap.
+      content: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: MediaBrowsingMetrics.pagePadding,
+        ),
+        child: RowScrollRegion(
+          controller: _controller,
+          onExitTop: widget.onExitTop,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: detailAppBarHeight(context) + 32),
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onFocusChange: (hasFocus) {
+                  if (hasFocus) _scrollToTop();
+                },
+                child: widget.upper,
+              ),
+              const SizedBox(height: 12),
+              widget.episodeSection,
+              if (widget.castSection != null) ...[
+                const SizedBox(height: 24),
+                widget.castSection!,
+              ],
+              SizedBox(height: MediaQuery.paddingOf(context).bottom + 24),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

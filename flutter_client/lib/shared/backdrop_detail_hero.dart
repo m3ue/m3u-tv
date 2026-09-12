@@ -47,10 +47,19 @@ class BackdropDetailHero extends StatefulWidget {
     this.contentPadding = EdgeInsets.zero,
     this.colorMatchReady,
     this.revealDuration = const Duration(milliseconds: 420),
+    this.scrollController,
+    this.parallaxFactor = 0.35,
   });
 
   final Widget content;
   final String? backdropUrl;
+
+  /// When set (wide/TV Series, whose [content] now scrolls the whole hero),
+  /// the backdrop translates at [parallaxFactor] of this controller's
+  /// offset - background moves slower than content. Null (default) keeps
+  /// the backdrop static, as every other caller still wants.
+  final ScrollController? scrollController;
+  final double parallaxFactor;
 
   /// Caps the backdrop image + scrim to a fixed-height band pinned to the
   /// top of the hero (mobile, e.g. half the viewport) instead of the image
@@ -149,6 +158,23 @@ class _BackdropDetailHeroState extends State<BackdropDetailHero> {
       imageAndScrim = Align(
         alignment: Alignment.topCenter,
         child: SizedBox(height: bandHeight, child: imageAndScrim),
+      );
+    }
+
+    final scrollController = w.scrollController;
+    if (scrollController != null) {
+      imageAndScrim = AnimatedBuilder(
+        animation: scrollController,
+        builder: (context, child) {
+          final offset = scrollController.hasClients
+              ? scrollController.offset
+              : 0.0;
+          return Transform.translate(
+            offset: Offset(0, -offset * w.parallaxFactor),
+            child: child,
+          );
+        },
+        child: imageAndScrim,
       );
     }
 

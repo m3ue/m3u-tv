@@ -8,6 +8,8 @@ import 'package:m3u_tv/shared/cast_reveal_slot.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart'
+    show detailAppBarHeight;
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -162,7 +164,10 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.35), bg.withValues(alpha: 0.92), bg],
       colorMatchReady: widget.colorMatchReady,
-      contentPadding: const EdgeInsets.only(top: 24, bottom: 24),
+      contentPadding: EdgeInsets.only(
+        top: 24 + detailAppBarHeight(context),
+        bottom: 24,
+      ),
       content: content,
     );
   }
@@ -204,7 +209,10 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
       backgroundColor: bg,
       scrimColors: [bg.withValues(alpha: 0.2), bg.withValues(alpha: 0.8), bg],
       colorMatchReady: widget.colorMatchReady,
-      contentPadding: EdgeInsets.only(top: bandHeight * 0.44, bottom: 24),
+      contentPadding: EdgeInsets.only(
+        top: bandHeight * 0.44 + detailAppBarHeight(context),
+        bottom: 24,
+      ),
       content: content,
     );
   }

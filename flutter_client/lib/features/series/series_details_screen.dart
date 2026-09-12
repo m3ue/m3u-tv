@@ -102,10 +102,27 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
   bool _colorMatchResolved = false;
   final FocusNode _playFocusNode = FocusNode(debugLabel: 'seriesPlayButton');
 
+  /// Owned here (rather than inside the shared body) so the AppBar back
+  /// button - which lives outside the scrollable page entirely - can also
+  /// snap it back to top on focus.
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void dispose() {
     _playFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    unawaited(
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   /// Authoritative per-series episode progress from `get_series_progress`.
@@ -163,6 +180,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     return ItemDetailScaffold(
       title: title,
       onSidebarActivate: widget.onSidebarActivate,
+      onBackButtonFocused: _scrollToTop,
       body: FutureBuilder<SeriesInfo>(
         future: _future,
         builder: (context, snapshot) {
@@ -186,6 +204,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             colorMatchReady: _colorMatchResolved,
             canMarkWatched: widget.onMarkEpisodeWatched != null,
             playFocusNode: _playFocusNode,
+            scrollController: _scrollController,
             onSeasonSelected: (season) =>
                 setState(() => _selectedSeason = season),
             onSeasonResolved: (season) {
@@ -307,6 +326,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     required this.onEpisodeSelected,
     required this.onMarkEpisode,
     required this.onMarkSeason,
+    this.scrollController,
   });
 
   final SeriesInfo info;
@@ -320,6 +340,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final bool colorMatchReady;
   final bool canMarkWatched;
   final FocusNode playFocusNode;
+  final ScrollController? scrollController;
   final ValueChanged<int> onSeasonSelected;
 
   /// Fires (post-frame) with the season currently in view - the user's pick
@@ -591,6 +612,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       onMarkEpisode: onMarkEpisode,
       onMarkSeason: onMarkSeason,
       onExitTop: playFocusNode.requestFocus,
+      scrollController: scrollController,
     );
   }
 

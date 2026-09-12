@@ -809,10 +809,12 @@ void main() {
       'wide layout: on a short viewport, moving focus cast -> episode strip '
       'scrolls the episode strip back into view (no clip)',
       (tester) async {
-        // Wide (>700) but deliberately short so the episode strip + cast row
-        // cannot both fit and the region has to scroll - the state that made
-        // the strip stay clipped on a TV.
-        tester.view.physicalSize = const Size(1000, 600);
+        // Wide (>700) but deliberately short so the hero (poster/meta/season
+        // picker), episode strip and cast row cannot all fit and the region -
+        // which now spans the whole page, not just the space left below the
+        // hero - still has to scroll. This is the state that made the strip
+        // stay clipped on a TV.
+        tester.view.physicalSize = const Size(1000, 420);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);

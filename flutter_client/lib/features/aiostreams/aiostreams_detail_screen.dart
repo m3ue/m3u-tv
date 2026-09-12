@@ -58,6 +58,22 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
   Color? _dominantColor;
   bool _colorMatchResolved = false;
 
+  /// Owned here (rather than inside the shared series body) so the AppBar
+  /// back button - outside the scrollable page entirely - can also snap it
+  /// back to top on focus. Unused (never attached) on the movie path.
+  final ScrollController _scrollController = ScrollController();
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    unawaited(
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
   bool get _isSeries => widget.item.type == 'series';
 
   @override
@@ -68,6 +84,12 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
     unawaited(
       _resolveDominantColor(widget.item.background ?? widget.item.poster),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _resolveDominantColor(String? url) async {
@@ -158,6 +180,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
     return ItemDetailScaffold(
       title: widget.item.name,
       onSidebarActivate: widget.onSidebarActivate,
+      onBackButtonFocused: _scrollToTop,
       body: FutureBuilder<AIOStreamsItem?>(
         future: _metaFuture,
         builder: (context, snapshot) {
@@ -175,6 +198,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
               appStateController: widget.appStateController,
               dominantColor: _dominantColor,
               colorMatchReady: colorMatchReady,
+              scrollController: _scrollController,
               onEpisodeSelected: (video) => _openStreamPicker(
                 item: item,
                 type: 'series',
@@ -284,11 +308,13 @@ class _SeriesBody extends StatefulWidget {
     this.appStateController,
     this.dominantColor,
     this.colorMatchReady = false,
+    this.scrollController,
   });
 
   final AIOStreamsItem item;
   final void Function(AIOStreamsVideo video) onEpisodeSelected;
   final AppStateController? appStateController;
+  final ScrollController? scrollController;
 
   /// Palette-extracted backdrop tone + whether it has resolved. Drives the
   /// same colour-matched, cross-faded hero as SeriesDetailsScreen.
@@ -540,6 +566,7 @@ class _SeriesBodyState extends State<_SeriesBody> {
       onMarkEpisode: (_, {required watched}) {},
       onMarkSeason: (_, {required watched}) {},
       onExitTop: _seasonFocusNode.requestFocus,
+      scrollController: widget.scrollController,
     );
   }
 }
