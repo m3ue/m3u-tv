@@ -12,7 +12,10 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart' show SelectHold;
 
-const double _kCardWidth = 130;
+// Matches MediaPreviewCard's posterStyle width elsewhere in the app (Movies/
+// Series grids, AIOStreams catalog rows) - a "related" card is the same kind
+// of poster tile, not a smaller cast-avatar-style thumbnail.
+const double _kCardWidth = MediaBrowsingMetrics.posterCardWidth;
 const double _kCardAspectRatio = 0.68;
 const double _kCardTextHeight = 20;
 const double _kCardGap = 12;
