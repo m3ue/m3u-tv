@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Mirrors the tvOS/Android-TV detection in `device_type_resolver.dart`
@@ -186,13 +187,19 @@ class _DvrSeriesRuleOptionsScreenState
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final show = widget.show;
+    final scale = FontSizeScope.scaleOf(context);
 
     return Scaffold(
       resizeToAvoidBottomInset: !_isRemoteDrivenEnvironment(context),
       appBar: AppBar(
         title: Text(l10n.dvrSeriesOptionsFor(show.displayTitle)),
+        // AppBar's default toolbarHeight is fixed and unscaled - without
+        // scaling it too, AppIconButton's larger footprint gets squeezed
+        // into that fixed height (see item_detail_scaffold.dart).
+        toolbarHeight: kToolbarHeight * scale,
+        leadingWidth: 56 * scale,
         leading: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(8 * scale),
           child: AppIconButton(
             icon: Icons.arrow_back,
             tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -470,6 +477,7 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(signed: true),
@@ -479,6 +487,14 @@ class _NumberField extends StatelessWidget {
         hintText: hint,
         suffixText: suffix,
         border: const OutlineInputBorder(),
+        // Material's default content padding is fixed and unscaled - as
+        // the field's (already-scaling) text grows with the display-size
+        // setting, a static padding makes the box look proportionally
+        // smaller. Scale it to match.
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 12 * scale,
+          vertical: 16 * scale,
+        ),
       ),
     );
   }

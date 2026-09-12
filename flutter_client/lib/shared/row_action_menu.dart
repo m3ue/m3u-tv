@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Visual treatment for a [RowAction]. `danger` reads as destructive (red
 /// ghost button / red menu item) — for actions like Stop or Delete.
@@ -71,14 +72,12 @@ class _RowActionMenuState extends State<RowActionMenu>
     GradientBorderEffect(borderRadius: BorderRadius.all(Radius.circular(50))),
   ];
   static const _menuWidth = 180.0;
-  static const _menuStyle = MenuStyle(
-    minimumSize: WidgetStatePropertyAll(Size(_menuWidth, 0)),
-  );
   static const _expandDuration = Duration(milliseconds: 320);
-  // Matches AppIconButton's fixed 56x56 footprint plus the 8px gap each
+  // Matches AppIconButton's 56x56 (scaled) footprint plus the 8px gap each
   // action is padded with below, so the reserved space can be computed
   // without measuring — it's what lets the reveal grow without clipping
-  // (see _buildInline).
+  // (see _buildInline). Both scale with the display-size setting so the
+  // reveal stays wide/tall enough to hold AppIconButton's own scaled size.
   static const _actionSlotWidth = 64.0;
   static const _actionRowHeight = 56.0;
   // Fraction of the timeline each later action's own slide/fade is offset
@@ -160,10 +159,11 @@ class _RowActionMenuState extends State<RowActionMenu>
 
   Widget _buildCompact(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
     final items = [
       for (final action in widget.actions)
         SizedBox(
-          width: _menuWidth,
+          width: _menuWidth * scale,
           child: MenuItemButton(
             leadingIcon: Icon(
               action.icon,
@@ -189,18 +189,21 @@ class _RowActionMenuState extends State<RowActionMenu>
       effects: _menuEffects,
       child: MenuAnchor(
         controller: _menuController,
-        style: _menuStyle,
+        style: MenuStyle(
+          minimumSize: WidgetStatePropertyAll(Size(_menuWidth * scale, 0)),
+        ),
         menuChildren: items,
         child: IconButton(
           tooltip: widget.moreLabel,
           onPressed: _toggleMenu,
-          icon: const Icon(Icons.more_vert),
+          icon: Icon(Icons.more_vert, size: 24 * scale),
         ),
       ),
     );
   }
 
   Widget _buildInline(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
     // Deliberately a plain `Focus` node, not a `DpadRegion`: a nested region
     // would exclude these buttons from the enclosing list region's
     // candidate set entirely, so d-pad right from the row content would
@@ -225,10 +228,11 @@ class _RowActionMenuState extends State<RowActionMenu>
               final reservedWidth =
                   Curves.easeOutCubic.transform(_expandController.value) *
                   widget.actions.length *
-                  _actionSlotWidth;
+                  _actionSlotWidth *
+                  scale;
               return SizedBox(
                 width: reservedWidth,
-                height: _actionRowHeight,
+                height: _actionRowHeight * scale,
                 // No ClipRect: each action slides/fades in on its own
                 // timeline below, so it's never visually chopped by a
                 // growing box edge the way wiping the whole row in via

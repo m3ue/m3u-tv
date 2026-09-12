@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Searches across every searchable AIOStreams catalog with All/Movies/Series tabs.
@@ -165,6 +166,7 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
 
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -185,11 +187,11 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
                     borderRadius: const BorderRadius.all(Radius.circular(50)),
                     onTap: () => Navigator.of(context).maybePop(),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: Icon(Icons.arrow_back, size: 24 * scale),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8 * scale),
                   Expanded(
                     child: InlineMediaSearchField(
                       query: _query,

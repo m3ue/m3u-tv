@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/shared/image_quality_scope.dart';
+
 /// Rounded-square leading icon tile for list rows, shared by the DVR section
 /// (recordings, series rules) and the Shows episode list. Centralizing the
 /// shape keeps row visual treatment consistent across feature surfaces.
@@ -28,12 +30,14 @@ class LeadingTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final scaledSize = size * scale;
 
     if (selectMode) {
       final accent = selected ? colorScheme.primary : colorScheme.outline;
       return Container(
-        width: size,
-        height: size,
+        width: scaledSize,
+        height: scaledSize,
         decoration: BoxDecoration(
           color: selected
               ? colorScheme.primary.withValues(alpha: 0.14)
@@ -44,18 +48,19 @@ class LeadingTile extends StatelessWidget {
         child: Icon(
           selected ? Icons.check_box : Icons.check_box_outline_blank,
           color: accent,
+          size: 24 * scale,
         ),
       );
     }
 
     return Container(
-      width: size,
-      height: size,
+      width: scaledSize,
+      height: scaledSize,
       decoration: BoxDecoration(
         color: tileColor.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, color: tileColor),
+      child: Icon(icon, color: tileColor, size: 24 * scale),
     );
   }
 }

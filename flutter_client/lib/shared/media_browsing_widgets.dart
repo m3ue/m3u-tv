@@ -213,11 +213,14 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
     const radius = BorderRadius.all(
       Radius.circular(MediaBrowsingMetrics.cardRadius),
     );
+    final scale = FontSizeScope.scaleOf(context);
 
     // Fixed so the facade button and the real TextField below are pixel
     // identical in height - letting each derive its own height from font
     // metrics/padding produced a visible size jump on activate/deactivate.
-    const fieldHeight = 52.0;
+    // Scaled with the display-size setting so the field doesn't clip its
+    // own (already-scaling) text/icons at Large/Very Large.
+    final fieldHeight = 52.0 * scale;
     final hintStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
       color: colorScheme.onSurfaceVariant,
     );
@@ -231,15 +234,15 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
           borderRadius: radius,
           color: colorScheme.surfaceContainerHigh,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: EdgeInsets.symmetric(horizontal: 12 * scale),
             child: Row(
               children: [
                 Icon(
                   Icons.search,
-                  size: 24,
+                  size: 24 * scale,
                   color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8 * scale),
                 Expanded(
                   child: Text(
                     widget.query.isEmpty ? widget.hintText : widget.query,
@@ -274,8 +277,8 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
               ),
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: 12,
-                  right: widget.query.isEmpty ? 12 : 4,
+                  left: 12 * scale,
+                  right: (widget.query.isEmpty ? 12 : 4) * scale,
                 ),
                 child: Focus(
                   focusNode: _containerFocusNode,
@@ -291,10 +294,10 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
                     children: [
                       Icon(
                         Icons.search,
-                        size: 24,
+                        size: 24 * scale,
                         color: colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8 * scale),
                       Expanded(
                         child: TextField(
                           controller: _controller,
@@ -323,7 +326,7 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
                           effects: kStadiumFocusEffects,
                           child: IconButton(
                             tooltip: 'Clear search',
-                            icon: const Icon(Icons.clear),
+                            icon: Icon(Icons.clear, size: 24 * scale),
                             onPressed: _clear,
                           ),
                         ),

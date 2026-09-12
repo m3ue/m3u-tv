@@ -13,6 +13,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/row_action_menu.dart';
@@ -985,8 +986,6 @@ class _RecordingCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onSelect;
 
-  // NOTE(cj): row height is tuned for touch/desktop; scaling to 88 for TV
-  // is tracked as follow-up work, not done here.
   static const double _rowHeight = 72;
 
   @override
@@ -995,6 +994,7 @@ class _RecordingCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final statusColor = _statusColor(colorScheme);
     final canSelect = onSelect != null;
+    final scale = FontSizeScope.scaleOf(context);
     // Hidden while selecting: bulk actions live in the selection rail/bar
     // instead, freeing the row's right edge for d-pad traversal to reach it.
     final hasMenu =
@@ -1002,7 +1002,7 @@ class _RecordingCard extends StatelessWidget {
         (onPlay != null || canSelect || onStop != null || onDelete != null);
 
     return SizedBox(
-      height: _rowHeight,
+      height: _rowHeight * scale,
       child: Material(
         color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),

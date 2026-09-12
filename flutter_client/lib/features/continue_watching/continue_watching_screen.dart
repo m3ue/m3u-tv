@@ -5,6 +5,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Full "Continue Watching" list, pushed from the Home row's overflow tile
@@ -33,6 +34,7 @@ class ContinueWatchingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
     final items = continueWatchingPreviewItems(
       context,
       progressList: progressList,
@@ -61,11 +63,11 @@ class ContinueWatchingScreen extends StatelessWidget {
                     borderRadius: const BorderRadius.all(Radius.circular(50)),
                     onTap: () => Navigator.of(context).maybePop(),
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
+                      icon: Icon(Icons.arrow_back, size: 24 * scale),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8 * scale),
                   Text(
                     l.homeContinueWatching,
                     style: theme.textTheme.headlineSmall,
