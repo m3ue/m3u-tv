@@ -5,14 +5,14 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_reveal_slot.dart';
-import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-import 'package:m3u_tv/shared/related_strip.dart';
+import 'package:m3u_tv/shared/series_detail_widgets.dart'
+    show CastRow, RelatedRow, RowScrollRegion;
 
 /// Shared layout scaffold for a movie-style detail page - poster + meta +
 /// cast strip over a colour-matched BackdropDetailHero. Used by both the
@@ -87,16 +87,11 @@ class MovieDetailBody extends StatefulWidget {
 class _MovieDetailBodyState extends State<MovieDetailBody> {
   static const double _wideBreakpoint = 600;
 
-  /// Focus target for the wide cast strip's "up" hop - the primary button.
+  /// Focus target for the wide layout's top-row exit (RowScrollRegion's
+  /// onExitTop) - the primary button.
   final FocusNode _primaryFocusNode = FocusNode(
     debugLabel: 'movieDetailPrimary',
   );
-
-  /// Lets the wide related strip hop focus back up into the cast strip (when
-  /// both are present) instead of only ever going to the primary button.
-  final GlobalKey<CastStripState> _castStripKey = GlobalKey<CastStripState>();
-  final GlobalKey<RelatedStripState> _relatedStripKey =
-      GlobalKey<RelatedStripState>();
 
   @override
   void dispose() {
@@ -127,21 +122,24 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
     final richRelated = widget.richRelated;
     final hasRelated = richRelated != null && richRelated.isNotEmpty;
     final scale = FontSizeScope.scaleOf(context);
-    // Poster + scrolling info column fill the height; the rich cast strip is
-    // pinned full-width below, out of that scroll view so left/right card
-    // navigation never drags the page.
+    // The whole page (poster + meta + cast + related) scrolls together via
+    // RowScrollRegion, matching SeriesDetailBody - the poster/meta block
+    // renders at its natural size and the page grows to fit a taller
+    // footer, rather than the footer squeezing the poster into less height
+    // than its aspect ratio wants.
     final content = Padding(
       padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: Row(
+      child: RowScrollRegion(
+        onExitTop: _primaryFocusNode.requestFocus,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                SizedBox(
-                  width: 220 * scale,
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 220 * scale),
                   child: AspectRatio(
                     aspectRatio: 0.68,
                     child: ResilientMediaImage(
@@ -153,54 +151,38 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
                   ),
                 ),
                 const SizedBox(width: MediaBrowsingMetrics.pagePadding),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: _infoColumn(context, theme),
-                  ),
-                ),
+                Expanded(child: _infoColumn(context, theme)),
               ],
             ),
-          ),
-          CastRevealSlot(
-            topPadding: MediaBrowsingMetrics.contentPadding,
-            castRow: (!hasCast && !hasRelated)
-                ? null
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasCast)
-                        Semantics(
-                          label: widget.castSemanticLabel,
-                          container: true,
-                          child: CastStrip(
-                            key: _castStripKey,
-                            members: richCast,
-                            onNavigateUp: _primaryFocusNode.requestFocus,
-                            onNavigateDown: hasRelated
-                                ? () =>
-                                      _relatedStripKey.currentState?.focusRow()
-                                : null,
-                          ),
-                        ),
-                      if (hasRelated) ...[
+            CastRevealSlot(
+              topPadding: MediaBrowsingMetrics.contentPadding,
+              castRow: (!hasCast && !hasRelated)
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         if (hasCast)
-                          const SizedBox(
-                            height: MediaBrowsingMetrics.contentPadding,
+                          Semantics(
+                            label: widget.castSemanticLabel,
+                            container: true,
+                            child: CastRow(members: richCast),
                           ),
-                        RelatedStrip(
-                          key: _relatedStripKey,
-                          items: richRelated,
-                          onTap: (item) => widget.onRelatedTap?.call(item),
-                          onNavigateUp: hasCast
-                              ? () => _castStripKey.currentState?.focusRow()
-                              : _primaryFocusNode.requestFocus,
-                        ),
+                        if (hasRelated) ...[
+                          if (hasCast)
+                            const SizedBox(
+                              height: MediaBrowsingMetrics.contentPadding,
+                            ),
+                          RelatedRow(
+                            items: richRelated,
+                            onTap: (item) => widget.onRelatedTap?.call(item),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-          ),
-        ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
 

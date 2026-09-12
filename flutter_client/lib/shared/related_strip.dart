@@ -16,6 +16,10 @@ const double _kCardWidth = 130;
 const double _kCardAspectRatio = 0.68;
 const double _kCardTextHeight = 20;
 const double _kCardGap = 12;
+// Breathing room between the poster/title and the focus border - without it
+// the border is drawn flush against (and visually overlaps) the content.
+const double _kCardVerticalPadding = 4;
+const double _kCardHorizontalPadding = 4;
 
 /// A "locked focus" horizontal poster row for the "Related" titles shown
 /// below the cast row on a movie/series detail screen.
@@ -184,6 +188,15 @@ class RelatedStripState extends State<RelatedStrip> {
     widget.onTap(widget.items[_focusedIndex]);
   }
 
+  /// Mouse/touch tap on a card - the row is a single locked focus stop for
+  /// D-pad purposes, so this bypasses that and activates directly rather
+  /// than routing through key-based selection.
+  void _selectByMouse(int index) {
+    _focusNode.requestFocus();
+    setState(() => _focusedIndex = index);
+    widget.onTap(widget.items[index]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
@@ -198,7 +211,7 @@ class RelatedStripState extends State<RelatedStrip> {
       child: SizedBox(
         height:
             _cardWidth / _kCardAspectRatio +
-            8 +
+            _kCardVerticalPadding * 2 +
             _kCardTextHeight * FontSizeScope.scaleOf(context),
         child: HoverScrollArrows(
           controller: _controller,
@@ -209,10 +222,14 @@ class RelatedStripState extends State<RelatedStrip> {
             itemCount: items.length,
             itemBuilder: (context, index) => Padding(
               padding: EdgeInsets.only(right: _cardGap),
-              child: _RelatedStripCard(
-                item: items[index],
-                width: _cardWidth,
-                focused: _hasFocus && index == _focusedIndex,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _selectByMouse(index),
+                child: _RelatedStripCard(
+                  item: items[index],
+                  width: _cardWidth,
+                  focused: _hasFocus && index == _focusedIndex,
+                ),
               ),
             ),
           ),
@@ -236,29 +253,36 @@ class _RelatedStripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AspectRatio(
-          aspectRatio: _kCardAspectRatio,
-          child: ResilientMediaImage(
-            imageUrl: item.posterUrl,
-            fallbackIcon: item.isSeries ? Icons.tv : Icons.movie,
-            borderRadius: MediaBrowsingMetrics.cardRadius,
-            fallbackTitle: item.title,
+    final body = Padding(
+      // Keep the focus border off the poster / title.
+      padding: const EdgeInsets.symmetric(
+        vertical: _kCardVerticalPadding,
+        horizontal: _kCardHorizontalPadding,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: _kCardAspectRatio,
+            child: ResilientMediaImage(
+              imageUrl: item.posterUrl,
+              fallbackIcon: item.isSeries ? Icons.tv : Icons.movie,
+              borderRadius: MediaBrowsingMetrics.cardRadius,
+              fallbackTitle: item.title,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 6),
+          Text(
+            item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
     return SizedBox(
       width: width,
