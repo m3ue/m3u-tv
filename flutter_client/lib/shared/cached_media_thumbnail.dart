@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
 /// Thumbnail (channel logo, episode/video preview, favorites tile, poster
 /// grid cell, ...) disk-cached via [MediaImageCacheManager] and decoded at
@@ -47,9 +46,7 @@ class CachedMediaThumbnail extends StatelessWidget {
         ImageQualityScope.oversampleOf(context) * this.oversample;
     final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
-        MediaQuery.devicePixelRatioOf(context) *
-        oversample *
-        TvZoomScale.of(context);
+        MediaQuery.devicePixelRatioOf(context) * oversample;
     final provider = CachedNetworkImageProvider(
       url,
       cacheManager: MediaImageCacheManager(),

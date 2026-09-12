@@ -7,6 +7,7 @@ import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_reveal_slot.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -102,6 +103,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
 
   Widget _buildWide(BuildContext context, ThemeData theme, Color bg) {
     final richCast = widget.richCast;
+    final scale = FontSizeScope.scaleOf(context);
     // Poster + scrolling info column fill the height; the rich cast strip is
     // pinned full-width below, out of that scroll view so left/right card
     // navigation never drags the page.
@@ -116,7 +118,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 SizedBox(
-                  width: 220,
+                  width: 220 * scale,
                   child: AspectRatio(
                     aspectRatio: 0.68,
                     child: ResilientMediaImage(
@@ -166,8 +168,9 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
   }
 
   Widget _buildNarrow(BuildContext context, ThemeData theme, Color bg) {
+    final scale = FontSizeScope.scaleOf(context);
     final poster = SizedBox(
-      width: 120,
+      width: 120 * scale,
       child: AspectRatio(
         aspectRatio: 0.68,
         child: ResilientMediaImage(

@@ -42,6 +42,7 @@ import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
 import 'package:window_manager/window_manager.dart';
@@ -1889,6 +1890,8 @@ class AppShellState extends ConsumerState<AppShell>
               ? _kMacTitlebarInset
               : 0.0;
           final fullScreenDetail = _fullScreenDetailActive;
+          final collapsedSidebarWidth =
+              kSidebarRailInset * FontSizeScope.scaleOf(context);
 
           // The sidebar physically slides off-screen to the left and the
           // content pane's left edge animates out to meet it, both on the
@@ -1927,7 +1930,7 @@ class AppShellState extends ConsumerState<AppShell>
             duration: _kFullScreenDetailTransition,
             curve: Curves.easeInOut,
             top: macTitlebarInset,
-            left: fullScreenDetail ? 0 : 64,
+            left: fullScreenDetail ? 0 : collapsedSidebarWidth,
             right: 0,
             bottom: 0,
             child: DpadRegion(
@@ -2109,7 +2112,8 @@ class NavigationSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final expanded = sidebarActive;
-    final width = expanded ? 200.0 : 64.0;
+    final scale = FontSizeScope.scaleOf(context);
+    final width = (expanded ? 200.0 : kSidebarRailInset) * scale;
 
     return MouseRegion(
       onEnter: (_) => onActivateSidebar(),
@@ -2146,19 +2150,32 @@ class NavigationSidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 72,
+                  height: 72 * scale,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
+                    // Horizontal (14) scales to keep the logo centered in
+                    // the collapsed rail, matching how SidebarDestinationItem
+                    // centers its icons (outer + inner padding + icon size
+                    // summing symmetrically around the rail's midpoint) - at
+                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
+                    // = 14, so left inset equals right space. Leaving this
+                    // unscaled while the logo itself scaled was the bug: the
+                    // logo drifted off-center as scale grew.
+                    padding: EdgeInsets.fromLTRB(
+                      14 * scale,
+                      20,
+                      14 * scale,
+                      16,
+                    ),
                     child: OverflowBox(
-                      maxWidth: 200,
+                      maxWidth: 200 * scale,
                       alignment: Alignment.centerLeft,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           SvgPicture.asset(
                             'assets/icons/logo.svg',
-                            width: 36,
-                            height: 36,
+                            width: 36 * scale,
+                            height: 36 * scale,
                           ),
                           if (expanded) ...[
                             const SizedBox(width: 12),
@@ -2178,9 +2195,9 @@ class NavigationSidebar extends StatelessWidget {
                 const SizedBox(height: 12),
                 ...List.generate(routes.length, (index) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8 * scale,
+                      vertical: 2 * scale,
                     ),
                     child: SidebarDestinationItem(
                       label: _routeLabel(context, routes[index]),
@@ -2290,8 +2307,9 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
       foregroundColor = colorScheme.onSurface;
     }
 
-    const hPad = 12.0;
-    const itemHeight = 48.0;
+    final scale = FontSizeScope.scaleOf(context);
+    final hPad = 12.0 * scale;
+    final itemHeight = 48.0 * scale;
     return MouseRegion(
       onEnter: (_) => _setHovered(true),
       onExit: (_) => _setHovered(false),
@@ -2326,13 +2344,13 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
             children: [
               Container(
                 height: itemHeight,
-                padding: const EdgeInsets.symmetric(horizontal: hPad),
+                padding: EdgeInsets.symmetric(horizontal: hPad),
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: OverflowBox(
-                  maxWidth: 200,
+                  maxWidth: 200 * scale,
                   alignment: Alignment.centerLeft,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2343,11 +2361,11 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                         child: Icon(
                           widget.icon,
                           color: foregroundColor,
-                          size: 24,
+                          size: 24 * scale,
                         ),
                       ),
                       if (widget.expanded) ...[
-                        const SizedBox(width: hPad),
+                        SizedBox(width: hPad),
                         Flexible(
                           child: Text(
                             widget.label,

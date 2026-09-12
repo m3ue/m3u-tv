@@ -2579,7 +2579,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFontSize.
   ///
   /// In en, this message translates to:
-  /// **'Font size'**
+  /// **'Display size'**
   String get settingsFontSize;
 
   /// No description provided for @settingsFontSizeNormal.

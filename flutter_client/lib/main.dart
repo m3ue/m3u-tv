@@ -26,7 +26,6 @@ import 'package:m3u_tv/services/window_state_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
@@ -399,7 +398,10 @@ class _MyAppState extends State<MyApp> {
         final viewSettings = widget.appState?.viewSettingsService;
         final optimizeFor =
             viewSettings?.optimizeForSync ?? OptimizeFor.quality;
-        final fontSize = viewSettings?.fontSizeSync ?? AppFontSize.normal;
+        final fontSize = AppFontSize.resolveDefault(
+          stored: viewSettings?.fontSizeSyncOrNull,
+          isTv: deviceType == DeviceType.tv,
+        );
         final routerChild = child ?? const SizedBox.shrink();
         return Dpad(
           theme: const DpadThemeData(
@@ -438,24 +440,21 @@ class _MyAppState extends State<MyApp> {
                   }
                 }
               : null,
-          child: _TvZoom(
-            deviceType: deviceType,
-            child: ImageQualityScope(
-              optimizeFor: optimizeFor,
-              child: FontSizeScope(
-                fontSize: fontSize,
-                child: Builder(
-                  builder: (context) {
-                    final scale = FontSizeScope.scaleOf(context);
-                    if (scale == 1) return routerChild;
-                    return MediaQuery(
-                      data: MediaQuery.of(
-                        context,
-                      ).copyWith(textScaler: TextScaler.linear(scale)),
-                      child: routerChild,
-                    );
-                  },
-                ),
+          child: ImageQualityScope(
+            optimizeFor: optimizeFor,
+            child: FontSizeScope(
+              fontSize: fontSize,
+              child: Builder(
+                builder: (context) {
+                  final scale = FontSizeScope.scaleOf(context);
+                  if (scale == 1) return routerChild;
+                  return MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(scale)),
+                    child: routerChild,
+                  );
+                },
               ),
             ),
           ),
@@ -510,61 +509,6 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
       themeMode: ThemeMode.dark,
-    );
-  }
-}
-
-/// Renders the app on a smaller virtual canvas and stretches it to fill the
-/// real screen, so text/icons/nav read clearly from a couch-length distance.
-/// TV-only: on the couch, physical viewing distance is far larger than a
-/// desktop/tablet/phone, so the same logical layout reads too small.
-class _TvZoom extends StatelessWidget {
-  const _TvZoom({required this.deviceType, required this.child});
-
-  static const double _scale = 1.4;
-
-  final DeviceType deviceType;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (deviceType != DeviceType.tv) return child;
-
-    final mediaQuery = MediaQuery.of(context);
-    final realSize = mediaQuery.size;
-    final virtualSize = realSize / _scale;
-
-    return SizedBox.fromSize(
-      size: realSize,
-      child: FittedBox(
-        fit: BoxFit.fill,
-        child: SizedBox.fromSize(
-          size: virtualSize,
-          child: MediaQuery(
-            // padding/viewPadding/viewInsets/systemGestureInsets are all
-            // calibrated for the real screen -- FittedBox stretches the
-            // virtual canvas back up by _scale, so anything computed from
-            // these in the virtual coordinate space (SafeArea, manual
-            // Positioned offsets) must divide by _scale too, or it consumes
-            // a _scale-times-too-large share of the smaller virtual canvas.
-            data: mediaQuery.copyWith(
-              size: virtualSize,
-              // devicePixelRatio is deliberately left as the real screen's
-              // value, not divided/multiplied by _scale: code that reads it
-              // together with localToGlobal() (e.g. native_video_surface.dart)
-              // already gets real-space coordinates for free, because
-              // localToGlobal composes the FittedBox's paint transform. Image
-              // cache-dimension widgets instead read TvZoomScale.of(context)
-              // (below) to correct for the extra stretch on top of this.
-              padding: mediaQuery.padding / _scale,
-              viewPadding: mediaQuery.viewPadding / _scale,
-              viewInsets: mediaQuery.viewInsets / _scale,
-              systemGestureInsets: mediaQuery.systemGestureInsets / _scale,
-            ),
-            child: TvZoomScale(scale: _scale, child: child),
-          ),
-        ),
-      ),
     );
   }
 }

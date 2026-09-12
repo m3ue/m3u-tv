@@ -14,9 +14,9 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 const double _kCardWidth = 150;
 const double _kAvatarSize = 72;
 const double _kAvatarGap = 8;
-// Name + role text below the avatar (each maxLines: 1). This grows with the
-// user's font-size setting (global TextScaler in main.dart) while the
-// avatar above it does not, so only this budget is scaled - see CastStripState.build.
+// Name + role text below the avatar (each maxLines: 1) - scales with the
+// global TextScaler in main.dart on top of the multiplication below, so it
+// needs its own (larger) budget - see CastStripState.build.
 const double _kCardTextHeight = 72;
 const double _kCardGap = 12;
 
@@ -140,7 +140,10 @@ class CastStripState extends State<CastStrip> {
     return KeyEventResult.ignored;
   }
 
-  double get _itemExtent => _kCardWidth + _kCardGap;
+  double get _scale => FontSizeScope.scaleOf(context);
+  double get _cardWidth => _kCardWidth * _scale;
+  double get _cardGap => _kCardGap * _scale;
+  double get _itemExtent => _cardWidth + _cardGap;
 
   /// KNOWN ISSUE (shared with the episode strip - see `_centerFocused` in
   /// series_details_screen.dart): aggressive fast left/right key-repeat can
@@ -157,7 +160,7 @@ class CastStripState extends State<CastStrip> {
       final position = _controller.position;
       final target =
           (_focusedIndex * _itemExtent +
-                  _kCardWidth / 2 -
+                  _cardWidth / 2 -
                   position.viewportDimension / 2)
               .clamp(0.0, position.maxScrollExtent);
       if ((target - position.pixels).abs() < 1) return;
@@ -195,7 +198,7 @@ class CastStripState extends State<CastStrip> {
       onKeyEvent: _handleKeyEvent,
       child: SizedBox(
         height:
-            _kAvatarSize +
+            _kAvatarSize * _scale +
             _kAvatarGap +
             _kCardTextHeight * FontSizeScope.scaleOf(context),
         // Desktop mouse users get hover arrows here (the scrollbar is hidden);
@@ -208,7 +211,7 @@ class CastStripState extends State<CastStrip> {
             itemExtent: _itemExtent,
             itemCount: members.length,
             itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.only(right: _kCardGap),
+              padding: EdgeInsets.only(right: _cardGap),
               child: _CastStripCard(
                 member: members[index],
                 focused: _hasFocus && index == _focusedIndex,
@@ -230,6 +233,8 @@ class _CastStripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    final avatarSize = _kAvatarSize * scale;
     final character = member.character?.trim();
     final body = Padding(
       // Keep the focus border off the avatar / a long name.
@@ -239,13 +244,13 @@ class _CastStripCard extends StatelessWidget {
         children: [
           ClipOval(
             child: SizedBox(
-              width: _kAvatarSize,
-              height: _kAvatarSize,
+              width: avatarSize,
+              height: avatarSize,
               child: ResilientMediaImage(
                 imageUrl: member.photo,
                 fallbackIcon: Icons.person,
-                width: _kAvatarSize,
-                height: _kAvatarSize,
+                width: avatarSize,
+                height: avatarSize,
                 borderRadius: 0,
               ),
             ),
@@ -276,7 +281,7 @@ class _CastStripCard extends StatelessWidget {
       ),
     );
     return SizedBox(
-      width: _kCardWidth,
+      width: _kCardWidth * scale,
       child: GradientBorderEffect(
         borderRadius: BorderRadius.circular(8),
       ).build(context, DpadFocusState(focused: focused, pressed: false), body),

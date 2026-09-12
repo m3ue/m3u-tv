@@ -21,6 +21,7 @@ import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -174,6 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         comskipSettings: widget.comskipSettings,
         viewSettingsService: widget.viewSettingsService,
         onSidebarActivate: widget.onSidebarActivate,
+        deviceType: widget.deviceType,
       ),
     );
   }
@@ -537,13 +539,14 @@ class _DevicePairingBody extends StatelessWidget {
   /// plain text next to the QR code.
   final bool linksAreTappable;
 
-  static Widget get _logo =>
-      SvgPicture.asset('assets/icons/editor-logo.svg', height: 40);
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final logo = SvgPicture.asset(
+      'assets/icons/editor-logo.svg',
+      height: 40 * FontSizeScope.scaleOf(context),
+    );
 
     final Widget body;
     if (service.status == DevicePairingStatus.error) {
@@ -583,7 +586,7 @@ class _DevicePairingBody extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_logo, const SizedBox(height: 16), body],
+          children: [logo, const SizedBox(height: 16), body],
         ),
       ),
     );
@@ -641,7 +644,7 @@ class _DevicePairingWide extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: QrImageView(
                 data: uri.isEmpty ? ' ' : uri,
-                size: 140,
+                size: 140 * FontSizeScope.scaleOf(context),
                 backgroundColor: Colors.white,
               ),
             ),
@@ -820,6 +823,7 @@ class _ConnectedView extends StatefulWidget {
     this.comskipSettings,
     this.viewSettingsService,
     this.onSidebarActivate,
+    this.deviceType,
   });
 
   final AuthNotifier authNotifier;
@@ -828,6 +832,7 @@ class _ConnectedView extends StatefulWidget {
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
+  final DeviceType? deviceType;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
   final String? sourceLabel;
@@ -1121,7 +1126,10 @@ class _ConnectedViewState extends State<_ConnectedView>
         ],
 
         if (widget.viewSettingsService != null) ...[
-          _ViewSettingsSection(service: widget.viewSettingsService!),
+          _ViewSettingsSection(
+            service: widget.viewSettingsService!,
+            deviceType: widget.deviceType,
+          ),
           const SizedBox(height: 20),
         ],
 
@@ -1393,14 +1401,13 @@ class _TraktCard extends StatelessWidget {
 
   final TraktService traktService;
 
-  static Widget get _logo => SvgPicture.asset(
-    'assets/icons/trakt-logo.svg',
-    height: 40,
-  );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final logo = SvgPicture.asset(
+      'assets/icons/trakt-logo.svg',
+      height: 40 * FontSizeScope.scaleOf(context),
+    );
 
     final l = AppLocalizations.of(context);
     final body = !traktService.isConfigured
@@ -1435,7 +1442,7 @@ class _TraktCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _logo,
+        logo,
         const SizedBox(height: 16),
         body,
       ],
@@ -1727,7 +1734,7 @@ Future<bool> _showConfirmDialog(
     context: context,
     builder: (ctx) => Dialog(
       child: SizedBox(
-        width: 480,
+        width: 480 * FontSizeScope.scaleOf(ctx),
         child: DpadRegion(
           memoryKey: 'confirm-dialog',
           child: Padding(
@@ -1829,9 +1836,11 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
         .where((v) => v.ulid != widget.activeViewer.ulid)
         .toList();
 
+    final scale = FontSizeScope.scaleOf(context);
+
     return Dialog(
       child: SizedBox(
-        width: 520,
+        width: 520 * scale,
         child: DpadRegion(
           memoryKey: 'viewer-management',
           child: Padding(
@@ -1923,7 +1932,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     ),
                     const SizedBox(height: 8),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 280),
+                      constraints: BoxConstraints(maxHeight: 280 * scale),
                       child: ListView.builder(
                         shrinkWrap: true,
                         itemCount: others.length,
@@ -2133,9 +2142,10 @@ class _ProxyProfilePicker extends StatelessWidget {
 }
 
 class _ViewSettingsSection extends StatefulWidget {
-  const _ViewSettingsSection({required this.service});
+  const _ViewSettingsSection({required this.service, this.deviceType});
 
   final ViewSettingsService service;
+  final DeviceType? deviceType;
 
   @override
   State<_ViewSettingsSection> createState() => _ViewSettingsSectionState();
@@ -2177,7 +2187,11 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final hdrEnabled = await widget.service.hdrEnabled();
     final matchRefreshRate = await widget.service.matchRefreshRate();
     final optimizeFor = await widget.service.optimizeFor();
-    final fontSize = await widget.service.fontSize();
+    final storedFontSize = await widget.service.fontSizeOrNull();
+    final fontSize = AppFontSize.resolveDefault(
+      stored: storedFontSize,
+      isTv: widget.deviceType == DeviceType.tv,
+    );
     if (!mounted) return;
     setState(() {
       _liveTvLayout = layout;

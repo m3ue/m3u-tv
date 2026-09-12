@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Track selector widget for audio and subtitle track selection.
 ///
@@ -80,6 +81,12 @@ class TrackSelector extends StatelessWidget {
     // which left "Audio" (a shorter label) surrounded by dead space on
     // both sides. That dead space, not `buttonGap` itself, was the bulk of
     // the visually "large gap" between the two buttons.
+    //
+    // The pinned height must scale with the display-size setting - AppButton
+    // itself grows (padding + text) at larger scales, and a fixed unscaled
+    // height here would clip that growth instead of fitting it.
+    final scale = FontSizeScope.scaleOf(context);
+    final scaledButtonHeight = buttonHeight * scale;
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -91,7 +98,7 @@ class TrackSelector extends StatelessWidget {
                   : 0,
             ),
             child: SizedBox(
-              height: buttonHeight,
+              height: scaledButtonHeight,
               child: AppButton(
                 icon: Icons.hdr_on,
                 label: hdrEnabled ? 'HDR On' : 'HDR Off',
@@ -101,7 +108,7 @@ class TrackSelector extends StatelessWidget {
           ),
         if (audioTracks.isNotEmpty)
           SizedBox(
-            height: buttonHeight,
+            height: scaledButtonHeight,
             child: AppButton(
               icon: Icons.audiotrack,
               label: 'Audio',
@@ -112,7 +119,7 @@ class TrackSelector extends StatelessWidget {
           const SizedBox(width: buttonGap),
         if (subtitleTracks.isNotEmpty)
           SizedBox(
-            height: buttonHeight,
+            height: scaledButtonHeight,
             child: AppButton(
               icon: Icons.subtitles,
               label: 'Subtitles',

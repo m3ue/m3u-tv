@@ -10,6 +10,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -170,7 +171,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                width: 300,
+                width: 300 * FontSizeScope.scaleOf(context),
                 child: _VersionRail(
                   key: _railKey,
                   releases: _releases,
@@ -424,10 +425,17 @@ class _VersionRail extends StatefulWidget {
 }
 
 class _VersionRailState extends State<_VersionRail> {
-  // Fixed row height. The rows set autoScroll: false so D-pad focus never
-  // nudges the enclosing tab PageView (the same bounce the DVR row actions
-  // hit); this rail scrolls itself to keep the focused row centred.
-  static const _rowExtent = 80.0;
+  // Base (unscaled) row height. The rows set autoScroll: false so D-pad
+  // focus never nudges the enclosing tab PageView (the same bounce the DVR
+  // row actions hit); this rail scrolls itself to keep the focused row
+  // centred.
+  static const _baseRowExtent = 80.0;
+
+  /// Scaled row height - _VersionRow's title/date text grows with the
+  /// display-size setting (global TextScaler in main.dart), so the fixed
+  /// itemExtent below must grow with it too, or a larger setting overflows
+  /// each row's Column into the row below it.
+  double get _rowExtent => _baseRowExtent * FontSizeScope.scaleOf(context);
 
   final _controller = ScrollController();
 

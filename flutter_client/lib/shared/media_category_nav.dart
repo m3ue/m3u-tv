@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Search + category filter UI shared by media-browsing screens (VOD,
@@ -144,7 +145,9 @@ class MediaCategoryNavState extends State<MediaCategoryNav> {
 
   Widget _buildSidebarLayout(BuildContext context) {
     return SizedBox(
-      width: MediaBrowsingMetrics.interstitialNavWidth,
+      width:
+          MediaBrowsingMetrics.interstitialNavWidth *
+          FontSizeScope.scaleOf(context),
       child: FocusScope(
         node: _stripFocusNode,
         child: DpadRegion(

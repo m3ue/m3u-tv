@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Stadium-radius focus border shared by every pill/circular button in the
 /// app. A large radius makes the dpad focus border match the pill shape
@@ -16,21 +17,22 @@ const kStadiumFocusEffects = [
 /// target, so a bare `FilledButton` renders far smaller than intended. These
 /// are the single place that size is restored — retune here to change every
 /// button in the app at once.
-const _kMinSize = Size(64, 48);
-const _kPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 12);
+Size _minSize(double scale) => Size(64 * scale, 48 * scale);
+EdgeInsets _padding(double scale) =>
+    EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 12 * scale);
 
-/// Icon-only buttons get a fixed square instead of [_kMinSize]'s flexible
+/// Icon-only buttons get a fixed square instead of [_minSize]'s flexible
 /// minimum — `ElevatedButton` (primary) and `IconButton` (tonal/destructive)
 /// resolve padding/constraints slightly differently, so a shared minimum can
 /// still end up rendering a couple of pixels shorter on one variant.
 /// `fixedSize` pins both to the exact same box no matter which widget draws
 /// it, which is what keeps transport controls visually level with each other.
-const _kIconButtonSize = Size(56, 56);
+Size _iconButtonSize(double scale) => Size(56 * scale, 56 * scale);
 
 /// [AppIconButton.dense] footprint - for icon buttons that sit next to text
 /// rather than in a transport-control row (e.g. a modal's close affordance),
 /// where the full 56dp target looks oversized against a title.
-const _kDenseIconButtonSize = Size(40, 40);
+Size _denseIconButtonSize(double scale) => Size(40 * scale, 40 * scale);
 
 enum AppButtonVariant { primary, primaryInverted, tonal, destructive }
 
@@ -264,9 +266,10 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
     final baseStyle = FilledButton.styleFrom(
-      minimumSize: _kMinSize,
-      padding: _kPadding,
+      minimumSize: _minSize(scale),
+      padding: _padding(scale),
     );
     final style = switch (variant) {
       AppButtonVariant.destructive => _ghostStyle(
@@ -293,8 +296,8 @@ class AppButton extends StatelessWidget {
     Widget button;
     if (loading) {
       final child = SizedBox(
-        width: 20,
-        height: 20,
+        width: 20 * scale,
+        height: 20 * scale,
         child: CircularProgressIndicator(
           strokeWidth: 2,
           color: switch (variant) {
@@ -340,11 +343,11 @@ class AppButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 18),
-            const SizedBox(width: 10),
+            Icon(icon, size: 18 * scale),
+            SizedBox(width: 10 * scale),
           ],
           SizedBox(
-            width: 72,
+            width: 72 * scale,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -353,7 +356,7 @@ class AppButton extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10 * scale),
           Text(label),
         ],
       );
@@ -381,8 +384,8 @@ class AppButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
+                Icon(icon, size: 18 * scale),
+                SizedBox(width: 8 * scale),
                 Text(label),
               ],
             );
@@ -392,7 +395,7 @@ class AppButton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(child: labelRow),
-            const SizedBox(height: 8),
+            SizedBox(height: 8 * scale),
             footer!,
           ],
         ),
@@ -506,9 +509,10 @@ class AppIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
     final baseStyle = IconButton.styleFrom(
-      fixedSize: dense ? _kDenseIconButtonSize : _kIconButtonSize,
-      iconSize: dense ? 20 : null,
+      fixedSize: dense ? _denseIconButtonSize(scale) : _iconButtonSize(scale),
+      iconSize: (dense ? 20 : 24) * scale,
     );
     final style = switch (variant) {
       AppButtonVariant.destructive => _ghostStyle(
@@ -535,7 +539,7 @@ class AppIconButton extends StatelessWidget {
       final elevatedButton = ElevatedButton(
         style: style,
         onPressed: onPressed,
-        child: Icon(icon, size: dense ? 20 : null),
+        child: Icon(icon, size: (dense ? 20 : 24) * scale),
       );
       final tooltipMessage = tooltip;
       rawButton = tooltipMessage == null

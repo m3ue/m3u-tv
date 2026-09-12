@@ -1439,7 +1439,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Faster loading, lower image quality.';
 
   @override
-  String get settingsFontSize => 'Font size';
+  String get settingsFontSize => 'Display size';
 
   @override
   String get settingsFontSizeNormal => 'Normal';

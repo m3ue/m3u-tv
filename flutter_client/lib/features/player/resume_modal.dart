@@ -5,6 +5,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// What the viewer chose in the resume dialog.
 enum ResumeAction {
@@ -70,9 +71,11 @@ class _ResumeModal extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final l = AppLocalizations.of(context);
 
+    final scale = FontSizeScope.scaleOf(context);
+
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: BoxConstraints(maxWidth: 400 * scale),
         child: DpadRegion(
           verticalEdge: DpadEdgeBehavior.stop,
           horizontalEdge: DpadEdgeBehavior.stop,

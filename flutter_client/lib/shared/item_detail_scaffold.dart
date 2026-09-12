@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Shared outer chrome for standalone item detail screens (VOD, Series,
 /// AIOStreams movie/series). Provides the back-button AppBar and the
@@ -31,6 +32,7 @@ class ItemDetailScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
       onEdge: (direction) {
@@ -42,9 +44,15 @@ class ItemDetailScaffold extends StatelessWidget {
         appBar: AppBar(
           title: Text(title),
           automaticallyImplyLeading: false,
-          leadingWidth: 56,
+          // AppBar's default toolbarHeight (kToolbarHeight, 56) is fixed and
+          // unscaled - without scaling it too, the leading button's now
+          // larger padding + icon (below) get squeezed into that fixed
+          // height, and the GradientBorderEffect stadium border sizes to
+          // the squeezed/clipped bounds instead of the button's real size.
+          toolbarHeight: kToolbarHeight * scale,
+          leadingWidth: 56 * scale,
           leading: Padding(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(8 * scale),
             child: DpadFocusable(
               onSelect: () => Navigator.of(context).maybePop(),
               effects: const [
@@ -53,7 +61,7 @@ class ItemDetailScaffold extends StatelessWidget {
                 ),
               ],
               child: IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: Icon(Icons.arrow_back, size: 24 * scale),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
             ),

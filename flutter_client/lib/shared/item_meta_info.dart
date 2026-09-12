@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
-import 'package:m3u_tv/shared/tv_zoom_scale.dart';
 
 /// A single "Label: value" credit row (e.g. Director, Cast).
 class MetaCreditLine {
@@ -192,12 +192,16 @@ class _TitleHeading extends StatelessWidget {
     final logo = clearLogoUrl?.trim();
     if (logo == null || logo.isEmpty) return text;
 
+    final scale = FontSizeScope.scaleOf(context);
+    final logoMaxHeight = _logoMaxHeight * scale;
+    final logoMaxWidth = _logoMaxWidth * scale;
+
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxHeight: _logoMaxHeight,
-          maxWidth: _logoMaxWidth,
+        constraints: BoxConstraints(
+          maxHeight: logoMaxHeight,
+          maxWidth: logoMaxWidth,
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -210,17 +214,12 @@ class _TitleHeading extends StatelessWidget {
               ),
               // Bound the decode to the display cap: a wordmark clearlogo can
               // ship at 1500px+ wide and would otherwise decode at full source
-              // resolution just to be scaled down into a 350x120 box.
-              width:
-                  (_logoMaxWidth *
-                          MediaQuery.devicePixelRatioOf(context) *
-                          TvZoomScale.of(context))
-                      .round(),
-              height:
-                  (_logoMaxHeight *
-                          MediaQuery.devicePixelRatioOf(context) *
-                          TvZoomScale.of(context))
-                      .round(),
+              // resolution just to be scaled down into a 350x120 (times the
+              // display-size scale) box.
+              width: (logoMaxWidth * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+              height: (logoMaxHeight * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
               policy: ResizeImagePolicy.fit,
             ),
             semanticLabel: name,

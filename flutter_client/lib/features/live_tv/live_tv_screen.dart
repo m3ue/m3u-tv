@@ -21,6 +21,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
@@ -1025,9 +1026,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           MediaBrowsingMetrics.contentPadding,
           MediaBrowsingMetrics.contentPadding,
         ),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 160,
-          mainAxisExtent: 120,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 160 * FontSizeScope.scaleOf(context),
+          mainAxisExtent: 120 * FontSizeScope.scaleOf(context),
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
         ),
@@ -1135,6 +1136,8 @@ class _ChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final logoSize = MediaBrowsingMetrics.logoSize * scale;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: DpadInkWell(
@@ -1145,7 +1148,7 @@ class _ChannelRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: SizedBox(
-          height: 72,
+          height: 72 * scale,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -1154,8 +1157,8 @@ class _ChannelRow extends StatelessWidget {
                 ResilientMediaImage(
                   imageUrl: channel.logoUrl,
                   fallbackIcon: Icons.tv,
-                  width: MediaBrowsingMetrics.logoSize,
-                  height: MediaBrowsingMetrics.logoSize,
+                  width: logoSize,
+                  height: logoSize,
                   fit: BoxFit.contain,
                   oversample: 2,
                 ),
@@ -1218,13 +1221,13 @@ class _ChannelRow extends StatelessWidget {
                     child: Icon(
                       Icons.star,
                       color: colorScheme.tertiary,
-                      size: 20,
+                      size: 20 * scale,
                     ),
                   ),
                 // Next program
                 if (epg?.next != null)
                   SizedBox(
-                    width: 160,
+                    width: 160 * scale,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1274,6 +1277,8 @@ class _ChannelGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final logoSize = MediaBrowsingMetrics.logoSize * scale;
     return DpadInkWell(
       autofocus: autofocus,
       onTap: onTap,
@@ -1287,8 +1292,8 @@ class _ChannelGridItem extends StatelessWidget {
           ResilientMediaImage(
             imageUrl: channel.logoUrl,
             fallbackIcon: Icons.tv,
-            width: MediaBrowsingMetrics.logoSize,
-            height: MediaBrowsingMetrics.logoSize,
+            width: logoSize,
+            height: logoSize,
             fit: BoxFit.contain,
             oversample: 2,
           ),
@@ -1312,7 +1317,7 @@ class _ChannelGridItem extends StatelessWidget {
             ],
           ),
           if (isFavorite)
-            Icon(Icons.star, color: colorScheme.tertiary, size: 16),
+            Icon(Icons.star, color: colorScheme.tertiary, size: 16 * scale),
         ],
       ),
     );
