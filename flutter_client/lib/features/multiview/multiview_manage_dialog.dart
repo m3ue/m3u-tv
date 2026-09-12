@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Long-press affordance for the Live TV Multiview button: lets the user
 /// drop individual channels, or clear the whole queue, without first
@@ -34,7 +35,7 @@ Future<void> showMultiviewManageDialog(BuildContext context) {
         return AlertDialog(
           title: Text(l10n.multiviewManageTitle),
           content: SizedBox(
-            width: 360,
+            width: 360 * FontSizeScope.scaleOf(context),
             child: DpadRegion(
               memoryKey: 'multiview/manage-dialog',
               child: ListView.builder(

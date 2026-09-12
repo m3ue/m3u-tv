@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Generic picker for "show all X" overflow scenarios. Mirrors the
 /// season picker's two modal forms: a drag-handle bottom sheet on the
@@ -74,7 +75,7 @@ class ListPickerSheet extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           contentPadding: const EdgeInsets.fromLTRB(0, 16, 0, 12),
           content: SizedBox(
-            width: 460,
+            width: 460 * FontSizeScope.scaleOf(dialogContext),
             child: ListPickerSheet(
               title: title,
               autofocusIndex: autofocusIndex,

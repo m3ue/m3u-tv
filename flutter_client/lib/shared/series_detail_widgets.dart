@@ -325,7 +325,7 @@ class SeasonPicker extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           contentPadding: const EdgeInsets.fromLTRB(0, 16, 0, 12),
           content: SizedBox(
-            width: 460,
+            width: 460 * FontSizeScope.scaleOf(dialogContext),
             child: pickerBody(
               dialogContext,
               listPadding: const EdgeInsets.fromLTRB(12, 4, 12, 4),

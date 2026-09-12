@@ -1734,7 +1734,7 @@ Future<bool> _showConfirmDialog(
     context: context,
     builder: (ctx) => Dialog(
       child: SizedBox(
-        width: 480,
+        width: 480 * FontSizeScope.scaleOf(ctx),
         child: DpadRegion(
           memoryKey: 'confirm-dialog',
           child: Padding(
@@ -1836,9 +1836,11 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
         .where((v) => v.ulid != widget.activeViewer.ulid)
         .toList();
 
+    final scale = FontSizeScope.scaleOf(context);
+
     return Dialog(
       child: SizedBox(
-        width: 520,
+        width: 520 * scale,
         child: DpadRegion(
           memoryKey: 'viewer-management',
           child: Padding(
@@ -1930,7 +1932,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                     ),
                     const SizedBox(height: 8),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 280),
+                      constraints: BoxConstraints(maxHeight: 280 * scale),
                       child: ListView.builder(
                         shrinkWrap: true,
                         itemCount: others.length,
