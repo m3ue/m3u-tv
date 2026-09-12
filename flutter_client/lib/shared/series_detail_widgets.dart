@@ -349,6 +349,7 @@ class SeasonPicker extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
     final count = episodeCountFor(season.number);
     final seasonCover = trimmedOrNull(season.coverUrl);
     final overview = trimmedOrNull(season.overview);
@@ -371,7 +372,7 @@ class SeasonPicker extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 84,
+                width: 84 * scale,
                 child: AspectRatio(
                   aspectRatio: 0.68,
                   child: ResilientMediaImage(
@@ -386,7 +387,7 @@ class SeasonPicker extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16 * scale),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 2),
@@ -432,7 +433,11 @@ class SeasonPicker extends StatelessWidget {
               if (selected)
                 Padding(
                   padding: const EdgeInsets.only(left: 12, top: 2),
-                  child: Icon(Icons.check, size: 22, color: scheme.primary),
+                  child: Icon(
+                    Icons.check,
+                    size: 22 * scale,
+                    color: scheme.primary,
+                  ),
                 ),
             ],
           ),
