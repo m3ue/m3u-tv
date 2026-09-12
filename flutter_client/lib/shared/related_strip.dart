@@ -276,7 +276,8 @@ class _RelatedStripCardState extends State<_RelatedStripCard> {
   @override
   void initState() {
     super.initState();
-    final delay = _staggerStep * widget.staggerIndex.clamp(0, _maxStaggeredIndex);
+    final delay =
+        _staggerStep * widget.staggerIndex.clamp(0, _maxStaggeredIndex);
     _timer = Timer(delay, () {
       if (mounted) setState(() => _visible = true);
     });
@@ -335,9 +336,16 @@ class _RelatedStripCardState extends State<_RelatedStripCard> {
         curve: Curves.easeOut,
         child: SizedBox(
           width: width,
-          child: GradientBorderEffect(
-            borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-          ).build(context, DpadFocusState(focused: focused, pressed: false), body),
+          child:
+              GradientBorderEffect(
+                borderRadius: BorderRadius.circular(
+                  MediaBrowsingMetrics.cardRadius,
+                ),
+              ).build(
+                context,
+                DpadFocusState(focused: focused, pressed: false),
+                body,
+              ),
         ),
       ),
     );
