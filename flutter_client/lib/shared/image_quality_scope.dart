@@ -65,11 +65,13 @@ class FontSizeScope extends InheritedWidget {
 
   final AppFontSize fontSize;
 
-  /// The text scale factor (1.0 for normal, 1.2 for large).
+  /// The text scale factor (1.0 for normal, 1.2 for large, 1.5 for very
+  /// large).
   double get scale => fontSize.scale;
 
-  /// Whether the user has selected the large font size.
-  bool get isLarge => fontSize == AppFontSize.large;
+  /// Whether the user has selected large or very large (i.e. anything above
+  /// the normal default).
+  bool get isLarge => fontSize != AppFontSize.normal;
 
   static FontSizeScope? of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<FontSizeScope>();
@@ -79,7 +81,7 @@ class FontSizeScope extends InheritedWidget {
   /// Falls back to 1.0 (normal) if no scope is found.
   static double scaleOf(BuildContext context) => of(context)?.scale ?? 1.0;
 
-  /// Returns whether large font size is active.
+  /// Returns whether large (or very large) font size is active.
   static bool isLargeOf(BuildContext context) => of(context)?.isLarge ?? false;
 
   @override

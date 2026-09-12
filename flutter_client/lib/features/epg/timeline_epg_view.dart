@@ -38,6 +38,14 @@ const double _kPxPerMin = 5; // 300 px per hour
 double _scaledRowH(BuildContext context) =>
     _kRowH * FontSizeScope.scaleOf(context);
 
+/// Scaled width of the fixed left channel column.
+double _scaledChannelColW(BuildContext context) =>
+    _kChannelColW * FontSizeScope.scaleOf(context);
+
+/// Scaled height of the corner cell / time-axis header row.
+double _scaledTimeHeaderH(BuildContext context) =>
+    _kTimeHeaderH * FontSizeScope.scaleOf(context);
+
 /// EPG text gets an extra boost on top of the base font-size scale because
 /// labelSmall/labelMedium are very small by default and unreadable from couch
 /// distance even at 1.2×.
@@ -516,12 +524,12 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
             children: [
               // ── Fixed left channel column ──────────────────────────────────────
               SizedBox(
-                width: _kChannelColW,
+                width: _scaledChannelColW(context),
                 child: Column(
                   children: [
                     // Corner cell
                     Container(
-                      height: _kTimeHeaderH,
+                      height: _scaledTimeHeaderH(context),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest,
                         borderRadius: widget.useSidebarLayout
@@ -612,7 +620,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                   children: [
                     // Time axis header
                     SizedBox(
-                      height: _kTimeHeaderH,
+                      height: _scaledTimeHeaderH(context),
                       child: AnimatedBuilder(
                         animation: _headerHCtrl,
                         builder: (context, _) {
@@ -634,7 +642,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                                   windowStart: _windowStart,
                                   windowEnd: _windowEnd,
                                   pixelsPerMinute: _kPxPerMin,
-                                  height: _kTimeHeaderH,
+                                  height: _scaledTimeHeaderH(context),
                                 ),
                               ),
                               if (nowX >= 0 && nowX <= _totalW)
@@ -846,9 +854,10 @@ class _DayControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context);
+    final scale = FontSizeScope.scaleOf(context);
     return Container(
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      height: 42 * scale,
+      padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
       // Left-aligned (Row's default) so this cluster sits directly above
       // the Channels column (matching its horizontal position) instead of
       // floating centered across the whole EPG width.
@@ -878,11 +887,11 @@ class _DayControls extends StatelessWidget {
             enabled: canGoPrevious,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 5),
+              padding: EdgeInsets.symmetric(horizontal: 5 * scale),
               child: Center(
                 child: Icon(
                   Icons.chevron_left,
-                  size: 20,
+                  size: 20 * scale,
                   color: canGoPrevious
                       ? colorScheme.onSurface
                       : colorScheme.onSurface.withValues(alpha: 0.35),
@@ -891,9 +900,9 @@ class _DayControls extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: 6 * scale),
           SizedBox(
-            width: 116,
+            width: 116 * scale,
             child: Center(
               child: Text(
                 DateFormat.yMMMd(
@@ -907,7 +916,7 @@ class _DayControls extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: 6 * scale),
           DpadInkWell(
             key: const ValueKey('timeline-now'),
             onTap: onNow,
@@ -915,7 +924,7 @@ class _DayControls extends StatelessWidget {
             borderRadius: BorderRadius.circular(50),
             color: colorScheme.primaryContainer,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: EdgeInsets.symmetric(horizontal: 12 * scale),
               child: Center(
                 child: Text(
                   l10n.epgNow,
@@ -929,18 +938,18 @@ class _DayControls extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: 6 * scale),
           DpadInkWell(
             key: const ValueKey('timeline-next-day'),
             onTap: canGoNext ? onNext : null,
             enabled: canGoNext,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 5),
+              padding: EdgeInsets.symmetric(horizontal: 5 * scale),
               child: Center(
                 child: Icon(
                   Icons.chevron_right,
-                  size: 20,
+                  size: 20 * scale,
                   color: canGoNext
                       ? colorScheme.onSurface
                       : colorScheme.onSurface.withValues(alpha: 0.35),
@@ -1053,7 +1062,10 @@ class _ChannelCell extends StatelessWidget {
                     colorScheme,
                   ),
                   ChannelColumnLayout.logoOnly => Center(
-                    child: _logoWithRecordingBadge(colorScheme, size: 44),
+                    child: _logoWithRecordingBadge(
+                      colorScheme,
+                      size: 44 * FontSizeScope.scaleOf(context),
+                    ),
                   ),
                   ChannelColumnLayout.titleOnly => _buildTitleOnly(
                     context,
@@ -1078,7 +1090,10 @@ class _ChannelCell extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _logoWithRecordingBadge(colorScheme, size: 26),
+        _logoWithRecordingBadge(
+          colorScheme,
+          size: 26 * FontSizeScope.scaleOf(context),
+        ),
         const SizedBox(height: 3),
         Text(
           channel.name,
