@@ -1136,6 +1136,12 @@ abstract class AppLocalizations {
   /// **'No notes for this release.'**
   String get settingsReleaseNotesNoneForVersion;
 
+  /// No description provided for @settingsReleaseNotesSelectVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a version'**
+  String get settingsReleaseNotesSelectVersion;
+
   /// No description provided for @settingsFillAllFields.
   ///
   /// In en, this message translates to:

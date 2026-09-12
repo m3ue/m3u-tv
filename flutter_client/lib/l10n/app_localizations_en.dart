@@ -571,6 +571,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsReleaseNotesNoneForVersion => 'No notes for this release.';
 
   @override
+  String get settingsReleaseNotesSelectVersion => 'Select a version';
+
+  @override
   String get settingsFillAllFields => 'Please fill in all fields';
 
   @override

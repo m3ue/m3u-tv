@@ -160,4 +160,59 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'narrow width collapses to a version dropdown with notes below, no overflow',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              height: 640,
+              child: ReleaseNotesView(
+                releaseNotesService: _FakeReleaseNotesService([
+                  _note('v1.4.0', "## What's Changed\n- Added subtitles"),
+                  _note('v1.3.0', '- Older fix here'),
+                  _note('v1.2.0', 'plain paragraph text'),
+                ]),
+                appVersionService: _FakeVersionService('1.3.0'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = await _l();
+
+      // Summary card collapses to just the status pill + a GitHub icon
+      // button - the version/latest text didn't fit and got clipped anyway.
+      expect(
+        find.text(l.settingsReleaseNotesYouAreOn('1.3.0')),
+        findsNothing,
+      );
+      expect(find.text(l.settingsReleaseNotesLatestIs('v1.4.0')), findsNothing);
+      expect(find.text(l.settingsReleaseNotesNewerCount(1)), findsOneWidget);
+      expect(find.byIcon(Icons.open_in_new), findsOneWidget);
+
+      // No rail rendered; the dropdown button and current notes show instead.
+      expect(find.widgetWithText(DpadInkWell, 'v1.2.0'), findsNothing);
+      expect(find.widgetWithText(DpadInkWell, 'v1.3.0'), findsOneWidget);
+      expect(find.textContaining('Older fix here'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Opening the picker lists every version and lets one be selected.
+      await tester.tap(find.widgetWithText(DpadInkWell, 'v1.3.0'));
+      await tester.pumpAndSettle();
+      expect(find.text(l.settingsReleaseNotesSelectVersion), findsOneWidget);
+      expect(find.widgetWithText(DpadInkWell, 'v1.2.0'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(DpadInkWell, 'v1.2.0'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('plain paragraph text'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

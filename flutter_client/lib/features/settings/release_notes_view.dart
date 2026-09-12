@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -156,46 +157,88 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
 
     final selected = _releases[_selectedIndex];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _VersionSummary(
-          currentVersion: _currentVersion,
-          latest: _releases.first,
-          newerCount: _newerCount(),
-          onOpenGithub: _openGithub,
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: 300 * FontSizeScope.scaleOf(context),
-                child: _VersionRail(
-                  key: _railKey,
-                  releases: _releases,
-                  selectedIndex: _selectedIndex,
-                  autofocusIndex: _autofocusIndex,
-                  currentVersion: _currentVersion,
-                  onRowFocused: _requestSelection,
-                  onSidebarActivate: widget.onSidebarActivate,
-                  onFocusNotes: _notesFocusNode.requestFocus,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _NotesPane(
-                  note: selected,
-                  focusNode: _notesFocusNode,
-                  onFocusRail: () => _railKey.currentState?.focusSelectedRow(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Below this the fixed-width rail leaves the notes pane no room -
+        // collapse to a version dropdown + full-width notes below it.
+        final wide = constraints.maxWidth >= 700;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _VersionSummary(
+              currentVersion: _currentVersion,
+              latest: _releases.first,
+              newerCount: _newerCount(),
+              onOpenGithub: _openGithub,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: 300 * FontSizeScope.scaleOf(context),
+                          child: _VersionRail(
+                            key: _railKey,
+                            releases: _releases,
+                            selectedIndex: _selectedIndex,
+                            autofocusIndex: _autofocusIndex,
+                            currentVersion: _currentVersion,
+                            onRowFocused: _requestSelection,
+                            onSidebarActivate: widget.onSidebarActivate,
+                            onFocusNotes: _notesFocusNode.requestFocus,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _NotesPane(
+                            note: selected,
+                            focusNode: _notesFocusNode,
+                            onFocusRail: () =>
+                                _railKey.currentState?.focusSelectedRow(),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _VersionDropdownButton(
+                          selected: selected,
+                          currentVersion: _currentVersion,
+                          onTap: () => _pickVersion(context),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: _NotesPane(
+                            note: selected,
+                            focusNode: _notesFocusNode,
+                            onFocusRail: widget.onSidebarActivate ?? () {},
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  Future<void> _pickVersion(BuildContext context) async {
+    final index = await showDialog<int>(
+      context: context,
+      builder: (_) => _VersionPickerDialog(
+        releases: _releases,
+        selectedIndex: _selectedIndex,
+        currentVersion: _currentVersion,
+      ),
+    );
+    if (index != null && index != _selectedIndex && mounted) {
+      setState(() => _selectedIndex = index);
+    }
   }
 
   int _newerCount() {
@@ -238,79 +281,91 @@ class _VersionSummary extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 600;
-            final info = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l.settingsReleaseNotesYouAreOn(
-                    currentVersion ?? l.unknown,
-                  ),
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l.settingsReleaseNotesLatestIs(latest.tag),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (newerCount > 0)
-                  _Pill(
-                    label: l.settingsReleaseNotesNewerCount(newerCount),
-                    background: theme.colorScheme.primaryContainer,
-                    foreground: theme.colorScheme.onPrimaryContainer,
-                    icon: Icons.arrow_upward,
-                  )
-                else
-                  _Pill(
-                    label: l.settingsReleaseNotesUpToDate,
-                    background: theme.colorScheme.secondaryContainer,
-                    foreground: theme.colorScheme.onSecondaryContainer,
-                    icon: Icons.check,
-                  ),
-              ],
-            );
+    final pill = newerCount > 0
+        ? _Pill(
+            label: l.settingsReleaseNotesNewerCount(newerCount),
+            background: theme.colorScheme.primaryContainer,
+            foreground: theme.colorScheme.onPrimaryContainer,
+            icon: Icons.arrow_upward,
+          )
+        : _Pill(
+            label: l.settingsReleaseNotesUpToDate,
+            background: theme.colorScheme.secondaryContainer,
+            foreground: theme.colorScheme.onSecondaryContainer,
+            icon: Icons.check,
+          );
 
-            if (wide) {
-              return Row(
+    return Card(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 600;
+
+          if (wide) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Expanded(child: info),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l.settingsReleaseNotesYouAreOn(
+                            currentVersion ?? l.unknown,
+                          ),
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          l.settingsReleaseNotesLatestIs(latest.tag),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        pill,
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  _GithubLink(wide: true, onOpen: onOpenGithub),
+                  const _GithubLink(),
                 ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                info,
-                const SizedBox(height: 12),
-                _GithubLink(wide: false, onOpen: onOpenGithub),
-              ],
+              ),
             );
-          },
-        ),
+          }
+
+          // Compact single row on mobile - the version/latest text barely
+          // fit and got clipped anyway, so the pill alone carries the status.
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                pill,
+                const Spacer(),
+                DpadFocusable(
+                  onSelect: onOpenGithub,
+                  effects: kStadiumFocusEffects,
+                  child: IconButton(
+                    icon: const Icon(Icons.open_in_new),
+                    tooltip: l.settingsReleaseNotesViewOnGithub,
+                    onPressed: onOpenGithub,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-/// TV can't tap a link and tvOS has no in-app browser, so wide/TV layouts get
-/// a QR code (scan on a phone) and narrow/mobile layouts get an Open button -
-/// same split `_AppReleaseLink` uses on the General tab.
+/// TV can't tap a link and tvOS has no in-app browser, so the wide layout
+/// gets a QR code to scan on a phone instead - the narrow/mobile layout skips
+/// this entirely in favor of an inline icon button (see `_VersionSummary`).
 class _GithubLink extends StatelessWidget {
-  const _GithubLink({required this.wide, required this.onOpen});
-
-  final bool wide;
-  final VoidCallback onOpen;
+  const _GithubLink();
 
   static const _url = 'https://github.com/m3ue/m3u-tv/releases';
 
@@ -319,32 +374,25 @@ class _GithubLink extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    if (wide) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: QrImageView(
-              data: _url,
-              size: 120,
-              backgroundColor: Colors.white,
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: QrImageView(
+            data: _url,
+            size: 120,
+            backgroundColor: Colors.white,
           ),
-          const SizedBox(height: 6),
-          Text(
-            l.settingsReleaseNotesViewOnGithub,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          l.settingsReleaseNotesViewOnGithub,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-        ],
-      );
-    }
-    return AppButton(
-      icon: Icons.open_in_new,
-      label: l.settingsReleaseNotesViewOnGithub,
-      onPressed: onOpen,
+        ),
+      ],
     );
   }
 }
@@ -650,6 +698,183 @@ class _VersionRow extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Narrow layout: version dropdown + picker dialog
+// ---------------------------------------------------------------------------
+
+/// Stands in for the rail on narrow screens: tapping it opens
+/// [_VersionPickerDialog] to pick a different version.
+class _VersionDropdownButton extends StatelessWidget {
+  const _VersionDropdownButton({
+    required this.selected,
+    required this.currentVersion,
+    required this.onTap,
+  });
+
+  final ReleaseNote selected;
+  final String? currentVersion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isCurrent =
+        currentVersion != null && selected.normalizedVersion == currentVersion;
+
+    return DpadInkWell(
+      borderRadius: const BorderRadius.all(Radius.circular(8)),
+      color: theme.colorScheme.surfaceContainerHigh,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                selected.tag.isNotEmpty ? selected.tag : selected.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isCurrent) ...[
+              _Pill(
+                label: l.settingsReleaseNotesCurrentBadge,
+                background: theme.colorScheme.secondary,
+                foreground: theme.colorScheme.onSecondary,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Modal version list shown on narrow screens in place of the rail. Selecting
+/// a row pops the dialog with that row's index.
+class _VersionPickerDialog extends StatefulWidget {
+  const _VersionPickerDialog({
+    required this.releases,
+    required this.selectedIndex,
+    required this.currentVersion,
+  });
+
+  final List<ReleaseNote> releases;
+  final int selectedIndex;
+  final String? currentVersion;
+
+  @override
+  State<_VersionPickerDialog> createState() => _VersionPickerDialogState();
+}
+
+class _VersionPickerDialogState extends State<_VersionPickerDialog> {
+  // Same per-index stable-node pattern as _VersionRailState, so scrolling the
+  // dialog's list doesn't recreate (and leak) focus nodes for visible rows.
+  final _rowNodes = <int, FocusNode>{};
+
+  FocusNode _nodeFor(int index) => _rowNodes.putIfAbsent(
+    index,
+    () => FocusNode(debugLabel: 'release-notes/picker-row-$index'),
+  );
+
+  @override
+  void dispose() {
+    for (final node in _rowNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    // Dialog defaults to 40px of inset padding per side; clamp so this never
+    // overflows a narrow phone screen the way a fixed 420 * scale would.
+    final maxWidth = MediaQuery.sizeOf(context).width - 80;
+    final width = math.min(420 * scale, maxWidth);
+
+    return Dialog(
+      child: SizedBox(
+        width: width,
+        child: DpadRegion(
+          memoryKey: 'release-notes-version-picker',
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l.settingsReleaseNotesSelectVersion,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ),
+                    DpadFocusable(
+                      onSelect: () => Navigator.of(context).pop(),
+                      effects: kStadiumFocusEffects,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 420 * scale),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: widget.releases.length,
+                    itemBuilder: (context, i) {
+                      final release = widget.releases[i];
+                      final normalized = release.normalizedVersion;
+                      final current = widget.currentVersion;
+                      final _RailBadge badge;
+                      if (current != null && normalized == current) {
+                        badge = _RailBadge.current;
+                      } else if (current != null &&
+                          _isNewer(normalized, current)) {
+                        badge = _RailBadge.newer;
+                      } else {
+                        badge = _RailBadge.none;
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _VersionRow(
+                          note: release,
+                          selected: i == widget.selectedIndex,
+                          badge: badge,
+                          autofocus: i == widget.selectedIndex,
+                          focusNode: _nodeFor(i),
+                          onFocused: () {},
+                          onTap: () => Navigator.of(context).pop(i),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -556,6 +556,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsReleaseNotesNoneForVersion => '此版本没有说明。';
 
   @override
+  String get settingsReleaseNotesSelectVersion => '选择版本';
+
+  @override
   String get settingsFillAllFields => '请填写所有字段';
 
   @override

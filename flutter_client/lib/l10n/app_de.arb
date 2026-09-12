@@ -255,6 +255,7 @@
   "settingsReleaseNotesUpToDate": "Du nutzt die neueste Version",
   "settingsReleaseNotesViewOnGithub": "Alle auf GitHub ansehen",
   "settingsReleaseNotesNoneForVersion": "Keine Hinweise für diese Version.",
+  "settingsReleaseNotesSelectVersion": "Version auswählen",
   "settingsFillAllFields": "Bitte fülle alle Felder aus",
   "settingsConnectionSettings": "Verbindungseinstellungen",
   "settingsConnectionSettingsSubtitle": "Gib deine Xtream-Codes-Daten ein",

@@ -255,6 +255,7 @@
   "settingsReleaseNotesUpToDate": "你使用的是最新版本",
   "settingsReleaseNotesViewOnGithub": "在 GitHub 上查看全部",
   "settingsReleaseNotesNoneForVersion": "此版本没有说明。",
+  "settingsReleaseNotesSelectVersion": "选择版本",
   "settingsFillAllFields": "请填写所有字段",
   "settingsConnectionSettings": "连接设置",
   "settingsConnectionSettingsSubtitle": "输入您的 Xtream Codes 信息",
