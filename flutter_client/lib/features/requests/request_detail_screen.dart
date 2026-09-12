@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Detail screen for a single `request_search` result — mirrors
@@ -126,19 +127,24 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
                   request.status == MediaRequestStatus.completed),
         )
         .firstOrNull;
+    final scale = FontSizeScope.scaleOf(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.result.title),
         automaticallyImplyLeading: false,
-        leadingWidth: 56,
+        // AppBar's default toolbarHeight is fixed and unscaled - without
+        // scaling it too, the leading button's larger padding + icon get
+        // squeezed into that fixed height (see item_detail_scaffold.dart).
+        toolbarHeight: kToolbarHeight * scale,
+        leadingWidth: 56 * scale,
         leading: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(8 * scale),
           child: DpadFocusable(
             onSelect: () => Navigator.of(context).maybePop(),
             effects: kStadiumFocusEffects,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: Icon(Icons.arrow_back, size: 24 * scale),
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           ),

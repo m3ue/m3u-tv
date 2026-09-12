@@ -407,6 +407,10 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
                       decoration: InputDecoration(
                         labelText: l.settingsServerUrl,
                         hintText: 'example.com:8080',
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12 * FontSizeScope.scaleOf(context),
+                          vertical: 16 * FontSizeScope.scaleOf(context),
+                        ),
                       ),
                       autocorrect: false,
                       keyboardType: TextInputType.url,
@@ -478,6 +482,14 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
     AppLocalizations l, {
     required bool autofocusServer,
   }) {
+    final scale = FontSizeScope.scaleOf(context);
+    // Material's default content padding is fixed and unscaled - as the
+    // field's (already-scaling) text grows with the display-size setting,
+    // a static padding makes the box look proportionally smaller.
+    final contentPadding = EdgeInsets.symmetric(
+      horizontal: 12 * scale,
+      vertical: 16 * scale,
+    );
     return [
       TextFormField(
         controller: _serverController,
@@ -485,6 +497,7 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
         decoration: InputDecoration(
           labelText: l.settingsServerUrl,
           hintText: 'example.com:8080',
+          contentPadding: contentPadding,
         ),
         autocorrect: false,
         keyboardType: TextInputType.url,
@@ -493,14 +506,20 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
       const SizedBox(height: 16),
       TextFormField(
         controller: _usernameController,
-        decoration: InputDecoration(labelText: l.settingsUsername),
+        decoration: InputDecoration(
+          labelText: l.settingsUsername,
+          contentPadding: contentPadding,
+        ),
         autocorrect: false,
         textInputAction: TextInputAction.next,
       ),
       const SizedBox(height: 16),
       TextFormField(
         controller: _passwordController,
-        decoration: InputDecoration(labelText: l.settingsPassword),
+        decoration: InputDecoration(
+          labelText: l.settingsPassword,
+          contentPadding: contentPadding,
+        ),
         obscureText: true,
         autocorrect: false,
         textInputAction: TextInputAction.done,
@@ -1882,6 +1901,10 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
                       ).settingsViewerNameLabel,
                       errorText: _createError,
                       border: const OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12 * scale,
+                        vertical: 16 * scale,
+                      ),
                     ),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _handleCreate(),

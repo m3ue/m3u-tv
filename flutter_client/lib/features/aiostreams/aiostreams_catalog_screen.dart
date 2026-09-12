@@ -141,6 +141,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
 
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -167,11 +168,11 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                           ),
                           onTap: () => Navigator.of(context).maybePop(),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back),
+                            icon: Icon(Icons.arrow_back, size: 24 * scale),
                             onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12 * scale),
                         Expanded(
                           child: Text(
                             _catalogDisplayTitle(l, widget.catalog),
@@ -188,9 +189,13 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: l.aiostreamsSearchHint,
-                          prefixIcon: const Icon(Icons.search),
+                          prefixIcon: Icon(Icons.search, size: 24 * scale),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12 * scale,
+                            vertical: 16 * scale,
                           ),
                         ),
                         onChanged: _onSearchChanged,

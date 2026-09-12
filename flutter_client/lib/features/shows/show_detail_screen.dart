@@ -16,6 +16,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -369,14 +370,19 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
     // the per-row "Scheduled" badge without a full route re-push.
     final recordings = ref.watch(dvrRecordingsProvider);
     final recordingIndex = EpgRecordingIndex.fromRecordings(recordings);
+    final scale = FontSizeScope.scaleOf(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.showDetailTitle),
         automaticallyImplyLeading: false,
-        leadingWidth: 56,
+        // AppBar's default toolbarHeight is fixed and unscaled - without
+        // scaling it too, AppIconButton's larger footprint gets squeezed
+        // into that fixed height (see item_detail_scaffold.dart).
+        toolbarHeight: kToolbarHeight * scale,
+        leadingWidth: 56 * scale,
         leading: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(8 * scale),
           child: AppIconButton(
             icon: Icons.arrow_back,
             tooltip: MaterialLocalizations.of(context).backButtonTooltip,
