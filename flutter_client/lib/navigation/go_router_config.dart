@@ -40,6 +40,27 @@ CustomTransitionPage<void> _slidePage(Widget screen) =>
       ),
     );
 
+/// Opens a Related-row tap's own detail screen, reusing the same
+/// `onVodSelect`/`onSeriesSelect` callbacks every other VOD/series entry
+/// point (grids, Continue Watching) already navigates through - a related
+/// item is guaranteed to already exist in the user's library, so it only
+/// needs resolving to the matching [VodItem]/[Series] by id.
+void _openRelated(ContentActions actions, RelatedItem related) {
+  final targetId = int.tryParse(related.id);
+  if (targetId == null) return;
+  if (related.isSeries) {
+    final series = actions.appState.seriesList.firstWhereOrNull(
+      (s) => s.id == targetId,
+    );
+    if (series != null) actions.onSeriesSelect(series);
+  } else {
+    final vod = actions.appState.vodItems.firstWhereOrNull(
+      (v) => v.id == targetId,
+    );
+    if (vod != null) actions.onVodSelect(vod);
+  }
+}
+
 GoRouter createGoRouter({
   required AppStateController appState,
   required bool nativeTelevisionHint,
@@ -163,6 +184,8 @@ GoRouter createGoRouter({
                             onPlay: actions.onOpenPlayer,
                             progressList: actions.progressList,
                             onSidebarActivate: actions.onSidebarActivate,
+                            onOpenRelated: (related) =>
+                                _openRelated(actions, related),
                           ),
                         ),
                       );
@@ -218,6 +241,8 @@ GoRouter createGoRouter({
                             progressList: actions.progressList,
                             onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
                             onSidebarActivate: actions.onSidebarActivate,
+                            onOpenRelated: (related) =>
+                                _openRelated(actions, related),
                           ),
                         ),
                       );
@@ -283,6 +308,13 @@ GoRouter createGoRouter({
                           appStateController: actions.appState,
                           onPlay: actions.onOpenPlayer,
                           onSidebarActivate: actions.onSidebarActivate,
+                          onOpenRelated: (related) => context.go(
+                            RouteNames.aiostreamsDetailsFor(
+                              integrationId,
+                              related.type,
+                              related.id,
+                            ),
+                          ),
                         ),
                       );
                     },

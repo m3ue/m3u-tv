@@ -1442,6 +1442,12 @@ abstract class AppLocalizations {
   /// **'Cast'**
   String get seriesCast;
 
+  /// No description provided for @relatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Related'**
+  String get relatedTitle;
+
   /// No description provided for @seriesEpisodeCount.
   ///
   /// In en, this message translates to:

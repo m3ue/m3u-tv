@@ -760,6 +760,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get seriesCast => 'Casting';
 
   @override
+  String get relatedTitle => 'Contenus similaires';
+
+  @override
   String seriesEpisodeCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

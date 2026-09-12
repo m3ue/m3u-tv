@@ -724,6 +724,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get seriesCast => '演员阵容';
 
   @override
+  String get relatedTitle => '相关内容';
+
+  @override
   String seriesEpisodeCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

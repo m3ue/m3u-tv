@@ -381,6 +381,7 @@
   },
   "seriesSeasons": "Staffeln",
   "seriesCast": "Besetzung",
+  "relatedTitle": "Ähnliche Titel",
   "seriesEpisodeCount": "{count, plural, =1{1 Folge} other{{count} Folgen}}",
   "@seriesEpisodeCount": {
     "placeholders": {

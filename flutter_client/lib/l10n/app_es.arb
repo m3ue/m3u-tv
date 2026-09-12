@@ -381,6 +381,7 @@
   },
   "seriesSeasons": "Temporadas",
   "seriesCast": "Reparto",
+  "relatedTitle": "Relacionados",
   "seriesEpisodeCount": "{count, plural, =1{1 episodio} other{{count} episodios}}",
   "@seriesEpisodeCount": {
     "placeholders": {

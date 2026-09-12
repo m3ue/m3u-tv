@@ -381,6 +381,7 @@
   },
   "seriesSeasons": "剧集季",
   "seriesCast": "演员阵容",
+  "relatedTitle": "相关内容",
   "seriesEpisodeCount": "{count, plural, =1{1 集} other{{count} 集}}",
   "@seriesEpisodeCount": {
     "placeholders": {

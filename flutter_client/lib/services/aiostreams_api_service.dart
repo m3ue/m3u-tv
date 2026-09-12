@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:m3u_tv/services/domain_models.dart' show CastMember, Season;
+import 'package:m3u_tv/services/domain_models.dart'
+    show CastMember, RelatedItem, Season;
 import 'package:m3u_tv/services/xtream_service.dart';
 
 /// A stream option returned by AIOStreams for a given IMDb/TMDB content ID.
@@ -94,6 +95,7 @@ class AIOStreamsItem {
     this.writer,
     this.runtime,
     this.seasons = const <Season>[],
+    this.related,
   });
 
   factory AIOStreamsItem.fromJson(Map<String, dynamic> json) {
@@ -136,6 +138,7 @@ class AIOStreamsItem {
       writer: _joinNames(json['writer']),
       runtime: json['runtime'] == null ? null : '${json['runtime']}',
       seasons: seasons,
+      related: _parseRelatedList(json['related']),
     );
   }
 
@@ -170,6 +173,10 @@ class AIOStreamsItem {
   /// Season poster / overview metadata from the editor's TMDB enrichment,
   /// keyed by season number at the call site. Empty on a plain Stremio meta.
   final List<Season> seasons;
+
+  /// TMDB recommendations already in the user's library, from the editor's
+  /// TMDB-enriched `related`. Null on a plain Stremio meta.
+  final List<RelatedItem>? related;
 }
 
 int? _parseInt(dynamic value) {
@@ -209,6 +216,18 @@ List<CastMember>? _parseCastList(dynamic raw) {
   final parsed = raw
       .map(CastMember.fromXtream)
       .whereType<CastMember>()
+      .toList(growable: false);
+  return parsed.isEmpty ? null : parsed;
+}
+
+/// Parses the editor's `related` payload into [RelatedItem]s (AIOStreams
+/// shape: `{id, type, name, poster}`). Mirrors the private reader in
+/// domain_models.dart (kept local so that file's helper can stay private).
+List<RelatedItem>? _parseRelatedList(dynamic raw) {
+  if (raw is! List) return null;
+  final parsed = raw
+      .map(RelatedItem.fromAiostreams)
+      .whereType<RelatedItem>()
       .toList(growable: false);
   return parsed.isEmpty ? null : parsed;
 }

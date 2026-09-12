@@ -12,6 +12,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/related_strip.dart';
 
 /// Shared layout scaffold for a movie-style detail page - poster + meta +
 /// cast strip over a colour-matched BackdropDetailHero. Used by both the
@@ -37,6 +38,8 @@ class MovieDetailBody extends StatefulWidget {
     this.clearLogoUrl,
     this.plot,
     this.richCast,
+    this.richRelated,
+    this.onRelatedTap,
     this.onStartOver,
     this.progressValue,
     this.dominantColor,
@@ -52,6 +55,15 @@ class MovieDetailBody extends StatefulWidget {
   final List<MetaCreditLine> credits;
   final List<CastMember>? richCast;
   final String castSemanticLabel;
+
+  /// TMDB recommendations already in the user's library, shown as the
+  /// "Related" row directly below the cast row. Null/empty renders nothing.
+  final List<RelatedItem>? richRelated;
+
+  /// Required whenever [richRelated] is non-empty - opens that item's own
+  /// detail screen. The caller (Xtream vs AIOStreams) owns the navigation,
+  /// this widget only reports the tap.
+  final ValueChanged<RelatedItem>? onRelatedTap;
 
   final String primaryButtonLabel;
   final VoidCallback onPrimary;
@@ -80,6 +92,12 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
     debugLabel: 'movieDetailPrimary',
   );
 
+  /// Lets the wide related strip hop focus back up into the cast strip (when
+  /// both are present) instead of only ever going to the primary button.
+  final GlobalKey<CastStripState> _castStripKey = GlobalKey<CastStripState>();
+  final GlobalKey<RelatedStripState> _relatedStripKey =
+      GlobalKey<RelatedStripState>();
+
   @override
   void dispose() {
     _primaryFocusNode.dispose();
@@ -105,6 +123,9 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
 
   Widget _buildWide(BuildContext context, ThemeData theme, Color bg) {
     final richCast = widget.richCast;
+    final hasCast = richCast != null && richCast.isNotEmpty;
+    final richRelated = widget.richRelated;
+    final hasRelated = richRelated != null && richRelated.isNotEmpty;
     final scale = FontSizeScope.scaleOf(context);
     // Poster + scrolling info column fill the height; the rich cast strip is
     // pinned full-width below, out of that scroll view so left/right card
@@ -142,15 +163,41 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
           ),
           CastRevealSlot(
             topPadding: MediaBrowsingMetrics.contentPadding,
-            castRow: (richCast == null || richCast.isEmpty)
+            castRow: (!hasCast && !hasRelated)
                 ? null
-                : Semantics(
-                    label: widget.castSemanticLabel,
-                    container: true,
-                    child: CastStrip(
-                      members: richCast,
-                      onNavigateUp: _primaryFocusNode.requestFocus,
-                    ),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasCast)
+                        Semantics(
+                          label: widget.castSemanticLabel,
+                          container: true,
+                          child: CastStrip(
+                            key: _castStripKey,
+                            members: richCast,
+                            onNavigateUp: _primaryFocusNode.requestFocus,
+                            onNavigateDown: hasRelated
+                                ? () =>
+                                      _relatedStripKey.currentState?.focusRow()
+                                : null,
+                          ),
+                        ),
+                      if (hasRelated) ...[
+                        if (hasCast)
+                          const SizedBox(
+                            height: MediaBrowsingMetrics.contentPadding,
+                          ),
+                        RelatedStrip(
+                          key: _relatedStripKey,
+                          items: richRelated,
+                          onTap: (item) => widget.onRelatedTap?.call(item),
+                          onNavigateUp: hasCast
+                              ? () => _castStripKey.currentState?.focusRow()
+                              : _primaryFocusNode.requestFocus,
+                        ),
+                      ],
+                    ],
                   ),
           ),
         ],
@@ -263,6 +310,28 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
                     onShowAll: () => showAllCast(context, richCast),
                     allCastSemanticLabel: l.castShowAll,
                   ),
+          ),
+        if (compact &&
+            widget.richRelated != null &&
+            widget.richRelated!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(
+              top: MediaBrowsingMetrics.contentPadding,
+            ),
+            child: MediaPreviewSection(
+              title: l.relatedTitle,
+              emptyLabel: '',
+              posterStyle: true,
+              items: [
+                for (final item in widget.richRelated!)
+                  MediaPreviewItem(
+                    title: item.title,
+                    imageUrl: item.posterUrl,
+                    fallbackIcon: item.isSeries ? Icons.tv : Icons.movie,
+                    onTap: () => widget.onRelatedTap?.call(item),
+                  ),
+              ],
+            ),
           ),
       ],
     );

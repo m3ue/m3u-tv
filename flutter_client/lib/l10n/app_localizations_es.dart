@@ -757,6 +757,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get seriesCast => 'Reparto';
 
   @override
+  String get relatedTitle => 'Relacionados';
+
+  @override
   String seriesEpisodeCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
