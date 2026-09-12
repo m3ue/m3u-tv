@@ -1784,6 +1784,7 @@ class SeriesDetailBody extends StatelessWidget {
             padding: const EdgeInsets.only(top: 20),
             child: MediaPreviewSection(
               title: l.relatedTitle,
+              titleIcon: Icons.recommend,
               emptyLabel: '',
               posterStyle: true,
               items: [
@@ -1839,12 +1840,7 @@ class SeriesDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                l.seriesCast,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              DetailRowHeader(icon: Icons.people, label: l.seriesCast),
               const SizedBox(height: 8),
               CastRow(members: richCastList),
             ],
@@ -1857,12 +1853,7 @@ class SeriesDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                l.relatedTitle,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              DetailRowHeader(icon: Icons.recommend, label: l.relatedTitle),
               const SizedBox(height: 8),
               RelatedRow(
                 items: richRelatedList,

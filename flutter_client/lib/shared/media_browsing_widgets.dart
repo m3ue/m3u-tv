@@ -45,6 +45,36 @@ class MediaBrowsingMetrics {
   static const double interstitialNavWidth = 200;
 }
 
+/// Small icon + label header used above a detail-page row (Cast, Related).
+/// Mirrors [MediaPreviewSection]'s own title-row styling so a header reads
+/// consistently whether the row sits inside a preview section or a locked
+/// D-pad row (CastRow/RelatedRow) on the Movie/Series detail pages.
+class DetailRowHeader extends StatelessWidget {
+  const DetailRowHeader({super.key, required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20 * scale, color: theme.textTheme.titleSmall?.color),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class InlineMediaSearchField extends StatefulWidget {
   const InlineMediaSearchField({
     required this.query,

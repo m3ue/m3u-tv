@@ -229,9 +229,11 @@ class RelatedStripState extends State<RelatedStrip> {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _selectByMouse(index),
                 child: _RelatedStripCard(
+                  key: ValueKey(items[index].id),
                   item: items[index],
                   width: _cardWidth,
                   focused: _hasFocus && index == _focusedIndex,
+                  staggerIndex: index,
                 ),
               ),
             ),
@@ -242,20 +244,56 @@ class RelatedStripState extends State<RelatedStrip> {
   }
 }
 
-class _RelatedStripCard extends StatelessWidget {
+/// Fades and slides a card up into place, staggered by [staggerIndex] so the
+/// row cascades in one card at a time rather than popping in as a single
+/// block (matches how CastRevealSlot's own arrival reads as one gentle
+/// motion rather than a jump-cut).
+class _RelatedStripCard extends StatefulWidget {
   const _RelatedStripCard({
+    super.key,
     required this.item,
     required this.width,
     required this.focused,
+    required this.staggerIndex,
   });
 
   final RelatedItem item;
   final double width;
   final bool focused;
+  final int staggerIndex;
+
+  @override
+  State<_RelatedStripCard> createState() => _RelatedStripCardState();
+}
+
+class _RelatedStripCardState extends State<_RelatedStripCard> {
+  static const _staggerStep = Duration(milliseconds: 45);
+  static const _maxStaggeredIndex = 8;
+
+  bool _visible = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    final delay = _staggerStep * widget.staggerIndex.clamp(0, _maxStaggeredIndex);
+    _timer = Timer(delay, () {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final item = widget.item;
+    final width = widget.width;
+    final focused = widget.focused;
     final body = Padding(
       // Keep the focus border off the poster / title.
       padding: const EdgeInsets.symmetric(
@@ -287,11 +325,21 @@ class _RelatedStripCard extends StatelessWidget {
         ],
       ),
     );
-    return SizedBox(
-      width: width,
-      child: GradientBorderEffect(
-        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-      ).build(context, DpadFocusState(focused: focused, pressed: false), body),
+    return AnimatedOpacity(
+      opacity: _visible ? 1 : 0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      child: AnimatedSlide(
+        offset: _visible ? Offset.zero : const Offset(0, 0.15),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        child: SizedBox(
+          width: width,
+          child: GradientBorderEffect(
+            borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+          ).build(context, DpadFocusState(focused: focused, pressed: false), body),
+        ),
+      ),
     );
   }
 }

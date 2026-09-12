@@ -139,6 +139,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
   }
 
   Widget _buildWide(BuildContext context, ThemeData theme, Color bg) {
+    final l = AppLocalizations.of(context);
     final richCast = widget.richCast;
     final hasCast = richCast != null && richCast.isNotEmpty;
     final richRelated = widget.richRelated;
@@ -204,13 +205,29 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
                           Semantics(
                             label: widget.castSemanticLabel,
                             container: true,
-                            child: CastRow(members: richCast),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                DetailRowHeader(
+                                  icon: Icons.people,
+                                  label: widget.castSemanticLabel,
+                                ),
+                                const SizedBox(height: 8),
+                                CastRow(members: richCast),
+                              ],
+                            ),
                           ),
                         if (hasRelated) ...[
                           if (hasCast)
                             const SizedBox(
                               height: MediaBrowsingMetrics.contentPadding,
                             ),
+                          DetailRowHeader(
+                            icon: Icons.recommend,
+                            label: l.relatedTitle,
+                          ),
+                          const SizedBox(height: 8),
                           RelatedRow(
                             items: richRelated,
                             onTap: (item) => widget.onRelatedTap?.call(item),
@@ -338,6 +355,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
             ),
             child: MediaPreviewSection(
               title: l.relatedTitle,
+              titleIcon: Icons.recommend,
               emptyLabel: '',
               posterStyle: true,
               items: [
