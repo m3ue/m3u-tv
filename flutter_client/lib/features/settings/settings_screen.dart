@@ -21,6 +21,7 @@ import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -538,13 +539,14 @@ class _DevicePairingBody extends StatelessWidget {
   /// plain text next to the QR code.
   final bool linksAreTappable;
 
-  static Widget get _logo =>
-      SvgPicture.asset('assets/icons/editor-logo.svg', height: 40);
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final logo = SvgPicture.asset(
+      'assets/icons/editor-logo.svg',
+      height: 40 * FontSizeScope.scaleOf(context),
+    );
 
     final Widget body;
     if (service.status == DevicePairingStatus.error) {
@@ -584,7 +586,7 @@ class _DevicePairingBody extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_logo, const SizedBox(height: 16), body],
+          children: [logo, const SizedBox(height: 16), body],
         ),
       ),
     );
@@ -642,7 +644,7 @@ class _DevicePairingWide extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: QrImageView(
                 data: uri.isEmpty ? ' ' : uri,
-                size: 140,
+                size: 140 * FontSizeScope.scaleOf(context),
                 backgroundColor: Colors.white,
               ),
             ),
@@ -1399,14 +1401,13 @@ class _TraktCard extends StatelessWidget {
 
   final TraktService traktService;
 
-  static Widget get _logo => SvgPicture.asset(
-    'assets/icons/trakt-logo.svg',
-    height: 40,
-  );
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final logo = SvgPicture.asset(
+      'assets/icons/trakt-logo.svg',
+      height: 40 * FontSizeScope.scaleOf(context),
+    );
 
     final l = AppLocalizations.of(context);
     final body = !traktService.isConfigured
@@ -1441,7 +1442,7 @@ class _TraktCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _logo,
+        logo,
         const SizedBox(height: 16),
         body,
       ],
