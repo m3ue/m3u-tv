@@ -88,6 +88,7 @@ class RelatedStripState extends State<RelatedStrip> {
     super.didUpdateWidget(oldWidget);
     if (_focusedIndex >= widget.items.length) {
       _focusedIndex = widget.items.isEmpty ? 0 : widget.items.length - 1;
+      if (widget.items.isNotEmpty) _centerFocused(animate: false);
     }
   }
 

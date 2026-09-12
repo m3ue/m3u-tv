@@ -370,13 +370,18 @@ class RelatedItem {
     if (json is! Map) return null;
     final map = json.cast<String, Object?>();
     final id = _asNullableString(map['id']);
+    final type = _asNullableString(map['type']);
     final title = _asNullableString(map['name'])?.trim();
-    if (id == null || id.isEmpty || title == null || title.isEmpty) {
+    if (id == null ||
+        id.isEmpty ||
+        title == null ||
+        title.isEmpty ||
+        (type != 'movie' && type != 'series')) {
       return null;
     }
     return RelatedItem(
       id: id,
-      type: _asNullableString(map['type']) ?? 'movie',
+      type: type!,
       title: title,
       posterUrl: _asNullableString(map['poster']),
     );

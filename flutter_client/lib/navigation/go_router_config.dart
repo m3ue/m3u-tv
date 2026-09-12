@@ -47,17 +47,28 @@ CustomTransitionPage<void> _slidePage(Widget screen) =>
 /// needs resolving to the matching [VodItem]/[Series] by id.
 void _openRelated(ContentActions actions, RelatedItem related) {
   final targetId = int.tryParse(related.id);
-  if (targetId == null) return;
+  if (targetId == null) {
+    debugPrint('_openRelated: unparseable id "${related.id}"');
+    return;
+  }
   if (related.isSeries) {
     final series = actions.appState.seriesList.firstWhereOrNull(
       (s) => s.id == targetId,
     );
-    if (series != null) actions.onSeriesSelect(series);
+    if (series != null) {
+      actions.onSeriesSelect(series);
+    } else {
+      debugPrint('_openRelated: series #$targetId not found in library');
+    }
   } else {
     final vod = actions.appState.vodItems.firstWhereOrNull(
       (v) => v.id == targetId,
     );
-    if (vod != null) actions.onVodSelect(vod);
+    if (vod != null) {
+      actions.onVodSelect(vod);
+    } else {
+      debugPrint('_openRelated: VOD #$targetId not found in library');
+    }
   }
 }
 

@@ -475,15 +475,22 @@ void main() {
       expect(item.posterUrl, 'https://example.com/pulp.jpg');
     });
 
-    test('fromAiostreams defaults to movie when type is absent', () {
-      final item = RelatedItem.fromAiostreams(<String, Object?>{
-        'id': 'tmdb:680',
-        'name': 'Pulp Fiction',
-      });
-
-      expect(item, isNotNull);
-      expect(item!.type, 'movie');
-      expect(item.posterUrl, isNull);
+    test('fromAiostreams returns null when type is absent or invalid', () {
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{
+          'id': 'tmdb:680',
+          'name': 'Pulp Fiction',
+        }),
+        isNull,
+      );
+      expect(
+        RelatedItem.fromAiostreams(<String, Object?>{
+          'id': 'tmdb:680',
+          'type': 'episode',
+          'name': 'Pulp Fiction',
+        }),
+        isNull,
+      );
     });
 
     test('fromAiostreams returns null when id or name is missing', () {
