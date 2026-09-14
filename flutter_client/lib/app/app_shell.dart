@@ -15,6 +15,7 @@ import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/features/notifications/notifications_screen.dart';
+import 'package:m3u_tv/features/player/channel_switch_banner.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/requests/request_screen.dart';
@@ -217,6 +218,15 @@ class AppShellState extends ConsumerState<AppShell>
   // full unfiltered live channel list. Set by feature screens right before
   // they invoke onChannelSelect.
   List<Channel> _playerChannelContext = const <Channel>[];
+
+  // Transient banner shown for 1.5s after a channel swap, so the user can
+  // see the new channel's name without having to wait for EPG to load.
+  // Driven by `_switchChannel`; the timer cancels and replaces the banner
+  // if the user spams Channel ±, so rapid surfing only ever shows one
+  // banner at a time.
+  Channel? _channelSwitchBannerChannel;
+  ChannelSwitchDirection? _channelSwitchBannerDirection;
+  Timer? _channelSwitchBannerTimer;
 
   final List<FocusNode> _sidebarFocusNodes = [];
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
@@ -476,6 +486,7 @@ class AppShellState extends ConsumerState<AppShell>
   void dispose() {
     unawaited(_systemUiPolicy.applyBrowsing());
     _backExitTimer?.cancel();
+    _channelSwitchBannerTimer?.cancel();
     _tvNotificationSub?.cancel().ignore();
     _epgSweepProgressSub?.cancel().ignore();
     _notificationActivationSub?.cancel().ignore();
@@ -921,7 +932,34 @@ class AppShellState extends ConsumerState<AppShell>
     if (currentIndex == -1) return;
     final nextIndex =
         (currentIndex + direction + channels.length) % channels.length;
-    _openChannel(channels[nextIndex]);
+    final nextChannel = channels[nextIndex];
+    _showChannelSwitchBanner(
+      nextChannel,
+      direction > 0 ? ChannelSwitchDirection.up : ChannelSwitchDirection.down,
+    );
+    _openChannel(nextChannel);
+  }
+
+  static const Duration _channelSwitchBannerDuration = Duration(
+    milliseconds: 1500,
+  );
+
+  void _showChannelSwitchBanner(
+    Channel channel,
+    ChannelSwitchDirection direction,
+  ) {
+    _channelSwitchBannerTimer?.cancel();
+    setState(() {
+      _channelSwitchBannerChannel = channel;
+      _channelSwitchBannerDirection = direction;
+    });
+    _channelSwitchBannerTimer = Timer(_channelSwitchBannerDuration, () {
+      if (!mounted) return;
+      setState(() {
+        _channelSwitchBannerChannel = null;
+        _channelSwitchBannerDirection = null;
+      });
+    });
   }
 
   Future<void> _handleRecordButtonTap(EpgProgram program) async {
@@ -1927,6 +1965,27 @@ class AppShellState extends ConsumerState<AppShell>
                   onClose: _closePlayer,
                 ),
           ),
+          if (_channelSwitchBannerChannel != null &&
+              _channelSwitchBannerDirection != null)
+            Positioned(
+              // Top-center so it doesn't collide with the EPG overlay
+              // (PlayerScreen renders it top-left) or the back-button
+              // header (top-left, ~44px circular button). IgnorePointer
+              // keeps it from stealing focus or absorbing clicks; the
+              // banner is purely informational.
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ChannelSwitchBanner(
+                    channel: _channelSwitchBannerChannel!,
+                    direction: _channelSwitchBannerDirection!,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

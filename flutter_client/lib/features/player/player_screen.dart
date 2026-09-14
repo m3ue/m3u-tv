@@ -1454,7 +1454,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const _PlayPauseIntent(),
-          // Only claim arrow keys when the overlay is hidden - when visible,
+          // Channel up/down always claim the hardware Channel ± buttons and
+          // D-pad Up/Down, even while the playback overlay is visible. The
+          // overlay's buttons are arranged in a Row with `DpadRegion` vertical
+          // edges set to `stop`, so D-pad Up/Down never moves focus to a
+          // sibling anyway -- binding them unconditionally gives the user a
+          // single press to skip a channel instead of having to navigate to
+          // the skip button and press Select.
+          LogicalKeySet(LogicalKeyboardKey.channelUp):
+              const _NextChannelIntent(),
+          LogicalKeySet(LogicalKeyboardKey.arrowUp): const _NextChannelIntent(),
+          LogicalKeySet(LogicalKeyboardKey.channelDown):
+              const _PreviousChannelIntent(),
+          LogicalKeySet(LogicalKeyboardKey.arrowDown):
+              const _PreviousChannelIntent(),
+          // Only claim Left/Right when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
@@ -1467,6 +1481,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
           actions: <Type, Action<Intent>>{
             _BackIntent: _BackAction(_handleBack),
             _PlayPauseIntent: _PlayPauseAction(_togglePlayPause),
+            _NextChannelIntent: CallbackAction<_NextChannelIntent>(
+              onInvoke: (_) {
+                widget.onNextChannel?.call();
+                return null;
+              },
+            ),
+            _PreviousChannelIntent: CallbackAction<_PreviousChannelIntent>(
+              onInvoke: (_) {
+                widget.onPreviousChannel?.call();
+                return null;
+              },
+            ),
             _SeekBackIntent: _SeekAction(
               () => _seekTo(_currentPosition - const Duration(seconds: 10)),
             ),
@@ -2249,6 +2275,14 @@ class _SeekBackIntent extends Intent {
 
 class _SeekForwardIntent extends Intent {
   const _SeekForwardIntent();
+}
+
+class _NextChannelIntent extends Intent {
+  const _NextChannelIntent();
+}
+
+class _PreviousChannelIntent extends Intent {
+  const _PreviousChannelIntent();
 }
 
 class _BackAction extends Action<_BackIntent> {

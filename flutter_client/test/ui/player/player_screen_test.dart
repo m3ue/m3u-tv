@@ -2628,6 +2628,148 @@ void main() {
       },
     );
 
+    testWidgets(
+      'hardware Channel ± keys invoke onNextChannel/onPreviousChannel '
+      'on a live player',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 1,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+        var nextPressed = 0;
+        var previousPressed = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/live.m3u8',
+                title: 'Channel',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+              onNextChannel: () => nextPressed++,
+              onPreviousChannel: () => previousPressed++,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.channelUp);
+        await tester.sendKeyEvent(LogicalKeyboardKey.channelDown);
+        await tester.pump();
+
+        expect(nextPressed, 1);
+        expect(previousPressed, 1);
+      },
+    );
+
+    testWidgets(
+      'D-pad Up/Down invoke onNextChannel/onPreviousChannel on a live '
+      'player (covers remotes without hardware Channel ± buttons, '
+      'including the tvOS Siri Remote click ring)',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 2,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+        var nextPressed = 0;
+        var previousPressed = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/live.m3u8',
+                title: 'Channel',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+              onNextChannel: () => nextPressed++,
+              onPreviousChannel: () => previousPressed++,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
+
+        expect(nextPressed, 1);
+        expect(previousPressed, 1);
+      },
+    );
+
+    testWidgets(
+      'channel shortcuts still fire while the playback overlay is visible '
+      '(no need to navigate to the skip button first)',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1200, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 3,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+        var nextPressed = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/live.m3u8',
+                title: 'Channel',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+              onNextChannel: () => nextPressed++,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Surface the playback overlay so we can prove the channel
+        // shortcut works from the user-visible state of "controls visible
+        // and focused on a transport button".
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pump();
+
+        expect(nextPressed, 1);
+      },
+    );
+
     group('Comskip', () {
       PlaybackOrchestrator buildOrchestrator(FakePlayerAdapter adapter) {
         return PlaybackOrchestrator(
