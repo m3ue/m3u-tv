@@ -16,6 +16,13 @@ analyzer:
     # vendor their own pubspec.yaml, which makes the analyzer treat them as a
     # nested project to lint.
     - '**/build/**'
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:isolate';
+
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 
@@ -44,7 +46,10 @@ class CacheService {
   Future<CacheEntry<T>?> get<T>(String key) async {
     var value = _memory['m3ue_cache_$key'];
     if (value is! _StampedValue && _store != null) {
-      value = _decodeStampedValue<T>(key, await _store.read('m3ue_cache_$key'));
+      value = await _decodeStampedValue<T>(
+        key,
+        await _store.read('m3ue_cache_$key'),
+      );
       if (value != null) _memory['m3ue_cache_$key'] = value;
     }
     if (value is! _StampedValue) return null;
@@ -139,7 +144,7 @@ Object? _encodeCacheData(String key, Object? data) {
   return null;
 }
 
-_StampedValue<T>? _decodeStampedValue<T>(String key, Object? raw) {
+Future<_StampedValue<T>?> _decodeStampedValue<T>(String key, Object? raw) async {
   if (raw is! Map) return null;
   final json = raw.cast<String, Object?>();
   final timestampText = json['timestamp'];
@@ -147,9 +152,26 @@ _StampedValue<T>? _decodeStampedValue<T>(String key, Object? raw) {
       ? DateTime.tryParse(timestampText)
       : null;
   if (timestamp == null) return null;
-  final data = _decodeCacheData(key, json['data']);
+  final data = await _decodeCacheDataMaybeOffloaded(key, json['data']);
   if (data == null) return null;
   return _StampedValue<T>(data as T, timestamp);
+}
+
+/// Below this many entries, mapping the cached JSON list into typed
+/// `Channel`/`VodItem`/`Series`/etc. objects inline is cheaper than an
+/// isolate hop. Above it (a real channel/VOD/series catalog, which the app
+/// expects to reach into the thousands - see the same reasoning behind
+/// `decodeJsonOffMainIsolate` in json_isolate.dart) the mapping loop itself
+/// is real, measurable work, and running it inline would block whichever
+/// isolate calls [CacheService.get] - the UI isolate, on every warm boot's
+/// cache hydration, right before the channel list is expected to appear.
+const int _decodeOffloadItemThreshold = 256;
+
+Future<Object?> _decodeCacheDataMaybeOffloaded(String key, Object? raw) {
+  if (raw is List && raw.length >= _decodeOffloadItemThreshold) {
+    return Isolate.run(() => _decodeCacheData(key, raw));
+  }
+  return Future.value(_decodeCacheData(key, raw));
 }
 
 Object? _decodeCacheData(String key, Object? raw) {

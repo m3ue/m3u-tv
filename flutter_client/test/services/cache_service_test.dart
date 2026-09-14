@@ -101,6 +101,48 @@ void main() {
   });
 
   test(
+    'a large live-stream catalog still hydrates correctly off the main '
+    'isolate',
+    () async {
+      // Exercises the Isolate.run offload path in
+      // _decodeCacheDataMaybeOffloaded (cache_service.dart), which only
+      // kicks in at _decodeOffloadItemThreshold (256) entries or more - a
+      // small list like the other tests here would just take the inline
+      // path and never touch this code.
+      final store = await newStore('m3u-tv-large-live-cache-roundtrip-');
+      final source = CacheService(store: store);
+      final original = List<Channel>.generate(
+        300,
+        (index) => Channel(
+          id: index,
+          name: 'Channel $index',
+          streamUrl: 'http://example.com/$index',
+          logoUrl: index.isEven ? 'http://example.com/$index.png' : null,
+          categoryId: '${index % 5}',
+          catchupSupported: index.isEven,
+          catchupDays: index.isEven ? 7 : null,
+        ),
+      );
+      await source.set<List<Channel>>('liveStreams', original);
+
+      final hydrated = CacheService(store: store);
+      final entry = await hydrated.get<List<Channel>>('liveStreams');
+      final channels = entry!.data;
+
+      expect(channels, hasLength(300));
+      expect(channels[0].id, 0);
+      expect(channels[0].name, 'Channel 0');
+      expect(channels[0].logoUrl, 'http://example.com/0.png');
+      expect(channels[0].catchupSupported, isTrue);
+      expect(channels[0].catchupDays, 7);
+      expect(channels[1].logoUrl, isNull);
+      expect(channels[1].catchupSupported, isFalse);
+      expect(channels[299].id, 299);
+      expect(channels[299].categoryId, '4');
+    },
+  );
+
+  test(
     'epg guide programmes survive a persist + cold hydrate round trip',
     () async {
       final store = await newStore('m3u-tv-epg-guide-roundtrip-');

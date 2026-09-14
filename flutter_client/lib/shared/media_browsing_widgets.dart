@@ -787,12 +787,20 @@ class ScrollbarListView extends StatefulWidget {
     required this.itemCount,
     required this.itemBuilder,
     this.padding,
+    this.itemExtent,
     super.key,
   });
 
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final EdgeInsetsGeometry? padding;
+
+  /// Fixed height of every item, when all items share one (e.g. a row list
+  /// with a constant-height row widget). Passing this lets [ListView.builder]
+  /// skip estimating each item's extent from what happens to already be
+  /// laid out, which matters for scroll-position math and initial layout
+  /// cost on a long list. Leave null for lists whose items vary in height.
+  final double? itemExtent;
 
   @override
   State<ScrollbarListView> createState() => _ScrollbarListViewState();
@@ -818,6 +826,7 @@ class _ScrollbarListViewState extends State<ScrollbarListView> {
           controller: _controller,
           padding: widget.padding,
           itemCount: widget.itemCount,
+          itemExtent: widget.itemExtent,
           itemBuilder: widget.itemBuilder,
         ),
       ),

@@ -686,7 +686,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     }
 
     final filtered = _filteredChannels(channels);
-    final channelsById = {for (final c in channels) c.id: c};
     _loadEpgForChannels(filtered, epgService);
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
@@ -696,6 +695,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     // regions competing with a separate FocusScope for the channel grid.
     final showSearchActive =
         widget.onSearchShows != null && _query.trim().length >= 2;
+    // Only ShowSearchResultsView (below) consumes this id lookup. Building
+    // it unconditionally rebuilt an O(n) Map from the full channel list on
+    // every rebuild - including the frequent ones EpgService triggers as
+    // each lazy EPG batch streams in right after the channel list first
+    // renders - even though search results usually aren't showing.
+    final channelsById = showSearchActive
+        ? {for (final c in channels) c.id: c}
+        : const <int, Channel>{};
     final nav = MediaCategoryNav(
       key: _navKey,
       useSidebarLayout: widget.useSidebarLayout,
@@ -938,6 +945,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       onEdge: _handleGridLeftEdge,
       child: ScrollbarListView(
         itemCount: channels.length,
+        // _ChannelRow is a fixed 72px SizedBox in 4px-vertical Padding (80px
+        // total). Declaring it lets ListView.builder lay out/scroll a long
+        // channel list without estimating each row's extent as it builds.
+        itemExtent: 80,
         itemBuilder: (context, index) {
           final channel = channels[index];
           widget.onEnsureEpg?.call([channel]);
