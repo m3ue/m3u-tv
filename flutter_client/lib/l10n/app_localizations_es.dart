@@ -1357,6 +1357,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsEpgStartViewPrimeTime => 'Horario estelar';
 
   @override
+  String get settingsEpgTimeStep => 'Paso izquierda/derecha de la guía';
+
+  @override
+  String get settingsEpgTimeStep30 => '30 minutos';
+
+  @override
+  String get settingsEpgTimeStep60 => '60 minutos';
+
+  @override
   String get settingsDefaultStartPage => 'Página de inicio predeterminada';
 
   @override

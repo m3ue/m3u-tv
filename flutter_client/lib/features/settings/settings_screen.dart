@@ -2129,6 +2129,7 @@ class _ViewSettingsSection extends StatefulWidget {
 class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   LiveTvLayout _liveTvLayout = LiveTvLayout.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  EpgTimeStep _epgTimeStep = EpgTimeStep.thirtyMinutes;
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
   bool _hdrEnabled = true;
@@ -2155,6 +2156,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   Future<void> _refresh() async {
     final layout = await widget.service.liveTvLayout();
     final startView = await widget.service.epgStartView();
+    final timeStep = await widget.service.epgTimeStep();
     final channelColumnLayout = await widget.service.channelColumnLayout();
     final defaultStartPage = await widget.service.defaultStartPage();
     final hdrEnabled = await widget.service.hdrEnabled();
@@ -2163,6 +2165,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     setState(() {
       _liveTvLayout = layout;
       _epgStartView = startView;
+      _epgTimeStep = timeStep;
       _channelColumnLayout = channelColumnLayout;
       _defaultStartPage = defaultStartPage;
       _hdrEnabled = hdrEnabled;
@@ -2280,6 +2283,29 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                   isSelected: _epgStartView == EpgStartView.primeTime,
                   onTap: () =>
                       widget.service.setEpgStartView(EpgStartView.primeTime),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l.settingsEpgTimeStep,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _IntervalChip(
+                  label: l.settingsEpgTimeStep30,
+                  isSelected: _epgTimeStep == EpgTimeStep.thirtyMinutes,
+                  onTap: () =>
+                      widget.service.setEpgTimeStep(EpgTimeStep.thirtyMinutes),
+                ),
+                _IntervalChip(
+                  label: l.settingsEpgTimeStep60,
+                  isSelected: _epgTimeStep == EpgTimeStep.sixtyMinutes,
+                  onTap: () =>
+                      widget.service.setEpgTimeStep(EpgTimeStep.sixtyMinutes),
                 ),
               ],
             ),

@@ -1308,6 +1308,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsEpgStartViewPrimeTime => '黄金时段';
 
   @override
+  String get settingsEpgTimeStep => '节目单左右移动步长';
+
+  @override
+  String get settingsEpgTimeStep30 => '30 分钟';
+
+  @override
+  String get settingsEpgTimeStep60 => '60 分钟';
+
+  @override
   String get settingsDefaultStartPage => '默认启动页面';
 
   @override

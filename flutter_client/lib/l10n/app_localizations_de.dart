@@ -1355,6 +1355,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsEpgStartViewPrimeTime => 'Prime Time';
 
   @override
+  String get settingsEpgTimeStep => 'Schrittweite links/rechts im Guide';
+
+  @override
+  String get settingsEpgTimeStep30 => '30 Minuten';
+
+  @override
+  String get settingsEpgTimeStep60 => '60 Minuten';
+
+  @override
   String get settingsDefaultStartPage => 'Standardstartseite';
 
   @override

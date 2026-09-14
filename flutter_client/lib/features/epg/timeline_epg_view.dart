@@ -11,7 +11,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart'
-    show ChannelColumnLayout, EpgStartView;
+    show ChannelColumnLayout, EpgStartView, EpgTimeStep;
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -70,6 +70,7 @@ class TimelineEpgView extends StatefulWidget {
     this.futureDays = 7,
     this.clock = DateTime.now,
     this.epgStartView = EpgStartView.currentTime,
+    this.epgTimeStep = EpgTimeStep.thirtyMinutes,
     this.useSidebarLayout = false,
     this.channelColumnLayout = ChannelColumnLayout.logoOnly,
     this.onFallbackFocusGrid,
@@ -143,6 +144,10 @@ class TimelineEpgView extends StatefulWidget {
   final Clock clock;
   final EpgStartView epgStartView;
 
+  /// How far a single D-pad left/right press moves the guide cursor within
+  /// a channel's row (see [TimelineEpgViewState._handleHorizontalStep]).
+  final EpgTimeStep epgTimeStep;
+
   /// Whether the caller is using the sidebar (TV/desktop) layout rather than
   /// the mobile stacked one — mirrors `MediaCategoryNav.useSidebarLayout`.
   /// Rounds the Channels column's corner cell to match the sidebar strip's
@@ -190,6 +195,25 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   // the day's first block.
   late List<FocusNode> _nowFocusNodes;
 
+  // Lazily populated as each row's blocks build (see _ProgramsRow), one map
+  // per channel row keyed by that program's start time. Lets
+  // _handleHorizontalStep jump directly to a specific (possibly
+  // non-adjacent) block by identity instead of relying on dpad's spatial
+  // nearest-candidate search, which only ever finds the next/previous block
+  // on screen. Cleared whenever the selected day changes (see _selectDate)
+  // since a new day means an entirely different set of programs.
+  late List<Map<DateTime, FocusNode>> _programFocusNodes;
+
+  // The shared point in time the guide is currently "at", moved in fixed
+  // widget.epgTimeStep increments by D-pad left/right (see
+  // _handleHorizontalStep) rather than by jumping to the next/previous
+  // program block - a block's on-screen width (and therefore how far one
+  // press moved) otherwise depended entirely on how long that particular
+  // program happened to run. Null until the first left/right press, at
+  // which point it's seeded from whichever block was actually focused;
+  // reset on every day change in _initWindow.
+  DateTime? _guideCursor;
+
   @override
   void initState() {
     super.initState();
@@ -201,6 +225,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     _rowHCtrls = _makeRowCtrls(widget.channels.length);
     _channelFocusNodes = _makeFocusNodes(widget.channels.length);
     _nowFocusNodes = _makeFocusNodes(widget.channels.length);
+    _programFocusNodes = _makeProgramFocusNodeMaps(widget.channels.length);
     _leftVCtrl.addListener(_onLeftV);
     _rightVCtrl.addListener(_onRightV);
     WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
@@ -208,6 +233,18 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   List<FocusNode> _makeFocusNodes(int count) =>
       List.generate(count, (_) => FocusNode());
+
+  List<Map<DateTime, FocusNode>> _makeProgramFocusNodeMaps(int count) =>
+      List.generate(count, (_) => <DateTime, FocusNode>{});
+
+  void _clearProgramFocusNodes() {
+    for (final map in _programFocusNodes) {
+      for (final node in map.values) {
+        node.dispose();
+      }
+      map.clear();
+    }
+  }
 
   void _setFocusedChannelIndex(int index) {
     if (_focusedChannelIndex == index) return;
@@ -247,6 +284,54 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     }
   }
 
+  /// Moves the shared guide cursor by one [TimelineEpgView.epgTimeStep]
+  /// increment and focuses whichever program in [channel]'s row now covers
+  /// it - the fixed-time-increment replacement for the old behavior of
+  /// jumping straight to the next/previous program block, where how far one
+  /// D-pad press moved depended entirely on how long the current block
+  /// happened to run.
+  ///
+  /// [pressedProgram] seeds the cursor the first time this fires (so the
+  /// very first press always steps relative to whatever block the user is
+  /// actually on); every press after that continues from the persisted
+  /// [_guideCursor] instead, so repeatedly stepping through one long program
+  /// still advances 30/60 minutes each time rather than recomputing the same
+  /// target from that program's start over and over.
+  ///
+  /// Returns `false` (declining to consume the key) once the step would
+  /// leave the selected day's window, so the region's normal edge handling
+  /// - e.g. activating the sidebar on Left - still applies at the boundary.
+  /// When the step lands in a gap with no program data, the cursor still
+  /// advances (so repeated presses keep moving through the gap) but focus
+  /// doesn't move until a covered program is reached.
+  bool _handleHorizontalStep({
+    required int rowIndex,
+    required Channel channel,
+    required EpgProgram pressedProgram,
+    required bool forward,
+  }) {
+    final step = Duration(minutes: widget.epgTimeStep.minutes);
+    final cursor = _guideCursor ?? pressedProgram.start;
+    final target = forward ? cursor.add(step) : cursor.subtract(step);
+    if (target.isBefore(_windowStart) || !target.isBefore(_windowEnd)) {
+      return false;
+    }
+    _guideCursor = target;
+    final now = widget.clock();
+    for (final program in widget.epgService.programsForChannel(channel)) {
+      if (!target.isBefore(program.start) && target.isBefore(program.end)) {
+        final isCurrent =
+            !now.isBefore(program.start) && now.isBefore(program.end);
+        final node = isCurrent
+            ? _attachedFocusNode(_nowFocusNodes, rowIndex)
+            : _programFocusNodes[rowIndex][program.start];
+        node?.requestFocus();
+        break;
+      }
+    }
+    return true;
+  }
+
   void _initWindow() {
     _windowStart = _selectedDate;
     _windowEnd = DateTime(
@@ -257,6 +342,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     );
     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
     _nowOffset = _computeStartOffset();
+    // A new window means an entirely different set of on-screen programs,
+    // so any remembered guide position from the previous day/window no
+    // longer means anything.
+    _guideCursor = null;
   }
 
   double _computeStartOffset() {
@@ -327,6 +416,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       setState(() {
         _selectedDate = selected;
         _initWindow();
+        _clearProgramFocusNodes();
       });
     }
     WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
@@ -420,6 +510,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
         n.dispose();
       }
       _nowFocusNodes = _makeFocusNodes(widget.channels.length);
+      _clearProgramFocusNodes();
+      _programFocusNodes = _makeProgramFocusNodeMaps(widget.channels.length);
       if (_focusedChannelIndex >= widget.channels.length) {
         _focusedChannelIndex = math.max(0, widget.channels.length - 1);
       }
@@ -450,6 +542,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     for (final n in _nowFocusNodes) {
       n.dispose();
     }
+    _clearProgramFocusNodes();
     for (final c in _rowHCtrls) {
       c.dispose();
     }
@@ -699,6 +792,19 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                                     // id, which lives on the Channel.
                                     recordingStateFor: (program) => widget
                                         .recordingStateFor(channel, program),
+                                    resolveFocusNode: (program) =>
+                                        _programFocusNodes[i].putIfAbsent(
+                                          program.start,
+                                          FocusNode.new,
+                                        ),
+                                    onHorizontalStep:
+                                        (program, {required forward}) =>
+                                            _handleHorizontalStep(
+                                              rowIndex: i,
+                                              channel: channel,
+                                              pressedProgram: program,
+                                              forward: forward,
+                                            ),
                                     onTap: (program) {
                                       final tapNow = widget.clock();
                                       final canReplay = EpgService.canReplay(
@@ -1161,6 +1267,8 @@ class _ProgramsRow extends StatelessWidget {
     required this.onTap,
     required this.catchupRetentionDays,
     required this.now,
+    required this.resolveFocusNode,
+    required this.onHorizontalStep,
     this.onLongPress,
     this.recordingStateFor = _noRecordingState,
     this.nowFocusNode,
@@ -1188,6 +1296,19 @@ class _ProgramsRow extends StatelessWidget {
   /// Called whenever any block in this row gains focus, so the caller can
   /// track which channel row currently holds grid focus.
   final VoidCallback? onAnyBlockFocus;
+
+  /// Resolves (creating on first use) the stable [FocusNode] for a given
+  /// block, so [onHorizontalStep] can jump straight to a specific program
+  /// by identity rather than by spatial adjacency.
+  final FocusNode Function(EpgProgram program) resolveFocusNode;
+
+  /// Steps the shared guide cursor by one time increment from the given
+  /// program - the block that was actually focused when the key was pressed
+  /// - and focuses whichever program now covers it. Returns `true` to
+  /// consume the key press, `false` to fall back to normal D-pad edge
+  /// handling (e.g. at the start/end of the selected day).
+  final bool Function(EpgProgram program, {required bool forward})
+  onHorizontalStep;
 
   /// Resolves the per-programme recording indicator for a block. Defaults
   /// to [EpgRecordingState.none], which renders no badge and is visually
@@ -1247,7 +1368,18 @@ class _ProgramsRow extends StatelessWidget {
             ),
             onTap: () => onTap(p),
             onLongTap: onLongPress == null ? null : () => onLongPress!(p),
-            focusNode: isCurrent ? nowFocusNode : null,
+            focusNode: isCurrent ? nowFocusNode : resolveFocusNode(p),
+            onDirection: (direction) {
+              if (direction == TraversalDirection.right) {
+                return onHorizontalStep(p, forward: true);
+              }
+              if (direction == TraversalDirection.left) {
+                return onHorizontalStep(p, forward: false);
+              }
+              // Up/down: let normal D-pad navigation move between channel
+              // rows, unchanged.
+              return false;
+            },
             onFocusChange: onAnyBlockFocus == null
                 ? null
                 : (focused) {

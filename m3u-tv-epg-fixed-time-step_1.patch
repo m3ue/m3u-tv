@@ -1,0 +1,847 @@
+diff --git a/flutter_client/lib/features/epg/timeline_epg_view.dart b/flutter_client/lib/features/epg/timeline_epg_view.dart
+index 8b88cbb..4d9abca 100644
+--- a/flutter_client/lib/features/epg/timeline_epg_view.dart
++++ b/flutter_client/lib/features/epg/timeline_epg_view.dart
+@@ -11,7 +11,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
+ import 'package:m3u_tv/services/domain_models.dart';
+ import 'package:m3u_tv/services/epg_service.dart';
+ import 'package:m3u_tv/services/view_settings_service.dart'
+-    show ChannelColumnLayout, EpgStartView;
++    show ChannelColumnLayout, EpgStartView, EpgTimeStep;
+ import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
+ import 'package:m3u_tv/shared/catchup_badge.dart';
+ import 'package:m3u_tv/shared/dpad_ink_well.dart';
+@@ -70,6 +70,7 @@ class TimelineEpgView extends StatefulWidget {
+     this.futureDays = 7,
+     this.clock = DateTime.now,
+     this.epgStartView = EpgStartView.currentTime,
++    this.epgTimeStep = EpgTimeStep.thirtyMinutes,
+     this.useSidebarLayout = false,
+     this.channelColumnLayout = ChannelColumnLayout.logoOnly,
+     this.onFallbackFocusGrid,
+@@ -143,6 +144,10 @@ class TimelineEpgView extends StatefulWidget {
+   final Clock clock;
+   final EpgStartView epgStartView;
+ 
++  /// How far a single D-pad left/right press moves the guide cursor within
++  /// a channel's row (see [TimelineEpgViewState._handleHorizontalStep]).
++  final EpgTimeStep epgTimeStep;
++
+   /// Whether the caller is using the sidebar (TV/desktop) layout rather than
+   /// the mobile stacked one — mirrors `MediaCategoryNav.useSidebarLayout`.
+   /// Rounds the Channels column's corner cell to match the sidebar strip's
+@@ -190,6 +195,25 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+   // the day's first block.
+   late List<FocusNode> _nowFocusNodes;
+ 
++  // Lazily populated as each row's blocks build (see _ProgramsRow), one map
++  // per channel row keyed by that program's start time. Lets
++  // _handleHorizontalStep jump directly to a specific (possibly
++  // non-adjacent) block by identity instead of relying on dpad's spatial
++  // nearest-candidate search, which only ever finds the next/previous block
++  // on screen. Cleared whenever the selected day changes (see _selectDate)
++  // since a new day means an entirely different set of programs.
++  late List<Map<DateTime, FocusNode>> _programFocusNodes;
++
++  // The shared point in time the guide is currently "at", moved in fixed
++  // widget.epgTimeStep increments by D-pad left/right (see
++  // _handleHorizontalStep) rather than by jumping to the next/previous
++  // program block - a block's on-screen width (and therefore how far one
++  // press moved) otherwise depended entirely on how long that particular
++  // program happened to run. Null until the first left/right press, at
++  // which point it's seeded from whichever block was actually focused;
++  // reset on every day change in _initWindow.
++  DateTime? _guideCursor;
++
+   @override
+   void initState() {
+     super.initState();
+@@ -201,6 +225,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+     _rowHCtrls = _makeRowCtrls(widget.channels.length);
+     _channelFocusNodes = _makeFocusNodes(widget.channels.length);
+     _nowFocusNodes = _makeFocusNodes(widget.channels.length);
++    _programFocusNodes = _makeProgramFocusNodeMaps(widget.channels.length);
+     _leftVCtrl.addListener(_onLeftV);
+     _rightVCtrl.addListener(_onRightV);
+     WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
+@@ -209,6 +234,18 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+   List<FocusNode> _makeFocusNodes(int count) =>
+       List.generate(count, (_) => FocusNode());
+ 
++  List<Map<DateTime, FocusNode>> _makeProgramFocusNodeMaps(int count) =>
++      List.generate(count, (_) => <DateTime, FocusNode>{});
++
++  void _clearProgramFocusNodes() {
++    for (final map in _programFocusNodes) {
++      for (final node in map.values) {
++        node.dispose();
++      }
++      map.clear();
++    }
++  }
++
+   void _setFocusedChannelIndex(int index) {
+     if (_focusedChannelIndex == index) return;
+     // Not setState: this only feeds the next focusChannelColumn/
+@@ -247,6 +284,54 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+     }
+   }
+ 
++  /// Moves the shared guide cursor by one [TimelineEpgView.epgTimeStep]
++  /// increment and focuses whichever program in [channel]'s row now covers
++  /// it - the fixed-time-increment replacement for the old behavior of
++  /// jumping straight to the next/previous program block, where how far one
++  /// D-pad press moved depended entirely on how long the current block
++  /// happened to run.
++  ///
++  /// [pressedProgram] seeds the cursor the first time this fires (so the
++  /// very first press always steps relative to whatever block the user is
++  /// actually on); every press after that continues from the persisted
++  /// [_guideCursor] instead, so repeatedly stepping through one long program
++  /// still advances 30/60 minutes each time rather than recomputing the same
++  /// target from that program's start over and over.
++  ///
++  /// Returns `false` (declining to consume the key) once the step would
++  /// leave the selected day's window, so the region's normal edge handling
++  /// - e.g. activating the sidebar on Left - still applies at the boundary.
++  /// When the step lands in a gap with no program data, the cursor still
++  /// advances (so repeated presses keep moving through the gap) but focus
++  /// doesn't move until a covered program is reached.
++  bool _handleHorizontalStep({
++    required int rowIndex,
++    required Channel channel,
++    required EpgProgram pressedProgram,
++    required bool forward,
++  }) {
++    final step = Duration(minutes: widget.epgTimeStep.minutes);
++    final cursor = _guideCursor ?? pressedProgram.start;
++    final target = forward ? cursor.add(step) : cursor.subtract(step);
++    if (target.isBefore(_windowStart) || !target.isBefore(_windowEnd)) {
++      return false;
++    }
++    _guideCursor = target;
++    final now = widget.clock();
++    for (final program in widget.epgService.programsForChannel(channel)) {
++      if (!target.isBefore(program.start) && target.isBefore(program.end)) {
++        final isCurrent =
++            !now.isBefore(program.start) && now.isBefore(program.end);
++        final node = isCurrent
++            ? _attachedFocusNode(_nowFocusNodes, rowIndex)
++            : _programFocusNodes[rowIndex][program.start];
++        node?.requestFocus();
++        break;
++      }
++    }
++    return true;
++  }
++
+   void _initWindow() {
+     _windowStart = _selectedDate;
+     _windowEnd = DateTime(
+@@ -257,6 +342,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+     );
+     _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
+     _nowOffset = _computeStartOffset();
++    // A new window means an entirely different set of on-screen programs,
++    // so any remembered guide position from the previous day/window no
++    // longer means anything.
++    _guideCursor = null;
+   }
+ 
+   double _computeStartOffset() {
+@@ -327,6 +416,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+       setState(() {
+         _selectedDate = selected;
+         _initWindow();
++        _clearProgramFocusNodes();
+       });
+     }
+     WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
+@@ -420,6 +510,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+         n.dispose();
+       }
+       _nowFocusNodes = _makeFocusNodes(widget.channels.length);
++      _clearProgramFocusNodes();
++      _programFocusNodes = _makeProgramFocusNodeMaps(widget.channels.length);
+       if (_focusedChannelIndex >= widget.channels.length) {
+         _focusedChannelIndex = math.max(0, widget.channels.length - 1);
+       }
+@@ -450,6 +542,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+     for (final n in _nowFocusNodes) {
+       n.dispose();
+     }
++    _clearProgramFocusNodes();
+     for (final c in _rowHCtrls) {
+       c.dispose();
+     }
+@@ -699,6 +792,19 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
+                                     // id, which lives on the Channel.
+                                     recordingStateFor: (program) => widget
+                                         .recordingStateFor(channel, program),
++                                    resolveFocusNode: (program) =>
++                                        _programFocusNodes[i].putIfAbsent(
++                                          program.start,
++                                          FocusNode.new,
++                                        ),
++                                    onHorizontalStep:
++                                        (program, {required forward}) =>
++                                            _handleHorizontalStep(
++                                              rowIndex: i,
++                                              channel: channel,
++                                              pressedProgram: program,
++                                              forward: forward,
++                                            ),
+                                     onTap: (program) {
+                                       final tapNow = widget.clock();
+                                       final canReplay = EpgService.canReplay(
+@@ -1161,6 +1267,8 @@ class _ProgramsRow extends StatelessWidget {
+     required this.onTap,
+     required this.catchupRetentionDays,
+     required this.now,
++    required this.resolveFocusNode,
++    required this.onHorizontalStep,
+     this.onLongPress,
+     this.recordingStateFor = _noRecordingState,
+     this.nowFocusNode,
+@@ -1189,6 +1297,19 @@ class _ProgramsRow extends StatelessWidget {
+   /// track which channel row currently holds grid focus.
+   final VoidCallback? onAnyBlockFocus;
+ 
++  /// Resolves (creating on first use) the stable [FocusNode] for a given
++  /// block, so [onHorizontalStep] can jump straight to a specific program
++  /// by identity rather than by spatial adjacency.
++  final FocusNode Function(EpgProgram program) resolveFocusNode;
++
++  /// Steps the shared guide cursor by one time increment from the given
++  /// program - the block that was actually focused when the key was pressed
++  /// - and focuses whichever program now covers it. Returns `true` to
++  /// consume the key press, `false` to fall back to normal D-pad edge
++  /// handling (e.g. at the start/end of the selected day).
++  final bool Function(EpgProgram program, {required bool forward})
++  onHorizontalStep;
++
+   /// Resolves the per-programme recording indicator for a block. Defaults
+   /// to [EpgRecordingState.none], which renders no badge and is visually
+   /// identical to the pre-#185 layout.
+@@ -1247,7 +1368,18 @@ class _ProgramsRow extends StatelessWidget {
+             ),
+             onTap: () => onTap(p),
+             onLongTap: onLongPress == null ? null : () => onLongPress!(p),
+-            focusNode: isCurrent ? nowFocusNode : null,
++            focusNode: isCurrent ? nowFocusNode : resolveFocusNode(p),
++            onDirection: (direction) {
++              if (direction == TraversalDirection.right) {
++                return onHorizontalStep(p, forward: true);
++              }
++              if (direction == TraversalDirection.left) {
++                return onHorizontalStep(p, forward: false);
++              }
++              // Up/down: let normal D-pad navigation move between channel
++              // rows, unchanged.
++              return false;
++            },
+             onFocusChange: onAnyBlockFocus == null
+                 ? null
+                 : (focused) {
+diff --git a/flutter_client/lib/features/live_tv/live_tv_screen.dart b/flutter_client/lib/features/live_tv/live_tv_screen.dart
+index 35289be..6dc3914 100644
+--- a/flutter_client/lib/features/live_tv/live_tv_screen.dart
++++ b/flutter_client/lib/features/live_tv/live_tv_screen.dart
+@@ -167,6 +167,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+   final Map<int, EpgCurrentNext?> _epgMap = {};
+   _ViewMode _viewMode = _ViewMode.list;
+   EpgStartView _epgStartView = EpgStartView.currentTime;
++  EpgTimeStep _epgTimeStep = EpgTimeStep.thirtyMinutes;
+   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
+   int _viewSettingsGeneration = 0;
+   // Shared across all three view modes since only one is ever mounted at a
+@@ -298,6 +299,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+     setState(() {
+       _viewMode = _layoutToViewMode(loaded.layout);
+       _epgStartView = loaded.epgStartView;
++      _epgTimeStep = loaded.epgTimeStep;
+       _channelColumnLayout = loaded.channelColumnLayout;
+     });
+   }
+@@ -306,6 +308,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+     ({
+       LiveTvLayout layout,
+       EpgStartView epgStartView,
++      EpgTimeStep epgTimeStep,
+       ChannelColumnLayout channelColumnLayout,
+     })?
+   >
+@@ -315,12 +318,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+     final results = await Future.wait([
+       viewSettings.liveTvLayout(),
+       viewSettings.epgStartView(),
++      viewSettings.epgTimeStep(),
+       viewSettings.channelColumnLayout(),
+     ]);
+     return (
+       layout: results[0] as LiveTvLayout,
+       epgStartView: results[1] as EpgStartView,
+-      channelColumnLayout: results[2] as ChannelColumnLayout,
++      epgTimeStep: results[2] as EpgTimeStep,
++      channelColumnLayout: results[3] as ChannelColumnLayout,
+     );
+   }
+ 
+@@ -350,6 +355,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+           if (loaded != null) {
+             _viewMode = _layoutToViewMode(loaded.layout);
+             _epgStartView = loaded.epgStartView;
++            _epgTimeStep = loaded.epgTimeStep;
+             _channelColumnLayout = loaded.channelColumnLayout;
+           }
+         });
+@@ -986,6 +992,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
+           programEnd: program.end,
+         ),
+         epgStartView: _epgStartView,
++        epgTimeStep: _epgTimeStep,
+         channelColumnFocusNode: _channelColumnFocusNode,
+         onChannelColumnEdge: _handleChannelColumnEdge,
+         dayControlsFocusNode: _dayControlsFocusNode,
+diff --git a/flutter_client/lib/features/settings/settings_screen.dart b/flutter_client/lib/features/settings/settings_screen.dart
+index e1177f3..8f489c8 100644
+--- a/flutter_client/lib/features/settings/settings_screen.dart
++++ b/flutter_client/lib/features/settings/settings_screen.dart
+@@ -2129,6 +2129,7 @@ class _ViewSettingsSection extends StatefulWidget {
+ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
+   LiveTvLayout _liveTvLayout = LiveTvLayout.list;
+   EpgStartView _epgStartView = EpgStartView.currentTime;
++  EpgTimeStep _epgTimeStep = EpgTimeStep.thirtyMinutes;
+   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
+   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
+   bool _hdrEnabled = true;
+@@ -2155,6 +2156,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
+   Future<void> _refresh() async {
+     final layout = await widget.service.liveTvLayout();
+     final startView = await widget.service.epgStartView();
++    final timeStep = await widget.service.epgTimeStep();
+     final channelColumnLayout = await widget.service.channelColumnLayout();
+     final defaultStartPage = await widget.service.defaultStartPage();
+     final hdrEnabled = await widget.service.hdrEnabled();
+@@ -2163,6 +2165,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
+     setState(() {
+       _liveTvLayout = layout;
+       _epgStartView = startView;
++      _epgTimeStep = timeStep;
+       _channelColumnLayout = channelColumnLayout;
+       _defaultStartPage = defaultStartPage;
+       _hdrEnabled = hdrEnabled;
+@@ -2283,6 +2286,29 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
+                 ),
+               ],
+             ),
++            const SizedBox(height: 16),
++            Text(
++              l.settingsEpgTimeStep,
++              style: Theme.of(context).textTheme.bodyMedium,
++            ),
++            const SizedBox(height: 8),
++            Wrap(
++              spacing: 8,
++              children: [
++                _IntervalChip(
++                  label: l.settingsEpgTimeStep30,
++                  isSelected: _epgTimeStep == EpgTimeStep.thirtyMinutes,
++                  onTap: () =>
++                      widget.service.setEpgTimeStep(EpgTimeStep.thirtyMinutes),
++                ),
++                _IntervalChip(
++                  label: l.settingsEpgTimeStep60,
++                  isSelected: _epgTimeStep == EpgTimeStep.sixtyMinutes,
++                  onTap: () =>
++                      widget.service.setEpgTimeStep(EpgTimeStep.sixtyMinutes),
++                ),
++              ],
++            ),
+             if (_showHdrToggle) ...[
+               const SizedBox(height: 16),
+               _BooleanSetting(
+diff --git a/flutter_client/lib/l10n/app_de.arb b/flutter_client/lib/l10n/app_de.arb
+index 3665075..b886378 100644
+--- a/flutter_client/lib/l10n/app_de.arb
++++ b/flutter_client/lib/l10n/app_de.arb
+@@ -755,6 +755,9 @@
+   "settingsEpgStartView": "EPG startet um",
+   "settingsEpgStartViewCurrentTime": "Aktuelle Uhrzeit",
+   "settingsEpgStartViewPrimeTime": "Prime Time",
++  "settingsEpgTimeStep": "Schrittweite links/rechts im Guide",
++  "settingsEpgTimeStep30": "30 Minuten",
++  "settingsEpgTimeStep60": "60 Minuten",
+   "settingsDefaultStartPage": "Standardstartseite",
+   "settingsHdrMode": "HDR-Modus",
+   "settingsHdrModeHint": "HDR-Videos dürfen das Display in den HDR-Modus schalten. Nur Windows und Linux.",
+diff --git a/flutter_client/lib/l10n/app_en.arb b/flutter_client/lib/l10n/app_en.arb
+index a4a13ed..88f54a4 100644
+--- a/flutter_client/lib/l10n/app_en.arb
++++ b/flutter_client/lib/l10n/app_en.arb
+@@ -756,6 +756,9 @@
+   "settingsEpgStartView": "EPG starts at",
+   "settingsEpgStartViewCurrentTime": "Current time",
+   "settingsEpgStartViewPrimeTime": "Prime time",
++  "settingsEpgTimeStep": "Guide left/right step",
++  "settingsEpgTimeStep30": "30 minutes",
++  "settingsEpgTimeStep60": "60 minutes",
+   "settingsDefaultStartPage": "Default start page",
+   "settingsHdrMode": "HDR mode",
+   "settingsHdrModeHint": "Let HDR videos switch the display into HDR mode. Windows and Linux only.",
+diff --git a/flutter_client/lib/l10n/app_es.arb b/flutter_client/lib/l10n/app_es.arb
+index 044d1e1..69dc1cb 100644
+--- a/flutter_client/lib/l10n/app_es.arb
++++ b/flutter_client/lib/l10n/app_es.arb
+@@ -755,6 +755,9 @@
+   "settingsEpgStartView": "La guía empieza a las",
+   "settingsEpgStartViewCurrentTime": "Hora actual",
+   "settingsEpgStartViewPrimeTime": "Horario estelar",
++  "settingsEpgTimeStep": "Paso izquierda/derecha de la guía",
++  "settingsEpgTimeStep30": "30 minutos",
++  "settingsEpgTimeStep60": "60 minutos",
+   "settingsDefaultStartPage": "Página de inicio predeterminada",
+   "settingsHdrMode": "Modo HDR",
+   "settingsHdrModeHint": "Permite que los vídeos HDR cambien la pantalla al modo HDR. Solo Windows y Linux.",
+diff --git a/flutter_client/lib/l10n/app_fr.arb b/flutter_client/lib/l10n/app_fr.arb
+index 0a1d0f3..7f2a927 100644
+--- a/flutter_client/lib/l10n/app_fr.arb
++++ b/flutter_client/lib/l10n/app_fr.arb
+@@ -755,6 +755,9 @@
+   "settingsEpgStartView": "Le guide démarre à",
+   "settingsEpgStartViewCurrentTime": "Heure actuelle",
+   "settingsEpgStartViewPrimeTime": "Prime time",
++  "settingsEpgTimeStep": "Pas gauche/droite du guide",
++  "settingsEpgTimeStep30": "30 minutes",
++  "settingsEpgTimeStep60": "60 minutes",
+   "settingsDefaultStartPage": "Page de démarrage par défaut",
+   "settingsHdrMode": "Mode HDR",
+   "settingsHdrModeHint": "Autoriser les vidéos HDR à basculer l'écran en mode HDR. Windows et Linux uniquement.",
+diff --git a/flutter_client/lib/l10n/app_localizations.dart b/flutter_client/lib/l10n/app_localizations.dart
+index 6731332..8045b65 100644
+--- a/flutter_client/lib/l10n/app_localizations.dart
++++ b/flutter_client/lib/l10n/app_localizations.dart
+@@ -2414,6 +2414,24 @@ abstract class AppLocalizations {
+   /// **'Prime time'**
+   String get settingsEpgStartViewPrimeTime;
+ 
++  /// No description provided for @settingsEpgTimeStep.
++  ///
++  /// In en, this message translates to:
++  /// **'Guide left/right step'**
++  String get settingsEpgTimeStep;
++
++  /// No description provided for @settingsEpgTimeStep30.
++  ///
++  /// In en, this message translates to:
++  /// **'30 minutes'**
++  String get settingsEpgTimeStep30;
++
++  /// No description provided for @settingsEpgTimeStep60.
++  ///
++  /// In en, this message translates to:
++  /// **'60 minutes'**
++  String get settingsEpgTimeStep60;
++
+   /// No description provided for @settingsDefaultStartPage.
+   ///
+   /// In en, this message translates to:
+diff --git a/flutter_client/lib/l10n/app_localizations_de.dart b/flutter_client/lib/l10n/app_localizations_de.dart
+index b3aaabe..260f22a 100644
+--- a/flutter_client/lib/l10n/app_localizations_de.dart
++++ b/flutter_client/lib/l10n/app_localizations_de.dart
+@@ -1354,6 +1354,15 @@ class AppLocalizationsDe extends AppLocalizations {
+   @override
+   String get settingsEpgStartViewPrimeTime => 'Prime Time';
+ 
++  @override
++  String get settingsEpgTimeStep => 'Schrittweite links/rechts im Guide';
++
++  @override
++  String get settingsEpgTimeStep30 => '30 Minuten';
++
++  @override
++  String get settingsEpgTimeStep60 => '60 Minuten';
++
+   @override
+   String get settingsDefaultStartPage => 'Standardstartseite';
+ 
+diff --git a/flutter_client/lib/l10n/app_localizations_en.dart b/flutter_client/lib/l10n/app_localizations_en.dart
+index ff931c2..7f946dd 100644
+--- a/flutter_client/lib/l10n/app_localizations_en.dart
++++ b/flutter_client/lib/l10n/app_localizations_en.dart
+@@ -1346,6 +1346,15 @@ class AppLocalizationsEn extends AppLocalizations {
+   @override
+   String get settingsEpgStartViewPrimeTime => 'Prime time';
+ 
++  @override
++  String get settingsEpgTimeStep => 'Guide left/right step';
++
++  @override
++  String get settingsEpgTimeStep30 => '30 minutes';
++
++  @override
++  String get settingsEpgTimeStep60 => '60 minutes';
++
+   @override
+   String get settingsDefaultStartPage => 'Default start page';
+ 
+diff --git a/flutter_client/lib/l10n/app_localizations_es.dart b/flutter_client/lib/l10n/app_localizations_es.dart
+index bcd3773..a900dba 100644
+--- a/flutter_client/lib/l10n/app_localizations_es.dart
++++ b/flutter_client/lib/l10n/app_localizations_es.dart
+@@ -1356,6 +1356,15 @@ class AppLocalizationsEs extends AppLocalizations {
+   @override
+   String get settingsEpgStartViewPrimeTime => 'Horario estelar';
+ 
++  @override
++  String get settingsEpgTimeStep => 'Paso izquierda/derecha de la guía';
++
++  @override
++  String get settingsEpgTimeStep30 => '30 minutos';
++
++  @override
++  String get settingsEpgTimeStep60 => '60 minutos';
++
+   @override
+   String get settingsDefaultStartPage => 'Página de inicio predeterminada';
+ 
+diff --git a/flutter_client/lib/l10n/app_localizations_fr.dart b/flutter_client/lib/l10n/app_localizations_fr.dart
+index d7a441a..485a66c 100644
+--- a/flutter_client/lib/l10n/app_localizations_fr.dart
++++ b/flutter_client/lib/l10n/app_localizations_fr.dart
+@@ -1357,6 +1357,15 @@ class AppLocalizationsFr extends AppLocalizations {
+   @override
+   String get settingsEpgStartViewPrimeTime => 'Prime time';
+ 
++  @override
++  String get settingsEpgTimeStep => 'Pas gauche/droite du guide';
++
++  @override
++  String get settingsEpgTimeStep30 => '30 minutes';
++
++  @override
++  String get settingsEpgTimeStep60 => '60 minutes';
++
+   @override
+   String get settingsDefaultStartPage => 'Page de démarrage par défaut';
+ 
+diff --git a/flutter_client/lib/l10n/app_localizations_zh.dart b/flutter_client/lib/l10n/app_localizations_zh.dart
+index 778aa65..bdd7e93 100644
+--- a/flutter_client/lib/l10n/app_localizations_zh.dart
++++ b/flutter_client/lib/l10n/app_localizations_zh.dart
+@@ -1307,6 +1307,15 @@ class AppLocalizationsZh extends AppLocalizations {
+   @override
+   String get settingsEpgStartViewPrimeTime => '黄金时段';
+ 
++  @override
++  String get settingsEpgTimeStep => '节目单左右移动步长';
++
++  @override
++  String get settingsEpgTimeStep30 => '30 分钟';
++
++  @override
++  String get settingsEpgTimeStep60 => '60 分钟';
++
+   @override
+   String get settingsDefaultStartPage => '默认启动页面';
+ 
+diff --git a/flutter_client/lib/l10n/app_zh.arb b/flutter_client/lib/l10n/app_zh.arb
+index 7b287bc..0d3c42d 100644
+--- a/flutter_client/lib/l10n/app_zh.arb
++++ b/flutter_client/lib/l10n/app_zh.arb
+@@ -755,6 +755,9 @@
+   "settingsEpgStartView": "节目单起始时间",
+   "settingsEpgStartViewCurrentTime": "当前时间",
+   "settingsEpgStartViewPrimeTime": "黄金时段",
++  "settingsEpgTimeStep": "节目单左右移动步长",
++  "settingsEpgTimeStep30": "30 分钟",
++  "settingsEpgTimeStep60": "60 分钟",
+   "settingsDefaultStartPage": "默认启动页面",
+   "settingsHdrMode": "HDR 模式",
+   "settingsHdrModeHint": "允许 HDR 视频将显示器切换到 HDR 模式。仅限 Windows 和 Linux。",
+diff --git a/flutter_client/lib/services/view_settings_service.dart b/flutter_client/lib/services/view_settings_service.dart
+index d6b78fc..a3d36a4 100644
+--- a/flutter_client/lib/services/view_settings_service.dart
++++ b/flutter_client/lib/services/view_settings_service.dart
+@@ -56,6 +56,30 @@ enum EpgStartView {
+       );
+ }
+ 
++/// How far a single D-pad left/right press moves the EPG timeline's guide
++/// cursor within a channel's row. Previously left/right jumped straight to
++/// the next/previous program block, so how far one press moved depended on
++/// how long that block happened to run - a few minutes for a short program,
++/// hours for a movie. This fixes the step to a constant amount of time
++/// instead.
++enum EpgTimeStep {
++  thirtyMinutes('thirtyMinutes', 30),
++  sixtyMinutes('sixtyMinutes', 60);
++
++  const EpgTimeStep(this.value, this.minutes);
++  final String value;
++
++  /// The number of minutes one D-pad left/right press moves the guide
++  /// cursor.
++  final int minutes;
++
++  static EpgTimeStep fromValue(String? value) =>
++      EpgTimeStep.values.firstWhere(
++        (step) => step.value == value,
++        orElse: () => EpgTimeStep.thirtyMinutes,
++      );
++}
++
+ /// What to display for each row of the EPG timeline's fixed Channels column.
+ enum ChannelColumnLayout {
+   logoAndTitle('logoAndTitle'),
+@@ -82,6 +106,7 @@ class ViewSettingsService extends ChangeNotifier {
+ 
+   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
+   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
++  static const epgTimeStepKey = 'm3ue_tv_epg_time_step';
+   static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
+   static const hdrEnabledKey = 'm3ue_tv_hdr_enabled';
+   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
+@@ -141,6 +166,20 @@ class ViewSettingsService extends ChangeNotifier {
+     notifyListeners();
+   }
+ 
++  Future<EpgTimeStep> epgTimeStep() async {
++    final raw = await _read(epgTimeStepKey);
++    return EpgTimeStep.fromValue(raw as String?);
++  }
++
++  /// Synchronous access to the in-memory cached EPG guide time step.
++  EpgTimeStep get epgTimeStepSync =>
++      EpgTimeStep.fromValue(_memory[epgTimeStepKey] as String?);
++
++  Future<void> setEpgTimeStep(EpgTimeStep step) async {
++    await _write(epgTimeStepKey, step.value);
++    notifyListeners();
++  }
++
+   Future<ChannelColumnLayout> channelColumnLayout() async {
+     final raw = await _read(channelColumnLayoutKey);
+     return ChannelColumnLayout.fromValue(raw as String?);
+diff --git a/flutter_client/lib/shared/dpad_ink_well.dart b/flutter_client/lib/shared/dpad_ink_well.dart
+index 2f3a58a..dffba64 100644
+--- a/flutter_client/lib/shared/dpad_ink_well.dart
++++ b/flutter_client/lib/shared/dpad_ink_well.dart
+@@ -31,6 +31,7 @@ class DpadInkWell extends StatefulWidget {
+     this.clipBehavior = Clip.none,
+     this.focusNode,
+     this.onFocusChange,
++    this.onDirection,
+   });
+ 
+   final Widget child;
+@@ -45,6 +46,11 @@ class DpadInkWell extends StatefulWidget {
+   final double? scrollPadding;
+   final Clip clipBehavior;
+ 
++  /// Intercepts directional key presses while this item is focused. Return
++  /// `true` to consume the press (focus will not move); return `false` to
++  /// let normal D-pad navigation happen. See [DpadFocusable.onDirection].
++  final DpadDirectionCallback? onDirection;
++
+   /// Supplies an external [FocusNode] instead of letting this widget manage
+   /// its own, so a caller can `requestFocus()` on a specific item directly
+   /// (e.g. targeting a particular row in a list) rather than only through
+@@ -199,6 +205,7 @@ class _DpadInkWellState extends State<DpadInkWell> {
+         onSelect: widget.onTap == null ? null : _onDpadSelect,
+         onLongSelect: widget.onLongTap == null ? null : _onDpadLongSelect,
+         onFocusChange: widget.onFocusChange,
++        onDirection: widget.onDirection,
+         enabled: widget.enabled,
+         // InkWell handles touch taps; DpadFocusable.onSelect handles D-pad key
+         // events. The default tapToSelect: true wraps the child in a
+diff --git a/flutter_client/test/ui/features/timeline_epg_view_test.dart b/flutter_client/test/ui/features/timeline_epg_view_test.dart
+index 4e37fd3..9b74f82 100644
+--- a/flutter_client/test/ui/features/timeline_epg_view_test.dart
++++ b/flutter_client/test/ui/features/timeline_epg_view_test.dart
+@@ -1199,6 +1199,184 @@ void main() {
+       );
+     });
+ 
++    testWidgets(
++      'D-pad left/right steps the guide by a fixed time increment, not '
++      'block-to-block',
++      (tester) async {
++        final now = DateTime(2026, 7, 31, 8, 5);
++        const channel = Channel(
++          id: 101,
++          name: 'BBC One',
++          streamUrl: 'https://streams.example/live/101.m3u8',
++          epgChannelId: 'bbc.one',
++        );
++        // A short current program, a long one that should absorb more than
++        // one 30-minute step, and a short one after it.
++        final current = EpgProgram(
++          channelId: 'bbc.one',
++          title: 'Breakfast',
++          description: 'Currently airing',
++          start: DateTime(2026, 7, 31, 8),
++          end: DateTime(2026, 7, 31, 8, 20),
++        );
++        final longProgram = EpgProgram(
++          channelId: 'bbc.one',
++          title: 'Movie',
++          description: 'Long block spanning multiple steps',
++          start: DateTime(2026, 7, 31, 8, 20),
++          end: DateTime(2026, 7, 31, 9, 20),
++        );
++        final nextProgram = EpgProgram(
++          channelId: 'bbc.one',
++          title: 'News',
++          description: 'After the movie',
++          start: DateTime(2026, 7, 31, 9, 20),
++          end: DateTime(2026, 7, 31, 9, 50),
++        );
++        final epgService = EpgService(clock: () => now)
++          ..loadPrograms([current, longProgram, nextProgram]);
++
++        await tester.pumpWidget(
++          MaterialApp(
++            theme: ThemeData.dark(useMaterial3: true),
++            localizationsDelegates: AppLocalizations.localizationsDelegates,
++            supportedLocales: AppLocalizations.supportedLocales,
++            home: Scaffold(
++              body: DpadRegion(
++                child: SizedBox(
++                  width: 800,
++                  height: 300,
++                  child: TimelineEpgView(
++                    channelColumnFocusNode: FocusScopeNode(),
++                    onChannelColumnEdge: (_) {},
++                    dayControlsFocusNode: FocusScopeNode(),
++                    onDayControlsEdge: (_) {},
++                    channels: const [channel],
++                    epgService: epgService,
++                    onChannelSelect: (_) {},
++                    clock: () => now,
++                  ),
++                ),
++              ),
++            ),
++          ),
++        );
++        await tester.pumpAndSettle();
++
++        FocusNode? focusNodeFor(EpgProgram program) => tester
++            .widget<DpadInkWell>(
++              find.byKey(
++                ValueKey(
++                  'timeline-program-${program.channelId}-'
++                  '${program.start.toIso8601String()}',
++                ),
++              ),
++            )
++            .focusNode;
++
++        focusNodeFor(current)?.requestFocus();
++        await tester.pump();
++        expect(focusNodeFor(current)?.hasFocus, isTrue);
++
++        // The cursor seeds from the focused block's own start (8:00), not
++        // from "now" (8:05) - see _handleHorizontalStep. 8:00 + 30 min =
++        // 8:30, inside the long block.
++        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
++        await tester.pumpAndSettle();
++        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
++
++        // 8:30 + 30 min = 9:00: still inside the same long block. The old
++        // block-to-block behavior would already have jumped to the next
++        // program by the second press; a fixed time step should not.
++        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
++        await tester.pumpAndSettle();
++        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
++
++        // 9:00 + 30 min = 9:30: now past the long block, into the next one.
++        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
++        await tester.pumpAndSettle();
++        expect(focusNodeFor(nextProgram)?.hasFocus, isTrue);
++
++        // 9:30 - 30 min = 9:00: stepping back left retraces into the long
++        // block again.
++        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
++        await tester.pumpAndSettle();
++        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
++      },
++    );
++
++    testWidgets(
++      'D-pad left step at the very start of the day is not consumed',
++      (tester) async {
++        final now = DateTime(2026, 7, 31, 0, 20);
++        const channel = Channel(
++          id: 101,
++          name: 'BBC One',
++          streamUrl: 'https://streams.example/live/101.m3u8',
++          epgChannelId: 'bbc.one',
++        );
++        final current = EpgProgram(
++          channelId: 'bbc.one',
++          title: 'Overnight',
++          description: 'Currently airing, right at the start of the day',
++          start: DateTime(2026, 7, 31),
++          end: DateTime(2026, 7, 31, 1),
++        );
++        final epgService = EpgService(clock: () => now)
++          ..loadPrograms([current]);
++
++        await tester.pumpWidget(
++          MaterialApp(
++            theme: ThemeData.dark(useMaterial3: true),
++            localizationsDelegates: AppLocalizations.localizationsDelegates,
++            supportedLocales: AppLocalizations.supportedLocales,
++            home: Scaffold(
++              body: DpadRegion(
++                horizontalEdge: DpadEdgeBehavior.stop,
++                child: SizedBox(
++                  width: 800,
++                  height: 300,
++                  child: TimelineEpgView(
++                    channelColumnFocusNode: FocusScopeNode(),
++                    onChannelColumnEdge: (_) {},
++                    dayControlsFocusNode: FocusScopeNode(),
++                    onDayControlsEdge: (_) {},
++                    channels: const [channel],
++                    epgService: epgService,
++                    onChannelSelect: (_) {},
++                    clock: () => now,
++                  ),
++                ),
++              ),
++            ),
++          ),
++        );
++        await tester.pumpAndSettle();
++
++        final currentNode = tester
++            .widget<DpadInkWell>(
++              find.byKey(
++                ValueKey(
++                  'timeline-program-${current.channelId}-'
++                  '${current.start.toIso8601String()}',
++                ),
++              ),
++            )
++            .focusNode;
++        currentNode?.requestFocus();
++        await tester.pump();
++        expect(currentNode?.hasFocus, isTrue);
++
++        // The cursor seeds from the focused block's own start (0:00, the
++        // very start of the window) - 0:00 - 30 min = -0:30 (the previous
++        // day), before the window start. The step must not be consumed (and
++        // must not throw), leaving focus exactly where it was.
++        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
++        await tester.pumpAndSettle();
++        expect(currentNode?.hasFocus, isTrue);
++      },
++    );
++
+     testWidgets(
+       're-initializes horizontal scroll offset when epgStartView prop changes',
+       (tester) async {

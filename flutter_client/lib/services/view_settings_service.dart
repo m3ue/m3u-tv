@@ -56,6 +56,30 @@ enum EpgStartView {
       );
 }
 
+/// How far a single D-pad left/right press moves the EPG timeline's guide
+/// cursor within a channel's row. Previously left/right jumped straight to
+/// the next/previous program block, so how far one press moved depended on
+/// how long that block happened to run - a few minutes for a short program,
+/// hours for a movie. This fixes the step to a constant amount of time
+/// instead.
+enum EpgTimeStep {
+  thirtyMinutes('thirtyMinutes', 30),
+  sixtyMinutes('sixtyMinutes', 60);
+
+  const EpgTimeStep(this.value, this.minutes);
+  final String value;
+
+  /// The number of minutes one D-pad left/right press moves the guide
+  /// cursor.
+  final int minutes;
+
+  static EpgTimeStep fromValue(String? value) =>
+      EpgTimeStep.values.firstWhere(
+        (step) => step.value == value,
+        orElse: () => EpgTimeStep.thirtyMinutes,
+      );
+}
+
 /// What to display for each row of the EPG timeline's fixed Channels column.
 enum ChannelColumnLayout {
   logoAndTitle('logoAndTitle'),
@@ -82,6 +106,7 @@ class ViewSettingsService extends ChangeNotifier {
 
   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
+  static const epgTimeStepKey = 'm3ue_tv_epg_time_step';
   static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
   static const hdrEnabledKey = 'm3ue_tv_hdr_enabled';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
@@ -138,6 +163,20 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setEpgStartView(EpgStartView view) async {
     await _write(epgStartViewKey, view.value);
+    notifyListeners();
+  }
+
+  Future<EpgTimeStep> epgTimeStep() async {
+    final raw = await _read(epgTimeStepKey);
+    return EpgTimeStep.fromValue(raw as String?);
+  }
+
+  /// Synchronous access to the in-memory cached EPG guide time step.
+  EpgTimeStep get epgTimeStepSync =>
+      EpgTimeStep.fromValue(_memory[epgTimeStepKey] as String?);
+
+  Future<void> setEpgTimeStep(EpgTimeStep step) async {
+    await _write(epgTimeStepKey, step.value);
     notifyListeners();
   }
 

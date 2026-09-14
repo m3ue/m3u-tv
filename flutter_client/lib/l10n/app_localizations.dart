@@ -2414,6 +2414,24 @@ abstract class AppLocalizations {
   /// **'Prime time'**
   String get settingsEpgStartViewPrimeTime;
 
+  /// No description provided for @settingsEpgTimeStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide left/right step'**
+  String get settingsEpgTimeStep;
+
+  /// No description provided for @settingsEpgTimeStep30.
+  ///
+  /// In en, this message translates to:
+  /// **'30 minutes'**
+  String get settingsEpgTimeStep30;
+
+  /// No description provided for @settingsEpgTimeStep60.
+  ///
+  /// In en, this message translates to:
+  /// **'60 minutes'**
+  String get settingsEpgTimeStep60;
+
   /// No description provided for @settingsDefaultStartPage.
   ///
   /// In en, this message translates to:

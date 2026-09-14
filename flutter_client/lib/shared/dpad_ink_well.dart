@@ -31,6 +31,7 @@ class DpadInkWell extends StatefulWidget {
     this.clipBehavior = Clip.none,
     this.focusNode,
     this.onFocusChange,
+    this.onDirection,
   });
 
   final Widget child;
@@ -44,6 +45,11 @@ class DpadInkWell extends StatefulWidget {
   final BorderRadius? borderRadius;
   final double? scrollPadding;
   final Clip clipBehavior;
+
+  /// Intercepts directional key presses while this item is focused. Return
+  /// `true` to consume the press (focus will not move); return `false` to
+  /// let normal D-pad navigation happen. See [DpadFocusable.onDirection].
+  final DpadDirectionCallback? onDirection;
 
   /// Supplies an external [FocusNode] instead of letting this widget manage
   /// its own, so a caller can `requestFocus()` on a specific item directly
@@ -199,6 +205,7 @@ class _DpadInkWellState extends State<DpadInkWell> {
         onSelect: widget.onTap == null ? null : _onDpadSelect,
         onLongSelect: widget.onLongTap == null ? null : _onDpadLongSelect,
         onFocusChange: widget.onFocusChange,
+        onDirection: widget.onDirection,
         enabled: widget.enabled,
         // InkWell handles touch taps; DpadFocusable.onSelect handles D-pad key
         // events. The default tapToSelect: true wraps the child in a

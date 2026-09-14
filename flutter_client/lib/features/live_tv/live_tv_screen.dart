@@ -167,6 +167,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  EpgTimeStep _epgTimeStep = EpgTimeStep.thirtyMinutes;
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   int _viewSettingsGeneration = 0;
   // Shared across all three view modes since only one is ever mounted at a
@@ -298,6 +299,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     setState(() {
       _viewMode = _layoutToViewMode(loaded.layout);
       _epgStartView = loaded.epgStartView;
+      _epgTimeStep = loaded.epgTimeStep;
       _channelColumnLayout = loaded.channelColumnLayout;
     });
   }
@@ -306,6 +308,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     ({
       LiveTvLayout layout,
       EpgStartView epgStartView,
+      EpgTimeStep epgTimeStep,
       ChannelColumnLayout channelColumnLayout,
     })?
   >
@@ -315,12 +318,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final results = await Future.wait([
       viewSettings.liveTvLayout(),
       viewSettings.epgStartView(),
+      viewSettings.epgTimeStep(),
       viewSettings.channelColumnLayout(),
     ]);
     return (
       layout: results[0] as LiveTvLayout,
       epgStartView: results[1] as EpgStartView,
-      channelColumnLayout: results[2] as ChannelColumnLayout,
+      epgTimeStep: results[2] as EpgTimeStep,
+      channelColumnLayout: results[3] as ChannelColumnLayout,
     );
   }
 
@@ -350,6 +355,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           if (loaded != null) {
             _viewMode = _layoutToViewMode(loaded.layout);
             _epgStartView = loaded.epgStartView;
+            _epgTimeStep = loaded.epgTimeStep;
             _channelColumnLayout = loaded.channelColumnLayout;
           }
         });
@@ -986,6 +992,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           programEnd: program.end,
         ),
         epgStartView: _epgStartView,
+        epgTimeStep: _epgTimeStep,
         channelColumnFocusNode: _channelColumnFocusNode,
         onChannelColumnEdge: _handleChannelColumnEdge,
         dayControlsFocusNode: _dayControlsFocusNode,

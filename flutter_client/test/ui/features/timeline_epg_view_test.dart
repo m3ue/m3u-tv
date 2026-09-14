@@ -1200,6 +1200,184 @@ void main() {
     });
 
     testWidgets(
+      'D-pad left/right steps the guide by a fixed time increment, not '
+      'block-to-block',
+      (tester) async {
+        final now = DateTime(2026, 7, 31, 8, 5);
+        const channel = Channel(
+          id: 101,
+          name: 'BBC One',
+          streamUrl: 'https://streams.example/live/101.m3u8',
+          epgChannelId: 'bbc.one',
+        );
+        // A short current program, a long one that should absorb more than
+        // one 30-minute step, and a short one after it.
+        final current = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Breakfast',
+          description: 'Currently airing',
+          start: DateTime(2026, 7, 31, 8),
+          end: DateTime(2026, 7, 31, 8, 20),
+        );
+        final longProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Movie',
+          description: 'Long block spanning multiple steps',
+          start: DateTime(2026, 7, 31, 8, 20),
+          end: DateTime(2026, 7, 31, 9, 20),
+        );
+        final nextProgram = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'News',
+          description: 'After the movie',
+          start: DateTime(2026, 7, 31, 9, 20),
+          end: DateTime(2026, 7, 31, 9, 50),
+        );
+        final epgService = EpgService(clock: () => now)
+          ..loadPrograms([current, longProgram, nextProgram]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: DpadRegion(
+                child: SizedBox(
+                  width: 800,
+                  height: 300,
+                  child: TimelineEpgView(
+                    channelColumnFocusNode: FocusScopeNode(),
+                    onChannelColumnEdge: (_) {},
+                    dayControlsFocusNode: FocusScopeNode(),
+                    onDayControlsEdge: (_) {},
+                    channels: const [channel],
+                    epgService: epgService,
+                    onChannelSelect: (_) {},
+                    clock: () => now,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        FocusNode? focusNodeFor(EpgProgram program) => tester
+            .widget<DpadInkWell>(
+              find.byKey(
+                ValueKey(
+                  'timeline-program-${program.channelId}-'
+                  '${program.start.toIso8601String()}',
+                ),
+              ),
+            )
+            .focusNode;
+
+        focusNodeFor(current)?.requestFocus();
+        await tester.pump();
+        expect(focusNodeFor(current)?.hasFocus, isTrue);
+
+        // The cursor seeds from the focused block's own start (8:00), not
+        // from "now" (8:05) - see _handleHorizontalStep. 8:00 + 30 min =
+        // 8:30, inside the long block.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
+
+        // 8:30 + 30 min = 9:00: still inside the same long block. The old
+        // block-to-block behavior would already have jumped to the next
+        // program by the second press; a fixed time step should not.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
+
+        // 9:00 + 30 min = 9:30: now past the long block, into the next one.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+        expect(focusNodeFor(nextProgram)?.hasFocus, isTrue);
+
+        // 9:30 - 30 min = 9:00: stepping back left retraces into the long
+        // block again.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pumpAndSettle();
+        expect(focusNodeFor(longProgram)?.hasFocus, isTrue);
+      },
+    );
+
+    testWidgets(
+      'D-pad left step at the very start of the day is not consumed',
+      (tester) async {
+        final now = DateTime(2026, 7, 31, 0, 20);
+        const channel = Channel(
+          id: 101,
+          name: 'BBC One',
+          streamUrl: 'https://streams.example/live/101.m3u8',
+          epgChannelId: 'bbc.one',
+        );
+        final current = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Overnight',
+          description: 'Currently airing, right at the start of the day',
+          start: DateTime(2026, 7, 31),
+          end: DateTime(2026, 7, 31, 1),
+        );
+        final epgService = EpgService(clock: () => now)
+          ..loadPrograms([current]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: DpadRegion(
+                horizontalEdge: DpadEdgeBehavior.stop,
+                child: SizedBox(
+                  width: 800,
+                  height: 300,
+                  child: TimelineEpgView(
+                    channelColumnFocusNode: FocusScopeNode(),
+                    onChannelColumnEdge: (_) {},
+                    dayControlsFocusNode: FocusScopeNode(),
+                    onDayControlsEdge: (_) {},
+                    channels: const [channel],
+                    epgService: epgService,
+                    onChannelSelect: (_) {},
+                    clock: () => now,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final currentNode = tester
+            .widget<DpadInkWell>(
+              find.byKey(
+                ValueKey(
+                  'timeline-program-${current.channelId}-'
+                  '${current.start.toIso8601String()}',
+                ),
+              ),
+            )
+            .focusNode;
+        currentNode?.requestFocus();
+        await tester.pump();
+        expect(currentNode?.hasFocus, isTrue);
+
+        // The cursor seeds from the focused block's own start (0:00, the
+        // very start of the window) - 0:00 - 30 min = -0:30 (the previous
+        // day), before the window start. The step must not be consumed (and
+        // must not throw), leaving focus exactly where it was.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pumpAndSettle();
+        expect(currentNode?.hasFocus, isTrue);
+      },
+    );
+
+    testWidgets(
       're-initializes horizontal scroll offset when epgStartView prop changes',
       (tester) async {
         final now = DateTime(2026, 7, 31, 14, 30);
