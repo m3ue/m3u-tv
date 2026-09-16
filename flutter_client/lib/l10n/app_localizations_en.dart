@@ -324,6 +324,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerReturningToMenu => 'Returning to the menu…';
 
   @override
+  String get playerLoadingTimedOut =>
+      'Stream loading timed out. The server may be unreachable or the stream URL is invalid.';
+
+  @override
+  String get playerPlaybackError => 'Playback error';
+
+  @override
+  String get playerLoadingStream => 'Loading stream…';
+
+  @override
   String get searchHint => 'Search live TV, movies, and series...';
 
   @override

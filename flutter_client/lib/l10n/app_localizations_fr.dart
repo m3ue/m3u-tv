@@ -326,6 +326,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerReturningToMenu => 'Retour au menu…';
 
   @override
+  String get playerLoadingTimedOut =>
+      'Délai de chargement du flux dépassé. Le serveur est peut-être inaccessible ou l\'URL du flux est invalide.';
+
+  @override
+  String get playerPlaybackError => 'Erreur de lecture';
+
+  @override
+  String get playerLoadingStream => 'Chargement du flux…';
+
+  @override
   String get searchHint => 'Rechercher Télévision en direct, films et séries…';
 
   @override

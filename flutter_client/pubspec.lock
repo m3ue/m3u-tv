@@ -1421,7 +1421,7 @@ packages:
       path: "packages/wakelock_plus_tvos"
       relative: true
     source: path
-    version: "0.0.1"
+    version: "0.0.2"
   watcher:
     dependency: transitive
     description:

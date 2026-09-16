@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/desktop_libmpv_backend.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -60,6 +61,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlayerScreen(
               args: const PlayerArgs(
                 streamUrl: 'https://provider.example/live/unsupported.ts',

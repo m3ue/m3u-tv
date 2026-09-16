@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:m3u_tv/app/app_shell.dart' show playerModalDismissTick;
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
@@ -32,6 +33,17 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 const bool _showPlaybackDiagnostics = bool.fromEnvironment(
   'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
+);
+
+/// Debug-only escape hatch: when set, the player on a handheld device
+/// does NOT call `SystemChrome.setPreferredOrientations` to lock into
+/// landscape. Lets QA rotate a handheld emulator mid-load to reproduce
+/// the landscape loading-bug scenarios (the spinner burn-in and the
+/// diagnostic-status overlay positioning) without having to fight the
+/// the OS rotation lock. Defaults to false; never affects production
+/// builds since the dart-define is opt-in.
+const bool _bypassOrientationLock = bool.fromEnvironment(
+  'PLAYER_BYPASS_ORIENTATION_LOCK',
 );
 
 /// Which TheIntroDB segment a skip prompt refers to.
@@ -283,7 +295,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // not just while actively playing — e.g. staying paused on an overlay
     // shouldn't let the screen sleep. Enabled here, disabled in dispose().
     unawaited(widget.wakelockController.enable());
-    if (widget.isHandheld) {
+    if (widget.isHandheld && !_bypassOrientationLock) {
       unawaited(
         SystemChrome.setPreferredOrientations([
           DeviceOrientation.landscapeLeft,
@@ -925,6 +937,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  /// Forces a full child rebuild on rotation (or any other MediaQuery
+  /// change). The hybrid-composition SurfaceView underneath is happy to
+  /// reuse its compositor layer across orientation changes, but the route
+  /// the player replaces (e.g. a just-dismissed resume modal) leaves a
+  /// cached bitmap that doesn't get invalidated until the first video
+  /// frame paints. setState here forces the loading overlay to repaint
+  /// fresh; the [RepaintBoundary] keyed on `playerModalDismissTick`
+  /// below gives the layer a new identity post-modal so the burn-in is
+  /// cleared even when `_status` is unchanged across the rotation.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -986,6 +1013,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _openAndSeek(PlaybackSource source) async {
+    if (!_disposed && mounted) {
+      setState(() {
+        _status = PlaybackStatus.loading;
+        _errorMessage = null;
+        _retryStatusMessage = null;
+      });
+      // Force a paint boundary so the spinner renders before the
+      // orchestrator emits ready/playing. Without this, a synchronous
+      // loading → playing emission would batch both setStates into a
+      // single frame and the spinner would never paint. One endOfFrame
+      // await guarantees the spinner paints at least once before
+      // orchestrator state events can override it.
+      await WidgetsBinding.instance.endOfFrame;
+    }
     try {
       await widget.orchestrator.open(source);
       // Native backends default to HDR on; only push an explicit call when
@@ -1020,7 +1061,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           (_status == PlaybackStatus.loading ||
               _status == PlaybackStatus.idle)) {
         _setErrorMessage(
-          'Stream loading timed out. The server may be unreachable or the stream URL is invalid.',
+          AppLocalizations.of(context).playerLoadingTimedOut,
         );
       }
     });
@@ -1593,26 +1634,62 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                     ),
 
-                    // Loading indicator
-                    if (_status == PlaybackStatus.loading &&
+                    // Loading indicator — visible during every pre-playback
+                    // state (idle/loading/ready) so the spinner stays on
+                    // screen for the entire window between mount and first
+                    // frame render. The orchestrator transitions
+                    // idle → loading → ready → playing as the source is
+                    // fetched and the first frame is decoded; once it
+                    // emits `playing`, the first video frame is on screen
+                    // and the overlay clears. `paused`/`buffering`/
+                    // `completed`/`stopped` deliberately don't show the
+                    // overlay — paused has the frozen frame, buffering
+                    // mid-stream has its own UX plan, completed/stopped
+                    // have end-of-stream UI.
+                    if ((_status == PlaybackStatus.idle ||
+                            _status == PlaybackStatus.loading ||
+                            _status == PlaybackStatus.ready) &&
                         _errorMessage == null)
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const CircularProgressIndicator(
-                              color: Colors.white,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _retryStatusMessage ?? 'Loading stream...',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
+                      // RepaintBoundary keyed on `_status` AND the modal-dismiss
+                      // tick so the layer is fresh on first paint after a
+                      // resume-modal exit AND on every status transition. The
+                      // tick read in didChangeMetrics busts the cached bitmap
+                      // that the modal route's exit animation would otherwise
+                      // leave behind across a concurrent rotation.
+                      RepaintBoundary(
+                        key: ValueKey(
+                          'player-loader-${_status.name}-'
+                          '${playerModalDismissTick.value}',
+                        ),
+                        child: SafeArea(
+                          minimum: const EdgeInsets.all(8),
+                          child: Align(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: isHandheldLayout(context) ? 240 : 360,
                               ),
-                              textAlign: TextAlign.center,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _retryStatusMessage ??
+                                        AppLocalizations.of(
+                                          context,
+                                        ).playerLoadingStream,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
 
@@ -1658,7 +1735,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Playback error',
+                                AppLocalizations.of(
+                                  context,
+                                ).playerPlaybackError,
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       color: Colors.white,
@@ -1699,6 +1778,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+
+                    // Diagnostic status banner — debug-only. Renders the
+                    // current `_status` and any active `_errorMessage`
+                    // in the top-right corner so QA can pin a report
+                    // ("I see X distortion in landscape") to a specific
+                    // state transition. Visible the entire time the
+                    // player is mounted; gated only on the
+                    // M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS dart-define so it
+                    // never ships to end users.
+                    if (_showPlaybackDiagnostics)
+                      Positioned(
+                        top: mediaQuery.padding.top + 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          color: Colors.black54,
+                          child: Text(
+                            'status=${_status.name}'
+                            '${_errorMessage != null ? " err=$_errorMessage" : ""}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
                           ),
                         ),
                       ),

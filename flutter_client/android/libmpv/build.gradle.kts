@@ -258,7 +258,12 @@ android {
   externalNativeBuild {
     cmake {
       path = file("src/main/cpp/CMakeLists.txt")
-      version = "4.1.2"
+      // AGP pinned cmake 4.1.2 here, but libmpv's CMakeLists.txt only
+      // requires 3.22.1. The SDK on this host has 3.22.1 installed;
+      // matching the CMakeLists.txt floor avoids the CXX1300
+      // "cmake 4.1.2 not found" failure on hosts without that exact
+      // version while keeping libmpv's CMake config green.
+      version = "3.22.1"
     }
   }
 

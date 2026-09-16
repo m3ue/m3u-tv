@@ -117,6 +117,8 @@ void main() {
     testWidgets('shows play button when paused', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: false,
             isLive: false,
@@ -135,6 +137,8 @@ void main() {
     testWidgets('shows pause button when playing', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -156,6 +160,8 @@ void main() {
       var tapped = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: false,
             isLive: false,
@@ -175,6 +181,8 @@ void main() {
     testWidgets('hides seek controls for live content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: true,
@@ -196,6 +204,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: true,
@@ -219,6 +229,8 @@ void main() {
       var previousPressed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -301,6 +313,8 @@ void main() {
     testWidgets('shows seek controls for VOD content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -320,6 +334,8 @@ void main() {
     testWidgets('orders VOD seek controls around play pause', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -349,6 +365,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -366,6 +384,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -412,6 +432,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -463,6 +485,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -508,6 +532,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -558,6 +584,8 @@ void main() {
       ) async {
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -597,6 +625,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -619,6 +649,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -641,6 +673,8 @@ void main() {
       final seekTargets = <Duration>[];
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -666,6 +700,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -695,6 +731,8 @@ void main() {
       final seekTargets = <Duration>[];
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -726,6 +764,8 @@ void main() {
     testWidgets('displays formatted time', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -746,6 +786,8 @@ void main() {
       var backPressed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -765,6 +807,8 @@ void main() {
     testWidgets('shows fallback reason badge when provided', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -786,6 +830,8 @@ void main() {
     testWidgets('shows audio track selector button', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -805,6 +851,8 @@ void main() {
     testWidgets('shows subtitle track selector button', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -823,6 +871,8 @@ void main() {
     testWidgets('opens audio track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -846,6 +896,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -877,6 +929,8 @@ void main() {
     testWidgets('opens subtitle track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -902,6 +956,8 @@ void main() {
       ) async {
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: TrackSelector(
               audioTracks: const [],
               subtitleTracks: const [
@@ -934,6 +990,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -965,6 +1023,8 @@ void main() {
       String? selectedTrack;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -993,6 +1053,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: List<PlaybackTrack>.generate(
               12,
@@ -1134,6 +1196,8 @@ void main() {
     testWidgets('shows resume and start over options', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5, seconds: 30),
             onResume: () {},
@@ -1148,6 +1212,8 @@ void main() {
     testWidgets('shows formatted position in prompt', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5, seconds: 30),
             onResume: () {},
@@ -1162,6 +1228,8 @@ void main() {
       var resumed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5),
             onResume: () => resumed = true,
@@ -1179,6 +1247,8 @@ void main() {
       var startedOver = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5),
             onResume: () {},
@@ -1314,6 +1384,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlayerScreen(
               args: const PlayerArgs(
                 streamUrl: 'https://example.com/live.m3u8',
@@ -1353,6 +1425,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1402,6 +1476,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1492,6 +1568,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1856,6 +1934,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1935,6 +2015,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2022,6 +2104,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2112,6 +2196,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2254,13 +2340,13 @@ void main() {
           expect(find.byIcon(Icons.audiotrack), findsOneWidget);
           expect(find.byIcon(Icons.subtitles), findsOneWidget);
           await tester.tap(find.byIcon(Icons.audiotrack));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text('Spanish').last);
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.byIcon(Icons.subtitles));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text('English CC').last);
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
 
           expect(tester.takeException(), isNull);
           expect(adapter.setAudioTrackCalls, <String?>['audio-spa']);
@@ -2325,9 +2411,9 @@ void main() {
           await tester.pump();
 
           await tester.tap(find.byIcon(Icons.audiotrack));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text('Disable'));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           expect(adapter.setAudioTrackCalls, <String?>[null]);
 
           adapter.emitState(
@@ -2362,7 +2448,7 @@ void main() {
             isNull,
           );
           await tester.tap(find.byIcon(Icons.audiotrack));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
 
           expect(
             tester
@@ -2373,12 +2459,12 @@ void main() {
           expect(find.text('English'), findsOneWidget);
           expect(find.text('Spanish'), findsOneWidget);
           tester.state<NavigatorState>(find.byType(Navigator)).pop();
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
 
           await tester.tap(find.byIcon(Icons.subtitles));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text('Off'));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
           expect(adapter.setSubtitleTrackCalls, <String?>[null]);
 
           adapter.emitState(
@@ -2400,7 +2486,7 @@ void main() {
             isTrue,
           );
           await tester.tap(find.byIcon(Icons.subtitles));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
 
           expect(
             tester
@@ -2490,6 +2576,155 @@ void main() {
       expect(find.text('Playback error'), findsNothing);
     });
 
+    // Regression coverage for the L1037 string being routed through
+    // AppLocalizations. Without ever emitting a state transition the
+    // player stays in `loading`, the 20s watchdog fires, and
+    // _setErrorMessage writes the localized timeout message into the
+    // error UI — assert the English value of playerLoadingTimedOut.
+    testWidgets('localized loading timeout message', (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.android,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.androidExoPlayer: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Launcher'),
+                    ElevatedButton(
+                      onPressed: () {
+                        unawaited(
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => PlayerScreen(
+                                args: const PlayerArgs(
+                                  streamUrl: 'https://example.com/live.m3u8',
+                                  title: 'Timeout Fixture',
+                                  type: 'live',
+                                ),
+                                orchestrator: orchestrator,
+                                epgService: EpgService(
+                                  clock: () => DateTime.utc(2026),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Open player'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open player'));
+      await tester.pumpAndSettle();
+
+      // _status is still `loading` because we never emitted a state
+      // transition. Advance the test clock past the 20s
+      // _loadingTimeout so the watchdog Timer fires and writes the
+      // localized timeout message via _setErrorMessage.
+      await tester.pump(const Duration(seconds: 21));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Stream loading timed out. The server may be unreachable or the stream URL is invalid.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    // Regression coverage for the L1691 'Playback error' string being
+    // routed through AppLocalizations. Emit a PlaybackError and assert
+    // the localized header (playerPlaybackError) appears.
+    testWidgets('localized playback error header', (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.android,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.androidExoPlayer: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Launcher'),
+                    ElevatedButton(
+                      onPressed: () {
+                        unawaited(
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => PlayerScreen(
+                                args: const PlayerArgs(
+                                  streamUrl: 'https://example.com/live.m3u8',
+                                  title: 'Error Header Fixture',
+                                  type: 'live',
+                                ),
+                                orchestrator: orchestrator,
+                                epgService: EpgService(
+                                  clock: () => DateTime.utc(2026),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text('Open player'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open player'));
+      await tester.pumpAndSettle();
+
+      adapter.emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.androidExoPlayer,
+          message: 'Playback failed',
+          code: 'playback_failed',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Playback error'), findsOneWidget);
+    });
+
     testWidgets(
       'switching live channel via a stable key reuses the orchestrator '
       'instead of disposing it',
@@ -2531,6 +2766,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: StatefulBuilder(
               builder: (context, setState) {
                 setArgs = setState;
@@ -2604,6 +2841,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: StatefulBuilder(
               builder: (context, setState) {
                 setArgs = setState;
@@ -4282,4 +4521,245 @@ void main() {
       );
     });
   });
+
+  group('loading state visibility', () {
+    testWidgets('renders spinner immediately on mount', (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/loading.m3u8',
+              title: 'Loading Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // The proactive _status = loading in _openAndSeek (plus the
+      // endOfFrame await) guarantees the spinner paints on the very
+      // first frame after initState, before the adapter has emitted
+      // anything. This is the core regression contract.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Loading stream…'), findsOneWidget);
+    });
+
+    testWidgets('localized spinner label in fr locale', (tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('fr'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/loading-fr.m3u8',
+              title: 'Chargement Fixture',
+              type: 'live',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Chargement du flux…'), findsOneWidget);
+    });
+
+    testWidgets(
+      'spinner visible before synchronous playing emission',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/sync-playing.m3u8',
+                title: 'Sync Playing Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+
+        // First pump: _openAndSeek runs setState(loading), schedules
+        // frame 1, then awaits WidgetsBinding.instance.endOfFrame.
+        // Frame 1 paints with the spinner visible.
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+        // Simulate the synchronous playing emission that a fast native
+        // adapter would deliver before the next frame. This is the race
+        // the bug exploits; the endOfFrame await in _openAndSeek holds
+        // the orchestrator back so the spinner paints first.
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+          ),
+        );
+
+        // Second pump: frame 2 paints with the playing state.
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'channel-skip via didUpdateWidget shows spinner',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        const argsA = PlayerArgs(
+          streamUrl: 'https://example.com/channel-a.m3u8',
+          title: 'Channel A',
+          type: 'live',
+          streamId: 1,
+        );
+        const argsB = PlayerArgs(
+          streamUrl: 'https://example.com/channel-b.m3u8',
+          title: 'Channel B',
+          type: 'live',
+          streamId: 2,
+        );
+
+        final harnessKey = GlobalKey<_ChannelArgsHarnessState>();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _ChannelArgsHarness(
+              key: harnessKey,
+              orchestrator: orchestrator,
+              initialArgs: argsA,
+            ),
+          ),
+        );
+
+        // Reach playing state on channel A.
+        await tester.pump();
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        // Channel-skip: change args on the harness, which rebuilds the
+        // same PlayerScreen instance with new properties — that fires
+        // didUpdateWidget. didUpdateWidget resets _status = idle, then
+        // calls _openSource → _openAndSeek, which proactively sets
+        // _status = loading and awaits endOfFrame. The spinner must
+        // re-appear during this transition.
+        harnessKey.currentState!.switchChannel(argsB);
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      },
+    );
+  });
+}
+
+/// Test harness that holds the current PlayerArgs in state and exposes
+/// `switchChannel` so a test can trigger PlayerScreen's didUpdateWidget
+/// path on the same widget instance with new properties. The widget tree
+/// uses this harness (not `tester.pumpWidget` for the swap) because
+/// `pumpWidget` replaces the root tree entirely — that disposes
+/// PlayerScreen and re-creates it, which fires initState instead of
+/// didUpdateWidget and doesn't exercise the channel-skip code path in
+/// `player_screen.dart`.
+class _ChannelArgsHarness extends StatefulWidget {
+  const _ChannelArgsHarness({
+    super.key,
+    required this.orchestrator,
+    required this.initialArgs,
+  });
+
+  final PlaybackOrchestrator orchestrator;
+  final PlayerArgs initialArgs;
+
+  @override
+  State<_ChannelArgsHarness> createState() => _ChannelArgsHarnessState();
+}
+
+class _ChannelArgsHarnessState extends State<_ChannelArgsHarness> {
+  late PlayerArgs _args;
+
+  @override
+  void initState() {
+    super.initState();
+    _args = widget.initialArgs;
+  }
+
+  void switchChannel(PlayerArgs args) {
+    setState(() {
+      _args = args;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PlayerScreen(
+      args: _args,
+      orchestrator: widget.orchestrator,
+      epgService: EpgService(clock: () => DateTime.utc(2026)),
+    );
+  }
 }

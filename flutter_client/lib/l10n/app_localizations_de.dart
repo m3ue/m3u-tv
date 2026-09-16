@@ -326,6 +326,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerReturningToMenu => 'Rückkehr zum Menü…';
 
   @override
+  String get playerLoadingTimedOut =>
+      'Stream-Ladezeit überschritten. Der Server ist möglicherweise nicht erreichbar oder die Stream-URL ist ungültig.';
+
+  @override
+  String get playerPlaybackError => 'Wiedergabefehler';
+
+  @override
+  String get playerLoadingStream => 'Stream wird geladen…';
+
+  @override
   String get searchHint => 'Live-TV, Filme und Serien durchsuchen …';
 
   @override

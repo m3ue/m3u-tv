@@ -326,6 +326,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerReturningToMenu => 'Volviendo al menú…';
 
   @override
+  String get playerLoadingTimedOut =>
+      'Tiempo de carga del stream agotado. Es posible que el servidor no esté accesible o que la URL del stream no sea válida.';
+
+  @override
+  String get playerPlaybackError => 'Error de reproducción';
+
+  @override
+  String get playerLoadingStream => 'Cargando stream…';
+
+  @override
   String get searchHint => 'Buscar Televisión en vivo, cine y series…';
 
   @override

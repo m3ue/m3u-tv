@@ -4,7 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show ValueNotifier, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +67,15 @@ bool get _isMacDesktopWindow => Platform.isMacOS;
 
 /// Device type enum matching the RN useDeviceType hook.
 enum DeviceType { tv, desktop, tablet, phone }
+
+/// Monotonic tick bumped whenever the resume modal dismisses on a code path
+/// that opens the player. PlayerScreen reads this in
+/// [State.didChangeDependencies] to compose into the spinner
+/// [RepaintBoundary] key, so a rotation that lands on a freshly-loaded
+/// player (post-modal) gets a fresh compositor layer — clearing any residue
+/// the modal route's exit animation might otherwise leave behind in the
+/// cached bitmap.
+final ValueNotifier<int> playerModalDismissTick = ValueNotifier<int>(0);
 
 /// Whether a device type should use sidebar navigation.
 bool shouldUseSidebar(DeviceType deviceType) =>
@@ -713,6 +722,11 @@ class AppShellState extends ConsumerState<AppShell>
         }
       }
     }
+    // Bump the modal-dismiss tick on any code path that opens the player
+    // (Resume / Start Over both reach this line; the cancel/watch-state paths
+    // already `return` above). PlayerScreen reads this in didChangeMetrics
+    // to invalidate its spinner RepaintBoundary's compositor layer.
+    playerModalDismissTick.value++;
     _openPlayerDirect(resolvedArgs);
   }
 
