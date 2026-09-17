@@ -530,12 +530,10 @@ class _VersionRailState extends State<_VersionRail> {
             .clamp(position.minScrollExtent, position.maxScrollExtent);
     if ((target - position.pixels).abs() < 0.5) return;
     if (animate) {
-      unawaited(
-        _controller.animateTo(
-          target,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-        ),
+      _controller.animateTo(
+        target,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
       );
     } else {
       _controller.jumpTo(target);
@@ -945,12 +943,10 @@ class _NotesPaneState extends State<_NotesPane> {
 
   void _animateTo(double offset) {
     final position = _scrollController.position;
-    unawaited(
-      _scrollController.animateTo(
-        offset.clamp(position.minScrollExtent, position.maxScrollExtent),
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-      ),
+    _scrollController.animateTo(
+      offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
     );
   }
 

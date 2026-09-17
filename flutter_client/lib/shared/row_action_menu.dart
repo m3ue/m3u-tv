@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
@@ -123,16 +121,16 @@ class _RowActionMenuState extends State<RowActionMenu>
   void _toggleExpanded() {
     setState(() => _expanded = !_expanded);
     if (_expanded) {
-      unawaited(_expandController.forward());
+      _expandController.forward();
     } else {
-      unawaited(_expandController.reverse());
+      _expandController.reverse();
     }
   }
 
   void _collapse() {
     if (_expanded) {
       setState(() => _expanded = false);
-      unawaited(_expandController.reverse());
+      _expandController.reverse();
     }
   }
 

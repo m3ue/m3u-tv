@@ -162,8 +162,7 @@ class FakeM3uEditorServer {
         });
         return;
       default:
-        final response = request.response;
-        response.statusCode = HttpStatus.ok;
+        final response = request.response..statusCode = HttpStatus.ok;
         if (request.uri.path.endsWith('.m3u8')) {
           response.headers.contentType = ContentType(
             'application',

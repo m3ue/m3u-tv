@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
@@ -145,12 +143,10 @@ class _PersonDetailBodyState extends State<_PersonDetailBody> {
 
   void _scrollToTop() {
     if (!_scrollController.hasClients) return;
-    unawaited(
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      ),
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
     );
   }
 

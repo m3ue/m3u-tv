@@ -557,7 +557,7 @@ class EpisodeStripState extends State<EpisodeStrip>
   void initState() {
     super.initState();
     _focusNode.addListener(_handleFocusChange);
-    unawaited(_seasonAnim.forward());
+    _seasonAnim.forward();
   }
 
   @override
@@ -580,7 +580,7 @@ class EpisodeStripState extends State<EpisodeStrip>
     // ease-in so the new season's episodes animate over the old ones instead
     // of snapping.
     if (!identical(oldWidget.episodes, widget.episodes)) {
-      unawaited(_seasonAnim.forward(from: 0));
+      _seasonAnim.forward(from: 0);
     }
     if (_focusedIndex >= widget.episodes.length) {
       _focusedIndex = widget.episodes.isEmpty ? 0 : widget.episodes.length - 1;
@@ -1364,12 +1364,10 @@ class RowScrollRegionState extends State<RowScrollRegion> {
   void scrollToTop() {
     ++_scrollOpGeneration;
     if (!_controller.hasClients) return;
-    unawaited(
-      _controller.animateTo(
-        0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      ),
+    _controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
     );
   }
 

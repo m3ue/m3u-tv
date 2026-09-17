@@ -2441,19 +2441,17 @@ void main() {
                     const Text('Launcher'),
                     ElevatedButton(
                       onPressed: () {
-                        unawaited(
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => PlayerScreen(
-                                args: const PlayerArgs(
-                                  streamUrl: 'https://example.com/live.m3u8',
-                                  title: 'Error Fixture',
-                                  type: 'live',
-                                ),
-                                orchestrator: orchestrator,
-                                epgService: EpgService(
-                                  clock: () => DateTime.utc(2026),
-                                ),
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PlayerScreen(
+                              args: const PlayerArgs(
+                                streamUrl: 'https://example.com/live.m3u8',
+                                title: 'Error Fixture',
+                                type: 'live',
+                              ),
+                              orchestrator: orchestrator,
+                              epgService: EpgService(
+                                clock: () => DateTime.utc(2026),
                               ),
                             ),
                           ),

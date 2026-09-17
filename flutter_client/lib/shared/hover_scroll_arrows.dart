@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/dpad_tab_bar.dart' show isDesktopPlatform;
@@ -93,12 +91,10 @@ class _HoverScrollArrowsState extends State<HoverScrollArrows> {
                     position.viewportDimension *
                     widget.viewportFraction)
             .clamp(0.0, position.maxScrollExtent);
-    unawaited(
-      widget.controller.animateTo(
-        target,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      ),
+    widget.controller.animateTo(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
     );
   }
 

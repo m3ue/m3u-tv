@@ -872,7 +872,7 @@ class AppShellState extends ConsumerState<AppShell>
   bool _handleShortcutBack() {
     if (_isBackEcho(_BackSource.shortcut)) return true;
     if (_playerModalDialogVisible) {
-      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      Navigator.of(context, rootNavigator: true).maybePop();
       return true;
     }
     return _handleBackPress();

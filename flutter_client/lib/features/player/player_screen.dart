@@ -1421,7 +1421,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _handleBack() {
     if (_trackDialogVisible) {
-      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      Navigator.of(context, rootNavigator: true).maybePop();
       return;
     }
     if (_liveEndHold) {

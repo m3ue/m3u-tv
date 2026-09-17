@@ -75,12 +75,10 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
 
   void _scrollToTop() {
     if (!_scrollController.hasClients) return;
-    unawaited(
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      ),
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
     );
   }
 

@@ -1,4 +1,3 @@
-import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
@@ -157,9 +156,7 @@ Widget _withTopLevelBackHandling(bool Function()? onBack, Widget child) {
               if (onBack != null) {
                 onBack();
               } else {
-                unawaited(
-                  Navigator.of(context, rootNavigator: true).maybePop(),
-                );
+                Navigator.of(context, rootNavigator: true).maybePop();
               }
               return null;
             },

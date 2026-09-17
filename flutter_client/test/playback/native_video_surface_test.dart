@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
@@ -90,27 +88,25 @@ void main() {
     expect(stablePlane.rects, isNotEmpty);
     expect(stablePlane.rects.last.isVisible, isTrue);
 
-    unawaited(
-      navigatorKey.currentState!.push(
-        PageRouteBuilder<void>(
-          transitionDuration: const Duration(seconds: 1),
-          reverseTransitionDuration: const Duration(seconds: 1),
-          pageBuilder: (_, _, _) => NativeVideoSurface(
-            textureId: null,
-            platformView: null,
-            nativePlane: transitioningPlane,
-            aspectRatio: 16 / 9,
-          ),
-          transitionsBuilder: (_, animation, _, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            );
-          },
+    navigatorKey.currentState!.push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(seconds: 1),
+        reverseTransitionDuration: const Duration(seconds: 1),
+        pageBuilder: (_, _, _) => NativeVideoSurface(
+          textureId: null,
+          platformView: null,
+          nativePlane: transitioningPlane,
+          aspectRatio: 16 / 9,
         ),
+        transitionsBuilder: (_, animation, _, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          );
+        },
       ),
     );
     await tester.pump();

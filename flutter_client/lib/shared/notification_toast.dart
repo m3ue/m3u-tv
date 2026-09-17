@@ -162,11 +162,11 @@ class _NotificationToastState extends State<_NotificationToast>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enterController, curve: Curves.easeOut));
 
-    unawaited(_enterController.forward());
+    _enterController.forward();
 
     if (!widget.item.sticky) {
       _progressController.addStatusListener(_onProgressStatus);
-      unawaited(_progressController.forward());
+      _progressController.forward();
     }
 
     _focusNode.addListener(_onFocusChange);
@@ -233,7 +233,7 @@ class _NotificationToastState extends State<_NotificationToast>
   void _resume() {
     if (!_paused || widget.item.sticky) return;
     _paused = false;
-    unawaited(_progressController.forward());
+    _progressController.forward();
   }
 
   Future<void> _dismissAnimated() async {
