@@ -68,7 +68,7 @@ flutter-tvos build tvos --simulator --debug   # build only
 
 #### Updating a ported plugin (`packages/*_tvos`)
 
-`packages/flutter_secure_storage_tvos`, `packages/sqflite_tvos`, and `packages/wakelock_plus_tvos` are manual tvOS ports of upstream iOS/macOS plugin implementations, generated with `flutter-tvos plugin port`. Pub has no idea these forks exist, so bumping the upstream package (`flutter_secure_storage_darwin`, `sqflite_darwin`, `wakelock_plus`, ...) in `pubspec.yaml` never updates the fork automatically - `test/release/tvos_port_drift_test.dart` exists to catch that drift and fail CI when it happens.
+`packages/flutter_secure_storage_tvos` and `packages/sqflite_tvos` are manual tvOS ports of upstream iOS/macOS plugin implementations, generated with `flutter-tvos plugin port`. Pub has no idea these forks exist, so bumping the upstream package (`flutter_secure_storage_darwin`, `sqflite_darwin`, ...) in `pubspec.yaml` never updates the fork automatically - `test/release/tvos_port_drift_test.dart` exists to catch that drift and fail CI when it happens. (`wakelock_plus` no longer needs a `_tvos` fork - upstream added native tvOS support directly in 1.8.0.)
 
 To re-port after that test fails, run `plugin port` against the **upstream** iOS/macOS package - not the existing `_tvos` fork itself:
 
@@ -89,6 +89,10 @@ Each fork's `PORTING_REPORT.md` records which upstream package and version it ca
 2. Update `packages/<name>_tvos/PORTING_REPORT.md`'s `Source:` line to the new upstream version.
 3. Bump `packages/<name>_tvos/pubspec.yaml`'s version and add a `CHANGELOG.md` entry.
 4. Run `flutter test test/release/tvos_port_drift_test.dart` to confirm the fork is back in sync.
+
+#### Plugins that add tvOS support upstream instead (no fork needed)
+
+Some plugins (e.g. `wakelock_plus` >= 1.8.0) add tvOS support directly to their existing `ios/*.podspec` (`s.tvos.deployment_target`) rather than shipping a separate `tvos/` folder. `tvos/Podfile` links these straight from the plugin's `ios/` directory instead of requiring a `_tvos` fork - `flutter-tvos`'s own Podfile template (as of 1.10.3) does not yet handle this pattern, so this project's `Podfile` does it by hand, including a locally-generated placeholder `Flutter` pod (mirroring `flutter_install_ios_engine_pod` in Flutter's `podhelper.rb`) and a `FRAMEWORK_SEARCH_PATHS` override in `post_install`, since the upstream podspec was never adapted to skip `s.dependency 'Flutter'` the way a real port does. If `pod install` for tvOS ever fails with `Module 'Flutter' not found` or `Module '<plugin>' not found` again, check whether a plugin newly declares `tvos:` in its `pubspec.yaml`'s `plugin.platforms` without a matching `tvos/` folder - it needs this fallback path, not a fork.
 
 ## Release builds
 

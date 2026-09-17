@@ -21,16 +21,70 @@ target 'Runner' do
     require 'json'
     deps = JSON.parse(File.read(flutter_plugins_deps))
     tvos_plugins = deps.dig('plugins', 'tvos') || []
+
+    uses_ios_podspec_fallback = tvos_plugins.any? do |plugin|
+      tvos_dir = File.join(plugin['path'], 'tvos')
+      ios_dir = File.join(plugin['path'], 'ios')
+      !File.directory?(tvos_dir) && File.directory?(ios_dir) &&
+        File.exist?(File.join(ios_dir, "#{plugin['name']}.podspec"))
+    end
+
+    if uses_ios_podspec_fallback
+      # At least one plugin below is linked from its ios/ podspec, which
+      # declares `s.dependency 'Flutter'`. That name resolves against the
+      # public CocoaPods trunk pod unless we provide a local override, and
+      # the trunk pod does not support tvOS - mirrors the local Flutter
+      # engine podspec `flutter_install_ios_engine_pod` generates for the
+      # real ios/ Podfile (see flutter_tools/bin/podhelper.rb), which
+      # flutter-tvos has no tvOS equivalent of yet.
+      flutter_podspec_dir = File.expand_path('Flutter', File.dirname(__FILE__))
+      File.write(File.join(flutter_podspec_dir, 'Flutter.podspec'), <<~PODSPEC)
+        #
+        # This podspec is NOT to be published. It is only used as a local source!
+        # This is a generated file; do not edit or check into version control.
+        #
+
+        Pod::Spec.new do |s|
+          s.name             = 'Flutter'
+          s.version          = '1.0.0'
+          s.summary          = 'A UI toolkit for beautiful and fast apps.'
+          s.homepage         = 'https://flutter.dev'
+          s.license          = { :type => 'BSD' }
+          s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
+          s.source           = { :git => 'https://github.com/flutter/engine', :tag => s.version.to_s }
+          s.tvos.deployment_target = '13.0'
+          # Framework linking is handled by flutter-tvos tooling, not CocoaPods.
+          # Add a placeholder to satisfy `s.dependency 'Flutter'` plugin podspecs.
+          s.vendored_frameworks = 'path/to/nothing'
+        end
+      PODSPEC
+      pod 'Flutter', :path => flutter_podspec_dir
+    end
+
+    $tvos_ios_podspec_fallback_pods = []
+
     tvos_plugins.each do |plugin|
       plugin_name = plugin['name']
       plugin_path = plugin['path']
       tvos_dir = File.join(plugin_path, 'tvos')
+      ios_dir = File.join(plugin_path, 'ios')
       # Plugins that ship a Package.swift are resolved via Swift Package Manager
       # (see flutter-tvos's generated FlutterGeneratedPluginSwiftPackage). Skip
       # them here so they are never linked twice (SPM + CocoaPods).
       has_spm = File.exist?(File.join(tvos_dir, 'Package.swift'))
-      if File.directory?(tvos_dir) && !has_spm && File.exist?(File.join(tvos_dir, "#{plugin_name}.podspec"))
+      next if has_spm
+
+      if File.directory?(tvos_dir) && File.exist?(File.join(tvos_dir, "#{plugin_name}.podspec"))
+        # Dedicated tvOS port, e.g. `flutter-tvos plugin port` output.
         pod plugin_name, :path => tvos_dir
+      elsif File.directory?(ios_dir) && File.exist?(File.join(ios_dir, "#{plugin_name}.podspec"))
+        # Plugin declares tvOS support directly in its iOS podspec (e.g.
+        # `s.tvos.deployment_target`, wakelock_plus >= 1.8.0) instead of
+        # shipping a separate tvos/ folder. flutter-tvos's own Podfile
+        # template (as of 1.10.3) does not yet handle this pattern, so this
+        # project's Podfile does it by hand.
+        pod plugin_name, :path => ios_dir
+        $tvos_ios_podspec_fallback_pods << plugin_name
       end
     end
   end
@@ -40,6 +94,18 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['TVOS_DEPLOYMENT_TARGET'] = '13.0'
+
+      # Pods linked via the ios/ podspec fallback above `#import <Flutter/Flutter.h>`
+      # expecting the same FRAMEWORK_SEARCH_PATHS a dedicated `flutter-tvos plugin
+      # port` output sets in its own podspec (see e.g.
+      # packages/flutter_secure_storage_tvos/tvos/*.podspec) - point them at the
+      # real Flutter.framework since the placeholder `Flutter` pod above only
+      # exists to satisfy CocoaPods' dependency graph, not to provide headers.
+      if $tvos_ios_podspec_fallback_pods.include?(target.name)
+        search_paths = config.build_settings['FRAMEWORK_SEARCH_PATHS'] || ['$(inherited)']
+        search_paths = [search_paths] if search_paths.is_a?(String)
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = search_paths + ['"${PODS_ROOT}/../Flutter"']
+      end
     end
   end
 end

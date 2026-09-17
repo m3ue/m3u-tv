@@ -8,7 +8,7 @@ import Foundation
 import flutter_secure_storage_tvos
 import path_provider_tvos
 import sqflite_tvos
-import wakelock_plus_tvos
+import wakelock_plus
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   // The registry returns nil registrars when the Flutter engine is not
