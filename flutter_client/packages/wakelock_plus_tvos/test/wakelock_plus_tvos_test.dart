@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-// Generated on 2026-08-08 by `flutter-tvos plugin port`.
+// Generated on 2026-09-17 by `flutter-tvos plugin port`.
 // Source plugin: wakelock_plus
 
 import 'package:flutter_test/flutter_test.dart';

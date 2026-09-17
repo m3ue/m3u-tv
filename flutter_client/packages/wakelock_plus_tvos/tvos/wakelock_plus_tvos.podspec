@@ -18,7 +18,7 @@ package that ships native code targeting Apple tvOS.
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.{h,m,mm,swift}'
   s.public_header_files = 'Classes/**/include/**/*.h'
-  s.platform         = :tvos, '13.0'
+  s.platform         = :tvos, '15.0'
   s.swift_version    = '5.0'
 
   # IMPORTANT: this podspec must not depend on the Flutter CocoaPod. That
