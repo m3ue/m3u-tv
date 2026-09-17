@@ -387,5 +387,5 @@ See [../docs/release/platform-release-matrix.md](../docs/release/platform-releas
 | Tool | Version |
 |---|---|
 | Flutter SDK | `^3.12.0` (see `pubspec.yaml`) |
-| flutter-tvos | 1.3.0 (Flutter 3.44.1) |
+| flutter-tvos | 1.10.3 (Flutter 3.47.4) |
 | Dart | `^3.12.0` |

@@ -243,7 +243,7 @@ Future<_JsonResponse> _jsonGet(
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     request.headers.set('X-API-Token', apiToken);
     final response = await request.close();
-    return _decode(response);
+    return await _decode(response);
   } finally {
     client.close(force: true);
   }
@@ -262,7 +262,7 @@ Future<_JsonResponse> _jsonPost(
     request.headers.set('X-API-Token', apiToken);
     request.write(jsonEncode(body));
     final response = await request.close();
-    return _decode(response);
+    return await _decode(response);
   } finally {
     client.close(force: true);
   }
