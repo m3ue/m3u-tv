@@ -51,4 +51,21 @@ void main() {
     );
     expect(series.richCast, isNull);
   });
+
+  test(
+    'Series.richCast falls back to the comma-separated `cast` string '
+    'when cast_list is absent',
+    () {
+      final series = Series.fromXtream(<String, Object?>{
+        'series_id': 99,
+        'name': 'Breaking Bad',
+        'cast': 'Bryan Cranston, Aaron Paul, Anna Gunn',
+      });
+      expect(series.richCast, isNotNull);
+      expect(series.richCast!.length, 3);
+      expect(series.richCast![0].name, 'Bryan Cranston');
+      expect(series.richCast![0].character, isNull);
+      expect(series.richCast![0].photo, isNull);
+    },
+  );
 }

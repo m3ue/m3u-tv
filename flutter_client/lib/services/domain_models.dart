@@ -236,6 +236,7 @@ class VodInfo {
     );
     final year =
         _asNullableString(pick(['year'])) ?? _yearFromDate(releaseDate);
+    final rawCastList = pick(['cast_list']);
 
     return VodInfo(
       id: _asInt(pick(['stream_id', 'vod_id', 'id'])),
@@ -244,7 +245,10 @@ class VodInfo {
       genre: _asNullableString(pick(['genre'])),
       director: _asNullableString(pick(['director'])),
       cast: _asNullableString(pick(['cast', 'actors'])),
-      richCast: _parseCastList(pick(['cast_list'])),
+      richCast: _parseCastList(rawCastList) ??
+          (rawCastList == null
+              ? _parseCastFromString(pick(['cast', 'actors']))
+              : null),
       releaseDate: releaseDate,
       year: year,
       duration: _durationText(
@@ -320,6 +324,25 @@ List<CastMember>? _parseCastList(Object? raw) {
       .whereType<CastMember>()
       .toList(growable: false);
   return parsed.isEmpty ? null : parsed;
+}
+
+/// Fallback parser for the comma-separated `cast`/`actors` string that older
+/// m3u-editor (and other Xtream-shaped providers) emit when TMDB enrichment
+/// has not produced a `cast_list` array. Splits on `,`, trims whitespace, and
+/// emits name-only `CastMember` entries. Members have no `id`, no `character`,
+/// and no `photo`, so the chip row renders the avatar slot with the default
+/// person icon and shows the name only.
+List<CastMember>? _parseCastFromString(Object? raw) {
+  if (raw is! String) return null;
+  final names = raw
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty);
+  if (names.isEmpty) return null;
+  return [
+    for (final name in names)
+      CastMember(name: name),
+  ];
 }
 
 /// A recommended title shown in the "Related" row below the cast row on a
@@ -551,23 +574,31 @@ class Series {
   /// "Related" row below the cast row.
   final List<RelatedItem>? related;
 
-  factory Series.fromXtream(Map<String, Object?> json) => Series(
-    id: _asInt(json['series_id']),
-    name: '${json['name'] ?? ''}',
-    coverUrl: _asNullableString(json['cover']),
-    backdropUrl: _asNullableString(_firstListItem(json['backdrop_path'])),
-    clearLogoUrl: _asNullableString(json['clearlogo']),
-    categoryId: _asNullableString(json['category_id']),
-    categoryIds: _asStringList(json['category_ids']),
-    plot: _asNullableString(json['plot']),
-    rating: _asDoubleOrNull(json['rating'] ?? json['rating_5based']),
-    tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
-    richCast: _parseCastList(json['cast_list']),
-    year: _yearString(
-      json['releaseDate'] ?? json['release_date'] ?? json['year'],
-    ),
-    related: _parseRelatedList(json['related']),
-  );
+  factory Series.fromXtream(Map<String, Object?> json) {
+    final rawCastList = json['cast_list'];
+    return Series(
+      id: _asInt(json['series_id']),
+      name: '${json['name'] ?? ''}',
+      coverUrl: _asNullableString(json['cover']),
+      backdropUrl: _asNullableString(_firstListItem(json['backdrop_path'])),
+      clearLogoUrl: _asNullableString(json['clearlogo']),
+      categoryId: _asNullableString(json['category_id']),
+      categoryIds: _asStringList(json['category_ids']),
+      plot: _asNullableString(json['plot']),
+      rating: _asDoubleOrNull(json['rating'] ?? json['rating_5based']),
+      tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
+      // Only fall back to the comma-separated `cast`/`actors` string when
+      // the rich `cast_list` is absent - not when it's present-but-malformed.
+      richCast: _parseCastList(rawCastList) ??
+          (rawCastList == null
+              ? _parseCastFromString(json['cast'] ?? json['actors'])
+              : null),
+      year: _yearString(
+        json['releaseDate'] ?? json['release_date'] ?? json['year'],
+      ),
+      related: _parseRelatedList(json['related']),
+    );
+  }
 }
 
 class Season {
