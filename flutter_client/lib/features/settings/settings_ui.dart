@@ -352,14 +352,14 @@ const Color _kSettingsSubpageBackground = Color(0xFF09090b);
 /// instead of a bespoke one-off header.
 Widget _settingsSubpageScaffold(
   BuildContext context, {
-  required String title,
+  required String Function(BuildContext) title,
   required Widget body,
 }) {
   final scale = FontSizeScope.scaleOf(context);
   final macInset = _isMacDesktopWindow ? _kMacTrafficLightInset : 0.0;
   return Scaffold(
     appBar: AppBar(
-      title: Text(title),
+      title: Text(title(context)),
       automaticallyImplyLeading: false,
       toolbarHeight: kToolbarHeight * scale,
       leadingWidth: (56 * scale) + macInset,
@@ -420,10 +420,16 @@ Future<T?> _pushImmersive<T>(
 }
 
 /// Pushes [builder] as a scrolling, immersive settings sub-page with the
-/// app's standard back-button-and-title AppBar. See [_pushImmersive].
+/// app's standard back-button-and-title AppBar. [title] is a builder rather
+/// than a plain `String` so the AppBar heading re-resolves against the
+/// current locale on every rebuild - a fixed `String` gets baked in with
+/// whatever language was active at the moment the row was tapped, and stays
+/// stuck in that language until the page is popped and re-pushed even though
+/// the body (which reads `AppLocalizations.of(context)` fresh each build)
+/// updates immediately. See [_pushImmersive].
 Future<T?> pushSettingsSubpage<T>(
   BuildContext context, {
-  required String title,
+  required String Function(BuildContext) title,
   required WidgetBuilder builder,
   bool Function()? onBack,
 }) {
@@ -444,7 +450,7 @@ Future<T?> pushSettingsSubpage<T>(
 /// view).
 Future<T?> pushSettingsSubpageFullHeight<T>(
   BuildContext context, {
-  required String title,
+  required String Function(BuildContext) title,
   required WidgetBuilder builder,
   bool Function()? onBack,
 }) {
@@ -475,7 +481,7 @@ class SettingsPickerOption<T> {
 /// refresh interval, transcoding profile, etc).
 Future<void> pushSettingsPicker<T>(
   BuildContext context, {
-  required String title,
+  required String Function(BuildContext) title,
   required List<SettingsPickerOption<T>> options,
   required T selected,
   required ValueChanged<T> onSelected,

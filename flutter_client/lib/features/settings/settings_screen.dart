@@ -951,7 +951,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                 onTap: () => unawaited(
                   pushSettingsSubpage<void>(
                     context,
-                    title: l.settingsGeneral,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsGeneral,
                     onBack: widget.onHandleTopLevelBack,
                     builder: _buildGeneralPageBody,
                   ),
@@ -966,7 +967,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                   onTap: () => unawaited(
                     pushSettingsSubpage<void>(
                       context,
-                      title: l.settingsAppearance,
+                      title: (context) =>
+                          AppLocalizations.of(context).settingsAppearance,
                       onBack: widget.onHandleTopLevelBack,
                       builder: (_) => _ViewSettingsSection(
                         service: widget.viewSettingsService!,
@@ -984,7 +986,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                 onTap: () => unawaited(
                   pushSettingsSubpage<void>(
                     context,
-                    title: l.settingsPlayback,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsPlayback,
                     onBack: widget.onHandleTopLevelBack,
                     builder: (_) => _PlaybackSettingsPage(
                       proxyCapability: auth?.proxy,
@@ -1007,7 +1010,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                 onTap: () => unawaited(
                   pushSettingsSubpage<void>(
                     context,
-                    title: l.settingsIntegrations,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsIntegrations,
                     onBack: widget.onHandleTopLevelBack,
                     builder: (_) => Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1034,7 +1038,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                 onTap: () => unawaited(
                   pushSettingsSubpageFullHeight<void>(
                     context,
-                    title: l.settingsReleaseNotesTab,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsReleaseNotesTab,
                     onBack: widget.onHandleTopLevelBack,
                     builder: (_) => ReleaseNotesView(
                       onSidebarActivate: widget.onSidebarActivate,
@@ -1168,7 +1173,7 @@ class _ConnectedViewState extends State<_ConnectedView> {
     unawaited(
       pushSettingsPicker<Locale?>(
         context,
-        title: l.settingsLanguage,
+        title: (context) => AppLocalizations.of(context).settingsLanguage,
         onBack: widget.onHandleTopLevelBack,
         selected: widget.locale,
         options: [
@@ -1300,6 +1305,8 @@ class _PlaybackSettingsPage extends StatelessWidget {
           context,
           l: l,
           title: l.settingsProxyLiveProfile,
+          titleBuilder: (context) =>
+              AppLocalizations.of(context).settingsProxyLiveProfile,
           profiles: capability.profiles,
           selectedId: settings.liveProfileId,
           onChanged: (id) => unawaited(settings.setLiveProfileId(id)),
@@ -1308,6 +1315,8 @@ class _PlaybackSettingsPage extends StatelessWidget {
           context,
           l: l,
           title: l.settingsProxyVodProfile,
+          titleBuilder: (context) =>
+              AppLocalizations.of(context).settingsProxyVodProfile,
           profiles: capability.profiles,
           selectedId: settings.vodProfileId,
           onChanged: (id) => unawaited(settings.setVodProfileId(id)),
@@ -1322,6 +1331,7 @@ class _PlaybackSettingsPage extends StatelessWidget {
     BuildContext context, {
     required AppLocalizations l,
     required String title,
+    required String Function(BuildContext) titleBuilder,
     required List<ProxyStreamProfile> profiles,
     required int? selectedId,
     required void Function(int? id) onChanged,
@@ -1349,7 +1359,7 @@ class _PlaybackSettingsPage extends StatelessWidget {
       onTap: () => unawaited(
         pushSettingsPicker<int?>(
           context,
-          title: title,
+          title: titleBuilder,
           onBack: onHandleTopLevelBack,
           options: options,
           selected: selectedId,
@@ -1375,7 +1385,8 @@ class _PlaybackSettingsPage extends StatelessWidget {
           onTap: () => unawaited(
             pushSettingsPicker<Duration>(
               context,
-              title: l.settingsEpgRefreshInterval,
+              title: (context) =>
+                  AppLocalizations.of(context).settingsEpgRefreshInterval,
               onBack: onHandleTopLevelBack,
               options: options,
               selected: epgRefreshInterval!,
@@ -2275,7 +2286,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<DefaultStartPage>(
                   context,
-                  title: l.settingsDefaultStartPage,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsDefaultStartPage,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _defaultStartPage,
                   options: [
@@ -2297,7 +2309,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<LiveTvLayout>(
                   context,
-                  title: l.settingsLiveTvLayout,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsLiveTvLayout,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _liveTvLayout,
                   options: [
@@ -2326,7 +2339,9 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<ChannelColumnLayout>(
                   context,
-                  title: l.settingsLiveTvChannelColumn,
+                  title: (context) => AppLocalizations.of(
+                    context,
+                  ).settingsLiveTvChannelColumn,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _channelColumnLayout,
                   options: [
@@ -2355,7 +2370,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<EpgStartView>(
                   context,
-                  title: l.settingsEpgStartView,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsEpgStartView,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _epgStartView,
                   options: [
@@ -2410,7 +2426,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<OptimizeFor>(
                   context,
-                  title: l.settingsOptimizeFor,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsOptimizeFor,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _optimizeFor,
                   options: [
@@ -2435,7 +2452,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
               onTap: () => unawaited(
                 pushSettingsPicker<AppFontSize>(
                   context,
-                  title: l.settingsFontSize,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsFontSize,
                   onBack: widget.onHandleTopLevelBack,
                   selected: _fontSize,
                   options: [
