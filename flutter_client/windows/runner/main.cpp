@@ -18,6 +18,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
+  // Flutter 3.47 made Impeller the default Windows renderer. Under Impeller,
+  // the libmpv GPU-texture path (DXGI shared-handle GpuSurfaceTexture, see
+  // desktop_libmpv_backend.cpp) stutters on every source, and upstream
+  // reports crashes with several such textures at once (Multiview) -
+  // flutter/flutter#191468. Stay on Skia until that path is solid under
+  // Impeller; note Flutter plans to remove this opt-out in a future release.
+  project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
