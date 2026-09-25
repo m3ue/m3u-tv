@@ -167,12 +167,12 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         case "setVolume":
             let volume = (args?["volume"] as? NSNumber)?.floatValue ?? 1
             states[playerId]?.player.volume = volume
-            // Volume alone only attenuates post-decode gain -- a "muted" tile
-            // (e.g. an unfocused Multiview tile) keeps decoding and rendering
-            // audio, competing with other concurrent AVPlayers for the shared
-            // hardware audio route. Disabling the audio track stops decode
-            // entirely so muted tiles no longer contend for that resource.
-            setAudioTracksEnabled(playerId: playerId, enabled: volume > 0)
+            // Mute rather than disabling the item's audio track. Toggling
+            // AVPlayerItemTrack.isEnabled back on mid-playback of a live
+            // stream doesn't reliably re-align audio with video (audio drifts
+            // further out of sync each time Multiview focus moves back to a
+            // tile) and can silently leave the tile with no audio at all.
+            states[playerId]?.player.isMuted = volume <= 0
             result(nil)
 
         case "setAudioTrack":
@@ -287,13 +287,6 @@ class AvKitPlaybackPlugin: NSObject, FlutterStreamHandler {
         }
         let prefix = characteristic == .audible ? "audio" : "subtitle"
         return "\(prefix):\(index)"
-    }
-
-    private func setAudioTracksEnabled(playerId: String, enabled: Bool) {
-        guard let item = states[playerId]?.item else { return }
-        for track in item.tracks where track.assetTrack?.mediaType == .audio {
-            track.isEnabled = enabled
-        }
     }
 
     private func parseTrackIndex(_ trackId: String) -> Int? {
