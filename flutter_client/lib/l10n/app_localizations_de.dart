@@ -450,14 +450,48 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsClearCacheBody =>
-      'Alle gecachten Inhalte werden gelöscht und von deiner Quelle neu geladen.';
+      'Wähle aus, was gelöscht werden soll. Es wird von deiner Quelle neu geladen.';
 
   @override
   String get settingsClearCacheConfirm => 'Löschen und aktualisieren';
 
   @override
   String get settingsCacheCleared =>
-      'Cache geleert – Inhalte werden im Hintergrund aktualisiert.';
+      'Cache geleert. Inhalte werden im Hintergrund aktualisiert.';
+
+  @override
+  String get settingsClearCacheAll => 'Alles';
+
+  @override
+  String get settingsClearCacheAllHint =>
+      'Kanäle, Filme, Serien, Programmdaten und Bilder';
+
+  @override
+  String get settingsClearCacheContent => 'Nur Inhalte';
+
+  @override
+  String get settingsClearCacheContentHint => 'Kanäle, Filme und Serien';
+
+  @override
+  String get settingsClearCacheEpg => 'Nur Programmführer (EPG)';
+
+  @override
+  String get settingsClearCacheEpgHint =>
+      'Der aktuelle Programmführer bleibt beim Neuladen sichtbar';
+
+  @override
+  String get settingsClearCacheImages => 'Nur Bilder';
+
+  @override
+  String get settingsClearCacheImagesHint =>
+      'Poster und Logos werden beim Durchsuchen neu geladen';
+
+  @override
+  String get settingsEpgCacheCleared =>
+      'Programmdaten werden im Hintergrund aktualisiert.';
+
+  @override
+  String get settingsImageCacheCleared => 'Bild-Cache geleert.';
 
   @override
   String get settingsContentCache => 'Inhaltscache';

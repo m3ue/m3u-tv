@@ -6,11 +6,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
+import 'package:m3u_tv/features/settings/clear_cache_dialog.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
+import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -78,7 +80,7 @@ class SettingsScreen extends StatefulWidget {
   final Future<Viewer?> Function(String name)? onCreateViewer;
   final Duration? epgRefreshInterval;
   final List<Duration> epgRefreshOptions;
-  final VoidCallback? onClearCache;
+  final ValueChanged<CacheClearScope>? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
 
   /// Called after a successful connection so the parent can navigate to Home.
@@ -872,7 +874,7 @@ class _ConnectedView extends StatefulWidget {
   final VoidCallback onDisconnect;
   final void Function(Viewer viewer)? onSwitchViewer;
   final Future<Viewer?> Function(String name)? onCreateViewer;
-  final VoidCallback? onClearCache;
+  final ValueChanged<CacheClearScope>? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
@@ -899,20 +901,18 @@ class _ConnectedViewState extends State<_ConnectedView> {
   }
 
   Future<void> _handleClearCache() async {
-    final l = AppLocalizations.of(context);
-    final confirmed = await _showConfirmDialog(
-      context,
-      title: l.settingsClearCacheTitle,
-      message: l.settingsClearCacheBody,
-      confirmLabel: l.settingsClearCacheConfirm,
-    );
-    if (!confirmed || !mounted) return;
-    widget.onClearCache?.call();
+    final scope = await showClearCacheDialog(context);
+    if (scope == null || !mounted) return;
+    widget.onClearCache?.call(scope);
     if (!mounted) return;
+    final l = AppLocalizations.of(context);
+    final message = switch (scope) {
+      CacheClearScope.all || CacheClearScope.content => l.settingsCacheCleared,
+      CacheClearScope.epg => l.settingsEpgCacheCleared,
+      CacheClearScope.images => l.settingsImageCacheCleared,
+    };
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).settingsCacheCleared),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -1149,7 +1149,9 @@ class _ConnectedViewState extends State<_ConnectedView> {
                     autofocus: true,
                     icon: Icons.refresh,
                     label: l.settingsRetryConnection,
-                    onPressed: widget.onClearCache,
+                    onPressed: widget.onClearCache == null
+                        ? null
+                        : () => widget.onClearCache!(CacheClearScope.all),
                   ),
                 ),
                 const SizedBox(height: 8),

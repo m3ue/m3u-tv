@@ -1672,7 +1672,8 @@ class AppShellState extends ConsumerState<AppShell>
           onDisconnect: () => unawaited(_appState.disconnect()),
           onSwitchViewer: (viewer) => unawaited(_appState.switchViewer(viewer)),
           onCreateViewer: _appState.createViewer,
-          onClearCache: () => unawaited(_appState.clearAndRefresh()),
+          onClearCache: (scope) =>
+              unawaited(_appState.clearAndRefresh(scope: scope)),
           onEpgIntervalChanged: (d) =>
               unawaited(_appState.setEpgRefreshInterval(d)),
           onConnected: () => _navigateTo(0),

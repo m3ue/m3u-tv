@@ -448,14 +448,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsClearCacheBody =>
-      'All cached content will be cleared and reloaded from your source.';
+      'Choose what to clear. It will be reloaded from your source.';
 
   @override
   String get settingsClearCacheConfirm => 'Clear & Refresh';
 
   @override
   String get settingsCacheCleared =>
-      'Cache cleared — content is refreshing in the background.';
+      'Cache cleared. Content is refreshing in the background.';
+
+  @override
+  String get settingsClearCacheAll => 'Everything';
+
+  @override
+  String get settingsClearCacheAllHint =>
+      'Channels, movies, series, guide data and artwork';
+
+  @override
+  String get settingsClearCacheContent => 'Content only';
+
+  @override
+  String get settingsClearCacheContentHint => 'Channels, movies and series';
+
+  @override
+  String get settingsClearCacheEpg => 'Guide (EPG) only';
+
+  @override
+  String get settingsClearCacheEpgHint =>
+      'The current guide stays visible while it reloads';
+
+  @override
+  String get settingsClearCacheImages => 'Images only';
+
+  @override
+  String get settingsClearCacheImagesHint =>
+      'Posters and logos reload as you browse';
+
+  @override
+  String get settingsEpgCacheCleared =>
+      'Guide data is refreshing in the background.';
+
+  @override
+  String get settingsImageCacheCleared => 'Image cache cleared.';
 
   @override
   String get settingsContentCache => 'Content Cache';

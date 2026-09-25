@@ -6,6 +6,22 @@ import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 
+/// What a user-triggered "Clear & Refresh" resets.
+enum CacheClearScope {
+  /// Catalog lists, guide data and artwork.
+  all,
+
+  /// Live/VOD/series catalog lists (and DVR/request state) only.
+  content,
+
+  /// Guide data only: every channel is re-fetched while the current guide
+  /// stays on screen.
+  epg,
+
+  /// The on-disk artwork cache only.
+  images,
+}
+
 class CacheEntry<T> {
   const CacheEntry({required this.data, required this.isStale});
 

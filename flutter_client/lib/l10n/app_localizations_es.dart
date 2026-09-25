@@ -450,14 +450,48 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsClearCacheBody =>
-      'Todo el contenido en caché se borrará y se volverá a cargar desde tu fuente.';
+      'Elige qué borrar. Se volverá a cargar desde tu fuente.';
 
   @override
   String get settingsClearCacheConfirm => 'Borrar y actualizar';
 
   @override
   String get settingsCacheCleared =>
-      'Caché borrada — el contenido se está actualizando en segundo plano.';
+      'Caché borrada. El contenido se está actualizando en segundo plano.';
+
+  @override
+  String get settingsClearCacheAll => 'Todo';
+
+  @override
+  String get settingsClearCacheAllHint =>
+      'Canales, películas, series, guía e imágenes';
+
+  @override
+  String get settingsClearCacheContent => 'Solo contenido';
+
+  @override
+  String get settingsClearCacheContentHint => 'Canales, películas y series';
+
+  @override
+  String get settingsClearCacheEpg => 'Solo guía (EPG)';
+
+  @override
+  String get settingsClearCacheEpgHint =>
+      'La guía actual sigue visible mientras se recarga';
+
+  @override
+  String get settingsClearCacheImages => 'Solo imágenes';
+
+  @override
+  String get settingsClearCacheImagesHint =>
+      'Pósteres y logotipos se recargan al navegar';
+
+  @override
+  String get settingsEpgCacheCleared =>
+      'La guía se está actualizando en segundo plano.';
+
+  @override
+  String get settingsImageCacheCleared => 'Caché de imágenes borrada.';
 
   @override
   String get settingsContentCache => 'Caché de contenido';

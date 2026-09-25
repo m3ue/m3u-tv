@@ -440,13 +440,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsClearCacheTitle => '清除缓存并刷新？';
 
   @override
-  String get settingsClearCacheBody => '所有缓存内容将被清除并从您的来源重新加载。';
+  String get settingsClearCacheBody => '选择要清除的内容，它将从您的来源重新加载。';
 
   @override
   String get settingsClearCacheConfirm => '清除并刷新';
 
   @override
-  String get settingsCacheCleared => '缓存已清除 — 内容正在后台刷新。';
+  String get settingsCacheCleared => '缓存已清除，内容正在后台刷新。';
+
+  @override
+  String get settingsClearCacheAll => '全部';
+
+  @override
+  String get settingsClearCacheAllHint => '频道、电影、剧集、节目指南和图片';
+
+  @override
+  String get settingsClearCacheContent => '仅内容';
+
+  @override
+  String get settingsClearCacheContentHint => '频道、电影和剧集';
+
+  @override
+  String get settingsClearCacheEpg => '仅节目指南 (EPG)';
+
+  @override
+  String get settingsClearCacheEpgHint => '重新加载期间仍显示当前节目指南';
+
+  @override
+  String get settingsClearCacheImages => '仅图片';
+
+  @override
+  String get settingsClearCacheImagesHint => '海报和台标将在浏览时重新加载';
+
+  @override
+  String get settingsEpgCacheCleared => '节目指南正在后台刷新。';
+
+  @override
+  String get settingsImageCacheCleared => '图片缓存已清除。';
 
   @override
   String get settingsContentCache => '内容缓存';

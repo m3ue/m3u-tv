@@ -450,14 +450,48 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsClearCacheBody =>
-      'Tout le contenu en cache sera effacé et rechargé depuis votre source.';
+      'Choisissez ce qu\'il faut vider. Tout sera rechargé depuis votre source.';
 
   @override
   String get settingsClearCacheConfirm => 'Vider et actualiser';
 
   @override
   String get settingsCacheCleared =>
-      'Cache vidé — le contenu est en cours d\'actualisation en arrière-plan.';
+      'Cache vidé. Le contenu est en cours d\'actualisation en arrière-plan.';
+
+  @override
+  String get settingsClearCacheAll => 'Tout';
+
+  @override
+  String get settingsClearCacheAllHint =>
+      'Chaînes, films, séries, guide et images';
+
+  @override
+  String get settingsClearCacheContent => 'Contenu uniquement';
+
+  @override
+  String get settingsClearCacheContentHint => 'Chaînes, films et séries';
+
+  @override
+  String get settingsClearCacheEpg => 'Guide (EPG) uniquement';
+
+  @override
+  String get settingsClearCacheEpgHint =>
+      'Le guide actuel reste visible pendant le rechargement';
+
+  @override
+  String get settingsClearCacheImages => 'Images uniquement';
+
+  @override
+  String get settingsClearCacheImagesHint =>
+      'Affiches et logos se rechargent pendant la navigation';
+
+  @override
+  String get settingsEpgCacheCleared =>
+      'Le guide est en cours d\'actualisation en arrière-plan.';
+
+  @override
+  String get settingsImageCacheCleared => 'Cache des images vidé.';
 
   @override
   String get settingsContentCache => 'Cache de contenu';

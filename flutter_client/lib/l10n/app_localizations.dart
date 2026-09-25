@@ -929,7 +929,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsClearCacheBody.
   ///
   /// In en, this message translates to:
-  /// **'All cached content will be cleared and reloaded from your source.'**
+  /// **'Choose what to clear. It will be reloaded from your source.'**
   String get settingsClearCacheBody;
 
   /// No description provided for @settingsClearCacheConfirm.
@@ -941,8 +941,68 @@ abstract class AppLocalizations {
   /// No description provided for @settingsCacheCleared.
   ///
   /// In en, this message translates to:
-  /// **'Cache cleared — content is refreshing in the background.'**
+  /// **'Cache cleared. Content is refreshing in the background.'**
   String get settingsCacheCleared;
+
+  /// No description provided for @settingsClearCacheAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything'**
+  String get settingsClearCacheAll;
+
+  /// No description provided for @settingsClearCacheAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels, movies, series, guide data and artwork'**
+  String get settingsClearCacheAllHint;
+
+  /// No description provided for @settingsClearCacheContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Content only'**
+  String get settingsClearCacheContent;
+
+  /// No description provided for @settingsClearCacheContentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels, movies and series'**
+  String get settingsClearCacheContentHint;
+
+  /// No description provided for @settingsClearCacheEpg.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide (EPG) only'**
+  String get settingsClearCacheEpg;
+
+  /// No description provided for @settingsClearCacheEpgHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The current guide stays visible while it reloads'**
+  String get settingsClearCacheEpgHint;
+
+  /// No description provided for @settingsClearCacheImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Images only'**
+  String get settingsClearCacheImages;
+
+  /// No description provided for @settingsClearCacheImagesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Posters and logos reload as you browse'**
+  String get settingsClearCacheImagesHint;
+
+  /// No description provided for @settingsEpgCacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide data is refreshing in the background.'**
+  String get settingsEpgCacheCleared;
+
+  /// No description provided for @settingsImageCacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Image cache cleared.'**
+  String get settingsImageCacheCleared;
 
   /// No description provided for @settingsContentCache.
   ///

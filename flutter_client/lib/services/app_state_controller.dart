@@ -1991,14 +1991,29 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> clearAndRefresh() async {
+  Future<void> clearAndRefresh({
+    CacheClearScope scope = CacheClearScope.all,
+  }) async {
+    switch (scope) {
+      case CacheClearScope.images:
+        await _bestEffort(emptyMediaImageCacheIfAvailable);
+        return;
+      case CacheClearScope.epg:
+        _refreshEpgGuide();
+        return;
+      case CacheClearScope.all:
+      case CacheClearScope.content:
+        break;
+    }
     final sourceGeneration = _sourceOperationGeneration.advance();
-    _resetEpgSession(clearGuide: false);
+    if (scope == CacheClearScope.all) _resetEpgSession(clearGuide: false);
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
     aiostreamsApiService.clearCache();
-    unawaited(_bestEffort(emptyMediaImageCacheIfAvailable));
+    if (scope == CacheClearScope.all) {
+      unawaited(_bestEffort(emptyMediaImageCacheIfAvailable));
+    }
     if (_sourceType == AppSourceType.xtream && !authNotifier.isConfigured) {
       _isLoadingContent = false;
       await boot();
@@ -3386,6 +3401,16 @@ class AppStateController extends ChangeNotifier {
       }
       if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
     }
+  }
+
+  /// Re-fetches the guide for every channel without touching the catalog.
+  /// The in-memory guide is kept so rows stay populated until each channel's
+  /// fresh response replaces them.
+  void _refreshEpgGuide() {
+    if (_sourceType != AppSourceType.xtream) return;
+    _resetEpgSession(clearGuide: false);
+    notifyListeners();
+    unawaited(_primeAndSweepXtreamEpg(_channels));
   }
 
   /// Primes EPG for the first [_epgPrimeCount] channels, then - once that

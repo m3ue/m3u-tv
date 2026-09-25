@@ -658,6 +658,111 @@ void main() {
       );
     });
 
+    group('clearAndRefresh scopes', () {
+      Future<(AppStateController, Map<String, int>)> connected(
+        DateTime now,
+        Future<Object?> Function(int epgCall) epgResponse,
+      ) async {
+        final counts = <String, int>{};
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) async {
+          counts.update(
+            request.action ?? '',
+            (n) => n + 1,
+            ifAbsent: () => 1,
+          );
+          if (request.action == 'get_epg_batch') {
+            return epgResponse(counts['get_epg_batch']!);
+          }
+          return fixtures.call(request);
+        }
+
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+        );
+        expect(
+          await controller.connectXtream(
+            const UserCredentials(
+              server: 'https://server-a.example',
+              username: 'fixture-user',
+              password: 'fixture-password',
+            ),
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+        return (controller, counts);
+      }
+
+      test('epg re-fetches the guide without reloading the catalog', () async {
+        final now = DateTime.now();
+        final freshEpg = Completer<Object?>();
+        final (controller, counts) = await connected(
+          now,
+          (call) => call == 1
+              ? Future<Object?>.value(_epgBatch('Old guide', now))
+              : freshEpg.future,
+        );
+        addTearDown(controller.dispose);
+        final liveRequests = counts['get_live_streams'];
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'Old guide',
+        );
+
+        await controller.clearAndRefresh(scope: CacheClearScope.epg);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'Old guide',
+        );
+
+        freshEpg.complete(_epgBatch('Fresh guide', now));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(counts['get_epg_batch'], 2);
+        expect(counts['get_live_streams'], liveRequests);
+        expect(controller.isLoadingContent, isFalse);
+        expect(
+          controller.epgService.lookup('bbc.one')?.current.title,
+          'Fresh guide',
+        );
+      });
+
+      test('content reloads the catalog but keeps fresh guide data', () async {
+        final now = DateTime.now();
+        final (controller, counts) = await connected(
+          now,
+          (_) async => _epgBatch('Guide', now),
+        );
+        addTearDown(controller.dispose);
+        final liveRequests = counts['get_live_streams']!;
+
+        await controller.clearAndRefresh(scope: CacheClearScope.content);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(counts['get_live_streams'], liveRequests + 1);
+        expect(counts['get_epg_batch'], 1);
+        expect(controller.epgService.lookup('bbc.one')?.current.title, 'Guide');
+      });
+
+      test('images makes no source requests', () async {
+        final now = DateTime.now();
+        final (controller, counts) = await connected(
+          now,
+          (_) async => _epgBatch('Guide', now),
+        );
+        addTearDown(controller.dispose);
+        final before = Map<String, int>.of(counts);
+
+        await controller.clearAndRefresh(scope: CacheClearScope.images);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(counts, before);
+      });
+    });
+
     test(
       'cached Xtream state is visible before remote refresh finishes',
       () async {

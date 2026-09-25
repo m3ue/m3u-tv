@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
-import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/dialog_option_tiles.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// What the viewer chose in the resume dialog.
@@ -99,54 +98,21 @@ class _ResumeModal extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 20),
-                DpadInkWell(
+                DialogPrimaryOption(
+                  icon: Icons.play_arrow,
+                  title: l.playerContinue,
+                  subtitle: l.playerFromTime(
+                    formatTime(Duration(seconds: positionSeconds)),
+                  ),
                   onTap: () => Navigator.of(context).pop(
                     ResumeModalResult(
                       ResumeAction.resume,
                       startPositionSeconds: positionSeconds.toDouble(),
                     ),
                   ),
-                  borderRadius: const BorderRadius.all(Radius.circular(12)),
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: colorScheme.primary,
-                            child: Icon(
-                              Icons.play_arrow,
-                              color: colorScheme.onPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l.playerContinue,
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              Text(
-                                l.playerFromTime(
-                                  formatTime(
-                                    Duration(seconds: positionSeconds),
-                                  ),
-                                ),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 8),
-                _ActionTile(
+                DialogActionTile(
                   icon: Icons.replay,
                   label: l.playerStartFromBeginning,
                   onTap: () => Navigator.of(
@@ -155,7 +121,7 @@ class _ResumeModal extends StatelessWidget {
                 ),
                 if (showManageActions) ...[
                   const SizedBox(height: 8),
-                  _ActionTile(
+                  DialogActionTile(
                     icon: Icons.remove_done,
                     label: l.playerClearProgress,
                     onTap: () => Navigator.of(context).pop(
@@ -163,7 +129,7 @@ class _ResumeModal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _ActionTile(
+                  DialogActionTile(
                     icon: Icons.done_all,
                     label: l.seriesMarkWatched,
                     onTap: () => Navigator.of(context).pop(
@@ -197,42 +163,6 @@ class _ResumeModal extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DpadFocusable(
-      onSelect: onTap,
-      effects: const [
-        GradientBorderEffect(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
-      ],
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.surfaceContainerHighest,
-          child: Icon(icon, color: colorScheme.onSurface),
-        ),
-        title: Text(label),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        onTap: onTap,
       ),
     );
   }

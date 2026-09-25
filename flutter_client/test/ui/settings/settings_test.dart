@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
+import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -634,7 +635,7 @@ void main() {
           notifier,
           sourceError: 'Server is currently unavailable.',
           isConfiguredOverride: true,
-          onClearCache: () => retried = true,
+          onClearCache: (_) => retried = true,
           onDisconnect: () => edited = true,
         ),
       );
@@ -1122,7 +1123,7 @@ Widget _settingsApp(
   Viewer? activeViewer,
   String? sourceError,
   bool? isConfiguredOverride,
-  VoidCallback? onClearCache,
+  ValueChanged<CacheClearScope>? onClearCache,
   VoidCallback? onDisconnect,
   DevicePairingService? devicePairingService,
   DeviceType? deviceType,
