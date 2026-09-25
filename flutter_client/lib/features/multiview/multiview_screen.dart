@@ -19,6 +19,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 enum _LayoutMode { grid, featured, pip }
 
@@ -404,6 +405,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final scale = FontSizeScope.scaleOf(context);
     return PopScope<Object?>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -416,7 +418,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                padding: EdgeInsets.fromLTRB(
+                  24 * scale,
+                  16 * scale,
+                  24 * scale,
+                  8 * scale,
+                ),
                 child: Row(
                   children: [
                     DpadFocusable(
@@ -426,12 +433,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                           borderRadius: BorderRadius.all(Radius.circular(50)),
                         ),
                       ],
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(Icons.arrow_back),
+                      child: Padding(
+                        padding: EdgeInsets.all(8 * scale),
+                        child: Icon(Icons.arrow_back, size: 24 * scale),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16 * scale),
                     Text(
                       l10n.multiviewTitle,
                       style: Theme.of(context).textTheme.titleLarge,
@@ -526,9 +533,9 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     );
   }
 
-  static const double _pipInset = 24;
-
   Widget _buildPip() {
+    final scale = FontSizeScope.scaleOf(context);
+    final pipInset = 24 * scale;
     final other = _primaryIndex == 0 ? 1 : 0;
     final atTop =
         _pipCorner == MultiviewPipCorner.topLeft ||
@@ -542,12 +549,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
         children: [
           Positioned.fill(child: _buildTile(_primaryIndex)),
           Positioned(
-            top: atTop ? _pipInset : null,
-            bottom: atTop ? null : _pipInset,
-            left: atLeft ? _pipInset : null,
-            right: atLeft ? null : _pipInset,
-            width: 280,
-            height: 158,
+            top: atTop ? pipInset : null,
+            bottom: atTop ? null : pipInset,
+            left: atLeft ? pipInset : null,
+            right: atLeft ? null : pipInset,
+            width: 280 * scale,
+            height: 158 * scale,
             child: _buildTile(other),
           ),
         ],
@@ -560,6 +567,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     final state = tile.state;
     final isFocused = _focusedIndex == index;
     final isReordering = _reorderingIndex == index;
+    final scale = FontSizeScope.scaleOf(context);
     final nativePlaneActive =
         !tile.hasError && (_nativePlaneFor(tile)?.usesNativePlane ?? false);
     return DpadFocusable(
@@ -613,12 +621,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.error_outline,
                         color: Colors.white,
-                        size: 28,
+                        size: 28 * scale,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8 * scale),
                       Text(
                         AppLocalizations.of(context).multiviewRetry,
                         style: const TextStyle(color: Colors.white),
@@ -629,21 +637,24 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
               else if (state == null ||
                   state.status == PlaybackStatus.loading ||
                   state.status == PlaybackStatus.buffering)
-                const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                Center(
+                  child: SizedBox.square(
+                    dimension: 36 * scale,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               Positioned(
-                left: 8,
-                right: 8,
-                bottom: 8,
+                left: 8 * scale,
+                right: 8 * scale,
+                bottom: 8 * scale,
                 child: Row(
                   children: [
                     Icon(
                       isFocused ? Icons.volume_up : Icons.volume_off,
-                      size: 16,
+                      size: 16 * scale,
                       color: Colors.white,
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6 * scale),
                     Expanded(
                       child: Text(
                         tile.channel.name,
@@ -707,16 +718,20 @@ class _MenuOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
     return DpadInkWell(
       onTap: onTap,
       autofocus: autofocus,
       borderRadius: const BorderRadius.all(Radius.circular(8)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16 * scale,
+          vertical: 12 * scale,
+        ),
         child: Row(
           children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 12),
+            Icon(icon, size: 20 * scale),
+            SizedBox(width: 12 * scale),
             Text(label),
           ],
         ),

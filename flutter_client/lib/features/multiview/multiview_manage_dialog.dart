@@ -32,10 +32,11 @@ Future<void> showMultiviewManageDialog(BuildContext context) {
         }
         final l10n = AppLocalizations.of(context);
         final controller = ref.read(multiviewControllerProvider);
+        final scale = FontSizeScope.scaleOf(context);
         return AlertDialog(
           title: Text(l10n.multiviewManageTitle),
           content: SizedBox(
-            width: 360 * FontSizeScope.scaleOf(context),
+            width: 360 * scale,
             child: DpadRegion(
               memoryKey: 'multiview/manage-dialog',
               child: ListView.builder(
@@ -44,7 +45,7 @@ Future<void> showMultiviewManageDialog(BuildContext context) {
                 itemBuilder: (context, index) {
                   final channel = channels[index];
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    padding: EdgeInsets.symmetric(vertical: 4 * scale),
                     child: Row(
                       children: [
                         Expanded(
@@ -54,7 +55,7 @@ Future<void> showMultiviewManageDialog(BuildContext context) {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8 * scale),
                         AppIconButton(
                           icon: Icons.close,
                           variant: AppButtonVariant.destructive,
@@ -74,8 +75,8 @@ Future<void> showMultiviewManageDialog(BuildContext context) {
               memoryKey: 'multiview/manage-dialog-actions',
               child: OverflowBar(
                 alignment: MainAxisAlignment.end,
-                spacing: 8,
-                overflowSpacing: 8,
+                spacing: 8 * scale,
+                overflowSpacing: 8 * scale,
                 children: [
                   AppButton(
                     label: l10n.multiviewClearAll,

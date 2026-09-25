@@ -435,8 +435,8 @@ class AppButton extends StatelessWidget {
       children: [
         result,
         Positioned(
-          top: -6,
-          right: -6,
+          top: -6 * scale,
+          right: -6 * scale,
           child: _CountBadge(
             count: count,
             color: badgeColor,
@@ -458,9 +458,16 @@ class _CountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // The label is already enlarged by the global TextScaler (main.dart), so
+    // the pill's box must scale by the same factor or the text outgrows it
+    // and the circle stretches into a tall oval at Large/Very Large. The
+    // label's line height is pinned to 1 so its height tracks the font
+    // size alone and always fits inside the scaled diameter.
+    final scale = FontSizeScope.scaleOf(context);
+    final diameter = 16 * scale;
     return Container(
-      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      constraints: BoxConstraints(minWidth: diameter, minHeight: diameter),
+      padding: EdgeInsets.symmetric(horizontal: 4 * scale),
       decoration: ShapeDecoration(
         color: color ?? scheme.error,
         shape: const StadiumBorder(),
@@ -468,9 +475,10 @@ class _CountBadge extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         '$count',
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: textColor ?? scheme.onError),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: textColor ?? scheme.onError,
+          height: 1,
+        ),
       ),
     );
   }
