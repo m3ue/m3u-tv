@@ -15,6 +15,7 @@ import 'package:m3u_tv/features/player/resume_prompt.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -1293,6 +1294,53 @@ void main() {
     });
 
     testWidgets(
+      'handheld holds the video surface back until the landscape rotation settles',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(430, 932);
+        addTearDown(tester.view.reset);
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/rotate.m3u8',
+                title: 'Rotation Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              isHandheld: true,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(NativeVideoSurface), findsNothing);
+
+        tester.view.physicalSize = const Size(932, 430);
+        await tester.pump();
+        expect(find.byType(NativeVideoSurface), findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.byType(NativeVideoSurface), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'hides visible controls when the overlay background is tapped',
       (
         tester,
@@ -1335,6 +1383,58 @@ void main() {
       },
     );
 
+    testWidgets(
+      'hides the controls bar until playback is ready but keeps the back button',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/loading.m3u8',
+                title: 'Loading Fixture',
+                type: 'movie',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+        expect(find.byIcon(Icons.play_arrow), findsNothing);
+        expect(find.byIcon(Icons.replay_10), findsNothing);
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.ready,
+            duration: Duration(hours: 1),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+        expect(find.byIcon(Icons.replay_10), findsOneWidget);
+      },
+    );
+
     testWidgets('keeps visible controls open when play pause is tapped', (
       tester,
     ) async {
@@ -1364,6 +1464,14 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+        ),
+      );
+      await tester.pump();
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.play_arrow));
@@ -1599,6 +1707,8 @@ void main() {
           duration: Duration(minutes: 10),
         ),
       );
+      await tester.pump();
+      // The controls bar only mounts once that state lands.
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.forward_10));
@@ -2249,6 +2359,8 @@ void main() {
             ),
           );
           await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
 
           expect(tester.takeException(), isNull);
           expect(find.byIcon(Icons.audiotrack), findsOneWidget);
@@ -2322,6 +2434,8 @@ void main() {
               isSubtitleTrackSelectionKnown: true,
             ),
           );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
           await tester.pump();
 
           await tester.tap(find.byIcon(Icons.audiotrack));
@@ -2816,6 +2930,8 @@ void main() {
                 ),
               );
               await tester.pump();
+              // The controls bar only mounts once that state lands.
+              await tester.pump();
 
               expect(adapter.seekCalls, isEmpty);
               expect(find.text('Skip commercial'), findsOneWidget);
@@ -2872,6 +2988,8 @@ void main() {
                   duration: Duration(minutes: 1),
                 ),
               );
+              await tester.pump();
+              // The controls bar only mounts once that state lands.
               await tester.pump();
               expect(find.text('Skip commercial'), findsOneWidget);
 
@@ -2932,6 +3050,8 @@ void main() {
                   duration: Duration(minutes: 1),
                 ),
               );
+              await tester.pump();
+              // The controls bar only mounts once that state lands.
               await tester.pump();
 
               expect(adapter.seekCalls, isEmpty);
@@ -3160,6 +3280,8 @@ void main() {
                 ),
               );
               await tester.pump();
+              // The controls bar only mounts once that state lands.
+              await tester.pump();
               expect(find.text('Skip commercial'), findsOneWidget);
 
               // User taps the button. _confirmComskipSkip now goes through
@@ -3240,6 +3362,8 @@ void main() {
                 ),
               );
               await tester.pump();
+              // The controls bar only mounts once that state lands.
+              await tester.pump();
               expect(find.text('Skip commercial'), findsOneWidget);
 
               await tester.tap(find.text('Skip commercial'));
@@ -3295,6 +3419,8 @@ void main() {
                   duration: Duration(minutes: 1),
                 ),
               );
+              await tester.pump();
+              // The controls bar only mounts once that state lands.
               await tester.pump();
               expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 

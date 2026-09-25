@@ -75,6 +75,7 @@ class PlaybackControls extends StatelessWidget {
     this.isRecording = false,
     this.skipPrompt,
     this.upNextPrompt,
+    this.showControlsBar = true,
     super.key,
   });
 
@@ -126,6 +127,12 @@ class PlaybackControls extends StatelessWidget {
   /// reason as [skipPrompt] - so the remote can actually move onto it.
   final Widget? upNextPrompt;
 
+  /// Whether the bottom transport/track bar (and the prompts riding above
+  /// it) renders. The player hides it until playback has actually started,
+  /// since its buttons do nothing while the stream is still loading; the
+  /// header's back button stays available either way.
+  final bool showControlsBar;
+
   static const Duration seekStep = Duration(seconds: 10);
 
   @override
@@ -157,39 +164,41 @@ class PlaybackControls extends StatelessWidget {
               children: [
                 _buildHeader(context, colorScheme),
                 const Spacer(),
-                // The "up next" card eases in from the right + fades rather
-                // than snapping into place, and slides back out the same way
-                // when it is dismissed or the episode ends.
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 320),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.18, 0),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
+                if (showControlsBar) ...[
+                  // The "up next" card eases in from the right + fades rather
+                  // than snapping into place, and slides back out the same way
+                  // when it is dismissed or the episode ends.
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.18, 0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
                     ),
+                    child: upNextPrompt != null
+                        ? Padding(
+                            key: const ValueKey('up-next'),
+                            padding: EdgeInsets.only(bottom: compact ? 8 : 14),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: upNextPrompt,
+                            ),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('no-up-next')),
                   ),
-                  child: upNextPrompt != null
-                      ? Padding(
-                          key: const ValueKey('up-next'),
-                          padding: EdgeInsets.only(bottom: compact ? 8 : 14),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: upNextPrompt,
-                          ),
-                        )
-                      : const SizedBox.shrink(key: ValueKey('no-up-next')),
-                ),
-                if (skipPrompt != null) ...[
-                  Align(alignment: Alignment.centerLeft, child: skipPrompt),
-                  SizedBox(height: compact ? 8 : 14),
+                  if (skipPrompt != null) ...[
+                    Align(alignment: Alignment.centerLeft, child: skipPrompt),
+                    SizedBox(height: compact ? 8 : 14),
+                  ],
+                  _buildControlsBar(context, colorScheme, compact: compact),
                 ],
-                _buildControlsBar(context, colorScheme, compact: compact),
               ],
             ),
           ),

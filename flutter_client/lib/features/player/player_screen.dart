@@ -132,6 +132,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isPlaying = false;
   double _videoAspectRatio = 16 / 9;
 
+  // Latches on the first `ready`/`playing`/`paused` state for the current source so
+  // the bottom controls bar stays hidden while the stream is still loading
+  // (its buttons can't do anything yet). Reset on a channel/episode switch.
+  bool _hasStartedPlayback = false;
+
+  // Handheld only: the video surface is held back (plain black instead)
+  // until the forced portrait->landscape rotation has settled. Android
+  // Hybrid Composition snapshots the current Flutter frame when a platform
+  // view first mounts, so mounting it on the very first player frame -
+  // while the window is still portrait - leaves the previous screen's
+  // portrait frame stretched across the landscape video rect until the
+  // first decoded frame covers it. Capped well under the ~2s the Android
+  // mpv `load` call waits for its view (MpvPlayerPlugin.waitForCore).
+  static const Duration _surfaceRotationSettle = Duration(milliseconds: 200);
+  static const Duration _surfaceRotationMaxHold = Duration(milliseconds: 1000);
+  bool _videoSurfaceReady = false;
+  bool _sawPortraitBeforeSurface = false;
+  Timer? _videoSurfaceSettleTimer;
+  Timer? _videoSurfaceMaxHoldTimer;
+
   List<PlaybackTrack> _audioTracks = [];
   List<PlaybackTrack> _subtitleTracks = [];
   String? _selectedAudioTrackId;
@@ -298,19 +318,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
           DeviceOrientation.landscapeRight,
         ]),
       );
+      // Safety net in case the rotation never lands (e.g. split-screen or
+      // freeform windows that ignore the orientation request).
+      _videoSurfaceMaxHoldTimer = Timer(
+        _surfaceRotationMaxHold,
+        _markVideoSurfaceReady,
+      );
+    } else {
+      _videoSurfaceReady = true;
     }
     // Steal focus from the content area (autofocus won't do this if another
     // widget already holds focus when the player opens via the AppShell Stack).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Overlay is visible on open - focus the play/pause button directly
-        // so D-pad traversal works immediately. Falls back to _screenFocusNode
-        // if somehow the overlay was already hidden.
-        if (_overlayVisible) {
-          _controlsFocusNode.requestFocus();
-        } else {
-          _screenFocusNode.requestFocus();
-        }
+        // The controls bar (and its play/pause button) isn't built until
+        // playback starts, so hold focus on the screen until then;
+        // _handleState moves it onto play/pause once the bar appears.
+        _focusControlsOrScreen();
       }
     });
     _stateSubscription = widget.orchestrator.onState.listen(_handleState);
@@ -342,6 +366,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // everything initState/_openSource would normally set up for a fresh
   // mount, but reuse the existing stream subscriptions rather than doubling
   // them up on the same orchestrator.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_videoSurfaceReady) return;
+    final size = MediaQuery.sizeOf(context);
+    if (size.width < size.height) {
+      _sawPortraitBeforeSurface = true;
+      return;
+    }
+    if (!_sawPortraitBeforeSurface) {
+      // Already landscape on open (e.g. a tablet) - nothing to wait for.
+      _videoSurfaceReady = true;
+      _videoSurfaceMaxHoldTimer?.cancel();
+      return;
+    }
+    // Rotated to landscape - give the rotation a moment to finish before
+    // the platform view mounts.
+    _videoSurfaceSettleTimer ??= Timer(
+      _surfaceRotationSettle,
+      _markVideoSurfaceReady,
+    );
+  }
+
+  void _markVideoSurfaceReady() {
+    _videoSurfaceSettleTimer?.cancel();
+    _videoSurfaceMaxHoldTimer?.cancel();
+    if (_disposed || !mounted || _videoSurfaceReady) return;
+    setState(() => _videoSurfaceReady = true);
+  }
+
   @override
   void didUpdateWidget(covariant PlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -376,6 +430,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _fallbackReason = null;
       _retryStatusMessage = null;
       _isPlaying = false;
+      _hasStartedPlayback = false;
       _videoAspectRatio = 16 / 9;
       _audioTracks = const <PlaybackTrack>[];
       _subtitleTracks = const <PlaybackTrack>[];
@@ -405,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(_initIntroDb(widget.args));
     unawaited(_initUpNext(widget.args));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+      if (mounted && _overlayVisible) _focusControlsOrScreen();
     });
   }
 
@@ -845,7 +900,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Hand focus back to the transport controls rather than letting Flutter
     // reparent it wherever after the card unmounts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+      if (mounted && _overlayVisible) _focusControlsOrScreen();
     });
     _scheduleOverlayHide();
   }
@@ -943,6 +998,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     if (_traktScrobbleActive) _scrobble('stop');
     _loadingTimer?.cancel();
+    _videoSurfaceSettleTimer?.cancel();
+    _videoSurfaceMaxHoldTimer?.cancel();
     _overlayHideTimer?.cancel();
     _progressTimer?.cancel();
     _positionTimer?.cancel();
@@ -1072,6 +1129,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // overlay hide timer and Trakt scrobbling below only react to a genuine
     // play/pause transition, not to every tick.
     final wasPlaying = _isPlaying;
+    final hadStartedPlayback = _hasStartedPlayback;
 
     // While a comskip auto-skip seek is in flight, ignore orchestrator
     // position reports that would regress _currentPosition backward into
@@ -1102,6 +1160,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           state.videoAspectRatio ?? state.source?.videoAspectRatio;
       if (aspectRatio != null) {
         _videoAspectRatio = aspectRatio;
+      }
+
+      if (state.status == PlaybackStatus.ready ||
+          state.status == PlaybackStatus.playing ||
+          state.status == PlaybackStatus.paused) {
+        _hasStartedPlayback = true;
       }
 
       if (state.status == PlaybackStatus.playing) {
@@ -1159,6 +1223,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // or the timer would never survive long enough to fire.
     if (_isPlaying != wasPlaying && _overlayVisible) {
       _scheduleOverlayHide();
+    }
+
+    // The controls bar just appeared - hand focus from the screen to its
+    // play/pause button, unless the user already moved it (e.g. onto the
+    // back button).
+    if (_hasStartedPlayback && !hadStartedPlayback && _overlayVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlayVisible && _screenFocusNode.hasPrimaryFocus) {
+          _controlsFocusNode.requestFocus();
+        }
+      });
     }
 
     final backend = widget.orchestrator.activeBackend;
@@ -1465,8 +1540,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     setState(() => _overlayVisible = true);
     _scheduleOverlayHide();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _overlayVisible) _controlsFocusNode.requestFocus();
+      if (mounted && _overlayVisible) _focusControlsOrScreen();
     });
+  }
+
+  void _focusControlsOrScreen() {
+    if (_overlayVisible && _hasStartedPlayback) {
+      _controlsFocusNode.requestFocus();
+    } else {
+      _screenFocusNode.requestFocus();
+    }
   }
 
   void _hideOverlay() {
@@ -1679,14 +1762,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 return Stack(
                   children: [
                     Positioned.fill(
-                      child: NativeVideoSurface(
-                        textureId: widget.orchestrator.activeTextureId,
-                        platformView:
-                            widget.orchestrator.activePlatformViewProvider,
-                        nativePlane:
-                            widget.orchestrator.activeNativePlaneProvider,
-                        aspectRatio: _videoAspectRatio,
-                      ),
+                      child: _videoSurfaceReady
+                          ? NativeVideoSurface(
+                              textureId: widget.orchestrator.activeTextureId,
+                              platformView: widget
+                                  .orchestrator
+                                  .activePlatformViewProvider,
+                              nativePlane:
+                                  widget.orchestrator.activeNativePlaneProvider,
+                              aspectRatio: _videoAspectRatio,
+                            )
+                          : const ColoredBox(color: Colors.black),
                     ),
 
                     // Loading indicator
@@ -1906,6 +1992,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             isRecording: widget.isRecordingCurrentChannel,
                             skipPrompt: skipPrompt,
                             upNextPrompt: upNextPrompt,
+                            showControlsBar: _hasStartedPlayback,
                           ),
                         ),
                       ),
