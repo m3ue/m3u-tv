@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -231,14 +232,15 @@ class _EpgProgramArtworkState extends State<EpgProgramArtwork> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (url != null && url == _wantedUrl)
+            if (url != null && url == _wantedUrl) ...[
+              _BlurredArtworkFill(key: ValueKey('fill-$url'), url: url),
               CachedMediaThumbnail(
                 key: ValueKey(url),
                 url: url,
                 fit: BoxFit.contain,
                 fallback: logo,
-              )
-            else
+              ),
+            ] else
               logo,
             if (selection.isLive)
               Positioned(
@@ -252,6 +254,41 @@ class _EpgProgramArtworkState extends State<EpgProgramArtwork> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A dimmed, blurred cover-fit copy of the artwork behind the contained
+/// image, so art that isn't 16:9 (square or portrait icons from many XMLTV
+/// sources) fills the frame instead of sitting between bars. Wide art covers
+/// it completely. Decoded tiny since the blur throws the detail away anyway.
+class _BlurredArtworkFill extends StatelessWidget {
+  const _BlurredArtworkFill({super.key, required this.url});
+
+  static const _decodeSize = 48.0;
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    // The dimming is drawn atop the image's own pixels only, so while the art
+    // loads (or if it fails) the frame keeps the plain placeholder look.
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.mode(Colors.black38, BlendMode.srcATop),
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: CachedMediaThumbnail(
+            url: url,
+            width: _decodeSize,
+            height: _decodeSize,
+            fit: BoxFit.cover,
+            fallback: const SizedBox.square(dimension: _decodeSize),
+          ),
         ),
       ),
     );

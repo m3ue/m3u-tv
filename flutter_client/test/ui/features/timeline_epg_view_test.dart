@@ -1124,6 +1124,35 @@ void main() {
       expect(find.text('TV-14'), findsOneWidget);
       expect(find.text('LIVE'), findsOneWidget);
       expect(find.text('NEW'), findsWidgets);
+      expect(find.byType(ImageFiltered), findsNothing);
+    });
+
+    testWidgets('preview artwork sits over a blurred fill of itself', (
+      tester,
+    ) async {
+      final withArt = EpgProgram(
+        channelId: 'bbc.one',
+        title: 'Square Art',
+        description: '',
+        start: DateTime(2026, 7, 31, 11, 30),
+        end: DateTime(2026, 7, 31, 12, 30),
+        iconUrl: 'http://example.com/square.jpg',
+      );
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        showPreview: true,
+        width: 1200,
+        height: 800,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now)..loadPrograms([withArt]),
+      );
+
+      expect(find.byType(ImageFiltered), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('http://example.com/square.jpg')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('preview panel is skipped when the guide is too short', (
