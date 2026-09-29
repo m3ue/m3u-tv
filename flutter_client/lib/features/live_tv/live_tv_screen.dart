@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
@@ -186,46 +187,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   final GlobalKey<MediaCategoryNavState> _navKey =
       GlobalKey<MediaCategoryNavState>();
 
-  // Lets the Channels column's and day-nav header's own right-edge handlers
-  // reach the program grid's actual last-focused block directly, rather
-  // than through _gridFocusNode's focus-history stack - that stack now also
-  // holds the Channels column's and day-controls' own (separately-scoped)
-  // entries, which can outrank a real grid block there and send focus back
-  // to one of them instead of into the grid.
-  final GlobalKey<DpadRegionState> _epgGridRegionKey =
-      GlobalKey<DpadRegionState>();
-
-  // EPG-only: a distinct hop between the program grid and the nav strip,
-  // reached via the Back key (see _handleBackFromEpg) rather than spatial
-  // left/right traversal from the grid. skipTraversal keeps this wrapper
-  // node itself out of dpad's spatial candidate search (which otherwise
-  // treats it as a real focusable item, in whichever region its own
-  // BuildContext resolves to) - without it, this node can be picked as a
-  // directional-navigation target in its own right, `.requestFocus()` calls
-  // aimed at *escaping* this region as a fresh candidate would just refocus
-  // itself, and the region behind it (or the day-navigation header, in the
-  // production layout) would never actually receive focus. skipTraversal
-  // does not affect explicit `.requestFocus()` calls (only candidate
-  // search), so entering the region programmatically still works.
-  final FocusScopeNode _channelColumnFocusNode = FocusScopeNode(
-    skipTraversal: true,
-  );
-
-  // Same rationale as _channelColumnFocusNode above, mirrored for the
-  // day-nav header: its own scope so up/down between it and the Channels
-  // column can be jumped to explicitly (see _handleChannelColumnEdge /
-  // _handleDayControlsEdge), since neither scope's boundary lets normal
-  // directional search reach the other on its own.
-  final FocusScopeNode _dayControlsFocusNode = FocusScopeNode(
-    skipTraversal: true,
-  );
-
-  // Lets LiveTvScreen reach TimelineEpgViewState's row-aware
-  // focusChannelColumn/focusProgramGrid directly (see _handleBackFromEpg,
-  // _handleChannelColumnEdge, _handleDayControlsEdge, and the nav strip's
-  // onGridEdgeEnter below) instead of the plain FocusScopeNode.requestFocus()
-  // calls above, which only ever restore whatever Flutter's own focus-history
-  // last landed on - not necessarily the row the user was actually just on.
+  // Lets LiveTvScreen reach the guide's cursor-aware focusChannelColumn /
+  // handleBack directly (see _handleBackFromEpg and the nav strip's
+  // onGridEdgeEnter below) instead of a plain FocusScopeNode.requestFocus(),
+  // which would only restore whatever focus-history last landed on.
   final GlobalKey<TimelineEpgViewState> _timelineEpgViewKey =
       GlobalKey<TimelineEpgViewState>();
   final _showSearchController = EpgShowSearchController();
@@ -260,16 +225,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     return service.liveTvSortOptionSync;
   }
 
+  /// Back on a guide programme returns to its channel cell; from the
+  /// channel cell (or the day toolbar) it falls through to the shell.
   bool _handleBackFromEpg() {
     if (_viewMode != _ViewMode.epgGrid) return false;
     if (!_gridFocusNode.hasFocus) return false;
-    final state = _timelineEpgViewKey.currentState;
-    if (state != null) {
-      state.focusChannelColumn();
-    } else {
-      _channelColumnFocusNode.requestFocus();
-    }
-    return true;
+    return _timelineEpgViewKey.currentState?.handleBack() ?? false;
   }
 
   @override
@@ -289,8 +250,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     _detachViewSettingsListener(widget.viewSettingsService);
     _gridFocusNode.dispose();
     _searchResultsFocusNode.dispose();
-    _channelColumnFocusNode.dispose();
-    _dayControlsFocusNode.dispose();
     _showSearchController
       ..removeListener(_onShowSearchChanged)
       ..dispose();
@@ -856,73 +815,18 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     }
   }
 
-  // Targets the program grid's own DpadRegionState directly (via
-  // _epgGridRegionKey) instead of _gridFocusNode's focus-history stack —
-  // that stack also holds the Channels column's and day-controls' own
-  // (separately-scoped) entries, which are more recent than any grid block
-  // whenever the user arrived at either of them via the Back key or the
-  // Channels-column-default landing focus, so falling back through it would
-  // just bounce between those two instead of ever reaching the grid.
-  void _focusEpgGridFallback() {
-    final region = _epgGridRegionKey.currentState;
-    if (region == null) return;
-    final target = region.lastFocused ?? _firstFocusNode(region.focusNodes);
-    target?.requestFocus();
-  }
-
-  FocusNode? _firstFocusNode(Iterable<FocusNode> nodes) {
-    final iterator = nodes.iterator;
-    return iterator.moveNext() ? iterator.current : null;
-  }
-
-  void _handleChannelColumnEdge(TraversalDirection direction) {
-    switch (direction) {
-      case TraversalDirection.right:
-        _focusEpgGrid();
-      case TraversalDirection.up:
-        _dayControlsFocusNode.requestFocus();
-      case TraversalDirection.left:
-        _activateSidebarNav();
-      case TraversalDirection.down:
-        break;
+  // The guide moves a cursor within one focus node, so it doesn't trip the
+  // app-wide focus-change click (main.dart); play the same sound, under the
+  // same setting, for its cursor moves.
+  void _playNavigationSound() {
+    if (widget.viewSettingsService?.navigationSoundEnabledSync ?? true) {
+      unawaited(SystemSound.play(SystemSoundType.click));
     }
   }
 
-  void _handleDayControlsEdge(TraversalDirection direction) {
-    switch (direction) {
-      case TraversalDirection.down:
-        _channelColumnFocusNode.requestFocus();
-      case TraversalDirection.left:
-        _activateSidebarNav();
-      case TraversalDirection.right:
-        _focusEpgGrid();
-      case TraversalDirection.up:
-        break;
-    }
-  }
-
-  // Lands on the currently-airing program in whichever channel row last held
-  // focus (see TimelineEpgViewState._focusedChannelIndex), falling back to
-  // the region-memory-based _focusEpgGridFallback only when that row has no
-  // "now" block to target (e.g. no EPG data yet).
-  void _focusEpgGrid() {
-    final state = _timelineEpgViewKey.currentState;
-    if (state != null) {
-      state.focusProgramGrid();
-    } else {
-      _focusEpgGridFallback();
-    }
-  }
-
-  // Lands on the Channels column row that last held focus, falling back to
-  // Flutter's own remembered focus in _channelColumnFocusNode.
+  // Lands on the channel cell of whichever guide row the cursor was last on.
   void _focusEpgChannelColumn() {
-    final state = _timelineEpgViewKey.currentState;
-    if (state != null) {
-      state.focusChannelColumn();
-    } else {
-      _channelColumnFocusNode.requestFocus();
-    }
+    _timelineEpgViewKey.currentState?.focusChannelColumn();
   }
 
   Widget? _buildMultiviewButton() {
@@ -1037,7 +941,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     EpgRecordingIndex recordingIndex,
   ) {
     return DpadRegion(
-      key: _epgGridRegionKey,
       memoryKey: 'live-tv/epg',
       horizontalEdge: DpadEdgeBehavior.stop,
       onEdge: _handleGridLeftEdge,
@@ -1045,8 +948,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         key: _timelineEpgViewKey,
         channels: channels,
         epgService: epgService,
-        useSidebarLayout: widget.useSidebarLayout,
         channelColumnLayout: _channelColumnLayout,
+        // TV/desktop get the focused-programme preview panel; touch devices
+        // have no focus to preview, so a tap opens a details sheet instead.
+        showPreview: widget.useSidebarLayout,
+        tapOpensDetails: !widget.useSidebarLayout,
+        onCursorMove: widget.useSidebarLayout ? _playNavigationSound : null,
         recordingChannelIds: recordingChannelIds,
         recordingStateFor: (channel, program) => recordingIndex.stateFor(
           channelId: channel.id,
@@ -1054,11 +961,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           programEnd: program.end,
         ),
         epgStartView: _epgStartView,
-        channelColumnFocusNode: _channelColumnFocusNode,
-        onChannelColumnEdge: _handleChannelColumnEdge,
-        dayControlsFocusNode: _dayControlsFocusNode,
-        onDayControlsEdge: _handleDayControlsEdge,
-        onFallbackFocusGrid: _focusEpgGridFallback,
         onChannelSelect: (channel) {
           widget.onChannelContextChanged?.call(channels);
           widget.onChannelSelect(channel);
@@ -1066,10 +968,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         onCatchupProgramSelect: widget.onCatchupProgramSelect,
         onEnsureEpg: widget.onEnsureEpg,
         onChannelLongPress: (channel, program) => unawaited(
-          // Pass the exact block that was pressed - schedulable for both
-          // the currently-airing and future programs, same as the editor
-          // supports; _openChannelContextMenu withholds "Record" itself
-          // if this program has already ended.
+          // Pass the exact programme that was selected - schedulable for
+          // both the currently-airing and future programs, same as the
+          // editor supports; _openChannelContextMenu withholds "Record"
+          // itself if this program has already ended.
           _openChannelContextMenu(context, channel, program),
         ),
         onChannelColumnLongPress: (channel) =>

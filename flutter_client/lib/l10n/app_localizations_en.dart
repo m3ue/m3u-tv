@@ -246,6 +246,88 @@ class AppLocalizationsEn extends AppLocalizations {
   String get epgProgramCurrentlyRecording => 'Currently recording';
 
   @override
+  String get epgToday => 'Today';
+
+  @override
+  String get epgTomorrow => 'Tomorrow';
+
+  @override
+  String get epgYesterday => 'Yesterday';
+
+  @override
+  String get epgLiveBadge => 'LIVE';
+
+  @override
+  String get epgReplayBadge => 'REPLAY';
+
+  @override
+  String get epgBadgeNew => 'NEW';
+
+  @override
+  String get epgBadgePremiere => 'PREMIERE';
+
+  @override
+  String get epgBadgeRepeat => 'REPEAT';
+
+  @override
+  String epgSeasonEpisode(int season, int episode) {
+    return 'S$season E$episode';
+  }
+
+  @override
+  String epgSeasonNumber(int season) {
+    return 'Season $season';
+  }
+
+  @override
+  String epgEpisodeNumber(int episode) {
+    return 'Episode $episode';
+  }
+
+  @override
+  String epgDurationMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String epgDurationHours(int hours) {
+    return '$hours h';
+  }
+
+  @override
+  String epgDurationHoursMinutes(int hours, int minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String epgTimeLeft(String duration) {
+    return '$duration left';
+  }
+
+  @override
+  String epgStartsIn(String duration) {
+    return 'Starts in $duration';
+  }
+
+  @override
+  String get epgEnded => 'Ended';
+
+  @override
+  String get epgWatchLive => 'Watch live';
+
+  @override
+  String get epgWatchReplay => 'Watch replay';
+
+  @override
+  String get epgMoreOptions => 'More options';
+
+  @override
+  String get epgKeyOk => 'OK';
+
+  @override
+  String get epgKeyHoldOk => 'Hold OK';
+
+  @override
   String get epgSweepLoadingTitle => 'Loading program guide';
 
   @override

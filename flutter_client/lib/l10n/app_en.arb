@@ -122,6 +122,99 @@
   "epgNoData": "No EPG data",
   "epgProgramScheduledToRecord": "Scheduled to record",
   "epgProgramCurrentlyRecording": "Currently recording",
+  "epgToday": "Today",
+  "epgTomorrow": "Tomorrow",
+  "epgYesterday": "Yesterday",
+  "epgLiveBadge": "LIVE",
+  "epgReplayBadge": "REPLAY",
+  "epgBadgeNew": "NEW",
+  "epgBadgePremiere": "PREMIERE",
+  "epgBadgeRepeat": "REPEAT",
+  "epgSeasonEpisode": "S{season} E{episode}",
+  "@epgSeasonEpisode": {
+    "description": "Compact season/episode label shown in the programme guide, e.g. S2 E5.",
+    "placeholders": {
+      "season": {
+        "type": "int"
+      },
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "epgSeasonNumber": "Season {season}",
+  "@epgSeasonNumber": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      }
+    }
+  },
+  "epgEpisodeNumber": "Episode {episode}",
+  "@epgEpisodeNumber": {
+    "placeholders": {
+      "episode": {
+        "type": "int"
+      }
+    }
+  },
+  "epgDurationMinutes": "{minutes} min",
+  "@epgDurationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "epgDurationHours": "{hours} h",
+  "@epgDurationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "epgDurationHoursMinutes": "{hours} h {minutes} min",
+  "@epgDurationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "epgTimeLeft": "{duration} left",
+  "@epgTimeLeft": {
+    "description": "Remaining time of a live programme; duration is already formatted (e.g. 32 min).",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "epgStartsIn": "Starts in {duration}",
+  "@epgStartsIn": {
+    "description": "Time until an upcoming programme starts; duration is already formatted.",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "epgEnded": "Ended",
+  "epgWatchLive": "Watch live",
+  "epgWatchReplay": "Watch replay",
+  "epgMoreOptions": "More options",
+  "epgKeyOk": "OK",
+  "@epgKeyOk": {
+    "description": "Remote-control select button label shown in the guide's key hints."
+  },
+  "epgKeyHoldOk": "Hold OK",
+  "@epgKeyHoldOk": {
+    "description": "Remote-control hint for long-pressing the select button."
+  },
   "epgSweepLoadingTitle": "Loading program guide",
   "epgSweepLoadingBody": "{loaded} of {total} channels",
   "@epgSweepLoadingBody": {

@@ -1105,6 +1105,16 @@ class EpgProgram {
     required this.start,
     required this.end,
     this.subtitle,
+    this.iconUrl,
+    this.category,
+    this.rating,
+    this.season,
+    this.episode,
+    this.year,
+    this.isNew = false,
+    this.isPremiere = false,
+    this.isRepeat = false,
+    this.isPlaceholder = false,
   });
 
   final String channelId;
@@ -1117,6 +1127,25 @@ class EpgProgram {
   /// exposes one (see m3u-editor #1410). Distinct from [title]; null when
   /// absent so display sites can fall back to [title].
   final String? subtitle;
+
+  // Extended guide metadata, only sent by m3u-editor's `get_epg_batch` when
+  // the client asks for it (`details=1`). All optional: sources that don't
+  // carry a value leave it null/false.
+  final String? iconUrl;
+  final String? category;
+  final String? rating;
+  final int? season;
+  final int? episode;
+  final int? year;
+  final bool isNew;
+  final bool isPremiere;
+
+  /// XMLTV `<previously-shown>`: a rerun.
+  final bool isRepeat;
+
+  /// m3u-editor's synthetic gap-fill row (`dummy-` id, titled with the
+  /// channel name) rather than a real scheduled programme.
+  final bool isPlaceholder;
 
   /// The show title, kept intact, with the episode / segment [subtitle]
   /// appended as "Title - Subtitle" when the source exposes a distinct one

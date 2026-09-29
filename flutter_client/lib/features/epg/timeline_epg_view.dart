@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import 'package:m3u_tv/features/epg/epg_guide_navigation.dart';
+import 'package:m3u_tv/features/epg/epg_program_details.dart';
 import 'package:m3u_tv/features/epg/epg_recording_state.dart';
 import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -16,8 +20,8 @@ import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
+import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
-import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
 typedef CatchupProgramSelect =
@@ -29,40 +33,6 @@ typedef EnsureEpg =
       DateTime? endDate,
     });
 
-const double _kChannelColW = 128;
-const double _kTimeHeaderH = 28;
-const double _kRowH = 60;
-const double _kPxPerMin = 5; // 300 px per hour
-
-/// Scaled row height that grows with the user's font-size preference.
-double _scaledRowH(BuildContext context) =>
-    _kRowH * FontSizeScope.scaleOf(context);
-
-/// Scaled width of the fixed left channel column.
-double _scaledChannelColW(BuildContext context) =>
-    _kChannelColW * FontSizeScope.scaleOf(context);
-
-/// Scaled height of the corner cell / time-axis header row.
-double _scaledTimeHeaderH(BuildContext context) =>
-    _kTimeHeaderH * FontSizeScope.scaleOf(context);
-
-/// EPG text gets an extra boost on top of the base font-size scale because
-/// labelSmall/labelMedium are very small by default and unreadable from couch
-/// distance even at 1.2×.
-TextStyle _epgStyle(
-  BuildContext context,
-  TextStyle? base, {
-  Color? color,
-  FontWeight? fontWeight,
-}) {
-  final extra = FontSizeScope.isLargeOf(context) ? 1.4 : 1.0;
-  return (base ?? const TextStyle()).copyWith(
-    fontSize: (base?.fontSize ?? 12) * extra,
-    color: color,
-    fontWeight: fontWeight,
-  );
-}
-
 // When a row builds, also request EPG for this many channels past it so a
 // downward scroll lands on already-loaded data instead of waiting on a lazy
 // fetch. [onEnsureEpg] is debounced and de-duped, so the widened slice just
@@ -70,26 +40,42 @@ TextStyle _epgStyle(
 const int _kEpgPrefetchAheadQuality = 12;
 const int _kEpgPrefetchAheadSpeed = 6;
 
-// Build (and therefore prefetch) roughly this many rows beyond the viewport in
-// each direction. Scaled at point of use to match the font-size setting.
-ScrollCacheExtent _scaledCacheExtent(BuildContext context) =>
-    ScrollCacheExtent.pixels(_scaledRowH(context) * 10);
+// Rows only build the programmes within this many minutes of the visible
+// time range; scrolling past that margin rebuilds them around the new view.
+const double _kBuildSpanMarginMinutes = 180;
 
-/// Horizontal TV-guide style EPG with channels on Y and time on X.
+// Lead-in before the start anchor ("now" or prime time) on first show.
+const int _kStartLeadInMinutes = 16;
+
+// The preview panel only shows when the guide has at least this much room,
+// so a small desktop window keeps a usable number of rows.
+const double _kMinHeightForPreview = 560;
+const double _kMinWidthForPreview = 720;
+
+const Duration _kClockTick = Duration(seconds: 30);
+
+/// TV-guide style EPG: channels down the side, time across the top, the
+/// programme under the cursor previewed above (TV/desktop).
 ///
-/// Programs appear as proportionally-sized blocks that can be scrolled left/right
-/// to move through the time window. The channel name column and time header stay
-/// fixed while both axes scroll independently and remain synchronised.
+/// Built D-pad first. The whole programme grid is a single focus node that
+/// moves a logical cursor: left/right step through a row's programmes (left
+/// of the first one lands on the channel, right of the last one moves to
+/// the next day), up/down keep the same time column, CH+/CH- and PgUp/PgDn
+/// page through channels. OK activates (play live, replay catchup, or open
+/// options for an upcoming programme) and a long OK opens the channel's
+/// options. Touch/mouse still scroll and tap; on touch devices
+/// ([tapOpensDetails]) a tap opens a details sheet instead, since there is
+/// no focus preview to read.
+///
+/// Layout: one horizontal scroll view holds the time ruler and a single
+/// vertical list of rows; each row's channel cell is pinned against the
+/// horizontal offset, so both axes scroll natively with nothing to sync.
 class TimelineEpgView extends StatefulWidget {
   const TimelineEpgView({
     super.key,
     required this.channels,
     required this.epgService,
     required this.onChannelSelect,
-    required this.channelColumnFocusNode,
-    required this.onChannelColumnEdge,
-    required this.dayControlsFocusNode,
-    required this.onDayControlsEdge,
     this.onCatchupProgramSelect,
     this.onEnsureEpg,
     this.onChannelLongPress,
@@ -100,9 +86,11 @@ class TimelineEpgView extends StatefulWidget {
     this.futureDays = 7,
     this.clock = DateTime.now,
     this.epgStartView = EpgStartView.currentTime,
-    this.useSidebarLayout = false,
     this.channelColumnLayout = ChannelColumnLayout.logoOnly,
-    this.onFallbackFocusGrid,
+    this.showPreview = false,
+    this.tapOpensDetails = false,
+    this.autofocus = true,
+    this.onCursorMove,
   });
 
   final List<Channel> channels;
@@ -110,57 +98,25 @@ class TimelineEpgView extends StatefulWidget {
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
 
-  /// The channel column's own focus scope, so the caller (`LiveTvScreen`)
-  /// can move focus there directly (e.g. from the Back key) instead of only
-  /// via spatial traversal from the program grid.
-  final FocusScopeNode channelColumnFocusNode;
-
-  /// Fired when d-pad navigation hits the channel column's own edge —
-  /// mirrors the program grid's `onEdge` (left activates the nav
-  /// strip/sidebar, right returns focus to the program grid, up moves to
-  /// the day-nav header).
-  final ValueChanged<TraversalDirection> onChannelColumnEdge;
-
-  /// The day-nav header's (previous/date/now/next) own focus scope, so the
-  /// caller can move focus there directly from the Channels column (up) the
-  /// same way [channelColumnFocusNode] is targeted from the Back key —
-  /// plain spatial traversal can't cross into a sibling [FocusScopeNode]
-  /// automatically, so this needs to be reachable programmatically.
-  final FocusScopeNode dayControlsFocusNode;
-
-  /// Fired when d-pad navigation hits the day-nav header's own edge — left
-  /// activates the nav strip/sidebar, right returns focus to the program
-  /// grid, down moves to the Channels column.
-  final ValueChanged<TraversalDirection> onDayControlsEdge;
-
   /// Requests EPG data for a channel be fetched (lazily, debounced) if not
   /// already fresh. Called per-row as the visible timeline builds.
   final EnsureEpg? onEnsureEpg;
 
-  /// Opens the channel's context menu (favorite/record) for the pressed
-  /// block — same long-press action available in the list/grid views, for
-  /// parity. The program passed is whichever block was pressed (past,
-  /// current, or future); the caller decides whether it's still schedulable.
+  /// Opens the channel's context menu (favorite/record) for a programme -
+  /// long OK / long-press on a programme, and plain OK on an upcoming one.
+  /// The caller decides whether the programme is still schedulable.
   final CatchupProgramSelect? onChannelLongPress;
 
-  /// Same context menu as [onChannelLongPress], but for long-pressing the
-  /// channel column itself, which has no associated program block.
+  /// Same context menu as [onChannelLongPress], for the channel itself (no
+  /// programme): long OK / long-press on the channel cell.
   final ValueChanged<Channel>? onChannelColumnLongPress;
 
   final Set<int> recordingChannelIds;
 
-  /// Resolves which per-programme recording indicator (if any) should be
-  /// drawn on a given EPG block. Defaults to [EpgRecordingState.none] for
-  /// every block, so the widget renders identically to the pre-#185
-  /// version when no resolver is supplied. The caller (typically the
-  /// EPG screen with the matching-logic index in scope) is responsible
-  /// for mapping a recording to each programme.
-  ///
-  /// Takes the [Channel] as well as the [EpgProgram] because the two carry
-  /// different notions of "channel id": [EpgProgram.channelId] is the EPG
-  /// (tvg) identifier, whereas a recording references the channel's database
-  /// id. Only the row's [Channel] has the latter, so the resolver needs both
-  /// to line a recording up with a block.
+  /// Resolves which per-programme recording indicator (if any) to draw.
+  /// Takes the [Channel] as well as the [EpgProgram] because a recording
+  /// references the channel's database id, which only the row's [Channel]
+  /// carries ([EpgProgram.channelId] is the tvg id).
   final EpgRecordingState Function(Channel channel, EpgProgram program)
   recordingStateFor;
 
@@ -173,118 +129,227 @@ class TimelineEpgView extends StatefulWidget {
   final Clock clock;
   final EpgStartView epgStartView;
 
-  /// Whether the caller is using the sidebar (TV/desktop) layout rather than
-  /// the mobile stacked one — mirrors `MediaCategoryNav.useSidebarLayout`.
-  /// Rounds the Channels column's corner cell to match the sidebar strip's
-  /// search input radius; left off (square corner) on mobile.
-  final bool useSidebarLayout;
-
-  /// What each row of the fixed Channels column shows for a channel.
+  /// What each row of the pinned channel column shows for a channel.
   final ChannelColumnLayout channelColumnLayout;
 
-  /// Called by [TimelineEpgViewState.focusProgramGrid] when the target
-  /// channel row's "now" program block isn't available to focus directly
-  /// (e.g. no live program data for that row yet) — falls back to whatever
-  /// the caller considers a reasonable default (typically the program
-  /// grid's own region focus-history).
-  final VoidCallback? onFallbackFocusGrid;
+  /// Shows the focused programme's artwork/details panel above the grid
+  /// (TV/desktop), when there's enough height for it.
+  final bool showPreview;
+
+  /// Tapping a programme opens its details sheet instead of activating it
+  /// (touch devices, which have no focus preview).
+  final bool tapOpensDetails;
+
+  /// Whether the programme grid takes focus when the view first builds.
+  final bool autofocus;
+
+  /// Called when a D-pad press moves the guide cursor. The grid is a single
+  /// focus node, so cursor moves don't change focus and the app-wide
+  /// focus-change navigation sound would otherwise stay silent here.
+  final VoidCallback? onCursorMove;
 
   @override
   State<TimelineEpgView> createState() => TimelineEpgViewState();
 }
 
+@immutable
+class _GuideMetrics {
+  const _GuideMetrics({
+    required this.compact,
+    required this.rowHeight,
+    required this.rulerHeight,
+    required this.channelColumnWidth,
+    required this.pxPerMinute,
+    required this.viewportWidth,
+  });
+
+  final bool compact;
+  final double rowHeight;
+  final double rulerHeight;
+  final double channelColumnWidth;
+  final double pxPerMinute;
+  final double viewportWidth;
+
+  double get programViewportWidth =>
+      math.max(0, viewportWidth - channelColumnWidth);
+}
+
+@immutable
+class _GuideCursor {
+  const _GuideCursor({
+    required this.row,
+    this.program,
+    this.onChannel = true,
+    this.focused = false,
+  });
+
+  final int row;
+
+  /// Null on the channel cell, or on a row with no programme data.
+  final EpgProgram? program;
+  final bool onChannel;
+  final bool focused;
+
+  bool isOn(EpgProgram candidate) {
+    final current = program;
+    return !onChannel &&
+        current != null &&
+        current.start == candidate.start &&
+        current.channelId == candidate.channelId;
+  }
+
+  _GuideCursor copyWith({
+    int? row,
+    EpgProgram? program,
+    bool clearProgram = false,
+    bool? onChannel,
+    bool? focused,
+  }) => _GuideCursor(
+    row: row ?? this.row,
+    program: clearProgram ? null : program ?? this.program,
+    onChannel: onChannel ?? this.onChannel,
+    focused: focused ?? this.focused,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is _GuideCursor &&
+      other.row == row &&
+      other.onChannel == onChannel &&
+      other.focused == focused &&
+      other.program?.start == program?.start &&
+      other.program?.channelId == program?.channelId;
+
+  @override
+  int get hashCode =>
+      Object.hash(row, onChannel, focused, program?.start, program?.channelId);
+}
+
+/// Minutes from the window start that rows currently build programmes for.
+@immutable
+class _MinuteSpan {
+  const _MinuteSpan(this.start, this.end);
+
+  final double start;
+  final double end;
+
+  bool overlaps(double from, double to) => to > start && from < end;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _MinuteSpan && other.start == start && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(start, end);
+}
+
 class TimelineEpgViewState extends State<TimelineEpgView> {
-  late final ScrollController _leftVCtrl;
-  late final ScrollController _rightVCtrl;
-  late final ScrollController _headerHCtrl;
-  late List<ScrollController> _rowHCtrls;
-  bool _vSyncing = false;
-  bool _hSyncing = false;
+  final FocusNode _gridFocusNode = FocusNode(debugLabel: 'epg-guide');
+  final ScrollController _vCtrl = ScrollController();
+  // Created on the first layout, once the start offset (which depends on
+  // the measured width) is known, so the first frame already shows "now"
+  // instead of flashing midnight.
+  ScrollController? _hCtrlOrNull;
+  ScrollController get _hCtrl => _hCtrlOrNull!;
+
+  final ValueNotifier<_GuideCursor> _cursor = ValueNotifier(
+    const _GuideCursor(row: 0),
+  );
+  final ValueNotifier<_MinuteSpan> _buildSpan = ValueNotifier(
+    const _MinuteSpan(0, 0),
+  );
+
   late DateTime _selectedDate;
   late DateTime _windowStart;
   late DateTime _windowEnd;
-  late double _totalW;
-  late double _nowOffset;
+  _GuideMetrics? _metrics;
+  late DateTime _now;
 
-  // Tracks whichever channel row last held focus, in either the Channels
-  // column or the program grid, so the two can hand focus back and forth on
-  // that same row instead of relying on Flutter's/dpad's own separate
-  // per-scope focus-history (which has no notion of "row" and drifts out of
-  // sync with whichever row the user is actually looking at - see
-  // LiveTvScreen's _handleBackFromEpg / _handleChannelColumnEdge callers of
-  // focusChannelColumn / focusProgramGrid).
-  int _focusedChannelIndex = 0;
-  late List<FocusNode> _channelFocusNodes;
-  // One per channel row, attached to that row's currently-airing program
-  // block (if any) so `focusProgramGrid` can land there directly instead of
-  // the day's first block.
-  late List<FocusNode> _nowFocusNodes;
+  /// The time up/down moves stay aligned with (see
+  /// [EpgGuideNavigation.anchorFor]); null until the first horizontal move.
+  DateTime? _anchor;
+
+  Timer? _clockTimer;
+  bool _revalidateScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = _dateOnly(widget.clock());
+    _now = widget.clock();
+    _selectedDate = _dateOnly(_now);
     _initWindow();
-    _leftVCtrl = ScrollController();
-    _rightVCtrl = ScrollController();
-    _headerHCtrl = ScrollController(initialScrollOffset: _nowOffset);
-    _rowHCtrls = _makeRowCtrls(widget.channels.length);
-    _channelFocusNodes = _makeFocusNodes(widget.channels.length);
-    _nowFocusNodes = _makeFocusNodes(widget.channels.length);
-    _leftVCtrl.addListener(_onLeftV);
-    _rightVCtrl.addListener(_onRightV);
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
+    _clockTimer = Timer.periodic(_kClockTick, (_) {
+      if (mounted) setState(() {});
+    });
   }
 
-  List<FocusNode> _makeFocusNodes(int count) =>
-      List.generate(count, (_) => FocusNode());
-
-  void _setFocusedChannelIndex(int index) {
-    if (_focusedChannelIndex == index) return;
-    // Not setState: this only feeds the next focusChannelColumn/
-    // focusProgramGrid call, nothing in build() reads it.
-    _focusedChannelIndex = index;
+  @override
+  void didUpdateWidget(TimelineEpgView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final today = _dateOnly(widget.clock());
+    final earliest = _offsetDate(today, -_maxCatchupDays);
+    final latest = _offsetDate(today, widget.futureDays);
+    if (_selectedDate.isBefore(earliest) || _selectedDate.isAfter(latest)) {
+      _selectedDate = _selectedDate.isBefore(earliest) ? earliest : latest;
+      _initWindow();
+    }
+    if (widget.epgStartView != oldWidget.epgStartView) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToStart());
+    }
+    if (!identical(widget.channels, oldWidget.channels)) {
+      // Clamp now (not just in the post-frame revalidate) so an OK press
+      // before the next frame can't index past a shrunken channel list.
+      final cursor = _cursor.value;
+      final lastRow = math.max(0, widget.channels.length - 1);
+      if (cursor.row > lastRow) _setCursor(cursor.copyWith(row: lastRow));
+      _scheduleRevalidate();
+    }
   }
 
-  FocusNode? _attachedFocusNode(List<FocusNode> nodes, int index) {
-    if (index < 0 || index >= nodes.length) return null;
-    final node = nodes[index];
-    return node.context != null ? node : null;
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    _hCtrlOrNull?.removeListener(_onHorizontalScroll);
+    _hCtrlOrNull?.dispose();
+    _vCtrl.dispose();
+    _gridFocusNode.dispose();
+    _cursor.dispose();
+    _buildSpan.dispose();
+    super.dispose();
   }
 
-  /// Moves focus to the Channels column, landing on the row last associated
-  /// with [_focusedChannelIndex] (whichever row most recently held focus in
-  /// either the Channels column or the program grid) rather than wherever
-  /// Flutter's own focus-history for the column happens to point.
+  // ---------------------------------------------------------------------------
+  // Public API (LiveTvScreen)
+  // ---------------------------------------------------------------------------
+
+  /// Focuses the guide with the cursor on the current row's channel cell -
+  /// the landing spot when entering from the category strip.
   void focusChannelColumn() {
-    final node = _attachedFocusNode(_channelFocusNodes, _focusedChannelIndex);
-    if (node != null) {
-      node.requestFocus();
-    } else {
-      widget.channelColumnFocusNode.requestFocus();
-    }
+    _setCursor(_cursor.value.copyWith(onChannel: true));
+    _gridFocusNode.requestFocus();
   }
 
-  /// Moves focus into the program grid, landing on the currently-airing
-  /// program for the row last associated with [_focusedChannelIndex] rather
-  /// than the day's first program block or a stale remembered cell.
-  void focusProgramGrid() {
-    final node = _attachedFocusNode(_nowFocusNodes, _focusedChannelIndex);
-    if (node != null) {
-      node.requestFocus();
-    } else {
-      widget.onFallbackFocusGrid?.call();
-    }
+  /// Back while on a programme returns the cursor to its channel cell and
+  /// consumes the press; otherwise lets the shell handle it.
+  bool handleBack() {
+    final cursor = _cursor.value;
+    if (!_gridFocusNode.hasFocus || cursor.onChannel) return false;
+    _setCursor(cursor.copyWith(onChannel: true));
+    return true;
   }
 
-  /// Scrolls the Channels column and program grid back to the top row.
-  /// Called by LiveTvScreen when the selected group/category changes, since
-  /// [didUpdateWidget] otherwise leaves the vertical scroll offset wherever
-  /// the previous group's channel list happened to land.
+  /// Back to the first channel. Called by LiveTvScreen when the selected
+  /// group changes, since the list otherwise keeps the previous group's
+  /// scroll offset and cursor row.
   void resetVerticalScroll() {
-    if (_leftVCtrl.hasClients) _leftVCtrl.jumpTo(0);
-    if (_rightVCtrl.hasClients) _rightVCtrl.jumpTo(0);
+    if (_vCtrl.hasClients) _vCtrl.jumpTo(0);
+    _setCursor(_cursor.value.copyWith(row: 0));
+    _scheduleRevalidate();
   }
+
+  // ---------------------------------------------------------------------------
+  // Window / dates
+  // ---------------------------------------------------------------------------
 
   void _initWindow() {
     _windowStart = _selectedDate;
@@ -294,47 +359,6 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       _selectedDate.day,
       widget.windowHours,
     );
-    _totalW = _windowEnd.difference(_windowStart).inMinutes * _kPxPerMin;
-    _nowOffset = _computeStartOffset();
-  }
-
-  double _computeStartOffset() {
-    final now = widget.clock();
-    final anchor = switch (widget.epgStartView) {
-      EpgStartView.primeTime => DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        20,
-      ),
-      EpgStartView.currentTime => DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        now.hour,
-        now.minute,
-      ),
-    };
-    final offset = anchor.difference(_windowStart).inMinutes * _kPxPerMin;
-    return math.max(0, offset - 80.0).toDouble();
-  }
-
-  // Rows are built lazily by ListView.builder as they scroll into view, so a
-  // row's ScrollController may attach long after the scroll-to-start jump
-  // below has already run. Baking the target into initialScrollOffset means
-  // a late-attaching row still lands on the right offset instead of 12am.
-  List<ScrollController> _makeRowCtrls(int count) => List.generate(
-    count,
-    (_) => ScrollController(initialScrollOffset: _nowOffset),
-  );
-
-  void _scrollToStart(_) {
-    if (!mounted) return;
-    for (final c in [_headerHCtrl, ..._rowHCtrls]) {
-      if (c.hasClients) {
-        c.jumpTo(_nowOffset.clamp(0.0, c.position.maxScrollExtent));
-      }
-    }
   }
 
   DateTime _dateOnly(DateTime value) =>
@@ -352,7 +376,15 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       )
       .fold(0, math.max);
 
-  void _selectDate(DateTime date) {
+  bool get _canGoPrevious => _selectedDate.isAfter(
+    _offsetDate(_dateOnly(widget.clock()), -_maxCatchupDays),
+  );
+
+  bool get _canGoNext => _selectedDate.isBefore(
+    _offsetDate(_dateOnly(widget.clock()), widget.futureDays),
+  );
+
+  void _selectDate(DateTime date, {bool scrollToDayStart = false}) {
     final today = _dateOnly(widget.clock());
     final earliest = _offsetDate(today, -_maxCatchupDays);
     final latest = _offsetDate(today, widget.futureDays);
@@ -368,472 +400,732 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
         _initWindow();
       });
     }
-    WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
-  }
-
-  // Both sync paths below defer their actual jumpTo() calls to a
-  // post-frame callback instead of firing them synchronously from within
-  // the triggering ScrollController listener/notification. jumpTo()
-  // internally calls goIdle()/beginActivity(), which toggles
-  // RenderIgnorePointer.ignoring and calls markNeedsSemanticsUpdate() on
-  // the *other* scrollable. During a fast fling, ListView.builder is
-  // itself mid-way through attaching/detaching rows and running its own
-  // semantics pass; a reentrant jumpTo() fired from inside that pass hits
-  // Flutter's `!attached || !owner!._debugDoingSemantics` assertion and
-  // throws, aborting the sync call and leaving the two scrollables
-  // permanently desynced. Deferring to addPostFrameCallback runs the jump
-  // after the current frame's build/layout/semantics have fully settled,
-  // which is always safe. The `_vSyncScheduled`/`_hSyncScheduled` flags
-  // coalesce a burst of notifications (many pixels-per-frame during a
-  // fling) into a single deferred jump using the latest offset.
-  bool _vSyncScheduled = false;
-  bool _pendingSyncFromLeft = false;
-
-  void _onLeftV() {
-    if (_vSyncing) return;
-    _pendingSyncFromLeft = true;
-    _scheduleVSync();
-  }
-
-  void _onRightV() {
-    if (_vSyncing) return;
-    _pendingSyncFromLeft = false;
-    _scheduleVSync();
-  }
-
-  void _scheduleVSync() {
-    if (_vSyncScheduled) return;
-    _vSyncScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _vSyncScheduled = false;
-      if (!mounted) return;
-      _vSyncing = true;
-      if (_pendingSyncFromLeft) {
-        _jump(_rightVCtrl, _leftVCtrl.hasClients ? _leftVCtrl.offset : 0);
+      if (scrollToDayStart) {
+        _jumpHorizontal(0);
       } else {
-        _jump(_leftVCtrl, _rightVCtrl.hasClients ? _rightVCtrl.offset : 0);
+        _scrollToStart();
       }
-      _vSyncing = false;
+      _revalidateCursor();
     });
   }
 
-  bool _hSyncScheduled = false;
-  double _pendingHOffset = 0;
+  // ---------------------------------------------------------------------------
+  // Geometry
+  // ---------------------------------------------------------------------------
 
-  void _syncH(double offset) {
-    if (_hSyncing) return;
-    _pendingHOffset = offset;
-    if (_hSyncScheduled) return;
-    _hSyncScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _hSyncScheduled = false;
-      if (!mounted) return;
-      _hSyncing = true;
-      _jump(_headerHCtrl, _pendingHOffset);
-      for (final c in _rowHCtrls) {
-        _jump(c, _pendingHOffset);
-      }
-      _hSyncing = false;
-    });
+  _GuideMetrics _computeMetrics(BuildContext context, double width) {
+    final scale = FontSizeScope.scaleOf(context);
+    final compact = width < 600;
+    final channelColumnWidth =
+        switch (widget.channelColumnLayout) {
+          ChannelColumnLayout.logoOnly => compact ? 72.0 : 132.0,
+          ChannelColumnLayout.logoAndTitle => compact ? 96.0 : 248.0,
+          ChannelColumnLayout.titleOnly => compact ? 104.0 : 208.0,
+        } *
+        scale;
+    // Aim for roughly 3 hours across on wide screens and 90 minutes on a
+    // phone, so a half-hour programme stays wide enough to read.
+    final programWidth = math.max<double>(1, width - channelColumnWidth);
+    final pxPerMinute = (programWidth / (compact ? 90 : 180)).clamp(4.0, 8.0);
+    return _GuideMetrics(
+      compact: compact,
+      rowHeight: (compact ? 64.0 : 76.0) * scale,
+      rulerHeight: (compact ? 32.0 : 40.0) * scale,
+      channelColumnWidth: channelColumnWidth,
+      pxPerMinute: pxPerMinute.roundToDouble(),
+      viewportWidth: width,
+    );
   }
 
-  void _jump(ScrollController ctrl, double offset) {
-    if (!ctrl.hasClients) return;
+  double _minutesFromStart(DateTime time) =>
+      time.difference(_windowStart).inSeconds / 60;
+
+  double _totalWidth(_GuideMetrics m) =>
+      _windowEnd.difference(_windowStart).inMinutes * m.pxPerMinute;
+
+  double _startOffsetFor(_GuideMetrics m) {
+    final now = widget.clock();
+    final anchor = switch (widget.epgStartView) {
+      EpgStartView.primeTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        20,
+      ),
+      EpgStartView.currentTime => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        now.hour,
+        now.minute,
+      ),
+    };
+    final minutes = _minutesFromStart(anchor) - _kStartLeadInMinutes;
+    return math.max(0, minutes * m.pxPerMinute);
+  }
+
+  double get _hOffset {
+    final ctrl = _hCtrlOrNull;
+    if (ctrl == null) return 0;
+    return ctrl.hasClients ? ctrl.offset : ctrl.initialScrollOffset;
+  }
+
+  (DateTime, DateTime)? _visibleTimeRange([double? offset]) {
+    final m = _metrics;
+    if (m == null) return null;
+    final startMinutes = (offset ?? _hOffset) / m.pxPerMinute;
+    final endMinutes = startMinutes + m.programViewportWidth / m.pxPerMinute;
+    return (
+      _windowStart.add(Duration(seconds: (startMinutes * 60).round())),
+      _windowStart.add(Duration(seconds: (endMinutes * 60).round())),
+    );
+  }
+
+  _MinuteSpan _spanAround(double offset, _GuideMetrics m) {
+    final start = offset / m.pxPerMinute;
+    final end = start + m.programViewportWidth / m.pxPerMinute;
+    return _MinuteSpan(
+      start - _kBuildSpanMarginMinutes,
+      end + _kBuildSpanMarginMinutes,
+    );
+  }
+
+  void _applyMetrics(_GuideMetrics m) {
+    final previous = _metrics;
+    _metrics = m;
+    if (_hCtrlOrNull == null) {
+      final offset = _startOffsetFor(m);
+      _hCtrlOrNull = ScrollController(initialScrollOffset: offset)
+        ..addListener(_onHorizontalScroll);
+      _buildSpan.value = _spanAround(offset, m);
+      return;
+    }
+    if (previous != null && previous.pxPerMinute != m.pxPerMinute) {
+      // Keep the same time at the left edge when the scale changes (window
+      // resize, rotation).
+      final minutes = _hOffset / previous.pxPerMinute;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _jumpHorizontal(minutes * m.pxPerMinute);
+        _buildSpan.value = _spanAround(_hOffset, m);
+      });
+    }
+  }
+
+  void _onHorizontalScroll() {
+    final m = _metrics;
+    if (m == null || !_hCtrl.hasClients) return;
+    final start = _hCtrl.offset / m.pxPerMinute;
+    final end = start + m.programViewportWidth / m.pxPerMinute;
+    final span = _buildSpan.value;
+    // Rebuild the rows around the view once it drifts to within an hour
+    // of the built span's edge.
+    if (start - 60 < span.start || end + 60 > span.end) {
+      _buildSpan.value = _spanAround(_hCtrl.offset, m);
+    }
+  }
+
+  void _scrollToStart() {
+    final m = _metrics;
+    if (!mounted || m == null) return;
+    _jumpHorizontal(_startOffsetFor(m));
+  }
+
+  void _jumpHorizontal(double offset) {
+    final ctrl = _hCtrlOrNull;
+    if (ctrl == null || !ctrl.hasClients) return;
     final clamped = offset.clamp(0.0, ctrl.position.maxScrollExtent);
     if ((ctrl.offset - clamped).abs() > 0.5) ctrl.jumpTo(clamped);
   }
 
-  @override
-  void didUpdateWidget(TimelineEpgView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.channels.length != oldWidget.channels.length) {
-      for (final c in _rowHCtrls) {
-        c.dispose();
-      }
-      _rowHCtrls = _makeRowCtrls(widget.channels.length);
-      for (final n in _channelFocusNodes) {
-        n.dispose();
-      }
-      _channelFocusNodes = _makeFocusNodes(widget.channels.length);
-      for (final n in _nowFocusNodes) {
-        n.dispose();
-      }
-      _nowFocusNodes = _makeFocusNodes(widget.channels.length);
-      if (_focusedChannelIndex >= widget.channels.length) {
-        _focusedChannelIndex = math.max(0, widget.channels.length - 1);
-      }
+  /// Scrolls horizontally so enough of [program] is on screen: nothing if
+  /// at least half the view (or all of it) already shows, otherwise the
+  /// whole programme when it fits, else its start. Returns the offset.
+  double _revealProgram(EpgProgram program) {
+    final m = _metrics;
+    final ctrl = _hCtrlOrNull;
+    if (m == null || ctrl == null || !ctrl.hasClients) return _hOffset;
+    final start = math.max<double>(0, _minutesFromStart(program.start));
+    final end = math.min(
+      _windowEnd.difference(_windowStart).inMinutes.toDouble(),
+      _minutesFromStart(program.end),
+    );
+    final left = start * m.pxPerMinute;
+    final right = end * m.pxPerMinute;
+    final viewWidth = m.programViewportWidth;
+    final offset = ctrl.offset;
+    final visible =
+        math.min(right, offset + viewWidth) - math.max(left, offset);
+    final width = right - left;
+    if (visible >= math.min(width, viewWidth * 0.5) - 1) return offset;
+    final pad = m.pxPerMinute * 10;
+    final target = width + pad * 2 <= viewWidth && left > offset
+        ? right + pad - viewWidth
+        : left - pad;
+    _jumpHorizontal(target);
+    return ctrl.offset;
+  }
+
+  void _revealRow(int row) {
+    final m = _metrics;
+    if (m == null || !_vCtrl.hasClients) return;
+    final position = _vCtrl.position;
+    final top = row * m.rowHeight;
+    final bottom = top + m.rowHeight;
+    final viewport = position.viewportDimension;
+    // Keep one row of context above/below the cursor when there's room.
+    final pad = viewport >= m.rowHeight * 3 ? m.rowHeight : 0.0;
+    double? target;
+    if (top - pad < position.pixels) {
+      target = top - pad;
+    } else if (bottom + pad > position.pixels + viewport) {
+      target = bottom + pad - viewport;
     }
-    if (widget.epgStartView != oldWidget.epgStartView) {
-      _initWindow();
-      WidgetsBinding.instance.addPostFrameCallback(_scrollToStart);
+    if (target == null) return;
+    _vCtrl.jumpTo(target.clamp(0.0, position.maxScrollExtent));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cursor
+  // ---------------------------------------------------------------------------
+
+  List<EpgProgram> _rowPrograms(int row) {
+    if (row < 0 || row >= widget.channels.length) return const [];
+    return EpgGuideNavigation.inWindow(
+      widget.epgService.programsForChannel(widget.channels[row]),
+      _windowStart,
+      _windowEnd,
+    );
+  }
+
+  void _setCursor(_GuideCursor cursor) => _cursor.value = cursor;
+
+  /// Where entering a row's programmes (from the channel cell, or a fresh
+  /// landing) should aim: "now" when it's on screen, else the view's start.
+  DateTime _entryTime() {
+    final now = widget.clock();
+    final visible = _visibleTimeRange();
+    if (visible == null) {
+      return now.isBefore(_windowStart) || !now.isBefore(_windowEnd)
+          ? _windowStart
+          : now;
     }
-    final today = _dateOnly(widget.clock());
-    final earliest = _offsetDate(today, -_maxCatchupDays);
-    final latest = _offsetDate(today, widget.futureDays);
-    if (_selectedDate.isBefore(earliest) || _selectedDate.isAfter(latest)) {
-      _selectedDate = _selectedDate.isBefore(earliest) ? earliest : latest;
-      _initWindow();
+    if (!now.isBefore(visible.$1) && now.isBefore(visible.$2)) return now;
+    return visible.$1.add(const Duration(minutes: 1));
+  }
+
+  DateTime _anchorInWindow() {
+    final anchor = _anchor;
+    if (anchor != null &&
+        !anchor.isBefore(_windowStart) &&
+        anchor.isBefore(_windowEnd)) {
+      return anchor;
+    }
+    return _entryTime();
+  }
+
+  void _moveToProgram(EpgProgram program) {
+    final offset = _revealProgram(program);
+    _anchor = EpgGuideNavigation.anchorFor(
+      program,
+      now: widget.clock(),
+      visibleStart: _visibleTimeRange(offset)?.$1 ?? _windowStart,
+    );
+    _setCursor(_cursor.value.copyWith(program: program, onChannel: false));
+  }
+
+  void _moveToRow(int row) {
+    final cursor = _cursor.value;
+    EpgProgram? program;
+    if (!cursor.onChannel) {
+      program = EpgGuideNavigation.at(_rowPrograms(row), _anchorInWindow());
+    }
+    _revealRow(row);
+    _setCursor(
+      cursor.copyWith(
+        row: row,
+        program: program,
+        clearProgram: program == null,
+      ),
+    );
+    if (program != null) _revealProgram(program);
+  }
+
+  void _pageRows(int direction) {
+    final m = _metrics;
+    if (m == null || widget.channels.isEmpty) return;
+    final viewport = _vCtrl.hasClients
+        ? _vCtrl.position.viewportDimension
+        : m.rowHeight * 5;
+    final perPage = math.max(1, (viewport / m.rowHeight).floor() - 1);
+    final row = (_cursor.value.row + direction * perPage).clamp(
+      0,
+      widget.channels.length - 1,
+    );
+    if (row == _cursor.value.row) return;
+    _moveToRow(row);
+    widget.onCursorMove?.call();
+  }
+
+  void _advanceToNextDay() {
+    if (!_canGoNext) return;
+    _selectDate(_offsetDate(_selectedDate, 1), scrollToDayStart: true);
+    _anchor = _windowStart;
+    final programs = _rowPrograms(_cursor.value.row);
+    _setCursor(
+      _cursor.value.copyWith(
+        onChannel: false,
+        program: programs.isEmpty ? null : programs.first,
+        clearProgram: programs.isEmpty,
+      ),
+    );
+  }
+
+  /// Re-resolves the cursor's programme after anything that can invalidate
+  /// it without a key press: a day change, a new channel list, or EPG data
+  /// arriving for a row the cursor landed on while it was still empty.
+  void _revalidateCursor() {
+    if (!mounted || widget.channels.isEmpty) return;
+    final cursor = _cursor.value;
+    final row = cursor.row.clamp(0, widget.channels.length - 1);
+    if (cursor.onChannel) {
+      if (row != cursor.row) _setCursor(cursor.copyWith(row: row));
+      return;
+    }
+    final programs = _rowPrograms(row);
+    final current = cursor.program;
+    if (row == cursor.row && current != null && programs.any(cursor.isOn)) {
+      return;
+    }
+    final target = EpgGuideNavigation.at(programs, _anchorInWindow());
+    _setCursor(
+      cursor.copyWith(row: row, program: target, clearProgram: target == null),
+    );
+  }
+
+  void _scheduleRevalidate() {
+    if (_revalidateScheduled) return;
+    _revalidateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _revalidateScheduled = false;
+      _revalidateCursor();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Input
+  // ---------------------------------------------------------------------------
+
+  bool _onDirection(TraversalDirection direction) {
+    final before = _cursor.value;
+    final handled = _moveCursor(direction);
+    if (handled && _cursor.value != before) widget.onCursorMove?.call();
+    return handled;
+  }
+
+  bool _moveCursor(TraversalDirection direction) {
+    if (widget.channels.isEmpty) return false;
+    final cursor = _cursor.value;
+    switch (direction) {
+      case TraversalDirection.left:
+        // Off the channel cell: let D-pad traversal leave the guide (the
+        // enclosing region hands it to the sidebar/category strip).
+        if (cursor.onChannel) return false;
+        final current = cursor.program;
+        final previous = current == null
+            ? null
+            : EpgGuideNavigation.previous(_rowPrograms(cursor.row), current);
+        if (previous == null) {
+          _setCursor(cursor.copyWith(onChannel: true));
+        } else {
+          _moveToProgram(previous);
+        }
+        return true;
+      case TraversalDirection.right:
+        final programs = _rowPrograms(cursor.row);
+        if (cursor.onChannel) {
+          final entry = _entryTime();
+          final target = EpgGuideNavigation.at(programs, entry);
+          if (target == null) {
+            _anchor = entry;
+            _setCursor(
+              cursor.copyWith(onChannel: false, clearProgram: true),
+            );
+          } else {
+            _moveToProgram(target);
+          }
+          return true;
+        }
+        final current = cursor.program;
+        final next = current == null
+            ? null
+            : EpgGuideNavigation.next(programs, current);
+        if (next == null) {
+          if (current != null) _advanceToNextDay();
+        } else {
+          _moveToProgram(next);
+        }
+        return true;
+      case TraversalDirection.up:
+        // Top row: let traversal move up to the day toolbar.
+        if (cursor.row == 0) return false;
+        _moveToRow(cursor.row - 1);
+        return true;
+      case TraversalDirection.down:
+        if (cursor.row < widget.channels.length - 1) {
+          _moveToRow(cursor.row + 1);
+        }
+        return true;
     }
   }
 
-  @override
-  void dispose() {
-    _leftVCtrl.removeListener(_onLeftV);
-    _rightVCtrl.removeListener(_onRightV);
-    _leftVCtrl.dispose();
-    _rightVCtrl.dispose();
-    _headerHCtrl.dispose();
-    for (final n in _channelFocusNodes) {
-      n.dispose();
+  KeyEventResult _onGuideKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.channelUp ||
+        key == LogicalKeyboardKey.pageUp) {
+      _pageRows(-1);
+      return KeyEventResult.handled;
     }
-    for (final n in _nowFocusNodes) {
-      n.dispose();
+    if (key == LogicalKeyboardKey.channelDown ||
+        key == LogicalKeyboardKey.pageDown) {
+      _pageRows(1);
+      return KeyEventResult.handled;
     }
-    for (final c in _rowHCtrls) {
-      c.dispose();
-    }
-    super.dispose();
+    return KeyEventResult.ignored;
   }
+
+  void _onGridFocusChange(bool focused) {
+    _setCursor(_cursor.value.copyWith(focused: focused));
+    if (focused) _revalidateCursor();
+  }
+
+  void _activateCursor() {
+    if (widget.channels.isEmpty) return;
+    final cursor = _cursor.value;
+    final channel = widget.channels[cursor.row];
+    final program = cursor.program;
+    if (cursor.onChannel || program == null) {
+      widget.onChannelSelect(channel);
+      return;
+    }
+    _activateProgram(channel, program);
+  }
+
+  void _activateProgram(Channel channel, EpgProgram program) {
+    final selection = EpgGuideSelection(
+      channel: channel,
+      program: program,
+      now: widget.clock(),
+    );
+    switch (selection.action) {
+      case EpgGuideAction.watchReplay:
+        widget.onCatchupProgramSelect?.call(channel, program);
+      case EpgGuideAction.options:
+        widget.onChannelLongPress?.call(channel, program);
+      case EpgGuideAction.none:
+        break;
+      case EpgGuideAction.watchLive:
+        widget.onChannelSelect(channel);
+    }
+  }
+
+  bool get _hasLongPress =>
+      widget.onChannelLongPress != null ||
+      widget.onChannelColumnLongPress != null;
+
+  void _openCursorOptions() {
+    if (widget.channels.isEmpty) return;
+    final cursor = _cursor.value;
+    final channel = widget.channels[cursor.row];
+    final program = cursor.program;
+    if (cursor.onChannel || program == null) {
+      widget.onChannelColumnLongPress?.call(channel);
+      return;
+    }
+    widget.onChannelLongPress?.call(channel, program);
+  }
+
+  void _onProgramTap(int row, EpgProgram program) {
+    final channel = widget.channels[row];
+    _anchor = EpgGuideNavigation.anchorFor(
+      program,
+      now: widget.clock(),
+      visibleStart: _visibleTimeRange()?.$1 ?? _windowStart,
+    );
+    _setCursor(
+      _cursor.value.copyWith(row: row, program: program, onChannel: false),
+    );
+    if (widget.tapOpensDetails) {
+      unawaited(_showDetails(channel, program));
+      return;
+    }
+    _gridFocusNode.requestFocus();
+    _activateProgram(channel, program);
+  }
+
+  void _onProgramHover(int row, EpgProgram program) {
+    final cursor = _cursor.value;
+    if (cursor.row == row && cursor.isOn(program)) return;
+    _setCursor(cursor.copyWith(row: row, program: program, onChannel: false));
+  }
+
+  void _onChannelTap(int row) {
+    _setCursor(_cursor.value.copyWith(row: row, onChannel: true));
+    if (!widget.tapOpensDetails) _gridFocusNode.requestFocus();
+    widget.onChannelSelect(widget.channels[row]);
+  }
+
+  Future<void> _showDetails(Channel channel, EpgProgram program) {
+    final onReplay = widget.onCatchupProgramSelect;
+    final onOptions = widget.onChannelLongPress;
+    return showEpgProgramDetailsSheet(
+      context,
+      selection: EpgGuideSelection(
+        channel: channel,
+        program: program,
+        now: widget.clock(),
+        recordingState: widget.recordingStateFor(channel, program),
+      ),
+      onWatchLive: () => widget.onChannelSelect(channel),
+      onWatchReplay: onReplay == null ? null : () => onReplay(channel, program),
+      onMoreOptions: onOptions == null
+          ? null
+          : () => onOptions(channel, program),
+    );
+  }
+
+  EpgGuideSelection? _selectionFor(_GuideCursor cursor) {
+    if (widget.channels.isEmpty) return null;
+    final row = cursor.row.clamp(0, widget.channels.length - 1);
+    final channel = widget.channels[row];
+    final now = widget.clock();
+    final program = cursor.onChannel
+        ? EpgGuideNavigation.at(
+            widget.epgService
+                .programsForChannel(channel)
+                .where((p) => p.end.isAfter(now))
+                .toList(),
+            now,
+          )
+        : cursor.program;
+    return EpgGuideSelection(
+      channel: channel,
+      program: program,
+      now: now,
+      recordingState: program == null
+          ? EpgRecordingState.none
+          : widget.recordingStateFor(channel, program),
+    );
+  }
+
+  void _ensureEpgAround(BuildContext context, int index) {
+    final onEnsureEpg = widget.onEnsureEpg;
+    if (onEnsureEpg == null) return;
+    // Request this row plus a look-ahead window so a downward scroll hits
+    // loaded EPG. The call is debounced and de-duped downstream.
+    final isSpeed =
+        ImageQualityScope.of(context)?.optimizeFor == OptimizeFor.speed;
+    final end = math.min(
+      widget.channels.length,
+      index +
+          1 +
+          (isSpeed ? _kEpgPrefetchAheadSpeed : _kEpgPrefetchAheadQuality),
+    );
+    onEnsureEpg(
+      widget.channels.sublist(index, end),
+      startDate: _selectedDate,
+      endDate: _selectedDate,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final now = widget.clock();
-
-    return Column(
-      children: [
-        // Its own FocusScope (like the Channels column) so LiveTvScreen can
-        // jump straight here from the Channels column's up-edge — a plain
-        // FocusScopeNode boundary blocks Flutter's normal directional
-        // search from crossing into a sibling scope on its own, so both
-        // hops (here and the Channels column) need to be explicit.
-        FocusScope(
-          node: widget.dayControlsFocusNode,
-          child: DpadRegion(
-            memoryKey: 'live-tv/epg-daycontrols',
-            horizontalEdge: DpadEdgeBehavior.stop,
-            verticalEdge: DpadEdgeBehavior.stop,
-            onEdge: widget.onDayControlsEdge,
-            child: _DayControls(
+    _now = widget.clock();
+    final cursor = _cursor.value;
+    if (!cursor.onChannel &&
+        cursor.program == null &&
+        _rowPrograms(cursor.row).isNotEmpty) {
+      // Data arrived for a row the cursor was waiting on.
+      _scheduleRevalidate();
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = _computeMetrics(context, constraints.maxWidth);
+        _applyMetrics(metrics);
+        final showPreview =
+            widget.showPreview &&
+            constraints.maxWidth >= _kMinWidthForPreview &&
+            constraints.maxHeight >=
+                _kMinHeightForPreview * FontSizeScope.scaleOf(context);
+        final previewHeight = (constraints.maxHeight * 0.32).clamp(
+          200.0,
+          360.0,
+        );
+        return Column(
+          children: [
+            if (showPreview)
+              SizedBox(
+                height: previewHeight,
+                child: ValueListenableBuilder<_GuideCursor>(
+                  valueListenable: _cursor,
+                  builder: (context, cursor, _) {
+                    final selection = _selectionFor(cursor);
+                    if (selection == null) return const SizedBox.shrink();
+                    return EpgProgramPreview(selection: selection);
+                  },
+                ),
+              ),
+            _DayToolbar(
+              blockUp: showPreview,
               selectedDate: _selectedDate,
-              canGoPrevious: _selectedDate.isAfter(
-                _offsetDate(now, -_maxCatchupDays),
-              ),
-              canGoNext: _selectedDate.isBefore(
-                _offsetDate(now, widget.futureDays),
-              ),
+              today: _dateOnly(_now),
+              compact: metrics.compact,
+              canGoPrevious: _canGoPrevious,
+              canGoNext: _canGoNext,
               onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
-              onNow: () => _selectDate(_dateOnly(widget.clock())),
+              onNow: () {
+                _anchor = null;
+                _selectDate(_dateOnly(widget.clock()));
+              },
               onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
             ),
-          ),
-        ),
-        Expanded(
-          child: Row(
-            children: [
-              // ── Fixed left channel column ──────────────────────────────────────
-              SizedBox(
-                width: _scaledChannelColW(context),
-                child: Column(
-                  children: [
-                    // Corner cell
-                    Container(
-                      height: _scaledTimeHeaderH(context),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: widget.useSidebarLayout
-                            ? const BorderRadius.only(
-                                topLeft: Radius.circular(
-                                  MediaBrowsingMetrics.cardRadius,
-                                ),
-                              )
-                            : null,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        AppLocalizations.of(context).epgChannels,
-                        style: _epgStyle(
-                          context,
-                          Theme.of(context).textTheme.labelSmall,
-                          color: colorScheme.onSurfaceVariant,
-                        ).copyWith(letterSpacing: 1.2),
-                      ),
-                    ),
-                    // Channel name/logo list (synced vertically with program rows)
-                    Expanded(
-                      // DpadRegion must be the OUTER widget here, not the
-                      // FocusScope: `DpadRegion.ofNode` resolves a node's
-                      // region from that node's own BuildContext, walking
-                      // upward. With FocusScope outside, its FocusScopeNode
-                      // (which defaults to canRequestFocus: true, unlike the
-                      // package's own region markers) would resolve to
-                      // whatever DpadRegion encloses this whole EPG view
-                      // (live-tv/epg) rather than this nested one — making
-                      // it a spurious spatial-navigation candidate that can
-                      // steal focus from unrelated controls elsewhere in
-                      // that outer region (e.g. the day-navigation header).
-                      // Nesting FocusScope inside DpadRegion instead makes
-                      // the scope node belong to *this* region, where it's
-                      // correctly excluded from being its own candidate.
-                      child: DpadRegion(
-                        memoryKey: 'live-tv/epg-channels',
-                        horizontalEdge: DpadEdgeBehavior.stop,
-                        verticalEdge: DpadEdgeBehavior.stop,
-                        onEdge: widget.onChannelColumnEdge,
-                        child: FocusScope(
-                          node: widget.channelColumnFocusNode,
-                          child: ListView.builder(
-                            controller: _leftVCtrl,
-                            itemCount: widget.channels.length,
-                            itemExtent: _scaledRowH(context),
-                            itemBuilder: (_, i) => _ChannelCell(
-                              channel: widget.channels[i],
-                              columnLayout: widget.channelColumnLayout,
-                              isRecording: widget.recordingChannelIds.contains(
-                                widget.channels[i].id,
+            Expanded(child: _buildGuide(context, metrics)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGuide(BuildContext context, _GuideMetrics m) {
+    final totalWidth = _totalWidth(m);
+    final hCtrl = _hCtrl;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _onGuideKey,
+      child: DpadFocusable(
+        focusNode: _gridFocusNode,
+        debugLabel: 'epg-guide',
+        autofocus: widget.autofocus,
+        autoScroll: false,
+        tapToSelect: false,
+        effects: const <DpadEffect>[],
+        onDirection: _onDirection,
+        onSelect: _activateCursor,
+        onLongSelect: _hasLongPress ? _openCursorOptions : null,
+        onFocusChange: _onGridFocusChange,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SingleChildScrollView(
+                controller: hCtrl,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: SizedBox(
+                  width: m.channelColumnWidth + totalWidth,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: m.rulerHeight,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: m.channelColumnWidth,
+                              top: 0,
+                              bottom: 0,
+                              width: totalWidth,
+                              child: _TimeRuler(
+                                windowStart: _windowStart,
+                                windowEnd: _windowEnd,
+                                pxPerMinute: m.pxPerMinute,
                               ),
-                              // The Channels column is the default landing
-                              // spot for the EPG view (not the day-nav
-                              // header or a program block), so it's the
-                              // only autofocus target in this widget.
-                              autofocus: i == 0,
-                              focusNode: i < _channelFocusNodes.length
-                                  ? _channelFocusNodes[i]
-                                  : null,
-                              onFocusChange: (focused) {
-                                if (focused) _setFocusedChannelIndex(i);
-                              },
-                              onTap: () =>
-                                  widget.onChannelSelect(widget.channels[i]),
-                              onLongTap: widget.onChannelColumnLongPress == null
-                                  ? null
-                                  : () => widget.onChannelColumnLongPress!(
-                                      widget.channels[i],
-                                    ),
                             ),
-                          ),
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: m.channelColumnWidth,
+                              child: _PinnedToViewport(
+                                controller: hCtrl,
+                                child: _RulerCorner(now: _now),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: ListView.builder(
+                          controller: _vCtrl,
+                          itemCount: widget.channels.length,
+                          itemExtent: m.rowHeight,
+                          scrollCacheExtent: ScrollCacheExtent.pixels(
+                            m.rowHeight * 10,
+                          ),
+                          itemBuilder: (context, index) =>
+                              _buildRow(context, index, m, totalWidth),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-
-              // Thin vertical divider
-              Container(width: 1, color: colorScheme.outlineVariant),
-
-              // ── Right: time header + scrollable program grid ───────────────────
-              Expanded(
-                child: Column(
-                  children: [
-                    // Time axis header
-                    SizedBox(
-                      height: _scaledTimeHeaderH(context),
-                      child: AnimatedBuilder(
-                        animation: _headerHCtrl,
-                        builder: (context, _) {
-                          final hOffset = _headerHCtrl.hasClients
-                              ? _headerHCtrl.offset
-                              : 0.0;
-                          final nowX =
-                              now.difference(_windowStart).inMinutes *
-                                  _kPxPerMin -
-                              hOffset;
-
-                          return Stack(
-                            children: [
-                              SingleChildScrollView(
-                                controller: _headerHCtrl,
-                                scrollDirection: Axis.horizontal,
-                                physics: const NeverScrollableScrollPhysics(),
-                                child: _TimeHeader(
-                                  windowStart: _windowStart,
-                                  windowEnd: _windowEnd,
-                                  pixelsPerMinute: _kPxPerMin,
-                                  height: _scaledTimeHeaderH(context),
-                                ),
-                              ),
-                              if (nowX >= 0 && nowX <= _totalW)
-                                Positioned(
-                                  left: nowX,
-                                  top: 4,
-                                  bottom: 0,
-                                  width: 2,
-                                  child: Container(
-                                    color: colorScheme.primary.withValues(
-                                      alpha: 0.8,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-
-                    // Program rows
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          ListView.builder(
-                            controller: _rightVCtrl,
-                            itemCount: widget.channels.length,
-                            itemExtent: _scaledRowH(context),
-                            scrollCacheExtent: _scaledCacheExtent(context),
-                            itemBuilder: (_, i) {
-                              final channel = widget.channels[i];
-                              final catchupRetentionDays =
-                                  EpgService.effectiveCatchupRetentionDays(
-                                    channel.catchupSupported,
-                                    channel.catchupDays,
-                                  );
-                              // Request this row plus a look-ahead window so a
-                              // downward scroll hits loaded EPG. The call is
-                              // debounced and de-duped downstream.
-                              final isSpeed =
-                                  ImageQualityScope.of(
-                                    context,
-                                  )?.optimizeFor ==
-                                  OptimizeFor.speed;
-                              final prefetchEnd = math.min(
-                                widget.channels.length,
-                                i +
-                                    1 +
-                                    (isSpeed
-                                        ? _kEpgPrefetchAheadSpeed
-                                        : _kEpgPrefetchAheadQuality),
-                              );
-                              widget.onEnsureEpg?.call(
-                                widget.channels.sublist(i, prefetchEnd),
-                                startDate: _selectedDate,
-                                endDate: _selectedDate,
-                              );
-                              final programs = widget.epgService
-                                  .programsForChannel(
-                                    channel,
-                                  );
-                              return NotificationListener<
-                                ScrollUpdateNotification
-                              >(
-                                onNotification: (n) {
-                                  _syncH(n.metrics.pixels);
-                                  return false;
-                                },
-                                child: SingleChildScrollView(
-                                  key: ValueKey(
-                                    'timeline-row-scroll-${channel.id}',
-                                  ),
-                                  controller: i < _rowHCtrls.length
-                                      ? _rowHCtrls[i]
-                                      : null,
-                                  scrollDirection: Axis.horizontal,
-                                  child: _ProgramsRow(
-                                    programs: programs,
-                                    windowStart: _windowStart,
-                                    windowEnd: _windowEnd,
-                                    pixelsPerMinute: _kPxPerMin,
-                                    totalWidth: _totalW,
-                                    rowHeight: _scaledRowH(context),
-                                    catchupRetentionDays: catchupRetentionDays,
-                                    now: now,
-                                    nowFocusNode: i < _nowFocusNodes.length
-                                        ? _nowFocusNodes[i]
-                                        : null,
-                                    onAnyBlockFocus: () =>
-                                        _setFocusedChannelIndex(i),
-                                    // Curry the row's channel in: _ProgramsRow
-                                    // only sees programmes, but resolving a
-                                    // recording needs the channel's database
-                                    // id, which lives on the Channel.
-                                    recordingStateFor: (program) => widget
-                                        .recordingStateFor(channel, program),
-                                    onTap: (program) {
-                                      final tapNow = widget.clock();
-                                      final canReplay = EpgService.canReplay(
-                                        catchupRetentionDays,
-                                        program,
-                                        tapNow,
-                                      );
-                                      if (canReplay) {
-                                        widget.onCatchupProgramSelect?.call(
-                                          channel,
-                                          program,
-                                        );
-                                        return;
-                                      }
-                                      if (program.start.isAfter(tapNow)) {
-                                        // Future programme: offer the
-                                        // context menu (record, etc.)
-                                        // instead of starting playback.
-                                        widget.onChannelLongPress?.call(
-                                          channel,
-                                          program,
-                                        );
-                                        return;
-                                      }
-                                      if (program.end.isBefore(tapNow) ||
-                                          program.end.isAtSameMomentAs(
-                                            tapNow,
-                                          )) {
-                                        // Past, non-catchup programme: no-op.
-                                        return;
-                                      }
-                                      widget.onChannelSelect(channel);
-                                    },
-                                    onLongPress:
-                                        widget.onChannelLongPress == null
-                                        ? null
-                                        : (program) =>
-                                              widget.onChannelLongPress!(
-                                                channel,
-                                                program,
-                                              ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // "Now" vertical line over the program grid
-                          AnimatedBuilder(
-                            animation: _headerHCtrl,
-                            builder: (context, _) {
-                              if (!_headerHCtrl.hasClients) {
-                                return const SizedBox.shrink();
-                              }
-                              final nowX =
-                                  now.difference(_windowStart).inMinutes *
-                                      _kPxPerMin -
-                                  _headerHCtrl.offset;
-                              if (nowX < 0 || nowX > _totalW) {
-                                return const SizedBox.shrink();
-                              }
-                              return Positioned(
-                                left: nowX,
-                                top: 0,
-                                bottom: 0,
-                                width: 2,
-                                child: IgnorePointer(
-                                  child: Container(
-                                    color: colorScheme.primary.withValues(
-                                      alpha: 0.35,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _NowLine(
+                  controller: hCtrl,
+                  metrics: m,
+                  nowOffset: _minutesFromStart(_now) * m.pxPerMinute,
+                  totalWidth: totalWidth,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildRow(
+    BuildContext context,
+    int index,
+    _GuideMetrics m,
+    double totalWidth,
+  ) {
+    final channel = widget.channels[index];
+    _ensureEpgAround(context, index);
+    return _GuideRow(
+      key: ValueKey('timeline-row-${channel.id}'),
+      index: index,
+      channel: channel,
+      programs: _rowPrograms(index),
+      metrics: m,
+      totalWidth: totalWidth,
+      windowStart: _windowStart,
+      now: _now,
+      cursor: _cursor,
+      buildSpan: _buildSpan,
+      hCtrl: _hCtrl,
+      columnLayout: widget.channelColumnLayout,
+      isRecording: widget.recordingChannelIds.contains(channel.id),
+      recordingStateFor: (program) =>
+          widget.recordingStateFor(channel, program),
+      onProgramTap: (program) => _onProgramTap(index, program),
+      onProgramLongPress: widget.onChannelLongPress == null
+          ? null
+          : (program) => widget.onChannelLongPress!(channel, program),
+      onProgramHover: widget.showPreview
+          ? (program) => _onProgramHover(index, program)
+          : null,
+      onChannelTap: () => _onChannelTap(index),
+      onChannelLongPress: widget.onChannelColumnLongPress == null
+          ? null
+          : () => widget.onChannelColumnLongPress!(channel),
     );
   }
 }
@@ -842,9 +1134,38 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 // Private sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _DayControls extends StatelessWidget {
-  const _DayControls({
+/// Keeps [child] fixed at the viewport's left edge while its horizontally
+/// scrolling parent moves underneath it.
+class _PinnedToViewport extends StatelessWidget {
+  const _PinnedToViewport({required this.controller, required this.child});
+
+  final ScrollController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(
+          controller.hasClients
+              ? controller.offset
+              : controller.initialScrollOffset,
+          0,
+        ),
+        child: child,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _DayToolbar extends StatelessWidget {
+  const _DayToolbar({
+    required this.blockUp,
     required this.selectedDate,
+    required this.today,
+    required this.compact,
     required this.canGoPrevious,
     required this.canGoNext,
     required this.onPrevious,
@@ -852,7 +1173,13 @@ class _DayControls extends StatelessWidget {
     required this.onNext,
   });
 
+  /// Swallow D-pad Up here. With the preview panel above there's nothing
+  /// focusable directly up, so traversal would otherwise jump sideways into
+  /// the middle of the category strip.
+  final bool blockUp;
   final DateTime selectedDate;
+  final DateTime today;
+  final bool compact;
   final bool canGoPrevious;
   final bool canGoNext;
   final VoidCallback onPrevious;
@@ -861,108 +1188,488 @@ class _DayControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final scale = FontSizeScope.scaleOf(context);
-    return Container(
-      height: 42 * scale,
-      padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 4 * scale),
-      // Left-aligned (Row's default) so this cluster sits directly above
-      // the Channels column (matching its horizontal position) instead of
-      // floating centered across the whole EPG width.
-      //
-      // crossAxisAlignment.stretch gives every child (icon buttons, the
-      // "now" pill, the date text) the exact same focus-node rect height.
-      // Without it, the "now" pill's naturally-shorter text-driven height
-      // sits entirely inside the taller icon buttons' rect on the vertical
-      // axis, which the dpad package's edge-based "is this candidate below
-      // me" check (see DpadTraversalPolicy._isCandidate) reads as still
-      // being a same-row neighbor even after Down should have left the
-      // row — so pressing Down from "now" would land on "previous"/"next"
-      // instead of dropping to the Channels column.
+    final locale = Localizations.localeOf(context).toLanguageTag();
+
+    Widget chevron({
+      required Key key,
+      required IconData icon,
+      required bool enabled,
+      required VoidCallback onTap,
+      required String label,
+    }) {
+      return DpadInkWell(
+        key: key,
+        onTap: enabled ? onTap : null,
+        enabled: enabled,
+        autoScroll: false,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 6 * scale),
+          child: Center(
+            child: Icon(
+              icon,
+              size: 26 * scale,
+              color: enabled
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurface.withValues(alpha: 0.3),
+              semanticLabel: label,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final toolbar = Container(
+      height: (compact ? 50 : 58) * scale,
+      padding: EdgeInsets.symmetric(
+        horizontal: (compact ? 8 : 12) * scale,
+        vertical: 6 * scale,
+      ),
+      // crossAxisAlignment.stretch gives every focusable the same rect
+      // height, so D-pad Down from any of them reads as leaving the row
+      // (dpad's edge-based "is this candidate below me" check) instead of
+      // hopping to a taller neighbour.
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DpadInkWell(
+          chevron(
             key: const ValueKey('timeline-previous-day'),
-            onTap: canGoPrevious ? onPrevious : null,
-            // Not the visible landing focus (the Channels column autofocus,
-            // built after this, wins that) — this just seeds the
-            // day-controls/program-grid region's own focus history, so
-            // returning here from the Channels column (see
-            // LiveTvScreen._handleChannelColumnEdge) has a real fallback
-            // target instead of parking on an empty scope.
-            autofocus: canGoPrevious,
+            icon: Icons.chevron_left,
             enabled: canGoPrevious,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5 * scale),
-              child: Center(
-                child: Icon(
-                  Icons.chevron_left,
-                  size: 20 * scale,
-                  color: canGoPrevious
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurface.withValues(alpha: 0.35),
-                  semanticLabel: l10n.epgPreviousDay,
-                ),
-              ),
-            ),
+            onTap: onPrevious,
+            label: l10n.epgPreviousDay,
           ),
-          SizedBox(width: 6 * scale),
           SizedBox(
-            width: 116 * scale,
-            child: Center(
-              child: Text(
-                DateFormat.yMMMd(
-                  Localizations.localeOf(context).toLanguageTag(),
-                ).format(selectedDate),
-                textAlign: TextAlign.center,
-                style: _epgStyle(
-                  context,
-                  Theme.of(context).textTheme.labelMedium,
+            width: (compact ? 118 : 150) * scale,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  epgRelativeDayLabel(context, selectedDate, today),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
+                Text(
+                  DateFormat.yMMMd(locale).format(selectedDate),
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          SizedBox(width: 6 * scale),
+          chevron(
+            key: const ValueKey('timeline-next-day'),
+            icon: Icons.chevron_right,
+            enabled: canGoNext,
+            onTap: onNext,
+            label: l10n.epgNextDay,
+          ),
+          SizedBox(width: 12 * scale),
           DpadInkWell(
             key: const ValueKey('timeline-now'),
             onTap: onNow,
-            autofocus: !canGoPrevious,
+            autoScroll: false,
             borderRadius: BorderRadius.circular(50),
             color: colorScheme.primaryContainer,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12 * scale),
-              child: Center(
-                child: Text(
-                  l10n.epgNow,
-                  style: _epgStyle(
-                    context,
-                    Theme.of(context).textTheme.labelMedium,
+              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.today,
+                    size: 18 * scale,
                     color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    l10n.epgNow,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          SizedBox(width: 6 * scale),
-          DpadInkWell(
-            key: const ValueKey('timeline-next-day'),
-            onTap: canGoNext ? onNext : null,
-            enabled: canGoNext,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5 * scale),
-              child: Center(
-                child: Icon(
-                  Icons.chevron_right,
-                  size: 20 * scale,
-                  color: canGoNext
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurface.withValues(alpha: 0.35),
-                  semanticLabel: l10n.epgNextDay,
+        ],
+      ),
+    );
+    if (!blockUp) return toolbar;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) =>
+          event is! KeyUpEvent &&
+              Dpad.keySetOf(context).directionOf(event.logicalKey) ==
+                  TraversalDirection.up
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored,
+      child: toolbar,
+    );
+  }
+}
+
+/// The corner above the channel column: the current time.
+class _RulerCorner extends StatelessWidget {
+  const _RulerCorner({required this.now});
+
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        border: Border(
+          right: BorderSide(color: colorScheme.outlineVariant),
+          bottom: BorderSide(color: colorScheme.outlineVariant),
+        ),
+      ),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          epgTimeLabel(context, now),
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: colorScheme.primary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeRuler extends StatelessWidget {
+  const _TimeRuler({
+    required this.windowStart,
+    required this.windowEnd,
+    required this.pxPerMinute,
+  });
+
+  final DateTime windowStart;
+  final DateTime windowEnd;
+  final double pxPerMinute;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    // Hourly labels only when half-hours would crowd each other.
+    final step = pxPerMinute * 30 >= 110 ? 30 : 60;
+    final labels = <Widget>[];
+    var slot = DateTime(
+      windowStart.year,
+      windowStart.month,
+      windowStart.day,
+      windowStart.hour,
+      (windowStart.minute ~/ step) * step,
+    );
+    while (slot.isBefore(windowEnd)) {
+      final x = slot.difference(windowStart).inMinutes * pxPerMinute;
+      if (x >= 0) {
+        final isHour = slot.minute == 0;
+        labels.add(
+          Positioned(
+            left: x,
+            top: 0,
+            bottom: 0,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 1,
+                  margin: const EdgeInsets.only(top: 12),
+                  color: colorScheme.outlineVariant,
+                ),
+                const SizedBox(width: 6),
+                Center(
+                  child: Text(
+                    epgTimeLabel(context, slot),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: isHour
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: isHour ? FontWeight.w600 : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      slot = DateTime(
+        slot.year,
+        slot.month,
+        slot.day,
+        slot.hour,
+        slot.minute + step,
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      child: Stack(children: labels),
+    );
+  }
+}
+
+class _NowLine extends StatelessWidget {
+  const _NowLine({
+    required this.controller,
+    required this.metrics,
+    required this.nowOffset,
+    required this.totalWidth,
+  });
+
+  final ScrollController controller;
+  final _GuideMetrics metrics;
+  final double nowOffset;
+  final double totalWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    if (nowOffset < 0 || nowOffset > totalWidth) {
+      return const SizedBox.shrink();
+    }
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final offset = controller.hasClients
+            ? controller.offset
+            : controller.initialScrollOffset;
+        final x = metrics.channelColumnWidth + nowOffset - offset;
+        if (x < metrics.channelColumnWidth || x > metrics.viewportWidth) {
+          return const SizedBox.shrink();
+        }
+        final top = metrics.rulerHeight * 0.3;
+        return Stack(
+          children: [
+            Positioned(
+              left: x - 1,
+              top: top,
+              bottom: 0,
+              width: 2,
+              child: ColoredBox(color: color.withValues(alpha: 0.85)),
+            ),
+            Positioned(
+              left: x - 5,
+              top: top - 5,
+              width: 10,
+              height: 10,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One channel row: its pinned channel cell plus its programmes. Listens
+/// to the shared cursor itself and only rebuilds when the cursor enters,
+/// moves within, or leaves this row, so a key press repaints one or two
+/// rows rather than the whole visible guide.
+class _GuideRow extends StatefulWidget {
+  const _GuideRow({
+    super.key,
+    required this.index,
+    required this.channel,
+    required this.programs,
+    required this.metrics,
+    required this.totalWidth,
+    required this.windowStart,
+    required this.now,
+    required this.cursor,
+    required this.buildSpan,
+    required this.hCtrl,
+    required this.columnLayout,
+    required this.isRecording,
+    required this.recordingStateFor,
+    required this.onProgramTap,
+    required this.onChannelTap,
+    this.onProgramLongPress,
+    this.onProgramHover,
+    this.onChannelLongPress,
+  });
+
+  final int index;
+  final Channel channel;
+  final List<EpgProgram> programs;
+  final _GuideMetrics metrics;
+  final double totalWidth;
+  final DateTime windowStart;
+  final DateTime now;
+  final ValueNotifier<_GuideCursor> cursor;
+  final ValueNotifier<_MinuteSpan> buildSpan;
+  final ScrollController hCtrl;
+  final ChannelColumnLayout columnLayout;
+  final bool isRecording;
+  final EpgRecordingState Function(EpgProgram program) recordingStateFor;
+  final ValueChanged<EpgProgram> onProgramTap;
+  final ValueChanged<EpgProgram>? onProgramLongPress;
+  final ValueChanged<EpgProgram>? onProgramHover;
+  final VoidCallback onChannelTap;
+  final VoidCallback? onChannelLongPress;
+
+  @override
+  State<_GuideRow> createState() => _GuideRowState();
+}
+
+class _GuideRowState extends State<_GuideRow> {
+  late _GuideCursor _lastCursor;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastCursor = widget.cursor.value;
+    widget.cursor.addListener(_onCursorChanged);
+    widget.buildSpan.addListener(_onSpanChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.cursor.removeListener(_onCursorChanged);
+    widget.buildSpan.removeListener(_onSpanChanged);
+    super.dispose();
+  }
+
+  void _onCursorChanged() {
+    final next = widget.cursor.value;
+    final affected =
+        _lastCursor.row == widget.index || next.row == widget.index;
+    _lastCursor = next;
+    if (affected) setState(() {});
+  }
+
+  void _onSpanChanged() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.metrics;
+    final colorScheme = Theme.of(context).colorScheme;
+    final cursor = widget.cursor.value;
+    _lastCursor = cursor;
+    final isCursorRow = cursor.row == widget.index;
+    final showCursor = isCursorRow && cursor.focused;
+    final catchupDays = EpgService.effectiveCatchupRetentionDays(
+      widget.channel.catchupSupported,
+      widget.channel.catchupDays,
+    );
+    final span = widget.buildSpan.value;
+
+    final cells = <Widget>[];
+    for (final program in widget.programs) {
+      final startMinutes = math.max<double>(
+        0,
+        program.start.difference(widget.windowStart).inSeconds / 60,
+      );
+      final endMinutes = math.min(
+        widget.totalWidth / m.pxPerMinute,
+        program.end.difference(widget.windowStart).inSeconds / 60,
+      );
+      if (!span.overlaps(startMinutes, endMinutes)) continue;
+      final left = startMinutes * m.pxPerMinute;
+      final width = (endMinutes - startMinutes) * m.pxPerMinute;
+      cells.add(
+        Positioned(
+          left: left + 2,
+          top: 3,
+          bottom: 3,
+          width: math.max(2, width - 4),
+          child: _ProgramCell(
+            key: ValueKey(
+              'timeline-program-${program.channelId}-'
+              '${program.start.toIso8601String()}',
+            ),
+            program: program,
+            width: width - 4,
+            now: widget.now,
+            compact: m.compact,
+            canReplay: EpgService.canReplay(catchupDays, program, widget.now),
+            recordingState: widget.recordingStateFor(program),
+            focused: showCursor && cursor.isOn(program),
+            onTap: () => widget.onProgramTap(program),
+            onLongPress: widget.onProgramLongPress == null
+                ? null
+                : () => widget.onProgramLongPress!(program),
+            onHover: widget.onProgramHover == null
+                ? null
+                : () => widget.onProgramHover!(program),
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: m.channelColumnWidth,
+            top: 0,
+            bottom: 0,
+            width: widget.totalWidth,
+            child: RepaintBoundary(child: Stack(children: cells)),
+          ),
+          if (widget.programs.isEmpty)
+            Positioned(
+              left: m.channelColumnWidth,
+              top: 0,
+              bottom: 0,
+              width: m.programViewportWidth,
+              child: _PinnedToViewport(
+                controller: widget.hCtrl,
+                child: _EmptyRowCell(
+                  focused: showCursor && !cursor.onChannel,
+                  compact: m.compact,
+                ),
+              ),
+            ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: m.channelColumnWidth,
+            child: _PinnedToViewport(
+              controller: widget.hCtrl,
+              child: RepaintBoundary(
+                child: _ChannelCell(
+                  channel: widget.channel,
+                  layout: widget.columnLayout,
+                  compact: m.compact,
+                  isRecording: widget.isRecording,
+                  rowActive: showCursor,
+                  focused: showCursor && cursor.onChannel,
+                  onTap: widget.onChannelTap,
+                  onLongPress: widget.onChannelLongPress,
                 ),
               ),
             ),
@@ -973,55 +1680,366 @@ class _DayControls extends StatelessWidget {
   }
 }
 
+/// The focused-cell outline: the same gradient ring D-pad focus draws
+/// everywhere else in the app.
+class _CursorRing extends StatelessWidget {
+  const _CursorRing({required this.radius});
+
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IgnorePointer(
+      child: CustomPaint(
+        key: const ValueKey('timeline-cursor'),
+        painter: GradientBorderPainter(
+          borderRadius: BorderRadius.circular(radius),
+          width: 3,
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [colorScheme.primary, colorScheme.secondary],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgramCell extends StatelessWidget {
+  const _ProgramCell({
+    super.key,
+    required this.program,
+    required this.width,
+    required this.now,
+    required this.compact,
+    required this.canReplay,
+    required this.recordingState,
+    required this.focused,
+    required this.onTap,
+    this.onLongPress,
+    this.onHover,
+  });
+
+  final EpgProgram program;
+  final double width;
+  final DateTime now;
+  final bool compact;
+  final bool canReplay;
+  final EpgRecordingState recordingState;
+  final bool focused;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onHover;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final isLive = !now.isBefore(program.start) && now.isBefore(program.end);
+    final isPast = !program.end.isAfter(now);
+    final dimmed = isPast && !canReplay;
+
+    final Color background;
+    if (focused) {
+      background = Color.alphaBlend(
+        colorScheme.primary.withValues(alpha: 0.32),
+        colorScheme.surfaceContainerHighest,
+      );
+    } else if (isLive) {
+      background = Color.alphaBlend(
+        colorScheme.primary.withValues(alpha: 0.16),
+        colorScheme.surfaceContainerHigh,
+      );
+    } else if (isPast || program.isPlaceholder) {
+      background = colorScheme.surfaceContainerLow;
+    } else {
+      background = colorScheme.surfaceContainerHigh;
+    }
+    final foreground = dimmed
+        ? colorScheme.onSurface.withValues(alpha: 0.55)
+        : colorScheme.onSurface;
+
+    final showText = width >= 28;
+    final showSecondLine = width >= 90;
+    final showBadges = width >= 64;
+
+    final title = program.isPlaceholder ? l10n.epgNoData : program.displayTitle;
+    final titleStyle =
+        (compact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
+            ?.copyWith(
+              color: program.isPlaceholder
+                  ? colorScheme.onSurfaceVariant
+                  : foreground,
+              fontWeight: isLive || focused ? FontWeight.w600 : FontWeight.w500,
+              fontStyle: program.isPlaceholder ? FontStyle.italic : null,
+            );
+    final episode = program.isPlaceholder
+        ? null
+        : epgEpisodeLabel(l10n, program);
+    final secondLine = [
+      epgTimeLabel(context, program.start),
+      ?episode,
+    ].join('  ·  ');
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onHover: onHover == null ? null : (_) => onHover!(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Semantics(
+          button: true,
+          selected: focused,
+          label: title,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              children: [
+                if (showText)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: width < 80 ? 6 : 10,
+                        vertical: 4,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              if (showBadges &&
+                                  recordingState != EpgRecordingState.none) ...[
+                                ProgramRecordingIndicator(
+                                  state: recordingState,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: titleStyle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (showBadges && canReplay) ...[
+                                const SizedBox(width: 6),
+                                EpgIconPill(
+                                  color: colorScheme.tertiaryContainer,
+                                  borderColor: colorScheme.tertiary.withValues(
+                                    alpha: 0.55,
+                                  ),
+                                  child: Icon(
+                                    Icons.replay_rounded,
+                                    size: 12,
+                                    color: colorScheme.onTertiaryContainer,
+                                    semanticLabel:
+                                        l10n.catchupProgramReplayable,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (showSecondLine && !program.isPlaceholder) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    secondLine,
+                                    style:
+                                        (compact
+                                                ? theme.textTheme.bodySmall
+                                                : theme.textTheme.bodyMedium)
+                                            ?.copyWith(
+                                              color: dimmed
+                                                  ? colorScheme.onSurfaceVariant
+                                                        .withValues(alpha: 0.6)
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (program.isNew) ...[
+                                  const SizedBox(width: 6),
+                                  _NewBadge(label: l10n.epgBadgeNew),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                if (isLive)
+                  Positioned(
+                    left: 0,
+                    bottom: 0,
+                    height: 3,
+                    width:
+                        width *
+                        (now.difference(program.start).inSeconds /
+                                math.max(
+                                  1,
+                                  program.end
+                                      .difference(program.start)
+                                      .inSeconds,
+                                ))
+                            .clamp(0.0, 1.0),
+                    child: ColoredBox(color: colorScheme.primary),
+                  ),
+                if (focused)
+                  const Positioned.fill(child: _CursorRing(radius: 8)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NewBadge extends StatelessWidget {
+  const _NewBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+          fontSize: 9,
+        ),
+      ),
+    );
+  }
+}
+
+/// A row with no programme data: a single cell pinned across the visible
+/// programme area, so the cursor still has somewhere to sit.
+class _EmptyRowCell extends StatelessWidget {
+  const _EmptyRowCell({required this.focused, required this.compact});
+
+  final bool focused;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: focused
+                    ? Color.alphaBlend(
+                        colorScheme.primary.withValues(alpha: 0.2),
+                        colorScheme.surfaceContainerHigh,
+                      )
+                    : colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                AppLocalizations.of(context).epgNoData,
+                style:
+                    (compact
+                            ? theme.textTheme.bodySmall
+                            : theme.textTheme.bodyMedium)
+                        ?.copyWith(
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
+                          fontStyle: FontStyle.italic,
+                        ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          if (focused) const Positioned.fill(child: _CursorRing(radius: 8)),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChannelCell extends StatelessWidget {
   const _ChannelCell({
     required this.channel,
-    this.isRecording = false,
-    this.onTap,
-    this.onLongTap,
-    this.autofocus = false,
-    this.columnLayout = ChannelColumnLayout.logoOnly,
-    this.focusNode,
-    this.onFocusChange,
+    required this.layout,
+    required this.compact,
+    required this.isRecording,
+    required this.rowActive,
+    required this.focused,
+    required this.onTap,
+    this.onLongPress,
   });
-  final Channel channel;
-  final bool isRecording;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongTap;
-  final bool autofocus;
-  final ChannelColumnLayout columnLayout;
-  final FocusNode? focusNode;
-  final ValueChanged<bool>? onFocusChange;
 
-  Widget _logo({required double size}) {
-    if (channel.logoUrl != null && channel.logoUrl!.isNotEmpty) {
-      return CachedMediaThumbnail(
-        url: channel.logoUrl!,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        oversample: 2,
-        fallback: Icon(Icons.tv, size: size - 4),
-      );
-    }
-    return Icon(Icons.tv, size: size - 4);
+  final Channel channel;
+  final ChannelColumnLayout layout;
+  final bool compact;
+  final bool isRecording;
+
+  /// The cursor is somewhere in this row: tint the cell so the channel the
+  /// focused programme belongs to is obvious.
+  final bool rowActive;
+  final bool focused;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  Widget _logo(double size) {
+    final url = channel.logoUrl;
+    final fallback = Icon(Icons.tv, size: size * 0.8);
+    if (url == null || url.isEmpty) return fallback;
+    return CachedMediaThumbnail(
+      url: url,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      oversample: 2,
+      fallback: fallback,
+    );
   }
 
-  /// Logo with the recording dot pinned to its top-right corner — used by
-  /// every layout that renders a logo, so recording status stays visible
-  /// even when [ChannelColumnLayout.logoOnly] hides the title.
-  Widget _logoWithRecordingBadge(
-    ColorScheme colorScheme, {
-    required double size,
-  }) {
-    if (!isRecording) return _logo(size: size);
+  Widget _logoWithRecordingDot(ColorScheme colorScheme, double size) {
+    if (!isRecording) return _logo(size);
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _logo(size: size),
+          _logo(size),
           Positioned(
             top: -2,
             right: -2,
@@ -1034,384 +2052,132 @@ class _ChannelCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DpadInkWell(
-      onTap: onTap,
-      onLongTap: onLongTap,
-      autofocus: autofocus,
-      focusNode: focusNode,
-      onFocusChange: onFocusChange,
-      borderRadius: BorderRadius.zero,
-      child: Container(
-        height: _scaledRowH(context),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
-          ),
-        ),
-        // A Stack rather than a plain padded child so the catchup badge can
-        // float in a fixed corner of the cell (see below) without being laid
-        // out as part of the logo/title content — keeping it out of that
-        // flow is what keeps its position identical across every
-        // [ChannelColumnLayout] and stops it from fighting the column/row
-        // for space (and overflowing) the way an inline badge did.
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
-                child: switch (columnLayout) {
-                  ChannelColumnLayout.logoAndTitle => _buildLogoAndTitle(
-                    context,
-                    colorScheme,
-                  ),
-                  ChannelColumnLayout.logoOnly => Center(
-                    child: _logoWithRecordingBadge(
-                      colorScheme,
-                      size: 44 * FontSizeScope.scaleOf(context),
-                    ),
-                  ),
-                  ChannelColumnLayout.titleOnly => _buildTitleOnly(
-                    context,
-                    colorScheme,
-                  ),
-                },
-              ),
-            ),
-            if (channel.catchupSupported)
-              Positioned(
-                top: 2,
-                right: 4,
-                child: CatchupBadge(days: channel.catchupDays, compact: true),
-              ),
-          ],
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final number = channel.channelNumber;
+    final numberStyle = theme.textTheme.labelMedium?.copyWith(
+      color: focused ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    final nameStyle =
+        (compact ? theme.textTheme.labelMedium : theme.textTheme.titleSmall)
+            ?.copyWith(fontWeight: focused ? FontWeight.w700 : null);
+
+    final Widget content = switch (layout) {
+      ChannelColumnLayout.logoOnly => Center(
+        child: _logoWithRecordingDot(
+          colorScheme,
+          (compact ? 36 : 44) * scale,
         ),
       ),
-    );
-  }
-
-  Widget _buildLogoAndTitle(BuildContext context, ColorScheme colorScheme) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _logoWithRecordingBadge(
-          colorScheme,
-          size: 26 * FontSizeScope.scaleOf(context),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          channel.name,
-          style: Theme.of(context).textTheme.labelSmall,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTitleOnly(BuildContext context, ColorScheme colorScheme) {
-    return Row(
-      children: [
-        if (isRecording) ...[
-          RecordingDot(color: colorScheme.error),
-          const SizedBox(width: 4),
-        ],
-        Expanded(
-          child: Text(
-            channel.name,
-            style: Theme.of(context).textTheme.labelSmall,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TimeHeader extends StatelessWidget {
-  const _TimeHeader({
-    required this.windowStart,
-    required this.windowEnd,
-    required this.pixelsPerMinute,
-    required this.height,
-  });
-
-  final DateTime windowStart;
-  final DateTime windowEnd;
-  final double pixelsPerMinute;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final totalW =
-        windowEnd.difference(windowStart).inMinutes * pixelsPerMinute;
-
-    // Snap to the last 30-min boundary at or before windowStart
-    var slot = DateTime(
-      windowStart.year,
-      windowStart.month,
-      windowStart.day,
-      windowStart.hour,
-      (windowStart.minute ~/ 30) * 30,
-    );
-
-    final slots = <Widget>[];
-    while (slot.isBefore(windowEnd)) {
-      final x = slot.difference(windowStart).inMinutes * pixelsPerMinute;
-      if (x >= -80 && x < totalW + 80) {
-        slots.add(
-          Positioned(
-            left: x,
-            top: 0,
-            bottom: 0,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 1,
-                  height: height * 0.55,
-                  color: colorScheme.outlineVariant,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  _label(slot),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      slot = slot.add(const Duration(minutes: 30));
-    }
-
-    return Container(
-      width: totalW,
-      height: height,
-      color: colorScheme.surfaceContainerHighest,
-      child: Stack(children: slots),
-    );
-  }
-
-  String _label(DateTime t) {
-    final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
-    final suffix = t.hour < 12 ? 'AM' : 'PM';
-    return t.minute == 0
-        ? '$h $suffix'
-        : '$h:${t.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-class _ProgramsRow extends StatelessWidget {
-  const _ProgramsRow({
-    required this.programs,
-    required this.windowStart,
-    required this.windowEnd,
-    required this.pixelsPerMinute,
-    required this.totalWidth,
-    required this.rowHeight,
-    required this.onTap,
-    required this.catchupRetentionDays,
-    required this.now,
-    this.onLongPress,
-    this.recordingStateFor = _noRecordingState,
-    this.nowFocusNode,
-    this.onAnyBlockFocus,
-  });
-
-  final List<EpgProgram> programs;
-  final DateTime windowStart;
-  final DateTime windowEnd;
-  final double pixelsPerMinute;
-  final double totalWidth;
-  final double rowHeight;
-  final void Function(EpgProgram program) onTap;
-  final int catchupRetentionDays;
-  final DateTime now;
-
-  /// Opens the favorite/record context menu for the pressed block.
-  final void Function(EpgProgram program)? onLongPress;
-
-  /// Attached to this row's currently-airing block (if any), so the caller
-  /// can `requestFocus()` directly onto "now" instead of the day's first
-  /// block.
-  final FocusNode? nowFocusNode;
-
-  /// Called whenever any block in this row gains focus, so the caller can
-  /// track which channel row currently holds grid focus.
-  final VoidCallback? onAnyBlockFocus;
-
-  /// Resolves the per-programme recording indicator for a block. Defaults
-  /// to [EpgRecordingState.none], which renders no badge and is visually
-  /// identical to the pre-#185 layout.
-  final EpgRecordingState Function(EpgProgram program) recordingStateFor;
-
-  static EpgRecordingState _noRecordingState(EpgProgram _) =>
-      EpgRecordingState.none;
-
-  bool showCatchupIcon(EpgProgram program) =>
-      EpgService.canReplay(catchupRetentionDays, program, now);
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context);
-
-    final visible = programs
-        .where((p) => p.end.isAfter(windowStart) && p.start.isBefore(windowEnd))
-        .toList();
-
-    final blocks = <Widget>[];
-    for (final p in visible) {
-      final isCurrent = !now.isBefore(p.start) && now.isBefore(p.end);
-      final clampedStart = p.start.isBefore(windowStart)
-          ? windowStart
-          : p.start;
-      final clampedEnd = p.end.isAfter(windowEnd) ? windowEnd : p.end;
-      final left =
-          clampedStart.difference(windowStart).inMinutes * pixelsPerMinute;
-      final width =
-          clampedEnd.difference(clampedStart).inMinutes * pixelsPerMinute;
-
-      if (width < 4) continue;
-
-      final bgColor = isCurrent
-          ? colorScheme.primaryContainer
-          : colorScheme.secondaryContainer;
-      final fgColor = isCurrent
-          ? colorScheme.onPrimaryContainer
-          : colorScheme.onSecondaryContainer;
-      final borderColor = isCurrent
-          ? colorScheme.primary.withValues(alpha: 0.6)
-          : colorScheme.outline.withValues(alpha: 0.25);
-      final recordingState = recordingStateFor(p);
-      final hasCatchup = showCatchupIcon(p);
-      final hasRecording = recordingState != EpgRecordingState.none;
-      blocks.add(
-        Positioned(
-          left: left + 1,
-          top: isCurrent ? 2 : 4,
-          height: rowHeight - (isCurrent ? 4 : 8),
-          width: width - 2,
-          child: DpadInkWell(
-            key: ValueKey(
-              'timeline-program-${p.channelId}-${p.start.toIso8601String()}',
-            ),
-            onTap: () => onTap(p),
-            onLongTap: onLongPress == null ? null : () => onLongPress!(p),
-            focusNode: isCurrent ? nowFocusNode : null,
-            onFocusChange: onAnyBlockFocus == null
-                ? null
-                : (focused) {
-                    if (focused) onAnyBlockFocus!();
-                  },
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: borderColor),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: hasRecording ? 18 : 0,
-                      right: hasCatchup ? 22 : 0,
-                    ),
-                    child: Text(
-                      p.displayTitle,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: fgColor,
-                        fontWeight: isCurrent
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (hasRecording)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: ProgramRecordingIndicator(state: recordingState),
-                    ),
-                  if (hasCatchup)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: EpgIconPill(
-                        color: colorScheme.tertiaryContainer,
-                        borderColor: colorScheme.tertiary.withValues(
-                          alpha: 0.55,
-                        ),
-                        child: Icon(
-                          Icons.replay_rounded,
-                          size: 10,
-                          color: colorScheme.onTertiaryContainer,
-                          semanticLabel: l10n.catchupProgramReplayable,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (blocks.isEmpty) {
-      return SizedBox(
-        width: totalWidth,
-        height: rowHeight,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(
-              l10n.epgNoData,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: totalWidth,
-      height: rowHeight,
-      child: Stack(
+      ChannelColumnLayout.logoAndTitle when compact => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: colorScheme.outlineVariant,
-                    width: 0.5,
-                  ),
-                ),
+          _logoWithRecordingDot(colorScheme, 26 * scale),
+          const SizedBox(height: 3),
+          Text(
+            channel.name,
+            style: theme.textTheme.labelSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+      ChannelColumnLayout.logoAndTitle => Row(
+        children: [
+          _logoWithRecordingDot(colorScheme, 40 * scale),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              channel.name,
+              style: nameStyle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      ChannelColumnLayout.titleOnly => Row(
+        children: [
+          if (isRecording) ...[
+            RecordingDot(color: colorScheme.error),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              channel.name,
+              style: nameStyle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    };
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Semantics(
+        button: true,
+        selected: focused,
+        label: channel.name,
+        child: Container(
+          decoration: BoxDecoration(
+            color: focused
+                ? Color.alphaBlend(
+                    colorScheme.primary.withValues(alpha: 0.3),
+                    colorScheme.surfaceContainerHighest,
+                  )
+                : rowActive
+                ? colorScheme.surfaceContainerHighest
+                : colorScheme.surface,
+            border: Border(
+              right: BorderSide(color: colorScheme.outlineVariant),
+              bottom: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
               ),
             ),
           ),
-          ...blocks,
-        ],
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    number != null && layout != ChannelColumnLayout.logoOnly
+                        ? 40 * scale
+                        : 8,
+                    6,
+                    8,
+                    6,
+                  ),
+                  child: content,
+                ),
+              ),
+              if (number != null)
+                Positioned(
+                  left: 8,
+                  top: layout == ChannelColumnLayout.logoOnly ? 4 : 0,
+                  bottom: layout == ChannelColumnLayout.logoOnly ? null : 0,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('$number', style: numberStyle),
+                  ),
+                ),
+              if (channel.catchupSupported)
+                Positioned(
+                  top: 3,
+                  right: 4,
+                  child: CatchupBadge(days: channel.catchupDays, compact: true),
+                ),
+              if (focused) const Positioned.fill(child: _CursorRing(radius: 0)),
+            ],
+          ),
+        ),
       ),
     );
   }

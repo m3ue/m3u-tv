@@ -103,6 +103,15 @@ void main() {
           start: start,
           end: start.add(const Duration(minutes: 30)),
           subtitle: 'Lunchtime edition',
+          iconUrl: 'https://images.example/noon.jpg',
+          category: 'News',
+          rating: 'TV-G',
+          season: 3,
+          episode: 12,
+          year: 2026,
+          isNew: true,
+          isPremiere: true,
+          isRepeat: true,
         ),
         EpgProgram(
           channelId: 'bbc.two',
@@ -125,8 +134,20 @@ void main() {
       expect(programs[0].start, start);
       expect(programs[0].end, start.add(const Duration(minutes: 30)));
       expect(programs[0].subtitle, 'Lunchtime edition');
+      expect(programs[0].iconUrl, 'https://images.example/noon.jpg');
+      expect(programs[0].category, 'News');
+      expect(programs[0].rating, 'TV-G');
+      expect(programs[0].season, 3);
+      expect(programs[0].episode, 12);
+      expect(programs[0].year, 2026);
+      expect(programs[0].isNew, isTrue);
+      expect(programs[0].isPremiere, isTrue);
+      expect(programs[0].isRepeat, isTrue);
+      expect(programs[0].isPlaceholder, isFalse);
       expect(programs[1].channelId, 'bbc.two');
       expect(programs[1].subtitle, isNull);
+      expect(programs[1].iconUrl, isNull);
+      expect(programs[1].isNew, isFalse);
     },
   );
 

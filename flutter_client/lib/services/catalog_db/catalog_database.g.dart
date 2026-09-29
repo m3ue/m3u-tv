@@ -1174,6 +1174,124 @@ class $EpgProgrammesTable extends EpgProgrammes
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _iconUrlMeta = const VerificationMeta(
+    'iconUrl',
+  );
+  @override
+  late final GeneratedColumn<String> iconUrl = GeneratedColumn<String>(
+    'icon_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ratingMeta = const VerificationMeta('rating');
+  @override
+  late final GeneratedColumn<String> rating = GeneratedColumn<String>(
+    'rating',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _seasonMeta = const VerificationMeta('season');
+  @override
+  late final GeneratedColumn<int> season = GeneratedColumn<int>(
+    'season',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _episodeMeta = const VerificationMeta(
+    'episode',
+  );
+  @override
+  late final GeneratedColumn<int> episode = GeneratedColumn<int>(
+    'episode',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _yearMeta = const VerificationMeta('year');
+  @override
+  late final GeneratedColumn<int> year = GeneratedColumn<int>(
+    'year',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isNewMeta = const VerificationMeta('isNew');
+  @override
+  late final GeneratedColumn<bool> isNew = GeneratedColumn<bool>(
+    'is_new',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_new" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isPremiereMeta = const VerificationMeta(
+    'isPremiere',
+  );
+  @override
+  late final GeneratedColumn<bool> isPremiere = GeneratedColumn<bool>(
+    'is_premiere',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_premiere" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isRepeatMeta = const VerificationMeta(
+    'isRepeat',
+  );
+  @override
+  late final GeneratedColumn<bool> isRepeat = GeneratedColumn<bool>(
+    'is_repeat',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_repeat" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isPlaceholderMeta = const VerificationMeta(
+    'isPlaceholder',
+  );
+  @override
+  late final GeneratedColumn<bool> isPlaceholder = GeneratedColumn<bool>(
+    'is_placeholder',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_placeholder" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     channelId,
@@ -1182,6 +1300,16 @@ class $EpgProgrammesTable extends EpgProgrammes
     title,
     subtitle,
     description,
+    iconUrl,
+    category,
+    rating,
+    season,
+    episode,
+    year,
+    isNew,
+    isPremiere,
+    isRepeat,
+    isPlaceholder,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1240,6 +1368,69 @@ class $EpgProgrammesTable extends EpgProgrammes
         ),
       );
     }
+    if (data.containsKey('icon_url')) {
+      context.handle(
+        _iconUrlMeta,
+        iconUrl.isAcceptableOrUnknown(data['icon_url']!, _iconUrlMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('rating')) {
+      context.handle(
+        _ratingMeta,
+        rating.isAcceptableOrUnknown(data['rating']!, _ratingMeta),
+      );
+    }
+    if (data.containsKey('season')) {
+      context.handle(
+        _seasonMeta,
+        season.isAcceptableOrUnknown(data['season']!, _seasonMeta),
+      );
+    }
+    if (data.containsKey('episode')) {
+      context.handle(
+        _episodeMeta,
+        episode.isAcceptableOrUnknown(data['episode']!, _episodeMeta),
+      );
+    }
+    if (data.containsKey('year')) {
+      context.handle(
+        _yearMeta,
+        year.isAcceptableOrUnknown(data['year']!, _yearMeta),
+      );
+    }
+    if (data.containsKey('is_new')) {
+      context.handle(
+        _isNewMeta,
+        isNew.isAcceptableOrUnknown(data['is_new']!, _isNewMeta),
+      );
+    }
+    if (data.containsKey('is_premiere')) {
+      context.handle(
+        _isPremiereMeta,
+        isPremiere.isAcceptableOrUnknown(data['is_premiere']!, _isPremiereMeta),
+      );
+    }
+    if (data.containsKey('is_repeat')) {
+      context.handle(
+        _isRepeatMeta,
+        isRepeat.isAcceptableOrUnknown(data['is_repeat']!, _isRepeatMeta),
+      );
+    }
+    if (data.containsKey('is_placeholder')) {
+      context.handle(
+        _isPlaceholderMeta,
+        isPlaceholder.isAcceptableOrUnknown(
+          data['is_placeholder']!,
+          _isPlaceholderMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1273,6 +1464,46 @@ class $EpgProgrammesTable extends EpgProgrammes
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
+      iconUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_url'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rating'],
+      ),
+      season: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}season'],
+      ),
+      episode: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}episode'],
+      ),
+      year: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}year'],
+      ),
+      isNew: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_new'],
+      )!,
+      isPremiere: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_premiere'],
+      )!,
+      isRepeat: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_repeat'],
+      )!,
+      isPlaceholder: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_placeholder'],
+      )!,
     );
   }
 
@@ -1289,6 +1520,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   final String title;
   final String? subtitle;
   final String description;
+  final String? iconUrl;
+  final String? category;
+  final String? rating;
+  final int? season;
+  final int? episode;
+  final int? year;
+  final bool isNew;
+  final bool isPremiere;
+  final bool isRepeat;
+  final bool isPlaceholder;
   const EpgProgrammeRow({
     required this.channelId,
     required this.startMs,
@@ -1296,6 +1537,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     required this.title,
     this.subtitle,
     required this.description,
+    this.iconUrl,
+    this.category,
+    this.rating,
+    this.season,
+    this.episode,
+    this.year,
+    required this.isNew,
+    required this.isPremiere,
+    required this.isRepeat,
+    required this.isPlaceholder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1308,6 +1559,28 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       map['subtitle'] = Variable<String>(subtitle);
     }
     map['description'] = Variable<String>(description);
+    if (!nullToAbsent || iconUrl != null) {
+      map['icon_url'] = Variable<String>(iconUrl);
+    }
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<String>(rating);
+    }
+    if (!nullToAbsent || season != null) {
+      map['season'] = Variable<int>(season);
+    }
+    if (!nullToAbsent || episode != null) {
+      map['episode'] = Variable<int>(episode);
+    }
+    if (!nullToAbsent || year != null) {
+      map['year'] = Variable<int>(year);
+    }
+    map['is_new'] = Variable<bool>(isNew);
+    map['is_premiere'] = Variable<bool>(isPremiere);
+    map['is_repeat'] = Variable<bool>(isRepeat);
+    map['is_placeholder'] = Variable<bool>(isPlaceholder);
     return map;
   }
 
@@ -1321,6 +1594,26 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           ? const Value.absent()
           : Value(subtitle),
       description: Value(description),
+      iconUrl: iconUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(iconUrl),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      rating: rating == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rating),
+      season: season == null && nullToAbsent
+          ? const Value.absent()
+          : Value(season),
+      episode: episode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(episode),
+      year: year == null && nullToAbsent ? const Value.absent() : Value(year),
+      isNew: Value(isNew),
+      isPremiere: Value(isPremiere),
+      isRepeat: Value(isRepeat),
+      isPlaceholder: Value(isPlaceholder),
     );
   }
 
@@ -1336,6 +1629,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       title: serializer.fromJson<String>(json['title']),
       subtitle: serializer.fromJson<String?>(json['subtitle']),
       description: serializer.fromJson<String>(json['description']),
+      iconUrl: serializer.fromJson<String?>(json['iconUrl']),
+      category: serializer.fromJson<String?>(json['category']),
+      rating: serializer.fromJson<String?>(json['rating']),
+      season: serializer.fromJson<int?>(json['season']),
+      episode: serializer.fromJson<int?>(json['episode']),
+      year: serializer.fromJson<int?>(json['year']),
+      isNew: serializer.fromJson<bool>(json['isNew']),
+      isPremiere: serializer.fromJson<bool>(json['isPremiere']),
+      isRepeat: serializer.fromJson<bool>(json['isRepeat']),
+      isPlaceholder: serializer.fromJson<bool>(json['isPlaceholder']),
     );
   }
   @override
@@ -1348,6 +1651,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       'title': serializer.toJson<String>(title),
       'subtitle': serializer.toJson<String?>(subtitle),
       'description': serializer.toJson<String>(description),
+      'iconUrl': serializer.toJson<String?>(iconUrl),
+      'category': serializer.toJson<String?>(category),
+      'rating': serializer.toJson<String?>(rating),
+      'season': serializer.toJson<int?>(season),
+      'episode': serializer.toJson<int?>(episode),
+      'year': serializer.toJson<int?>(year),
+      'isNew': serializer.toJson<bool>(isNew),
+      'isPremiere': serializer.toJson<bool>(isPremiere),
+      'isRepeat': serializer.toJson<bool>(isRepeat),
+      'isPlaceholder': serializer.toJson<bool>(isPlaceholder),
     };
   }
 
@@ -1358,6 +1671,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     String? title,
     Value<String?> subtitle = const Value.absent(),
     String? description,
+    Value<String?> iconUrl = const Value.absent(),
+    Value<String?> category = const Value.absent(),
+    Value<String?> rating = const Value.absent(),
+    Value<int?> season = const Value.absent(),
+    Value<int?> episode = const Value.absent(),
+    Value<int?> year = const Value.absent(),
+    bool? isNew,
+    bool? isPremiere,
+    bool? isRepeat,
+    bool? isPlaceholder,
   }) => EpgProgrammeRow(
     channelId: channelId ?? this.channelId,
     startMs: startMs ?? this.startMs,
@@ -1365,6 +1688,16 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     title: title ?? this.title,
     subtitle: subtitle.present ? subtitle.value : this.subtitle,
     description: description ?? this.description,
+    iconUrl: iconUrl.present ? iconUrl.value : this.iconUrl,
+    category: category.present ? category.value : this.category,
+    rating: rating.present ? rating.value : this.rating,
+    season: season.present ? season.value : this.season,
+    episode: episode.present ? episode.value : this.episode,
+    year: year.present ? year.value : this.year,
+    isNew: isNew ?? this.isNew,
+    isPremiere: isPremiere ?? this.isPremiere,
+    isRepeat: isRepeat ?? this.isRepeat,
+    isPlaceholder: isPlaceholder ?? this.isPlaceholder,
   );
   EpgProgrammeRow copyWithCompanion(EpgProgrammesCompanion data) {
     return EpgProgrammeRow(
@@ -1376,6 +1709,20 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      iconUrl: data.iconUrl.present ? data.iconUrl.value : this.iconUrl,
+      category: data.category.present ? data.category.value : this.category,
+      rating: data.rating.present ? data.rating.value : this.rating,
+      season: data.season.present ? data.season.value : this.season,
+      episode: data.episode.present ? data.episode.value : this.episode,
+      year: data.year.present ? data.year.value : this.year,
+      isNew: data.isNew.present ? data.isNew.value : this.isNew,
+      isPremiere: data.isPremiere.present
+          ? data.isPremiere.value
+          : this.isPremiere,
+      isRepeat: data.isRepeat.present ? data.isRepeat.value : this.isRepeat,
+      isPlaceholder: data.isPlaceholder.present
+          ? data.isPlaceholder.value
+          : this.isPlaceholder,
     );
   }
 
@@ -1387,14 +1734,40 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           ..write('endMs: $endMs, ')
           ..write('title: $title, ')
           ..write('subtitle: $subtitle, ')
-          ..write('description: $description')
+          ..write('description: $description, ')
+          ..write('iconUrl: $iconUrl, ')
+          ..write('category: $category, ')
+          ..write('rating: $rating, ')
+          ..write('season: $season, ')
+          ..write('episode: $episode, ')
+          ..write('year: $year, ')
+          ..write('isNew: $isNew, ')
+          ..write('isPremiere: $isPremiere, ')
+          ..write('isRepeat: $isRepeat, ')
+          ..write('isPlaceholder: $isPlaceholder')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(channelId, startMs, endMs, title, subtitle, description);
+  int get hashCode => Object.hash(
+    channelId,
+    startMs,
+    endMs,
+    title,
+    subtitle,
+    description,
+    iconUrl,
+    category,
+    rating,
+    season,
+    episode,
+    year,
+    isNew,
+    isPremiere,
+    isRepeat,
+    isPlaceholder,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1404,7 +1777,17 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           other.endMs == this.endMs &&
           other.title == this.title &&
           other.subtitle == this.subtitle &&
-          other.description == this.description);
+          other.description == this.description &&
+          other.iconUrl == this.iconUrl &&
+          other.category == this.category &&
+          other.rating == this.rating &&
+          other.season == this.season &&
+          other.episode == this.episode &&
+          other.year == this.year &&
+          other.isNew == this.isNew &&
+          other.isPremiere == this.isPremiere &&
+          other.isRepeat == this.isRepeat &&
+          other.isPlaceholder == this.isPlaceholder);
 }
 
 class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
@@ -1414,6 +1797,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   final Value<String> title;
   final Value<String?> subtitle;
   final Value<String> description;
+  final Value<String?> iconUrl;
+  final Value<String?> category;
+  final Value<String?> rating;
+  final Value<int?> season;
+  final Value<int?> episode;
+  final Value<int?> year;
+  final Value<bool> isNew;
+  final Value<bool> isPremiere;
+  final Value<bool> isRepeat;
+  final Value<bool> isPlaceholder;
   final Value<int> rowid;
   const EpgProgrammesCompanion({
     this.channelId = const Value.absent(),
@@ -1422,6 +1815,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.title = const Value.absent(),
     this.subtitle = const Value.absent(),
     this.description = const Value.absent(),
+    this.iconUrl = const Value.absent(),
+    this.category = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.season = const Value.absent(),
+    this.episode = const Value.absent(),
+    this.year = const Value.absent(),
+    this.isNew = const Value.absent(),
+    this.isPremiere = const Value.absent(),
+    this.isRepeat = const Value.absent(),
+    this.isPlaceholder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EpgProgrammesCompanion.insert({
@@ -1431,6 +1834,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.title = const Value.absent(),
     this.subtitle = const Value.absent(),
     this.description = const Value.absent(),
+    this.iconUrl = const Value.absent(),
+    this.category = const Value.absent(),
+    this.rating = const Value.absent(),
+    this.season = const Value.absent(),
+    this.episode = const Value.absent(),
+    this.year = const Value.absent(),
+    this.isNew = const Value.absent(),
+    this.isPremiere = const Value.absent(),
+    this.isRepeat = const Value.absent(),
+    this.isPlaceholder = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : channelId = Value(channelId),
        startMs = Value(startMs),
@@ -1442,6 +1855,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Expression<String>? title,
     Expression<String>? subtitle,
     Expression<String>? description,
+    Expression<String>? iconUrl,
+    Expression<String>? category,
+    Expression<String>? rating,
+    Expression<int>? season,
+    Expression<int>? episode,
+    Expression<int>? year,
+    Expression<bool>? isNew,
+    Expression<bool>? isPremiere,
+    Expression<bool>? isRepeat,
+    Expression<bool>? isPlaceholder,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1451,6 +1874,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
       if (title != null) 'title': title,
       if (subtitle != null) 'subtitle': subtitle,
       if (description != null) 'description': description,
+      if (iconUrl != null) 'icon_url': iconUrl,
+      if (category != null) 'category': category,
+      if (rating != null) 'rating': rating,
+      if (season != null) 'season': season,
+      if (episode != null) 'episode': episode,
+      if (year != null) 'year': year,
+      if (isNew != null) 'is_new': isNew,
+      if (isPremiere != null) 'is_premiere': isPremiere,
+      if (isRepeat != null) 'is_repeat': isRepeat,
+      if (isPlaceholder != null) 'is_placeholder': isPlaceholder,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1462,6 +1895,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Value<String>? title,
     Value<String?>? subtitle,
     Value<String>? description,
+    Value<String?>? iconUrl,
+    Value<String?>? category,
+    Value<String?>? rating,
+    Value<int?>? season,
+    Value<int?>? episode,
+    Value<int?>? year,
+    Value<bool>? isNew,
+    Value<bool>? isPremiere,
+    Value<bool>? isRepeat,
+    Value<bool>? isPlaceholder,
     Value<int>? rowid,
   }) {
     return EpgProgrammesCompanion(
@@ -1471,6 +1914,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       description: description ?? this.description,
+      iconUrl: iconUrl ?? this.iconUrl,
+      category: category ?? this.category,
+      rating: rating ?? this.rating,
+      season: season ?? this.season,
+      episode: episode ?? this.episode,
+      year: year ?? this.year,
+      isNew: isNew ?? this.isNew,
+      isPremiere: isPremiere ?? this.isPremiere,
+      isRepeat: isRepeat ?? this.isRepeat,
+      isPlaceholder: isPlaceholder ?? this.isPlaceholder,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1496,6 +1949,36 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (iconUrl.present) {
+      map['icon_url'] = Variable<String>(iconUrl.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (rating.present) {
+      map['rating'] = Variable<String>(rating.value);
+    }
+    if (season.present) {
+      map['season'] = Variable<int>(season.value);
+    }
+    if (episode.present) {
+      map['episode'] = Variable<int>(episode.value);
+    }
+    if (year.present) {
+      map['year'] = Variable<int>(year.value);
+    }
+    if (isNew.present) {
+      map['is_new'] = Variable<bool>(isNew.value);
+    }
+    if (isPremiere.present) {
+      map['is_premiere'] = Variable<bool>(isPremiere.value);
+    }
+    if (isRepeat.present) {
+      map['is_repeat'] = Variable<bool>(isRepeat.value);
+    }
+    if (isPlaceholder.present) {
+      map['is_placeholder'] = Variable<bool>(isPlaceholder.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1511,6 +1994,16 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
           ..write('title: $title, ')
           ..write('subtitle: $subtitle, ')
           ..write('description: $description, ')
+          ..write('iconUrl: $iconUrl, ')
+          ..write('category: $category, ')
+          ..write('rating: $rating, ')
+          ..write('season: $season, ')
+          ..write('episode: $episode, ')
+          ..write('year: $year, ')
+          ..write('isNew: $isNew, ')
+          ..write('isPremiere: $isPremiere, ')
+          ..write('isRepeat: $isRepeat, ')
+          ..write('isPlaceholder: $isPlaceholder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2103,7 +2596,16 @@ class $$CatalogItemsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CatalogItemsTable, CatalogItemRow>(table),
+                  BaseReferences<
+                    _$CatalogDatabase,
+                    $CatalogItemsTable,
+                    CatalogItemRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2333,7 +2835,18 @@ class $$CatalogCategoriesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CatalogCategoriesTable, CatalogCategoryRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$CatalogDatabase,
+                    $CatalogCategoriesTable,
+                    CatalogCategoryRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2369,6 +2882,16 @@ typedef $$EpgProgrammesTableCreateCompanionBuilder =
       Value<String> title,
       Value<String?> subtitle,
       Value<String> description,
+      Value<String?> iconUrl,
+      Value<String?> category,
+      Value<String?> rating,
+      Value<int?> season,
+      Value<int?> episode,
+      Value<int?> year,
+      Value<bool> isNew,
+      Value<bool> isPremiere,
+      Value<bool> isRepeat,
+      Value<bool> isPlaceholder,
       Value<int> rowid,
     });
 typedef $$EpgProgrammesTableUpdateCompanionBuilder =
@@ -2379,6 +2902,16 @@ typedef $$EpgProgrammesTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String?> subtitle,
       Value<String> description,
+      Value<String?> iconUrl,
+      Value<String?> category,
+      Value<String?> rating,
+      Value<int?> season,
+      Value<int?> episode,
+      Value<int?> year,
+      Value<bool> isNew,
+      Value<bool> isPremiere,
+      Value<bool> isRepeat,
+      Value<bool> isPlaceholder,
       Value<int> rowid,
     });
 
@@ -2418,6 +2951,56 @@ class $$EpgProgrammesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconUrl => $composableBuilder(
+    column: $table.iconUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get season => $composableBuilder(
+    column: $table.season,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get episode => $composableBuilder(
+    column: $table.episode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get year => $composableBuilder(
+    column: $table.year,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isNew => $composableBuilder(
+    column: $table.isNew,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPremiere => $composableBuilder(
+    column: $table.isPremiere,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRepeat => $composableBuilder(
+    column: $table.isRepeat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPlaceholder => $composableBuilder(
+    column: $table.isPlaceholder,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2460,6 +3043,56 @@ class $$EpgProgrammesTableOrderingComposer
     column: $table.description,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get iconUrl => $composableBuilder(
+    column: $table.iconUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get season => $composableBuilder(
+    column: $table.season,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get episode => $composableBuilder(
+    column: $table.episode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get year => $composableBuilder(
+    column: $table.year,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isNew => $composableBuilder(
+    column: $table.isNew,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPremiere => $composableBuilder(
+    column: $table.isPremiere,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isRepeat => $composableBuilder(
+    column: $table.isRepeat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPlaceholder => $composableBuilder(
+    column: $table.isPlaceholder,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EpgProgrammesTableAnnotationComposer
@@ -2488,6 +3121,40 @@ class $$EpgProgrammesTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconUrl =>
+      $composableBuilder(column: $table.iconUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get rating =>
+      $composableBuilder(column: $table.rating, builder: (column) => column);
+
+  GeneratedColumn<int> get season =>
+      $composableBuilder(column: $table.season, builder: (column) => column);
+
+  GeneratedColumn<int> get episode =>
+      $composableBuilder(column: $table.episode, builder: (column) => column);
+
+  GeneratedColumn<int> get year =>
+      $composableBuilder(column: $table.year, builder: (column) => column);
+
+  GeneratedColumn<bool> get isNew =>
+      $composableBuilder(column: $table.isNew, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPremiere => $composableBuilder(
+    column: $table.isPremiere,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isRepeat =>
+      $composableBuilder(column: $table.isRepeat, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPlaceholder => $composableBuilder(
+    column: $table.isPlaceholder,
     builder: (column) => column,
   );
 }
@@ -2535,6 +3202,16 @@ class $$EpgProgrammesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String?> subtitle = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String?> iconUrl = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> rating = const Value.absent(),
+                Value<int?> season = const Value.absent(),
+                Value<int?> episode = const Value.absent(),
+                Value<int?> year = const Value.absent(),
+                Value<bool> isNew = const Value.absent(),
+                Value<bool> isPremiere = const Value.absent(),
+                Value<bool> isRepeat = const Value.absent(),
+                Value<bool> isPlaceholder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EpgProgrammesCompanion(
                 channelId: channelId,
@@ -2543,6 +3220,16 @@ class $$EpgProgrammesTableTableManager
                 title: title,
                 subtitle: subtitle,
                 description: description,
+                iconUrl: iconUrl,
+                category: category,
+                rating: rating,
+                season: season,
+                episode: episode,
+                year: year,
+                isNew: isNew,
+                isPremiere: isPremiere,
+                isRepeat: isRepeat,
+                isPlaceholder: isPlaceholder,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2553,6 +3240,16 @@ class $$EpgProgrammesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String?> subtitle = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String?> iconUrl = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> rating = const Value.absent(),
+                Value<int?> season = const Value.absent(),
+                Value<int?> episode = const Value.absent(),
+                Value<int?> year = const Value.absent(),
+                Value<bool> isNew = const Value.absent(),
+                Value<bool> isPremiere = const Value.absent(),
+                Value<bool> isRepeat = const Value.absent(),
+                Value<bool> isPlaceholder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EpgProgrammesCompanion.insert(
                 channelId: channelId,
@@ -2561,10 +3258,29 @@ class $$EpgProgrammesTableTableManager
                 title: title,
                 subtitle: subtitle,
                 description: description,
+                iconUrl: iconUrl,
+                category: category,
+                rating: rating,
+                season: season,
+                episode: episode,
+                year: year,
+                isNew: isNew,
+                isPremiere: isPremiere,
+                isRepeat: isRepeat,
+                isPlaceholder: isPlaceholder,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$EpgProgrammesTable, EpgProgrammeRow>(table),
+                  BaseReferences<
+                    _$CatalogDatabase,
+                    $EpgProgrammesTable,
+                    EpgProgrammeRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2728,7 +3444,16 @@ class $$KvCacheTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$KvCacheTable, KvCacheRow>(table),
+                  BaseReferences<_$CatalogDatabase, $KvCacheTable, KvCacheRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
