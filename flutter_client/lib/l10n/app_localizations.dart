@@ -1442,12 +1442,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 fix} other{{count} fixes}}'**
   String settingsReleaseNotesFixCount(int count);
 
-  /// No description provided for @settingsReleaseNotesShowMore.
-  ///
-  /// In en, this message translates to:
-  /// **'Show {count} more'**
-  String settingsReleaseNotesShowMore(int count);
-
   /// No description provided for @settingsReleaseNotesOlder.
   ///
   /// In en, this message translates to:

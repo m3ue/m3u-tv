@@ -766,11 +766,6 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String settingsReleaseNotesShowMore(int count) {
-    return 'Afficher $count de plus';
-  }
-
-  @override
   String get settingsReleaseNotesOlder => 'Version précédente';
 
   @override

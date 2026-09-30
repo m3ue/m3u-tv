@@ -323,14 +323,6 @@
       }
     }
   },
-  "settingsReleaseNotesShowMore": "Mostrar {count} más",
-  "@settingsReleaseNotesShowMore": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "settingsReleaseNotesOlder": "Versión anterior",
   "settingsReleaseNotesNewer": "Versión más reciente",
   "settingsReleaseNotesHintVersions": "Cambiar versión",

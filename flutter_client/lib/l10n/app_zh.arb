@@ -323,14 +323,6 @@
       }
     }
   },
-  "settingsReleaseNotesShowMore": "再显示 {count} 项",
-  "@settingsReleaseNotesShowMore": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "settingsReleaseNotesOlder": "较旧版本",
   "settingsReleaseNotesNewer": "较新版本",
   "settingsReleaseNotesHintVersions": "切换版本",

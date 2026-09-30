@@ -420,14 +420,6 @@
       }
     }
   },
-  "settingsReleaseNotesShowMore": "Show {count} more",
-  "@settingsReleaseNotesShowMore": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "settingsReleaseNotesOlder": "Older version",
   "settingsReleaseNotesNewer": "Newer version",
   "settingsReleaseNotesHintVersions": "Change version",

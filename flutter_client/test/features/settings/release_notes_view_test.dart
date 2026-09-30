@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
@@ -239,25 +240,8 @@ void main() {
       findsOneWidget,
     );
 
-    // Maintenance starts collapsed; tapping the row expands it.
-    expect(find.textContaining('Refactor settings screen'), findsNothing);
-    await tester.tap(find.text(l.settingsReleaseNotesShowMore(3)));
-    await tester.pumpAndSettle();
+    // Maintenance is shown in full, not collapsed.
     expect(find.textContaining('Refactor settings screen'), findsOneWidget);
-  });
-
-  testWidgets('Select on the focused notes expands collapsed sections', (
-    tester,
-  ) async {
-    await pump(
-      tester,
-      currentVersion: '1.2.0',
-      releases: [_note('v1.2.0', _changelog)],
-    );
-
-    expect(find.textContaining('Align related tiles'), findsNothing);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
     expect(find.textContaining('Align related tiles'), findsOneWidget);
   });
 
@@ -315,13 +299,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('no overflow on a narrow phone width', (tester) async {
+  testWidgets('phone width keeps the version and status readable', (
+    tester,
+  ) async {
     await pump(
       tester,
       currentVersion: '1.2.0',
       releases: [_note('v1.3.0', _changelog), _note('v1.2.0', _changelog)],
-      size: const Size(360, 640),
+      // The test font draws every glyph as a full em square (roughly twice
+      // the real font's width), so Normal here is already a stress case.
+      size: const Size(354, 700),
     );
     expect(tester.takeException(), isNull);
+
+    bool truncated(Finder finder) =>
+        tester.renderObject<RenderParagraph>(finder).didExceedMaxLines;
+
+    expect(truncated(find.text('v1.2.0')), isFalse);
+
+    // The status parts go on separate lines rather than being squeezed
+    // onto one (pixel width isn't asserted - see the test-font note above).
+    final l = await _l();
+    expect(
+      find.text(
+        '${l.settingsReleaseNotesNewerCount(1)}\n'
+        '${l.settingsReleaseNotesYouAreOn('1.2.0')}',
+      ),
+      findsOneWidget,
+    );
   });
 }

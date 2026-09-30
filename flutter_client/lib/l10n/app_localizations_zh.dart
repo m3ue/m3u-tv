@@ -739,11 +739,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String settingsReleaseNotesShowMore(int count) {
-    return '再显示 $count 项';
-  }
-
-  @override
   String get settingsReleaseNotesOlder => '较旧版本';
 
   @override

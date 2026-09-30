@@ -64,10 +64,6 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
   String? _currentVersion;
   int _selectedIndex = 0;
 
-  /// Expands the low-priority (maintenance/refactoring) sections. Kept for
-  /// the whole visit so stepping between versions doesn't re-collapse them.
-  bool _showAllSections = false;
-
   final _parsedByTag = <String, _StructuredNotes?>{};
 
   @override
@@ -271,7 +267,10 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
         // scroll view spans the full width with the column centred inside
         // it, which puts the scrollbar in the gutter instead of eating into
         // the cards.
-        final gutter = 16 * scale;
+        // Phones: every pixel goes to the notes; the (transient, touch)
+        // scrollbar can overlay the card edge like any mobile list.
+        final compact = constraints.maxWidth < 600;
+        final gutter = compact ? 0.0 : 16 * scale;
         final contentWidth = math.min(
           960 * scale,
           constraints.maxWidth - gutter * 2,
@@ -297,6 +296,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
                 title: _displayTag(selected),
                 summary: _summaryFor(context, selected),
                 badge: _badgeFor(selected),
+                compact: compact,
                 focusNode: _versionButtonFocusNode,
                 onPick: _pickVersion,
                 onOlder: _hasOlder ? () => _stepFromHeader(older: true) : null,
@@ -309,9 +309,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
                 note: selected,
                 structured: _structuredFor(selected),
                 contentWidth: contentWidth,
-                showAllSections: _showAllSections,
-                onShowAllSections: () =>
-                    setState(() => _showAllSections = true),
+                compact: compact,
                 focusNode: _notesFocusNode,
                 onOlder: _showOlder,
                 onNewer: _showNewer,
@@ -363,13 +361,15 @@ class _StatusBar extends StatelessWidget {
       (0, _) => (
         Icons.check_circle_outline,
         theme.colorScheme.onSurfaceVariant,
-        l.settingsReleaseNotesUpToDate,
+        <String>[l.settingsReleaseNotesUpToDate],
       ),
       (final n, final version?) => (
         Icons.arrow_circle_up,
         theme.colorScheme.primary,
-        '${l.settingsReleaseNotesNewerCount(n)}  ·  '
-            '${l.settingsReleaseNotesYouAreOn(version)}',
+        [
+          l.settingsReleaseNotesNewerCount(n),
+          l.settingsReleaseNotesYouAreOn(version),
+        ],
       ),
     };
 
@@ -387,8 +387,10 @@ class _StatusBar extends StatelessWidget {
               child: status == null
                   ? const SizedBox.shrink()
                   : Text(
-                      status.$3,
-                      maxLines: 1,
+                      // Narrow: one part per line instead of squeezing both
+                      // onto one and truncating.
+                      status.$3.join(compact ? '\n' : '  ·  '),
+                      maxLines: compact ? status.$3.length : 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: status.$2,
@@ -402,6 +404,7 @@ class _StatusBar extends StatelessWidget {
                 icon: isTv ? Icons.qr_code_2 : Icons.open_in_new,
                 tooltip: l.settingsReleaseNotesViewOnGithub,
                 autoScroll: false,
+                dense: true,
                 onPressed: onOpenGithub,
               )
             else
@@ -423,6 +426,7 @@ class _VersionHeader extends StatelessWidget {
     required this.title,
     required this.summary,
     required this.badge,
+    required this.compact,
     required this.focusNode,
     required this.onPick,
     required this.onOlder,
@@ -432,6 +436,9 @@ class _VersionHeader extends StatelessWidget {
   final String title;
   final String summary;
   final _VersionBadge badge;
+
+  /// Phone width: smaller step buttons so the title keeps its room.
+  final bool compact;
   final FocusNode focusNode;
   final VoidCallback onPick;
   final VoidCallback? onOlder;
@@ -454,6 +461,7 @@ class _VersionHeader extends StatelessWidget {
           _EdgeChevron(
             icon: Icons.chevron_left,
             tooltip: l.settingsReleaseNotesOlder,
+            dense: compact,
             onPressed: onOlder,
           ),
           SizedBox(width: 8 * scale),
@@ -465,42 +473,50 @@ class _VersionHeader extends StatelessWidget {
               onTap: onPick,
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: 12 * scale,
+                  horizontal: (compact ? 4 : 12) * scale,
                   vertical: 8 * scale,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                    // Wraps (badge drops to its own line) rather than
+                    // truncating the version on a narrow phone.
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8 * scale,
+                      runSpacing: 4 * scale,
                       children: [
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
+                            SizedBox(width: 2 * scale),
+                            Icon(
+                              Icons.expand_more,
+                              size: 22 * scale,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
-                        if (badge != _VersionBadge.none) ...[
-                          SizedBox(width: 10 * scale),
-                          Flexible(child: _BadgePill(badge: badge)),
-                        ],
-                        SizedBox(width: 4 * scale),
-                        Icon(
-                          Icons.expand_more,
-                          size: 22 * scale,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        if (badge != _VersionBadge.none)
+                          _BadgePill(badge: badge),
                       ],
                     ),
                     if (summary.isNotEmpty) ...[
                       SizedBox(height: 2 * scale),
                       Text(
                         summary,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -517,6 +533,7 @@ class _VersionHeader extends StatelessWidget {
           _EdgeChevron(
             icon: Icons.chevron_right,
             tooltip: l.settingsReleaseNotesNewer,
+            dense: compact,
             onPressed: onNewer,
           ),
         ],
@@ -532,11 +549,13 @@ class _EdgeChevron extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.dense = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -552,6 +571,7 @@ class _EdgeChevron extends StatelessWidget {
           icon: icon,
           tooltip: tooltip,
           autoScroll: false,
+          dense: dense,
           onPressed: onPressed,
         ),
       ),
@@ -722,8 +742,7 @@ class _NotesPane extends StatefulWidget {
     required this.note,
     required this.structured,
     required this.contentWidth,
-    required this.showAllSections,
-    required this.onShowAllSections,
+    required this.compact,
     required this.focusNode,
     required this.onOlder,
     required this.onNewer,
@@ -739,8 +758,7 @@ class _NotesPane extends StatefulWidget {
   /// Width of the page's content column; the notes are centred at this width
   /// inside a full-width scroll view.
   final double contentWidth;
-  final bool showAllSections;
-  final VoidCallback onShowAllSections;
+  final bool compact;
   final FocusNode focusNode;
   final VoidCallback onOlder;
   final VoidCallback onNewer;
@@ -815,10 +833,6 @@ class _NotesPaneState extends State<_NotesPane> {
     final theme = Theme.of(context);
     final body = widget.note.body.trim();
     final structured = widget.structured;
-    final hasCollapsed =
-        structured != null &&
-        !widget.showAllSections &&
-        structured.collapsibleCount > 0;
 
     final Widget content;
     if (body.isEmpty) {
@@ -832,8 +846,7 @@ class _NotesPaneState extends State<_NotesPane> {
     } else if (structured != null) {
       content = _StructuredNotesBody(
         notes: structured,
-        showAll: widget.showAllSections,
-        onShowAll: widget.onShowAllSections,
+        compact: widget.compact,
       );
     } else {
       content = SettingsCard(child: _MarkdownBody(text: body));
@@ -844,10 +857,9 @@ class _NotesPaneState extends State<_NotesPane> {
       autofocus: true,
       // The pane always fills the page; revealing it would only jiggle it.
       autoScroll: false,
-      // A tap should scroll/tap through (touch), not toggle sections.
+      // Nothing to activate; a tap should just scroll (touch).
       tapToSelect: false,
       onDirection: _onDirection,
-      onSelect: hasCollapsed ? widget.onShowAllSections : null,
       builder: (context, state, child) => Scrollbar(
         controller: _scrollController,
         // The pane is the only thing focused while reading, so a visible
@@ -901,9 +913,6 @@ class _NotesSection {
   final String title;
   final _SectionKind kind;
   final items = <_NotesItem>[];
-
-  /// Housekeeping sections start collapsed behind a "Show N more" row.
-  bool get collapsible => kind == _SectionKind.maintenance;
 }
 
 class _StructuredNotes {
@@ -913,10 +922,6 @@ class _StructuredNotes {
 
   int countOf(_SectionKind kind) => sections
       .where((s) => s.kind == kind)
-      .fold(0, (sum, s) => sum + s.items.length);
-
-  int get collapsibleCount => sections
-      .where((s) => s.collapsible)
       .fold(0, (sum, s) => sum + s.items.length);
 
   static final _heading = RegExp(r'^(#{1,6})\s+(.*)$');
@@ -1011,13 +1016,11 @@ class _StructuredNotes {
 class _StructuredNotesBody extends StatelessWidget {
   const _StructuredNotesBody({
     required this.notes,
-    required this.showAll,
-    required this.onShowAll,
+    required this.compact,
   });
 
   final _StructuredNotes notes;
-  final bool showAll;
-  final VoidCallback onShowAll;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1028,8 +1031,7 @@ class _StructuredNotesBody extends StatelessWidget {
       children.add(
         _SectionCard(
           section: section,
-          collapsed: section.collapsible && !showAll,
-          onShowAll: onShowAll,
+          compact: compact,
         ),
       );
     }
@@ -1043,13 +1045,14 @@ class _StructuredNotesBody extends StatelessWidget {
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.section,
-    required this.collapsed,
-    required this.onShowAll,
+    required this.compact,
   });
 
   final _NotesSection section;
-  final bool collapsed;
-  final VoidCallback onShowAll;
+
+  /// Phone width: items run the full card width instead of being indented
+  /// under the section title.
+  final bool compact;
 
   (IconData, Color) _style(ColorScheme scheme) => switch (section.kind) {
     _SectionKind.features => (Icons.auto_awesome, scheme.primary),
@@ -1064,7 +1067,6 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final (icon, accent) = _style(theme.colorScheme);
@@ -1079,7 +1081,7 @@ class _SectionCard extends StatelessWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
     final badgeSize = 30 * scale;
-    final contentIndent = badgeSize + 12 * scale;
+    final contentIndent = compact ? 14 * scale : badgeSize + 12 * scale;
 
     return SettingsCard(
       child: Column(
@@ -1115,59 +1117,43 @@ class _SectionCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 10 * scale),
-          if (collapsed)
+          for (final item in section.items)
             Padding(
-              padding: EdgeInsets.only(left: contentIndent - 12),
-              // Not a focus stop - the notes pane is the one D-pad target,
-              // and its Select press does the same thing.
-              child: ExcludeFocus(
-                child: TextButton.icon(
-                  onPressed: onShowAll,
-                  icon: const Icon(Icons.expand_more),
-                  label: Text(
-                    l.settingsReleaseNotesShowMore(section.items.length),
-                  ),
-                ),
+              padding: EdgeInsets.only(
+                left: item.bullet ? contentIndent - 14 * scale : 0,
+                top: 3 * scale,
+                bottom: 3 * scale,
               ),
-            )
-          else
-            for (final item in section.items)
-              Padding(
-                padding: EdgeInsets.only(
-                  left: item.bullet ? contentIndent - 14 * scale : 0,
-                  top: 3 * scale,
-                  bottom: 3 * scale,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (item.bullet)
-                      Container(
-                        width: 6 * scale,
-                        height: 6 * scale,
-                        margin: EdgeInsets.only(
-                          top: (itemStyle?.fontSize ?? 16) * 0.55,
-                          right: 8 * scale,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                        ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (item.bullet)
+                    Container(
+                      width: 6 * scale,
+                      height: 6 * scale,
+                      margin: EdgeInsets.only(
+                        top: (itemStyle?.fontSize ?? 16) * 0.55,
+                        right: 8 * scale,
                       ),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            _inlineSpans(item.text, context, base: itemStyle),
-                            for (final ref in item.refs)
-                              TextSpan(text: '  $ref', style: refStyle),
-                          ],
-                        ),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                  ],
-                ),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          _inlineSpans(item.text, context, base: itemStyle),
+                          for (final ref in item.refs)
+                            TextSpan(text: '  $ref', style: refStyle),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
         ],
       ),
     );
