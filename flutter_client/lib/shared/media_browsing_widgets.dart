@@ -1041,6 +1041,15 @@ class MediaPreviewItem {
   final String? emphasisLabel;
 }
 
+/// Builds one card of a [MediaPreviewSection.builder] row at [cardSize].
+typedef PreviewCardBuilder =
+    Widget Function(
+      BuildContext context,
+      int index,
+      Size cardSize, {
+      required bool autofocus,
+    });
+
 class MediaPreviewSection extends StatefulWidget {
   const MediaPreviewSection({
     required this.title,
@@ -1052,7 +1061,30 @@ class MediaPreviewSection extends StatefulWidget {
     this.useSidebarLayout = false,
     this.onSidebarActivate,
     super.key,
-  });
+  }) : itemCount = null,
+       itemBuilder = null,
+       baseCardWidth = null,
+       baseCardHeight = null;
+
+  /// A row of caller-built cards (e.g. the Home Live TV row's
+  /// `ChannelGridTile`s) that keeps this section's header, D-pad region,
+  /// scrollbar and width-responsive card sizing. [itemBuilder] receives the
+  /// final card size and must size its card to it; the first card should
+  /// honor `autofocus`.
+  const MediaPreviewSection.builder({
+    required this.title,
+    required this.emptyLabel,
+    required int this.itemCount,
+    required PreviewCardBuilder this.itemBuilder,
+    required double this.baseCardWidth,
+    required double this.baseCardHeight,
+    this.titleIcon,
+    this.useSidebarLayout = false,
+    this.onSidebarActivate,
+    super.key,
+  }) : items = const [],
+       posterStyle = false,
+       landscapeStyle = false;
 
   final String title;
   final IconData? titleIcon;
@@ -1060,6 +1092,12 @@ class MediaPreviewSection extends StatefulWidget {
   final List<MediaPreviewItem> items;
   final bool posterStyle;
   final bool landscapeStyle;
+
+  /// Set only by [MediaPreviewSection.builder].
+  final int? itemCount;
+  final PreviewCardBuilder? itemBuilder;
+  final double? baseCardWidth;
+  final double? baseCardHeight;
 
   /// Whether this row is hosted inside `AppShell`'s TV/desktop sidebar
   /// layout, where the content pane sits at a `left` inset equal to the
@@ -1101,9 +1139,15 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     final visibleItems = widget.items
         .take(MediaPreviewSection.maxVisibleItems)
         .toList(growable: false);
+    final visibleCount = widget.itemBuilder != null
+        ? widget.itemCount!.clamp(0, MediaPreviewSection.maxVisibleItems)
+        : visibleItems.length;
     final double baseWidth;
     final double baseHeight;
-    if (widget.landscapeStyle) {
+    if (widget.itemBuilder != null) {
+      baseWidth = widget.baseCardWidth!;
+      baseHeight = widget.baseCardHeight!;
+    } else if (widget.landscapeStyle) {
       baseWidth = MediaBrowsingMetrics.landscapeCardWidth;
       baseHeight = MediaBrowsingMetrics.landscapeCardHeight;
     } else if (widget.posterStyle) {
@@ -1160,7 +1204,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
             ],
           ),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          if (visibleItems.isEmpty)
+          if (visibleCount == 0)
             Text(widget.emptyLabel)
           else
             SizedBox(
@@ -1186,17 +1230,28 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       controller: _controller,
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.only(bottom: 12),
-                      itemCount: visibleItems.length,
+                      itemCount: visibleCount,
                       separatorBuilder: (_, _) => const SizedBox(
                         width: MediaBrowsingMetrics.itemGap,
                       ),
-                      itemBuilder: (context, index) => MediaPreviewCard(
-                        item: visibleItems[index],
-                        posterStyle: widget.posterStyle,
-                        landscapeStyle: widget.landscapeStyle,
-                        autofocus: index == 0,
-                        cardWidth: cardWidth,
-                      ),
+                      itemBuilder: (context, index) {
+                        final cardBuilder = widget.itemBuilder;
+                        if (cardBuilder != null) {
+                          return cardBuilder(
+                            context,
+                            index,
+                            Size(cardWidth * fontScale, cardHeight),
+                            autofocus: index == 0,
+                          );
+                        }
+                        return MediaPreviewCard(
+                          item: visibleItems[index],
+                          posterStyle: widget.posterStyle,
+                          landscapeStyle: widget.landscapeStyle,
+                          autofocus: index == 0,
+                          cardWidth: cardWidth,
+                        );
+                      },
                     ),
                   ),
                 ),

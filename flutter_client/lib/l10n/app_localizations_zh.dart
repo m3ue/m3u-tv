@@ -814,9 +814,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNoMovies => '暂无电影';
 
   @override
-  String get homeLiveChannel => '直播频道';
-
-  @override
   String get homeMovie => '电影';
 
   @override

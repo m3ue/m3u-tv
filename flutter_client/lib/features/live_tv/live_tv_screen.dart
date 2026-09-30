@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/catchup_shows_dialog.dart';
@@ -20,6 +19,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/channel_sort_dialog.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -997,8 +997,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           MediaBrowsingMetrics.contentPadding,
         ),
         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 220 * FontSizeScope.scaleOf(context),
-          mainAxisExtent: 160 * FontSizeScope.scaleOf(context),
+          maxCrossAxisExtent:
+              ChannelGridTile.baseWidth * FontSizeScope.scaleOf(context),
+          mainAxisExtent:
+              ChannelGridTile.baseHeight * FontSizeScope.scaleOf(context),
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
         ),
@@ -1008,7 +1010,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           widget.onEnsureEpg?.call([channel]);
           final epg = _epgMap[channel.id];
           final isFav = _favoriteIds.contains(channel.id);
-          return _ChannelGridItem(
+          return ChannelGridTile(
             channel: channel,
             epg: epg,
             isFavorite: isFav,
@@ -1229,143 +1231,5 @@ class _ChannelRow extends StatelessWidget {
         ), // SizedBox
       ), // DpadInkWell
     ); // outer Padding
-  }
-}
-
-class _ChannelGridItem extends StatelessWidget {
-  const _ChannelGridItem({
-    required this.channel,
-    this.epg,
-    required this.isFavorite,
-    required this.isRecording,
-    required this.autofocus,
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  final Channel channel;
-  final EpgCurrentNext? epg;
-  final bool isFavorite;
-  final bool isRecording;
-  final bool autofocus;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final scale = FontSizeScope.scaleOf(context);
-    final languageTag = Localizations.localeOf(context).toLanguageTag();
-    final timeFormat = DateFormat.jm(languageTag);
-    return DpadInkWell(
-      autofocus: autofocus,
-      onTap: onTap,
-      onLongTap: onLongPress,
-      color: colorScheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: ResilientMediaImage(
-                      imageUrl: channel.logoUrl,
-                      fallbackIcon: Icons.tv,
-                      fit: BoxFit.contain,
-                      oversample: 2,
-                    ),
-                  ),
-                  if (isFavorite)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      child: Container(
-                        padding: EdgeInsets.all(3 * scale),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.star,
-                          color: Colors.white,
-                          size: 14 * scale,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            if (epg != null)
-              LinearProgressIndicator(
-                value: epg!.progress,
-                minHeight: 3,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation(colorScheme.primary),
-              )
-            else
-              const SizedBox(height: 3),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (isRecording) ...[
-                  RecordingDot(color: colorScheme.error),
-                  const SizedBox(width: 4),
-                ],
-                Expanded(
-                  child: Text(
-                    channel.name,
-                    style: Theme.of(context).textTheme.labelMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            if (epg != null) ...[
-              Text(
-                epg!.current.displayTitle,
-                style:
-                    Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                '${timeFormat.format(epg!.current.start.toLocal())} - '
-                '${timeFormat.format(epg!.current.end.toLocal())}',
-                style:
-                    Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ] else
-              Text(
-                AppLocalizations.of(context).liveTvNoProgram,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontStyle: FontStyle.italic,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
-        ),
-      ),
-    );
   }
 }

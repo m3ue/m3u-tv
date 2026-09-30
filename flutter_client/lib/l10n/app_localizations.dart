@@ -1610,12 +1610,6 @@ abstract class AppLocalizations {
   /// **'No Movies available'**
   String get homeNoMovies;
 
-  /// No description provided for @homeLiveChannel.
-  ///
-  /// In en, this message translates to:
-  /// **'Live channel'**
-  String get homeLiveChannel;
-
   /// No description provided for @homeMovie.
   ///
   /// In en, this message translates to:

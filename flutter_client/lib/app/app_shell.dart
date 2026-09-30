@@ -41,6 +41,7 @@ import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
@@ -2785,33 +2786,38 @@ class _LiveRow extends ConsumerWidget {
     final liveSectionChannels = favoriteChannels.isEmpty
         ? channels
         : favoriteChannels;
-    MediaPreviewItem liveChannelItem(Channel channel) => MediaPreviewItem(
-      title: channel.name,
-      imageUrl: channel.logoUrl,
-      subtitle:
-          epgService.lookupForChannel(channel)?.current.displayTitle ??
-          channel.groupTitle ??
-          l.homeLiveChannel,
-      fallbackIcon: Icons.live_tv,
-      imageFit: BoxFit.contain,
-      imagePadding: const EdgeInsets.all(10),
-      imageBackgroundColor: Colors.transparent,
-      isFavorite: favoriteChannelIds.contains(channel.id),
-      onTap: () {
-        onChannelContextChanged?.call(liveSectionChannels);
-        onChannelSelect(channel);
-      },
-      onLongTap: () => onToggleFavorite(channel),
-    );
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final rowChannels = liveSectionChannels
+        .take(rowItemLimit)
+        .toList(growable: false);
 
-    return MediaPreviewSection(
+    // Same card as Live TV's Grid view (logo, progress, current program and
+    // its start/end), so the Home row matches that view.
+    return MediaPreviewSection.builder(
       title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
       titleIcon: favoriteChannels.isEmpty ? Icons.live_tv : Icons.star,
       emptyLabel: l.homeNoLiveTv,
-      items: liveSectionChannels
-          .take(rowItemLimit)
-          .map(liveChannelItem)
-          .toList(growable: false),
+      itemCount: rowChannels.length,
+      baseCardWidth: ChannelGridTile.baseWidth,
+      baseCardHeight: ChannelGridTile.baseHeight,
+      itemBuilder: (context, index, cardSize, {required autofocus}) {
+        final channel = rowChannels[index];
+        return SizedBox.fromSize(
+          size: cardSize,
+          child: ChannelGridTile(
+            channel: channel,
+            epg: epgService.lookupForChannel(channel),
+            isFavorite: favoriteChannelIds.contains(channel.id),
+            isRecording: recordingChannelIds.contains(channel.id),
+            autofocus: autofocus,
+            onTap: () {
+              onChannelContextChanged?.call(liveSectionChannels);
+              onChannelSelect(channel);
+            },
+            onLongPress: () => onToggleFavorite(channel),
+          ),
+        );
+      },
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,
     );

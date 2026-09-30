@@ -843,9 +843,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeNoMovies => 'No Movies available';
 
   @override
-  String get homeLiveChannel => 'Live channel';
-
-  @override
   String get homeMovie => 'Movie';
 
   @override

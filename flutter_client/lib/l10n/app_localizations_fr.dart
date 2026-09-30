@@ -852,9 +852,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeNoMovies => 'Pas de films disponibles';
 
   @override
-  String get homeLiveChannel => 'Chaîne en direct';
-
-  @override
   String get homeMovie => 'Film';
 
   @override
