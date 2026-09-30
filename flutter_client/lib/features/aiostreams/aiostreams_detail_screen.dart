@@ -452,6 +452,7 @@ class _SeriesBodyState extends State<_SeriesBody> {
             plot: v.description,
             thumbnailUrl: v.thumbnail,
             rating: v.rating,
+            duration: v.runtime == null ? null : '${v.runtime}m',
             releaseDate: v.released,
           ),
         )

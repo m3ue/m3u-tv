@@ -45,6 +45,7 @@ class AIOStreamsVideo {
     this.description,
     this.released,
     this.rating,
+    this.runtime,
   });
 
   factory AIOStreamsVideo.fromJson(Map<String, dynamic> json) =>
@@ -61,6 +62,7 @@ class AIOStreamsVideo {
                   : null),
         released: json['released'] as String? ?? json['firstAired'] as String?,
         rating: _parseDouble(json['rating']),
+        runtime: _parseInt(json['runtime']),
       );
 
   final String id;
@@ -71,8 +73,12 @@ class AIOStreamsVideo {
   final String? description;
   final String? released;
 
-  /// Episode rating (0-10), when the Stremio meta addon supplies one.
+  /// Episode rating (0-10), when the Stremio meta addon supplies one or the
+  /// editor's TMDB enrichment stamps it on.
   final double? rating;
+
+  /// Episode runtime in minutes, from the editor's TMDB enrichment.
+  final int? runtime;
 }
 
 /// A catalog item (movie or series) from AIOStreams.
