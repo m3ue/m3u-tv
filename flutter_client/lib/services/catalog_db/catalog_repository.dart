@@ -443,6 +443,16 @@ class CatalogRepository {
             title: Value(program.title),
             subtitle: Value(program.subtitle),
             description: Value(program.description),
+            iconUrl: Value(program.iconUrl),
+            category: Value(program.category),
+            rating: Value(program.rating),
+            season: Value(program.season),
+            episode: Value(program.episode),
+            year: Value(program.year),
+            isNew: Value(program.isNew),
+            isPremiere: Value(program.isPremiere),
+            isRepeat: Value(program.isRepeat),
+            isPlaceholder: Value(program.isPlaceholder),
           ),
           mode: InsertMode.insertOrReplace,
         );
@@ -492,6 +502,16 @@ class CatalogRepository {
     start: DateTime.fromMillisecondsSinceEpoch(row.startMs, isUtc: true),
     end: DateTime.fromMillisecondsSinceEpoch(row.endMs, isUtc: true),
     subtitle: row.subtitle,
+    iconUrl: row.iconUrl,
+    category: row.category,
+    rating: row.rating,
+    season: row.season,
+    episode: row.episode,
+    year: row.year,
+    isNew: row.isNew,
+    isPremiere: row.isPremiere,
+    isRepeat: row.isRepeat,
+    isPlaceholder: row.isPlaceholder,
   );
 
   // -------------------------------------------------------------------------

@@ -536,6 +536,138 @@ abstract class AppLocalizations {
   /// **'Currently recording'**
   String get epgProgramCurrentlyRecording;
 
+  /// No description provided for @epgToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get epgToday;
+
+  /// No description provided for @epgTomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get epgTomorrow;
+
+  /// No description provided for @epgYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get epgYesterday;
+
+  /// No description provided for @epgLiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get epgLiveBadge;
+
+  /// No description provided for @epgReplayBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'REPLAY'**
+  String get epgReplayBadge;
+
+  /// No description provided for @epgBadgeNew.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get epgBadgeNew;
+
+  /// No description provided for @epgBadgePremiere.
+  ///
+  /// In en, this message translates to:
+  /// **'PREMIERE'**
+  String get epgBadgePremiere;
+
+  /// No description provided for @epgBadgeRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'REPEAT'**
+  String get epgBadgeRepeat;
+
+  /// Compact season/episode label shown in the programme guide, e.g. S2 E5.
+  ///
+  /// In en, this message translates to:
+  /// **'S{season} E{episode}'**
+  String epgSeasonEpisode(int season, int episode);
+
+  /// No description provided for @epgSeasonNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Season {season}'**
+  String epgSeasonNumber(int season);
+
+  /// No description provided for @epgEpisodeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Episode {episode}'**
+  String epgEpisodeNumber(int episode);
+
+  /// No description provided for @epgDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String epgDurationMinutes(int minutes);
+
+  /// No description provided for @epgDurationHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String epgDurationHours(int hours);
+
+  /// No description provided for @epgDurationHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String epgDurationHoursMinutes(int hours, int minutes);
+
+  /// Remaining time of a live programme; duration is already formatted (e.g. 32 min).
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} left'**
+  String epgTimeLeft(String duration);
+
+  /// Time until an upcoming programme starts; duration is already formatted.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts in {duration}'**
+  String epgStartsIn(String duration);
+
+  /// No description provided for @epgEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get epgEnded;
+
+  /// No description provided for @epgWatchLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch live'**
+  String get epgWatchLive;
+
+  /// No description provided for @epgWatchReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch replay'**
+  String get epgWatchReplay;
+
+  /// No description provided for @epgMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get epgMoreOptions;
+
+  /// Remote-control select button label shown in the guide's key hints.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get epgKeyOk;
+
+  /// Remote-control hint for long-pressing the select button.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold OK'**
+  String get epgKeyHoldOk;
+
   /// No description provided for @epgSweepLoadingTitle.
   ///
   /// In en, this message translates to:

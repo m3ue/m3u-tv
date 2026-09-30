@@ -1223,6 +1223,10 @@ class XtreamService {
             'stream_ids': chunk.map((channel) => '${channel.id}').join(','),
             'limit': '$limit',
             if (date != null) 'date': _formatEpgDate(date),
+            // Opt-in extended metadata (artwork, category, S/E, rating,
+            // new/premiere flags) for the guide preview; older editors
+            // ignore the unknown param.
+            'details': '1',
           },
           wantsRawText: true,
         );
@@ -1668,12 +1672,11 @@ EpgProgram? _epgProgramFromMap(
   Map<String, String> channelIdsByStream, {
   bool dropPlaceholders = false,
 }) {
-  if (dropPlaceholders) {
-    // m3u-editor fills EPG gaps with synthetic hourly rows whose id is
-    // `dummy-<md5>` (see XtreamApiController get_epg_batch).
-    final id = _stringOrNull(json['id']);
-    if (id != null && id.startsWith('dummy-')) return null;
-  }
+  // m3u-editor fills EPG gaps with synthetic hourly rows whose id is
+  // `dummy-<md5>` (see XtreamApiController get_epg_batch).
+  final isPlaceholder =
+      _stringOrNull(json['id'])?.startsWith('dummy-') ?? false;
+  if (dropPlaceholders && isPlaceholder) return null;
   final streamId = _stringOrNull(json['stream_id']);
   // Prefer the caller-resolved key (fallbackChannelId, derived from the
   // stream→channel mapping) so that EpgService stores programs under the same
@@ -1708,8 +1711,26 @@ EpgProgram? _epgProgramFromMap(
     start: start,
     end: end,
     subtitle: _decodedSubtitle(json['subtitle']),
+    iconUrl: nullIfBlank(_stringOrNull(json['icon'])),
+    category: nullIfBlank(_stringOrNull(json['category'])),
+    rating: nullIfBlank(_stringOrNull(json['rating'])),
+    season: _positiveIntOrNull(json['season']),
+    episode: _positiveIntOrNull(json['episode']),
+    year: _positiveIntOrNull(json['year']),
+    isNew: _isTruthyFlag(json['is_new']),
+    isPremiere: _isTruthyFlag(json['premiere']),
+    isRepeat: _isTruthyFlag(json['previously_shown']),
+    isPlaceholder: isPlaceholder,
   );
 }
+
+int? _positiveIntOrNull(Object? value) {
+  final parsed = value is num ? value.toInt() : int.tryParse('${value ?? ''}');
+  return parsed != null && parsed > 0 ? parsed : null;
+}
+
+bool _isTruthyFlag(Object? value) =>
+    value == true || value == 1 || value == '1' || value == 'true';
 
 DateTime? _parseEpgTime(Object? value) {
   if (value == null) return null;

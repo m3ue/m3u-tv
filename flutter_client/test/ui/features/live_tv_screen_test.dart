@@ -479,15 +479,13 @@ void main() {
           'timeline-program-${program.channelId}-'
           '${program.start.toIso8601String()}',
         );
-        final focusWidgets = tester
-            .widgetList<Focus>(
-              find.descendant(
-                of: find.byKey(programBlockKey),
-                matching: find.byType(Focus),
-              ),
-            )
-            .where((focus) => focus.focusNode != null);
-        expect(focusWidgets.any((focus) => focus.focusNode!.hasFocus), isTrue);
+        expect(
+          find.descendant(
+            of: find.byKey(programBlockKey),
+            matching: find.byKey(const ValueKey('timeline-cursor')),
+          ),
+          findsOneWidget,
+        );
       },
     );
 

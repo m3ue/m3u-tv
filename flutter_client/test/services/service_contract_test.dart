@@ -1070,6 +1070,83 @@ void main() {
       expect(afternoon.subtitle, isNull);
     });
 
+    test('EPG batch asks for and parses extended guide details', () async {
+      final transport = FakeXtreamTransport({'auth': xtreamAuth(auth: 1)});
+      final requests = <XtreamRequest>[];
+      transport.onRequest = (request) {
+        if (request.action != 'get_epg_batch') {
+          return transport.responses[request.action ?? 'auth'];
+        }
+        requests.add(request);
+        return <String, Object?>{
+          '101': <String, Object?>{
+            'epg_listings': <Map<String, Object?>>[
+              <String, Object?>{
+                'id': 'rich-1',
+                'title': 'Detective Show',
+                'description': 'Plot',
+                'start': '2026-01-01 12:00:00',
+                'end': '2026-01-01 13:00:00',
+                'icon': 'https://images.example/rich.jpg',
+                'category': 'Drama',
+                'rating': 'TV-14',
+                'season': 2,
+                'episode': 5,
+                'year': 2024,
+                'is_new': 1,
+                'premiere': 1,
+                'previously_shown': 1,
+              },
+              <String, Object?>{
+                'id': 'dummy-abc',
+                'title': 'BBC One',
+                'description': 'No information available',
+                'start': '2026-01-01 13:00:00',
+                'end': '2026-01-01 14:00:00',
+              },
+            ],
+          },
+        };
+      };
+      final service = XtreamService(transport: transport.call);
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final programs = await service.getEpgBatch(const [
+        Channel(
+          id: 101,
+          name: 'BBC One',
+          streamUrl: 'https://example/live/101.m3u8',
+          epgChannelId: 'bbc.one',
+        ),
+      ]);
+
+      expect(requests.single.params['details'], '1');
+      final rich = programs.singleWhere((p) => p.title == 'Detective Show');
+      expect(rich.iconUrl, 'https://images.example/rich.jpg');
+      expect(rich.category, 'Drama');
+      expect(rich.rating, 'TV-14');
+      expect(rich.season, 2);
+      expect(rich.episode, 5);
+      expect(rich.year, 2024);
+      expect(rich.isNew, isTrue);
+      expect(rich.isPremiere, isTrue);
+      expect(rich.isRepeat, isTrue);
+      expect(rich.isPlaceholder, isFalse);
+
+      final placeholder = programs.singleWhere((p) => p.title == 'BBC One');
+      expect(placeholder.isPlaceholder, isTrue);
+      expect(placeholder.iconUrl, isNull);
+      expect(placeholder.category, isNull);
+      expect(placeholder.season, isNull);
+      expect(placeholder.isNew, isFalse);
+    });
+
     test('EPG batch chunks requests to at most 100 stream ids', () async {
       final now = DateTime.utc(2026, 1, 1, 12);
       final transport = FakeXtreamTransport({'auth': xtreamAuth(auth: 1)});

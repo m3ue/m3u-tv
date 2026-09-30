@@ -239,6 +239,88 @@ class AppLocalizationsZh extends AppLocalizations {
   String get epgProgramCurrentlyRecording => '正在录制';
 
   @override
+  String get epgToday => '今天';
+
+  @override
+  String get epgTomorrow => '明天';
+
+  @override
+  String get epgYesterday => '昨天';
+
+  @override
+  String get epgLiveBadge => '直播';
+
+  @override
+  String get epgReplayBadge => '回看';
+
+  @override
+  String get epgBadgeNew => '新';
+
+  @override
+  String get epgBadgePremiere => '首播';
+
+  @override
+  String get epgBadgeRepeat => '重播';
+
+  @override
+  String epgSeasonEpisode(int season, int episode) {
+    return '第$season季 第$episode集';
+  }
+
+  @override
+  String epgSeasonNumber(int season) {
+    return '第$season季';
+  }
+
+  @override
+  String epgEpisodeNumber(int episode) {
+    return '第$episode集';
+  }
+
+  @override
+  String epgDurationMinutes(int minutes) {
+    return '$minutes分钟';
+  }
+
+  @override
+  String epgDurationHours(int hours) {
+    return '$hours小时';
+  }
+
+  @override
+  String epgDurationHoursMinutes(int hours, int minutes) {
+    return '$hours小时$minutes分钟';
+  }
+
+  @override
+  String epgTimeLeft(String duration) {
+    return '剩余$duration';
+  }
+
+  @override
+  String epgStartsIn(String duration) {
+    return '$duration后开始';
+  }
+
+  @override
+  String get epgEnded => '已结束';
+
+  @override
+  String get epgWatchLive => '观看直播';
+
+  @override
+  String get epgWatchReplay => '观看回放';
+
+  @override
+  String get epgMoreOptions => '更多选项';
+
+  @override
+  String get epgKeyOk => '确定';
+
+  @override
+  String get epgKeyHoldOk => '长按确定';
+
+  @override
   String get epgSweepLoadingTitle => '正在加载节目指南';
 
   @override

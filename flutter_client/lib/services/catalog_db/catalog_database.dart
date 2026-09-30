@@ -80,6 +80,17 @@ class EpgProgrammes extends Table {
   TextColumn get title => text().withDefault(const Constant(''))();
   TextColumn get subtitle => text().nullable()();
   TextColumn get description => text().withDefault(const Constant(''))();
+  TextColumn get iconUrl => text().nullable()();
+  TextColumn get category => text().nullable()();
+  TextColumn get rating => text().nullable()();
+  IntColumn get season => integer().nullable()();
+  IntColumn get episode => integer().nullable()();
+  IntColumn get year => integer().nullable()();
+  BoolColumn get isNew => boolean().withDefault(const Constant(false))();
+  BoolColumn get isPremiere => boolean().withDefault(const Constant(false))();
+  BoolColumn get isRepeat => boolean().withDefault(const Constant(false))();
+  BoolColumn get isPlaceholder =>
+      boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {channelId, startMs};
@@ -136,7 +147,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
