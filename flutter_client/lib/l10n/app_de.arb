@@ -295,14 +295,6 @@
       }
     }
   },
-  "settingsReleaseNotesLatestIs": "Neueste: {version}",
-  "@settingsReleaseNotesLatestIs": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
   "settingsReleaseNotesNewerCount": "{count} neuere",
   "@settingsReleaseNotesNewerCount": {
     "placeholders": {
@@ -315,6 +307,34 @@
   "settingsReleaseNotesViewOnGithub": "Alle auf GitHub ansehen",
   "settingsReleaseNotesNoneForVersion": "Keine Hinweise für diese Version.",
   "settingsReleaseNotesSelectVersion": "Version auswählen",
+  "settingsReleaseNotesFeatureCount": "{count, plural, =1{1 Funktion} other{{count} Funktionen}}",
+  "@settingsReleaseNotesFeatureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesFixCount": "{count, plural, =1{1 Fehlerbehebung} other{{count} Fehlerbehebungen}}",
+  "@settingsReleaseNotesFixCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesShowMore": "{count} weitere anzeigen",
+  "@settingsReleaseNotesShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesOlder": "Ältere Version",
+  "settingsReleaseNotesNewer": "Neuere Version",
+  "settingsReleaseNotesHintVersions": "Version wechseln",
+  "settingsReleaseNotesHintScroll": "Scrollen",
   "settingsFillAllFields": "Bitte fülle alle Felder aus",
   "settingsConnectionSettings": "Verbindungseinstellungen",
   "settingsConnectionSettingsSubtitle": "Gib deine Xtream-Codes-Daten ein",

@@ -295,14 +295,6 @@
       }
     }
   },
-  "settingsReleaseNotesLatestIs": "最新：{version}",
-  "@settingsReleaseNotesLatestIs": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
   "settingsReleaseNotesNewerCount": "{count} 个更新版本",
   "@settingsReleaseNotesNewerCount": {
     "placeholders": {
@@ -315,6 +307,34 @@
   "settingsReleaseNotesViewOnGithub": "在 GitHub 上查看全部",
   "settingsReleaseNotesNoneForVersion": "此版本没有说明。",
   "settingsReleaseNotesSelectVersion": "选择版本",
+  "settingsReleaseNotesFeatureCount": "{count, plural, other{{count} 项新功能}}",
+  "@settingsReleaseNotesFeatureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesFixCount": "{count, plural, other{{count} 项修复}}",
+  "@settingsReleaseNotesFixCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesShowMore": "再显示 {count} 项",
+  "@settingsReleaseNotesShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesOlder": "较旧版本",
+  "settingsReleaseNotesNewer": "较新版本",
+  "settingsReleaseNotesHintVersions": "切换版本",
+  "settingsReleaseNotesHintScroll": "滚动",
   "settingsFillAllFields": "请填写所有字段",
   "settingsConnectionSettings": "连接设置",
   "settingsConnectionSettingsSubtitle": "输入您的 Xtream Codes 信息",

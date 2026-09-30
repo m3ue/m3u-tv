@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/release_notes_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
-import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class _FakeReleaseNotesService extends ReleaseNotesService {
   _FakeReleaseNotesService(this._releases);
@@ -35,6 +36,28 @@ ReleaseNote _note(String tag, String body) => ReleaseNote(
   publishedAt: DateTime.utc(2026, 8, 2),
 );
 
+const _changelog = '''
+## What's Changed
+
+### Features
+- Add canary workflow (`fae2f6e`)
+- bump flutter_cache_manager (#306) (`efa1234`)
+
+### Bug Fixes
+- Timeline scrubber on large scale (`e061396`)
+
+### Maintenance
+- Refactor settings screen (`cdd1ed8`)
+- Update app screenshots (`cb97216`)
+- Align related tiles (`35bf36a`)
+''';
+
+final List<ReleaseNote> _threeReleases = [
+  _note('v1.4.0', '- Added subtitles'),
+  _note('v1.3.0', '- Older fix here'),
+  _note('v1.2.0', 'plain paragraph text'),
+];
+
 Future<AppLocalizations> _l() =>
     AppLocalizations.delegate.load(const Locale('en'));
 
@@ -43,18 +66,35 @@ void main() {
     WidgetTester tester, {
     required List<ReleaseNote> releases,
     String? currentVersion,
+    bool isTv = false,
+    Size size = const Size(1000, 700),
+    AppFontSize fontSize = AppFontSize.normal,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SizedBox(
-            width: 900,
-            height: 600,
-            child: ReleaseNotesView(
-              releaseNotesService: _FakeReleaseNotesService(releases),
-              appVersionService: _FakeVersionService(currentVersion),
+          body: FontSizeScope(
+            fontSize: fontSize,
+            child: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(
+                    FontSizeScope.scaleOf(context),
+                  ),
+                ),
+                child: Center(
+                  child: SizedBox.fromSize(
+                    size: size,
+                    child: ReleaseNotesView(
+                      releaseNotesService: _FakeReleaseNotesService(releases),
+                      appVersionService: _FakeVersionService(currentVersion),
+                      isTv: isTv,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -63,51 +103,197 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('lists versions, flags the current and newer ones', (
+  testWidgets('opens on the running version and shows the install status', (
+    tester,
+  ) async {
+    await pump(tester, currentVersion: '1.3.0', releases: _threeReleases);
+    final l = await _l();
+
+    expect(find.text('v1.3.0'), findsOneWidget);
+    expect(find.text(l.settingsReleaseNotesCurrentBadge), findsOneWidget);
+    expect(find.textContaining('Older fix here'), findsOneWidget);
+    expect(find.textContaining('Added subtitles'), findsNothing);
+    expect(
+      find.textContaining(l.settingsReleaseNotesNewerCount(1)),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(l.settingsReleaseNotesYouAreOn('1.3.0')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows the up-to-date status on the latest version', (
+    tester,
+  ) async {
+    await pump(tester, currentVersion: '1.4.0', releases: _threeReleases);
+    final l = await _l();
+
+    expect(find.text(l.settingsReleaseNotesUpToDate), findsOneWidget);
+    expect(
+      find.textContaining(l.settingsReleaseNotesYouAreOn('1.4.0')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('hides the chevron with no version beyond it', (tester) async {
+    await pump(tester, currentVersion: '1.4.0', releases: _threeReleases);
+    final l = await _l();
+
+    bool visible(String tooltip) => tester
+        .widget<Visibility>(
+          find.ancestor(
+            of: find.byTooltip(tooltip),
+            matching: find.byType(Visibility),
+          ),
+        )
+        .visible;
+
+    // On the newest release: nothing newer.
+    expect(visible(l.settingsReleaseNotesNewer), isFalse);
+    expect(visible(l.settingsReleaseNotesOlder), isTrue);
+
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesOlder));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesOlder));
+    await tester.pumpAndSettle();
+
+    // On the oldest: the older chevron hides and focus lands on the title.
+    expect(find.text('v1.2.0'), findsOneWidget);
+    expect(visible(l.settingsReleaseNotesOlder), isFalse);
+    expect(visible(l.settingsReleaseNotesNewer), isTrue);
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'release-notes/version-button',
+    );
+  });
+
+  testWidgets('the header arrows step to older and newer versions', (
+    tester,
+  ) async {
+    await pump(tester, currentVersion: '1.3.0', releases: _threeReleases);
+    final l = await _l();
+
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesOlder));
+    await tester.pumpAndSettle();
+    expect(find.text('v1.2.0'), findsOneWidget);
+    expect(find.textContaining('plain paragraph text'), findsOneWidget);
+
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesNewer));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesNewer));
+    await tester.pumpAndSettle();
+    expect(find.text('v1.4.0'), findsOneWidget);
+    expect(find.text(l.settingsReleaseNotesNewBadge), findsOneWidget);
+    expect(find.textContaining('Added subtitles'), findsOneWidget);
+  });
+
+  testWidgets('Left/Right on the focused notes switch versions', (
+    tester,
+  ) async {
+    await pump(tester, currentVersion: '1.3.0', releases: _threeReleases);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(find.text('v1.4.0'), findsOneWidget);
+
+    // Already on the newest: Right is swallowed, nothing changes.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(find.text('v1.4.0'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('v1.2.0'), findsOneWidget);
+  });
+
+  testWidgets('renders a categorized changelog as cleaned-up sections', (
     tester,
   ) async {
     await pump(
       tester,
-      currentVersion: '1.3.0',
-      releases: [
-        _note('v1.4.0', "## What's Changed\n- Added subtitles"),
-        _note('v1.3.0', '- Older fix'),
-        _note('v1.2.0', 'plain paragraph'),
-      ],
+      currentVersion: '1.2.0',
+      releases: [_note('v1.2.0', _changelog)],
     );
     final l = await _l();
 
-    expect(find.widgetWithText(DpadInkWell, 'v1.4.0'), findsOneWidget);
-    expect(find.widgetWithText(DpadInkWell, 'v1.2.0'), findsOneWidget);
-    expect(find.text(l.settingsReleaseNotesCurrentBadge), findsOneWidget);
-    expect(find.text(l.settingsReleaseNotesNewBadge), findsOneWidget);
+    expect(find.text("What's Changed"), findsNothing);
+    expect(find.text('Features'), findsOneWidget);
+    expect(find.text('Bug Fixes'), findsOneWidget);
+    expect(find.text('Maintenance'), findsOneWidget);
+
+    // Commit hashes stripped, first letter capitalized, PR ref kept apart.
+    expect(find.textContaining('fae2f6e'), findsNothing);
+    expect(find.textContaining('Add canary workflow'), findsOneWidget);
+    expect(find.textContaining('Bump flutter_cache_manager'), findsOneWidget);
+    expect(find.textContaining('#306'), findsOneWidget);
+
+    // Header summary counts features and fixes.
     expect(
-      find.text(l.settingsReleaseNotesYouAreOn('1.3.0')),
+      find.textContaining(l.settingsReleaseNotesFeatureCount(2)),
       findsOneWidget,
     );
-    expect(find.text(l.settingsReleaseNotesNewerCount(1)), findsOneWidget);
+    expect(
+      find.textContaining(l.settingsReleaseNotesFixCount(1)),
+      findsOneWidget,
+    );
+
+    // Maintenance starts collapsed; tapping the row expands it.
+    expect(find.textContaining('Refactor settings screen'), findsNothing);
+    await tester.tap(find.text(l.settingsReleaseNotesShowMore(3)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Refactor settings screen'), findsOneWidget);
   });
 
-  testWidgets('shows the current version notes first, then follows selection', (
+  testWidgets('Select on the focused notes expands collapsed sections', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      currentVersion: '1.2.0',
+      releases: [_note('v1.2.0', _changelog)],
+    );
+
+    expect(find.textContaining('Align related tiles'), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Align related tiles'), findsOneWidget);
+  });
+
+  testWidgets('the version title opens a picker that switches versions', (
+    tester,
+  ) async {
+    await pump(tester, currentVersion: '1.3.0', releases: _threeReleases);
+    final l = await _l();
+
+    await tester.tap(find.text('v1.3.0'));
+    await tester.pumpAndSettle();
+    expect(find.text(l.settingsReleaseNotesSelectVersion), findsOneWidget);
+
+    await tester.tap(find.text('v1.2.0'));
+    await tester.pumpAndSettle();
+    expect(find.text(l.settingsReleaseNotesSelectVersion), findsNothing);
+    expect(find.textContaining('plain paragraph text'), findsOneWidget);
+  });
+
+  testWidgets('TV shows remote hints and a QR code for GitHub', (
     tester,
   ) async {
     await pump(
       tester,
       currentVersion: '1.3.0',
-      releases: [
-        _note('v1.4.0', '- Added subtitles'),
-        _note('v1.3.0', '- Older fix here'),
-        _note('v1.2.0', 'plain paragraph text'),
-      ],
+      releases: _threeReleases,
+      isTv: true,
     );
+    final l = await _l();
 
-    // Lands on the running version's notes.
-    expect(find.textContaining('Older fix here'), findsOneWidget);
-    expect(find.textContaining('Added subtitles'), findsNothing);
+    expect(find.text(l.settingsReleaseNotesHintVersions), findsOneWidget);
+    expect(find.byType(QrImageView), findsNothing);
 
-    await tester.tap(find.widgetWithText(DpadInkWell, 'v1.2.0'));
+    await tester.tap(find.text(l.settingsReleaseNotesViewOnGithub));
     await tester.pumpAndSettle();
-    expect(find.textContaining('plain paragraph text'), findsOneWidget);
+    expect(find.byType(QrImageView), findsOneWidget);
   });
 
   testWidgets('shows a retry affordance when no releases load', (tester) async {
@@ -115,104 +301,27 @@ void main() {
     final l = await _l();
 
     expect(find.text(l.settingsReleaseNotesError), findsOneWidget);
-    expect(
-      find.widgetWithText(Container, l.settingsReleaseNotesRetry),
-      findsNothing,
-    );
     expect(find.text(l.settingsReleaseNotesRetry), findsOneWidget);
   });
 
-  testWidgets('version rail rows do not overflow at Very Large display size', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: FontSizeScope(
-            fontSize: AppFontSize.veryLarge,
-            child: Builder(
-              builder: (context) => MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(
-                    FontSizeScope.scaleOf(context),
-                  ),
-                ),
-                child: SizedBox(
-                  width: 900,
-                  height: 600,
-                  child: ReleaseNotesView(
-                    releaseNotesService: _FakeReleaseNotesService([
-                      _note('v1.4.0', "## What's Changed\n- Added subtitles"),
-                      _note('v1.3.0', '- Older fix'),
-                    ]),
-                    appVersionService: _FakeVersionService('1.3.0'),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+  testWidgets('no overflow at Very Large display size', (tester) async {
+    await pump(
+      tester,
+      currentVersion: '1.2.0',
+      releases: [_note('v1.3.0', _changelog), _note('v1.2.0', _changelog)],
+      fontSize: AppFontSize.veryLarge,
+      isTv: true,
     );
-    await tester.pumpAndSettle();
-
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'narrow width collapses to a version dropdown with notes below, no overflow',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: SizedBox(
-              width: 360,
-              height: 640,
-              child: ReleaseNotesView(
-                releaseNotesService: _FakeReleaseNotesService([
-                  _note('v1.4.0', "## What's Changed\n- Added subtitles"),
-                  _note('v1.3.0', '- Older fix here'),
-                  _note('v1.2.0', 'plain paragraph text'),
-                ]),
-                appVersionService: _FakeVersionService('1.3.0'),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final l = await _l();
-
-      // Summary card collapses to just the status pill + a GitHub icon
-      // button - the version/latest text didn't fit and got clipped anyway.
-      expect(
-        find.text(l.settingsReleaseNotesYouAreOn('1.3.0')),
-        findsNothing,
-      );
-      expect(find.text(l.settingsReleaseNotesLatestIs('v1.4.0')), findsNothing);
-      expect(find.text(l.settingsReleaseNotesNewerCount(1)), findsOneWidget);
-      expect(find.byIcon(Icons.open_in_new), findsOneWidget);
-
-      // No rail rendered; the dropdown button and current notes show instead.
-      expect(find.widgetWithText(DpadInkWell, 'v1.2.0'), findsNothing);
-      expect(find.widgetWithText(DpadInkWell, 'v1.3.0'), findsOneWidget);
-      expect(find.textContaining('Older fix here'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-
-      // Opening the picker lists every version and lets one be selected.
-      await tester.tap(find.widgetWithText(DpadInkWell, 'v1.3.0'));
-      await tester.pumpAndSettle();
-      expect(find.text(l.settingsReleaseNotesSelectVersion), findsOneWidget);
-      expect(find.widgetWithText(DpadInkWell, 'v1.2.0'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(DpadInkWell, 'v1.2.0'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('plain paragraph text'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('no overflow on a narrow phone width', (tester) async {
+    await pump(
+      tester,
+      currentVersion: '1.2.0',
+      releases: [_note('v1.3.0', _changelog), _note('v1.2.0', _changelog)],
+      size: const Size(360, 640),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

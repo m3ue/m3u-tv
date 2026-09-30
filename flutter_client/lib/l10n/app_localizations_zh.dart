@@ -702,11 +702,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String settingsReleaseNotesLatestIs(String version) {
-    return '最新：$version';
-  }
-
-  @override
   String settingsReleaseNotesNewerCount(int count) {
     return '$count 个更新版本';
   }
@@ -722,6 +717,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsReleaseNotesSelectVersion => '选择版本';
+
+  @override
+  String settingsReleaseNotesFeatureCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 项新功能',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsReleaseNotesFixCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 项修复',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsReleaseNotesShowMore(int count) {
+    return '再显示 $count 项';
+  }
+
+  @override
+  String get settingsReleaseNotesOlder => '较旧版本';
+
+  @override
+  String get settingsReleaseNotesNewer => '较新版本';
+
+  @override
+  String get settingsReleaseNotesHintVersions => '切换版本';
+
+  @override
+  String get settingsReleaseNotesHintScroll => '滚动';
 
   @override
   String get settingsFillAllFields => '请填写所有字段';

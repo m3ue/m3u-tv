@@ -54,7 +54,6 @@ class SettingsScreen extends StatefulWidget {
     this.comskipSettings,
     this.viewSettingsService,
     this.deviceType,
-    this.onSidebarActivate,
     this.onHandleTopLevelBack,
   });
 
@@ -87,9 +86,6 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onConnected;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
-
-  /// Activates the shell sidebar (left-edge press from tab content).
-  final VoidCallback? onSidebarActivate;
 
   /// Pops the topmost immersive settings sub-page pushed on the root
   /// Navigator, deduping Android TV's two hardware-Back delivery paths (see
@@ -183,7 +179,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
         comskipSettings: widget.comskipSettings,
         viewSettingsService: widget.viewSettingsService,
-        onSidebarActivate: widget.onSidebarActivate,
         deviceType: widget.deviceType,
         onHandleTopLevelBack: widget.onHandleTopLevelBack,
       ),
@@ -851,14 +846,12 @@ class _ConnectedView extends StatefulWidget {
     this.proxyPlaybackSettings,
     this.comskipSettings,
     this.viewSettingsService,
-    this.onSidebarActivate,
     this.deviceType,
     this.onHandleTopLevelBack,
   });
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
-  final VoidCallback? onSidebarActivate;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
@@ -1042,7 +1035,8 @@ class _ConnectedViewState extends State<_ConnectedView> {
                         AppLocalizations.of(context).settingsReleaseNotesTab,
                     onBack: widget.onHandleTopLevelBack,
                     builder: (_) => ReleaseNotesView(
-                      onSidebarActivate: widget.onSidebarActivate,
+                      isTv: widget.deviceType == DeviceType.tv,
+                      onHandleTopLevelBack: widget.onHandleTopLevelBack,
                     ),
                   ),
                 ),

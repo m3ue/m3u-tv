@@ -1400,12 +1400,6 @@ abstract class AppLocalizations {
   /// **'You\'re on {version}'**
   String settingsReleaseNotesYouAreOn(String version);
 
-  /// No description provided for @settingsReleaseNotesLatestIs.
-  ///
-  /// In en, this message translates to:
-  /// **'Latest: {version}'**
-  String settingsReleaseNotesLatestIs(String version);
-
   /// No description provided for @settingsReleaseNotesNewerCount.
   ///
   /// In en, this message translates to:
@@ -1435,6 +1429,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select a version'**
   String get settingsReleaseNotesSelectVersion;
+
+  /// No description provided for @settingsReleaseNotesFeatureCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 feature} other{{count} features}}'**
+  String settingsReleaseNotesFeatureCount(int count);
+
+  /// No description provided for @settingsReleaseNotesFixCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 fix} other{{count} fixes}}'**
+  String settingsReleaseNotesFixCount(int count);
+
+  /// No description provided for @settingsReleaseNotesShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more'**
+  String settingsReleaseNotesShowMore(int count);
+
+  /// No description provided for @settingsReleaseNotesOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Older version'**
+  String get settingsReleaseNotesOlder;
+
+  /// No description provided for @settingsReleaseNotesNewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer version'**
+  String get settingsReleaseNotesNewer;
+
+  /// No description provided for @settingsReleaseNotesHintVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Change version'**
+  String get settingsReleaseNotesHintVersions;
+
+  /// No description provided for @settingsReleaseNotesHintScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get settingsReleaseNotesHintScroll;
 
   /// No description provided for @settingsFillAllFields.
   ///

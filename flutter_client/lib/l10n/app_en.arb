@@ -392,14 +392,6 @@
       }
     }
   },
-  "settingsReleaseNotesLatestIs": "Latest: {version}",
-  "@settingsReleaseNotesLatestIs": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
   "settingsReleaseNotesNewerCount": "{count} newer",
   "@settingsReleaseNotesNewerCount": {
     "placeholders": {
@@ -412,6 +404,34 @@
   "settingsReleaseNotesViewOnGithub": "View all on GitHub",
   "settingsReleaseNotesNoneForVersion": "No notes for this release.",
   "settingsReleaseNotesSelectVersion": "Select a version",
+  "settingsReleaseNotesFeatureCount": "{count, plural, =1{1 feature} other{{count} features}}",
+  "@settingsReleaseNotesFeatureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesFixCount": "{count, plural, =1{1 fix} other{{count} fixes}}",
+  "@settingsReleaseNotesFixCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesShowMore": "Show {count} more",
+  "@settingsReleaseNotesShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsReleaseNotesOlder": "Older version",
+  "settingsReleaseNotesNewer": "Newer version",
+  "settingsReleaseNotesHintVersions": "Change version",
+  "settingsReleaseNotesHintScroll": "Scroll",
   "settingsFillAllFields": "Please fill in all fields",
   "settingsConnectionSettings": "Connection Settings",
   "settingsConnectionSettingsSubtitle": "Enter your Xtream codes details",

@@ -1683,7 +1683,6 @@ class AppShellState extends ConsumerState<AppShell>
           viewSettingsService: _appState.viewSettingsService,
           proxyPlaybackSettings: _appState.proxyPlaybackSettings,
           comskipSettings: _appState.comskipSettings,
-          onSidebarActivate: _activateSidebar,
           onHandleTopLevelBack: handleBackFromTopLevelRoute,
         ),
       ),

@@ -725,11 +725,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String settingsReleaseNotesLatestIs(String version) {
-    return 'Última: $version';
-  }
-
-  @override
   String settingsReleaseNotesNewerCount(int count) {
     return '$count más recientes';
   }
@@ -746,6 +741,45 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsReleaseNotesSelectVersion => 'Seleccionar una versión';
+
+  @override
+  String settingsReleaseNotesFeatureCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count novedades',
+      one: '1 novedad',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsReleaseNotesFixCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count correcciones',
+      one: '1 corrección',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsReleaseNotesShowMore(int count) {
+    return 'Mostrar $count más';
+  }
+
+  @override
+  String get settingsReleaseNotesOlder => 'Versión anterior';
+
+  @override
+  String get settingsReleaseNotesNewer => 'Versión más reciente';
+
+  @override
+  String get settingsReleaseNotesHintVersions => 'Cambiar versión';
+
+  @override
+  String get settingsReleaseNotesHintScroll => 'Desplazar';
 
   @override
   String get settingsFillAllFields => 'Por favor completa todos los campos';
