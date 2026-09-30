@@ -2,7 +2,9 @@
 
 ![logo](./favicon.png)
 
-Cross-platform TV front-end player for the [M3U Editor web app](https://github.com/m3ue/m3u-editor). The primary client is the Flutter app in `flutter_client/`.
+Cross-platform TV front-end player for the [M3U Editor web app](https://github.com/m3ue/m3u-editor).
+
+![feature-card](https://m3ue.sparkison.dev/img/tv-social-card.jpg)
 
 ## Download
 
