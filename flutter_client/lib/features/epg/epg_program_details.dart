@@ -77,8 +77,13 @@ class EpgGuideSelection {
   }
 
   EpgGuideAction get action {
-    if (program == null || isLive) return EpgGuideAction.watchLive;
+    final p = program;
+    if (p == null || isLive) return EpgGuideAction.watchLive;
     if (canReplay) return EpgGuideAction.watchReplay;
+    // The editor's filler blocks have nothing to record, so they tune the
+    // channel like a row with no EPG data. Past ones still replay: catchup
+    // is by time range, so the archive is real either way.
+    if (p.isPlaceholder) return EpgGuideAction.watchLive;
     if (isUpcoming) return EpgGuideAction.options;
     return EpgGuideAction.none;
   }
@@ -143,12 +148,22 @@ class EpgProgramPreview extends StatelessWidget {
     super.key,
     required this.selection,
     this.showKeyHints = true,
+    this.okAction,
+    this.canOpenOptions = true,
   });
 
   final EpgGuideSelection selection;
 
   /// Remote-control hints ("OK Watch live", "Hold OK More options").
   final bool showKeyHints;
+
+  /// What OK does, when it differs from [EpgGuideSelection.action] (on the
+  /// channel cell OK always tunes, whatever programme the preview shows).
+  final EpgGuideAction? okAction;
+
+  /// Whether holding OK opens anything, so the hint isn't offered when it
+  /// would do nothing.
+  final bool canOpenOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +182,13 @@ class EpgProgramPreview extends StatelessWidget {
               selection: selection,
               descriptionMaxLines: 4,
               expandDescription: true,
-              footer: showKeyHints ? _KeyHints(selection: selection) : null,
+              footer: showKeyHints
+                  ? _KeyHints(
+                      selection: selection,
+                      okAction: okAction ?? selection.action,
+                      canOpenOptions: canOpenOptions,
+                    )
+                  : null,
             ),
           ),
         ],
@@ -206,8 +227,10 @@ class _EpgProgramArtworkState extends State<EpgProgramArtwork> {
   void didUpdateWidget(EpgProgramArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
     final wanted = _wantedUrl;
-    if (wanted == _shownUrl) return;
+    // Cancel first: moving A -> B -> A inside the delay must drop B's timer,
+    // or it lands B while A is wanted and the frame falls back to the logo.
     _settleTimer?.cancel();
+    if (wanted == _shownUrl) return;
     _settleTimer = Timer(_settleDelay, () {
       if (mounted) setState(() => _shownUrl = wanted);
     });
@@ -653,14 +676,20 @@ class _MetaChip extends StatelessWidget {
 
 /// "OK: Watch live" / "Hold OK: More options" remote hints.
 class _KeyHints extends StatelessWidget {
-  const _KeyHints({required this.selection});
+  const _KeyHints({
+    required this.selection,
+    required this.okAction,
+    required this.canOpenOptions,
+  });
 
   final EpgGuideSelection selection;
+  final EpgGuideAction okAction;
+  final bool canOpenOptions;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final primary = switch (selection.action) {
+    final primary = switch (okAction) {
       EpgGuideAction.watchLive => l10n.epgWatchLive,
       EpgGuideAction.watchReplay => l10n.epgWatchReplay,
       EpgGuideAction.options => l10n.epgMoreOptions,
@@ -681,7 +710,7 @@ class _KeyHints extends StatelessWidget {
           children: [
             if (primary != null)
               _KeyHint(keyLabel: l10n.epgKeyOk, label: primary),
-            if (selection.action != EpgGuideAction.options)
+            if (canOpenOptions && okAction != EpgGuideAction.options)
               _KeyHint(keyLabel: l10n.epgKeyHoldOk, label: l10n.epgMoreOptions),
           ],
         ),
@@ -804,7 +833,9 @@ Future<void> showEpgProgramDetailsSheet(
 
       final l10n = AppLocalizations.of(sheetContext);
       final canReplay = selection.canReplay && onWatchReplay != null;
-      final isUpcoming = selection.isUpcoming;
+      // A filler block ahead of now still offers Watch live: there is no
+      // programme to wait for.
+      final isUpcoming = selection.isUpcoming && selection.hasProgramInfo;
       return ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.85,

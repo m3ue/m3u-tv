@@ -672,11 +672,16 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     _selectDate(_offsetDate(_selectedDate, 1), scrollToDayStart: true);
     _anchor = _windowStart;
     final programs = _rowPrograms(_cursor.value.row);
+    // The day's first programme is usually the one running over midnight,
+    // which the cursor is already on; step to the first that starts here.
+    final target =
+        programs.where((p) => !p.start.isBefore(_windowStart)).firstOrNull ??
+        programs.firstOrNull;
     _setCursor(
       _cursor.value.copyWith(
         onChannel: false,
-        program: programs.isEmpty ? null : programs.first,
-        clearProgram: programs.isEmpty,
+        program: target,
+        clearProgram: target == null,
       ),
     );
   }
@@ -834,12 +839,42 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       widget.onChannelLongPress != null ||
       widget.onChannelColumnLongPress != null;
 
+  /// Whether hold-OK at [cursor] goes to the channel menu rather than the
+  /// programme's: on the channel cell, on an empty row, or on one of the
+  /// editor's filler blocks (nothing there to record).
+  bool _usesChannelOptions(_GuideCursor cursor) {
+    final program = cursor.program;
+    return cursor.onChannel || program == null || program.isPlaceholder;
+  }
+
+  bool _canOpenOptions(_GuideCursor cursor) => _usesChannelOptions(cursor)
+      ? widget.onChannelColumnLongPress != null
+      : widget.onChannelLongPress != null;
+
+  /// What OK does at [cursor], mirroring [_activateCursor] so the preview's
+  /// hint matches the key.
+  EpgGuideAction _okActionFor(
+    _GuideCursor cursor,
+    EpgGuideSelection selection,
+  ) {
+    if (cursor.onChannel || cursor.program == null) {
+      return EpgGuideAction.watchLive;
+    }
+    return switch (selection.action) {
+      EpgGuideAction.watchReplay when widget.onCatchupProgramSelect == null =>
+        EpgGuideAction.none,
+      EpgGuideAction.options when widget.onChannelLongPress == null =>
+        EpgGuideAction.none,
+      final action => action,
+    };
+  }
+
   void _openCursorOptions() {
     if (widget.channels.isEmpty) return;
     final cursor = _cursor.value;
     final channel = widget.channels[cursor.row];
     final program = cursor.program;
-    if (cursor.onChannel || program == null) {
+    if (_usesChannelOptions(cursor) || program == null) {
       widget.onChannelColumnLongPress?.call(channel);
       return;
     }
@@ -878,7 +913,13 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   Future<void> _showDetails(Channel channel, EpgProgram program) {
     final onReplay = widget.onCatchupProgramSelect;
-    final onOptions = widget.onChannelLongPress;
+    final onProgramOptions = widget.onChannelLongPress;
+    final onChannelOptions = widget.onChannelColumnLongPress;
+    final onMoreOptions = program.isPlaceholder
+        ? (onChannelOptions == null ? null : () => onChannelOptions(channel))
+        : (onProgramOptions == null
+              ? null
+              : () => onProgramOptions(channel, program));
     return showEpgProgramDetailsSheet(
       context,
       selection: EpgGuideSelection(
@@ -889,9 +930,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       ),
       onWatchLive: () => widget.onChannelSelect(channel),
       onWatchReplay: onReplay == null ? null : () => onReplay(channel, program),
-      onMoreOptions: onOptions == null
-          ? null
-          : () => onOptions(channel, program),
+      onMoreOptions: onMoreOptions,
     );
   }
 
@@ -976,7 +1015,11 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                   builder: (context, cursor, _) {
                     final selection = _selectionFor(cursor);
                     if (selection == null) return const SizedBox.shrink();
-                    return EpgProgramPreview(selection: selection);
+                    return EpgProgramPreview(
+                      selection: selection,
+                      okAction: _okActionFor(cursor, selection),
+                      canOpenOptions: _canOpenOptions(cursor),
+                    );
                   },
                 ),
               ),

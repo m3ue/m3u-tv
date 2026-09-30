@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/epg/epg_program_details.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -32,6 +33,7 @@ void main() {
     void Function(Channel)? onChannelSelect,
     CatchupProgramSelect? onCatchupProgramSelect,
     CatchupProgramSelect? onChannelLongPress,
+    void Function(Channel)? onChannelColumnLongPress,
     EnsureEpg? onEnsureEpg,
     EpgStartView epgStartView = EpgStartView.currentTime,
     int futureDays = 7,
@@ -53,6 +55,7 @@ void main() {
         onChannelSelect: onChannelSelect ?? (_) {},
         onCatchupProgramSelect: onCatchupProgramSelect,
         onChannelLongPress: onChannelLongPress,
+        onChannelColumnLongPress: onChannelColumnLongPress,
         onEnsureEpg: onEnsureEpg,
         epgStartView: epgStartView,
         futureDays: futureDays,
@@ -111,6 +114,14 @@ void main() {
 
   Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
     await tester.sendKeyEvent(key);
+    await tester.pumpAndSettle();
+  }
+
+  /// Holds [key] past the dpad long-select delay.
+  Future<void> hold(WidgetTester tester, LogicalKeyboardKey key) async {
+    await tester.sendKeyDownEvent(key);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.sendKeyUpEvent(key);
     await tester.pumpAndSettle();
   }
 
@@ -991,6 +1002,78 @@ void main() {
       expect(cursorOn(programCell(tomorrow)), isTrue);
     });
 
+    testWidgets('next day skips the programme running over midnight', (
+      tester,
+    ) async {
+      final lateNow = DateTime(2026, 7, 31, 22);
+      final overnight = program(
+        'alpha',
+        'Overnight',
+        at(23, 30),
+        DateTime(2026, 8, 1, 0, 30),
+      );
+      final afterMidnight = program(
+        'alpha',
+        'After Midnight',
+        DateTime(2026, 8, 1, 0, 30),
+        DateTime(2026, 8, 1, 1, 30),
+      );
+      var moves = 0;
+      await pumpGuide(
+        tester,
+        clock: () => lateNow,
+        channels: const [channelA],
+        epgService: EpgService(clock: () => lateNow)
+          ..loadPrograms([overnight, afterMidnight]),
+        onCursorMove: () => moves += 1,
+      );
+
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(cursorOn(programCell(overnight)), isTrue);
+
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+      expect(cursorOn(programCell(afterMidnight)), isTrue);
+      expect(moves, 2, reason: 'the day change is a real move');
+    });
+
+    testWidgets('a filler block tunes on OK and opens the channel menu', (
+      tester,
+    ) async {
+      final filler = EpgProgram(
+        channelId: 'alpha',
+        title: 'Alpha',
+        description: '',
+        start: at(12, 30),
+        end: at(13, 30),
+        isPlaceholder: true,
+      );
+      final selected = <Channel>[];
+      final programOptions = <EpgProgram>[];
+      final channelOptions = <Channel>[];
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        channels: const [channelA],
+        epgService: EpgService(clock: () => now)..loadPrograms([a1, filler]),
+        onChannelSelect: selected.add,
+        onChannelLongPress: (_, program) => programOptions.add(program),
+        onChannelColumnLongPress: channelOptions.add,
+      );
+
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(cursorOn(programCell(filler)), isTrue);
+
+      await press(tester, LogicalKeyboardKey.select);
+      expect(selected, [channelA]);
+
+      await hold(tester, LogicalKeyboardKey.select);
+      expect(channelOptions, [channelA]);
+      expect(programOptions, isEmpty);
+      expect(selected, [channelA]);
+    });
+
     testWidgets('reports cursor moves, but not presses that go nowhere', (
       tester,
     ) async {
@@ -1153,6 +1236,135 @@ void main() {
         find.byKey(const ValueKey('http://example.com/square.jpg')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('key hints only offer what OK and hold-OK actually do', (
+      tester,
+    ) async {
+      final upcoming = EpgProgram(
+        channelId: 'bbc.one',
+        title: 'Later Show',
+        description: 'Coming up.',
+        start: DateTime(2026, 7, 31, 12, 30),
+        end: DateTime(2026, 7, 31, 13, 30),
+      );
+      Future<void> pump({
+        CatchupProgramSelect? onChannelLongPress,
+        void Function(Channel)? onChannelColumnLongPress,
+      }) => pumpGuide(
+        tester,
+        clock: () => now,
+        showPreview: true,
+        width: 1200,
+        height: 800,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now)..loadPrograms([upcoming]),
+        onChannelLongPress: onChannelLongPress,
+        onChannelColumnLongPress: onChannelColumnLongPress,
+        // Fresh state each time, so the cursor starts on the channel cell.
+        guideKey: UniqueKey(),
+      );
+
+      // On the channel cell OK tunes, though the preview shows the next
+      // programme; and nothing is wired to hold-OK.
+      await pump();
+      expect(find.text('Coming up.'), findsOneWidget);
+      expect(find.text('Watch live'), findsOneWidget);
+      expect(find.text('Hold OK'), findsNothing);
+      expect(find.text('More options'), findsNothing);
+
+      // Programme options alone don't make hold-OK work on the channel cell.
+      await pump(onChannelLongPress: (_, _) {});
+      expect(find.text('Hold OK'), findsNothing);
+
+      await pump(onChannelColumnLongPress: (_) {});
+      expect(find.text('Hold OK'), findsOneWidget);
+
+      // On the upcoming programme OK opens its options, when there are any.
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(find.text('Watch live'), findsNothing);
+      expect(find.text('More options'), findsNothing);
+
+      await pump(onChannelLongPress: (_, _) {});
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(find.text('More options'), findsOneWidget);
+      expect(find.text('Hold OK'), findsNothing);
+    });
+
+    testWidgets('artwork settles on the wanted image after a quick return', (
+      tester,
+    ) async {
+      const first = 'http://example.com/first.jpg';
+      const second = 'http://example.com/second.jpg';
+      Future<void> show(String url) => tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 320,
+              height: 180,
+              child: EpgProgramArtwork(
+                selection: EpgGuideSelection(
+                  channel: bbcOne,
+                  program: EpgProgram(
+                    channelId: 'bbc.one',
+                    title: url,
+                    description: '',
+                    start: DateTime(2026, 7, 31, 11, 30),
+                    end: DateTime(2026, 7, 31, 12, 30),
+                    iconUrl: url,
+                  ),
+                  now: now,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await show(first);
+      await show(second);
+      await tester.pump(const Duration(milliseconds: 100));
+      await show(first);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byKey(const ValueKey(first)), findsOneWidget);
+    });
+
+    testWidgets('the details sheet treats a filler block as no programme', (
+      tester,
+    ) async {
+      final filler = EpgProgram(
+        channelId: 'bbc.one',
+        title: 'BBC One',
+        description: '',
+        start: DateTime(2026, 7, 31, 12, 30),
+        end: DateTime(2026, 7, 31, 13, 30),
+        isPlaceholder: true,
+      );
+      final selected = <Channel>[];
+      final programOptions = <EpgProgram>[];
+      final channelOptions = <Channel>[];
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        tapOpensDetails: true,
+        width: 400,
+        height: 700,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now)..loadPrograms([filler]),
+        onChannelSelect: selected.add,
+        onChannelLongPress: (_, program) => programOptions.add(program),
+        onChannelColumnLongPress: channelOptions.add,
+      );
+
+      await tester.tap(programCell(filler));
+      await tester.pumpAndSettle();
+      expect(find.text('Watch live'), findsOneWidget);
+
+      await tester.tap(find.text('More options'));
+      await tester.pumpAndSettle();
+      expect(channelOptions, [bbcOne]);
+      expect(programOptions, isEmpty);
     });
 
     testWidgets('preview panel is skipped when the guide is too short', (
