@@ -180,7 +180,6 @@ class EpgProgramPreview extends StatelessWidget {
           Expanded(
             child: _ProgramInfo(
               selection: selection,
-              descriptionMaxLines: 4,
               expandDescription: true,
               footer: showKeyHints
                   ? _KeyHints(
@@ -353,18 +352,17 @@ class _ChannelLogoFallback extends StatelessWidget {
 class _ProgramInfo extends StatelessWidget {
   const _ProgramInfo({
     required this.selection,
-    required this.descriptionMaxLines,
     this.expandDescription = false,
     this.compact = false,
     this.footer,
   });
 
   final EpgGuideSelection selection;
-  final int? descriptionMaxLines;
 
-  /// Fill (and clip to) a fixed height with the footer pinned at the
-  /// bottom, for the TV panel. The details sheet sizes to its content and
-  /// scrolls instead.
+  /// Fill a fixed height with the footer pinned at the bottom, for the TV
+  /// panel: the description gets whatever height is left (see
+  /// [_AutoScrollText]). The details sheet sizes to its content and scrolls
+  /// instead.
   final bool expandDescription;
   final bool compact;
   final Widget? footer;
@@ -389,19 +387,17 @@ class _ProgramInfo extends StatelessWidget {
     ];
     final description = hasInfo ? program!.description.trim() : '';
 
-    final descriptionText = Text(
-      hasInfo ? description : l10n.epgNoData,
-      style: (compact ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
-          ?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontStyle: hasInfo ? null : FontStyle.italic,
-            height: 1.35,
-          ),
-      maxLines: descriptionMaxLines,
-      overflow: descriptionMaxLines == null ? null : TextOverflow.ellipsis,
-    );
+    final descriptionText = hasInfo ? description : l10n.epgNoData;
+    final descriptionStyle =
+        (compact ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
+            ?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontStyle: hasInfo ? null : FontStyle.italic,
+              height: 1.35,
+            );
+    final showDescription = hasInfo ? description.isNotEmpty : program != null;
 
-    final body = Column(
+    final header = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -432,10 +428,6 @@ class _ProgramInfo extends StatelessWidget {
           const SizedBox(height: 10),
           _MetaChips(selection: selection),
         ],
-        if (hasInfo ? description.isNotEmpty : program != null) ...[
-          const SizedBox(height: 10),
-          descriptionText,
-        ],
       ],
     );
 
@@ -444,28 +436,225 @@ class _ProgramInfo extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          body,
+          header,
+          if (showDescription) ...[
+            const SizedBox(height: 10),
+            Text(descriptionText, style: descriptionStyle),
+          ],
           if (footer != null) ...[const SizedBox(height: 8), footer!],
         ],
       );
     }
-    // Fixed-height panel: the footer stays pinned to the bottom and the
-    // body clips at whatever height is left (a short window or a large
-    // font size), losing description lines rather than overflowing.
+    // Fixed-height panel: the footer stays pinned to the bottom, the header
+    // takes what it needs (clipped if even that doesn't fit, on a short
+    // window or a large font size) and the description fills the rest.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: ClipRect(
-            child: OverflowBox(
-              alignment: Alignment.topLeft,
-              maxHeight: double.infinity,
-              child: body,
+            child: CustomMultiChildLayout(
+              delegate: _HeaderThenFillLayout(gap: 10),
+              children: [
+                LayoutId(id: _InfoSlot.header, child: header),
+                if (showDescription)
+                  LayoutId(
+                    id: _InfoSlot.description,
+                    child: _AutoScrollText(
+                      // Fresh state (back at the top, waiting to rest) for
+                      // each programme the cursor lands on.
+                      key: ValueKey(
+                        '${program?.channelId}|${program?.start.toIso8601String()}',
+                      ),
+                      text: descriptionText,
+                      style: descriptionStyle,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
         if (footer != null) ...[const SizedBox(height: 8), footer!],
       ],
+    );
+  }
+}
+
+enum _InfoSlot { header, description }
+
+/// Lays the header out at its natural height and gives the description a
+/// tight box with whatever height is left below it (none when the header
+/// already fills the panel).
+class _HeaderThenFillLayout extends MultiChildLayoutDelegate {
+  _HeaderThenFillLayout({required this.gap});
+
+  final double gap;
+
+  @override
+  void performLayout(Size size) {
+    final headerSize = layoutChild(
+      _InfoSlot.header,
+      BoxConstraints(maxWidth: size.width),
+    );
+    positionChild(_InfoSlot.header, Offset.zero);
+    if (!hasChild(_InfoSlot.description)) return;
+    final top = headerSize.height + gap;
+    layoutChild(
+      _InfoSlot.description,
+      BoxConstraints.tightFor(
+        width: size.width,
+        height: math.max(0, size.height - top),
+      ),
+    );
+    positionChild(_InfoSlot.description, Offset(0, top));
+  }
+
+  @override
+  bool shouldRelayout(_HeaderThenFillLayout oldDelegate) =>
+      oldDelegate.gap != gap;
+}
+
+/// The preview's description in the height the panel leaves it. Shows whole
+/// lines only, fading out the last one when there is more. Once the cursor
+/// has rested on the programme it slowly scrolls through the rest, pauses at
+/// the end, returns to the top and starts over (the way Kodi shows plot
+/// text), unless the platform asks for reduced motion.
+class _AutoScrollText extends StatefulWidget {
+  const _AutoScrollText({super.key, required this.text, this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_AutoScrollText> createState() => _AutoScrollTextState();
+}
+
+class _AutoScrollTextState extends State<_AutoScrollText> {
+  static const _restDelay = Duration(seconds: 3);
+  static const _endPause = Duration(seconds: 3);
+  static const _returnDuration = Duration(milliseconds: 700);
+  static const _millisecondsPerLine = 2500;
+
+  final _controller = ScrollController();
+  Timer? _timer;
+  bool _running = false;
+  double _lineHeight = 1;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Starts the scroll loop the first time the text is found to overflow.
+  void _startLoop() {
+    if (_running || MediaQuery.disableAnimationsOf(context)) return;
+    _running = true;
+    _timer = Timer(_restDelay, _scrollDown);
+  }
+
+  Future<void> _scrollDown() async {
+    if (!mounted || !_controller.hasClients) return;
+    final position = _controller.position;
+    final distance = position.maxScrollExtent - position.pixels;
+    if (distance <= 0) {
+      // A relayout gave the text room after all; build restarts the loop
+      // if it overflows again.
+      _running = false;
+      return;
+    }
+    await _controller.animateTo(
+      position.maxScrollExtent,
+      duration: Duration(
+        milliseconds: (distance / _lineHeight * _millisecondsPerLine).round(),
+      ),
+      curve: Curves.linear,
+    );
+    if (!mounted) return;
+    _timer = Timer(_endPause, _scrollUp);
+  }
+
+  Future<void> _scrollUp() async {
+    if (!mounted || !_controller.hasClients) return;
+    await _controller.animateTo(
+      0,
+      duration: _returnDuration,
+      curve: Curves.easeInOut,
+    );
+    if (!mounted) return;
+    _timer = Timer(_restDelay, _scrollDown);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(widget.text, style: widget.style);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final textHeight = painter.height;
+        final lineHeight = painter.preferredLineHeight;
+        painter.dispose();
+        _lineHeight = lineHeight;
+
+        final lines = (constraints.maxHeight / lineHeight).floor();
+        if (lines < 1) return const SizedBox.shrink();
+        if (textHeight <= constraints.maxHeight) {
+          return Align(alignment: Alignment.topLeft, child: text);
+        }
+        _startLoop();
+
+        final viewportHeight = lines * lineHeight;
+        final fade = math.min(0.5, lineHeight * 0.9 / viewportHeight);
+        return Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            height: viewportHeight,
+            child: ListenableBuilder(
+              listenable: _controller,
+              builder: (context, child) {
+                final position = _controller.hasClients
+                    ? _controller.position
+                    : null;
+                final atTop = position == null || position.pixels <= 0.5;
+                final atEnd =
+                    position != null &&
+                    position.hasContentDimensions &&
+                    position.pixels >= position.maxScrollExtent - 0.5;
+                return ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (bounds) => LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      if (atTop) Colors.white else Colors.transparent,
+                      Colors.white,
+                      Colors.white,
+                      if (atEnd) Colors.white else Colors.transparent,
+                    ],
+                    stops: [0, fade, 1 - fade, 1],
+                  ).createShader(bounds),
+                  child: child,
+                );
+              },
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(scrollbars: false, overscroll: false),
+                child: SingleChildScrollView(
+                  controller: _controller,
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: text,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -856,7 +1045,6 @@ Future<void> showEpgProgramDetailsSheet(
               ],
               _ProgramInfo(
                 selection: selection,
-                descriptionMaxLines: null,
                 compact: true,
               ),
               const SizedBox(height: 12),

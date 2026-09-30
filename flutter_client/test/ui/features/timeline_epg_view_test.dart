@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,6 +71,14 @@ void main() {
       // Matches the production wrapping in live_tv_screen.dart's
       // `_buildEpgGrid` (`horizontalEdge: stop`).
       guide = DpadRegion(horizontalEdge: DpadEdgeBehavior.stop, child: guide);
+    }
+    // Grow the test surface (800x600 by default) so the guide really gets
+    // the requested size instead of being squeezed to the window.
+    if (width > 800 || height > 600) {
+      tester.view
+        ..physicalSize = Size(math.max(width, 800), math.max(height, 600))
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
     }
     await tester.pumpWidget(
       MaterialApp(
@@ -1208,7 +1218,66 @@ void main() {
       expect(find.text('LIVE'), findsOneWidget);
       expect(find.text('NEW'), findsWidgets);
       expect(find.byType(ImageFiltered), findsNothing);
+      expect(
+        find.ancestor(
+          of: find.text('Our heroes crack the case at last.'),
+          matching: find.byType(Scrollable),
+        ),
+        findsNothing,
+        reason: 'a description that fits is plain text',
+      );
     });
+
+    testWidgets(
+      'a long description shows whole lines and scrolls once rested',
+      (
+        tester,
+      ) async {
+        final synopsis = List.filled(
+          40,
+          'A long synopsis that keeps on going.',
+        ).join(' ');
+        final wordy = EpgProgram(
+          channelId: 'bbc.one',
+          title: 'Wordy Show',
+          description: synopsis,
+          start: DateTime(2026, 7, 31, 11, 30),
+          end: DateTime(2026, 7, 31, 12, 30),
+        );
+        await pumpGuide(
+          tester,
+          clock: () => now,
+          showPreview: true,
+          width: 1200,
+          height: 800,
+          channels: const [bbcOne],
+          epgService: EpgService(clock: () => now)..loadPrograms([wordy]),
+        );
+
+        final scrollable = find.ancestor(
+          of: find.text(synopsis),
+          matching: find.byType(Scrollable),
+        );
+        expect(scrollable, findsOneWidget);
+        final position = tester.state<ScrollableState>(scrollable).position;
+        expect(position.maxScrollExtent, greaterThan(0));
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(position.pixels, 0, reason: 'waits for the cursor to rest');
+
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump(const Duration(seconds: 1));
+        expect(position.pixels, greaterThan(0));
+
+        await tester.pump(const Duration(minutes: 3));
+        expect(position.pixels, position.maxScrollExtent);
+
+        // Pauses at the end, then returns to the top.
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump(const Duration(seconds: 1));
+        expect(position.pixels, 0);
+      },
+    );
 
     testWidgets('preview artwork sits over a blurred fill of itself', (
       tester,
