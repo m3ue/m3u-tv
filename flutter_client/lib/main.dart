@@ -27,12 +27,19 @@ import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/tv_remote_input_governor_scope.dart';
+import 'package:m3u_tv/shared/tvos_scroll_semantics.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.operatingSystem == 'tvos') {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    dispatcher.onSemanticsActionEvent = ignoreNativeScrollToOffset(
+      dispatcher.onSemanticsActionEvent,
+    );
+  }
   await DevicePerformance.ensureDetected();
   if (kDebugMode) debugPrint(DevicePerformance.describe());
   _configureImageCache();
@@ -414,6 +421,9 @@ class _MyAppState extends State<MyApp> {
         'HIDE_DEBUG_BANNER',
       ),
       routerConfig: _router,
+      scrollBehavior: Platform.operatingSystem == 'tvos'
+          ? const TvosScrollBehavior()
+          : null,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: widget.appState?.locale,

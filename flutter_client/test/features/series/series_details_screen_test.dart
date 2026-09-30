@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/series_detail_widgets.dart';
 
 Episode _ep(int season, int number) => Episode(
   id: '${season}0$number',
@@ -533,6 +534,54 @@ void main() {
     await tester.pump();
     expect(played?.startPosition, 0);
   });
+
+  testWidgets(
+    'wide layout: holding RIGHT through a long season with semantics on '
+    'keeps the episode strip following focus to the last episode',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _app(
+          SeriesInfo(
+            series: const Series(id: 7, name: 'Long Show'),
+            seasons: const [Season(number: 1, name: 'Season 1')],
+            episodesBySeason: {
+              1: [for (var i = 1; i <= 20; i++) _ep(1, i)],
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'episodeStrip');
+
+      final list = find.descendant(
+        of: find.byType(EpisodeStrip),
+        matching: find.byType(ListView),
+      );
+      final controller = tester.widget<ListView>(list).controller!;
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      for (var i = 0; i < 25; i++) {
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(controller.position.isScrollingNotifier.value, isFalse);
+      expect(controller.offset, controller.position.maxScrollExtent);
+      semantics.dispose();
+    },
+  );
 
   testWidgets('long-pressing an episode card confirms before marking watched', (
     tester,

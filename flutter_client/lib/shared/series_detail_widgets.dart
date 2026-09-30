@@ -661,20 +661,9 @@ class EpisodeStripState extends State<EpisodeStrip>
   /// the page. (dpad's focus-follow reveal only ever pulled the page when
   /// each card was its own focus node.)
   ///
-  /// KNOWN ISSUE (not yet bullet-proof - needs more device testing): under
-  /// aggressive fast left/right key-repeat this `animateTo` can still land its
-  /// `DrivenScrollActivity` goBallistic -> goIdle transition inside the
-  /// semantics flush, tripping Flutter's
-  /// `!attached || !owner!._debugDoingSemantics` assertion storm
-  /// (`ScrollableState.setIgnorePointer` -> `RenderIgnorePointer.ignoring=` ->
-  /// `markNeedsSemanticsUpdate`). It is visually harmless (debug-only assert)
-  /// and self-recovers, but the real fix is still open. A
-  /// `FrameSafeScrollController` that deferred/collapsed these jumps out of the
-  /// frame pipeline killed the asserts but broke normal recenter (focus
-  /// advanced, scroll lagged a frame and sometimes never landed), so it was
-  /// reverted. Candidate directions to try next: gate the recenter to
-  /// KeyDown-only (skip KeyRepeat), debounce `_centerFocused`, or drop the
-  /// tween for an unconditional `jumpTo` on repeat.
+  /// The `!owner!._debugDoingSemantics` assertion storm that used to hit
+  /// here on tvOS came from UIKit's focus engine scrolling this list via
+  /// `scrollToOffset`, not from this animation - see `TvosScrollBehavior`.
   void _centerFocused({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_controller.hasClients) return;

@@ -160,15 +160,8 @@ class CastStripState extends State<CastStrip> {
   double get _cardGap => _kCardGap * _scale;
   double get _itemExtent => _cardWidth + _cardGap;
 
-  /// KNOWN ISSUE (shared with the episode strip - see `_centerFocused` in
-  /// series_details_screen.dart): aggressive fast left/right key-repeat can
-  /// still trip the `!_debugDoingSemantics` assertion storm when this
-  /// `animateTo` settles during a semantics flush. Debug-only, self-recovers,
-  /// but not yet bullet-proof - needs more device testing. A
-  /// FrameSafeScrollController that deferred these jumps fixed the asserts but
-  /// broke normal recenter, so it was reverted. In practice this row is far
-  /// harder to race than the episode strip (fewer, wider cards), so it is left
-  /// as-is pending a shared fix for both rows.
+  /// See the episode strip's `_centerFocused` for the tvOS assertion storm
+  /// this used to hit (fixed by `TvosScrollBehavior`).
   void _centerFocused({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_controller.hasClients) return;
