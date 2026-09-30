@@ -123,14 +123,14 @@ void _configureImageCache() {
     maximumSizeBytes = 256 * 1024 * 1024;
     maximumSize = 1200;
   } else {
-    // Android TV - tightest RAM budget. Raised from 160MB/900 alongside the
-    // fling-aware decode throttle in ScrollbarGridView (which caps how many
-    // decodes a single fast scroll can queue at once) - the ceiling alone
-    // never fixed decode-burst OOMs, it only delayed them, so this is
-    // deliberately a moderate bump (not all the way to desktop's 384MB) with
-    // the throttle doing the actual burst control.
-    maximumSizeBytes = 224 * 1024 * 1024;
-    maximumSize = 1100;
+    // Android TV - tightest RAM budget. Decoded images live in GPU memory,
+    // which the box shares with the launcher and video decode: at 224MB/1100
+    // a 3GB SHIELD sat at ~650MB of GPU memory and the low-memory killer
+    // took the launcher down while browsing. Plezy caps TV at 64MB; this is a
+    // midpoint while that is evaluated, with the fling-aware decode throttle
+    // in ScrollbarGridView still doing the actual burst control.
+    maximumSizeBytes = 144 * 1024 * 1024;
+    maximumSize = 800;
   }
   // Low-end Android hardware (32-bit, low-RAM flag, <= ~2.2 GiB): halve the
   // ceiling so a poster-grid decode burst can't push RSS into LMK range

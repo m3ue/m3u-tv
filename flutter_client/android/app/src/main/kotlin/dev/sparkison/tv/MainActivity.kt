@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.os.Build
 import android.os.Process
 import android.util.DisplayMetrics
+import android.util.Log
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -16,6 +17,7 @@ import dev.sparkison.tv.mpv.MpvPlayerPlatformViewFactory
 import dev.sparkison.tv.mpv.MpvPlayerPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterShellArgs
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
@@ -50,6 +52,36 @@ class MainActivity : FlutterActivity() {
             newBase
         }
         super.attachBaseContext(override)
+    }
+
+    override fun getFlutterShellArgs(): FlutterShellArgs {
+        val args = super.getFlutterShellArgs()
+        val vulkan11 = 0x401000 // FEATURE_VULKAN_HARDWARE_VERSION encodes 1.1.0 as 0x401000
+        // Feature flag only, not UiModeManager - see attachBaseContext.
+        val isAndroidTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        val renderer = FlutterRendererPolicy.select(
+            manufacturer = Build.MANUFACTURER,
+            isAndroidTv = isAndroidTv,
+            sdkInt = Build.VERSION.SDK_INT,
+            supportsVulkan11 = packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION, vulkan11),
+            is64Bit = Process.is64Bit(),
+        )
+        renderer.shellArgument?.let { args.add(it) }
+        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(renderer, isLowRamClass())
+        memoryArgs.forEach { args.add(it) }
+        Log.i(TAG, "Flutter renderer: ${renderer.diagnosticName} $memoryArgs")
+        return args
+    }
+
+    // Mirrors DevicePerformance's reduced-tier triple: a 32-bit process, the
+    // platform low-RAM flag, or <= ~2.2 GiB (nominal 2GB boxes report
+    // slightly above 2 GiB after carve-outs).
+    private fun isLowRamClass(): Boolean {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
+        return !Process.is64Bit() ||
+            activityManager?.isLowRamDevice == true ||
+            memInfo.totalMem <= LOW_MEM_THRESHOLD_BYTES
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -151,6 +183,8 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        private const val TAG = "MainActivity"
+        private const val LOW_MEM_THRESHOLD_BYTES = 2252L shl 20
         private const val DEVICE_INFO_CHANNEL = "m3u_tv/device_info"
         private const val SYSTEM_UI_CHANNEL = "m3u_tv/system_ui"
     }

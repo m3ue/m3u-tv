@@ -37,6 +37,12 @@ class MemoryWatchdog {
   static const int _cacheFloorBytes = 8 << 20;
 
   Timer? _timer;
+  Timer? _diagnosticsTimer;
+
+  /// Opt-in image-cache logging for memory investigations, enabled with
+  /// `--dart-define=MEM_DIAG=true`. Uses print (not debugPrint) so it also
+  /// reaches logcat in release builds.
+  static const bool _diagnosticsEnabled = bool.fromEnvironment('MEM_DIAG');
   DateTime _lastEviction = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastEvictionRss = 0;
 
@@ -47,6 +53,12 @@ class MemoryWatchdog {
   void start() {
     if (_timer != null) return;
     if (Platform.environment['FLUTTER_TEST'] == 'true') return;
+    if (_diagnosticsEnabled) {
+      _diagnosticsTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _logDiagnostics(),
+      );
+    }
     final (threshold, period) = _thresholdAndPeriod();
     if (threshold == null || period == null) return;
     _timer = Timer.periodic(period, (_) => _sample(threshold));
@@ -55,6 +67,19 @@ class MemoryWatchdog {
   void stop() {
     _timer?.cancel();
     _timer = null;
+    _diagnosticsTimer?.cancel();
+    _diagnosticsTimer = null;
+  }
+
+  void _logDiagnostics() {
+    final cache = _imageCache;
+    // ignore: avoid_print
+    print(
+      '[MemDiag] rss=${_currentRss() >> 20}MB '
+      'cache=${cache.currentSize}img/${cache.currentSizeBytes >> 20}MB '
+      'max=${cache.maximumSize}img/${cache.maximumSizeBytes >> 20}MB '
+      'live=${cache.liveImageCount} pending=${cache.pendingImageCount}',
+    );
   }
 
   /// Platform memory-pressure hook. Shares the RSS-poll path's cooldown and

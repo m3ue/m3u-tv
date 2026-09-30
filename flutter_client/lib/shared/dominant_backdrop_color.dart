@@ -42,8 +42,14 @@ Future<Color?> resolveDominantBackdropColor(String? url) {
 
 Future<Color?> _extractSwatch(String url) async {
   try {
+    // Decode small: the swatch only needs a thumbnail, and an unsized decode
+    // of a 4K backdrop cost ~33MB of GPU memory per title visited.
     final palette = await PaletteGeneratorMaster.fromImageProvider(
-      CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
+      ResizeImage(
+        CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
+        width: 440,
+        policy: ResizeImagePolicy.fit,
+      ),
       size: const Size(220, 124),
       maximumColorCount: 8,
     );

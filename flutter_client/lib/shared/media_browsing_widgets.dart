@@ -536,12 +536,6 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
     final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
         MediaQuery.devicePixelRatioOf(context) * oversample;
-    final cacheWidth = widget.width == null
-        ? null
-        : (widget.width! * devicePixelRatio).round();
-    final cacheHeight = widget.height == null
-        ? null
-        : (widget.height! * devicePixelRatio).round();
     final shouldDefer = !_hasResolvedOnce && DeferImageLoadingScope.of(context);
     final provider = url == null || url.isEmpty || shouldDefer
         ? null
@@ -563,34 +557,38 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
           ),
           child: provider == null
               ? fallback
-              : Image(
-                  image: cacheWidth == null && cacheHeight == null
-                      ? provider
-                      : ResizeImage(
-                          provider,
-                          width: cacheWidth,
-                          height: cacheHeight,
-                          policy: ResizeImagePolicy.fit,
-                        ),
-                  fit: widget.fit,
-                  width: widget.width,
-                  height: widget.height,
-                  filterQuality: filterQuality,
-                  gaplessPlayback: true,
-                  frameBuilder:
-                      (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded || frame != null) {
-                          return child;
-                        }
-                        return fallback;
-                      },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return fallback;
-                  },
-                  errorBuilder: (_, _, _) {
-                    _scheduleRetry();
-                    return fallback;
+              // Callers that size the art through layout (e.g. a poster grid
+              // cell's Expanded slot) pass no width/height; fall back to the
+              // bounded constraints so those still decode at display size.
+              // Without this a grid poster decoded at full source resolution
+              // (~15-24MB each for TMDB originals), which on a 3GB SHIELD put
+              // ~800MB on the GPU within seconds of scrolling and got the app
+              // and the launcher killed by the low-memory killer.
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final decodeWidth =
+                        widget.width ??
+                        (constraints.hasBoundedWidth
+                            ? constraints.maxWidth
+                            : null);
+                    final decodeHeight =
+                        widget.height ??
+                        (constraints.hasBoundedHeight
+                            ? constraints.maxHeight
+                            : null);
+                    final cacheWidth = decodeWidth == null
+                        ? null
+                        : (decodeWidth * devicePixelRatio).round();
+                    final cacheHeight = decodeHeight == null
+                        ? null
+                        : (decodeHeight * devicePixelRatio).round();
+                    return _buildImage(
+                      provider,
+                      fallback,
+                      cacheWidth,
+                      cacheHeight,
+                      filterQuality,
+                    );
                   },
                 ),
         ),
@@ -598,6 +596,44 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
     );
     if (widget.aspectRatio == null) return image;
     return AspectRatio(aspectRatio: widget.aspectRatio!, child: image);
+  }
+
+  Widget _buildImage(
+    ImageProvider provider,
+    Widget fallback,
+    int? cacheWidth,
+    int? cacheHeight,
+    FilterQuality filterQuality,
+  ) {
+    return Image(
+      image: cacheWidth == null && cacheHeight == null
+          ? provider
+          : ResizeImage(
+              provider,
+              width: cacheWidth,
+              height: cacheHeight,
+              policy: ResizeImagePolicy.fit,
+            ),
+      fit: widget.fit,
+      width: widget.width,
+      height: widget.height,
+      filterQuality: filterQuality,
+      gaplessPlayback: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) {
+          return child;
+        }
+        return fallback;
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return fallback;
+      },
+      errorBuilder: (_, _, _) {
+        _scheduleRetry();
+        return fallback;
+      },
+    );
   }
 }
 
