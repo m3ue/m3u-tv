@@ -1,102 +1,262 @@
+import 'dart:async';
+
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/features/settings/settings_ui.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 
-import 'package:m3u_tv/features/settings/backend_capabilities.dart';
+/// Upload cap; matches m3u-editor's `TvDeviceLog::MAX_BYTES`. The export
+/// keeps the device header and the newest lines that fit.
+const int kDiagnosticsUploadMaxBytes = 1024 * 1024;
 
-/// Diagnostics screen showing backend capabilities and transcode server status.
-///
-/// Does NOT expose secrets (passwords, credentials) in the UI.
-class DiagnosticsScreen extends StatelessWidget {
-  const DiagnosticsScreen({super.key, required this.capabilities});
+/// Settings > General > Logs & Diagnostics: a device header (build, platform,
+/// renderer, performance tier, memory) above this session's captured log
+/// lines, with an Upload that stores the report against this device in
+/// m3u-editor's Registered Devices list. Modeled on Plezy's logs screen.
+class DiagnosticsScreen extends StatefulWidget {
+  const DiagnosticsScreen({
+    super.key,
+    required this.loadHeader,
+    this.onUpload,
+    this.buffer,
+  });
 
-  /// Backend capabilities to display. Null means not connected.
-  final BackendCapabilities? capabilities;
+  /// Builds the device header fresh (memory figures change over time).
+  final Future<String> Function() loadHeader;
+
+  /// Uploads a report and returns the stored upload's id. Null when not
+  /// connected to a server, which disables Upload.
+  final Future<int> Function(String report)? onUpload;
+
+  /// Defaults to [AppLogBuffer.instance].
+  final AppLogBuffer? buffer;
+
+  @override
+  State<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
+}
+
+class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
+  final _uploadFocusNode = FocusNode(debugLabel: 'diagnostics-upload');
+  final _paneFocusNode = FocusNode(debugLabel: 'diagnostics-pane');
+  final _scrollController = ScrollController();
+
+  String? _header;
+  List<AppLogEntry> _entries = const [];
+  bool _uploading = false;
+
+  AppLogBuffer get _buffer => widget.buffer ?? AppLogBuffer.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    _uploadFocusNode.dispose();
+    _paneFocusNode.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final header = await widget.loadHeader();
+    if (!mounted) return;
+    setState(() {
+      _header = header;
+      _entries = _buffer.entries.reversed.toList(growable: false);
+    });
+  }
+
+  void _clear() {
+    _buffer.clear();
+    setState(() => _entries = const []);
+  }
+
+  Future<void> _upload() async {
+    final onUpload = widget.onUpload;
+    if (onUpload == null || _uploading) return;
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _uploading = true);
+    try {
+      await _refresh();
+      final report = _buffer.export(
+        header: _header ?? '',
+        maxBytes: kDiagnosticsUploadMaxBytes,
+      );
+      final id = await onUpload(report);
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.diagnosticsUploaded(id))),
+      );
+    } on Object catch (error) {
+      debugPrint('[Diagnostics] upload failed: $error');
+      messenger.showSnackBar(
+        SnackBar(content: Text(l.diagnosticsUploadFailed('$error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  // Every direction is consumed so a press never falls through to spatial
+  // traversal (see the release notes pane, which this mirrors).
+  bool _onDirection(TraversalDirection direction) {
+    switch (direction) {
+      case TraversalDirection.up:
+        if (!_scrollController.hasClients ||
+            _scrollController.position.pixels <=
+                _scrollController.position.minScrollExtent + 0.5) {
+          _uploadFocusNode.requestFocus();
+        } else {
+          _scrollBy(-_step);
+        }
+      case TraversalDirection.down:
+        _scrollBy(_step);
+      case TraversalDirection.left:
+      case TraversalDirection.right:
+        break;
+    }
+    return true;
+  }
+
+  double get _step =>
+      (_scrollController.position.viewportDimension * 0.4).clamp(120.0, 400.0);
+
+  void _scrollBy(double delta) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if ((target - position.pixels).abs() < 0.5) return;
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final mono = theme.textTheme.bodySmall?.copyWith(
+      fontFamily: 'monospace',
+      height: 1.4,
+    );
+    final canUpload = widget.onUpload != null;
 
-    if (capabilities == null) {
-      return Center(
-        child: Text('Not connected', style: theme.textTheme.bodyLarge),
-      );
-    }
-
-    final cap = capabilities!;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Backend Capabilities', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 16),
-          _CapabilityRow(
-            label: 'm3u-editor Version',
-            value: cap.m3uEditorVersion,
-          ),
-          const SizedBox(height: 8),
-          Text('Features', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
-          ...cap.features.map(
-            (f) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: theme.colorScheme.primary,
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              AppButton(
+                label: _uploading
+                    ? l.diagnosticsUploading
+                    : l.diagnosticsUpload,
+                icon: Icons.cloud_upload_outlined,
+                variant: AppButtonVariant.primary,
+                focusNode: _uploadFocusNode,
+                autofocus: true,
+                loading: _uploading,
+                onPressed: canUpload ? () => unawaited(_upload()) : null,
+              ),
+              AppButton(
+                label: l.diagnosticsRefresh,
+                icon: Icons.refresh,
+                onPressed: () => unawaited(_refresh()),
+              ),
+              AppButton(
+                label: l.diagnosticsClear,
+                icon: Icons.delete_outline,
+                onPressed: _clear,
+              ),
+              if (!canUpload)
+                Text(
+                  l.diagnosticsNotConnected,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
-                  Text(f, style: theme.textTheme.bodyMedium),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: DpadFocusable(
+              focusNode: _paneFocusNode,
+              autoScroll: false,
+              tapToSelect: false,
+              onDirection: _onDirection,
+              builder: (context, state, child) => Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: state.focused,
+                child: child,
+              ),
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SettingsSectionHeader(l.diagnosticsDeviceHeading),
+                  ),
+                  SliverToBoxAdapter(
+                    child: SettingsCard(
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Text(_header ?? '', style: mono),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: SettingsSectionHeader(
+                      l.diagnosticsLogsHeading(_entries.length),
+                    ),
+                  ),
+                  if (_entries.isEmpty)
+                    SliverToBoxAdapter(
+                      child: SettingsCard(
+                        child: Text(
+                          l.diagnosticsNoLogs,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    // Newest first: what led up to the problem is on top.
+                    SliverList.builder(
+                      itemCount: _entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = _entries[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            entry.format(),
+                            style: entry.level == AppLogLevel.error
+                                ? mono?.copyWith(color: theme.colorScheme.error)
+                                : mono,
+                          ),
+                        );
+                      },
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          Text('Transcode Server', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(
-                cap.transcodeAvailable ? Icons.cloud_done : Icons.cloud_off,
-                color: cap.transcodeAvailable ? Colors.green : Colors.grey,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                cap.transcodeAvailable ? 'Available' : 'Unavailable',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: cap.transcodeAvailable ? Colors.green : Colors.grey,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
-    );
-  }
-}
-
-class _CapabilityRow extends StatelessWidget {
-  const _CapabilityRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(value, style: theme.textTheme.bodyMedium),
-      ],
     );
   }
 }

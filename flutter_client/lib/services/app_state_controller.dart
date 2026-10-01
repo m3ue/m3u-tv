@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show Locale;
 
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -17,6 +18,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
+import 'package:m3u_tv/services/diagnostics_report.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -211,6 +213,18 @@ class AppStateController extends ChangeNotifier {
         _captureAioFavoriteMutationOwnership;
     aioFavoritesService.onAdded = _pushAioFavoriteAdded;
     aioFavoritesService.onRemoved = _pushAioFavoriteRemoved;
+    authNotifier.addListener(_registerLogSecrets);
+    _registerLogSecrets();
+  }
+
+  /// Scrubs the active username/password from every captured log line, on
+  /// top of the buffer's generic URL patterns, so an uploaded report can
+  /// never carry them.
+  void _registerLogSecrets() {
+    final credentials = authNotifier.credentials;
+    AppLogBuffer.instance
+      ..registerSecret(credentials?.username)
+      ..registerSecret(credentials?.password);
   }
 
   static const _sourceKey = 'm3ue_tv_source';
@@ -351,6 +365,34 @@ class AppStateController extends ChangeNotifier {
     unawaited(
       _tvNotificationService.markRead(credentials, id).catchError((_) {}),
     );
+  }
+
+  /// Device header for the Logs & Diagnostics screen and its uploads.
+  Future<String> diagnosticsHeader({required String layout}) async {
+    DeviceIdentity? identity;
+    try {
+      identity = await deviceIdentityService.resolve();
+    } on Object catch (_) {
+      identity = null;
+    }
+    final server = authNotifier.credentials?.server;
+    return buildDiagnosticsHeader(
+      layout: layout,
+      identity: identity,
+      serverHost: server == null
+          ? null
+          : Uri.tryParse(normalizeServerUrl(server))?.host,
+    );
+  }
+
+  /// Uploads a Logs & Diagnostics report to the connected editor. Returns the
+  /// stored upload's id, shown to the user so they can point an admin at it.
+  Future<int> uploadDiagnosticLogs(String report) {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) {
+      throw StateError('Not connected');
+    }
+    return _tvNotificationService.uploadLogs(credentials, report);
   }
 
   Future<void> markAllNotificationsRead() async {
@@ -3691,6 +3733,7 @@ class AppStateController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    authNotifier.removeListener(_registerLogSecrets);
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();

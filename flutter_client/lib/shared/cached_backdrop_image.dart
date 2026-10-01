@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart'
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/sized_image_url.dart';
 
 /// Full-bleed backdrop image for detail screens, disk-cached via
 /// [MediaImageCacheManager] (the same cache posters use) so revisiting a
@@ -58,13 +59,13 @@ class _CachedBackdropImageState extends State<CachedBackdropImage> {
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final provider = CachedNetworkImageProvider(
-          widget.url,
-          cacheManager: MediaImageCacheManager(),
-        );
         final cacheWidth = constraints.hasBoundedWidth
             ? (constraints.maxWidth * devicePixelRatio).round()
             : null;
+        final provider = CachedNetworkImageProvider(
+          sizedImageUrl(widget.url, decodeWidth: cacheWidth),
+          cacheManager: MediaImageCacheManager(),
+        );
         final cacheHeight = constraints.hasBoundedHeight
             ? (constraints.maxHeight * devicePixelRatio).round()
             : null;

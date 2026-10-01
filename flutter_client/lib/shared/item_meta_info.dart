@@ -7,6 +7,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/sized_image_url.dart';
 
 /// A single "Label: value" credit row (e.g. Director, Cast).
 class MetaCreditLine {
@@ -208,6 +209,8 @@ class _TitleHeading extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     final logoMaxHeight = _logoMaxHeight * scale;
     final logoMaxWidth = _logoMaxWidth * scale;
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final decodeWidth = (logoMaxWidth * devicePixelRatio).round();
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -222,17 +225,15 @@ class _TitleHeading extends StatelessWidget {
           child: Image(
             image: ResizeImage(
               CachedNetworkImageProvider(
-                logo,
+                sizedImageUrl(logo, decodeWidth: decodeWidth),
                 cacheManager: MediaImageCacheManager(),
               ),
               // Bound the decode to the display cap: a wordmark clearlogo can
               // ship at 1500px+ wide and would otherwise decode at full source
               // resolution just to be scaled down into a 350x120 (times the
               // display-size scale) box.
-              width: (logoMaxWidth * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
-              height: (logoMaxHeight * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
+              width: decodeWidth,
+              height: (logoMaxHeight * devicePixelRatio).round(),
               policy: ResizeImagePolicy.fit,
             ),
             semanticLabel: name,

@@ -1738,4 +1738,49 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get personDetailsNoLibraryMatches =>
       'Aucun élément de la filmographie de cet acteur n\'est dans votre bibliothèque.';
+
+  @override
+  String get settingsLogsDiagnostics => 'Journaux et diagnostics';
+
+  @override
+  String get settingsLogsDiagnosticsSubtitle =>
+      'Détails de l\'appareil et journaux de cette session, pour le dépannage';
+
+  @override
+  String get diagnosticsUpload => 'Envoyer au serveur';
+
+  @override
+  String get diagnosticsRefresh => 'Actualiser';
+
+  @override
+  String get diagnosticsClear => 'Effacer les journaux';
+
+  @override
+  String get diagnosticsUploading => 'Envoi des journaux...';
+
+  @override
+  String diagnosticsUploaded(int id) {
+    return 'Journaux envoyés (#$id). Un administrateur peut les consulter dans m3u-editor sous Appareils > Appareils enregistrés.';
+  }
+
+  @override
+  String diagnosticsUploadFailed(String error) {
+    return 'Impossible d\'envoyer les journaux : $error';
+  }
+
+  @override
+  String get diagnosticsNotConnected =>
+      'Connectez-vous à un serveur pour envoyer les journaux.';
+
+  @override
+  String get diagnosticsDeviceHeading => 'Appareil';
+
+  @override
+  String diagnosticsLogsHeading(int count) {
+    return 'Journaux ($count)';
+  }
+
+  @override
+  String get diagnosticsNoLogs =>
+      'Rien n\'a encore été journalisé pendant cette session.';
 }

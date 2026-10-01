@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/clear_cache_dialog.dart';
+import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -47,6 +48,8 @@ class SettingsScreen extends StatefulWidget {
     this.onCreateViewer,
     this.onClearCache,
     this.onEpgIntervalChanged,
+    this.loadDiagnosticsHeader,
+    this.onUploadLogs,
     this.onConnected,
     this.locale,
     this.onLocaleChanged,
@@ -81,6 +84,12 @@ class SettingsScreen extends StatefulWidget {
   final List<Duration> epgRefreshOptions;
   final ValueChanged<CacheClearScope>? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
+
+  /// Logs & Diagnostics (Settings > General > App): builds the device header,
+  /// and uploads a report to the editor returning the stored upload's id.
+  /// The row is hidden when [loadDiagnosticsHeader] is null.
+  final Future<String> Function()? loadDiagnosticsHeader;
+  final Future<int> Function(String report)? onUploadLogs;
 
   /// Called after a successful connection so the parent can navigate to Home.
   final VoidCallback? onConnected;
@@ -174,6 +183,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onCreateViewer: widget.onCreateViewer,
         onClearCache: widget.onClearCache,
         onEpgIntervalChanged: widget.onEpgIntervalChanged,
+        loadDiagnosticsHeader: widget.loadDiagnosticsHeader,
+        onUploadLogs: widget.onUploadLogs,
         locale: widget.locale,
         onLocaleChanged: widget.onLocaleChanged,
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
@@ -841,6 +852,8 @@ class _ConnectedView extends StatefulWidget {
     this.onCreateViewer,
     this.onClearCache,
     this.onEpgIntervalChanged,
+    this.loadDiagnosticsHeader,
+    this.onUploadLogs,
     this.locale,
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
@@ -869,6 +882,8 @@ class _ConnectedView extends StatefulWidget {
   final Future<Viewer?> Function(String name)? onCreateViewer;
   final ValueChanged<CacheClearScope>? onClearCache;
   final void Function(Duration interval)? onEpgIntervalChanged;
+  final Future<String> Function()? loadDiagnosticsHeader;
+  final Future<int> Function(String report)? onUploadLogs;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
 
@@ -1091,6 +1106,31 @@ class _ConnectedViewState extends State<_ConnectedView> {
 
         SettingsSectionHeader(l.settingsApp),
         const SettingsCard(child: _AppVersionCard()),
+        if (widget.loadDiagnosticsHeader case final loadHeader?) ...[
+          const SizedBox(height: 12),
+          SettingsGroup(
+            children: [
+              SettingsRow(
+                title: l.settingsLogsDiagnostics,
+                subtitle: l.settingsLogsDiagnosticsSubtitle,
+                icon: Icons.bug_report_outlined,
+                trailing: const SettingsChevron(),
+                onTap: () => unawaited(
+                  pushSettingsSubpageFullHeight<void>(
+                    context,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsLogsDiagnostics,
+                    onBack: widget.onHandleTopLevelBack,
+                    builder: (_) => DiagnosticsScreen(
+                      loadHeader: loadHeader,
+                      onUpload: widget.onUploadLogs,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
 
         SettingsSectionHeader(l.settingsConnection),
         SettingsCard(

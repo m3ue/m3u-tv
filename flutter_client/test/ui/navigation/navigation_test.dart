@@ -1314,19 +1314,21 @@ void main() {
     expect(find.text('Route Movie'), findsWidgets);
   });
 
-  testWidgets('Router back dispatch preserves root double-back exit', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
-    await _pumpAppFrame(tester);
-    final app = tester.state<_TestAppState>(find.byType(_TestApp));
+  testWidgets(
+    'Router back dispatch preserves root double-back exit off Android',
+    (tester) async {
+      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
+      await _pumpAppFrame(tester);
+      final app = tester.state<_TestAppState>(find.byType(_TestApp));
 
-    expect(await app.dispatchRouterBack(), isTrue);
-    await tester.pump();
-    expect(find.text('Press back again to exit'), findsOneWidget);
+      expect(await app.dispatchRouterBack(), isTrue);
+      await tester.pump();
+      expect(find.text('Press back again to exit'), findsOneWidget);
 
-    expect(await app.dispatchRouterBack(), isFalse);
-  });
+      expect(await app.dispatchRouterBack(), isFalse);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets('legacy Android platform back closes active player', (
     tester,
@@ -1359,14 +1361,18 @@ void main() {
   });
 
   testWidgets(
-    'predictive back stays handled until the root exit window is armed',
+    'Android root double-back keeps Back claimed and exits explicitly',
     (tester) async {
       final frameworkHandlesBack = <bool>[];
+      var systemNavigatorPops = 0;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
         (methodCall) async {
           if (methodCall.method == 'SystemNavigator.setFrameworkHandlesBack') {
             frameworkHandlesBack.add(methodCall.arguments as bool);
+          }
+          if (methodCall.method == 'SystemNavigator.pop') {
+            systemNavigatorPops++;
           }
           return null;
         },
@@ -1390,12 +1396,42 @@ void main() {
       await tester.pump();
 
       expect(find.text('Press back again to exit'), findsOneWidget);
-      expect(frameworkHandlesBack.last, isFalse);
-
-      await tester.pump(const Duration(seconds: 2));
-      await tester.pump();
-
+      // The framework never hands Back to the OS (which on Android 12+ only
+      // backgrounds a root task); the second press exits explicitly instead.
       expect(frameworkHandlesBack.last, isTrue);
+      expect(systemNavigatorPops, 0);
+
+      expect(await app.dispatchRouterBack(), isTrue);
+      await tester.pump();
+      expect(systemNavigatorPops, 1);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    'Android root Back from another tab returns to the start page first',
+    (tester) async {
+      await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
+      await _pumpAppFrame(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomNavigationBar),
+          matching: find.text('Search'),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      final app = tester.state<_TestAppState>(find.byType(_TestApp));
+
+      expect(await app.dispatchRouterBack(), isTrue);
+      await _pumpAppFrame(tester);
+
+      expect(
+        tester
+            .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+            .currentIndex,
+        0,
+      );
+      expect(find.text('Press back again to exit'), findsNothing);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
@@ -1958,6 +1994,47 @@ void main() {
               .sidebarActive,
           isFalse,
         );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
+      'TV root Back still reaches the exit prompt when the key event arrives first',
+      (tester) async {
+        await tester.pumpWidget(const _TestApp(deviceType: DeviceType.tv));
+        await _pumpAppFrame(tester);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+
+        // First press opens the sidebar.
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await _sendPlatformNavigationMethod(
+          tester,
+          const MethodCall('popRoute'),
+        );
+        await tester.pump();
+        expect(
+          tester
+              .widget<NavigationSidebar>(find.byType(NavigationSidebar))
+              .sidebarActive,
+          isTrue,
+        );
+
+        // Second press, key event first: this used to find nothing to pop on
+        // the key path and then drop the popRoute as its echo, so Back did
+        // nothing at the top level.
+        // The echo window is measured on the wall clock, so wait in real time.
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 300)),
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await _sendPlatformNavigationMethod(
+          tester,
+          const MethodCall('popRoute'),
+        );
+        await tester.pump();
+
+        expect(find.text('Press back again to exit'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );

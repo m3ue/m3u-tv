@@ -1732,4 +1732,49 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get personDetailsNoLibraryMatches =>
       'Nichts aus der Filmografie dieses Schauspielers ist in deiner Bibliothek.';
+
+  @override
+  String get settingsLogsDiagnostics => 'Protokolle & Diagnose';
+
+  @override
+  String get settingsLogsDiagnosticsSubtitle =>
+      'Gerätedetails und Protokolle dieser Sitzung zur Fehlersuche';
+
+  @override
+  String get diagnosticsUpload => 'Auf den Server hochladen';
+
+  @override
+  String get diagnosticsRefresh => 'Aktualisieren';
+
+  @override
+  String get diagnosticsClear => 'Protokolle löschen';
+
+  @override
+  String get diagnosticsUploading => 'Protokolle werden hochgeladen...';
+
+  @override
+  String diagnosticsUploaded(int id) {
+    return 'Protokolle hochgeladen (#$id). Ein Admin kann sie in m3u-editor unter Geräte > Registrierte Geräte ansehen.';
+  }
+
+  @override
+  String diagnosticsUploadFailed(String error) {
+    return 'Protokolle konnten nicht hochgeladen werden: $error';
+  }
+
+  @override
+  String get diagnosticsNotConnected =>
+      'Verbinde dich mit einem Server, um Protokolle hochzuladen.';
+
+  @override
+  String get diagnosticsDeviceHeading => 'Gerät';
+
+  @override
+  String diagnosticsLogsHeading(int count) {
+    return 'Protokolle ($count)';
+  }
+
+  @override
+  String get diagnosticsNoLogs =>
+      'In dieser Sitzung wurde noch nichts protokolliert.';
 }

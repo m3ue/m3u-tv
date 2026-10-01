@@ -3067,6 +3067,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'None of this actor\'s filmography is in your library.'**
   String get personDetailsNoLibraryMatches;
+
+  /// No description provided for @settingsLogsDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs & Diagnostics'**
+  String get settingsLogsDiagnostics;
+
+  /// No description provided for @settingsLogsDiagnosticsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device details and this session\'s logs, for troubleshooting'**
+  String get settingsLogsDiagnosticsSubtitle;
+
+  /// No description provided for @diagnosticsUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload to server'**
+  String get diagnosticsUpload;
+
+  /// No description provided for @diagnosticsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get diagnosticsRefresh;
+
+  /// No description provided for @diagnosticsClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear logs'**
+  String get diagnosticsClear;
+
+  /// No description provided for @diagnosticsUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading logs...'**
+  String get diagnosticsUploading;
+
+  /// No description provided for @diagnosticsUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs uploaded (#{id}). An admin can view them in m3u-editor under Devices > Registered Devices.'**
+  String diagnosticsUploaded(int id);
+
+  /// No description provided for @diagnosticsUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t upload logs: {error}'**
+  String diagnosticsUploadFailed(String error);
+
+  /// No description provided for @diagnosticsNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to a server to upload logs.'**
+  String get diagnosticsNotConnected;
+
+  /// No description provided for @diagnosticsDeviceHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get diagnosticsDeviceHeading;
+
+  /// No description provided for @diagnosticsLogsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs ({count})'**
+  String diagnosticsLogsHeading(int count);
+
+  /// No description provided for @diagnosticsNoLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing logged yet this session.'**
+  String get diagnosticsNoLogs;
 }
 
 class _AppLocalizationsDelegate

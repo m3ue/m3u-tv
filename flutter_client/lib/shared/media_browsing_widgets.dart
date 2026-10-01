@@ -14,6 +14,7 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/sized_image_url.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});
@@ -537,13 +538,8 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
     final devicePixelRatio =
         MediaQuery.devicePixelRatioOf(context) * oversample;
     final shouldDefer = !_hasResolvedOnce && DeferImageLoadingScope.of(context);
-    final provider = url == null || url.isEmpty || shouldDefer
-        ? null
-        : CachedNetworkImageProvider(
-            url,
-            cacheManager: MediaImageCacheManager(),
-          );
-    if (provider != null) _hasResolvedOnce = true;
+    final loadUrl = url == null || url.isEmpty || shouldDefer ? null : url;
+    if (loadUrl != null) _hasResolvedOnce = true;
 
     final image = ClipRRect(
       borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -555,7 +551,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
             color:
                 widget.backgroundColor ?? colorScheme.surfaceContainerHighest,
           ),
-          child: provider == null
+          child: loadUrl == null
               ? fallback
               // Callers that size the art through layout (e.g. a poster grid
               // cell's Expanded slot) pass no width/height; fall back to the
@@ -582,6 +578,10 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
                     final cacheHeight = decodeHeight == null
                         ? null
                         : (decodeHeight * devicePixelRatio).round();
+                    final provider = CachedNetworkImageProvider(
+                      sizedImageUrl(loadUrl, decodeWidth: cacheWidth),
+                      cacheManager: MediaImageCacheManager(),
+                    );
                     return _buildImage(
                       provider,
                       fallback,

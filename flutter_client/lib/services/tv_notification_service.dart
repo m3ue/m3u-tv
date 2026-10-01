@@ -281,6 +281,26 @@ class TvNotificationService {
     return '${map['auth'] ?? ''}';
   }
 
+  /// Uploads a Logs & Diagnostics report to the editor, which stores it
+  /// against this install's Registered Devices row. Sends the same identity
+  /// params as [fetchUnread] so the server can resolve (and upsert) the
+  /// device. Returns the server's id for the stored upload.
+  Future<int> uploadLogs(UserCredentials creds, String report) async {
+    final identity = await _resolveIdentity();
+    if (identity == null) {
+      throw StateError('Device identity unavailable');
+    }
+    final base = _baseUri(creds.server);
+    final u = Uri.encodeComponent(creds.username);
+    final p = Uri.encodeComponent(creds.password);
+    final uri = base.replace(
+      path: '${base.path}/api/tv/$u/$p/logs',
+      queryParameters: identity.toQueryParams(),
+    );
+    final body = await _post(uri, {'log': report});
+    return _asInt((body as Map?)?['id']);
+  }
+
   // ---- helpers ----
 
   Uri _baseUri(String server) {

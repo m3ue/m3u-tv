@@ -901,5 +901,17 @@
   "personDetailsEmpty": "No hay filmografía disponible.",
   "personDetailsError": "No se pudo cargar la filmografía de este actor.",
   "personDetailsFilterInLibrary": "En la biblioteca",
-  "personDetailsNoLibraryMatches": "Nada de la filmografía de este actor está en tu biblioteca."
+  "personDetailsNoLibraryMatches": "Nada de la filmografía de este actor está en tu biblioteca.",
+  "settingsLogsDiagnostics": "Registros y diagnóstico",
+  "settingsLogsDiagnosticsSubtitle": "Detalles del dispositivo y registros de esta sesión, para solucionar problemas",
+  "diagnosticsUpload": "Subir al servidor",
+  "diagnosticsRefresh": "Actualizar",
+  "diagnosticsClear": "Borrar registros",
+  "diagnosticsUploading": "Subiendo registros...",
+  "diagnosticsUploaded": "Registros subidos (#{id}). Un administrador puede verlos en m3u-editor en Dispositivos > Dispositivos registrados.",
+  "diagnosticsUploadFailed": "No se pudieron subir los registros: {error}",
+  "diagnosticsNotConnected": "Conéctate a un servidor para subir los registros.",
+  "diagnosticsDeviceHeading": "Dispositivo",
+  "diagnosticsLogsHeading": "Registros ({count})",
+  "diagnosticsNoLogs": "Aún no hay nada registrado en esta sesión."
 }

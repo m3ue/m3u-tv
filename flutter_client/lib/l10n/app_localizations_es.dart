@@ -1734,4 +1734,48 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get personDetailsNoLibraryMatches =>
       'Nada de la filmografía de este actor está en tu biblioteca.';
+
+  @override
+  String get settingsLogsDiagnostics => 'Registros y diagnóstico';
+
+  @override
+  String get settingsLogsDiagnosticsSubtitle =>
+      'Detalles del dispositivo y registros de esta sesión, para solucionar problemas';
+
+  @override
+  String get diagnosticsUpload => 'Subir al servidor';
+
+  @override
+  String get diagnosticsRefresh => 'Actualizar';
+
+  @override
+  String get diagnosticsClear => 'Borrar registros';
+
+  @override
+  String get diagnosticsUploading => 'Subiendo registros...';
+
+  @override
+  String diagnosticsUploaded(int id) {
+    return 'Registros subidos (#$id). Un administrador puede verlos en m3u-editor en Dispositivos > Dispositivos registrados.';
+  }
+
+  @override
+  String diagnosticsUploadFailed(String error) {
+    return 'No se pudieron subir los registros: $error';
+  }
+
+  @override
+  String get diagnosticsNotConnected =>
+      'Conéctate a un servidor para subir los registros.';
+
+  @override
+  String get diagnosticsDeviceHeading => 'Dispositivo';
+
+  @override
+  String diagnosticsLogsHeading(int count) {
+    return 'Registros ($count)';
+  }
+
+  @override
+  String get diagnosticsNoLogs => 'Aún no hay nada registrado en esta sesión.';
 }

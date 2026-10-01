@@ -26,6 +26,9 @@ class MainActivity : FlutterActivity() {
     private var deviceInfoChannel: MethodChannel? = null
     private var systemUiChannel: MethodChannel? = null
 
+    // What getFlutterShellArgs picked, for the Logs & Diagnostics header.
+    private var rendererDescription = "unknown"
+
     override fun attachBaseContext(newBase: Context) {
         // UiModeManager.getCurrentModeType() calls getDisplayId() internally on Android 17+,
         // which NPEs here because the display isn't attached until after attachBaseContext returns.
@@ -69,7 +72,8 @@ class MainActivity : FlutterActivity() {
         renderer.shellArgument?.let { args.add(it) }
         val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(renderer, isLowRamClass())
         memoryArgs.forEach { args.add(it) }
-        Log.i(TAG, "Flutter renderer: ${renderer.diagnosticName} $memoryArgs")
+        rendererDescription = "${renderer.diagnosticName} $memoryArgs"
+        Log.i(TAG, "Flutter renderer: $rendererDescription")
         return args
     }
 
@@ -106,6 +110,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "isTelevision" -> result.success(isTelevisionDevice())
                     "getPerformanceSignals" -> result.success(performanceSignals())
+                    "getRenderer" -> result.success(rendererDescription)
                     else -> result.notImplemented()
                 }
             }

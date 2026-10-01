@@ -40,8 +40,8 @@ class MemoryWatchdog {
   Timer? _diagnosticsTimer;
 
   /// Opt-in image-cache logging for memory investigations, enabled with
-  /// `--dart-define=MEM_DIAG=true`. Uses print (not debugPrint) so it also
-  /// reaches logcat in release builds.
+  /// `--dart-define=MEM_DIAG=true`. Lands in logcat / the Xcode console and
+  /// in the Logs & Diagnostics screen.
   static const bool _diagnosticsEnabled = bool.fromEnvironment('MEM_DIAG');
   DateTime _lastEviction = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastEvictionRss = 0;
@@ -73,8 +73,7 @@ class MemoryWatchdog {
 
   void _logDiagnostics() {
     final cache = _imageCache;
-    // ignore: avoid_print
-    print(
+    debugPrint(
       '[MemDiag] rss=${_currentRss() >> 20}MB '
       'cache=${cache.currentSize}img/${cache.currentSizeBytes >> 20}MB '
       'max=${cache.maximumSize}img/${cache.maximumSizeBytes >> 20}MB '
@@ -90,7 +89,7 @@ class MemoryWatchdog {
   /// nothing and just forces avoidable re-decode churn on top of the memory
   /// pressure that triggered this in the first place.
   void notifyMemoryPressure() {
-    if (kDebugMode) debugPrint('[MemoryWatchdog] system memory pressure');
+    debugPrint('[MemoryWatchdog] system memory pressure');
     if (_imageCache.currentSizeBytes < _cacheFloorBytes) return;
     final now = _clock();
     if (now.difference(_lastEviction) < _cooldown) return;
@@ -131,13 +130,11 @@ class MemoryWatchdog {
     if (inCooldown && rss <= _lastEvictionRss) return;
     _lastEviction = now;
     _lastEvictionRss = rss;
-    if (kDebugMode) {
-      debugPrint(
-        '[MemoryWatchdog] RSS ${rss >> 20}MB > ${thresholdBytes >> 20}MB, '
-        'evicting image caches (${_imageCache.currentSizeBytes >> 20}MB / '
-        '${_imageCache.currentSize} images)',
-      );
-    }
+    debugPrint(
+      '[MemoryWatchdog] RSS ${rss >> 20}MB > ${thresholdBytes >> 20}MB, '
+      'evicting image caches (${_imageCache.currentSizeBytes >> 20}MB / '
+      '${_imageCache.currentSize} images)',
+    );
     _evict();
   }
 
