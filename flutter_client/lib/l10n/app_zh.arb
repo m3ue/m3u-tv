@@ -901,5 +901,17 @@
   "personDetailsEmpty": "暂无作品年表。",
   "personDetailsError": "无法加载该演员的作品年表。",
   "personDetailsFilterInLibrary": "库中已有",
-  "personDetailsNoLibraryMatches": "该演员的作品年表中没有你库中已有的内容。"
+  "personDetailsNoLibraryMatches": "该演员的作品年表中没有你库中已有的内容。",
+  "settingsLogsDiagnostics": "日志与诊断",
+  "settingsLogsDiagnosticsSubtitle": "设备详情和本次会话的日志，用于排查问题",
+  "diagnosticsUpload": "上传到服务器",
+  "diagnosticsRefresh": "刷新",
+  "diagnosticsClear": "清除日志",
+  "diagnosticsUploading": "正在上传日志...",
+  "diagnosticsUploaded": "日志已上传（#{id}）。管理员可在 m3u-editor 的 设备 > 已注册设备 中查看。",
+  "diagnosticsUploadFailed": "无法上传日志：{error}",
+  "diagnosticsNotConnected": "请先连接服务器再上传日志。",
+  "diagnosticsDeviceHeading": "设备",
+  "diagnosticsLogsHeading": "日志（{count}）",
+  "diagnosticsNoLogs": "本次会话尚无日志。"
 }

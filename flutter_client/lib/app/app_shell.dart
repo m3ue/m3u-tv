@@ -4,7 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -329,30 +329,92 @@ class AppShellState extends ConsumerState<AppShell>
       if (popped) return true;
     }
     if (_handleBackPress()) return true;
+    if (_usesExplicitBackExit) return _handleRootBack();
 
     // Double-back to exit: require two back presses within 2 seconds.
     final now = DateTime.now();
     final last = _lastBackPress;
-    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+    if (last != null && now.difference(last) < _backExitWindow) {
       return false;
     }
-    _backExitTimer?.cancel();
-    _backExitTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _lastBackPress = null);
-    });
-    if (mounted) {
-      setState(() => _lastBackPress = now);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).appBackToExit),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    _armBackExit(now);
     return true;
   }
 
-  bool get _canSystemExit => _playerArgs == null && _lastBackPress != null;
+  /// Android exits explicitly from [_handleRootBack]; every other platform
+  /// keeps the original popRoute-only double-back that releases the
+  /// [PopScope] for the second press. On Android that version only worked
+  /// when the platform popRoute beat the goBack key event: when the key
+  /// arrived first it found nothing to pop, and the popRoute that followed
+  /// was then dropped by [_isBackEcho], so Back did nothing at the top level
+  /// no matter how often it was pressed.
+  static bool get _usesExplicitBackExit =>
+      defaultTargetPlatform == TargetPlatform.android;
+
+  static const Duration _backExitWindow = Duration(seconds: 2);
+
+  /// Android top-level Back (nothing left to pop, sidebar already open):
+  /// first return to the configured start page, then press Back twice
+  /// within [_backExitWindow] to exit. Reached from whichever delivery path
+  /// arrives first; [_isBackEcho] drops the other one.
+  bool _handleRootBack() {
+    final startRoute = _appState.viewSettingsService.defaultStartPageSync.route;
+    final currentRoute =
+        RouteNames.mainRoutes[widget.navigationShell.currentIndex];
+    if (currentRoute != startRoute && _mainRoutes.contains(startRoute)) {
+      _backExitTimer?.cancel();
+      _lastBackPress = null;
+      _goToStartPage(startRoute);
+      return true;
+    }
+
+    final now = DateTime.now();
+    final last = _lastBackPress;
+    if (last != null && now.difference(last) < _backExitWindow) {
+      _backExitTimer?.cancel();
+      _lastBackPress = null;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      // Finishes the Activity outright rather than handing Back to the OS,
+      // which on Android 12+ only moves a root task to the background.
+      unawaited(SystemNavigator.pop());
+      return true;
+    }
+    _armBackExit(now);
+    return true;
+  }
+
+  void _goToStartPage(String startRoute) {
+    widget.navigationShell.goBranch(RouteNames.mainRoutes.indexOf(startRoute));
+    if (!_sidebarActive) return;
+    final visibleIndex = _mainRoutes.indexOf(startRoute);
+    if (visibleIndex < 0 || visibleIndex >= _sidebarFocusNodes.length) return;
+    final node = _sidebarFocusNodes[visibleIndex];
+    unawaited(
+      Future.microtask(() {
+        if (mounted) node.requestFocus();
+      }),
+    );
+  }
+
+  void _armBackExit(DateTime now) {
+    _backExitTimer?.cancel();
+    _backExitTimer = Timer(_backExitWindow, () {
+      if (mounted) setState(() => _lastBackPress = null);
+    });
+    if (!mounted) return;
+    setState(() => _lastBackPress = now);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).appBackToExit),
+        duration: _backExitWindow,
+      ),
+    );
+  }
+
+  // Android never releases the PopScope (see [_usesExplicitBackExit]), so
+  // the framework keeps claiming Back and the OS keeps delivering it here.
+  bool get _canSystemExit =>
+      !_usesExplicitBackExit && _playerArgs == null && _lastBackPress != null;
 
   bool _handleNavigationNotification(NavigationNotification notification) {
     if (_canSystemExit || notification.canHandlePop) return false;
@@ -508,6 +570,7 @@ class AppShellState extends ConsumerState<AppShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[Lifecycle] ${state.name}');
     if (state == AppLifecycleState.paused) {
       _backgroundedAt = clock.now();
       unawaited(_appState.suspendNotifications());
@@ -881,7 +944,8 @@ class AppShellState extends ConsumerState<AppShell>
       Navigator.of(context, rootNavigator: true).maybePop();
       return true;
     }
-    return _handleBackPress();
+    if (_handleBackPress()) return true;
+    return _usesExplicitBackExit && _handleRootBack();
   }
 
   void _openChannel(Channel channel) {
@@ -1677,6 +1741,11 @@ class AppShellState extends ConsumerState<AppShell>
               unawaited(_appState.clearAndRefresh(scope: scope)),
           onEpgIntervalChanged: (d) =>
               unawaited(_appState.setEpgRefreshInterval(d)),
+          loadDiagnosticsHeader: () =>
+              _appState.diagnosticsHeader(layout: widget.deviceType.name),
+          onUploadLogs: _appState.isConfigured
+              ? _appState.uploadDiagnosticLogs
+              : null,
           onConnected: () => _navigateTo(0),
           locale: _appState.locale,
           onLocaleChanged: (locale) => unawaited(_appState.setLocale(locale)),

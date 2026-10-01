@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
@@ -34,6 +36,9 @@ import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // First, so everything after (including startup failures) lands in the
+  // Logs & Diagnostics screen.
+  AppLogBuffer.instance.install();
   if (Platform.operatingSystem == 'tvos') {
     final dispatcher = WidgetsBinding.instance.platformDispatcher;
     dispatcher.onSemanticsActionEvent = ignoreNativeScrollToOffset(
@@ -41,20 +46,12 @@ Future<void> main() async {
     );
   }
   await DevicePerformance.ensureDetected();
-  if (kDebugMode) debugPrint(DevicePerformance.describe());
-  _configureImageCache();
+  debugPrint(DevicePerformance.describe());
   tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
-  // In speed mode, cap the decoded image cache at 50 MB to prevent memory
-  // accumulation during long browsing sessions on low-RAM devices.
-  final optimizeFor = await appState.viewSettingsService.optimizeFor();
-  if (optimizeFor == OptimizeFor.speed) {
-    PaintingBinding.instance.imageCache.maximumSizeBytes =
-        50 * 1024 * 1024; // 50 MB
-    PaintingBinding.instance.imageCache.maximumSize = 200;
-  }
+  _configureImageCache(await appState.viewSettingsService.optimizeFor());
   if (_isDesktop) {
     await _configureDesktopWindow(appState);
   }
@@ -112,7 +109,11 @@ Future<void> main() async {
 /// with an aggressive low-memory killer, so they get the smallest ceiling;
 /// tvOS has more headroom but still hard-caps per-app memory; desktop is
 /// effectively unconstrained.
-void _configureImageCache() {
+///
+/// Speed mode caps the result at 50MB/200 images to prevent memory
+/// accumulation during long browsing sessions on low-RAM devices; it never
+/// raises a platform budget that is already lower.
+void _configureImageCache(OptimizeFor? optimizeFor) {
   int maximumSizeBytes;
   int maximumSize;
   if (_isDesktop) {
@@ -124,11 +125,10 @@ void _configureImageCache() {
     maximumSize = 1200;
   } else {
     // Android TV - tightest RAM budget. Decoded images live in GPU memory,
-    // which the box shares with the launcher and video decode: at 224MB/1100
-    // a 3GB SHIELD sat at ~650MB of GPU memory and the low-memory killer
-    // took the launcher down while browsing. Plezy caps TV at 64MB; this is a
-    // midpoint while that is evaluated, with the fling-aware decode throttle
-    // in ScrollbarGridView still doing the actual burst control.
+    // which the box shares with the launcher and video decode. Plezy caps TV
+    // at 64MB; this sits between that and the previous 224MB, with the
+    // fling-aware decode throttle in ScrollbarGridView doing the actual
+    // burst control.
     maximumSizeBytes = 144 * 1024 * 1024;
     maximumSize = 800;
   }
@@ -139,6 +139,10 @@ void _configureImageCache() {
   if (DevicePerformance.isReduced) {
     maximumSizeBytes = (maximumSizeBytes * 0.5).round();
     maximumSize = (maximumSize * 0.6).round();
+  }
+  if (optimizeFor == OptimizeFor.speed) {
+    maximumSizeBytes = math.min(maximumSizeBytes, 50 * 1024 * 1024);
+    maximumSize = math.min(maximumSize, 200);
   }
   PaintingBinding.instance.imageCache
     ..maximumSizeBytes = maximumSizeBytes
@@ -383,18 +387,17 @@ class _MyAppState extends State<MyApp> {
     // one of those would force live logos/posters to re-decode constantly.
     final optimizeFor = widget.appState?.viewSettingsService.optimizeForSync;
     if (optimizeFor != _lastOptimizeFor) {
+      final previous = _lastOptimizeFor;
       _lastOptimizeFor = optimizeFor;
-      if (optimizeFor == OptimizeFor.speed) {
-        PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
-        PaintingBinding.instance.imageCache.maximumSize = 200;
-      } else {
-        PaintingBinding.instance.imageCache.maximumSizeBytes =
-            100 * 1024 * 1024;
-        PaintingBinding.instance.imageCache.maximumSize = 1000;
-      }
+      // Recompute from the per-platform budget rather than a fixed figure:
+      // this listener's first call (boot) used to overwrite every platform's
+      // budget with 100MB/1000, so desktop/tvOS/Android TV values and the
+      // low-RAM halving never took effect.
+      _configureImageCache(optimizeFor);
       // Clear cached images so they re-decode at the new oversample/filter
       // quality - stale entries from the previous mode waste GPU memory.
-      PaintingBinding.instance.imageCache.clear();
+      // Nothing to re-decode on the first (boot) notification.
+      if (previous != null) PaintingBinding.instance.imageCache.clear();
     }
     // boot() calls notifyListeners() synchronously from AppShellState.initState,
     // which fires mid-build. Deferring to post-frame avoids the setState-during-

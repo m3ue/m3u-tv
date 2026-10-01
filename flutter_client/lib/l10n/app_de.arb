@@ -901,5 +901,17 @@
   "personDetailsEmpty": "Keine Filmografie verfügbar.",
   "personDetailsError": "Die Filmografie konnte nicht geladen werden.",
   "personDetailsFilterInLibrary": "In der Bibliothek",
-  "personDetailsNoLibraryMatches": "Nichts aus der Filmografie dieses Schauspielers ist in deiner Bibliothek."
+  "personDetailsNoLibraryMatches": "Nichts aus der Filmografie dieses Schauspielers ist in deiner Bibliothek.",
+  "settingsLogsDiagnostics": "Protokolle & Diagnose",
+  "settingsLogsDiagnosticsSubtitle": "Gerätedetails und Protokolle dieser Sitzung zur Fehlersuche",
+  "diagnosticsUpload": "Auf den Server hochladen",
+  "diagnosticsRefresh": "Aktualisieren",
+  "diagnosticsClear": "Protokolle löschen",
+  "diagnosticsUploading": "Protokolle werden hochgeladen...",
+  "diagnosticsUploaded": "Protokolle hochgeladen (#{id}). Ein Admin kann sie in m3u-editor unter Geräte > Registrierte Geräte ansehen.",
+  "diagnosticsUploadFailed": "Protokolle konnten nicht hochgeladen werden: {error}",
+  "diagnosticsNotConnected": "Verbinde dich mit einem Server, um Protokolle hochzuladen.",
+  "diagnosticsDeviceHeading": "Gerät",
+  "diagnosticsLogsHeading": "Protokolle ({count})",
+  "diagnosticsNoLogs": "In dieser Sitzung wurde noch nichts protokolliert."
 }

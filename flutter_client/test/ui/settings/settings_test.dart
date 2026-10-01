@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
-import 'package:m3u_tv/features/settings/backend_capabilities.dart';
 import 'package:m3u_tv/features/settings/connection_form.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
@@ -14,6 +14,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 
 void main() {
   // --- SecureStorage ---
@@ -981,93 +982,96 @@ void main() {
   // --- DiagnosticsScreen ---
 
   group('DiagnosticsScreen', () {
-    testWidgets('shows backend capabilities when available', (tester) async {
-      const capabilities = BackendCapabilities(
-        m3uEditorVersion: '0.10.0',
-        features: ['progress', 'viewers', 'transcode'],
-        transcodeAvailable: true,
-      );
+    AppLogBuffer bufferWith(List<String> lines) {
+      final buffer = AppLogBuffer();
+      for (final (i, line) in lines.indexed) {
+        buffer.add(
+          AppLogLevel.info,
+          line,
+          at: DateTime(2026, 10, 1, 12, 0, i),
+        );
+      }
+      return buffer;
+    }
 
+    testWidgets('shows the device header and newest log lines first', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _testApp(
-          const DiagnosticsScreen(capabilities: capabilities),
+          DiagnosticsScreen(
+            loadHeader: () async => 'M3U TV 1.1.4\nRenderer: Skia []',
+            buffer: bufferWith(['first line', 'second line']),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Backend Capabilities'), findsOneWidget);
-      expect(find.text('0.10.0'), findsOneWidget);
-      expect(find.text('progress'), findsOneWidget);
+      expect(find.text('M3U TV 1.1.4\nRenderer: Skia []'), findsOneWidget);
+      expect(find.text('Logs (2)'), findsOneWidget);
+      final first = tester.getTopLeft(find.textContaining('second line')).dy;
+      final second = tester.getTopLeft(find.textContaining('first line')).dy;
+      expect(first, lessThan(second));
     });
 
-    testWidgets('shows transcode server status', (tester) async {
-      const capabilities = BackendCapabilities(
-        m3uEditorVersion: '0.10.0',
-        features: ['progress'],
-        transcodeAvailable: true,
-      );
-
+    testWidgets('uploads the header and log lines and reports the id', (
+      tester,
+    ) async {
+      String? uploaded;
       await tester.pumpWidget(
         _testApp(
-          const DiagnosticsScreen(capabilities: capabilities),
+          DiagnosticsScreen(
+            loadHeader: () async => 'HEADER',
+            buffer: bufferWith(['something happened']),
+            onUpload: (report) async {
+              uploaded = report;
+              return 42;
+            },
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Transcode Server'), findsOneWidget);
-      expect(find.text('Available'), findsOneWidget);
+      await tester.tap(find.text('Upload to server'));
+      await tester.pumpAndSettle();
+
+      expect(uploaded, startsWith('HEADER\n---\n'));
+      expect(uploaded, contains('[INFO] something happened'));
+      expect(find.textContaining('Logs uploaded (#42)'), findsOneWidget);
     });
 
-    testWidgets('shows unavailable transcode status', (tester) async {
-      const capabilities = BackendCapabilities(
-        m3uEditorVersion: '0.10.0',
-        features: ['progress'],
-        transcodeAvailable: false,
-      );
-
+    testWidgets('disables upload when not connected', (tester) async {
       await tester.pumpWidget(
         _testApp(
-          const DiagnosticsScreen(capabilities: capabilities),
+          DiagnosticsScreen(
+            loadHeader: () async => 'HEADER',
+            buffer: bufferWith(['x']),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Unavailable'), findsOneWidget);
+      expect(find.text('Connect to a server to upload logs.'), findsOneWidget);
+      final upload = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Upload to server'),
+      );
+      expect(upload.onPressed, isNull);
     });
 
-    testWidgets('does not expose secrets in diagnostics', (tester) async {
-      const capabilities = BackendCapabilities(
-        m3uEditorVersion: '0.10.0',
-        features: ['progress'],
-        transcodeAvailable: true,
-      );
-
+    testWidgets('clear empties the log list', (tester) async {
+      final buffer = bufferWith(['x', 'y']);
       await tester.pumpWidget(
         _testApp(
-          const DiagnosticsScreen(capabilities: capabilities),
+          DiagnosticsScreen(loadHeader: () async => 'HEADER', buffer: buffer),
         ),
       );
       await tester.pumpAndSettle();
 
-      // Ensure no password or credential text appears
-      final allText = tester
-          .widgetList<Text>(find.byType(Text))
-          .map((t) => t.data)
-          .where((s) => s != null)
-          .join(' ');
-      expect(allText, isNot(contains('password')));
-      expect(allText, isNot(contains('secret')));
-    });
-
-    testWidgets('shows no capabilities message when null', (tester) async {
-      await tester.pumpWidget(
-        _testApp(
-          const DiagnosticsScreen(capabilities: null),
-        ),
-      );
+      await tester.tap(find.text('Clear logs'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Not connected'), findsOneWidget);
+      expect(buffer.entries, isEmpty);
+      expect(find.text('Nothing logged yet this session.'), findsOneWidget);
     });
   });
 }

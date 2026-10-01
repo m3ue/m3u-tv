@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/sized_image_url.dart';
 
 /// Thumbnail (channel logo, episode/video preview, favorites tile, poster
 /// grid cell, ...) disk-cached via [MediaImageCacheManager] and decoded at
@@ -47,10 +48,6 @@ class CachedMediaThumbnail extends StatelessWidget {
     final filterQuality = ImageQualityScope.filterQualityOf(context);
     final devicePixelRatio =
         MediaQuery.devicePixelRatioOf(context) * oversample;
-    final provider = CachedNetworkImageProvider(
-      url,
-      cacheManager: MediaImageCacheManager(),
-    );
     // Decode dimensions come from the explicit [width]/[height] when given,
     // otherwise from the bounded layout constraints - so a thumbnail dropped
     // into an Expanded/Flexible slot (e.g. a poster grid cell) still decodes
@@ -69,6 +66,10 @@ class CachedMediaThumbnail extends StatelessWidget {
         final cacheHeight = decodeHeight == null
             ? null
             : (decodeHeight * devicePixelRatio).round();
+        final provider = CachedNetworkImageProvider(
+          sizedImageUrl(url, decodeWidth: cacheWidth),
+          cacheManager: MediaImageCacheManager(),
+        );
         return Image(
           image: cacheWidth == null && cacheHeight == null
               ? provider

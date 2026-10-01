@@ -1670,4 +1670,46 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get personDetailsNoLibraryMatches => '该演员的作品年表中没有你库中已有的内容。';
+
+  @override
+  String get settingsLogsDiagnostics => '日志与诊断';
+
+  @override
+  String get settingsLogsDiagnosticsSubtitle => '设备详情和本次会话的日志，用于排查问题';
+
+  @override
+  String get diagnosticsUpload => '上传到服务器';
+
+  @override
+  String get diagnosticsRefresh => '刷新';
+
+  @override
+  String get diagnosticsClear => '清除日志';
+
+  @override
+  String get diagnosticsUploading => '正在上传日志...';
+
+  @override
+  String diagnosticsUploaded(int id) {
+    return '日志已上传（#$id）。管理员可在 m3u-editor 的 设备 > 已注册设备 中查看。';
+  }
+
+  @override
+  String diagnosticsUploadFailed(String error) {
+    return '无法上传日志：$error';
+  }
+
+  @override
+  String get diagnosticsNotConnected => '请先连接服务器再上传日志。';
+
+  @override
+  String get diagnosticsDeviceHeading => '设备';
+
+  @override
+  String diagnosticsLogsHeading(int count) {
+    return '日志（$count）';
+  }
+
+  @override
+  String get diagnosticsNoLogs => '本次会话尚无日志。';
 }

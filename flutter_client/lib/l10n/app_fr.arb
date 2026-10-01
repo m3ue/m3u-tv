@@ -901,5 +901,17 @@
   "personDetailsEmpty": "Aucune filmographie disponible.",
   "personDetailsError": "Impossible de charger la filmographie de cet acteur.",
   "personDetailsFilterInLibrary": "Dans la bibliothèque",
-  "personDetailsNoLibraryMatches": "Aucun élément de la filmographie de cet acteur n'est dans votre bibliothèque."
+  "personDetailsNoLibraryMatches": "Aucun élément de la filmographie de cet acteur n'est dans votre bibliothèque.",
+  "settingsLogsDiagnostics": "Journaux et diagnostics",
+  "settingsLogsDiagnosticsSubtitle": "Détails de l'appareil et journaux de cette session, pour le dépannage",
+  "diagnosticsUpload": "Envoyer au serveur",
+  "diagnosticsRefresh": "Actualiser",
+  "diagnosticsClear": "Effacer les journaux",
+  "diagnosticsUploading": "Envoi des journaux...",
+  "diagnosticsUploaded": "Journaux envoyés (#{id}). Un administrateur peut les consulter dans m3u-editor sous Appareils > Appareils enregistrés.",
+  "diagnosticsUploadFailed": "Impossible d'envoyer les journaux : {error}",
+  "diagnosticsNotConnected": "Connectez-vous à un serveur pour envoyer les journaux.",
+  "diagnosticsDeviceHeading": "Appareil",
+  "diagnosticsLogsHeading": "Journaux ({count})",
+  "diagnosticsNoLogs": "Rien n'a encore été journalisé pendant cette session."
 }

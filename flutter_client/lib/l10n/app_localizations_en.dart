@@ -1722,4 +1722,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get personDetailsNoLibraryMatches =>
       'None of this actor\'s filmography is in your library.';
+
+  @override
+  String get settingsLogsDiagnostics => 'Logs & Diagnostics';
+
+  @override
+  String get settingsLogsDiagnosticsSubtitle =>
+      'Device details and this session\'s logs, for troubleshooting';
+
+  @override
+  String get diagnosticsUpload => 'Upload to server';
+
+  @override
+  String get diagnosticsRefresh => 'Refresh';
+
+  @override
+  String get diagnosticsClear => 'Clear logs';
+
+  @override
+  String get diagnosticsUploading => 'Uploading logs...';
+
+  @override
+  String diagnosticsUploaded(int id) {
+    return 'Logs uploaded (#$id). An admin can view them in m3u-editor under Devices > Registered Devices.';
+  }
+
+  @override
+  String diagnosticsUploadFailed(String error) {
+    return 'Couldn\'t upload logs: $error';
+  }
+
+  @override
+  String get diagnosticsNotConnected => 'Connect to a server to upload logs.';
+
+  @override
+  String get diagnosticsDeviceHeading => 'Device';
+
+  @override
+  String diagnosticsLogsHeading(int count) {
+    return 'Logs ($count)';
+  }
+
+  @override
+  String get diagnosticsNoLogs => 'Nothing logged yet this session.';
 }

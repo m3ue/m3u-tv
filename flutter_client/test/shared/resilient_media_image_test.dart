@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart'
+    show CachedNetworkImageProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -57,5 +59,29 @@ void main() {
     final resize = _decodedImage(tester);
     expect(resize.width, 200);
     expect(resize.height, 300);
+  });
+
+  testWidgets('fetches a TMDB variant sized for the decode, not original', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const SizedBox(
+          width: 150,
+          height: 225,
+          child: ResilientMediaImage(
+            imageUrl: 'https://image.tmdb.org/t/p/original/poster.jpg',
+            fallbackIcon: Icons.movie,
+          ),
+        ),
+      ),
+    );
+
+    final provider = _decodedImage(tester).imageProvider;
+    expect(provider, isA<CachedNetworkImageProvider>());
+    expect(
+      (provider as CachedNetworkImageProvider).url,
+      'https://image.tmdb.org/t/p/w342/poster.jpg',
+    );
   });
 }

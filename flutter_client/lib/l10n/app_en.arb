@@ -973,5 +973,38 @@
   "personDetailsEmpty": "No filmography available.",
   "personDetailsError": "Couldn't load this actor's filmography.",
   "personDetailsFilterInLibrary": "In Library",
-  "personDetailsNoLibraryMatches": "None of this actor's filmography is in your library."
+  "personDetailsNoLibraryMatches": "None of this actor's filmography is in your library.",
+  "settingsLogsDiagnostics": "Logs & Diagnostics",
+  "settingsLogsDiagnosticsSubtitle": "Device details and this session's logs, for troubleshooting",
+  "diagnosticsUpload": "Upload to server",
+  "diagnosticsRefresh": "Refresh",
+  "diagnosticsClear": "Clear logs",
+  "diagnosticsUploading": "Uploading logs...",
+  "diagnosticsUploaded": "Logs uploaded (#{id}). An admin can view them in m3u-editor under Devices > Registered Devices.",
+  "@diagnosticsUploaded": {
+    "placeholders": {
+      "id": {
+        "type": "int"
+      }
+    }
+  },
+  "diagnosticsUploadFailed": "Couldn't upload logs: {error}",
+  "@diagnosticsUploadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "diagnosticsNotConnected": "Connect to a server to upload logs.",
+  "diagnosticsDeviceHeading": "Device",
+  "diagnosticsLogsHeading": "Logs ({count})",
+  "@diagnosticsLogsHeading": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "diagnosticsNoLogs": "Nothing logged yet this session."
 }
