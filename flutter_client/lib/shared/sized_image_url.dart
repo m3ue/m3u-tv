@@ -11,11 +11,12 @@ final RegExp _tmdbImage = RegExp(
 /// [decodeWidth] pixels wide, or [url] unchanged when the width is unknown,
 /// the host has no sized variants, or no smaller variant would cover it.
 ///
-/// Only TMDB URLs are rewritten. m3u-editor's logo proxy already bakes a
-/// role-based `?w=` into the URLs it hands out (when the playlist's logo
-/// proxy is on), and arbitrary provider hosts have no resize API. Its media
-/// server image proxy URLs are signed over their full query string, so they
-/// must never be modified here.
+/// Only TMDB URLs are rewritten. m3u-editor serves its logo proxy, media
+/// server and Schedules Direct artwork already downscaled to a role-based
+/// size it picks itself (logo proxy URLs carry a `?p=` profile name), and
+/// arbitrary provider hosts have no resize API. Its media server image proxy
+/// URLs are signed over their full query string, so they must never be
+/// modified here.
 ///
 /// Never upsizes: a URL already at a smaller width is left as-is, and a
 /// decode wider than the largest bucket keeps `original`. A height alone is
