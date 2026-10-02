@@ -438,6 +438,14 @@ class MpvPlayerCore(
                                 "mpv end-file error: $detail"
                             }
                             emitError(message, "android-mpv-error")
+                        } else if (event.reason == EndFileReason.Stop) {
+                            // A `stop` ends the current file too, but only a
+                            // real end of stream is END_FILE, which Dart reads
+                            // as playback completed. The Windows core makes
+                            // the same split.
+                            emit("STOP", emptyMap())
+                        } else if (event.reason == EndFileReason.Quit) {
+                            emit("QUIT", emptyMap())
                         } else {
                             emit("END_FILE", emptyMap())
                         }

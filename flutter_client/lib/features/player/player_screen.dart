@@ -1224,7 +1224,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (_traktScrobbleActive) _scrobble('pause');
         }
         _stopPositionTimer();
-      } else if (state.status == PlaybackStatus.completed) {
+      } else if (state.status == PlaybackStatus.completed &&
+          // The old stream ending is the reopen itself, not the programme.
+          !_catchupReopenPending) {
         _isPlaying = false;
         _stopPositionTimer();
         if (_traktScrobbleActive) {

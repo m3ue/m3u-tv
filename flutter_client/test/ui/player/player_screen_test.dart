@@ -4414,11 +4414,15 @@ void main() {
     Future<FakePlayerAdapter> pumpCatchup(
       WidgetTester tester, {
       Duration? streamDuration,
+      FakePlayerAdapter? player,
+      VoidCallback? onClose,
     }) async {
-      final adapter = FakePlayerAdapter(
-        capabilities: PlaybackCapabilities.desktopLibmpv,
-        textureId: 42,
-      );
+      final adapter =
+          player ??
+          FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 42,
+          );
       final orchestrator = PlaybackOrchestrator(
         platform: PlaybackPlatform.desktop,
         adapters: <PlaybackBackend, PlayerAdapter>{
@@ -4446,6 +4450,7 @@ void main() {
             orchestrator: orchestrator,
             epgService: EpgService(clock: () => DateTime.utc(2026)),
             xtreamService: XtreamService(transport: (_) async => null),
+            onClose: onClose,
           ),
         ),
       );
@@ -4538,5 +4543,40 @@ void main() {
       expect(find.text('45:30'), findsOneWidget);
       expect(find.text('1:00:00'), findsOneWidget);
     });
+
+    testWidgets('stays open when the old stream reports completed as it '
+        'is replaced', (tester) async {
+      var closed = 0;
+      final adapter = await pumpCatchup(
+        tester,
+        player: _CompletesOnStopAdapter(),
+        onClose: () => closed++,
+      );
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump();
+
+      expect(adapter.loadCalls, hasLength(2));
+      expect(closed, 0);
+    });
   });
+}
+
+/// Reports `completed` when stopped, as mpv's end-file for a `stop` did on
+/// the Apple and Android mpv cores.
+class _CompletesOnStopAdapter extends FakePlayerAdapter {
+  _CompletesOnStopAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv, textureId: 42);
+
+  @override
+  Future<void> stop() async {
+    await super.stop();
+    emitState(
+      const PlaybackState(
+        backend: PlaybackBackend.desktopLibmpv,
+        status: PlaybackStatus.completed,
+      ),
+    );
+  }
 }
