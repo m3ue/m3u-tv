@@ -774,14 +774,6 @@ class _NotesPaneState extends State<_NotesPane> {
   final _scrollController = ScrollController();
 
   @override
-  void didUpdateWidget(_NotesPane oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.note.tag != widget.note.tag && _scrollController.hasClients) {
-      _scrollController.jumpTo(0);
-    }
-  }
-
-  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
@@ -868,6 +860,10 @@ class _NotesPaneState extends State<_NotesPane> {
         child: child,
       ),
       child: SingleChildScrollView(
+        // A new version gets a fresh scroll position at the top. Resetting
+        // the old one with jumpTo() would have to happen mid-build, and its
+        // scroll notification makes the mobile AppBar setState during build.
+        key: ValueKey(widget.note.tag),
         controller: _scrollController,
         padding: const EdgeInsets.only(bottom: 24),
         child: Center(

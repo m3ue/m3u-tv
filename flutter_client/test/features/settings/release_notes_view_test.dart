@@ -70,12 +70,18 @@ void main() {
     bool isTv = false,
     Size size = const Size(1000, 700),
     AppFontSize fontSize = AppFontSize.normal,
+    bool withAppBar = false,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
+          // Mobile pushes the view under an AppBar, which listens to the
+          // Scaffold's scroll notifications for its scrolled-under tint.
+          appBar: withAppBar
+              ? AppBar(title: const Text('Release notes'))
+              : null,
           body: FontSizeScope(
             fontSize: fontSize,
             child: Builder(
@@ -207,6 +213,36 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
     expect(find.text('v1.2.0'), findsOneWidget);
+  });
+
+  testWidgets('switching versions while scrolled resets to the top', (
+    tester,
+  ) async {
+    final longNotes = List.generate(60, (i) => '- Change number $i').join('\n');
+    await pump(
+      tester,
+      currentVersion: '1.3.0',
+      releases: [_note('v1.4.0', longNotes), _note('v1.3.0', longNotes)],
+      withAppBar: true,
+    );
+    final l = await _l();
+
+    ScrollPosition position() =>
+        tester.state<ScrollableState>(find.byType(Scrollable).last).position;
+
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -400),
+    );
+    await tester.pumpAndSettle();
+    expect(position().pixels, greaterThan(0));
+
+    // Resetting the offset mid-build used to notify the AppBar during build.
+    await tester.tap(find.byTooltip(l.settingsReleaseNotesNewer));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('v1.4.0'), findsOneWidget);
+    expect(position().pixels, 0);
   });
 
   testWidgets('renders a categorized changelog as cleaned-up sections', (
