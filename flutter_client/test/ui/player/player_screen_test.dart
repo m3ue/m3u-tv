@@ -4406,4 +4406,252 @@ void main() {
       );
     });
   });
+
+  group('PlayerScreen catchup seeking', () {
+    const catchupUrl =
+        'https://editor.example/timeshift/demo/secret/60/2026-10-01:20-00/101.ts?proxy=true';
+
+    Future<FakePlayerAdapter> pumpCatchup(
+      WidgetTester tester, {
+      Duration? streamDuration,
+      FakePlayerAdapter? player,
+      PlaybackStreamSessionGateway? streamSessionGateway,
+      VoidCallback? onClose,
+    }) async {
+      final adapter =
+          player ??
+          FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+            textureId: 42,
+          );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+        streamSessionGateway: streamSessionGateway,
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: catchupUrl,
+              title: 'News - Evening Bulletin',
+              type: 'catchup',
+              streamId: 101,
+              metadata: <String, Object?>{
+                'catchup': true,
+                'program_start': '2026-10-01T20:00:00.000Z',
+                'program_end': '2026-10-01T21:00:00.000Z',
+              },
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+            xtreamService: XtreamService(transport: (_) async => null),
+            onClose: onClose,
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+          position: const Duration(minutes: 5),
+          duration: streamDuration,
+        ),
+      );
+      await tester.pump();
+      // The controls bar only mounts once that state lands.
+      await tester.pump();
+      return adapter;
+    }
+
+    testWidgets('reopens a stream that cannot seek at the next minute', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(tester);
+
+      // The programme timeline makes it scrubbable even though the stream
+      // reported no duration of its own.
+      expect(find.text('1:00:00'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump();
+
+      expect(adapter.seekCalls, isEmpty);
+      expect(adapter.loadCalls.map((source) => source.uri), <String>[
+        catchupUrl,
+        'https://editor.example/timeshift/demo/secret/54/2026-10-01:20-06/101.ts?proxy=true',
+      ]);
+      expect(find.text('6:00'), findsOneWidget);
+    });
+
+    testWidgets('seeks in place for a short seek on a seekable stream', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+      );
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+
+      expect(adapter.seekCalls, <Duration>[
+        const Duration(minutes: 5, seconds: 10),
+      ]);
+      expect(adapter.loadCalls, hasLength(1));
+    });
+
+    testWidgets('reopens a long seek and maps the new stream onto the '
+        'programme', (tester) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+      );
+
+      final track = tester.getRect(
+        find.byKey(const Key('playback-seekbar-track')),
+      );
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.76, track.center.dy),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(adapter.seekCalls, isEmpty);
+      expect(
+        adapter.loadCalls.last.uri,
+        'https://editor.example/timeshift/demo/secret/15/2026-10-01:20-45/101.ts?proxy=true',
+      );
+
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.ready,
+          position: Duration(seconds: 30),
+          duration: Duration(minutes: 15),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('45:30'), findsOneWidget);
+      expect(find.text('1:00:00'), findsOneWidget);
+    });
+
+    testWidgets('stays open when the old stream reports completed as it '
+        'is replaced', (tester) async {
+      var closed = 0;
+      final adapter = await pumpCatchup(
+        tester,
+        player: _CompletesOnStopAdapter(),
+        onClose: () => closed++,
+      );
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump();
+
+      expect(adapter.loadCalls, hasLength(2));
+      expect(closed, 0);
+    });
+
+    testWidgets('keeps the native view mounted while a reopen swaps the '
+        'stream', (tester) async {
+      final viewCalls = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform_views,
+        (call) async {
+          viewCalls.add(call.method);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform_views,
+          null,
+        ),
+      );
+      final adapter = await pumpCatchup(
+        tester,
+        player: _PlatformViewAdapter(),
+        streamSessionGateway: _SlowReleaseGateway(),
+      );
+      await tester.pump();
+      expect(viewCalls.where((method) => method == 'create'), hasLength(1));
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      // Frames keep building while the old session's release is in flight
+      // and open() has no active adapter.
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // Remounting would make the native side re-create its player core and
+      // tear down the one the new load went to.
+      expect(adapter.loadCalls, hasLength(2));
+      expect(viewCalls.where((method) => method == 'create'), hasLength(1));
+      expect(viewCalls, isNot(contains('dispose')));
+
+      // Closing the player releases the session too; let that finish.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 3));
+    });
+  });
+}
+
+/// Renders through a native platform view, like the mpv and ExoPlayer
+/// backends.
+class _PlatformViewAdapter extends FakePlayerAdapter
+    implements PlatformViewProvider {
+  _PlatformViewAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv);
+
+  @override
+  String get platformViewType => 'm3u_tv/test_player_view';
+
+  @override
+  Map<String, dynamic>? get platformViewCreationParams => <String, dynamic>{
+    'viewId': 1,
+  };
+
+  @override
+  Future<void> releaseNativeView() async {}
+}
+
+/// Tags editor URLs like the real gateway and takes as long to release a
+/// session as the editor's stop call does.
+class _SlowReleaseGateway implements PlaybackStreamSessionGateway {
+  @override
+  PlaybackSource attachClientId(PlaybackSource source, String clientId) =>
+      source.copyWith(uri: '${source.uri}&client_id=$clientId');
+
+  @override
+  Future<void> releaseStream(PlaybackSource source, String clientId) =>
+      Future<void>.delayed(const Duration(milliseconds: 150));
+}
+
+/// Reports `completed` when stopped, as mpv's end-file for a `stop` did on
+/// the Apple and Android mpv cores.
+class _CompletesOnStopAdapter extends FakePlayerAdapter {
+  _CompletesOnStopAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv, textureId: 42);
+
+  @override
+  Future<void> stop() async {
+    await super.stop();
+    emitState(
+      const PlaybackState(
+        backend: PlaybackBackend.desktopLibmpv,
+        status: PlaybackStatus.completed,
+      ),
+    );
+  }
 }

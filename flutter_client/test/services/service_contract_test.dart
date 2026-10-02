@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 void main() {
   group('XtreamService contract', () {
@@ -389,6 +390,42 @@ void main() {
       expect(
         url,
         'https://xtream.example/timeshift/demo/secret/45/2026-01-01:12-30/101.ts',
+      );
+    });
+
+    test('moves a catchup URL to a new start in server time', () async {
+      tz_data.initializeTimeZones();
+      final auth = xtreamAuth(auth: 1);
+      (auth['server_info']! as Map<String, Object?>)['timezone'] =
+          'America/New_York';
+      final service = XtreamService(
+        transport: FakeXtreamTransport({'auth': auth}).call,
+      );
+      await service.authenticate(
+        const UserCredentials(
+          server: 'https://xtream.example/',
+          username: 'demo',
+          password: 'secret',
+        ),
+      );
+
+      final url = service.catchupStreamUrlAt(
+        'https://xtream.example/timeshift/demo/secret/60/2026-01-01:12-00/101.ts?proxy=true&profile=3',
+        DateTime.utc(2026, 1, 1, 17, 45),
+        const Duration(minutes: 15),
+      );
+
+      expect(
+        url,
+        'https://xtream.example/timeshift/demo/secret/15/2026-01-01:12-45/101.ts?proxy=true&profile=3',
+      );
+      expect(
+        service.catchupStreamUrlAt(
+          'https://xtream.example/live/demo/secret/101.ts',
+          DateTime.utc(2026, 1, 1, 17, 45),
+          const Duration(minutes: 15),
+        ),
+        isNull,
       );
     });
 

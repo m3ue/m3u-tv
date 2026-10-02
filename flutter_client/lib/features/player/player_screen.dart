@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:m3u_tv/features/player/catchup_timeline.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
@@ -262,6 +263,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _failureReported = false;
   double _lastValidProgress = 0;
 
+  // Catchup only: the controls show the programme's timeline (see
+  // CatchupTimeline), so position and duration are mapped from whichever
+  // timeshift stream is open for it. While a reopened stream loads, the old
+  // stream's position reports no longer apply, so the landing point is held
+  // on screen until the new stream has opened.
+  CatchupTimeline? _catchup;
+  bool _catchupStreamSeekable = false;
+  bool _catchupReopenPending = false;
+  int _catchupReopenGeneration = 0;
+
+  // The platform view stays mounted while a reopen swaps the stream. open()
+  // clears the active adapter until the new load starts, and unmounting the
+  // view in that gap makes the native side re-create its player core when
+  // the view comes back, tearing down the core the new load was sent to.
+  PlatformViewProvider? _reopenPlatformView;
+
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
   bool get _isSeries => widget.args.type == 'series';
@@ -351,7 +368,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         .listen((_) {
           if (mounted) setState(() {});
         });
-    _openSource(widget.args);
+    _resetCatchupTimeline(widget.args);
+    unawaited(_openSource(widget.args));
     _startLoadingTimeout();
     _scheduleOverlayHide();
     unawaited(_initComskip(widget.args));
@@ -451,9 +469,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _upNextDismissed = false;
       _nextEpisode = null;
       _upNextSeries = null;
+      _resetCatchupTimeline(widget.args);
     });
 
-    _openSource(widget.args);
+    unawaited(_openSource(widget.args));
     _startLoadingTimeout();
     _scheduleOverlayHide();
     unawaited(_initComskip(widget.args));
@@ -481,7 +500,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _startPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (_disposed || !mounted || !_isPlaying || _isLive) return;
+      if (_disposed ||
+          !mounted ||
+          !_isPlaying ||
+          _isLive ||
+          _catchupReopenPending) {
+        return;
+      }
       setState(() {
         final next = _currentPosition + const Duration(milliseconds: 500);
         _currentPosition = (_duration > Duration.zero && next > _duration)
@@ -1039,16 +1064,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _openSource(PlayerArgs args) {
-    unawaited(
-      _openAndSeek(
-        args.toPlaybackSource().copyWith(
-          hdrEnabled: _hdrEnabled,
-          matchDisplayRefreshRate:
-              widget.viewSettingsService?.matchRefreshRateSync ?? false,
-        ),
+  Future<void> _openSource(PlayerArgs args) {
+    return _openAndSeek(
+      args.toPlaybackSource().copyWith(
+        hdrEnabled: _hdrEnabled,
+        matchDisplayRefreshRate:
+            widget.viewSettingsService?.matchRefreshRateSync ?? false,
       ),
     );
+  }
+
+  void _resetCatchupTimeline(PlayerArgs args) {
+    _catchup = args.type == 'catchup'
+        ? CatchupTimeline.fromMetadata(args.metadata)
+        : null;
+    _catchupStreamSeekable = false;
+    _catchupReopenPending = false;
+    _catchupReopenGeneration++;
+    _reopenPlatformView = null;
+    _duration = _catchup?.duration ?? Duration.zero;
   }
 
   Future<void> _openAndSeek(PlaybackSource source) async {
@@ -1137,17 +1171,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // seek's buffering). Accept state.position only once it's at or past
     // the pending target — that proves the real seek genuinely caught up.
     final pendingTarget = _pendingComskipSeekTarget;
-    final acceptedPosition =
-        pendingTarget != null && state.position < pendingTarget
-        ? _currentPosition
-        : state.position;
+    final catchup = _catchup;
+    final Duration acceptedPosition;
+    if (catchup != null) {
+      acceptedPosition = _catchupReopenPending
+          ? _currentPosition
+          : catchup.positionOf(state.position);
+    } else {
+      acceptedPosition = pendingTarget != null && state.position < pendingTarget
+          ? _currentPosition
+          : state.position;
+    }
 
     setState(() {
       _status = state.status;
       _retryStatusMessage = null;
       _currentPosition = acceptedPosition;
       if (state.duration != null && state.duration! > Duration.zero) {
-        _duration = state.duration!;
+        // A catchup duration is the programme's, not the stream's. A stream
+        // that reports one at all can seek in place.
+        if (catchup == null) {
+          _duration = state.duration!;
+        } else {
+          _catchupStreamSeekable = true;
+        }
       }
       _audioTracks = state.audioTracks;
       _subtitleTracks = state.subtitleTracks;
@@ -1184,7 +1231,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (_traktScrobbleActive) _scrobble('pause');
         }
         _stopPositionTimer();
-      } else if (state.status == PlaybackStatus.completed) {
+      } else if (state.status == PlaybackStatus.completed &&
+          // The old stream ending is the reopen itself, not the programme.
+          !_catchupReopenPending) {
         _isPlaying = false;
         _stopPositionTimer();
         if (_traktScrobbleActive) {
@@ -1503,9 +1552,63 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
+    final catchup = _catchup;
+    if (catchup != null) {
+      _seekCatchup(catchup, clamped);
+      return;
+    }
     setState(() => _currentPosition = clamped);
     _reportProgress(clamped);
     unawaited(widget.orchestrator.seek(clamped));
+  }
+
+  /// Seeks inside the open timeshift stream when the target is close and the
+  /// stream can seek, otherwise reopens the programme at the target minute
+  /// (see [CatchupTimeline.planSeek]).
+  void _seekCatchup(CatchupTimeline catchup, Duration target) {
+    switch (catchup.planSeek(
+      target,
+      from: _currentPosition,
+      // A seek while a reopen is still loading supersedes it.
+      streamSeekable: _catchupStreamSeekable && !_catchupReopenPending,
+    )) {
+      case null:
+        return;
+      case CatchupInStreamSeek(:final streamPosition):
+        setState(() => _currentPosition = target);
+        unawaited(widget.orchestrator.seek(streamPosition));
+      case CatchupReopen(:final start, :final duration):
+        final url = widget.xtreamService?.catchupStreamUrlAt(
+          widget.args.streamUrl,
+          start,
+          duration,
+        );
+        if (url == null) return;
+        unawaited(_reopenCatchup(catchup.withStreamStart(start), url));
+    }
+  }
+
+  /// Opens the programme's stream at [url] in place of the current one.
+  /// `open()` ends the current stream session first, so the proxy drops the
+  /// old stream straight away, and a newer seek supersedes this one.
+  Future<void> _reopenCatchup(CatchupTimeline timeline, String url) async {
+    final generation = ++_catchupReopenGeneration;
+    setState(() {
+      _catchup = timeline;
+      _catchupReopenPending = true;
+      _reopenPlatformView =
+          widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
+      _currentPosition = timeline.positionOf(Duration.zero);
+    });
+    _startLoadingTimeout();
+    await _openSource(widget.args.copyWith(streamUrl: url));
+    if (_disposed || !mounted || generation != _catchupReopenGeneration) {
+      return;
+    }
+    setState(() {
+      _catchupReopenPending = false;
+      _reopenPlatformView = null;
+    });
   }
 
   void _handleAudioTrackSelected(String? trackId) {
@@ -1765,9 +1868,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       child: _videoSurfaceReady
                           ? NativeVideoSurface(
                               textureId: widget.orchestrator.activeTextureId,
-                              platformView: widget
-                                  .orchestrator
-                                  .activePlatformViewProvider,
+                              platformView:
+                                  widget
+                                      .orchestrator
+                                      .activePlatformViewProvider ??
+                                  _reopenPlatformView,
                               nativePlane:
                                   widget.orchestrator.activeNativePlaneProvider,
                               aspectRatio: _videoAspectRatio,

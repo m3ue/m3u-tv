@@ -315,6 +315,17 @@ final class MpvPlayerCore {
           emitError(message: message, code: "apple-mpv-error")
           return
         }
+        // A `stop` (or quit) ends the current file too, but only a real end
+        // of stream is END_FILE, which Dart reads as playback completed. The
+        // Windows core makes the same split.
+        if endFile.reason == MPV_END_FILE_REASON_STOP {
+          emit(kind: "STOP", extra: [:])
+          return
+        }
+        if endFile.reason == MPV_END_FILE_REASON_QUIT {
+          emit(kind: "QUIT", extra: [:])
+          return
+        }
       }
       emit(kind: "END_FILE", extra: [:])
     case MPV_EVENT_IDLE, MPV_EVENT_SHUTDOWN:
