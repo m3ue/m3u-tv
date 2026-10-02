@@ -1145,6 +1145,13 @@ bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
     api.set_option_string(gpu_handle, "demuxer-lavf-analyzeduration", "10");
     api.set_option_string(gpu_handle, "demuxer-lavf-probesize", "10000000");
   }
+  // A catchup timeline comes from the EPG, not the file, so skip FFmpeg reading the end of
+  // the file to estimate its duration, and let the probe rewind inside a larger stream
+  // buffer: a catchup open then costs one request to the provider instead of three.
+  if (BoolArg(args, "isCatchup", false)) {
+    api.set_option_string(gpu_handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
+    api.set_option_string(gpu_handle, "stream-buffer-size", "4MiB");
+  }
   if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
   // mpv's own render-API output negotiates the swap chain's color space and
   // HDR metadata itself once the OS display is actually in HDR mode;
@@ -1391,6 +1398,11 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
   if (BoolArg(args, "isLive", false)) {
     api.set_option_string(handle, "demuxer-lavf-analyzeduration", "10");
     api.set_option_string(handle, "demuxer-lavf-probesize", "10000000");
+  }
+  // See the matching comment on the GPU-path handle above.
+  if (BoolArg(args, "isCatchup", false)) {
+    api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
+    api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
   if (!start_value.empty()) api.set_option_string(handle, "start", start_value.c_str());
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
@@ -1758,6 +1770,18 @@ ProbeMap VideoAspectRatioForHandle(const flutter::EncodableMap* args) {
   return VideoAspectRatioResult(it->second.get());
 }
 
+// mpv's demuxer cache state, as JSON. Its `seekable-ranges` are the positions a seek reaches
+// without fetching more data, which Dart uses to plan catchup seeks. Empty when unknown.
+ProbeMap SeekWindowForHandle(const flutter::EncodableMap* args) {
+  const int64_t id = IntArg(args, "handle");
+  auto it = g_players.find(id);
+  std::string state;
+  if (it == g_players.end() || !StringProperty(it->second.get(), "demuxer-cache-state", &state)) {
+    return ProbeMap{};
+  }
+  return ProbeMap{{flutter::EncodableValue("cacheState"), flutter::EncodableValue(state)}};
+}
+
 void Control(const std::string& method, const flutter::EncodableMap* args) {
   const int64_t id = IntArg(args, "handle");
   auto it = g_players.find(id);
@@ -1886,6 +1910,10 @@ class DesktopLibmpvBackendPlugin : public flutter::Plugin {
     }
     if (method == "getVideoAspectRatio") {
       result->Success(flutter::EncodableValue(VideoAspectRatioForHandle(args)));
+      return;
+    }
+    if (method == "seekWindow") {
+      result->Success(flutter::EncodableValue(SeekWindowForHandle(args)));
       return;
     }
     Control(method, args);

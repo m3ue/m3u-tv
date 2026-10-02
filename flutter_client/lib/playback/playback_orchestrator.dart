@@ -218,6 +218,12 @@ class PlaybackOrchestrator {
     return adapter! as HdrToggleProvider;
   }
 
+  SeekWindowProvider? get activeSeekWindowProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! SeekWindowProvider) return null;
+    return adapter! as SeekWindowProvider;
+  }
+
   MultiviewBackend? get activeVolumeProvider {
     final adapter = _activeAdapter;
     if (adapter is! MultiviewBackend) return null;

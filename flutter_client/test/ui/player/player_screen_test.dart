@@ -4563,6 +4563,62 @@ void main() {
       expect(closed, 0);
     });
 
+    testWidgets('reopens a short seek past what the player has buffered', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: _BufferReportingAdapter(
+          const PlaybackSeekWindow([
+            (start: Duration.zero, end: Duration(minutes: 5, seconds: 5)),
+          ]),
+        ),
+      );
+
+      // Without the buffer report this 10 s skip would seek in place.
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump();
+
+      expect(adapter.seekCalls, isEmpty);
+      expect(
+        adapter.loadCalls.last.uri,
+        'https://editor.example/timeshift/demo/secret/54/2026-10-01:20-06/101.ts?proxy=true',
+      );
+    });
+
+    testWidgets('seeks in place to a buffered target however far away', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: _BufferReportingAdapter(
+          const PlaybackSeekWindow([
+            (start: Duration.zero, end: Duration(minutes: 50)),
+          ]),
+        ),
+      );
+
+      final track = tester.getRect(
+        find.byKey(const Key('playback-seekbar-track')),
+      );
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.76, track.center.dy),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(adapter.loadCalls, hasLength(1));
+      expect(adapter.seekCalls, hasLength(1));
+      expect(
+        adapter.seekCalls.single.inMinutes,
+        45,
+        reason: 'the jump stays on the open stream',
+      );
+    });
+
     testWidgets('keeps the native view mounted while a reopen swaps the '
         'stream', (tester) async {
       final viewCalls = <String>[];
@@ -4605,6 +4661,18 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
   });
+}
+
+/// Reports a fixed buffer, like the mpv backends do from mpv's demuxer cache.
+class _BufferReportingAdapter extends FakePlayerAdapter
+    implements SeekWindowProvider {
+  _BufferReportingAdapter(this.window)
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv, textureId: 42);
+
+  final PlaybackSeekWindow window;
+
+  @override
+  Future<PlaybackSeekWindow?> seekWindow() async => window;
 }
 
 /// Renders through a native platform view, like the mpv and ExoPlayer

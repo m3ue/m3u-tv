@@ -1,3 +1,5 @@
+import 'package:m3u_tv/playback/player_adapter.dart';
+
 /// How [CatchupTimeline.planSeek] reaches a programme position.
 sealed class CatchupSeek {
   const CatchupSeek();
@@ -28,7 +30,9 @@ final class CatchupReopen extends CatchupSeek {
 /// seek inside a timeshift stream costs a run of Range requests (ExoPlayer
 /// sends every one back through the editor's redirect), and a stream the
 /// proxy transcodes, or a provider serves without Range support, can't seek
-/// at all. Short seeks still seek in place when the stream can.
+/// at all. A seek stays in place when the target is already buffered, or,
+/// when the player can't report its buffer, when it's short and the stream
+/// can seek.
 class CatchupTimeline {
   CatchupTimeline({
     required this.programStart,
@@ -50,7 +54,8 @@ class CatchupTimeline {
     return CatchupTimeline(programStart: start, programEnd: end);
   }
 
-  /// The furthest a seek may travel and still seek inside the open stream.
+  /// The furthest a seek may travel and still seek inside the open stream,
+  /// when the player can't report what it has buffered.
   static const Duration reopenThreshold = Duration(minutes: 1);
 
   final DateTime programStart;
@@ -77,19 +82,27 @@ class CatchupTimeline {
 
   /// Plans a seek from programme position [from] to [target], or returns
   /// null when there is nowhere to go.
+  ///
+  /// [buffered] is what the open stream's player has buffered, when it can
+  /// tell. A target inside it is reached in place at any distance; anything
+  /// outside reopens, because seeking a timeshift stream outside its buffer
+  /// starts a timestamp search of many Range requests. Without it, a seek
+  /// stays in place only when it's short and the stream can seek.
   CatchupSeek? planSeek(
     Duration target, {
     required Duration from,
     required bool streamSeekable,
+    PlaybackSeekWindow? buffered,
   }) {
     final to = _clamp(target);
     if (to == from) return null;
     final inStream = to - _streamOffset;
-    if (streamSeekable &&
+    final seekInPlace =
         !inStream.isNegative &&
-        (to - from).abs() <= reopenThreshold) {
-      return CatchupInStreamSeek(inStream);
-    }
+        (buffered != null
+            ? buffered.contains(inStream)
+            : streamSeekable && (to - from).abs() <= reopenThreshold);
+    if (seekInPlace) return CatchupInStreamSeek(inStream);
 
     // Providers only take whole-minute starts, so the stream reopens at the
     // target's minute and plays from up to a minute early. A forward skip

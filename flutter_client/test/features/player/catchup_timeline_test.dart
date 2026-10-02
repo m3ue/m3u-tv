@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/catchup_timeline.dart';
+import 'package:m3u_tv/playback/player_adapter.dart';
 
 void main() {
   final programStart = DateTime.utc(2026, 10, 1, 20);
@@ -110,6 +111,48 @@ void main() {
       // Flooring would land back on the current minute, so a forward skip
       // moves on to the next one instead.
       expect((forward! as CatchupReopen).start, programStart.add(min(11)));
+    });
+
+    group('with the player reporting its buffer', () {
+      // Opened at 30:00, buffered from 30:00 to 33:00 of the programme.
+      final reopened = timeline(streamStart: programStart.add(min(30)));
+      final buffered = PlaybackSeekWindow([
+        (start: Duration.zero, end: min(3)),
+      ]);
+
+      test('seeks in place to a buffered target at any distance', () {
+        final seek = reopened.planSeek(
+          min(32, 30),
+          from: min(30, 5),
+          streamSeekable: true,
+          buffered: buffered,
+        );
+
+        expect((seek! as CatchupInStreamSeek).streamPosition, min(2, 30));
+      });
+
+      test('reopens a short seek past what is buffered', () {
+        final seek = reopened.planSeek(
+          min(33, 20),
+          from: min(33),
+          streamSeekable: true,
+          buffered: buffered,
+        );
+
+        expect(seek, isA<CatchupReopen>());
+      });
+
+      test('seeks in place inside the buffer even when the stream cannot '
+          'seek', () {
+        final seek = reopened.planSeek(
+          min(31),
+          from: min(31, 30),
+          streamSeekable: false,
+          buffered: buffered,
+        );
+
+        expect((seek! as CatchupInStreamSeek).streamPosition, min(1));
+      });
     });
 
     test('has nothing to do at the programme edges', () {

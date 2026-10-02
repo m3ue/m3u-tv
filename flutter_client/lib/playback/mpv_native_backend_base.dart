@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/playback/mpv_native_event.dart';
+import 'package:m3u_tv/playback/mpv_seek_window.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
@@ -16,7 +17,8 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 /// `MacMpvNativeBackend` and `AppleMpvNativeBackend` are near-identical
 /// consumers of this FSM, differing only in their method/event channel
 /// names, [PlaybackCapabilities], error codes, and (macOS only) `setVolume`.
-abstract class MpvNativeBackendBase implements PlayerAdapter {
+abstract class MpvNativeBackendBase
+    implements PlayerAdapter, SeekWindowProvider {
   MpvNativeBackendBase({
     required this.viewId,
     required this._channel,
@@ -89,6 +91,7 @@ abstract class MpvNativeBackendBase implements PlayerAdapter {
         'title': source.title,
         'startPositionMs': source.startPosition.inMilliseconds,
         'isLive': source.isLive,
+        'isCatchup': source.isCatchup,
         'userAgent': source.userAgent,
         'headers': source.headers,
         // Read only by the Android mpv core (FrameRateManager) -- inert on
@@ -183,6 +186,13 @@ abstract class MpvNativeBackendBase implements PlayerAdapter {
       'positionMs': position.inMilliseconds,
     });
   }
+
+  @override
+  Future<PlaybackSeekWindow?> seekWindow() async => mpvSeekWindow(
+    await _channel.invokeMapMethod<String, Object?>('seekWindow', {
+      'viewId': viewId,
+    }),
+  );
 
   @override
   Future<void> stop() async {

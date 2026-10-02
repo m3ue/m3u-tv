@@ -258,6 +258,7 @@ class MpvPlayerCore(
         uri: String,
         startPositionMs: Int,
         isLive: Boolean,
+        isCatchup: Boolean,
         userAgent: String?,
         headers: Map<String, String>?,
         externalSubtitles: List<Triple<String, String?, String?>>,
@@ -300,6 +301,13 @@ class MpvPlayerCore(
                     // so this is a no-op for VOD, not a behavior change.
                     current.setProperty("demuxer-lavf-analyzeduration", if (isLive) "10" else "5")
                     current.setProperty("demuxer-lavf-probesize", if (isLive) "10000000" else "5000000")
+                    // A catchup timeline comes from the EPG, not the file, so skip FFmpeg
+                    // reading the end of the file to estimate its duration, and let the
+                    // probe rewind inside a larger stream buffer: a catchup open then costs
+                    // one request to the provider instead of three. Reset for every other
+                    // load, for the same reason as above.
+                    current.setProperty("demuxer-lavf-o", if (isCatchup) "skip_estimate_duration_from_pts=1" else "")
+                    current.setProperty("stream-buffer-size", if (isCatchup) "4MiB" else "128KiB")
 
                     val args = mutableListOf("loadfile", uri, "replace")
                     if (startPositionMs > 0) {
@@ -332,6 +340,18 @@ class MpvPlayerCore(
     fun pause() = setProperty("pause", "yes")
 
     fun seek(positionMs: Int) = command("seek", (positionMs / 1000.0).toString(), "absolute")
+
+    /**
+     * mpv's demuxer cache state, as JSON. Its `seekable-ranges` are the positions a seek
+     * reaches without fetching more data, which Dart uses to plan catchup seeks.
+     * [onResult] runs on the main thread.
+     */
+    fun seekWindow(onResult: (String?) -> Unit) {
+        scope.launch {
+            val state = mutex.withLock { player?.let { stringProperty(it, "demuxer-cache-state") } }
+            mainHandler.post { onResult(state) }
+        }
+    }
 
     fun stop() = command("stop")
 

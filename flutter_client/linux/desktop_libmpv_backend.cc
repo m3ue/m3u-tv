@@ -1624,6 +1624,13 @@ FlMethodResponse* Load(FlValue* args) {
     api.set_option_string(handle, "demuxer-lavf-analyzeduration", "10");
     api.set_option_string(handle, "demuxer-lavf-probesize", "10000000");
   }
+  // A catchup timeline comes from the EPG, not the file, so skip FFmpeg reading the end of
+  // the file to estimate its duration, and let the probe rewind inside a larger stream
+  // buffer: a catchup open then costs one request to the provider instead of three.
+  if (BoolArg(args, "isCatchup", false)) {
+    api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
+    api.set_option_string(handle, "stream-buffer-size", "4MiB");
+  }
   std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   std::string headers = HeaderString(args);
@@ -1873,6 +1880,15 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
 #endif
   } else if (g_strcmp0(method, "getVideoAspectRatio") == 0) {
     g_autoptr(FlValue) result = VideoAspectRatioResult(player);
+    return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+  } else if (g_strcmp0(method, "seekWindow") == 0) {
+    // mpv's demuxer cache state, as JSON. Its `seekable-ranges` are the positions a seek
+    // reaches without fetching more data, which Dart uses to plan catchup seeks.
+    g_autoptr(FlValue) result = fl_value_new_map();
+    std::string state;
+    if (StringProperty(player, "demuxer-cache-state", &state)) {
+      fl_value_set_string_take(result, "cacheState", fl_value_new_string(state.c_str()));
+    }
     return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
   } else if (g_strcmp0(method, "dispose") == 0) {
     g_players.erase(it);

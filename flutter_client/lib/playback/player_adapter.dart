@@ -85,6 +85,29 @@ abstract class HdrToggleProvider {
   );
 }
 
+/// A [PlayerAdapter] that can report which stream positions it has buffered,
+/// so a seek can be planned around data the player already has. Implemented
+/// by the mpv backends, from mpv's demuxer cache (see `mpvSeekWindow`).
+// ignore: one_member_abstracts
+abstract class SeekWindowProvider {
+  /// Null when the backend can't tell right now (e.g. nothing loaded yet).
+  Future<PlaybackSeekWindow?> seekWindow();
+}
+
+/// The stream positions a seek can reach without the player fetching more
+/// data.
+class PlaybackSeekWindow {
+  const PlaybackSeekWindow(this.buffered);
+
+  /// Buffered ranges, on the open stream's own clock (the same one as the
+  /// playback position).
+  final List<({Duration start, Duration end})> buffered;
+
+  bool contains(Duration position) => buffered.any(
+    (range) => position >= range.start && position <= range.end,
+  );
+}
+
 /// A [PlayerAdapter] that Multiview can drive: one concurrently playable
 /// instance per grid tile, rendered via either [VideoTextureProvider] or
 /// [PlatformViewProvider]. [setVolume] mutes/unmutes a tile by audio focus
@@ -200,6 +223,7 @@ class PlaybackSource {
     this.title,
     this.startPosition = Duration.zero,
     this.isLive = false,
+    this.isCatchup = false,
     this.videoCodec,
     this.audioCodec,
     this.userAgent,
@@ -214,6 +238,11 @@ class PlaybackSource {
   final String? title;
   final Duration startPosition;
   final bool isLive;
+
+  /// A catchup (timeshift) programme. Its timeline comes from the EPG, so the
+  /// mpv backends skip work that only serves the file's own duration.
+  final bool isCatchup;
+
   final String? videoCodec;
   final String? audioCodec;
   final String? userAgent;
@@ -246,6 +275,7 @@ class PlaybackSource {
     String? title,
     Duration? startPosition,
     bool? isLive,
+    bool? isCatchup,
     String? videoCodec,
     String? audioCodec,
     String? userAgent,
@@ -260,6 +290,7 @@ class PlaybackSource {
       title: title ?? this.title,
       startPosition: startPosition ?? this.startPosition,
       isLive: isLive ?? this.isLive,
+      isCatchup: isCatchup ?? this.isCatchup,
       videoCodec: videoCodec ?? this.videoCodec,
       audioCodec: audioCodec ?? this.audioCodec,
       userAgent: userAgent ?? this.userAgent,

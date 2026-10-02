@@ -255,6 +255,7 @@ void main() {
           'title': 'Movie',
           'startPositionMs': 12000,
           'isLive': false,
+          'isCatchup': false,
           'userAgent': 'm3u-tv/windows-test',
           'headers': <String, String>{'Referer': 'https://provider.test'},
           'hdrEnabled': true,
@@ -296,6 +297,41 @@ void main() {
       final args = loadCall!.arguments as Map<Object?, Object?>;
       expect(args['hdrEnabled'], isFalse);
       expect(args['matchRefreshRate'], isTrue);
+
+      await backend.dispose();
+      await events.close();
+    });
+
+    test('load tells the native core when the source is catchup', () async {
+      final events = setupMockEvents();
+      MethodCall? loadCall;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            loadCall = call;
+            return <String, Object?>{
+              'ok': false,
+              'code': BackendUnavailableException.unavailableCode,
+              'error': 'no libmpv',
+            };
+          });
+
+      final backend = DesktopLibmpvBackend();
+      await expectLater(
+        backend.load(
+          const PlaybackSource(
+            uri: 'https://editor.test/timeshift/u/p/60/2026-10-01:20-00/1.ts',
+            isCatchup: true,
+          ),
+        ),
+        throwsA(isA<BackendUnavailableException>()),
+      );
+
+      expect(
+        (loadCall!.arguments as Map<Object?, Object?>)['isCatchup'],
+        isTrue,
+      );
+      // Nothing loaded, so there's no buffer to ask about.
+      expect(await backend.seekWindow(), isNull);
 
       await backend.dispose();
       await events.close();

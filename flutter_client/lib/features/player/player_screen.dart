@@ -272,6 +272,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _catchupStreamSeekable = false;
   bool _catchupReopenPending = false;
   int _catchupReopenGeneration = 0;
+  int _catchupSeekGeneration = 0;
 
   // The platform view stays mounted while a reopen swaps the stream. open()
   // clears the active adapter until the new load starts, and unmounting the
@@ -1081,6 +1082,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _catchupStreamSeekable = false;
     _catchupReopenPending = false;
     _catchupReopenGeneration++;
+    _catchupSeekGeneration++;
     _reopenPlatformView = null;
     _duration = _catchup?.duration ?? Duration.zero;
   }
@@ -1552,9 +1554,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
-    final catchup = _catchup;
-    if (catchup != null) {
-      _seekCatchup(catchup, clamped);
+    if (_catchup != null) {
+      unawaited(_seekCatchup(clamped));
       return;
     }
     setState(() => _currentPosition = clamped);
@@ -1562,15 +1563,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(clamped));
   }
 
-  /// Seeks inside the open timeshift stream when the target is close and the
-  /// stream can seek, otherwise reopens the programme at the target minute
-  /// (see [CatchupTimeline.planSeek]).
-  void _seekCatchup(CatchupTimeline catchup, Duration target) {
+  /// Seeks inside the open timeshift stream when the target is already
+  /// buffered (or, when the player can't say, close and seekable), otherwise
+  /// reopens the programme at the target minute (see
+  /// [CatchupTimeline.planSeek]).
+  Future<void> _seekCatchup(Duration target) async {
+    final from = _currentPosition;
+    final generation = ++_catchupSeekGeneration;
+    // A seek while a reopen is still loading supersedes it, and the old
+    // stream's buffer no longer applies.
+    final reopening = _catchupReopenPending;
+    final buffered = reopening ? null : await _catchupSeekWindow();
+    final catchup = _catchup;
+    if (_disposed ||
+        !mounted ||
+        catchup == null ||
+        generation != _catchupSeekGeneration) {
+      return;
+    }
     switch (catchup.planSeek(
       target,
-      from: _currentPosition,
-      // A seek while a reopen is still loading supersedes it.
-      streamSeekable: _catchupStreamSeekable && !_catchupReopenPending,
+      from: from,
+      streamSeekable: _catchupStreamSeekable && !reopening,
+      buffered: buffered,
     )) {
       case null:
         return;
@@ -1585,6 +1600,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
         );
         if (url == null) return;
         unawaited(_reopenCatchup(catchup.withStreamStart(start), url));
+    }
+  }
+
+  /// What the active player has buffered, when it can tell quickly. Null for
+  /// players that can't report it, an older native build without the call,
+  /// or no answer in time.
+  Future<PlaybackSeekWindow?> _catchupSeekWindow() async {
+    final provider = widget.orchestrator.activeSeekWindowProvider;
+    if (provider == null) return null;
+    try {
+      return await provider.seekWindow().timeout(
+        const Duration(milliseconds: 500),
+      );
+    } on Object {
+      return null;
     }
   }
 
