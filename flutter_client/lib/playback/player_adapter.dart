@@ -106,6 +106,26 @@ class PlaybackSeekWindow {
   bool contains(Duration position) => buffered.any(
     (range) => position >= range.start && position <= range.end,
   );
+
+  /// Where the buffered range that [playing] is in ends: the range the player
+  /// is still reading ahead into. Null when [playing] isn't buffered. A
+  /// reported playback position can trail the buffer report a little, so
+  /// positions within a second of a range count as inside it, and an empty
+  /// buffer counts as one that ends at the very start of the stream, where a
+  /// stream that has only just opened is.
+  Duration? bufferedEndAt(Duration playing) {
+    const slack = Duration(seconds: 1);
+    if (buffered.isEmpty) return playing <= slack ? Duration.zero : null;
+    Duration? end;
+    for (final range in buffered) {
+      if (playing >= range.start - slack &&
+          playing <= range.end + slack &&
+          (end == null || range.end > end)) {
+        end = range.end;
+      }
+    }
+    return end;
+  }
 }
 
 /// A [PlayerAdapter] that Multiview can drive: one concurrently playable

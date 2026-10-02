@@ -131,7 +131,7 @@ void main() {
         expect((seek! as CatchupInStreamSeek).streamPosition, min(2, 30));
       });
 
-      test('reopens a short seek past what is buffered', () {
+      test('waits for a target a short way past the buffer being played', () {
         final seek = reopened.planSeek(
           min(33, 20),
           from: min(33),
@@ -139,7 +139,61 @@ void main() {
           buffered: buffered,
         );
 
+        final wait = seek! as CatchupBufferWait;
+        expect(wait.streamPosition, min(3, 20));
+        expect(wait.bufferEnd, min(3));
+        // If the buffer doesn't get there in time, it reopens a minute on,
+        // since the target's own minute is where it's already playing.
+        expect(wait.reopen?.start, programStart.add(min(34)));
+      });
+
+      test('reopens a target more than a minute past the buffer', () {
+        final seek = reopened.planSeek(
+          min(34, 30),
+          from: min(33),
+          streamSeekable: true,
+          buffered: buffered,
+        );
+
         expect(seek, isA<CatchupReopen>());
+      });
+
+      test('reopens rather than waiting on a buffer it is not playing in', () {
+        final seek = reopened.planSeek(
+          min(31, 45),
+          from: min(31, 30),
+          streamSeekable: true,
+          buffered: PlaybackSeekWindow([
+            (start: Duration.zero, end: min(1)),
+            (start: min(2), end: min(3)),
+          ]),
+        );
+
+        expect(seek, isA<CatchupReopen>());
+      });
+
+      test('reopens a seek back past what is buffered without waiting', () {
+        final seek = reopened.planSeek(
+          min(30, 30),
+          from: min(32, 30),
+          streamSeekable: true,
+          buffered: PlaybackSeekWindow([(start: min(2), end: min(3))]),
+        );
+
+        expect(seek, isA<CatchupReopen>());
+      });
+
+      test('waits on a stream that has only just opened', () {
+        final seek = reopened.planSeek(
+          min(30, 10),
+          from: min(30),
+          streamSeekable: false,
+          buffered: const PlaybackSeekWindow([]),
+        );
+
+        final wait = seek! as CatchupBufferWait;
+        expect(wait.streamPosition, const Duration(seconds: 10));
+        expect(wait.bufferEnd, Duration.zero);
       });
 
       test('seeks in place inside the buffer even when the stream cannot '
