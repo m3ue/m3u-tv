@@ -838,7 +838,9 @@ class AppShellState extends ConsumerState<AppShell>
     _playerSessionId += 1;
     final newOrch =
         widget.playbackOrchestratorBuilder?.call() ??
-        buildPlaybackOrchestrator();
+        buildPlaybackOrchestrator(
+          streamSessionGateway: ref.read(streamSessionGatewayProvider),
+        );
     setState(() {
       _playerArgs = args;
       _playerOrchestrator = newOrch;

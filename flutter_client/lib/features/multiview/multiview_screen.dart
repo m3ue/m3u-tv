@@ -142,7 +142,10 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   void _openTile(Channel channel) {
     final playerId = 'multiview-${_nextPlayerSeq++}';
     final tile = _MultiviewTile(channel, playerId);
-    final built = buildMultiviewTilePlayer(playerId);
+    final built = buildMultiviewTilePlayer(
+      playerId,
+      streamSessionGateway: ref.read(streamSessionGatewayProvider),
+    );
     tile
       ..orchestrator = built.orchestrator
       ..backend = built.backend

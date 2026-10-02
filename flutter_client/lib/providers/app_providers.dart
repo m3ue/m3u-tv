@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
+import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
+import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -189,6 +191,19 @@ final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>(
 /// can read and update layout preferences without touching credentials.
 final viewSettingsServiceProvider = Provider<ViewSettingsService>((ref) {
   return ref.read(appStateControllerProvider).appState.viewSettingsService;
+});
+
+/// Shared by every player's orchestrator (full-screen and Multiview tiles) so
+/// each playback session's editor proxy stream is stopped as soon as the
+/// session ends.
+final streamSessionGatewayProvider = Provider<PlaybackStreamSessionGateway>((
+  ref,
+) {
+  final appState = ref.read(appStateControllerProvider).appState;
+  return EditorStreamSessionGateway(
+    serverBase: () => appState.xtreamService.credentials?.server,
+    stopPlayerStream: appState.stopPlayerStream,
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -395,6 +395,23 @@ class AppStateController extends ChangeNotifier {
     return _tvNotificationService.uploadLogs(credentials, report);
   }
 
+  /// Stops the editor proxy stream a player session opened as [clientId]
+  /// (see `EditorStreamSessionGateway`). No-op when not connected.
+  Future<void> stopPlayerStream({
+    required String type,
+    required int streamId,
+    required String clientId,
+  }) async {
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return;
+    await _tvNotificationService.stopPlayerStream(
+      credentials,
+      type: type,
+      streamId: streamId,
+      clientId: clientId,
+    );
+  }
+
   Future<void> markAllNotificationsRead() async {
     final credentials = authNotifier.credentials;
     if (credentials == null) return;

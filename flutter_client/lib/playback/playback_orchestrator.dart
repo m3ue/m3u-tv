@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:m3u_tv/playback/decoder_failure.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
@@ -20,6 +21,19 @@ abstract class PlaybackTranscodeGateway {
   });
 }
 
+/// Ties each opened source to a per-session client id the server can use to
+/// end that session's stream as soon as it's over (channel change, close)
+/// rather than waiting out its idle timeout. See [PlaybackOrchestrator.open].
+abstract class PlaybackStreamSessionGateway {
+  /// [source] carrying [clientId] (e.g. as a `client_id` query param), or
+  /// [source] itself when the server doesn't track sessions for it.
+  PlaybackSource attachClientId(PlaybackSource source, String clientId);
+
+  /// Tells the server the session that opened [source] as [clientId] has
+  /// ended. Best effort.
+  Future<void> releaseStream(PlaybackSource source, String clientId);
+}
+
 class TranscodeUnavailableException implements Exception {
   const TranscodeUnavailableException(this.message);
 
@@ -34,11 +48,13 @@ class PlaybackOrchestrator {
     required PlaybackPlatform platform,
     required Map<PlaybackBackend, PlayerAdapter> adapters,
     required PlaybackTranscodeGateway transcodeGateway,
+    PlaybackStreamSessionGateway? streamSessionGateway,
     Duration bufferingTimeout = const Duration(seconds: 15),
     Duration retryDelay = const Duration(milliseconds: 250),
   }) : _platform = platform,
        _adapters = Map<PlaybackBackend, PlayerAdapter>.unmodifiable(adapters),
        _transcodeGateway = transcodeGateway,
+       _streamSessionGateway = streamSessionGateway,
        _bufferingTimeout = bufferingTimeout,
        _retryDelay = retryDelay;
 
@@ -140,6 +156,7 @@ class PlaybackOrchestrator {
   final PlaybackPlatform _platform;
   final Map<PlaybackBackend, PlayerAdapter> _adapters;
   final PlaybackTranscodeGateway _transcodeGateway;
+  final PlaybackStreamSessionGateway? _streamSessionGateway;
   final Duration _bufferingTimeout;
   final Duration _retryDelay;
   final StreamController<PlaybackState> _stateController =
@@ -158,6 +175,7 @@ class PlaybackOrchestrator {
   PlaybackSource? _activeSource;
   TranscodeResponse? _activeServerTranscode;
   BroadcastSession? _activeBroadcast;
+  ({PlaybackSource source, String clientId})? _activeStreamSession;
   Timer? _bufferingTimer;
   int _activeRecoveryAttempts = 0;
   int _playbackGeneration = 0;
@@ -225,9 +243,10 @@ class PlaybackOrchestrator {
     await _cleanupSessions();
     if (!_isCurrentGeneration(generation)) return;
     _clearActiveAdapter();
+    final sessionSource = _beginStreamSession(source);
 
-    if (source.isLive) {
-      final rejection = await _preflightLiveStream(source.uri);
+    if (sessionSource.isLive) {
+      final rejection = await _preflightLiveStream(sessionSource.uri);
       if (!_isCurrentGeneration(generation)) return;
       if (rejection != null && rejection.isNotEmpty) {
         _emitError(
@@ -241,8 +260,33 @@ class PlaybackOrchestrator {
       }
     }
 
-    await _tryBackendsThenTranscode(_nativeBackends(), source, generation);
+    await _tryBackendsThenTranscode(
+      _nativeBackends(),
+      sessionSource,
+      generation,
+    );
   }
+
+  /// Tags [source] with a fresh client id via [PlaybackStreamSessionGateway].
+  /// Retries and backend fallbacks reuse the returned source, so one session
+  /// keeps one id; the next [open] or [stop] releases it (see
+  /// [_cleanupSessions]).
+  PlaybackSource _beginStreamSession(PlaybackSource source) {
+    final gateway = _streamSessionGateway;
+    if (gateway == null) return source;
+    final clientId = 'm3utv-${_randomHex(8)}';
+    final tagged = gateway.attachClientId(source, clientId);
+    if (identical(tagged, source)) return source;
+    _activeStreamSession = (source: tagged, clientId: clientId);
+    return tagged;
+  }
+
+  static final Random _random = Random.secure();
+
+  static String _randomHex(int bytes) => List<String>.generate(
+    bytes,
+    (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
 
   /// Walks [backends] in order via [_tryLoadBackend], falling through to
   /// server transcode if every one of them fails recoverably. Shared by
@@ -732,6 +776,28 @@ class PlaybackOrchestrator {
     _activeServerTranscode = null;
     if (serverTranscode != null) {
       await _stopServerTranscode(serverTranscode);
+    }
+    final streamSession = _activeStreamSession;
+    _activeStreamSession = null;
+    if (streamSession != null) {
+      await _releaseStreamSession(streamSession);
+    }
+  }
+
+  /// Bounded so an unreachable server can't hold up the next [open]; the
+  /// server's own idle timeout still cleans up if this doesn't land.
+  static const Duration _streamReleaseTimeout = Duration(seconds: 2);
+
+  Future<void> _releaseStreamSession(
+    ({PlaybackSource source, String clientId}) session,
+  ) async {
+    try {
+      await _streamSessionGateway!
+          .releaseStream(session.source, session.clientId)
+          .timeout(_streamReleaseTimeout);
+      _diagnostics.add('cleanup:stream-session:released:${session.clientId}');
+    } on Object catch (_) {
+      _diagnostics.add('cleanup:stream-session:failed:${session.clientId}');
     }
   }
 

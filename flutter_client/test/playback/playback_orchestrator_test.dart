@@ -899,6 +899,98 @@ void main() {
       },
     );
   });
+
+  group('stream sessions', () {
+    PlaybackOrchestrator sessionOrchestrator(
+      _FakePlayerAdapter adapter,
+      _FakeStreamSessionGateway sessions,
+    ) {
+      return PlaybackOrchestrator(
+        platform: PlaybackPlatform.android,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.androidExoPlayer: adapter,
+        },
+        transcodeGateway: _FakeTranscodeGateway(),
+        streamSessionGateway: sessions,
+      );
+    }
+
+    test(
+      'loads each source tagged with a fresh client id and releases it when the session ends',
+      () async {
+        final direct = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final sessions = _FakeStreamSessionGateway(log: direct.commands);
+        final orchestrator = sessionOrchestrator(direct, sessions);
+
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.stop();
+
+        final [first, second] = sessions.attached;
+        expect(first.clientId, matches(RegExp(r'^m3utv-[0-9a-f]{16}$')));
+        expect(second.clientId, isNot(first.clientId));
+        expect(sessions.released, <String>[first.clientId, second.clientId]);
+        // The previous session is released before the next source loads, so
+        // the server frees its stream before the new request arrives.
+        expect(
+          direct.commands.where(
+            (command) =>
+                command.startsWith('load:') || command.startsWith('release:'),
+          ),
+          <String>[
+            'load:${first.source.uri}',
+            'release:${first.clientId}',
+            'load:${second.source.uri}',
+            'release:${second.clientId}',
+          ],
+        );
+
+        await orchestrator.dispose();
+      },
+    );
+
+    test('a failed release does not block the next source', () async {
+      final direct = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final sessions = _FakeStreamSessionGateway(failRelease: true);
+      final orchestrator = sessionOrchestrator(direct, sessions);
+
+      await orchestrator.open(_source(isLive: false));
+      await orchestrator.open(_source(isLive: false));
+
+      expect(
+        direct.commands.where((command) => command.startsWith('load:')),
+        hasLength(2),
+      );
+      expect(
+        orchestrator.diagnostics,
+        contains(
+          'cleanup:stream-session:failed:${sessions.attached.first.clientId}',
+        ),
+      );
+
+      await orchestrator.dispose();
+    });
+
+    test('sources the gateway does not track load unchanged', () async {
+      final direct = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final sessions = _FakeStreamSessionGateway(tracks: false);
+      final orchestrator = sessionOrchestrator(direct, sessions);
+
+      await orchestrator.open(_source(isLive: false));
+      await orchestrator.stop();
+
+      expect(direct.commands, contains('load:${_source().uri}'));
+      expect(sessions.released, isEmpty);
+
+      await orchestrator.dispose();
+    });
+  });
 }
 
 StreamController<Map<String, Object?>> _setUpDesktopEvents(
@@ -1243,5 +1335,35 @@ class _FakePlayerAdapter implements PlayerAdapter {
   void _emit(PlaybackState state) {
     _state = state;
     _stateController.add(state);
+  }
+}
+
+class _FakeStreamSessionGateway implements PlaybackStreamSessionGateway {
+  _FakeStreamSessionGateway({
+    this.log,
+    this.tracks = true,
+    this.failRelease = false,
+  });
+
+  final List<String>? log;
+  final bool tracks;
+  final bool failRelease;
+  final List<({PlaybackSource source, String clientId})> attached =
+      <({PlaybackSource source, String clientId})>[];
+  final List<String> released = <String>[];
+
+  @override
+  PlaybackSource attachClientId(PlaybackSource source, String clientId) {
+    if (!tracks) return source;
+    final tagged = source.copyWith(uri: '${source.uri}?client_id=$clientId');
+    attached.add((source: tagged, clientId: clientId));
+    return tagged;
+  }
+
+  @override
+  Future<void> releaseStream(PlaybackSource source, String clientId) async {
+    log?.add('release:$clientId');
+    if (failRelease) throw StateError('editor unreachable');
+    released.add(clientId);
   }
 }
