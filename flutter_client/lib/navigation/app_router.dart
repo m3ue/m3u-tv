@@ -122,7 +122,9 @@ class SeriesDetailsArgs {
   final String seriesName;
 }
 
-PlaybackOrchestrator buildPlaybackOrchestrator() {
+PlaybackOrchestrator buildPlaybackOrchestrator({
+  PlaybackStreamSessionGateway? streamSessionGateway,
+}) {
   final platform = _playbackPlatformForCurrentTarget();
   final adapters = <PlaybackBackend, PlayerAdapter>{};
 
@@ -214,6 +216,7 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
     platform: platform,
     adapters: adapters,
     transcodeGateway: const _UnavailableTranscodeGateway(),
+    streamSessionGateway: streamSessionGateway,
     retryDelay: Duration.zero,
   );
 }
@@ -228,7 +231,10 @@ PlaybackOrchestrator buildPlaybackOrchestrator() {
 /// and Linux/Windows (the in-process libmpv backend) are multi-instance by
 /// design already, so `playerId` is unused there.
 ({PlaybackOrchestrator orchestrator, MultiviewBackend backend})
-buildMultiviewTilePlayer(String playerId) {
+buildMultiviewTilePlayer(
+  String playerId, {
+  PlaybackStreamSessionGateway? streamSessionGateway,
+}) {
   final platform = _playbackPlatformForCurrentTarget();
   final MultiviewBackend backend;
   final PlaybackBackend backendKind;
@@ -269,6 +275,7 @@ buildMultiviewTilePlayer(String playerId) {
     platform: platform,
     adapters: <PlaybackBackend, PlayerAdapter>{backendKind: backend},
     transcodeGateway: const _UnavailableTranscodeGateway(),
+    streamSessionGateway: streamSessionGateway,
     retryDelay: Duration.zero,
   );
   return (orchestrator: orchestrator, backend: backend);

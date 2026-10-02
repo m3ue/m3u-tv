@@ -281,6 +281,32 @@ class TvNotificationService {
     return '${map['auth'] ?? ''}';
   }
 
+  /// Asks the editor to stop the proxy stream this player session opened as
+  /// [clientId], instead of waiting out the proxy's idle timeout. Other
+  /// viewers of the same stream are left connected. [type] is
+  /// live/vod/catchup/series; [streamId] is the episode id for series.
+  Future<void> stopPlayerStream(
+    UserCredentials creds, {
+    required String type,
+    required int streamId,
+    required String clientId,
+  }) async {
+    final base = _baseUri(creds.server);
+    final u = Uri.encodeComponent(creds.username);
+    final p = Uri.encodeComponent(creds.password);
+    final uri = base.replace(
+      path: '${base.path}/api/tv/$u/$p/player-stream/stop',
+    );
+    await _post(uri, {
+      'type': type,
+      if (type == 'series')
+        'episode_id': '$streamId'
+      else
+        'stream_id': '$streamId',
+      'client_id': clientId,
+    });
+  }
+
   /// Uploads a Logs & Diagnostics report to the editor, which stores it
   /// against this install's Registered Devices row. Sends the same identity
   /// params as [fetchUnread] so the server can resolve (and upsert) the

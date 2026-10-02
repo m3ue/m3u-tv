@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -63,6 +64,19 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            // Opening a tile reads the session gateway, which otherwise needs
+            // a real AppStateController; this test has no editor to stop.
+            streamSessionGatewayProvider.overrideWith(
+              (_) => EditorStreamSessionGateway(
+                serverBase: () => null,
+                stopPlayerStream:
+                    ({
+                      required type,
+                      required streamId,
+                      required clientId,
+                    }) async {},
+              ),
+            ),
             multiviewChannelsProvider.overrideWith(
               (_) => const <Channel>[
                 Channel(
