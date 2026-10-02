@@ -1271,6 +1271,30 @@ class XtreamService {
     return '${c.server}/timeshift/${c.username}/${c.password}/$durationMinutes/$startText/$streamId.$extension';
   }
 
+  static final RegExp _timeshiftWindowPattern = RegExp(
+    r'/timeshift/([^/]+)/([^/]+)/\d+/[^/]+/',
+  );
+
+  /// Moves a [getCatchupStreamUrl] URL to a new [start] and [duration],
+  /// keeping everything else, including any proxy or profile query the
+  /// player appended. Null when [catchupUrl] isn't a timeshift URL.
+  String? catchupStreamUrlAt(
+    String catchupUrl,
+    DateTime start,
+    Duration duration,
+  ) {
+    final match = _timeshiftWindowPattern.firstMatch(catchupUrl);
+    if (match == null) return null;
+    final startText = _formatTimeshiftStart(
+      tz.TZDateTime.from(start, _serverLocation),
+    );
+    return catchupUrl.replaceRange(
+      match.start,
+      match.end,
+      '/timeshift/${match[1]}/${match[2]}/${duration.inMinutes}/$startText/',
+    );
+  }
+
   String getVodStreamUrl(int streamId, [String extension = 'mp4']) {
     final c = _requireCredentials();
     return '${c.server}/movie/${c.username}/${c.password}/$streamId.$extension';
