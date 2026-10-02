@@ -285,8 +285,17 @@ class PlaybackOrchestrator {
 
   Future<void> play() => _requireActiveAdapter().play();
   Future<void> pause() => _requireActiveAdapter().pause();
-  Future<void> seek(Duration position) =>
-      _requireActiveAdapter().seek(position);
+
+  /// When [approximate] is set and the active backend supports it, seeks by
+  /// byte offset (see [ApproximateSeekProvider]); otherwise an exact seek.
+  Future<void> seek(Duration position, {bool approximate = false}) {
+    final adapter = _requireActiveAdapter();
+    if (approximate && adapter is ApproximateSeekProvider) {
+      return (adapter as ApproximateSeekProvider).seekApproximate(position);
+    }
+    return adapter.seek(position);
+  }
+
   Future<void> setAudioTrack(String? trackId) =>
       _requireActiveAdapter().setAudioTrack(trackId);
   Future<void> setSubtitleTrack(String? trackId) =>

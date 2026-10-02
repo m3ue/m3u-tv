@@ -372,6 +372,50 @@ void main() {
       await events.close();
     });
 
+    test('seekApproximate flags the seek command as approximate', () async {
+      final events = setupMockEvents();
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            calls.add(call);
+            if (call.method == 'load') {
+              scheduleMicrotask(() {
+                events.add(<String, Object?>{
+                  'schemaVersion': 1,
+                  'handle': 41,
+                  'sequence': 0,
+                  'kind': 'FILE_LOADED',
+                });
+              });
+              return <String, Object?>{
+                'ok': true,
+                'handle': 41,
+                'textureId': 4100,
+              };
+            }
+            return null;
+          });
+
+      final backend = DesktopLibmpvBackend();
+      await backend.load(
+        const PlaybackSource(uri: 'https://example.test/timeshift.ts'),
+      );
+      await backend.seekApproximate(const Duration(minutes: 20));
+      await backend.seek(const Duration(minutes: 20));
+      await backend.dispose();
+
+      final seeks = calls.where((call) => call.method == 'seek').toList();
+      expect(seeks.map((call) => call.arguments), <Object?>[
+        <String, Object?>{
+          'handle': 41,
+          'positionMs': 1200000,
+          'approximate': true,
+        },
+        <String, Object?>{'handle': 41, 'positionMs': 1200000},
+      ]);
+      await events.close();
+    });
+
     test(
       'dispose during a pending load releases the returned handle without publishing after close',
       () async {

@@ -32,6 +32,7 @@ class DesktopLibmpvBackend
         VideoTextureProvider,
         NativePlaneProvider,
         HdrToggleProvider,
+        ApproximateSeekProvider,
         MultiviewBackend {
   DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _channel = channel ?? const MethodChannel(_methodChannelName),
@@ -253,6 +254,14 @@ class DesktopLibmpvBackend
   Future<void> seek(Duration position) async {
     await _invokeControl('seek', <String, Object?>{
       'positionMs': position.inMilliseconds,
+    });
+  }
+
+  @override
+  Future<void> seekApproximate(Duration position) async {
+    await _invokeControl('seek', <String, Object?>{
+      'positionMs': position.inMilliseconds,
+      'approximate': true,
     });
   }
 

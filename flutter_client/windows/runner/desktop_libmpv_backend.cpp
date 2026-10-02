@@ -1785,9 +1785,20 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
     player->api->command(player->handle, command);
   } else if (method == "seek") {
     const double seconds = static_cast<double>(IntArg(args, "positionMs")) / 1000.0;
-    const std::string value = std::to_string(seconds);
-    const char* command[] = {"seek", value.c_str(), "absolute", nullptr};
-    player->api->command(player->handle, command);
+    // An approximate seek jumps by byte offset (absolute-percent) instead of
+    // mpv's timestamp search. On an unindexed MPEG-TS over HTTP (catchup) the
+    // timestamp search issues a Range request per probe -- often 5-20 per
+    // seek against a slow-to-respond provider -- where a byte seek needs one.
+    double duration = 0.0;
+    if (BoolArg(args, "approximate", false) && DoubleProperty(player, "duration", &duration)) {
+      const std::string percent = std::to_string(std::clamp(seconds / duration * 100.0, 0.0, 100.0));
+      const char* command[] = {"seek", percent.c_str(), "absolute-percent", nullptr};
+      player->api->command(player->handle, command);
+    } else {
+      const std::string value = std::to_string(seconds);
+      const char* command[] = {"seek", value.c_str(), "absolute", nullptr};
+      player->api->command(player->handle, command);
+    }
   } else if (method == "stop") {
     const char* command[] = {"stop", nullptr};
     player->api->command(player->handle, command);

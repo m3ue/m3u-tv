@@ -1438,6 +1438,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // locally - same pattern as _SeekBar._adjustScrub's dpad-focused scrubbing
   // - and only commits a single real seek once the repeats go quiet.
   static const Duration _skipStep = Duration(seconds: 10);
+  static const Duration _approximateSeekThreshold = Duration(seconds: 60);
   static const Duration _skipCommitDebounce = Duration(milliseconds: 700);
   Duration? _skipScrubPosition;
   Timer? _skipCommitTimer;
@@ -1503,9 +1504,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
+    // Catchup is one unindexed MPEG-TS over HTTP: an exact seek far from the
+    // buffered data costs a Range request per timestamp probe (often 10s+ on
+    // slow providers). Big jumps trade accuracy for a single byte seek; short
+    // skips stay exact since they usually land in already-buffered data.
+    final approximate =
+        widget.args.type == 'catchup' &&
+        (clamped - _currentPosition).abs() > _approximateSeekThreshold;
     setState(() => _currentPosition = clamped);
     _reportProgress(clamped);
-    unawaited(widget.orchestrator.seek(clamped));
+    unawaited(widget.orchestrator.seek(clamped, approximate: approximate));
   }
 
   void _handleAudioTrackSelected(String? trackId) {

@@ -85,6 +85,16 @@ abstract class HdrToggleProvider {
   );
 }
 
+/// A [PlayerAdapter] that can jump to a rough position by byte offset
+/// instead of an exact timestamp search. On an unindexed MPEG-TS served over
+/// HTTP (catchup) the exact search costs one Range request per probe, while a
+/// byte seek costs one in total -- at the price of landing wherever that byte
+/// offset falls in time. Implemented by `DesktopLibmpvBackend` only.
+// ignore: one_member_abstracts
+abstract class ApproximateSeekProvider {
+  Future<void> seekApproximate(Duration position);
+}
+
 /// A [PlayerAdapter] that Multiview can drive: one concurrently playable
 /// instance per grid tile, rendered via either [VideoTextureProvider] or
 /// [PlatformViewProvider]. [setVolume] mutes/unmutes a tile by audio focus

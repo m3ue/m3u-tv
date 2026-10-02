@@ -898,6 +898,60 @@ void main() {
         await orchestrator.dispose();
       },
     );
+
+    test(
+      'approximate seeks use the backend byte seek when it supports one',
+      () async {
+        final direct = _ApproximateSeekPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: direct,
+          },
+          transcodeGateway: _FakeTranscodeGateway(),
+        );
+
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.seek(
+          const Duration(minutes: 20),
+          approximate: true,
+        );
+        await orchestrator.seek(const Duration(minutes: 21));
+
+        expect(direct.commands.skip(1), <String>[
+          'approx-seek:1200',
+          'seek:1260',
+        ]);
+
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
+      'approximate seeks fall back to an exact seek on other backends',
+      () async {
+        final direct = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: direct,
+          },
+          transcodeGateway: _FakeTranscodeGateway(),
+        );
+
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.seek(
+          const Duration(minutes: 20),
+          approximate: true,
+        );
+
+        expect(direct.commands.skip(1), <String>['seek:1200']);
+
+        await orchestrator.dispose();
+      },
+    );
   });
 }
 
@@ -1243,5 +1297,15 @@ class _FakePlayerAdapter implements PlayerAdapter {
   void _emit(PlaybackState state) {
     _state = state;
     _stateController.add(state);
+  }
+}
+
+class _ApproximateSeekPlayerAdapter extends _FakePlayerAdapter
+    implements ApproximateSeekProvider {
+  _ApproximateSeekPlayerAdapter({required super.capabilities});
+
+  @override
+  Future<void> seekApproximate(Duration position) async {
+    commands.add('approx-seek:${position.inSeconds}');
   }
 }
