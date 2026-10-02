@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/connection_form.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
+import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
@@ -1056,6 +1059,61 @@ void main() {
         find.widgetWithText(AppButton, 'Upload to server'),
       );
       expect(upload.onPressed, isNull);
+    });
+
+    testWidgets('lines up with the other settings sub-pages on a phone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_testApp(const SizedBox()));
+      final context = tester.element(find.byType(SizedBox));
+
+      unawaited(
+        pushSettingsSubpage<void>(
+          context,
+          title: (_) => 'Regular',
+          builder: (_) => const SettingsCard(child: Text('regular')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final regular = tester.getRect(find.byType(SettingsCard));
+      Navigator.of(context, rootNavigator: true).pop();
+      await tester.pumpAndSettle();
+
+      unawaited(
+        pushSettingsSubpageFullHeight<void>(
+          context,
+          title: (_) => 'Diagnostics',
+          builder: (_) => DiagnosticsScreen(
+            loadHeader: () async => 'HEADER',
+            buffer: bufferWith(['something happened']),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final device = tester.getRect(
+        find.ancestor(
+          of: find.text('HEADER'),
+          matching: find.byType(SettingsCard),
+        ),
+      );
+      expect(device.left, regular.left);
+      expect(device.right, regular.right);
+      expect(
+        tester
+            .getTopLeft(find.widgetWithText(AppButton, 'Upload to server'))
+            .dx,
+        regular.left,
+      );
+      // Log lines get the same card inset as the device header text.
+      expect(
+        tester.getTopLeft(find.textContaining('something happened')).dx,
+        tester.getTopLeft(find.text('HEADER')).dx,
+      );
     });
 
     testWidgets('clear empties the log list', (tester) async {
