@@ -4415,6 +4415,7 @@ void main() {
       WidgetTester tester, {
       Duration? streamDuration,
       FakePlayerAdapter? player,
+      PlaybackStreamSessionGateway? streamSessionGateway,
       VoidCallback? onClose,
     }) async {
       final adapter =
@@ -4429,6 +4430,7 @@ void main() {
           PlaybackBackend.desktopLibmpv: adapter,
         },
         transcodeGateway: FakeTranscodeGateway(),
+        streamSessionGateway: streamSessionGateway,
       );
       addTearDown(orchestrator.dispose);
 
@@ -4560,7 +4562,80 @@ void main() {
       expect(adapter.loadCalls, hasLength(2));
       expect(closed, 0);
     });
+
+    testWidgets('keeps the native view mounted while a reopen swaps the '
+        'stream', (tester) async {
+      final viewCalls = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform_views,
+        (call) async {
+          viewCalls.add(call.method);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform_views,
+          null,
+        ),
+      );
+      final adapter = await pumpCatchup(
+        tester,
+        player: _PlatformViewAdapter(),
+        streamSessionGateway: _SlowReleaseGateway(),
+      );
+      await tester.pump();
+      expect(viewCalls.where((method) => method == 'create'), hasLength(1));
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      // Frames keep building while the old session's release is in flight
+      // and open() has no active adapter.
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // Remounting would make the native side re-create its player core and
+      // tear down the one the new load went to.
+      expect(adapter.loadCalls, hasLength(2));
+      expect(viewCalls.where((method) => method == 'create'), hasLength(1));
+      expect(viewCalls, isNot(contains('dispose')));
+
+      // Closing the player releases the session too; let that finish.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 3));
+    });
   });
+}
+
+/// Renders through a native platform view, like the mpv and ExoPlayer
+/// backends.
+class _PlatformViewAdapter extends FakePlayerAdapter
+    implements PlatformViewProvider {
+  _PlatformViewAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv);
+
+  @override
+  String get platformViewType => 'm3u_tv/test_player_view';
+
+  @override
+  Map<String, dynamic>? get platformViewCreationParams => <String, dynamic>{
+    'viewId': 1,
+  };
+
+  @override
+  Future<void> releaseNativeView() async {}
+}
+
+/// Tags editor URLs like the real gateway and takes as long to release a
+/// session as the editor's stop call does.
+class _SlowReleaseGateway implements PlaybackStreamSessionGateway {
+  @override
+  PlaybackSource attachClientId(PlaybackSource source, String clientId) =>
+      source.copyWith(uri: '${source.uri}&client_id=$clientId');
+
+  @override
+  Future<void> releaseStream(PlaybackSource source, String clientId) =>
+      Future<void>.delayed(const Duration(milliseconds: 150));
 }
 
 /// Reports `completed` when stopped, as mpv's end-file for a `stop` did on

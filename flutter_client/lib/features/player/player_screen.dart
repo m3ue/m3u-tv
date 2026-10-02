@@ -273,6 +273,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _catchupReopenPending = false;
   int _catchupReopenGeneration = 0;
 
+  // The platform view stays mounted while a reopen swaps the stream. open()
+  // clears the active adapter until the new load starts, and unmounting the
+  // view in that gap makes the native side re-create its player core when
+  // the view comes back, tearing down the core the new load was sent to.
+  PlatformViewProvider? _reopenPlatformView;
+
   bool get _isLive => widget.args.type == 'live';
   bool get _canSeek => !_isLive && _duration > Duration.zero;
   bool get _isSeries => widget.args.type == 'series';
@@ -1075,6 +1081,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _catchupStreamSeekable = false;
     _catchupReopenPending = false;
     _catchupReopenGeneration++;
+    _reopenPlatformView = null;
     _duration = _catchup?.duration ?? Duration.zero;
   }
 
@@ -1589,6 +1596,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     setState(() {
       _catchup = timeline;
       _catchupReopenPending = true;
+      _reopenPlatformView =
+          widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
       _currentPosition = timeline.positionOf(Duration.zero);
     });
     _startLoadingTimeout();
@@ -1596,7 +1605,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_disposed || !mounted || generation != _catchupReopenGeneration) {
       return;
     }
-    setState(() => _catchupReopenPending = false);
+    setState(() {
+      _catchupReopenPending = false;
+      _reopenPlatformView = null;
+    });
   }
 
   void _handleAudioTrackSelected(String? trackId) {
@@ -1856,9 +1868,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       child: _videoSurfaceReady
                           ? NativeVideoSurface(
                               textureId: widget.orchestrator.activeTextureId,
-                              platformView: widget
-                                  .orchestrator
-                                  .activePlatformViewProvider,
+                              platformView:
+                                  widget
+                                      .orchestrator
+                                      .activePlatformViewProvider ??
+                                  _reopenPlatformView,
                               nativePlane:
                                   widget.orchestrator.activeNativePlaneProvider,
                               aspectRatio: _videoAspectRatio,
