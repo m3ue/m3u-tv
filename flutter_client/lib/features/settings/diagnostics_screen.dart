@@ -151,112 +151,123 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     );
     final canUpload = widget.onUpload != null;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              AppButton(
-                label: _uploading
-                    ? l.diagnosticsUploading
-                    : l.diagnosticsUpload,
-                icon: Icons.cloud_upload_outlined,
-                variant: AppButtonVariant.primary,
-                focusNode: _uploadFocusNode,
-                autofocus: true,
-                loading: _uploading,
-                onPressed: canUpload ? () => unawaited(_upload()) : null,
+    // No outer padding: the settings sub-page scaffold already insets every
+    // page by 24, so the buttons and cards line up with the other pages.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            AppButton(
+              label: _uploading ? l.diagnosticsUploading : l.diagnosticsUpload,
+              icon: Icons.cloud_upload_outlined,
+              variant: AppButtonVariant.primary,
+              focusNode: _uploadFocusNode,
+              autofocus: true,
+              loading: _uploading,
+              onPressed: canUpload ? () => unawaited(_upload()) : null,
+            ),
+            AppButton(
+              label: l.diagnosticsRefresh,
+              icon: Icons.refresh,
+              onPressed: () => unawaited(_refresh()),
+            ),
+            AppButton(
+              label: l.diagnosticsClear,
+              icon: Icons.delete_outline,
+              onPressed: _clear,
+            ),
+            if (!canUpload)
+              Text(
+                l.diagnosticsNotConnected,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              AppButton(
-                label: l.diagnosticsRefresh,
-                icon: Icons.refresh,
-                onPressed: () => unawaited(_refresh()),
-              ),
-              AppButton(
-                label: l.diagnosticsClear,
-                icon: Icons.delete_outline,
-                onPressed: _clear,
-              ),
-              if (!canUpload)
-                Text(
-                  l.diagnosticsNotConnected,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+          ],
+        ),
+        // The first section header carries its own top spacing.
+        Expanded(
+          child: DpadFocusable(
+            focusNode: _paneFocusNode,
+            autoScroll: false,
+            tapToSelect: false,
+            onDirection: _onDirection,
+            builder: (context, state, child) => Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: state.focused,
+              child: child,
+            ),
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SettingsSectionHeader(l.diagnosticsDeviceHeading),
+                ),
+                SliverToBoxAdapter(
+                  child: SettingsCard(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Text(_header ?? '', style: mono),
+                    ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: DpadFocusable(
-              focusNode: _paneFocusNode,
-              autoScroll: false,
-              tapToSelect: false,
-              onDirection: _onDirection,
-              builder: (context, state, child) => Scrollbar(
-                controller: _scrollController,
-                thumbVisibility: state.focused,
-                child: child,
-              ),
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: SettingsSectionHeader(l.diagnosticsDeviceHeading),
+                SliverToBoxAdapter(
+                  child: SettingsSectionHeader(
+                    l.diagnosticsLogsHeading(_entries.length),
                   ),
+                ),
+                if (_entries.isEmpty)
                   SliverToBoxAdapter(
                     child: SettingsCard(
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Text(_header ?? '', style: mono),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SettingsSectionHeader(
-                      l.diagnosticsLogsHeading(_entries.length),
-                    ),
-                  ),
-                  if (_entries.isEmpty)
-                    SliverToBoxAdapter(
-                      child: SettingsCard(
-                        child: Text(
-                          l.diagnosticsNoLogs,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                      child: Text(
+                        l.diagnosticsNoLogs,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    )
-                  else
-                    // Newest first: what led up to the problem is on top.
-                    SliverList.builder(
-                      itemCount: _entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = _entries[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            entry.format(),
-                            style: entry.level == AppLogLevel.error
-                                ? mono?.copyWith(color: theme.colorScheme.error)
-                                : mono,
-                          ),
-                        );
-                      },
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                ],
-              ),
+                  )
+                else
+                  // The same card as [SettingsCard] (which the empty state
+                  // uses), built as slivers so the list stays lazy.
+                  DecoratedSliver(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(
+                        kSettingsGroupRadius,
+                      ),
+                    ),
+                    sliver: SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      // Newest first: what led up to the problem is on top.
+                      sliver: SliverList.builder(
+                        itemCount: _entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = _entries[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(
+                              entry.format(),
+                              style: entry.level == AppLogLevel.error
+                                  ? mono?.copyWith(
+                                      color: theme.colorScheme.error,
+                                    )
+                                  : mono,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
