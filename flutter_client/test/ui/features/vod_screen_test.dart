@@ -907,6 +907,89 @@ void main() {
       ]);
     });
 
+    testWidgets(
+      'applies when the dialog closes, never reloading the grid behind it',
+      (tester) async {
+        final service = ViewSettingsService();
+        await service.setRememberMediaSort(true);
+        final repo = await _buildRepo(tester, items);
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: categories,
+            favoritesService: favorites,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.sort));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Favorites First'));
+        await tester.pumpAndSettle();
+
+        // Still open, and the grid behind it is untouched (a reload there
+        // rebuilds the autofocus card, which can steal the dialog's focus).
+        expect(find.text('Sort Movies By'), findsOneWidget);
+        expect(gridTitles(tester), [
+          'CCCC Unrated',
+          'DDDD Third',
+          'AAAA Highest',
+          'BBBB Mid',
+        ]);
+        expect(await service.vodFavoritesFirst(), isTrue);
+
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'BBBB Mid',
+          'CCCC Unrated',
+          'DDDD Third',
+        ]);
+        expect(await service.vodFavoritesFirst(), isFalse);
+      },
+    );
+
+    testWidgets('flipping it off and back on before closing changes nothing', (
+      tester,
+    ) async {
+      final memory = <String, Object?>{};
+      final service = ViewSettingsService(memory: memory);
+      await service.setRememberMediaSort(true);
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+          viewSettingsService: service,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Favorites First'));
+      await tester.pump();
+      await tester.tap(find.text('Favorites First'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), [
+        'CCCC Unrated',
+        'DDDD Third',
+        'AAAA Highest',
+        'BBBB Mid',
+      ]);
+      expect(
+        memory.containsKey(ViewSettingsService.vodFavoritesFirstKey),
+        isFalse,
+      );
+    });
+
     testWidgets('combines with the chosen sort within each group', (
       tester,
     ) async {

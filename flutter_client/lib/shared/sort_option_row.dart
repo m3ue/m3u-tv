@@ -61,9 +61,9 @@ class SortOptionRow extends StatelessWidget {
 
 /// The "Favorites First" switch at the top of both "Sort By" modals. Unlike
 /// a [SortOptionRow] it flips in place instead of closing the dialog, and
-/// reports each flip through [onChanged] immediately, so it applies on its
-/// own and combines with whichever sort option is then picked (or none, if
-/// the dialog is dismissed).
+/// reports each flip through [onChanged]. The screens apply the final state
+/// once the dialog closes, combined with whichever sort option was picked
+/// (or none, if the dialog was dismissed).
 class FavoritesFirstSortRow extends StatefulWidget {
   const FavoritesFirstSortRow({
     super.key,

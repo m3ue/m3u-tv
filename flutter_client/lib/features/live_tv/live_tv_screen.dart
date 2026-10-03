@@ -908,20 +908,27 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (service != null) remember = await service.rememberMediaSort();
     if (!mounted || !context.mounted) return;
 
+    var favoritesFirst = _favoritesFirst;
     final selected = await showChannelSortDialog(
       context,
       current: _sortOption,
-      favoritesFirst: _favoritesFirst,
-      onFavoritesFirstChanged: (value) {
-        if (!mounted) return;
-        setState(() => _favoritesFirst = value);
-        if (remember) unawaited(service!.setLiveTvFavoritesFirst(value));
-      },
+      favoritesFirst: favoritesFirst,
+      // Applied once the dialog closes, same as VOD/Series, so the list never
+      // rebuilds behind the open dialog.
+      onFavoritesFirstChanged: (value) => favoritesFirst = value,
     );
-    if (selected == null || !mounted) return;
-    setState(() => _sortOption = selected);
+    if (!mounted) return;
+    final favoritesFirstChanged = favoritesFirst != _favoritesFirst;
+    if (selected == null && !favoritesFirstChanged) return;
+    setState(() {
+      _sortOption = selected ?? _sortOption;
+      _favoritesFirst = favoritesFirst;
+    });
     if (!remember) return;
-    unawaited(service!.setLiveTvSortOption(selected));
+    if (selected != null) unawaited(service!.setLiveTvSortOption(selected));
+    if (favoritesFirstChanged) {
+      unawaited(service!.setLiveTvFavoritesFirst(favoritesFirst));
+    }
   }
 
   Widget _buildListView(List<Channel> channels, Set<int> recordingChannelIds) {

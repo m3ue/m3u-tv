@@ -1913,6 +1913,8 @@ void main() {
         await tester.tap(find.text('Favorites First'));
         await tester.pumpAndSettle();
         expect(find.text('Sort Channels By'), findsOneWidget);
+        // Not applied behind the open dialog, only once it closes.
+        expect(listTitles(tester), ['ESPN', 'BBC One', 'CNN']);
         await tester.tap(find.text('Cancel'));
         await tester.pumpAndSettle();
 

@@ -508,23 +508,30 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     final remember = await service.rememberMediaSort();
     if (!mounted || !context.mounted) return;
 
+    var favoritesFirst = _favoritesFirst;
     final selected = await showMediaSortDialog(
       context,
       title: AppLocalizations.of(context).vodSortDialogTitle,
       current: _sortOption,
-      favoritesFirst: _favoritesFirst,
-      onFavoritesFirstChanged: (value) {
-        if (!mounted) return;
-        setState(() => _favoritesFirst = value);
-        _reconfigureWindow();
-        if (remember) unawaited(service.setVodFavoritesFirst(value));
-      },
+      favoritesFirst: favoritesFirst,
+      // Applied once the dialog closes rather than per flip: reloading the
+      // grid behind the open dialog rebuilds its autofocus card, which can
+      // pull focus out from under the dialog.
+      onFavoritesFirstChanged: (value) => favoritesFirst = value,
     );
 
-    if (selected == null || !mounted) return;
-    setState(() => _sortOption = selected);
+    if (!mounted) return;
+    final favoritesFirstChanged = favoritesFirst != _favoritesFirst;
+    if (selected == null && !favoritesFirstChanged) return;
+    setState(() {
+      _sortOption = selected ?? _sortOption;
+      _favoritesFirst = favoritesFirst;
+    });
     _reconfigureWindow();
     if (!remember) return;
-    unawaited(service.setVodSortOption(selected));
+    if (selected != null) unawaited(service.setVodSortOption(selected));
+    if (favoritesFirstChanged) {
+      unawaited(service.setVodFavoritesFirst(favoritesFirst));
+    }
   }
 }
