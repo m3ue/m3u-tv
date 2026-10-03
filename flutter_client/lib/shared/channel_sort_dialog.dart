@@ -73,7 +73,7 @@ Future<ChannelSortOption?> showChannelSortDialog(
                   ),
                 SortOptionRow(
                   icon: Icons.close,
-                  label: l.cancel,
+                  label: l.close,
                   onTap: () => Navigator.of(dialogContext).pop(),
                 ),
               ],

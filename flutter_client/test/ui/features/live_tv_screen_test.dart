@@ -1915,7 +1915,7 @@ void main() {
         expect(find.text('Sort Channels By'), findsOneWidget);
         // Not applied behind the open dialog, only once it closes.
         expect(listTitles(tester), ['ESPN', 'BBC One', 'CNN']);
-        await tester.tap(find.text('Cancel'));
+        await tester.tap(find.text('Close'));
         await tester.pumpAndSettle();
 
         expect(listTitles(tester), ['BBC One', 'CNN', 'ESPN']);

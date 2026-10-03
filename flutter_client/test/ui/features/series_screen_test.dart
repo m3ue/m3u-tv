@@ -403,7 +403,7 @@ void main() {
     }
 
     testWidgets(
-      'tapping Sort opens the sort menu with Default, Rating, Cancel',
+      'tapping Sort opens the sort menu with Default, Rating, Close',
       (tester) async {
         final repo = await _buildRepo(tester, sortItems);
         await tester.pumpWidget(
@@ -417,7 +417,7 @@ void main() {
         expect(find.text('Sort Series By'), findsOneWidget);
         expect(find.text('Default'), findsOneWidget);
         expect(find.text('Rating'), findsOneWidget);
-        expect(find.text('Cancel'), findsOneWidget);
+        expect(find.text('Close'), findsOneWidget);
       },
     );
 
@@ -571,7 +571,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Favorites First'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
+      await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
 
       expect(gridTitles(tester), ['AAAA First', 'BBBB Second', 'CCCC Third']);

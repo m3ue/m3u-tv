@@ -469,7 +469,7 @@ void main() {
     }
 
     testWidgets(
-      'tapping Sort opens the sort menu with Default, Rating, Cancel',
+      'tapping Sort opens the sort menu with Default, Rating, Close',
       (tester) async {
         final repo = await _buildRepo(tester, sortItems);
         await tester.pumpWidget(
@@ -486,7 +486,7 @@ void main() {
         expect(find.text('Sort Movies By'), findsOneWidget);
         expect(find.text('Default'), findsOneWidget);
         expect(find.text('Rating'), findsOneWidget);
-        expect(find.text('Cancel'), findsOneWidget);
+        expect(find.text('Close'), findsOneWidget);
       },
     );
 
@@ -859,7 +859,7 @@ void main() {
       await tester.pumpAndSettle();
       // The switch flips in place rather than closing the dialog.
       expect(find.text('Sort Movies By'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
+      await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
     }
 
@@ -939,7 +939,7 @@ void main() {
         ]);
         expect(await service.vodFavoritesFirst(), isTrue);
 
-        await tester.tap(find.text('Cancel'));
+        await tester.tap(find.text('Close'));
         await tester.pumpAndSettle();
 
         expect(gridTitles(tester), [
@@ -975,7 +975,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('Favorites First'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
+      await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
 
       expect(gridTitles(tester), [
