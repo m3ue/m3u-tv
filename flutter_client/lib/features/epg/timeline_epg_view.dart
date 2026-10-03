@@ -21,6 +21,7 @@ import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 
@@ -1062,73 +1063,83 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
         onSelect: _activateCursor,
         onLongSelect: _hasLongPress ? _openCursorOptions : null,
         onFocusChange: _onGridFocusChange,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: SingleChildScrollView(
-                controller: hCtrl,
-                scrollDirection: Axis.horizontal,
-                physics: const ClampingScrollPhysics(),
-                child: SizedBox(
-                  width: m.channelColumnWidth + totalWidth,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        height: m.rulerHeight,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: m.channelColumnWidth,
-                              top: 0,
-                              bottom: 0,
-                              width: totalWidth,
-                              child: _TimeRuler(
-                                windowStart: _windowStart,
-                                windowEnd: _windowEnd,
-                                pxPerMinute: m.pxPerMinute,
+        // Desktop mouse users get hover arrows for paging through time,
+        // kept clear of the pinned channel column and the ruler; TV / phone
+        // pass straight through.
+        child: HoverScrollArrows(
+          controller: hCtrl,
+          viewportInsets: EdgeInsets.only(
+            left: m.channelColumnWidth,
+            top: m.rulerHeight,
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: SingleChildScrollView(
+                  controller: hCtrl,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: SizedBox(
+                    width: m.channelColumnWidth + totalWidth,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: m.rulerHeight,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                left: m.channelColumnWidth,
+                                top: 0,
+                                bottom: 0,
+                                width: totalWidth,
+                                child: _TimeRuler(
+                                  windowStart: _windowStart,
+                                  windowEnd: _windowEnd,
+                                  pxPerMinute: m.pxPerMinute,
+                                ),
                               ),
-                            ),
-                            Positioned(
-                              left: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: m.channelColumnWidth,
-                              child: _PinnedToViewport(
-                                controller: hCtrl,
-                                child: _RulerCorner(now: _now),
+                              Positioned(
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: m.channelColumnWidth,
+                                child: _PinnedToViewport(
+                                  controller: hCtrl,
+                                  child: _RulerCorner(now: _now),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          controller: _vCtrl,
-                          itemCount: widget.channels.length,
-                          itemExtent: m.rowHeight,
-                          scrollCacheExtent: ScrollCacheExtent.pixels(
-                            m.rowHeight * 10,
+                            ],
                           ),
-                          itemBuilder: (context, index) =>
-                              _buildRow(context, index, m, totalWidth),
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          child: ListView.builder(
+                            controller: _vCtrl,
+                            itemCount: widget.channels.length,
+                            itemExtent: m.rowHeight,
+                            scrollCacheExtent: ScrollCacheExtent.pixels(
+                              m.rowHeight * 10,
+                            ),
+                            itemBuilder: (context, index) =>
+                                _buildRow(context, index, m, totalWidth),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: _NowLine(
-                  controller: hCtrl,
-                  metrics: m,
-                  nowOffset: _minutesFromStart(_now) * m.pxPerMinute,
-                  totalWidth: totalWidth,
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _NowLine(
+                    controller: hCtrl,
+                    metrics: m,
+                    nowOffset: _minutesFromStart(_now) * m.pxPerMinute,
+                    totalWidth: totalWidth,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

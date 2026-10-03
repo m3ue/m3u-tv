@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:m3u_tv/shared/dpad_tab_bar.dart' show isDesktopPlatform;
@@ -19,6 +21,7 @@ class HoverScrollArrows extends StatefulWidget {
     required this.controller,
     required this.child,
     this.viewportFraction = 0.8,
+    this.viewportInsets = EdgeInsets.zero,
   });
 
   /// Must be the SAME controller the wrapped scrollable is driven by.
@@ -28,6 +31,11 @@ class HoverScrollArrows extends StatefulWidget {
 
   /// How far one arrow press travels, as a fraction of the viewport width.
   final double viewportFraction;
+
+  /// Parts of the viewport covered by pinned content (the EPG's channel
+  /// column): the arrows sit inside them, and a press travels a fraction of
+  /// the uncovered width only.
+  final EdgeInsets viewportInsets;
 
   @override
   State<HoverScrollArrows> createState() => _HoverScrollArrowsState();
@@ -85,11 +93,12 @@ class _HoverScrollArrowsState extends State<HoverScrollArrows> {
   void _nudge(int direction) {
     if (widget.controller.positions.length != 1) return;
     final position = widget.controller.position;
+    final visibleWidth = math.max<double>(
+      0,
+      position.viewportDimension - widget.viewportInsets.horizontal,
+    );
     final target =
-        (position.pixels +
-                direction *
-                    position.viewportDimension *
-                    widget.viewportFraction)
+        (position.pixels + direction * visibleWidth * widget.viewportFraction)
             .clamp(0.0, position.maxScrollExtent);
     widget.controller.animateTo(
       target,
@@ -115,12 +124,14 @@ class _HoverScrollArrowsState extends State<HoverScrollArrows> {
             widget.child,
             _EdgeArrow(
               alignment: Alignment.centerLeft,
+              insets: widget.viewportInsets,
               icon: Icons.chevron_left,
               visible: _hovering && _canLeft,
               onTap: () => _nudge(-1),
             ),
             _EdgeArrow(
               alignment: Alignment.centerRight,
+              insets: widget.viewportInsets,
               icon: Icons.chevron_right,
               visible: _hovering && _canRight,
               onTap: () => _nudge(1),
@@ -135,12 +146,14 @@ class _HoverScrollArrowsState extends State<HoverScrollArrows> {
 class _EdgeArrow extends StatelessWidget {
   const _EdgeArrow({
     required this.alignment,
+    required this.insets,
     required this.icon,
     required this.visible,
     required this.onTap,
   });
 
   final Alignment alignment;
+  final EdgeInsets insets;
   final IconData icon;
   final bool visible;
   final VoidCallback onTap;
@@ -149,6 +162,10 @@ class _EdgeArrow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Positioned.fill(
+      left: insets.left,
+      top: insets.top,
+      right: insets.right,
+      bottom: insets.bottom,
       child: Align(
         alignment: alignment,
         child: Padding(
@@ -165,6 +182,9 @@ class _EdgeArrow extends StatelessWidget {
                 elevation: 4,
                 child: InkWell(
                   onTap: onTap,
+                  // Mouse-only affordance: keep it out of D-pad / Tab
+                  // traversal, which the EPG grid doesn't fence off.
+                  canRequestFocus: false,
                   customBorder: const CircleBorder(),
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,

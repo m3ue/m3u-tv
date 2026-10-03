@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 
 void main() {
   final observesBerlinDst =
@@ -622,6 +625,58 @@ void main() {
 
       expect(_horizontalScrollOffset(tester), greaterThan(before));
     });
+
+    testWidgets(
+      'desktop hover arrows page through time clear of the channel column',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+        try {
+          final now = DateTime(2026, 7, 31, 12);
+          await pumpGuide(
+            tester,
+            clock: () => now,
+            channels: const [bbcOne],
+            epgService: EpgService(clock: () => now),
+          );
+
+          final gesture = await tester.createGesture(
+            kind: PointerDeviceKind.mouse,
+          );
+          await gesture.addPointer(
+            location: tester.getCenter(find.byType(TimelineEpgView)),
+          );
+          addTearDown(gesture.removePointer);
+          await tester.pumpAndSettle();
+
+          // The day toolbar has its own chevrons; the hover arrows are the
+          // ones inside the guide body.
+          final arrows = find.descendant(
+            of: find.byType(HoverScrollArrows),
+            matching: find.byType(InkWell),
+          );
+          expect(arrows, findsNWidgets(2));
+          // Logo-only channel column at 800px wide is 132px.
+          expect(tester.getRect(arrows.first).left, greaterThan(132));
+
+          final before = _horizontalScrollOffset(tester);
+          await tester.tap(arrows.last);
+          await tester.pumpAndSettle();
+
+          // 80% of the 668px programme area, not of the full 800px width.
+          expect(
+            _horizontalScrollOffset(tester) - before,
+            closeTo(0.8 * (800 - 132), 1),
+          );
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'epg-guide',
+            reason: 'the arrows never take focus from the grid',
+          );
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
 
     testWidgets('date controls traverse and activate with D-pad keys', (
       tester,
