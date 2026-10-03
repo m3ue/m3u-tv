@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import 'package:m3u_tv/playback/mpv_seek_window.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
@@ -32,6 +33,7 @@ class DesktopLibmpvBackend
         VideoTextureProvider,
         NativePlaneProvider,
         HdrToggleProvider,
+        SeekWindowProvider,
         MultiviewBackend {
   DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _channel = channel ?? const MethodChannel(_methodChannelName),
@@ -142,6 +144,7 @@ class DesktopLibmpvBackend
         'title': source.title,
         'startPositionMs': source.startPosition.inMilliseconds,
         'isLive': source.isLive,
+        'isCatchup': source.isCatchup,
         'userAgent': source.userAgent,
         'headers': source.headers,
         // Passed with the load so the native side has the right value before
@@ -311,6 +314,17 @@ class DesktopLibmpvBackend
     await _invokeControl('setHdrEnabled', <String, Object?>{
       'enabled': enabled,
     });
+  }
+
+  @override
+  Future<PlaybackSeekWindow?> seekWindow() async {
+    final handle = _handle;
+    if (handle == null) return null;
+    return mpvSeekWindow(
+      await _channel.invokeMapMethod<String, Object?>('seekWindow', {
+        'handle': handle,
+      }),
+    );
   }
 
   @override

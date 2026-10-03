@@ -4563,6 +4563,154 @@ void main() {
       expect(closed, 0);
     });
 
+    testWidgets('waits for the buffer to reach a short seek just past it', (
+      tester,
+    ) async {
+      final adapter = _BufferReportingAdapter(
+        const PlaybackSeekWindow([
+          (start: Duration.zero, end: Duration(minutes: 5, seconds: 5)),
+        ]),
+      );
+      await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: adapter,
+      );
+
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump();
+
+      // Held on screen, not sought yet: seeking past the buffer would start
+      // a timestamp search.
+      expect(find.text('5:10'), findsOneWidget);
+      expect(adapter.seekCalls, isEmpty);
+
+      for (final end in const [
+        Duration(minutes: 5, seconds: 7),
+        Duration(minutes: 5, seconds: 9),
+        Duration(minutes: 5, seconds: 11),
+      ]) {
+        adapter.window = PlaybackSeekWindow([(start: Duration.zero, end: end)]);
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+      await tester.pump();
+
+      expect(adapter.seekCalls, <Duration>[
+        const Duration(minutes: 5, seconds: 10),
+      ]);
+      expect(adapter.loadCalls, hasLength(1));
+    });
+
+    testWidgets('reopens a short seek past a buffer that is not filling', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: _BufferReportingAdapter(
+          const PlaybackSeekWindow([
+            (start: Duration.zero, end: Duration(minutes: 5, seconds: 5)),
+          ]),
+        ),
+      );
+
+      // Without the buffer report this 10 s skip would seek in place.
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(adapter.loadCalls, hasLength(1));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+
+      expect(adapter.seekCalls, isEmpty);
+      expect(
+        adapter.loadCalls.last.uri,
+        'https://editor.example/timeshift/demo/secret/54/2026-10-01:20-06/101.ts?proxy=true',
+      );
+    });
+
+    testWidgets('a skip while a reopen loads waits for the new stream '
+        'instead of opening another', (tester) async {
+      final adapter = _SlowLoadBufferAdapter();
+      await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: adapter,
+      );
+
+      final track = tester.getRect(
+        find.byKey(const Key('playback-seekbar-track')),
+      );
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.76, track.center.dy),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(adapter.loadCalls, hasLength(2));
+      expect(find.text('45:00'), findsOneWidget);
+
+      // Skipping on from the landing point while it loads.
+      await tester.tap(find.byIcon(Icons.forward_10));
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text('45:10'), findsOneWidget);
+      expect(adapter.loadCalls, hasLength(2));
+      expect(adapter.seekCalls, isEmpty);
+
+      // The new stream opens with a few seconds buffered, then fills.
+      adapter
+        ..window = const PlaybackSeekWindow([
+          (start: Duration.zero, end: Duration(seconds: 4)),
+        ])
+        ..finishLoad();
+      await tester.pump();
+      adapter.window = const PlaybackSeekWindow([
+        (start: Duration.zero, end: Duration(seconds: 7)),
+      ]);
+      await tester.pump(const Duration(milliseconds: 250));
+      adapter.window = const PlaybackSeekWindow([
+        (start: Duration.zero, end: Duration(seconds: 11)),
+      ]);
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump();
+
+      // Exactly 10 s into the new stream, with no third stream.
+      expect(adapter.loadCalls, hasLength(2));
+      expect(adapter.seekCalls, <Duration>[const Duration(seconds: 10)]);
+    });
+
+    testWidgets('seeks in place to a buffered target however far away', (
+      tester,
+    ) async {
+      final adapter = await pumpCatchup(
+        tester,
+        streamDuration: const Duration(minutes: 58),
+        player: _BufferReportingAdapter(
+          const PlaybackSeekWindow([
+            (start: Duration.zero, end: Duration(minutes: 50)),
+          ]),
+        ),
+      );
+
+      final track = tester.getRect(
+        find.byKey(const Key('playback-seekbar-track')),
+      );
+      await tester.tapAt(
+        Offset(track.left + track.width * 0.76, track.center.dy),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(adapter.loadCalls, hasLength(1));
+      expect(adapter.seekCalls, hasLength(1));
+      expect(
+        adapter.seekCalls.single.inMinutes,
+        45,
+        reason: 'the jump stays on the open stream',
+      );
+    });
+
     testWidgets('keeps the native view mounted while a reopen swaps the '
         'stream', (tester) async {
       final viewCalls = <String>[];
@@ -4605,6 +4753,49 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
   });
+}
+
+/// Reports its buffer, like the mpv backends do from mpv's demuxer cache.
+/// Tests move [window] on to show it filling.
+class _BufferReportingAdapter extends FakePlayerAdapter
+    implements SeekWindowProvider {
+  _BufferReportingAdapter(this.window)
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv, textureId: 42);
+
+  PlaybackSeekWindow window;
+
+  @override
+  Future<PlaybackSeekWindow?> seekWindow() async => window;
+}
+
+/// Reports its buffer, and holds every load after the first until
+/// [finishLoad], like a reopened stream that takes a while to open. It has
+/// no buffer to report while a load is pending.
+class _SlowLoadBufferAdapter extends _BufferReportingAdapter {
+  _SlowLoadBufferAdapter()
+    : super(
+        const PlaybackSeekWindow([
+          (start: Duration.zero, end: Duration(minutes: 5, seconds: 30)),
+        ]),
+      );
+
+  Completer<void>? _pendingLoad;
+
+  @override
+  Future<void> load(PlaybackSource source) async {
+    await super.load(source);
+    if (loadCalls.length == 1) return;
+    _pendingLoad = Completer<void>();
+    await _pendingLoad!.future;
+  }
+
+  void finishLoad() => _pendingLoad?.complete();
+
+  @override
+  Future<PlaybackSeekWindow?> seekWindow() async {
+    final pending = _pendingLoad;
+    return pending != null && !pending.isCompleted ? null : window;
+  }
 }
 
 /// Renders through a native platform view, like the mpv and ExoPlayer

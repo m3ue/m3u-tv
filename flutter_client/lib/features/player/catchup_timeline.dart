@@ -1,3 +1,5 @@
+import 'package:m3u_tv/playback/player_adapter.dart';
+
 /// How [CatchupTimeline.planSeek] reaches a programme position.
 sealed class CatchupSeek {
   const CatchupSeek();
@@ -20,6 +22,22 @@ final class CatchupReopen extends CatchupSeek {
   final Duration duration;
 }
 
+/// Wait for the player's buffer to reach [streamPosition], then seek there in
+/// place. The buffer the player is reading ahead into currently ends at
+/// [bufferEnd]. [reopen] is the way there if the buffer won't get there soon
+/// enough (null when there's nowhere to reopen to).
+final class CatchupBufferWait extends CatchupSeek {
+  const CatchupBufferWait({
+    required this.streamPosition,
+    required this.bufferEnd,
+    required this.reopen,
+  });
+
+  final Duration streamPosition;
+  final Duration bufferEnd;
+  final CatchupReopen? reopen;
+}
+
 /// A catchup programme's timeline, mapped onto the timeshift stream currently
 /// open for it.
 ///
@@ -28,7 +46,10 @@ final class CatchupReopen extends CatchupSeek {
 /// seek inside a timeshift stream costs a run of Range requests (ExoPlayer
 /// sends every one back through the editor's redirect), and a stream the
 /// proxy transcodes, or a provider serves without Range support, can't seek
-/// at all. Short seeks still seek in place when the stream can.
+/// at all. A seek stays in place when the target is already buffered, or,
+/// when the player can't report its buffer, when it's short and the stream
+/// can seek. A target a short way past the buffer is reached by waiting for
+/// the buffer to get there, which keeps it exact.
 class CatchupTimeline {
   CatchupTimeline({
     required this.programStart,
@@ -50,8 +71,13 @@ class CatchupTimeline {
     return CatchupTimeline(programStart: start, programEnd: end);
   }
 
-  /// The furthest a seek may travel and still seek inside the open stream.
+  /// The furthest a seek may travel and still seek inside the open stream,
+  /// when the player can't report what it has buffered.
   static const Duration reopenThreshold = Duration(minutes: 1);
+
+  /// The furthest past the buffer a target may be and still be worth waiting
+  /// for. Further out, a reopen lands closer than waiting would.
+  static const Duration bufferWaitLimit = Duration(minutes: 1);
 
   final DateTime programStart;
   final DateTime programEnd;
@@ -77,20 +103,47 @@ class CatchupTimeline {
 
   /// Plans a seek from programme position [from] to [target], or returns
   /// null when there is nowhere to go.
+  ///
+  /// [from] is where the open stream is playing. [buffered] is what its
+  /// player has buffered, when it can tell. A target inside it is reached in
+  /// place at any distance, and one up to [bufferWaitLimit] ahead of the
+  /// buffer being played waits for it (see [CatchupBufferWait]). Anything
+  /// else reopens, because seeking a timeshift stream outside its buffer
+  /// starts a timestamp search of many Range requests. Without [buffered], a
+  /// seek stays in place only when it's short and the stream can seek.
   CatchupSeek? planSeek(
     Duration target, {
     required Duration from,
     required bool streamSeekable,
+    PlaybackSeekWindow? buffered,
   }) {
     final to = _clamp(target);
     if (to == from) return null;
     final inStream = to - _streamOffset;
-    if (streamSeekable &&
+    final seekInPlace =
         !inStream.isNegative &&
-        (to - from).abs() <= reopenThreshold) {
-      return CatchupInStreamSeek(inStream);
-    }
+        (buffered != null
+            ? buffered.contains(inStream)
+            : streamSeekable && (to - from).abs() <= reopenThreshold);
+    if (seekInPlace) return CatchupInStreamSeek(inStream);
 
+    final reopen = _reopenAt(to, from: from);
+    if (buffered != null && to > from) {
+      final bufferEnd = buffered.bufferedEndAt(from - _streamOffset);
+      if (bufferEnd != null &&
+          inStream > bufferEnd &&
+          inStream - bufferEnd <= bufferWaitLimit) {
+        return CatchupBufferWait(
+          streamPosition: inStream,
+          bufferEnd: bufferEnd,
+          reopen: reopen,
+        );
+      }
+    }
+    return reopen;
+  }
+
+  CatchupReopen? _reopenAt(Duration to, {required Duration from}) {
     // Providers only take whole-minute starts, so the stream reopens at the
     // target's minute and plays from up to a minute early. A forward skip
     // that would floor back onto the current position moves on a minute

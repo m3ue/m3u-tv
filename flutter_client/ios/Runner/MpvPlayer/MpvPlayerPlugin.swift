@@ -57,6 +57,7 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
           title: args["title"] as? String,
           startPositionMs: (args["startPositionMs"] as? NSNumber)?.intValue ?? 0,
           isLive: args["isLive"] as? Bool ?? false,
+          isCatchup: args["isCatchup"] as? Bool ?? false,
           userAgent: args["userAgent"] as? String,
           headers: args["headers"] as? [String: String],
           externalSubtitles: Self.parseExternalSubtitles(args["externalSubtitles"])
@@ -73,6 +74,14 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       let positionMs = (args["positionMs"] as? NSNumber)?.intValue ?? 0
       core(for: viewId)?.seek(positionMs: positionMs)
       result(nil)
+    case "seekWindow":
+      guard let core = core(for: viewId) else {
+        result(nil)
+        return
+      }
+      core.seekWindow { state in
+        result(state.map { ["cacheState": $0] })
+      }
     case "stop":
       core(for: viewId)?.stop()
       result(nil)

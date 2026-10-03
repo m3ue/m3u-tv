@@ -196,6 +196,7 @@ final class MpvPlayerCore {
     title: String?,
     startPositionMs: Int,
     isLive: Bool,
+    isCatchup: Bool,
     userAgent: String?,
     headers: [String: String]?,
     externalSubtitles: [(uri: String, title: String?, language: String?)] = []
@@ -223,6 +224,12 @@ final class MpvPlayerCore {
       // VOD, not a behavior change.
       mpv_set_option_string(handle, "demuxer-lavf-analyzeduration", isLive ? "10" : "5")
       mpv_set_option_string(handle, "demuxer-lavf-probesize", isLive ? "10000000" : "5000000")
+      // A catchup timeline comes from the EPG, not the file, so skip FFmpeg reading the end
+      // of the file to estimate its duration, and let the probe rewind inside a larger
+      // stream buffer: a catchup open then costs one request to the provider instead of
+      // three. Reset for every other load, since this handle persists across loads.
+      mpv_set_option_string(handle, "demuxer-lavf-o", isCatchup ? "skip_estimate_duration_from_pts=1" : "")
+      mpv_set_option_string(handle, "stream-buffer-size", isCatchup ? "4MiB" : "128KiB")
       if let headers, !headers.isEmpty {
         let headerString = headers.map { "\($0.key): \($0.value)" }.joined(separator: ",")
         mpv_set_option_string(handle, "http-header-fields", headerString)
@@ -269,6 +276,18 @@ final class MpvPlayerCore {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }
       self.command(handle, ["seek", String(Double(positionMs) / 1000.0), "absolute"])
+    }
+  }
+
+  /// mpv's demuxer cache state, as JSON. Its `seekable-ranges` are the positions a seek
+  /// reaches without fetching more data, which Dart uses to plan catchup seeks.
+  func seekWindow(completion: @escaping (String?) -> Void) {
+    queue.async { [weak self] in
+      var state: String?
+      if let self, let handle = self.mpv {
+        state = self.stringProperty(handle, "demuxer-cache-state")
+      }
+      DispatchQueue.main.async { completion(state) }
     }
   }
 

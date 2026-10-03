@@ -120,6 +120,7 @@ class MpvPlayerPlugin(
                         uri = args["uri"] as? String ?: "",
                         startPositionMs = (args["startPositionMs"] as? Number)?.toInt() ?: 0,
                         isLive = args["isLive"] as? Boolean ?: false,
+                        isCatchup = args["isCatchup"] as? Boolean ?: false,
                         userAgent = args["userAgent"] as? String,
                         headers = headers,
                         externalSubtitles = parseExternalSubtitles(args["externalSubtitles"]),
@@ -139,6 +140,16 @@ class MpvPlayerPlugin(
             "seek" -> {
                 core(viewId)?.seek((args["positionMs"] as? Number)?.toInt() ?: 0)
                 result.success(null)
+            }
+            "seekWindow" -> {
+                val core = core(viewId)
+                if (core == null) {
+                    result.success(null)
+                    return
+                }
+                core.seekWindow { state ->
+                    result.success(state?.let { mapOf("cacheState" to it) })
+                }
             }
             "stop" -> {
                 core(viewId)?.stop()

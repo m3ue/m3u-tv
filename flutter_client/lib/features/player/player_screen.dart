@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpClient, HttpStatus, Platform;
 
+import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
@@ -267,11 +268,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // CatchupTimeline), so position and duration are mapped from whichever
   // timeshift stream is open for it. While a reopened stream loads, the old
   // stream's position reports no longer apply, so the landing point is held
-  // on screen until the new stream has opened.
+  // on screen until the new stream has opened. A seek's target is held on
+  // screen the same way while it waits for the buffer or for a reopen.
   CatchupTimeline? _catchup;
   bool _catchupStreamSeekable = false;
   bool _catchupReopenPending = false;
   int _catchupReopenGeneration = 0;
+  int _catchupSeekGeneration = 0;
+  Duration? _catchupSeekTarget;
+  // Last position the open stream reported, on its own clock.
+  Duration _catchupStreamPosition = Duration.zero;
 
   // The platform view stays mounted while a reopen swaps the stream. open()
   // clears the active adapter until the new load starts, and unmounting the
@@ -504,7 +510,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           !mounted ||
           !_isPlaying ||
           _isLive ||
-          _catchupReopenPending) {
+          _catchupReopenPending ||
+          _catchupSeekTarget != null) {
         return;
       }
       setState(() {
@@ -1081,6 +1088,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _catchupStreamSeekable = false;
     _catchupReopenPending = false;
     _catchupReopenGeneration++;
+    _catchupSeekGeneration++;
+    _catchupSeekTarget = null;
+    _catchupStreamPosition = Duration.zero;
     _reopenPlatformView = null;
     _duration = _catchup?.duration ?? Duration.zero;
   }
@@ -1174,7 +1184,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final catchup = _catchup;
     final Duration acceptedPosition;
     if (catchup != null) {
-      acceptedPosition = _catchupReopenPending
+      if (!_catchupReopenPending) _catchupStreamPosition = state.position;
+      acceptedPosition = _catchupReopenPending || _catchupSeekTarget != null
           ? _currentPosition
           : catchup.positionOf(state.position);
     } else {
@@ -1552,9 +1563,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
-    final catchup = _catchup;
-    if (catchup != null) {
-      _seekCatchup(catchup, clamped);
+    if (_catchup != null) {
+      _seekCatchup(clamped);
       return;
     }
     setState(() => _currentPosition = clamped);
@@ -1562,18 +1572,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.seek(clamped));
   }
 
-  /// Seeks inside the open timeshift stream when the target is close and the
-  /// stream can seek, otherwise reopens the programme at the target minute
-  /// (see [CatchupTimeline.planSeek]).
-  void _seekCatchup(CatchupTimeline catchup, Duration target) {
-    switch (catchup.planSeek(
-      target,
-      from: _currentPosition,
-      // A seek while a reopen is still loading supersedes it.
-      streamSeekable: _catchupStreamSeekable && !_catchupReopenPending,
-    )) {
-      case null:
+  // How long a catchup seek may wait for the buffer to reach its target
+  // before it reopens instead, and how often it checks.
+  static const Duration _catchupBufferWaitBudget = Duration(seconds: 5);
+  static const Duration _catchupBufferPollInterval = Duration(
+    milliseconds: 250,
+  );
+
+  /// Seeks the catchup programme to [target], holding it on screen until
+  /// it's reached. Only the newest seek acts, and a seek made while a reopen
+  /// is loading waits for that stream (see [_reopenCatchup]) instead of
+  /// opening another one.
+  void _seekCatchup(Duration target) {
+    final generation = ++_catchupSeekGeneration;
+    setState(() {
+      _catchupSeekTarget = target;
+      _currentPosition = target;
+    });
+    if (_catchupReopenPending) return;
+    unawaited(_settleCatchupSeek(generation));
+  }
+
+  /// Seeks inside the open timeshift stream when the target is already
+  /// buffered (or, when the player can't say, close and seekable), waits for
+  /// the buffer when the target is just past it and it's filling fast enough
+  /// to get there within [_catchupBufferWaitBudget], and otherwise reopens
+  /// the programme at the target minute (see [CatchupTimeline.planSeek]).
+  Future<void> _settleCatchupSeek(int generation) async {
+    final waited = clock.stopwatch()..start();
+    ({Duration at, Duration end})? firstSample;
+    while (true) {
+      final buffered = await _catchupSeekWindow();
+      final catchup = _catchup;
+      final target = _catchupSeekTarget;
+      if (_disposed ||
+          !mounted ||
+          catchup == null ||
+          target == null ||
+          generation != _catchupSeekGeneration) {
         return;
+      }
+      final plan = catchup.planSeek(
+        target,
+        from: catchup.positionOf(_catchupStreamPosition),
+        streamSeekable: _catchupStreamSeekable,
+        buffered: buffered,
+      );
+      if (plan case CatchupBufferWait(
+        :final streamPosition,
+        :final bufferEnd,
+      )) {
+        final sample = (at: waited.elapsed, end: bufferEnd);
+        firstSample ??= sample;
+        if (_bufferArrivesInTime(firstSample, sample, streamPosition)) {
+          await Future<void>.delayed(_catchupBufferPollInterval);
+          continue;
+        }
+      }
+      _catchupSeekTarget = null;
+      _applyCatchupSeek(catchup, target, plan);
+      return;
+    }
+  }
+
+  void _applyCatchupSeek(
+    CatchupTimeline catchup,
+    Duration target,
+    CatchupSeek? plan,
+  ) {
+    switch (plan) {
+      case null:
+        setState(
+          () => _currentPosition = catchup.positionOf(_catchupStreamPosition),
+        );
       case CatchupInStreamSeek(:final streamPosition):
         setState(() => _currentPosition = target);
         unawaited(widget.orchestrator.seek(streamPosition));
@@ -1585,17 +1656,62 @@ class _PlayerScreenState extends State<PlayerScreen> {
         );
         if (url == null) return;
         unawaited(_reopenCatchup(catchup.withStreamStart(start), url));
+      case CatchupBufferWait(:final reopen):
+        // The buffer won't get there in time.
+        _applyCatchupSeek(catchup, target, reopen);
+    }
+  }
+
+  /// Whether a buffer that ended at [first] and now ends at [latest], on the
+  /// stream clock, is on course to reach [target] within the wait budget.
+  /// It gets half a second to show it's filling at all.
+  static bool _bufferArrivesInTime(
+    ({Duration at, Duration end}) first,
+    ({Duration at, Duration end}) latest,
+    Duration target,
+  ) {
+    if (latest.at >= _catchupBufferWaitBudget) return false;
+    final measuredFor = latest.at - first.at;
+    final filled = latest.end - first.end;
+    if (filled <= Duration.zero) {
+      return measuredFor < const Duration(milliseconds: 500);
+    }
+    final remaining = target - latest.end;
+    final arrivesIn = Duration(
+      microseconds:
+          remaining.inMicroseconds *
+          measuredFor.inMicroseconds ~/
+          filled.inMicroseconds,
+    );
+    return latest.at + arrivesIn <= _catchupBufferWaitBudget;
+  }
+
+  /// What the active player has buffered, when it can tell quickly. Null for
+  /// players that can't report it, an older native build without the call,
+  /// or no answer in time.
+  Future<PlaybackSeekWindow?> _catchupSeekWindow() async {
+    final provider = widget.orchestrator.activeSeekWindowProvider;
+    if (provider == null) return null;
+    try {
+      return await provider.seekWindow().timeout(
+        const Duration(milliseconds: 500),
+      );
+    } on Object {
+      return null;
     }
   }
 
   /// Opens the programme's stream at [url] in place of the current one.
   /// `open()` ends the current stream session first, so the proxy drops the
-  /// old stream straight away, and a newer seek supersedes this one.
+  /// old stream straight away. A seek made while this loads is held until
+  /// the new stream has opened and then planned against it, so skipping
+  /// faster than streams open doesn't open one per skip.
   Future<void> _reopenCatchup(CatchupTimeline timeline, String url) async {
     final generation = ++_catchupReopenGeneration;
     setState(() {
       _catchup = timeline;
       _catchupReopenPending = true;
+      _catchupStreamPosition = Duration.zero;
       _reopenPlatformView =
           widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
       _currentPosition = timeline.positionOf(Duration.zero);
@@ -1609,6 +1725,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _catchupReopenPending = false;
       _reopenPlatformView = null;
     });
+    if (_catchupSeekTarget != null) {
+      unawaited(_settleCatchupSeek(_catchupSeekGeneration));
+    }
   }
 
   void _handleAudioTrackSelected(String? trackId) {

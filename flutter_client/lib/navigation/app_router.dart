@@ -93,6 +93,7 @@ class PlayerArgs {
           ? Duration(seconds: startPosition!.round())
           : Duration.zero,
       isLive: type == 'live',
+      isCatchup: type == 'catchup',
       videoCodec: videoCodec,
       audioCodec: audioCodec,
       userAgent: userAgent,
