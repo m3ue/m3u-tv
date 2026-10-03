@@ -155,6 +155,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const Duration _surfaceRotationMaxHold = Duration(milliseconds: 1000);
   bool _videoSurfaceReady = false;
   bool _sawPortraitBeforeSurface = false;
+  // Android only: the first source opens once the surface hold above ends -
+  // see [_openInitialSource].
+  bool _initialOpenPending = false;
   Timer? _videoSurfaceSettleTimer;
   Timer? _videoSurfaceMaxHoldTimer;
 
@@ -379,7 +382,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (mounted) setState(() {});
         });
     _resetCatchupTimeline(widget.args);
-    unawaited(_openSource(widget.args));
+    _openInitialSource();
     _startLoadingTimeout();
     _scheduleOverlayHide();
     unawaited(_initComskip(widget.args));
@@ -422,6 +425,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _videoSurfaceMaxHoldTimer?.cancel();
     if (_disposed || !mounted || _videoSurfaceReady) return;
     setState(() => _videoSurfaceReady = true);
+    if (_initialOpenPending) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openPendingInitialSource(),
+      );
+    }
+  }
+
+  // Android starts playback only once the player has drawn its own black
+  // placeholder and the surface hold has ended: the native load (ExoPlayer or
+  // mpv setup) runs on the platform thread, which Hybrid Composition also
+  // composites Flutter frames on, so opening on the first frame left this
+  // screen stuck half-drawn over the one it opened from until the stream had
+  // loaded. Other platforms open straight away.
+  void _openInitialSource() {
+    if (widget.orchestrator.platform != PlaybackPlatform.android) {
+      unawaited(_openSource(widget.args));
+      return;
+    }
+    _initialOpenPending = true;
+    if (_videoSurfaceReady) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openPendingInitialSource(),
+      );
+    }
+  }
+
+  void _openPendingInitialSource() {
+    if (!_initialOpenPending || _disposed || !mounted) return;
+    _initialOpenPending = false;
+    unawaited(_openSource(widget.args));
   }
 
   // For an open with no rotation to wait out. Android's Hybrid Composition
@@ -500,6 +533,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _resetCatchupTimeline(widget.args);
     });
 
+    _initialOpenPending = false;
     unawaited(_openSource(widget.args));
     _startLoadingTimeout();
     _scheduleOverlayHide();

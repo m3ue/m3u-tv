@@ -187,6 +187,7 @@ class PlaybackOrchestrator {
   Stream<PlaybackError> get onError => _errorController.stream;
   Stream<bool> get onNativePlaneCompositionChanged =>
       _nativePlaneController.stream;
+  PlaybackPlatform get platform => _platform;
   PlaybackBackend? get activeBackend => _activeBackend;
   bool get isNativePlaneActive {
     final adapter = _activeAdapter;

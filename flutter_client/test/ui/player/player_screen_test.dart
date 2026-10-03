@@ -1386,6 +1386,47 @@ void main() {
     );
 
     testWidgets(
+      'Android starts playback only after the player has drawn its placeholder',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.android,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/deferred.mkv',
+                title: 'Deferred Fixture',
+                type: 'vod',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        expect(adapter.loadCalls, isEmpty);
+
+        await tester.pump();
+        expect(adapter.loadCalls, isEmpty);
+
+        await tester.pump();
+        expect(adapter.loadCalls, hasLength(1));
+      },
+    );
+
+    testWidgets(
       'other platforms mount the video surface on the first frame',
       (tester) async {
         await pumpSurfaceFixture(tester);
@@ -2383,6 +2424,9 @@ void main() {
               ),
             ),
           );
+          await tester.pump();
+          // Android opens the source only once the player has drawn its
+          // placeholder, a frame later than the other platforms.
           await tester.pump();
 
           adapter.emitState(

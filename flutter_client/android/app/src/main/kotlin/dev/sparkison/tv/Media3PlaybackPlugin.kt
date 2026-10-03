@@ -27,6 +27,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.SubtitleView
@@ -280,7 +281,20 @@ class Media3PlaybackPlugin(
             .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
             .setUsage(C.USAGE_MEDIA)
             .build()
+        // An HDMI renegotiation mid-playback (an Auto Frame Rate switch, or
+        // an AVR link drop) briefly reports no passthrough support; the
+        // selection falls off the encoded audio track, and without this flag
+        // never re-picks it once capabilities return -- playback carries on
+        // silent until a track is chosen by hand. androidx/media#2258; Plezy's
+        // ExoPlayerCore sets the same flag for the same Shield behavior.
+        val trackSelector = DefaultTrackSelector(
+            context,
+            DefaultTrackSelector.Parameters.Builder(context)
+                .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
+                .build(),
+        )
         val player = ExoPlayer.Builder(context)
+            .setTrackSelector(trackSelector)
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory))
             .setAudioAttributes(audioAttributes, handleAudioFocus)
             .build()
