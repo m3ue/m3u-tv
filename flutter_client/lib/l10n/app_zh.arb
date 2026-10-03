@@ -873,6 +873,7 @@
   "mediaSortRating": "评分",
   "mediaSortReleaseDateNewest": "最新优先",
   "mediaSortReleaseDateOldest": "最早优先",
+  "mediaSortFavoritesFirst": "收藏优先",
   "liveTvSortDialogTitle": "频道排序方式",
   "channelSortPlaylistOrder": "播放列表顺序",
   "channelSortChannelNumber": "频道编号",

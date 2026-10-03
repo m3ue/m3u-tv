@@ -1848,6 +1848,80 @@ void main() {
       },
     );
   });
+
+  group('LiveTvScreen favorites first', () {
+    const channels = [
+      Channel(id: 1, name: 'BBC One', streamUrl: 'http://example.com/1'),
+      Channel(id: 2, name: 'CNN', streamUrl: 'http://example.com/2'),
+      Channel(id: 3, name: 'ESPN', streamUrl: 'http://example.com/3'),
+    ];
+
+    List<String> listTitles(WidgetTester tester) {
+      final knownNames = channels.map((channel) => channel.name).toSet();
+      return tester
+          .widgetList<Text>(find.byType(Text))
+          .where((text) => knownNames.contains(text.data))
+          .map((text) => text.data!)
+          .toList();
+    }
+
+    testWidgets(
+      'is on by default, and the player context follows the same order',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.add(3);
+        List<Channel>? reportedContext;
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: channels,
+            categories: const [],
+            favoritesService: favoritesService,
+            onChannelContextChanged: (context) => reportedContext = context,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(listTitles(tester), ['ESPN', 'BBC One', 'CNN']);
+
+        await tester.tap(find.text('BBC One'));
+        await tester.pumpAndSettle();
+        expect(reportedContext!.map((c) => c.id), [3, 1, 2]);
+      },
+    );
+
+    testWidgets(
+      'switching it off restores playlist order and persists when remembered',
+      (tester) async {
+        final favoritesService = FavoritesService();
+        await favoritesService.add(3);
+        final viewSettings = ViewSettingsService();
+        await viewSettings.setRememberMediaSort(true);
+
+        await tester.pumpWidget(
+          _TestApp(
+            channels: channels,
+            categories: const [],
+            favoritesService: favoritesService,
+            viewSettingsService: viewSettings,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.sort));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Favorites First'));
+        await tester.pumpAndSettle();
+        expect(find.text('Sort Channels By'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        expect(listTitles(tester), ['BBC One', 'CNN', 'ESPN']);
+        expect(await viewSettings.liveTvFavoritesFirst(), isFalse);
+        expect(await viewSettings.vodFavoritesFirst(), isTrue);
+      },
+    );
+  });
 }
 
 class _SlowPersistentJsonStore extends PersistentJsonStore {

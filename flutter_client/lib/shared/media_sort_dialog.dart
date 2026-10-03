@@ -7,11 +7,15 @@ import 'package:m3u_tv/shared/sort_option_row.dart';
 
 /// Shows the "Sort By" modal shared by every sortable media grid (VOD,
 /// Series). Returns the newly selected [MediaSortOption], or null if the
-/// dialog was dismissed (Cancel, back, tap outside) without one.
+/// dialog was dismissed (Cancel, back, tap outside) without one. The
+/// Favorites First switch reports through [onFavoritesFirstChanged] as it
+/// is flipped, independent of the return value.
 Future<MediaSortOption?> showMediaSortDialog(
   BuildContext context, {
   required String title,
   required MediaSortOption current,
+  required bool favoritesFirst,
+  required ValueChanged<bool> onFavoritesFirstChanged,
 }) {
   final l = AppLocalizations.of(context);
   final options = <(IconData, String, MediaSortOption)>[
@@ -45,6 +49,11 @@ Future<MediaSortOption?> showMediaSortDialog(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                FavoritesFirstSortRow(
+                  initialValue: favoritesFirst,
+                  onChanged: onFavoritesFirstChanged,
+                ),
+                const Divider(),
                 for (final (icon, label, option) in options)
                   SortOptionRow(
                     icon: icon,

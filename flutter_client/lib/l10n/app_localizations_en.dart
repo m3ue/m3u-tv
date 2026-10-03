@@ -1631,6 +1631,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mediaSortReleaseDateOldest => 'Oldest First';
 
   @override
+  String get mediaSortFavoritesFirst => 'Favorites First';
+
+  @override
   String get liveTvSortDialogTitle => 'Sort Channels By';
 
   @override

@@ -61,7 +61,8 @@ Future<void> main() async {
   }
   // Pre-load persisted view settings into the in-memory cache so the
   // synchronous getters (fontSizeSync, optimizeForSync, rememberMediaSortSync,
-  // vodSortOptionSync, seriesSortOptionSync, navigationSoundEnabledSync,
+  // vodSortOptionSync, seriesSortOptionSync, the *FavoritesFirstSync trio,
+  // navigationSoundEnabledSync,
   // volumeSync) return the correct values on the very first build - without
   // this, fontSizeSync defaults to AppFontSize.normal and the user's saved
   // choice is ignored until the settings screen opens and triggers an async
@@ -78,6 +79,9 @@ Future<void> main() async {
     appState.viewSettingsService.vodSortOption(),
     appState.viewSettingsService.seriesSortOption(),
     appState.viewSettingsService.liveTvSortOption(),
+    appState.viewSettingsService.vodFavoritesFirst(),
+    appState.viewSettingsService.seriesFavoritesFirst(),
+    appState.viewSettingsService.liveTvFavoritesFirst(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
   ]);

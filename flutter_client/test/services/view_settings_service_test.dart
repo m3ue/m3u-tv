@@ -75,6 +75,32 @@ void main() {
       },
     );
 
+    test(
+      'favorites-first defaults on and persists independently per screen',
+      () async {
+        expect(await service.vodFavoritesFirst(), isTrue);
+        expect(await service.seriesFavoritesFirst(), isTrue);
+        expect(await service.liveTvFavoritesFirst(), isTrue);
+
+        await service.setVodFavoritesFirst(false);
+        expect(await service.vodFavoritesFirst(), isFalse);
+        expect(await service.seriesFavoritesFirst(), isTrue);
+        expect(await service.liveTvFavoritesFirst(), isTrue);
+
+        await service.setLiveTvFavoritesFirst(false);
+        final recreated = ViewSettingsService(memory: memory);
+        expect(await recreated.vodFavoritesFirst(), isFalse);
+        expect(await recreated.seriesFavoritesFirst(), isTrue);
+        expect(await recreated.liveTvFavoritesFirst(), isFalse);
+      },
+    );
+
+    test('favorites-first sync getters default on before any load', () {
+      expect(service.vodFavoritesFirstSync, isTrue);
+      expect(service.seriesFavoritesFirstSync, isTrue);
+      expect(service.liveTvFavoritesFirstSync, isTrue);
+    });
+
     test('persists and restores VOD sort option', () async {
       for (final option in MediaSortOption.values) {
         await service.setVodSortOption(option);

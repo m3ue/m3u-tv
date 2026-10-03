@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
@@ -528,6 +529,56 @@ void main() {
       },
     );
   });
+
+  group('SeriesScreen favorites first', () {
+    const seriesList = [
+      Series(id: 1, name: 'AAAA First', categoryId: '30'),
+      Series(id: 2, name: 'BBBB Second', categoryId: '30'),
+      Series(id: 3, name: 'CCCC Third', categoryId: '30'),
+    ];
+    const categories = [Category(id: '30', name: 'Thriller')];
+
+    List<String> gridTitles(WidgetTester tester) {
+      final knownNames = seriesList.map((series) => series.name).toSet();
+      return tester
+          .widgetList<Text>(find.byType(Text))
+          .where((text) => knownNames.contains(text.data))
+          .map((text) => text.data!)
+          .toList();
+    }
+
+    testWidgets('is on by default and switches off independently of VOD', (
+      tester,
+    ) async {
+      final favorites = FavoritesService();
+      await favorites.add(3);
+      final service = ViewSettingsService();
+      await service.setRememberMediaSort(true);
+      final repo = await _buildRepo(tester, seriesList);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+          viewSettingsService: service,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), ['CCCC Third', 'AAAA First', 'BBBB Second']);
+
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Favorites First'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), ['AAAA First', 'BBBB Second', 'CCCC Third']);
+      expect(await service.seriesFavoritesFirst(), isFalse);
+      expect(await service.vodFavoritesFirst(), isTrue);
+    });
+  });
 }
 
 class _TestApp extends StatelessWidget {
@@ -538,6 +589,7 @@ class _TestApp extends StatelessWidget {
     this.useSidebarLayout = true,
     this.onSeriesSelect,
     this.viewSettingsService,
+    this.favoritesService,
   });
 
   final CatalogRepository catalogRepository;
@@ -546,6 +598,7 @@ class _TestApp extends StatelessWidget {
   final bool useSidebarLayout;
   final void Function(Series)? onSeriesSelect;
   final ViewSettingsService? viewSettingsService;
+  final FavoritesService? favoritesService;
 
   @override
   Widget build(BuildContext context) {
@@ -565,6 +618,7 @@ class _TestApp extends StatelessWidget {
         home: SeriesScreen(
           useSidebarLayout: useSidebarLayout,
           onSeriesSelect: onSeriesSelect ?? (_) {},
+          favoritesService: favoritesService,
         ),
       ),
     );

@@ -68,5 +68,27 @@ void main() {
         expect(sorted.map((c) => c.id), [3, 1, 2]);
       },
     );
+
+    test(
+      'favoritesFirst moves favorites ahead, each group keeping the sort',
+      () {
+        final sorted = sortChannels(
+          channels,
+          ChannelSortOption.alphabeticalAsc,
+          favoritesFirst: {1, 2},
+        );
+        // Favorites &TV, Zebra News (A-Z), then the rest (00s Replay).
+        expect(sorted.map((c) => c.id), [2, 1, 3]);
+      },
+    );
+
+    test('favoritesFirst also reorders playlist order', () {
+      final sorted = sortChannels(
+        channels,
+        ChannelSortOption.playlistOrder,
+        favoritesFirst: {3},
+      );
+      expect(sorted.map((c) => c.id), [3, 1, 2]);
+    });
   });
 }

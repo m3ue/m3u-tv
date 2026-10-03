@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 
@@ -792,6 +793,256 @@ void main() {
       },
     );
   });
+
+  // ---------------------------------------------------------------------
+  // Favorites First (Sort dialog switch, default on). Same four items as
+  // the sort group; CCCC (3) and DDDD (4) are favorited, so favorites-first
+  // provider order is CCCC -> DDDD -> AAAA -> BBBB.
+  // ---------------------------------------------------------------------
+  group('VodScreen favorites first', () {
+    const items = [
+      VodItem(
+        id: 1,
+        name: 'AAAA Highest',
+        streamUrl: 'http://example.com/1.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+        rating: 9,
+      ),
+      VodItem(
+        id: 2,
+        name: 'BBBB Mid',
+        streamUrl: 'http://example.com/2.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+        rating: 7,
+      ),
+      VodItem(
+        id: 3,
+        name: 'CCCC Unrated',
+        streamUrl: 'http://example.com/3.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+      ),
+      VodItem(
+        id: 4,
+        name: 'DDDD Third',
+        streamUrl: 'http://example.com/4.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+        rating: 8,
+      ),
+    ];
+    const categories = [Category(id: '20', name: 'Action')];
+
+    late FavoritesService favorites;
+
+    setUp(() async {
+      favorites = FavoritesService();
+      await favorites.add(3);
+      await favorites.add(4);
+    });
+
+    List<String> gridTitles(WidgetTester tester) {
+      final knownNames = items.map((item) => item.name).toSet();
+      return tester
+          .widgetList<Text>(find.byType(Text))
+          .where((text) => knownNames.contains(text.data))
+          .map((text) => text.data!)
+          .toList();
+    }
+
+    Future<void> toggleFavoritesFirst(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Favorites First'));
+      await tester.pumpAndSettle();
+      // The switch flips in place rather than closing the dialog.
+      expect(find.text('Sort Movies By'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('is on by default, floating favorites above the rest', (
+      tester,
+    ) async {
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), [
+        'CCCC Unrated',
+        'DDDD Third',
+        'AAAA Highest',
+        'BBBB Mid',
+      ]);
+    });
+
+    testWidgets('switching it off restores the plain sort order', (
+      tester,
+    ) async {
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await toggleFavoritesFirst(tester);
+
+      expect(gridTitles(tester), [
+        'AAAA Highest',
+        'BBBB Mid',
+        'CCCC Unrated',
+        'DDDD Third',
+      ]);
+    });
+
+    testWidgets('combines with the chosen sort within each group', (
+      tester,
+    ) async {
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rating'));
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), [
+        'DDDD Third', // favorite, 8
+        'CCCC Unrated', // favorite, unrated
+        'AAAA Highest', // 9
+        'BBBB Mid', // 7
+      ]);
+    });
+
+    testWidgets('a newly favorited movie moves up into the favorites group', (
+      tester,
+    ) async {
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('BBBB Mid'));
+      await tester.pumpAndSettle();
+      // The toggle -> favorites reload -> window refresh chain hits the
+      // repository, which needs a real async turn (see _buildRepo).
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), [
+        'BBBB Mid',
+        'CCCC Unrated',
+        'DDDD Third',
+        'AAAA Highest',
+      ]);
+    });
+
+    testWidgets(
+      'with rememberMediaSort true, switching it off persists across restart',
+      (tester) async {
+        final service = ViewSettingsService();
+        await service.setRememberMediaSort(true);
+        final repo = await _buildRepo(tester, items);
+        await tester.pumpWidget(
+          _TestApp(
+            key: const ValueKey('first'),
+            catalogRepository: repo,
+            categories: categories,
+            favoritesService: favorites,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await toggleFavoritesFirst(tester);
+        expect(await service.vodFavoritesFirst(), isFalse);
+        expect(await service.seriesFavoritesFirst(), isTrue);
+
+        await tester.pumpWidget(
+          _TestApp(
+            key: const ValueKey('second'),
+            catalogRepository: repo,
+            categories: categories,
+            favoritesService: favorites,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'AAAA Highest',
+          'BBBB Mid',
+          'CCCC Unrated',
+          'DDDD Third',
+        ]);
+      },
+    );
+
+    testWidgets(
+      'with rememberMediaSort false, switching it off resets to on at restart',
+      (tester) async {
+        final service = ViewSettingsService();
+        final repo = await _buildRepo(tester, items);
+        await tester.pumpWidget(
+          _TestApp(
+            key: const ValueKey('first'),
+            catalogRepository: repo,
+            categories: categories,
+            favoritesService: favorites,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await toggleFavoritesFirst(tester);
+        expect(await service.vodFavoritesFirst(), isTrue);
+
+        await tester.pumpWidget(
+          _TestApp(
+            key: const ValueKey('second'),
+            catalogRepository: repo,
+            categories: categories,
+            favoritesService: favorites,
+            viewSettingsService: service,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(gridTitles(tester), [
+          'CCCC Unrated',
+          'DDDD Third',
+          'AAAA Highest',
+          'BBBB Mid',
+        ]);
+      },
+    );
+  });
 }
 
 class _TestApp extends StatelessWidget {
@@ -803,6 +1054,7 @@ class _TestApp extends StatelessWidget {
     this.useSidebarLayout = true,
     this.onVodSelect,
     this.viewSettingsService,
+    this.favoritesService,
   });
 
   final CatalogRepository catalogRepository;
@@ -811,6 +1063,7 @@ class _TestApp extends StatelessWidget {
   final bool useSidebarLayout;
   final void Function(VodItem)? onVodSelect;
   final ViewSettingsService? viewSettingsService;
+  final FavoritesService? favoritesService;
 
   @override
   Widget build(BuildContext context) {
@@ -830,6 +1083,7 @@ class _TestApp extends StatelessWidget {
         home: VodScreen(
           useSidebarLayout: useSidebarLayout,
           onVodSelect: onVodSelect ?? (_) {},
+          favoritesService: favoritesService,
         ),
       ),
     );

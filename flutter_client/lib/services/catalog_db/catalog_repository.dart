@@ -53,6 +53,7 @@ class CatalogRepository {
     String? categoryId,
     String? search,
     CatalogSort sort = CatalogSort.providerOrder,
+    Set<int> favoritesFirst = const {},
     required int offset,
     required int limit,
   }) => pageItems<T>(
@@ -61,6 +62,7 @@ class CatalogRepository {
     categoryId: categoryId,
     search: search,
     sort: sort,
+    favoritesFirst: favoritesFirst,
     offset: offset,
     limit: limit,
   );
@@ -263,19 +265,29 @@ class CatalogRepository {
 
   /// A windowed slice of [kind], provider order, optionally filtered to
   /// [categoryId] and/or a case-insensitive [search] substring of the name,
-  /// ordered per [sort] (see [_orderingFor]).
+  /// ordered per [sort] (see [_orderingFor]). Rows whose id is in
+  /// [favoritesFirst] are ordered ahead of the rest, each group still in
+  /// [sort] order.
   Future<List<T>> pageItems<T>({
     required String sourceKey,
     required String kind,
     String? categoryId,
     String? search,
     CatalogSort sort = CatalogSort.providerOrder,
+    Set<int> favoritesFirst = const {},
     required int offset,
     required int limit,
   }) async {
     final query = _db.select(_db.catalogItems)
       ..where((t) => _itemFilter(t, sourceKey, kind, categoryId, search))
-      ..orderBy(_orderingFor(sort))
+      ..orderBy([
+        if (favoritesFirst.isNotEmpty)
+          (t) => OrderingTerm(
+            expression: t.streamId.isIn(favoritesFirst),
+            mode: OrderingMode.desc,
+          ),
+        ..._orderingFor(sort),
+      ])
       ..limit(limit, offset: offset);
     final rows = await query.get();
     return rows

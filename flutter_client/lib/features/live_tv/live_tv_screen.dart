@@ -172,6 +172,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   final Map<int, EpgCurrentNext?> _epgMap = {};
   _ViewMode _viewMode = _ViewMode.list;
   ChannelSortOption _sortOption = ChannelSortOption.playlistOrder;
+  bool _favoritesFirst = true;
   EpgStartView _epgStartView = EpgStartView.currentTime;
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   int _viewSettingsGeneration = 0;
@@ -201,6 +202,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     widget.favoritesService.addListener(_onFavoritesChanged);
     _attachViewSettingsListener();
     _sortOption = _initialSortOption();
+    _favoritesFirst = _initialFavoritesFirst();
     unawaited(_initCategory());
     widget.onBackHandlerReady?.call(_handleBackFromEpg);
     _showSearchController.addListener(_onShowSearchChanged);
@@ -223,6 +225,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       return ChannelSortOption.playlistOrder;
     }
     return service.liveTvSortOptionSync;
+  }
+
+  /// Favorites First's starting state: the persisted Live TV choice under
+  /// Filter Persistence, otherwise on. Sync for the same reason as
+  /// [_initialSortOption].
+  bool _initialFavoritesFirst() {
+    final service = widget.viewSettingsService;
+    if (service == null || !service.rememberMediaSortSync) return true;
+    return service.liveTvFavoritesFirstSync;
   }
 
   /// Back on a guide programme returns to its channel cell; from the
@@ -674,7 +685,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       );
     }
 
-    final filtered = sortChannels(_filteredChannels(channels), _sortOption);
+    final filtered = sortChannels(
+      _filteredChannels(channels),
+      _sortOption,
+      favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
+    );
     final channelsById = {for (final c in channels) c.id: c};
     _loadEpgForChannels(filtered, epgService);
     final l = AppLocalizations.of(context);
@@ -884,8 +899,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   /// Opens the shared Live TV "Sort By" modal. Mirrors VOD/Series'
-  /// `_showSortMenu`: always updates the local [_sortOption]; only writes
-  /// back to the service when persistence is currently on.
+  /// `_showSortMenu`: always updates the local [_sortOption]/
+  /// [_favoritesFirst]; only writes back to the service when persistence is
+  /// currently on.
   Future<void> _showSortMenu(BuildContext context) async {
     final service = widget.viewSettingsService;
     var remember = false;
@@ -895,6 +911,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final selected = await showChannelSortDialog(
       context,
       current: _sortOption,
+      favoritesFirst: _favoritesFirst,
+      onFavoritesFirstChanged: (value) {
+        if (!mounted) return;
+        setState(() => _favoritesFirst = value);
+        if (remember) unawaited(service!.setLiveTvFavoritesFirst(value));
+      },
     );
     if (selected == null || !mounted) return;
     setState(() => _sortOption = selected);

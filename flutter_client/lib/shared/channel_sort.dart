@@ -17,7 +17,27 @@ String channelSortButtonLabel(AppLocalizations l, ChannelSortOption option) =>
 /// Sorts the Live TV channel list/grid per [option]. Channels are a plain
 /// in-memory list (unlike VOD/Series' windowed SQL-backed catalog), so this
 /// sorts client-side rather than pushing an `ORDER BY` down to a repository.
-List<Channel> sortChannels(List<Channel> channels, ChannelSortOption option) {
+///
+/// Channels whose id is in [favoritesFirst] are moved ahead of the rest,
+/// each group keeping [option]'s order - the in-memory counterpart of
+/// `CatalogRepository.pageItems`' `favoritesFirst`.
+List<Channel> sortChannels(
+  List<Channel> channels,
+  ChannelSortOption option, {
+  Set<int> favoritesFirst = const {},
+}) {
+  final sorted = _sortChannelsBy(channels, option);
+  if (favoritesFirst.isEmpty) return sorted;
+  return [
+    ...sorted.where((channel) => favoritesFirst.contains(channel.id)),
+    ...sorted.where((channel) => !favoritesFirst.contains(channel.id)),
+  ];
+}
+
+List<Channel> _sortChannelsBy(
+  List<Channel> channels,
+  ChannelSortOption option,
+) {
   if (option == ChannelSortOption.playlistOrder) return channels;
   final list = channels.toList(growable: false);
   switch (option) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -74,6 +75,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
 
   Set<int> _favoriteIds = {};
   MediaSortOption _sortOption = MediaSortOption.defaultOrder;
+  bool _favoritesFirst = true;
   List<VodItem> _favoriteItems = const [];
   bool _favoritesLoadedOnce = false;
 
@@ -94,8 +96,9 @@ class _VodScreenState extends ConsumerState<VodScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadFavorites());
     _sortOption = _initialSortOption();
+    _favoritesFirst = _initialFavoritesFirst();
+    unawaited(_loadFavorites());
     _reconfigureWindow();
   }
 
@@ -113,6 +116,15 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     final service = ref.read(viewSettingsServiceProvider);
     if (!service.rememberMediaSortSync) return MediaSortOption.defaultOrder;
     return service.vodSortOptionSync;
+  }
+
+  /// Favorites First's starting state: the persisted VOD choice under Filter
+  /// Persistence, otherwise on. Sync for the same reason as
+  /// [_initialSortOption].
+  bool _initialFavoritesFirst() {
+    final service = ref.read(viewSettingsServiceProvider);
+    if (!service.rememberMediaSortSync) return true;
+    return service.vodFavoritesFirstSync;
   }
 
   @override
@@ -134,6 +146,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
           categoryId: categoryId,
           search: search,
           sort: catalogSortFor(_sortOption),
+          favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
           offset: offset,
           limit: limit,
         ),
@@ -187,13 +200,16 @@ class _VodScreenState extends ConsumerState<VodScreen> {
             kind: kCatalogKindVod,
             ids: ids,
           );
-    if (mounted) {
-      setState(() {
-        _favoriteIds = ids;
-        _favoriteItems = items;
-        _favoritesLoadedOnce = true;
-      });
-    }
+    if (!mounted) return;
+    final orderChanged = !setEquals(ids, _favoriteIds);
+    setState(() {
+      _favoriteIds = ids;
+      _favoriteItems = items;
+      _favoritesLoadedOnce = true;
+    });
+    // Also covers the first load: the grid doesn't wait on the favorites
+    // read, so the favorites move up in place once it resolves.
+    if (_favoritesFirst && orderChanged) unawaited(_window.refresh());
   }
 
   /// Applies [_sortOption] to the (already category/query-filtered)
@@ -485,8 +501,8 @@ class _VodScreenState extends ConsumerState<VodScreen> {
   /// .rememberMediaSort] fresh on each open so a change to the Settings
   /// toggle in another tab is honored on next open, then applies the user's
   /// selection (or no-op on dismiss): always updates the local
-  /// [_sortOption]; only writes back to the service when persistence is
-  /// currently on.
+  /// [_sortOption]/[_favoritesFirst]; only writes back to the service when
+  /// persistence is currently on.
   Future<void> _showSortMenu(BuildContext context) async {
     final service = ref.read(viewSettingsServiceProvider);
     final remember = await service.rememberMediaSort();
@@ -496,14 +512,19 @@ class _VodScreenState extends ConsumerState<VodScreen> {
       context,
       title: AppLocalizations.of(context).vodSortDialogTitle,
       current: _sortOption,
+      favoritesFirst: _favoritesFirst,
+      onFavoritesFirstChanged: (value) {
+        if (!mounted) return;
+        setState(() => _favoritesFirst = value);
+        _reconfigureWindow();
+        if (remember) unawaited(service.setVodFavoritesFirst(value));
+      },
     );
 
     if (selected == null || !mounted) return;
     setState(() => _sortOption = selected);
     _reconfigureWindow();
     if (!remember) return;
-    unawaited(
-      ref.read(viewSettingsServiceProvider).setVodSortOption(selected),
-    );
+    unawaited(service.setVodSortOption(selected));
   }
 }

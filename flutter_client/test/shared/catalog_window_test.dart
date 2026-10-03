@@ -130,6 +130,41 @@ void main() {
     },
   );
 
+  test(
+    'refresh re-reads resident pages in place without blanking them',
+    () async {
+      final source = _FakeSource(30);
+      final window = windowFor(source, pageSize: 10);
+      await window.load();
+      window.ensureVisible(10, 10, buffer: 0);
+      await Future<void>.delayed(Duration.zero);
+      expect(window.itemAt(15), 150);
+
+      final observed = <int?>[];
+      window.addListener(() => observed.add(window.itemAt(15)));
+      source.items.setAll(0, source.items.reversed.toList());
+      await window.refresh();
+
+      // Index 15 never went blank in between, and now holds the reordered row.
+      expect(observed, isNotEmpty);
+      expect(observed, isNot(contains(null)));
+      expect(window.itemAt(15), 140);
+      expect(window.itemAt(0), 290);
+      // Page 2 was never resident, so refresh doesn't pull it in.
+      expect(window.itemAt(25), isNull);
+    },
+  );
+
+  test('refresh before any load behaves like load', () async {
+    final window = windowFor(_FakeSource(5));
+
+    await window.refresh();
+
+    expect(window.hasLoadedOnce, isTrue);
+    expect(window.totalCount, 5);
+    expect(window.itemAt(0), 0);
+  });
+
   test('captures a fetch error and recovers on retry', () async {
     final source = _FakeSource(50)..failWith = StateError('boom');
     final window = windowFor(source);

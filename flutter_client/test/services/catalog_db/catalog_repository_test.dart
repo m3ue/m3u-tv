@@ -281,6 +281,42 @@ void main() {
         ]);
       },
     );
+
+    test(
+      'favoritesFirst floats favorites above the rest, each group in sort order',
+      () async {
+        final rows = await repo.pageItems<VodItem>(
+          sourceKey: 's1',
+          kind: kCatalogKindVod,
+          sort: CatalogSort.ratingDesc,
+          favoritesFirst: {2, 3, 99},
+          offset: 0,
+          limit: 50,
+        );
+        expect(rows.map((v) => v.name), [
+          'BBBB Mid', // favorite, rated
+          'CCCC Unrated', // favorite, unrated
+          'AAAA Highest',
+          'DDDD Third',
+        ]);
+      },
+    );
+
+    test('favoritesFirst pages consistently across offsets', () async {
+      Future<List<String>> page(int offset) async {
+        final rows = await repo.pageItems<VodItem>(
+          sourceKey: 's1',
+          kind: kCatalogKindVod,
+          favoritesFirst: {4},
+          offset: offset,
+          limit: 2,
+        );
+        return rows.map((v) => v.name).toList();
+      }
+
+      expect(await page(0), ['DDDD Third', 'AAAA Highest']);
+      expect(await page(2), ['BBBB Mid', 'CCCC Unrated']);
+    });
   });
 
   test('categories round-trip in provider order', () async {

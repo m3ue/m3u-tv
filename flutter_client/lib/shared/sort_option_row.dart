@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
@@ -51,6 +52,58 @@ class SortOptionRow extends StatelessWidget {
             ),
             if (isActive)
               Icon(Icons.check, color: colorScheme.primary, size: 24 * scale),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The "Favorites First" switch at the top of both "Sort By" modals. Unlike
+/// a [SortOptionRow] it flips in place instead of closing the dialog, and
+/// reports each flip through [onChanged] immediately, so it applies on its
+/// own and combines with whichever sort option is then picked (or none, if
+/// the dialog is dismissed).
+class FavoritesFirstSortRow extends StatefulWidget {
+  const FavoritesFirstSortRow({
+    super.key,
+    required this.initialValue,
+    required this.onChanged,
+  });
+
+  final bool initialValue;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  State<FavoritesFirstSortRow> createState() => _FavoritesFirstSortRowState();
+}
+
+class _FavoritesFirstSortRowState extends State<FavoritesFirstSortRow> {
+  late bool _value = widget.initialValue;
+
+  void _set(bool value) {
+    setState(() => _value = value);
+    widget.onChanged(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    return DpadInkWell(
+      onTap: () => _set(!_value),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: 4 * scale,
+          horizontal: 24 * scale,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.star, size: 20 * scale),
+            SizedBox(width: 12 * scale),
+            Expanded(
+              child: Text(AppLocalizations.of(context).mediaSortFavoritesFirst),
+            ),
+            Switch(value: _value, onChanged: _set),
           ],
         ),
       ),

@@ -10,9 +10,13 @@ import 'package:m3u_tv/shared/sort_option_row.dart';
 /// (playlist order / channel number / alphabetical) have nothing in common
 /// with VOD/Series' (rating / release date). Returns the newly selected
 /// [ChannelSortOption], or null if the dialog was dismissed without one.
+/// The Favorites First switch reports through [onFavoritesFirstChanged] as
+/// it is flipped, independent of the return value.
 Future<ChannelSortOption?> showChannelSortDialog(
   BuildContext context, {
   required ChannelSortOption current,
+  required bool favoritesFirst,
+  required ValueChanged<bool> onFavoritesFirstChanged,
 }) {
   final l = AppLocalizations.of(context);
   final options = <(IconData, String, ChannelSortOption)>[
@@ -54,6 +58,11 @@ Future<ChannelSortOption?> showChannelSortDialog(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                FavoritesFirstSortRow(
+                  initialValue: favoritesFirst,
+                  onChanged: onFavoritesFirstChanged,
+                ),
+                const Divider(),
                 for (final (icon, label, option) in options)
                   SortOptionRow(
                     icon: icon,

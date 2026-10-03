@@ -1584,6 +1584,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mediaSortReleaseDateOldest => '最早优先';
 
   @override
+  String get mediaSortFavoritesFirst => '收藏优先';
+
+  @override
   String get liveTvSortDialogTitle => '频道排序方式';
 
   @override

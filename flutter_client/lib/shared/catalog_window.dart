@@ -108,6 +108,42 @@ class CatalogWindow<T> extends ChangeNotifier {
     }
   }
 
+  /// Re-run the current query in place, for when only its ordering changed
+  /// (a favorite toggled under favorites-first), not the slice itself.
+  /// Unlike [load], resident rows stay on screen until their replacements
+  /// land, so a focused card is swapped for whatever row now sits at its
+  /// index instead of blanking to a placeholder and dropping D-pad focus.
+  Future<void> refresh() async {
+    if (!_loadedOnce) return load();
+    final generation = _generation.advance();
+    _pagesInFlight.clear();
+    final pages = <int>{0, for (final index in _items.keys) index ~/ pageSize};
+    try {
+      final count = await _fetchCount();
+      if (_generation.isStale(generation)) return;
+      final fresh = <int, T>{};
+      for (final page in pages) {
+        final offset = page * pageSize;
+        if (offset >= count) continue;
+        final rows = await _fetchPage(offset, pageSize);
+        if (_generation.isStale(generation)) return;
+        for (var i = 0; i < rows.length; i++) {
+          fresh[offset + i] = rows[i];
+        }
+      }
+      _items
+        ..clear()
+        ..addAll(fresh);
+      _totalCount = count;
+      _error = null;
+      notifyListeners();
+    } on Object catch (error) {
+      if (_generation.isStale(generation)) return;
+      _error = error;
+      notifyListeners();
+    }
+  }
+
   /// Ensure every index in `[firstIndex - buffer, firstIndex + visibleCount +
   /// buffer)` is loaded (or being loaded). Cheap to call from an item builder
   /// or scroll listener every frame.

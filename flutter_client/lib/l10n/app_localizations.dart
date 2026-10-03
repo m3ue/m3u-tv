@@ -2894,6 +2894,12 @@ abstract class AppLocalizations {
   /// **'Oldest First'**
   String get mediaSortReleaseDateOldest;
 
+  /// No description provided for @mediaSortFavoritesFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites First'**
+  String get mediaSortFavoritesFirst;
+
   /// No description provided for @liveTvSortDialogTitle.
   ///
   /// In en, this message translates to:

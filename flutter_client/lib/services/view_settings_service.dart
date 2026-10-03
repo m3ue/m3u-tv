@@ -180,6 +180,9 @@ class ViewSettingsService extends ChangeNotifier {
   static const vodSortOptionKey = 'm3ue_tv_vod_sort_option';
   static const seriesSortOptionKey = 'm3ue_tv_series_sort_option';
   static const liveTvSortOptionKey = 'm3ue_tv_live_tv_sort_option';
+  static const vodFavoritesFirstKey = 'm3ue_tv_vod_favorites_first';
+  static const seriesFavoritesFirstKey = 'm3ue_tv_series_favorites_first';
+  static const liveTvFavoritesFirstKey = 'm3ue_tv_live_tv_favorites_first';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
@@ -337,6 +340,63 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setLiveTvSortOption(ChannelSortOption option) async {
     await _write(liveTvSortOptionKey, option.value);
+    notifyListeners();
+  }
+
+  /// Whether favorited movies sort ahead of everything else in the VOD grid
+  /// (each half keeping the active [vodSortOption]). Defaults on. Like the
+  /// sort options, only read/written by the screen while [rememberMediaSort]
+  /// is on - otherwise every launch starts back at this default.
+  Future<bool> vodFavoritesFirst() async {
+    final raw = await _read(vodFavoritesFirstKey);
+    return raw as bool? ?? true;
+  }
+
+  /// Synchronous accessor - see [hdrEnabledSync].
+  bool get vodFavoritesFirstSync =>
+      (_memory[vodFavoritesFirstKey] as bool?) ?? true;
+
+  Future<void> setVodFavoritesFirst(
+    // ignore: avoid_positional_boolean_parameters
+    bool value,
+  ) async {
+    await _write(vodFavoritesFirstKey, value);
+    notifyListeners();
+  }
+
+  /// Series counterpart of [vodFavoritesFirst], stored independently.
+  Future<bool> seriesFavoritesFirst() async {
+    final raw = await _read(seriesFavoritesFirstKey);
+    return raw as bool? ?? true;
+  }
+
+  /// Synchronous accessor - see [hdrEnabledSync].
+  bool get seriesFavoritesFirstSync =>
+      (_memory[seriesFavoritesFirstKey] as bool?) ?? true;
+
+  Future<void> setSeriesFavoritesFirst(
+    // ignore: avoid_positional_boolean_parameters
+    bool value,
+  ) async {
+    await _write(seriesFavoritesFirstKey, value);
+    notifyListeners();
+  }
+
+  /// Live TV counterpart of [vodFavoritesFirst], stored independently.
+  Future<bool> liveTvFavoritesFirst() async {
+    final raw = await _read(liveTvFavoritesFirstKey);
+    return raw as bool? ?? true;
+  }
+
+  /// Synchronous accessor - see [hdrEnabledSync].
+  bool get liveTvFavoritesFirstSync =>
+      (_memory[liveTvFavoritesFirstKey] as bool?) ?? true;
+
+  Future<void> setLiveTvFavoritesFirst(
+    // ignore: avoid_positional_boolean_parameters
+    bool value,
+  ) async {
+    await _write(liveTvFavoritesFirstKey, value);
     notifyListeners();
   }
 

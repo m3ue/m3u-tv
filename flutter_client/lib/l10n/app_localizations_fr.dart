@@ -1645,6 +1645,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get mediaSortReleaseDateOldest => 'Plus anciens d\'abord';
 
   @override
+  String get mediaSortFavoritesFirst => 'Favoris en premier';
+
+  @override
   String get liveTvSortDialogTitle => 'Trier les chaînes par';
 
   @override
