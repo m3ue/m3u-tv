@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
+import 'package:m3u_tv/app/text_input_reporting_binding.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -35,7 +36,9 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Reports text field focus to Android so the TV keyboard keeps its input
+  // session (#309) - see TextInputReportingBinding.
+  TextInputReportingBinding.ensureInitialized();
   // First, so everything after (including startup failures) lands in the
   // Logs & Diagnostics screen.
   AppLogBuffer.instance.install();

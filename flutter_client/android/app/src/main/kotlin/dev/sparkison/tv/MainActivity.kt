@@ -7,9 +7,15 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
+import android.os.Bundle
 import android.os.Process
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.widget.FrameLayout
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -25,7 +31,12 @@ class MainActivity : FlutterActivity() {
     private var mpvPlugin: MpvPlayerPlugin? = null
     private var deviceInfoChannel: MethodChannel? = null
     private var systemUiChannel: MethodChannel? = null
+    private var textInputChannel: MethodChannel? = null
     private var nativeLogChannel: NativeLogChannel? = null
+
+    // Set from Dart (TextInputReportingBinding) while a Flutter text field
+    // holds the text input connection; read by TextEditorProxyView.
+    private var flutterTextInputActive = false
 
     // What getFlutterShellArgs picked, for the Logs & Diagnostics header.
     private var rendererDescription = "unknown"
@@ -56,6 +67,52 @@ class MainActivity : FlutterActivity() {
             newBase
         }
         super.attachBaseContext(override)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (isTelevisionDevice()) installTextEditorProxy()
+    }
+
+    // Google TV Streamer, Chromecast with Google TV and other Android TV builds
+    // enable config_preventImeStartupUnlessTextEditor (#309): the system answers
+    // every startInput whose focused view does not report onCheckIsTextEditor()
+    // with NO_EDITOR and unbinds the keyboard. FlutterView never reports it, so
+    // the engine's restartInput unbinds Gboard, the showSoftInput that follows
+    // draws it again without an input session, and D-pad presses and typed
+    // text never reach it (flutter/flutter#177360). Ported from Plezy.
+    //
+    // This 1x1 view lives inside FlutterView and holds Android focus in its
+    // place (FOCUS_AFTER_DESCENDANTS routes the engine's requestFocus here too).
+    // It reports text-editor status from the Dart-side flag, hands the IMM
+    // Flutter's own InputConnection, and vouches for FlutterView so the
+    // engine's showSoftInput/restartInput(flutterView) still pass the IMM's
+    // served-view check. Keys are unaffected: FlutterView.dispatchKeyEvent runs
+    // before descending to the focused child.
+    private inner class TextEditorProxyView(
+        context: Context,
+        private val flutterView: View,
+    ) : View(context) {
+        init {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+
+        override fun onCheckIsTextEditor(): Boolean = flutterTextInputActive
+
+        override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? =
+            flutterView.onCreateInputConnection(outAttrs)
+
+        override fun checkInputConnectionProxy(view: View): Boolean = view === flutterView
+    }
+
+    private fun installTextEditorProxy() {
+        val flutterView = findViewById<View>(FLUTTER_VIEW_ID) as? ViewGroup ?: return
+        flutterView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        val proxy = TextEditorProxyView(this, flutterView)
+        flutterView.addView(proxy, FrameLayout.LayoutParams(1, 1))
+        if (flutterView.isFocused) proxy.requestFocus()
     }
 
     override fun getFlutterShellArgs(): FlutterShellArgs {
@@ -129,6 +186,17 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        textInputChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TEXT_INPUT_CHANNEL).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setActive" -> {
+                        flutterTextInputActive = call.arguments as? Boolean ?: false
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -140,6 +208,8 @@ class MainActivity : FlutterActivity() {
         deviceInfoChannel = null
         systemUiChannel?.setMethodCallHandler(null)
         systemUiChannel = null
+        textInputChannel?.setMethodCallHandler(null)
+        textInputChannel = null
         nativeLogChannel?.dispose()
         nativeLogChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
@@ -197,5 +267,6 @@ class MainActivity : FlutterActivity() {
         private const val LOW_MEM_THRESHOLD_BYTES = 2252L shl 20
         private const val DEVICE_INFO_CHANNEL = "m3u_tv/device_info"
         private const val SYSTEM_UI_CHANNEL = "m3u_tv/system_ui"
+        private const val TEXT_INPUT_CHANNEL = "m3u_tv/text_input"
     }
 }
