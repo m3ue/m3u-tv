@@ -1340,6 +1340,60 @@ void main() {
       },
     );
 
+    Future<void> pumpSurfaceFixture(WidgetTester tester) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: const PlayerArgs(
+              streamUrl: 'https://example.com/surface.m3u8',
+              title: 'Surface Fixture',
+              type: 'vod',
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+    }
+
+    testWidgets(
+      'Android holds the video surface back for the first black frames with no rotation to wait for',
+      (tester) async {
+        await pumpSurfaceFixture(tester);
+        expect(find.byType(NativeVideoSurface), findsNothing);
+
+        await tester.pump();
+        expect(find.byType(NativeVideoSurface), findsNothing);
+
+        await tester.pump();
+        expect(find.byType(NativeVideoSurface), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'other platforms mount the video surface on the first frame',
+      (tester) async {
+        await pumpSurfaceFixture(tester);
+        expect(find.byType(NativeVideoSurface), findsOneWidget);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
+
     testWidgets(
       'hides visible controls when the overlay background is tapped',
       (

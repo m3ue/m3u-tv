@@ -4,7 +4,8 @@ import 'dart:io' show HttpClient, HttpStatus, Platform;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -146,7 +147,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // while the window is still portrait - leaves the previous screen's
   // portrait frame stretched across the landscape video rect until the
   // first decoded frame covers it. Capped well under the ~2s the Android
-  // mpv `load` call waits for its view (MpvPlayerPlugin.waitForCore).
+  // mpv `load` call waits for its view (MpvPlayerPlugin.waitForCore). With
+  // no rotation to wait out (TV, or already landscape), Android still holds
+  // the surface for the player's first frames - see
+  // [_markVideoSurfaceReadyAfterFirstFrames].
   static const Duration _surfaceRotationSettle = Duration(milliseconds: 200);
   static const Duration _surfaceRotationMaxHold = Duration(milliseconds: 1000);
   bool _videoSurfaceReady = false;
@@ -348,7 +352,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _markVideoSurfaceReady,
       );
     } else {
-      _videoSurfaceReady = true;
+      _markVideoSurfaceReadyAfterFirstFrames();
     }
     // Steal focus from the content area (autofocus won't do this if another
     // widget already holds focus when the player opens via the AppShell Stack).
@@ -393,16 +397,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_videoSurfaceReady) return;
+    if (_videoSurfaceReady || !widget.isHandheld) return;
     final size = MediaQuery.sizeOf(context);
     if (size.width < size.height) {
       _sawPortraitBeforeSurface = true;
       return;
     }
     if (!_sawPortraitBeforeSurface) {
-      // Already landscape on open (e.g. a tablet) - nothing to wait for.
-      _videoSurfaceReady = true;
+      // Already landscape on open (e.g. a tablet) - no rotation to wait for.
       _videoSurfaceMaxHoldTimer?.cancel();
+      _markVideoSurfaceReadyAfterFirstFrames();
       return;
     }
     // Rotated to landscape - give the rotation a moment to finish before
@@ -418,6 +422,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _videoSurfaceMaxHoldTimer?.cancel();
     if (_disposed || !mounted || _videoSurfaceReady) return;
     setState(() => _videoSurfaceReady = true);
+  }
+
+  // For an open with no rotation to wait out. Android's Hybrid Composition
+  // snapshot still applies: a surface mounted on the player's very first
+  // frame captures the screen the player opened over (e.g. a detail page),
+  // left showing behind the overlay until the first decoded frame covers it
+  // (seen on Shield TV). Two frames of the player's own black first make
+  // that black the snapshot instead.
+  void _markVideoSurfaceReadyAfterFirstFrames() {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      _videoSurfaceReady = true;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance
+        ..addPostFrameCallback((_) => _markVideoSurfaceReady())
+        ..scheduleFrame();
+    });
   }
 
   @override
