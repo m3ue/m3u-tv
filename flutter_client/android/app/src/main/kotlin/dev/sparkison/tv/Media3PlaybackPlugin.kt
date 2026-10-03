@@ -1,6 +1,7 @@
 package dev.sparkison.tv
 
 import android.content.Context
+import android.media.MediaFormat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -11,6 +12,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
@@ -25,6 +27,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.SubtitleView
 import io.flutter.embedding.engine.FlutterEngine
@@ -294,6 +297,10 @@ class Media3PlaybackPlugin(
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
+        if (matchDisplayRefreshRate) {
+            frameRateManager.log("ExoPlayer load: Auto Frame Rate on")
+            player.setVideoFrameMetadataListener(FrameRateProbe(playerId, player))
+        }
         player.setMediaItem(buildMediaItem(uri, source, subtitleConfigurations), startPositionMs)
         emit(playerId, "buffering", uri = uri, positionMs = startPositionMs)
         player.prepare()
@@ -414,6 +421,71 @@ class Media3PlaybackPlugin(
             }
         }
         return result
+    }
+
+    private fun selectedVideoFormat(tracks: Tracks): Format? {
+        for (group in tracks.groups) {
+            if (group.type != C.TRACK_TYPE_VIDEO) continue
+            for (trackIndex in 0 until group.length) {
+                if (group.isTrackSelected(trackIndex)) return group.getTrackFormat(trackIndex)
+            }
+        }
+        return null
+    }
+
+    /** Auto Frame Rate: asks for a display mode once per distinct rate. [source] is for the log only. */
+    private fun applyFrameRate(state: PlayerState, fps: Float, source: String) {
+        if (!state.matchDisplayRefreshRate || fps <= 0f || fps == state.lastAppliedFps) return
+        state.lastAppliedFps = fps
+        frameRateManager.applyForFrameRate(fps.toDouble(), source)
+    }
+
+    /**
+     * Auto Frame Rate's rate for streams whose container doesn't declare one
+     * (issue #314; see [FrameRateEstimator] for which), measured from the
+     * timestamps of the frames being rendered. Installed only while matching
+     * is on, one per ExoPlayer (so per load). ExoPlayer calls it on its
+     * playback thread; its single result is applied on the main thread,
+     * where it then detaches itself.
+     */
+    @OptIn(UnstableApi::class)
+    private inner class FrameRateProbe(
+        private val playerId: String,
+        private val player: ExoPlayer,
+    ) : VideoFrameMetadataListener {
+        private val estimator = FrameRateEstimator()
+        @Volatile private var finished = false
+
+        override fun onVideoFrameAboutToBeRendered(
+            presentationTimeUs: Long,
+            releaseTimeNs: Long,
+            format: Format,
+            mediaFormat: MediaFormat?,
+        ) {
+            if (finished) return
+            if (format.frameRate > 0f) {
+                finish { state -> applyFrameRate(state, format.frameRate, "container") }
+                return
+            }
+            when (val result = estimator.addFrame(presentationTimeUs)) {
+                FrameRateEstimator.Result.Pending -> Unit
+                is FrameRateEstimator.Result.Measured -> finish { state ->
+                    applyFrameRate(state, result.fps.toFloat(), "measured over ${result.frames} frames / ${result.spanUs / 1000}ms")
+                }
+                FrameRateEstimator.Result.Unstable -> finish {
+                    frameRateManager.log("ExoPlayer: frame timestamps never settled into a steady rate, not matching")
+                }
+            }
+        }
+
+        private fun finish(onMain: (PlayerState) -> Unit) {
+            finished = true
+            mainHandler.post {
+                val state = states[playerId]?.takeIf { it.player === player } ?: return@post
+                player.clearVideoFrameMetadataListener(this)
+                onMain(state)
+            }
+        }
     }
 
     private fun selectedTrackId(tracks: Tracks, trackType: Int): String? {
@@ -544,11 +616,11 @@ class Media3PlaybackPlugin(
             val player = state.player
             emitTrackSnapshot(playerId, player)
 
-            val fps = player.videoFormat?.frameRate
-            if (state.matchDisplayRefreshRate && fps != null && fps > 0f && fps != state.lastAppliedFps) {
-                state.lastAppliedFps = fps
-                frameRateManager.applyForFrameRate(fps.toDouble())
-            }
+            // The selected track's own format, not player.videoFormat: that
+            // is the renderer's input format, which needn't be set yet when
+            // the first onTracksChanged lands. Unset (<= 0) for most
+            // containers -- FrameRateProbe measures those instead.
+            selectedVideoFormat(tracks)?.let { applyFrameRate(state, it.frameRate, "container") }
         }
 
         override fun onCues(cueGroup: CueGroup) {

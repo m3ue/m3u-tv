@@ -98,6 +98,10 @@ class MpvPlayerCore(
     // doesn't re-trigger a display-mode switch for the same fps.
     private var lastAppliedFps: Double = 0.0
 
+    // Logs a missing `container-fps` once per load rather than on every
+    // VIDEO_RECONFIG -- see [applyFrameRateFromContainer].
+    private var reportedMissingFps = false
+
     // Set fresh on every load() -- see [FrameRateManager]'s class doc; off
     // by default (mirrors the open-source Plezy player's own opt-in
     // Android toggle, `matchContentFrameRate`, default off).
@@ -270,10 +274,14 @@ class MpvPlayerCore(
                 readyEmitted = false
                 lastLogText = null
                 lastAppliedFps = 0.0
+                reportedMissingFps = false
                 // Written here, not synchronously in load()'s caller-thread
                 // body, so it's only ever touched from this single-threaded
                 // scope -- same invariant [readyEmitted]/[lastLogText] rely on.
                 this@MpvPlayerCore.matchDisplayRefreshRate = matchDisplayRefreshRate
+                if (matchDisplayRefreshRate) {
+                    mainHandler.post { frameRateManager.log("mpv load: Auto Frame Rate on") }
+                }
                 try {
                     if (!userAgent.isNullOrEmpty()) {
                         current.setProperty("user-agent", userAgent)
@@ -494,10 +502,17 @@ class MpvPlayerCore(
     // same as [emit]/[emitError] below.
     private suspend fun applyFrameRateFromContainer(player: MpvPlayer) {
         if (!matchDisplayRefreshRate) return
-        val fps = runCatching { player.getDouble("container-fps") }.getOrNull() ?: return
-        if (fps <= 0.0 || fps == lastAppliedFps) return
+        val fps = runCatching { player.getDouble("container-fps") }.getOrNull()
+        if (fps == null || fps <= 0.0) {
+            if (!reportedMissingFps && lastAppliedFps == 0.0) {
+                reportedMissingFps = true
+                mainHandler.post { frameRateManager.log("mpv: no container-fps yet, nothing to match") }
+            }
+            return
+        }
+        if (fps == lastAppliedFps) return
         lastAppliedFps = fps
-        mainHandler.post { frameRateManager.applyForFrameRate(fps) }
+        mainHandler.post { frameRateManager.applyForFrameRate(fps, "mpv container-fps") }
     }
 
     private suspend fun snapshot(player: MpvPlayer, includeTracks: Boolean): Map<String, Any?> {

@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
     private var mpvPlugin: MpvPlayerPlugin? = null
     private var deviceInfoChannel: MethodChannel? = null
     private var systemUiChannel: MethodChannel? = null
+    private var nativeLogChannel: NativeLogChannel? = null
 
     // What getFlutterShellArgs picked, for the Logs & Diagnostics header.
     private var rendererDescription = "unknown"
@@ -92,7 +93,9 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Shared across both playback plugins -- see FrameRateManager's class
         // doc for why a single Window-scoped instance, not one per plugin.
-        val frameRateManager = FrameRateManager(this)
+        val nativeLog = NativeLogChannel(flutterEngine.dartExecutor.binaryMessenger)
+        nativeLogChannel = nativeLog
+        val frameRateManager = FrameRateManager(this) { message -> nativeLog.log("FrameRateManager", message) }
         val media3 = Media3PlaybackPlugin(this, flutterEngine, frameRateManager)
         media3Plugin = media3
         flutterEngine.platformViewsController.registry.registerViewFactory(
@@ -137,6 +140,8 @@ class MainActivity : FlutterActivity() {
         deviceInfoChannel = null
         systemUiChannel?.setMethodCallHandler(null)
         systemUiChannel = null
+        nativeLogChannel?.dispose()
+        nativeLogChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 

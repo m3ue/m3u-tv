@@ -39,6 +39,15 @@ Future<void> main() async {
   // First, so everything after (including startup failures) lands in the
   // Logs & Diagnostics screen.
   AppLogBuffer.instance.install();
+  if (Platform.isAndroid) {
+    // Native decisions worth seeing in an uploaded log (Auto Frame Rate's
+    // mode choice, see NativeLogChannel.kt) - debugPrint tees them into the
+    // buffer, where android.util.Log output never reaches.
+    const EventChannel('m3u_tv/native_log').receiveBroadcastStream().listen(
+      (line) => debugPrint('$line'),
+      onError: (Object _) {},
+    );
+  }
   if (Platform.operatingSystem == 'tvos') {
     final dispatcher = WidgetsBinding.instance.platformDispatcher;
     dispatcher.onSemanticsActionEvent = ignoreNativeScrollToOffset(
@@ -72,7 +81,11 @@ Future<void> main() async {
   // without this a disabled click sound would still play on every D-pad
   // focus change until Settings was opened once; volumeSync defaults to
   // full volume, so a custom desktop volume would similarly be ignored by
-  // the very first stream opened in a session.
+  // the very first stream opened in a session. The player reads
+  // hdrEnabledSync and matchRefreshRateSync when it opens a stream, so
+  // without these two an Android/Windows user's Auto Frame Rate stayed off
+  // (and a tvOS user's opt-out, or anyone's HDR opt-out, was undone) after
+  // every cold start until Settings was opened (issue #314).
   await appState.viewSettingsService.fontSize();
   await Future.wait([
     appState.viewSettingsService.rememberMediaSort(),
@@ -82,6 +95,8 @@ Future<void> main() async {
     appState.viewSettingsService.vodFavoritesFirst(),
     appState.viewSettingsService.seriesFavoritesFirst(),
     appState.viewSettingsService.liveTvFavoritesFirst(),
+    appState.viewSettingsService.hdrEnabled(),
+    appState.viewSettingsService.matchRefreshRate(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
   ]);

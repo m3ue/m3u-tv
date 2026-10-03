@@ -3,9 +3,9 @@ package dev.sparkison.tv
 import android.app.Activity
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import android.view.Display
 import android.view.WindowManager
+import java.util.Locale
 
 /**
  * Applies Auto Frame Rate display-mode matching on Android TV (issue #283):
@@ -37,25 +37,50 @@ import android.view.WindowManager
  * landing (unlike Plezy, no caller pauses playback around it), so that
  * machinery would be diagnostic-only complexity with no functional consumer.
  * Left as documented follow-up work if a real report needs it.
+ *
+ * Every request and its outcome -- including the panel's full mode list and
+ * a "nothing to match" -- goes to [log], which `MainActivity` points at
+ * [NativeLogChannel] so a user's Logs & Diagnostics upload shows why a
+ * switch did or didn't happen (issue #314). Main thread only.
  */
-class FrameRateManager(private val activity: Activity) {
+class FrameRateManager(
+    private val activity: Activity,
+    val log: (String) -> Unit = {},
+) {
     private var applied = false
 
-    /** Applies the best available display mode for [fps], if any and if different from the current mode. */
-    fun applyForFrameRate(fps: Double) {
+    /**
+     * Applies the best available display mode for [fps], if any and if
+     * different from the current mode. [source] names where the rate came
+     * from (container metadata, a measurement), for the log only.
+     */
+    fun applyForFrameRate(fps: Double, source: String) {
         if (fps <= 0.0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
-        val display = currentDisplay() ?: return
-        val supportedModes = display.supportedModes ?: return
-        val currentMode = display.mode ?: return
+        val request = "${formatRate(fps)}fps ($source)"
+        val display = currentDisplay()
+        val supportedModes = display?.supportedModes
+        val currentMode = display?.mode
+        if (supportedModes == null || currentMode == null) {
+            log("$request: display modes unavailable, not matching")
+            return
+        }
+        log("$request: current ${describe(currentMode)}, supported ${supportedModes.joinToString(prefix = "[", postfix = "]") { describe(it) }}")
 
         val candidates = supportedModes.map {
             DisplayModeSelector.Mode(it.modeId, it.refreshRate.toDouble(), it.physicalWidth, it.physicalHeight)
         }
-        val target = DisplayModeSelector.bestMode(candidates, currentMode.modeId, fps) ?: return
-        if (target.modeId == currentMode.modeId) return
+        val target = DisplayModeSelector.bestMode(candidates, currentMode.modeId, fps)
+        if (target == null) {
+            log("$request: no ${currentMode.physicalWidth}x${currentMode.physicalHeight} mode presents it cleanly, staying at ${formatRate(currentMode.refreshRate.toDouble())}Hz")
+            return
+        }
+        if (target.modeId == currentMode.modeId) {
+            log("$request: current mode already presents it, no switch")
+            return
+        }
 
         val window = activity.window ?: return
-        Log.d(TAG, "matching ${fps}fps: mode #${currentMode.modeId} (${currentMode.refreshRate}Hz) -> #${target.modeId} (${target.refreshRate}Hz)")
+        log("$request: switching to #${target.modeId} ${target.width}x${target.height}@${formatRate(target.refreshRate)}Hz")
         window.attributes = window.attributes.apply { preferredDisplayModeId = target.modeId }
         applied = true
     }
@@ -66,7 +91,7 @@ class FrameRateManager(private val activity: Activity) {
         applied = false
         val window = activity.window ?: return
         if (window.attributes.preferredDisplayModeId == 0) return
-        Log.d(TAG, "restoring default display mode")
+        log("restoring default display mode")
         window.attributes = window.attributes.apply { preferredDisplayModeId = 0 }
     }
 
@@ -77,7 +102,8 @@ class FrameRateManager(private val activity: Activity) {
         (activity.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay
     }
 
-    companion object {
-        private const val TAG = "FrameRateManager"
-    }
+    private fun describe(mode: Display.Mode): String =
+        "#${mode.modeId} ${mode.physicalWidth}x${mode.physicalHeight}@${formatRate(mode.refreshRate.toDouble())}Hz"
+
+    private fun formatRate(rate: Double): String = String.format(Locale.US, "%.3f", rate)
 }
