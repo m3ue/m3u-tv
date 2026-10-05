@@ -541,6 +541,26 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
     final loadUrl = url == null || url.isEmpty || shouldDefer ? null : url;
     if (loadUrl != null) _hasResolvedOnce = true;
 
+    Widget buildSized(double? decodeWidth, double? decodeHeight) {
+      final cacheWidth = decodeWidth == null
+          ? null
+          : (decodeWidth * devicePixelRatio).round();
+      final cacheHeight = decodeHeight == null
+          ? null
+          : (decodeHeight * devicePixelRatio).round();
+      final provider = CachedNetworkImageProvider(
+        sizedImageUrl(loadUrl!, decodeWidth: cacheWidth),
+        cacheManager: MediaImageCacheManager(),
+      );
+      return _buildImage(
+        provider,
+        fallback,
+        cacheWidth,
+        cacheHeight,
+        filterQuality,
+      );
+    }
+
     final image = ClipRRect(
       borderRadius: BorderRadius.circular(widget.borderRadius),
       child: SizedBox(
@@ -553,6 +573,11 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
           ),
           child: loadUrl == null
               ? fallback
+              // A fixed size needs no LayoutBuilder, which also keeps this
+              // usable under IntrinsicHeight/IntrinsicWidth (a LayoutBuilder
+              // can't report intrinsics and fails the whole subtree's layout).
+              : widget.width != null && widget.height != null
+              ? buildSized(widget.width, widget.height)
               // Callers that size the art through layout (e.g. a poster grid
               // cell's Expanded slot) pass no width/height; fall back to the
               // bounded constraints so those still decode at display size.
@@ -561,35 +586,16 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
               // ~800MB on the GPU within seconds of scrolling and got the app
               // and the launcher killed by the low-memory killer.
               : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final decodeWidth =
-                        widget.width ??
+                  builder: (context, constraints) => buildSized(
+                    widget.width ??
                         (constraints.hasBoundedWidth
                             ? constraints.maxWidth
-                            : null);
-                    final decodeHeight =
-                        widget.height ??
+                            : null),
+                    widget.height ??
                         (constraints.hasBoundedHeight
                             ? constraints.maxHeight
-                            : null);
-                    final cacheWidth = decodeWidth == null
-                        ? null
-                        : (decodeWidth * devicePixelRatio).round();
-                    final cacheHeight = decodeHeight == null
-                        ? null
-                        : (decodeHeight * devicePixelRatio).round();
-                    final provider = CachedNetworkImageProvider(
-                      sizedImageUrl(loadUrl, decodeWidth: cacheWidth),
-                      cacheManager: MediaImageCacheManager(),
-                    );
-                    return _buildImage(
-                      provider,
-                      fallback,
-                      cacheWidth,
-                      cacheHeight,
-                      filterQuality,
-                    );
-                  },
+                            : null),
+                  ),
                 ),
         ),
       ),

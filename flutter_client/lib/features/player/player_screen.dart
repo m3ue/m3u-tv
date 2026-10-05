@@ -140,6 +140,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // (its buttons can't do anything yet). Reset on a channel/episode switch.
   bool _hasStartedPlayback = false;
 
+  // Keeps the loading overlay up past `ready` until the first frame is
+  // actually showing. mpv reports `ready` on FILE_LOADED (stream probed, cache
+  // not filled, nothing decoded), so a slow stream otherwise sits on a black
+  // screen with the OSD up for several seconds. Reset on a channel/episode
+  // switch.
+  bool _awaitingFirstFrame = true;
+
   // Handheld only: the video surface is held back (plain black instead)
   // until the forced portrait->landscape rotation has settled. Android
   // Hybrid Composition snapshots the current Flutter frame when a platform
@@ -510,6 +517,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _retryStatusMessage = null;
       _isPlaying = false;
       _hasStartedPlayback = false;
+      _awaitingFirstFrame = true;
       _videoAspectRatio = 16 / 9;
       _audioTracks = const <PlaybackTrack>[];
       _subtitleTracks = const <PlaybackTrack>[];
@@ -1181,6 +1189,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  static bool _isMpvBackend(PlaybackBackend backend) => switch (backend) {
+    PlaybackBackend.androidMpv ||
+    PlaybackBackend.appleMpvNative ||
+    PlaybackBackend.desktopLibmpv ||
+    PlaybackBackend.macMpvNative => true,
+    PlaybackBackend.androidExoPlayer ||
+    PlaybackBackend.appleAvKit ||
+    PlaybackBackend.serverTranscode => false,
+  };
+
+  // `buffering` before the first frame is still the initial load (ExoPlayer
+  // and AVKit emit it right after open), so it keeps the overlay up too.
+  bool get _showLoadingOverlay =>
+      _errorMessage == null &&
+      (_status == PlaybackStatus.loading ||
+          (_awaitingFirstFrame &&
+              (_status == PlaybackStatus.ready ||
+                  _status == PlaybackStatus.buffering)));
+
   void _startLoadingTimeout() {
     _loadingTimer?.cancel();
     _loadingTimer = Timer(_loadingTimeout, () {
@@ -1280,6 +1307,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
           state.status == PlaybackStatus.playing ||
           state.status == PlaybackStatus.paused) {
         _hasStartedPlayback = true;
+      }
+
+      if (state.status == PlaybackStatus.playing ||
+          state.status == PlaybackStatus.paused ||
+          // ExoPlayer/AVKit only report `ready` once loaded but not playing
+          // (a frame is up), unlike mpv's FILE_LOADED `ready`.
+          (state.status == PlaybackStatus.ready &&
+              !_isMpvBackend(state.backend))) {
+        _awaitingFirstFrame = false;
       }
 
       if (state.status == PlaybackStatus.playing) {
@@ -2056,8 +2092,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
 
                     // Loading indicator
-                    if (_status == PlaybackStatus.loading &&
-                        _errorMessage == null)
+                    if (_showLoadingOverlay)
                       Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,

@@ -1039,6 +1039,25 @@ void main() {
       expect(find.text('Live News'), findsOneWidget);
     });
 
+    testWidgets('lays out with a channel logo', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 463,
+              child: EpgOverlay(
+                currentTitle: 'Live News',
+                currentProgress: 0.5,
+                logoUrl: 'https://example.com/logo.png',
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(EpgOverlay)).height, greaterThan(0));
+    });
+
     testWidgets('shows progress bar', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -1530,6 +1549,104 @@ void main() {
       },
     );
 
+    group('loading overlay before the first frame', () {
+      Future<FakePlayerAdapter> pumpLoadingFixture(
+        WidgetTester tester, {
+        required PlaybackCapabilities capabilities,
+        required PlaybackPlatform platform,
+      }) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: capabilities,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: platform,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            capabilities.backend: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/slow-live.ts',
+                title: 'Slow Channel',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+        return adapter;
+      }
+
+      Future<void> emit(
+        WidgetTester tester,
+        FakePlayerAdapter adapter,
+        PlaybackStatus status,
+      ) async {
+        adapter.emitState(
+          PlaybackState(backend: adapter.capabilities.backend, status: status),
+        );
+        await tester.pump();
+        await tester.pump();
+      }
+
+      testWidgets('mpv keeps it up through ready and buffering until playing', (
+        tester,
+      ) async {
+        final adapter = await pumpLoadingFixture(
+          tester,
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          platform: PlaybackPlatform.desktop,
+        );
+        final loading = find.text('Loading stream…');
+
+        await emit(tester, adapter, PlaybackStatus.loading);
+        expect(loading, findsOneWidget);
+
+        // FILE_LOADED: stream probed, nothing decoded yet.
+        await emit(tester, adapter, PlaybackStatus.ready);
+        expect(loading, findsOneWidget);
+
+        await emit(tester, adapter, PlaybackStatus.buffering);
+        expect(loading, findsOneWidget);
+
+        await emit(tester, adapter, PlaybackStatus.playing);
+        expect(loading, findsNothing);
+
+        // Mid-stream buffering is not the initial load.
+        await emit(tester, adapter, PlaybackStatus.buffering);
+        expect(loading, findsNothing);
+      });
+
+      testWidgets('ExoPlayer keeps it up through initial buffering only', (
+        tester,
+      ) async {
+        final adapter = await pumpLoadingFixture(
+          tester,
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+          platform: PlaybackPlatform.android,
+        );
+        final loading = find.text('Loading stream…');
+
+        await emit(tester, adapter, PlaybackStatus.buffering);
+        expect(loading, findsOneWidget);
+
+        // ExoPlayer `ready` means loaded with a frame up, just not playing.
+        await emit(tester, adapter, PlaybackStatus.ready);
+        expect(loading, findsNothing);
+      });
+    });
+
     testWidgets('keeps visible controls open when play pause is tapped', (
       tester,
     ) async {
@@ -1563,7 +1680,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.paused,
         ),
       );
       await tester.pump();
@@ -1621,7 +1738,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -1712,7 +1829,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -2079,7 +2196,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -2160,7 +2277,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -2245,7 +2362,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -2335,7 +2452,7 @@ void main() {
       adapter.emitState(
         const PlaybackState(
           backend: PlaybackBackend.desktopLibmpv,
-          status: PlaybackStatus.ready,
+          status: PlaybackStatus.playing,
         ),
       );
       await tester.pump();
@@ -2432,7 +2549,7 @@ void main() {
           adapter.emitState(
             PlaybackState(
               backend: backend,
-              status: PlaybackStatus.ready,
+              status: PlaybackStatus.paused,
               duration: const Duration(hours: 1),
               audioTracks: const <PlaybackTrack>[
                 PlaybackTrack(
@@ -2523,7 +2640,7 @@ void main() {
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
-              status: PlaybackStatus.ready,
+              status: PlaybackStatus.paused,
               audioTracks: audioTracks,
               subtitleTracks: subtitleTracks,
               selectedAudioTrackId: 'audio-eng',

@@ -61,8 +61,13 @@ class EpgOverlay extends StatelessWidget {
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
+                // Explicit size (the box's width minus its padding): without
+                // it ResilientMediaImage measures through a LayoutBuilder,
+                // which the IntrinsicHeight above can't lay out.
                 child: ResilientMediaImage(
                   imageUrl: logoUrl,
+                  width: logoSize - 16,
+                  height: logoSize - 16,
                   fallbackIcon: Icons.tv,
                   fit: BoxFit.contain,
                   oversample: 2,
