@@ -655,6 +655,8 @@ class _SeriesDetailsBody extends StatelessWidget {
     return ItemMetaInfo(
       name: info.series.name,
       clearLogoUrl: info.series.clearLogoUrl,
+      year: info.series.year,
+      contentRating: info.series.contentRating,
       chips: chips,
       hidePrimaryAction: true,
       buttonLabel: '',

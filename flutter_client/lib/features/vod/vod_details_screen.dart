@@ -165,8 +165,9 @@ class _VodDetailsBody extends StatelessWidget {
       posterUrl: details.coverUrl,
       backdropUrl: details.backdropUrl,
       clearLogoUrl: details.clearLogoUrl,
+      year: details.year,
+      contentRating: details.contentRating,
       chips: [
-        if (details.year != null) details.year!,
         if (details.genre != null) details.genre!,
         if (details.duration != null) details.duration!,
         if (details.rating != null) '★ ${details.rating}',
@@ -272,6 +273,7 @@ class _ResolvedVodDetails {
   String? get year => _notEmpty(info?.year) ?? _notEmpty(info?.releaseDate);
   String? get duration => _notEmpty(info?.duration);
   double? get rating => info?.rating ?? item.rating;
+  String? get contentRating => info?.contentRating;
   String? get coverUrl => _notEmpty(info?.coverUrl) ?? _notEmpty(item.logoUrl);
   String? get backdropUrl => _notEmpty(info?.backdropUrl);
   String? get clearLogoUrl => _notEmpty(info?.clearLogoUrl);

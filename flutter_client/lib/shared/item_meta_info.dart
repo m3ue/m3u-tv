@@ -29,6 +29,8 @@ class ItemMetaInfo extends StatelessWidget {
     required this.buttonLabel,
     required this.onPlay,
     this.primaryIcon = Icons.play_arrow,
+    this.year,
+    this.contentRating,
     this.chips = const [],
     this.fullWidthButton = false,
     this.hidePrimaryAction = false,
@@ -48,6 +50,14 @@ class ItemMetaInfo extends StatelessWidget {
   /// [name] headline at the top of the column; a load failure falls back to
   /// the text. Null keeps the text-only heading.
   final String? clearLogoUrl;
+
+  /// Release year, rendered as the first chip. Kept separate from [chips] so
+  /// the [contentRating] badge can sit directly after it.
+  final String? year;
+
+  /// Certification (e.g. "PG-13", "TV-MA"), rendered as a chip after [year]
+  /// and before the remaining [chips].
+  final String? contentRating;
   final List<String> chips;
 
   /// Primary button's label. When [progressValue] is set, this is the
@@ -137,17 +147,22 @@ class ItemMetaInfo extends StatelessWidget {
             children: [sizedButton, startOverButton],
           );
     final hasPlot = plot != null && plot!.trim().isNotEmpty;
+    final chipWidgets = <Widget>[
+      if (year != null) MetadataChip(label: year!),
+      if (contentRating != null) MetadataChip(label: contentRating!),
+      for (final label in chips) MetadataChip(label: label),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _TitleHeading(name: name, clearLogoUrl: clearLogoUrl),
         const SizedBox(height: MediaBrowsingMetrics.itemGap),
-        if (chips.isNotEmpty)
+        if (chipWidgets.isNotEmpty)
           Wrap(
             spacing: MediaBrowsingMetrics.itemGap,
             runSpacing: MediaBrowsingMetrics.chipGap,
-            children: chips.map((label) => MetadataChip(label: label)).toList(),
+            children: chipWidgets,
           ),
         if (!hidePrimaryAction) ...[
           const SizedBox(height: MediaBrowsingMetrics.contentPadding),

@@ -184,6 +184,7 @@ class VodInfo {
     this.year,
     this.duration,
     this.rating,
+    this.contentRating,
     this.coverUrl,
     this.backdropUrl,
     this.clearLogoUrl,
@@ -204,6 +205,11 @@ class VodInfo {
   final String? year;
   final String? duration;
   final double? rating;
+
+  /// Content rating / certification (e.g. "PG-13"). m3u-editor sends the
+  /// provider's value with TMDB's US certification as the fallback in
+  /// `mpaa_rating`; other Xtream panels often only fill `age`.
+  final String? contentRating;
   final String? coverUrl;
   final String? backdropUrl;
 
@@ -256,6 +262,7 @@ class VodInfo {
         ]),
       ),
       rating: _asDoubleOrNull(info['rating']),
+      contentRating: _contentRating([info['mpaa_rating'], info['age']]),
       coverUrl: _asNullableString(
         pick(['cover_big', 'movie_image', 'stream_icon', 'cover']),
       ),
@@ -517,6 +524,7 @@ class Series {
     this.categoryIds = const [],
     this.plot,
     this.rating,
+    this.contentRating,
     this.tmdbId,
     this.richCast,
     this.year,
@@ -540,6 +548,10 @@ class Series {
 
   final String? plot;
   final double? rating;
+
+  /// Content rating (e.g. "TV-MA"), from the same `mpaa_rating` wire key
+  /// m3u-editor uses for movies - see [VodInfo.contentRating].
+  final String? contentRating;
   final int? tmdbId;
   final List<CastMember>? richCast;
 
@@ -561,6 +573,7 @@ class Series {
     categoryIds: _asStringList(json['category_ids']),
     plot: _asNullableString(json['plot']),
     rating: _asDoubleOrNull(json['rating'] ?? json['rating_5based']),
+    contentRating: _contentRating([json['mpaa_rating'], json['age']]),
     tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
     richCast: _parseCastList(json['cast_list']),
     year: _yearString(
@@ -1804,6 +1817,17 @@ String? _yearFromDate(String? value) {
 /// Normalizes the assorted "release year" shapes list endpoints emit - an int
 /// year from `get_vod_streams`, a `releaseDate` string from `get_series` - to a
 /// bare four-digit string, or null when the value is absent/zero/unparseable.
+/// First usable content rating among [candidates]. Panels send a blank
+/// string (m3u-editor's `mpaa_rating`) or a bare `0` (common for `age`) when
+/// there is no rating, so both count as missing.
+String? _contentRating(List<Object?> candidates) {
+  for (final candidate in candidates) {
+    final text = _asNullableString(candidate)?.trim();
+    if (text != null && text.isNotEmpty && text != '0') return text;
+  }
+  return null;
+}
+
 String? _yearString(Object? value) {
   if (value == null) return null;
   if (value is num) return value > 0 ? '${value.toInt()}' : null;

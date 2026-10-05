@@ -36,6 +36,8 @@ class MovieDetailBody extends StatefulWidget {
     this.posterUrl,
     this.backdropUrl,
     this.clearLogoUrl,
+    this.year,
+    this.contentRating,
     this.plot,
     this.richCast,
     this.onTapMember,
@@ -53,6 +55,10 @@ class MovieDetailBody extends StatefulWidget {
   final String? posterUrl;
   final String? backdropUrl;
   final String? clearLogoUrl;
+
+  /// See [ItemMetaInfo.year] / [ItemMetaInfo.contentRating].
+  final String? year;
+  final String? contentRating;
   final List<String> chips;
   final String? plot;
   final List<MetaCreditLine> credits;
@@ -339,6 +345,8 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
           name: widget.name,
           clearLogoUrl: widget.clearLogoUrl,
           primaryActionFocusNode: _primaryFocusNode,
+          year: widget.year,
+          contentRating: widget.contentRating,
           chips: widget.chips,
           buttonLabel: widget.primaryButtonLabel,
           onPlay: widget.onPrimary,
