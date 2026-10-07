@@ -1141,6 +1141,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         hdrEnabled: _hdrEnabled,
         matchDisplayRefreshRate:
             widget.viewSettingsService?.matchRefreshRateSync ?? false,
+        deinterlace: widget.viewSettingsService?.deinterlaceSync ?? false,
       ),
     );
   }

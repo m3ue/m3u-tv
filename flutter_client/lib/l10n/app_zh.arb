@@ -884,6 +884,8 @@
   "settingsHdrModeHint": "允许 HDR 视频将显示器切换到 HDR 模式。仅限 Windows 和 Linux。",
   "settingsMatchRefreshRate": "匹配显示器刷新率",
   "settingsMatchRefreshRateHint": "播放开始时将显示器切换为视频的帧率。屏幕可能会短暂闪烁或黑屏。",
+  "settingsDeinterlace": "视频去隔行",
+  "settingsDeinterlaceHint": "消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。",
   "settingsNavigationSound": "导航音效",
   "settingsNavigationSoundHint": "使用遥控器或键盘移动焦点时播放点击音效。",
   "settingsToggleOn": "开",

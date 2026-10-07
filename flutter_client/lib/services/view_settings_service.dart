@@ -184,6 +184,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const seriesFavoritesFirstKey = 'm3ue_tv_series_favorites_first';
   static const liveTvFavoritesFirstKey = 'm3ue_tv_live_tv_favorites_first';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
+  static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
   static const optimizeForKey = 'm3ue_tv_optimize_for';
@@ -425,6 +426,26 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(matchRefreshRateKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the mpv backends deinterlace video (mpv's `deinterlace=auto`,
+  /// which filters only frames flagged interlaced, e.g. 1080i/576i live
+  /// channels). Defaults off: the filter costs CPU. ExoPlayer and AVKit have
+  /// no filter chain and ignore it.
+  Future<bool> deinterlace() async {
+    final raw = await _read(deinterlaceKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached deinterlace setting.
+  bool get deinterlaceSync => (_memory[deinterlaceKey] as bool?) ?? false;
+
+  Future<void> setDeinterlace(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(deinterlaceKey, enabled);
     notifyListeners();
   }
 

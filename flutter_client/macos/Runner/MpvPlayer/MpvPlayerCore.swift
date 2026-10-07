@@ -199,7 +199,8 @@ final class MpvPlayerCore {
     isCatchup: Bool,
     userAgent: String?,
     headers: [String: String]?,
-    externalSubtitles: [(uri: String, title: String?, language: String?)] = []
+    externalSubtitles: [(uri: String, title: String?, language: String?)] = [],
+    deinterlace: Bool = false
   ) {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }
@@ -230,6 +231,9 @@ final class MpvPlayerCore {
       // three. Reset for every other load, since this handle persists across loads.
       mpv_set_option_string(handle, "demuxer-lavf-o", isCatchup ? "skip_estimate_duration_from_pts=1" : "")
       mpv_set_option_string(handle, "stream-buffer-size", isCatchup ? "4MiB" : "128KiB")
+      // The Deinterlace setting: `auto` filters only frames flagged interlaced. Set on
+      // every load, since this handle persists across loads.
+      mpv_set_option_string(handle, "deinterlace", deinterlace ? "auto" : "no")
       if let headers, !headers.isEmpty {
         let headerString = headers.map { "\($0.key): \($0.value)" }.joined(separator: ",")
         mpv_set_option_string(handle, "http-header-fields", headerString)

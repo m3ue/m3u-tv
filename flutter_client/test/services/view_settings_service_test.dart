@@ -133,6 +133,22 @@ void main() {
       },
     );
 
+    test(
+      'deinterlace defaults off and persists, sync getter included',
+      () async {
+        expect(service.deinterlaceSync, isFalse);
+        expect(await service.deinterlace(), isFalse);
+
+        await service.setDeinterlace(true);
+        expect(await service.deinterlace(), isTrue);
+        expect(service.deinterlaceSync, isTrue);
+
+        final recreated = ViewSettingsService(memory: memory);
+        expect(recreated.deinterlaceSync, isTrue);
+        expect(await recreated.deinterlace(), isTrue);
+      },
+    );
+
     test('values survive service recreation with same store', () async {
       await service.setLiveTvLayout(LiveTvLayout.grid);
       await service.setEpgStartView(EpgStartView.primeTime);

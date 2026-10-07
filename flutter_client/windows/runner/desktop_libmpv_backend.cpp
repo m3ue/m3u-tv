@@ -1152,6 +1152,8 @@ bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
     api.set_option_string(gpu_handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(gpu_handle, "stream-buffer-size", "4MiB");
   }
+  // The Deinterlace setting: `auto` filters only frames flagged interlaced.
+  if (BoolArg(args, "deinterlace", false)) api.set_option_string(gpu_handle, "deinterlace", "auto");
   if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
   // mpv's own render-API output negotiates the swap chain's color space and
   // HDR metadata itself once the OS display is actually in HDR mode;
@@ -1342,6 +1344,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
         // "ytdl_hook: youtube-dl failed: not found or not enough
         // permissions" end-file error even for plain local/network media.
         api.set_option_string(gpu_handle, "ytdl", "no");
+        if (BoolArg(args, "deinterlace", false)) api.set_option_string(gpu_handle, "deinterlace", "auto");
         if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
         // mpv's own D3D11 GPU-next VO negotiates the swap chain's color
         // space and HDR metadata itself once the OS display is actually in
@@ -1404,6 +1407,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
     api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
+  if (BoolArg(args, "deinterlace", false)) api.set_option_string(handle, "deinterlace", "auto");
   if (!start_value.empty()) api.set_option_string(handle, "start", start_value.c_str());
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   if (!headers.empty()) api.set_option_string(handle, "http-header-fields", headers.c_str());

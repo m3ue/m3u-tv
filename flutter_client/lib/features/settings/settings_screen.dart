@@ -2234,6 +2234,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
   bool _hdrEnabled = true;
   bool _matchRefreshRate = false;
+  bool _deinterlace = false;
   bool _navigationSoundEnabled = true;
   OptimizeFor _optimizeFor = OptimizeFor.quality;
   AppFontSize _fontSize = AppFontSize.normal;
@@ -2249,6 +2250,10 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   static final bool _showHdrToggle = Platform.isWindows || Platform.isLinux;
   static final bool _showRefreshRateToggle =
       Platform.isWindows || Platform.isAndroid || _isTvOS;
+
+  // Deinterlacing is an mpv filter. Android plays through ExoPlayer, which
+  // has no filter chain (mpv there is only a fallback), so hide it there.
+  static final bool _showDeinterlaceToggle = !Platform.isAndroid;
 
   // Mirrors the tvOS/Android-TV detection duplicated in go_router_config.dart
   // and dvr_series_rule_options_screen.dart -- no shared helper exists yet.
@@ -2281,6 +2286,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final defaultStartPage = await widget.service.defaultStartPage();
     final hdrEnabled = await widget.service.hdrEnabled();
     final matchRefreshRate = await widget.service.matchRefreshRate();
+    final deinterlace = await widget.service.deinterlace();
     final navigationSoundEnabled = await widget.service
         .navigationSoundEnabled();
     final optimizeFor = await widget.service.optimizeFor();
@@ -2298,6 +2304,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
       _defaultStartPage = defaultStartPage;
       _hdrEnabled = hdrEnabled;
       _matchRefreshRate = matchRefreshRate;
+      _deinterlace = deinterlace;
       _navigationSoundEnabled = navigationSoundEnabled;
       _optimizeFor = optimizeFor;
       _fontSize = fontSize;
@@ -2445,6 +2452,14 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                 icon: Icons.speed_outlined,
                 value: _matchRefreshRate,
                 onChanged: widget.service.setMatchRefreshRate,
+              ),
+            if (_showDeinterlaceToggle)
+              SettingsSwitchRow(
+                title: l.settingsDeinterlace,
+                subtitle: l.settingsDeinterlaceHint,
+                icon: Icons.reorder,
+                value: _deinterlace,
+                onChanged: widget.service.setDeinterlace,
               ),
             if (_showNavigationSoundToggle)
               SettingsSwitchRow(

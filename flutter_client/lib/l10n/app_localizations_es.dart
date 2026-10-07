@@ -1677,6 +1677,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cambia la pantalla a la frecuencia de fotogramas del vídeo al iniciar la reproducción. La pantalla puede parpadear o quedarse en negro un instante.';
 
   @override
+  String get settingsDeinterlace => 'Desentrelazar vídeo';
+
+  @override
+  String get settingsDeinterlaceHint =>
+      'Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.';
+
+  @override
   String get settingsNavigationSound => 'Sonido de navegación';
 
   @override

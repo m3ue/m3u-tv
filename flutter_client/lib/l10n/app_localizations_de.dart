@@ -1675,6 +1675,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schaltet das Display beim Start der Wiedergabe auf die Bildrate des Videos. Der Bildschirm kann dabei kurz flackern oder schwarz werden.';
 
   @override
+  String get settingsDeinterlace => 'Video deinterlacen';
+
+  @override
+  String get settingsDeinterlaceHint =>
+      'Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.';
+
+  @override
   String get settingsNavigationSound => 'Navigationston';
 
   @override

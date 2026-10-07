@@ -5,6 +5,7 @@
 #   - ios/macos/tvos Runner.xcodeproj/project.pbxproj (XCRemoteSwiftPackageReference
 #     "mpv-build" -> requirement.revision)
 #   - mpv-build.lock.json (android + windows tarball asset names + checksums)
+#   - windows/CMakeLists.txt (a hand-kept mirror of the lock's windows entry)
 #
 # mpv-build publishes every build to one perpetually-growing GitHub Release per
 # platform (200+ assets and counting) instead of pruning old ones, and GitHub's
@@ -14,8 +15,13 @@
 #
 # This script re-checks every URL our pins currently resolve to and fails if
 # any of them are no longer servable, so staleness is caught on a schedule
-# instead of mid-release. Run standalone (`scripts/check-mpv-build-pins.sh`)
-# or via .github/workflows/dependency-canary.yml.
+# instead of mid-release. It also fails when the pins disagree with each other
+# or with mpv-build's own artifacts.json at the locked commit: a partial bump
+# still resolves and builds, so nothing else notices it (the 2026-09-21 bump
+# moved Apple + Android to a new commit but left Windows on its 2026-09-05
+# asset while the lock's "commit" field claimed otherwise). Run standalone
+# (`scripts/check-mpv-build-pins.sh`) or via
+# .github/workflows/dependency-canary.yml.
 #
 # Deliberately avoids bash 4+ features (associative arrays, mapfile): macOS
 # runners' default /bin/bash is 3.2.
@@ -102,6 +108,80 @@ else
 fi
 
 echo ""
+echo "=== Pin consistency (pbxproj / $lock_file / windows/CMakeLists.txt) ==="
+
+if [[ -f "$lock_file" ]]; then
+  lock_commit=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"])' "$lock_file")
+  echo "  $lock_file commit is $lock_commit"
+
+  while IFS= read -r revision; do
+    [[ -z "$revision" ]] && continue
+    if [[ "$revision" == "$lock_commit" ]]; then
+      echo "  OK   Apple pin $revision matches the lock commit"
+    else
+      echo "  FAIL Apple pin $revision differs from the lock commit $lock_commit"
+      FAILED=$((FAILED + 1))
+    fi
+  done < "$REVISIONS_FILE"
+
+  artifacts_url="https://raw.githubusercontent.com/edde746/mpv-build/$lock_commit/artifacts.json"
+  if ! curl -sfL --max-time 30 "$artifacts_url" -o "$WORK/artifacts.json"; then
+    echo "  FAIL could not fetch artifacts.json at $lock_commit ($artifacts_url)"
+    FAILED=$((FAILED + 1))
+  else
+    # Exit status is the number of mismatches it printed.
+    set +e
+    python3 - "$lock_file" "$WORK/artifacts.json" windows/CMakeLists.txt <<'PYEOF'
+import json
+import re
+import sys
+
+lock_path, artifacts_path, cmake_path = sys.argv[1:]
+lock = json.load(open(lock_path))["artifacts"]
+platforms = json.load(open(artifacts_path))["platforms"]
+failures = 0
+
+
+def check(ok, label):
+    global failures
+    print(f"  {'OK  ' if ok else 'FAIL'} {label}")
+    if not ok:
+        failures += 1
+
+
+for platform, entry in lock.items():
+    libraries = platforms.get(platform, {}).get("libraries", {})
+    published = next(iter(libraries.values()), None)
+    if published is None:
+        check(False, f"{platform}: artifacts.json at the lock commit has no {platform} library")
+        continue
+    check(entry["key"] == published["key"],
+          f"{platform}: lock key {entry['key']} vs artifacts.json key {published['key']}")
+    for arch, asset in entry["assets"].items():
+        expected = published["prebuilt"].get(arch, {})
+        check(asset == {"asset": expected.get("asset"), "checksum": expected.get("checksum")},
+              f"{platform}/{arch}: lock asset + checksum match artifacts.json")
+
+cmake = open(cmake_path).read()
+windows = lock.get("windows")
+if windows is not None:
+    key = re.search(r'set\(MPV_KEY "([0-9a-f]+)"\)', cmake)
+    check(key is not None and key.group(1) == windows["key"],
+          f"windows/CMakeLists.txt MPV_KEY {key.group(1) if key else '(missing)'} vs lock {windows['key']}")
+    for arch in ("aarch64", "x86_64"):
+        sha = re.search(r'set\(MPV_ARCH "' + arch + r'"\)\s*set\(MPV_SHA256 "([0-9a-f]+)"\)', cmake)
+        check(sha is not None and sha.group(1) == windows["assets"][arch]["checksum"],
+              f"windows/CMakeLists.txt {arch} MPV_SHA256 matches the lock")
+
+sys.exit(min(failures, 125))
+PYEOF
+    mismatches=$?
+    set -e
+    FAILED=$((FAILED + mismatches))
+  fi
+fi
+
+echo ""
 echo "=== Checking $(sort -u "$URLS_FILE" | wc -l | tr -d ' ') unique asset URL(s) ==="
 
 CHECKED=0
@@ -130,10 +210,11 @@ echo "=== Summary: $CHECKED unique asset(s) checked, $FAILED failed ==="
 if [[ "$FAILED" -gt 0 ]]; then
   echo ""
   echo "One or more pinned mpv-build/MPVKit assets are no longer servable from"
-  echo "GitHub. Bump the pin (XCRemoteSwiftPackageReference \"mpv-build\" in each"
-  echo "project.pbxproj + matching Package.resolved files, and mpv-build.lock.json)"
-  echo "to the latest edde746/mpv-build commit/release before this reaches a"
-  echo "release build."
+  echo "GitHub, or the pins disagree with each other. Bump every pin together"
+  echo "(XCRemoteSwiftPackageReference \"mpv-build\" in each project.pbxproj +"
+  echo "matching Package.resolved files, mpv-build.lock.json, and the MPV_KEY +"
+  echo "MPV_SHA256 values in windows/CMakeLists.txt) to one edde746/mpv-build"
+  echo "commit before this reaches a release build."
   exit 1
 fi
 

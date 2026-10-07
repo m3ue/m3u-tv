@@ -1618,6 +1618,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMatchRefreshRateHint => '播放开始时将显示器切换为视频的帧率。屏幕可能会短暂闪烁或黑屏。';
 
   @override
+  String get settingsDeinterlace => '视频去隔行';
+
+  @override
+  String get settingsDeinterlaceHint =>
+      '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
+
+  @override
   String get settingsNavigationSound => '导航音效';
 
   @override

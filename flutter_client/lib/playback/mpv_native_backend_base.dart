@@ -97,6 +97,8 @@ abstract class MpvNativeBackendBase
         // Read only by the Android mpv core (FrameRateManager) -- inert on
         // iOS/macOS, whose mpv plugins don't read this key.
         'matchRefreshRate': source.matchDisplayRefreshRate,
+        // Read by the Apple mpv cores; the Android core ignores it.
+        'deinterlace': source.deinterlace,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{
