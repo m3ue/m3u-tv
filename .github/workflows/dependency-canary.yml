@@ -1,0 +1,37 @@
+name: Dependency Canary
+
+# Checks that the mpv-build/MPVKit binary assets we pin (Apple project.pbxproj
+# revisions + mpv-build.lock.json for Android/Windows) are still servable from
+# GitHub, on a schedule independent of any release.
+#
+# Why this exists: mpv-build publishes every build to one perpetually-growing
+# GitHub Release per platform (200+ assets and counting) instead of pruning
+# old ones, and that release has been observed to intermittently 5xx on
+# essentially random assets - old and new alike. A pin that resolved fine
+# yesterday can 504/500 mid-release with no warning, which is exactly what
+# happened on 2026-09-21 (see flutter_client/scripts/check-mpv-build-pins.sh
+# for the full incident writeup) and cost hours to diagnose because it was
+# first discovered in a release build instead of here.
+#
+# This does not fix transient per-asset flakiness (only retries around the
+# actual build-time downloads would); it catches a pin that has gone
+# genuinely stale (asset renamed/removed) with weeks of runway to fix it,
+# instead of finding out during a release.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Monday 09:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  check-mpv-build-pins:
+    name: Check pinned mpv-build/MPVKit assets
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check pinned asset URLs are servable
+        run: ./scripts/check-mpv-build-pins.sh

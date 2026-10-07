@@ -60,7 +60,8 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
           isCatchup: args["isCatchup"] as? Bool ?? false,
           userAgent: args["userAgent"] as? String,
           headers: args["headers"] as? [String: String],
-          externalSubtitles: Self.parseExternalSubtitles(args["externalSubtitles"])
+          externalSubtitles: Self.parseExternalSubtitles(args["externalSubtitles"]),
+          deinterlace: args["deinterlace"] as? Bool ?? false
         )
         result(["ok": true])
       }

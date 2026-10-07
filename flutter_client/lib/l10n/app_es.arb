@@ -884,6 +884,8 @@
   "settingsHdrModeHint": "Permite que los vídeos HDR cambien la pantalla al modo HDR. Solo Windows y Linux.",
   "settingsMatchRefreshRate": "Ajustar frecuencia de actualización",
   "settingsMatchRefreshRateHint": "Cambia la pantalla a la frecuencia de fotogramas del vídeo al iniciar la reproducción. La pantalla puede parpadear o quedarse en negro un instante.",
+  "settingsDeinterlace": "Desentrelazar vídeo",
+  "settingsDeinterlaceHint": "Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.",
   "settingsNavigationSound": "Sonido de navegación",
   "settingsNavigationSoundHint": "Reproduce un sonido de clic al mover el foco con el control remoto o el teclado.",
   "settingsToggleOn": "Activado",

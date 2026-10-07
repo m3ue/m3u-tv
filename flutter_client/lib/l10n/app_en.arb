@@ -956,6 +956,8 @@
   "settingsHdrModeHint": "Let HDR videos switch the display into HDR mode. Windows and Linux only.",
   "settingsMatchRefreshRate": "Match display refresh rate",
   "settingsMatchRefreshRateHint": "Switch the display to the video's frame rate when playback starts. Can briefly flash or blank the screen.",
+  "settingsDeinterlace": "Deinterlace video",
+  "settingsDeinterlaceHint": "Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.",
   "settingsNavigationSound": "Navigation sound",
   "settingsNavigationSoundHint": "Play a click sound when moving focus with the remote or keyboard.",
   "settingsToggleOn": "On",

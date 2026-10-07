@@ -84,6 +84,41 @@ void main() {
       await backend.dispose();
     });
 
+    test('load forwards the deinterlace setting', () async {
+      setupMockEvents();
+      final loadCalls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            if (call.method == 'load') loadCalls.add(call);
+            return <String, Object?>{'ok': false, 'error': 'test'};
+          });
+
+      final backend = MacMpvNativeBackend();
+      for (final deinterlace in [true, false]) {
+        await expectLater(
+          backend.load(
+            PlaybackSource(
+              uri: 'https://editor.test/live/u/p/1.ts',
+              isLive: true,
+              deinterlace: deinterlace,
+            ),
+          ),
+          throwsA(isA<PlaybackException>()),
+        );
+      }
+
+      // Sent on every load, off included: the native handle persists across
+      // loads, so an omitted key would leave the previous load's value.
+      expect(
+        loadCalls.map(
+          (call) => (call.arguments as Map<Object?, Object?>)['deinterlace'],
+        ),
+        [isTrue, isFalse],
+      );
+
+      await backend.dispose();
+    });
+
     test('seekWindow reads the buffered ranges from the native core', () async {
       setupMockEvents();
       final calls = <MethodCall>[];

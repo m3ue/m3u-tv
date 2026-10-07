@@ -252,6 +252,7 @@ class PlaybackSource {
     this.externalSubtitles = const <ExternalSubtitle>[],
     this.hdrEnabled = true,
     this.matchDisplayRefreshRate = false,
+    this.deinterlace = false,
   });
 
   final String uri;
@@ -288,6 +289,12 @@ class PlaybackSource {
   /// `ViewSettingsService.matchRefreshRate`.
   final bool matchDisplayRefreshRate;
 
+  /// Whether the Apple and desktop mpv backends deinterlace video flagged
+  /// interlaced (mpv's `deinterlace=auto`). Android ignores it: ExoPlayer has
+  /// no filter chain, and the setting is hidden there. Mirrors
+  /// `ViewSettingsService.deinterlace`.
+  final bool deinterlace;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -304,6 +311,7 @@ class PlaybackSource {
     List<ExternalSubtitle>? externalSubtitles,
     bool? hdrEnabled,
     bool? matchDisplayRefreshRate,
+    bool? deinterlace,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -320,6 +328,7 @@ class PlaybackSource {
       hdrEnabled: hdrEnabled ?? this.hdrEnabled,
       matchDisplayRefreshRate:
           matchDisplayRefreshRate ?? this.matchDisplayRefreshRate,
+      deinterlace: deinterlace ?? this.deinterlace,
     );
   }
 }

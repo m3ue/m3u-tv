@@ -1681,6 +1681,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Bascule l\'écran sur la fréquence d\'images de la vidéo au démarrage de la lecture. L\'écran peut brièvement clignoter ou devenir noir.';
 
   @override
+  String get settingsDeinterlace => 'Désentrelacer la vidéo';
+
+  @override
+  String get settingsDeinterlaceHint =>
+      'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
+
+  @override
   String get settingsNavigationSound => 'Son de navigation';
 
   @override

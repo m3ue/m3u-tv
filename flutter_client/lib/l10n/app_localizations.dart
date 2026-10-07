@@ -2960,6 +2960,18 @@ abstract class AppLocalizations {
   /// **'Switch the display to the video\'s frame rate when playback starts. Can briefly flash or blank the screen.'**
   String get settingsMatchRefreshRateHint;
 
+  /// No description provided for @settingsDeinterlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Deinterlace video'**
+  String get settingsDeinterlace;
+
+  /// No description provided for @settingsDeinterlaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
+  String get settingsDeinterlaceHint;
+
   /// No description provided for @settingsNavigationSound.
   ///
   /// In en, this message translates to:

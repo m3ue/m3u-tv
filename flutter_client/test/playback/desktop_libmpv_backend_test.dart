@@ -260,6 +260,7 @@ void main() {
           'headers': <String, String>{'Referer': 'https://provider.test'},
           'hdrEnabled': true,
           'matchRefreshRate': false,
+          'deinterlace': false,
           'externalSubtitles': <Map<String, Object?>>[],
         });
         expect(backend.textureId, isNull);
@@ -269,38 +270,43 @@ void main() {
       },
     );
 
-    test('load forwards the HDR and refresh-rate view settings', () async {
-      final events = setupMockEvents();
-      MethodCall? loadCall;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(methodChannel, (call) async {
-            loadCall = call;
-            return <String, Object?>{
-              'ok': false,
-              'code': BackendUnavailableException.unavailableCode,
-              'error': 'no libmpv',
-            };
-          });
+    test(
+      'load forwards the HDR, refresh-rate and deinterlace view settings',
+      () async {
+        final events = setupMockEvents();
+        MethodCall? loadCall;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(methodChannel, (call) async {
+              loadCall = call;
+              return <String, Object?>{
+                'ok': false,
+                'code': BackendUnavailableException.unavailableCode,
+                'error': 'no libmpv',
+              };
+            });
 
-      final backend = DesktopLibmpvBackend();
-      await expectLater(
-        backend.load(
-          const PlaybackSource(
-            uri: 'https://example.test/movie.mp4',
-            hdrEnabled: false,
-            matchDisplayRefreshRate: true,
+        final backend = DesktopLibmpvBackend();
+        await expectLater(
+          backend.load(
+            const PlaybackSource(
+              uri: 'https://example.test/movie.mp4',
+              hdrEnabled: false,
+              matchDisplayRefreshRate: true,
+              deinterlace: true,
+            ),
           ),
-        ),
-        throwsA(isA<BackendUnavailableException>()),
-      );
+          throwsA(isA<BackendUnavailableException>()),
+        );
 
-      final args = loadCall!.arguments as Map<Object?, Object?>;
-      expect(args['hdrEnabled'], isFalse);
-      expect(args['matchRefreshRate'], isTrue);
+        final args = loadCall!.arguments as Map<Object?, Object?>;
+        expect(args['hdrEnabled'], isFalse);
+        expect(args['matchRefreshRate'], isTrue);
+        expect(args['deinterlace'], isTrue);
 
-      await backend.dispose();
-      await events.close();
-    });
+        await backend.dispose();
+        await events.close();
+      },
+    );
 
     test('load tells the native core when the source is catchup', () async {
       final events = setupMockEvents();

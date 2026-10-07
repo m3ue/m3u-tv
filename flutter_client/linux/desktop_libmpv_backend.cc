@@ -1631,6 +1631,10 @@ FlMethodResponse* Load(FlValue* args) {
     api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
+  // The Deinterlace setting: `auto` filters only frames flagged interlaced.
+  // The system libmpv may predate `auto` and reject it, which leaves mpv's
+  // default (off) rather than failing the open.
+  if (BoolArg(args, "deinterlace", false)) api.set_option_string(handle, "deinterlace", "auto");
   std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   std::string headers = HeaderString(args);

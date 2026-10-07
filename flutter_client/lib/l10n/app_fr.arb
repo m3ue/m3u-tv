@@ -884,6 +884,8 @@
   "settingsHdrModeHint": "Autoriser les vidéos HDR à basculer l'écran en mode HDR. Windows et Linux uniquement.",
   "settingsMatchRefreshRate": "Adapter la fréquence de rafraîchissement",
   "settingsMatchRefreshRateHint": "Bascule l'écran sur la fréquence d'images de la vidéo au démarrage de la lecture. L'écran peut brièvement clignoter ou devenir noir.",
+  "settingsDeinterlace": "Désentrelacer la vidéo",
+  "settingsDeinterlaceHint": "Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.",
   "settingsNavigationSound": "Son de navigation",
   "settingsNavigationSoundHint": "Joue un son de clic lors du déplacement du focus avec la télécommande ou le clavier.",
   "settingsToggleOn": "Activé",

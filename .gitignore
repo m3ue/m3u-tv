@@ -17,6 +17,7 @@
 .github/workflows/*
 !.github/workflows/ci.yml
 !.github/workflows/release.yml
+!.github/workflows/dependency-canary.yml
 
 # Flutter
 flutter_client/build/

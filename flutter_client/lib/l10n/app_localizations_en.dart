@@ -1666,6 +1666,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Switch the display to the video\'s frame rate when playback starts. Can briefly flash or blank the screen.';
 
   @override
+  String get settingsDeinterlace => 'Deinterlace video';
+
+  @override
+  String get settingsDeinterlaceHint =>
+      'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.';
+
+  @override
   String get settingsNavigationSound => 'Navigation sound';
 
   @override

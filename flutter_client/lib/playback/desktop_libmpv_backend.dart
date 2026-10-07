@@ -152,6 +152,7 @@ class DesktopLibmpvBackend
         // round trip would lose the race with the first-frame display switch.
         'hdrEnabled': source.hdrEnabled,
         'matchRefreshRate': source.matchDisplayRefreshRate,
+        'deinterlace': source.deinterlace,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

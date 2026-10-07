@@ -43,6 +43,22 @@ private enum DisplayDynamicRange: String {
   case dolbyVision = "Dolby Vision"
 }
 
+private struct DisplayCriteriaInputs: Equatable {
+  var width: Double = 0
+  var height: Double = 0
+  var sigPeak: Double = 0
+  var doviProfile: Int64 = 0
+  var doviLevel: Int64 = 0
+  var containerFps: Double = 0
+  /// `estimated-vf-fps` at the first shown frame. Changes every frame, so it
+  /// is read at PLAYBACK_RESTART only, never observed.
+  var estimatedFps: Double = 0
+  var deinterlaceActive = false
+  var gamma: String?
+  var primaries: String?
+  var colorMatrix: String?
+}
+
 final class MpvPlayerCore {
   let viewId: Int
   weak var delegate: MpvPlayerCoreDelegate?
@@ -59,8 +75,19 @@ final class MpvPlayerCore {
   private weak var hostView: UIView?
   private var activeDisplayCriteriaKey: String?
 
+  // Display-criteria inputs and hold, both owned by `queue`. Held from a
+  // file's START_FILE/END_FILE until its first PLAYBACK_RESTART (and before
+  // the first file): nothing is committed while held, so the previous
+  // file's mode stays on the HDMI link until the next file's first frame
+  // shows whether it needs to change. Without the hold, the teardown and
+  // startup property deliveries of a channel zap or episode advance cleared
+  // the criteria ("invalid video dimensions") and re-set the same mode,
+  // renegotiating HDMI for seconds per transition (Plezy e30ba79c5).
+  private var displayCriteriaInputs = DisplayCriteriaInputs()
+  private var displayCriteriaHeld = true
+
   // Set fresh on every `load()`, read only on `queue` (see
-  // `scheduleDisplayCriteriaUpdate`, which captures it into the main-thread
+  // `commitDisplayCriteria`, which captures it into the main-thread
   // `updateDisplayCriteria` call rather than reading it there directly) --
   // same single-queue-owns-it convention as `readyEmitted`/`disposed`.
   // Default true is a belt-and-suspenders fallback only; the authoritative
@@ -166,6 +193,7 @@ final class MpvPlayerCore {
         ("video-params/gamma", MPV_FORMAT_STRING),
         ("video-params/primaries", MPV_FORMAT_STRING),
         ("video-params/colormatrix", MPV_FORMAT_STRING),
+        ("deinterlace-active", MPV_FORMAT_FLAG),
       ]
       for (index, entry) in observed.enumerated() {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
@@ -197,7 +225,8 @@ final class MpvPlayerCore {
     userAgent: String?,
     headers: [String: String]?,
     externalSubtitles: [(uri: String, title: String?, language: String?)] = [],
-    matchRefreshRate: Bool = true
+    matchRefreshRate: Bool = true,
+    deinterlace: Bool = false
   ) {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }
@@ -233,6 +262,9 @@ final class MpvPlayerCore {
       // three. Reset for every other load, since this handle persists across loads.
       mpv_set_option_string(handle, "demuxer-lavf-o", isCatchup ? "skip_estimate_duration_from_pts=1" : "")
       mpv_set_option_string(handle, "stream-buffer-size", isCatchup ? "4MiB" : "128KiB")
+      // The Deinterlace setting: `auto` filters only frames flagged interlaced. Set on
+      // every load, since this handle persists across loads.
+      mpv_set_option_string(handle, "deinterlace", deinterlace ? "auto" : "no")
 
       var args: [String?] = ["loadfile", uri, "replace"]
       if startPositionMs > 0 {
@@ -386,15 +418,29 @@ final class MpvPlayerCore {
   private func handle_(event: mpv_event) {
     switch event.event_id {
     case MPV_EVENT_START_FILE:
+      displayCriteriaHeld = true
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:
       readyEmitted = true
       emit(kind: "FILE_LOADED", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PLAYBACK_RESTART:
+      // The first shown frame after a load or seek. mpv delivers queued
+      // events before pending property changes, so the observed values can
+      // still be the previous file's or its teardown's here; this one
+      // synchronous read is the file's authoritative snapshot and its first
+      // commit.
+      if let handle = mpv {
+        displayCriteriaInputs = readDisplayCriteriaInputs(handle)
+        displayCriteriaHeld = false
+        commitDisplayCriteria()
+      }
       emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
-      if Self.displayCriteriaPropertyIndices.contains(event.reply_userdata) {
-        scheduleDisplayCriteriaUpdate()
+      if Self.displayCriteriaPropertyIndices.contains(event.reply_userdata), !displayCriteriaHeld,
+        let data = event.data,
+        refineDisplayCriteria(with: data.assumingMemoryBound(to: mpv_event_property.self).pointee)
+      {
+        commitDisplayCriteria()
       }
       if readyEmitted {
         // Most property-change events are `time-pos` ticks (essentially
@@ -406,6 +452,9 @@ final class MpvPlayerCore {
         emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: includeTracks))
       }
     case MPV_EVENT_END_FILE:
+      // Queued before any teardown-valued property delivery, so the hold is
+      // in place before those could commit.
+      displayCriteriaHeld = true
       if let data = event.data {
         let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         if endFile.reason == MPV_END_FILE_REASON_ERROR {
@@ -440,8 +489,9 @@ final class MpvPlayerCore {
 
   /// Indices of the HDR display-criteria inputs appended to `observed` in
   /// `attach(to:hostView:)` (sig-peak, width, height, Dolby Vision
-  /// profile/level, container-fps, gamma, primaries, colormatrix).
-  private static let displayCriteriaPropertyIndices: Set<UInt64> = [10, 11, 12, 13, 14, 15, 16, 17, 18]
+  /// profile/level, container-fps, gamma, primaries, colormatrix,
+  /// deinterlace-active).
+  private static let displayCriteriaPropertyIndices: Set<UInt64> = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 
   private func snapshot(includeTracks: Bool) -> [String: Any] {
     guard let handle = mpv else { return [:] }
@@ -579,45 +629,121 @@ final class MpvPlayerCore {
 
   // MARK: - HDR display-mode switching
 
-  /// Reads the current HDR-relevant mpv properties (on `queue`, where mpv
-  /// access is safe) and hands them to `updateDisplayCriteria` on main
-  /// (where `AVDisplayManager` must be touched). Called on every change to
-  /// any property in `displayCriteriaPropertyIndices`.
-  private func scheduleDisplayCriteriaUpdate() {
-    guard let handle = mpv else { return }
+  /// Reads every display-criteria input synchronously (on `queue`, where mpv
+  /// access is safe). Taken as authoritative: an unavailable property means
+  /// the stream lacks it.
+  private func readDisplayCriteriaInputs(_ handle: OpaquePointer) -> DisplayCriteriaInputs {
+    var inputs = DisplayCriteriaInputs()
+    _ = mpv_get_property(handle, "video-params/sig-peak", MPV_FORMAT_DOUBLE, &inputs.sigPeak)
+    _ = mpv_get_property(handle, "width", MPV_FORMAT_DOUBLE, &inputs.width)
+    _ = mpv_get_property(handle, "height", MPV_FORMAT_DOUBLE, &inputs.height)
+    _ = mpv_get_property(handle, "current-tracks/video/dolby-vision-profile", MPV_FORMAT_INT64, &inputs.doviProfile)
+    _ = mpv_get_property(handle, "current-tracks/video/dolby-vision-level", MPV_FORMAT_INT64, &inputs.doviLevel)
+    _ = mpv_get_property(handle, "container-fps", MPV_FORMAT_DOUBLE, &inputs.containerFps)
+    _ = mpv_get_property(handle, "estimated-vf-fps", MPV_FORMAT_DOUBLE, &inputs.estimatedFps)
+    var deinterlaceActive: Int32 = 0
+    _ = mpv_get_property(handle, "deinterlace-active", MPV_FORMAT_FLAG, &deinterlaceActive)
+    inputs.deinterlaceActive = deinterlaceActive != 0
+    inputs.gamma = stringProperty(handle, "video-params/gamma")
+    inputs.primaries = stringProperty(handle, "video-params/primaries")
+    inputs.colorMatrix = stringProperty(handle, "video-params/colormatrix")
+    return inputs
+  }
 
-    var sigPeak: Double = 0
-    _ = mpv_get_property(handle, "video-params/sig-peak", MPV_FORMAT_DOUBLE, &sigPeak)
-    var width: Double = 0
-    _ = mpv_get_property(handle, "width", MPV_FORMAT_DOUBLE, &width)
-    var height: Double = 0
-    _ = mpv_get_property(handle, "height", MPV_FORMAT_DOUBLE, &height)
-    var doviProfile: Int64 = 0
-    _ = mpv_get_property(handle, "current-tracks/video/dolby-vision-profile", MPV_FORMAT_INT64, &doviProfile)
-    var doviLevel: Int64 = 0
-    _ = mpv_get_property(handle, "current-tracks/video/dolby-vision-level", MPV_FORMAT_INT64, &doviLevel)
-    var fps: Double = 0
-    _ = mpv_get_property(handle, "container-fps", MPV_FORMAT_DOUBLE, &fps)
-    let gamma = stringProperty(handle, "video-params/gamma")
-    let primaries = stringProperty(handle, "video-params/primaries")
-    let colorMatrix = stringProperty(handle, "video-params/colormatrix")
+  /// Folds one observer delivery into `displayCriteriaInputs`, returning
+  /// whether anything changed. Only a delivered value counts: an unavailable
+  /// one is ambiguous (teardown, a superseded read, or genuinely absent) and
+  /// only the PLAYBACK_RESTART snapshot can tell which.
+  private func refineDisplayCriteria(with property: mpv_event_property) -> Bool {
+    guard property.format != MPV_FORMAT_NONE, let data = property.data, let name = property.name else {
+      return false
+    }
+    var inputs = displayCriteriaInputs
+    switch (String(cString: name), property.format) {
+    case ("video-params/sig-peak", MPV_FORMAT_DOUBLE): inputs.sigPeak = data.load(as: Double.self)
+    case ("width", MPV_FORMAT_DOUBLE): inputs.width = data.load(as: Double.self)
+    case ("height", MPV_FORMAT_DOUBLE): inputs.height = data.load(as: Double.self)
+    case ("current-tracks/video/dolby-vision-profile", MPV_FORMAT_INT64):
+      inputs.doviProfile = data.load(as: Int64.self)
+    case ("current-tracks/video/dolby-vision-level", MPV_FORMAT_INT64):
+      inputs.doviLevel = data.load(as: Int64.self)
+    case ("container-fps", MPV_FORMAT_DOUBLE): inputs.containerFps = data.load(as: Double.self)
+    case ("deinterlace-active", MPV_FORMAT_FLAG): inputs.deinterlaceActive = data.load(as: Int32.self) != 0
+    case (let key, MPV_FORMAT_STRING):
+      guard let cString = data.assumingMemoryBound(to: UnsafePointer<CChar>?.self).pointee else { return false }
+      let value = String(cString: cString)
+      switch key {
+      case "video-params/gamma": inputs.gamma = value
+      case "video-params/primaries": inputs.primaries = value
+      case "video-params/colormatrix": inputs.colorMatrix = value
+      default: return false
+      }
+    default:
+      return false
+    }
+    guard inputs != displayCriteriaInputs else { return false }
+    displayCriteriaInputs = inputs
+    return true
+  }
+
+  /// Hands the current inputs to `updateDisplayCriteria` on main (where
+  /// `AVDisplayManager` must be touched). Runs on `queue`; never while held.
+  private func commitDisplayCriteria() {
+    guard !displayCriteriaHeld else { return }
+    let inputs = displayCriteriaInputs
+    // Presented one frame per field when mpv's deinterlacer runs, or when
+    // the first frame's cadence says the decoder deinterlaced by itself:
+    // either way the display should run at twice the container rate.
+    let fieldOutput =
+      inputs.deinterlaceActive
+      || Self.presentsFields(container: inputs.containerFps, presented: inputs.estimatedFps)
+    let fps = Self.nominalRefreshRate(fieldOutput ? inputs.containerFps * 2 : inputs.containerFps)
     // Read here, on `queue` -- see `matchRefreshRateEnabled`'s doc comment.
     let matchRefreshRateEnabled = self.matchRefreshRateEnabled
 
     DispatchQueue.main.async { [weak self] in
       self?.updateDisplayCriteria(
-        doviProfile: doviProfile,
-        doviLevel: doviLevel,
+        doviProfile: inputs.doviProfile,
+        doviLevel: inputs.doviLevel,
         fps: fps,
-        width: Int32(width),
-        height: Int32(height),
-        sigPeak: sigPeak,
-        gamma: gamma,
-        primaries: primaries,
-        colorMatrix: colorMatrix,
+        width: Int32(inputs.width),
+        height: Int32(inputs.height),
+        sigPeak: inputs.sigPeak,
+        gamma: inputs.gamma,
+        primaries: inputs.primaries,
+        colorMatrix: inputs.colorMatrix,
         matchRefreshRateEnabled: matchRefreshRateEnabled
       )
     }
+  }
+
+  /// Whether the measured output cadence is the container rate doubled. The
+  /// band absorbs millisecond timestamp rounding and one duplicated
+  /// timestamp in the measurement window while rejecting duplicated,
+  /// dropped or telecined cadences (3.0, 0.5, 1.25). From Plezy's
+  /// `MpvPlayerCoreBase.presentsFields`.
+  private static func presentsFields(container: Double, presented: Double) -> Bool {
+    guard container > 0, presented > 0 else { return false }
+    let ratio = presented / container
+    return ratio > 1.7 && ratio < 2.3
+  }
+
+  /// Rates a TV advertises display modes for, in Hz.
+  private static let nominalRefreshRates: [Double] = [
+    23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 100, 119.88, 120,
+  ]
+
+  /// The nearest nominal rate when `fps` is within 1% of one (FFmpeg's own
+  /// band for rounding a guessed frame rate), otherwise `fps` unchanged.
+  /// Container rates are declared or averaged, never measured (a 29.97i
+  /// capture reads 29.95784, an MKV with a 42 ms frame duration 23.8095),
+  /// and tvOS hands the pick to AVDisplayManager, which only has modes for
+  /// nominal rates, so the request itself has to be nominal (Plezy
+  /// 81f0b49cb).
+  private static func nominalRefreshRate(_ fps: Double) -> Double {
+    guard fps > 0 else { return 0 }
+    guard let nearest = nominalRefreshRates.min(by: { abs($0 - fps) < abs($1 - fps) }) else { return fps }
+    return abs(nearest - fps) / nearest < 0.01 ? nearest : fps
   }
 
   /// Requests an HDMI display-mode switch matching the current source's
