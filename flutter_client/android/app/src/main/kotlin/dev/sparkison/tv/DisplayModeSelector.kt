@@ -40,12 +40,21 @@ internal object DisplayModeSelector {
         val current = candidates.firstOrNull { it.modeId == currentModeId } ?: return null
         val sameResolution = candidates.filter { it.width == current.width && it.height == current.height }
 
+        // An exact rate beats every multiple, and among exact rates the smaller
+        // error wins (the active mode settles only an equal error). Among
+        // multiples the active mode wins, then the largest multiple, then the
+        // smaller error: 48 Hz is nearer 2x 23.976 than 120 Hz is to 5x, but on
+        // a 120 Hz panel 48 Hz judders where 120 Hz is a clean 5:5, and keeping
+        // the active mode avoids an HDMI renegotiation (Plezy 6fcac5243,
+        // d9e103262).
         return sameResolution
             .mapNotNull { mode -> matchError(mode.refreshRate, targetFps)?.let { mode to it } }
             .minWithOrNull(
                 compareBy<Pair<Mode, RateMatch>> { it.second.priority }
-                    .thenBy { it.second.error }
-                    .thenByDescending { it.second.multiple },
+                    .thenBy { if (it.second.priority == 0) it.second.error else 0.0 }
+                    .thenByDescending { it.first.modeId == currentModeId }
+                    .thenByDescending { it.second.multiple }
+                    .thenBy { it.second.error },
             )
             ?.first
     }

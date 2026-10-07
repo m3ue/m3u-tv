@@ -48,23 +48,19 @@ internal object FlutterRendererPolicy {
     }
 
     /**
-     * Engine memory-pool caps for low-RAM boxes, matching Plezy. Flutter's
-     * `imageCache` budget only bounds decoded bitmaps: Skia's GPU resource
-     * cache is sized from the surface area (hundreds of MB on a 4K-composited
-     * TV) and the Dart old gen defaults to a large fraction of physical RAM.
+     * The Dart old-gen heap size, always passed. FlutterLoader appends its own
+     * defaults after the activity's shell args and the engine keeps the last
+     * value of a flag, so a cap passed here alone never applied. The
+     * manifest's `OldGenHeapSize` meta-data suppresses the loader's default,
+     * which makes this the value that sticks: 256 MB on low-RAM boxes, where
+     * the default of half of physical RAM drives LMK kills, and that same
+     * default everywhere else (Plezy f7fa32e66). Skia's resource cache has no
+     * such opt-out, so Dart caps it instead (`DevicePerformance`).
      */
-    fun engineMemoryArgs(
-        renderer: FlutterRenderer,
-        isLowRamClass: Boolean,
-    ): List<String> {
-        if (!isLowRamClass) return emptyList()
-        val args = mutableListOf<String>()
-        if (renderer == FlutterRenderer.SKIA) {
-            args.add("--resource-cache-max-bytes-threshold=$LOW_RAM_RESOURCE_CACHE_BYTES")
-        }
-        args.add("--old-gen-heap-size=256")
-        return args
+    fun engineMemoryArgs(isLowRamClass: Boolean, totalMemBytes: Long): List<String> {
+        val oldGenMegabytes = if (isLowRamClass) LOW_RAM_OLD_GEN_MB else (totalMemBytes / 1e6 / 2).toInt()
+        return listOf("--old-gen-heap-size=$oldGenMegabytes")
     }
 
-    private const val LOW_RAM_RESOURCE_CACHE_BYTES = 48L shl 20
+    private const val LOW_RAM_OLD_GEN_MB = 256
 }

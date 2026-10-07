@@ -63,6 +63,34 @@ class DisplayModeSelectorTest {
     }
 
     @Test
+    fun prefersTheLargerMultipleOverASmallerErrorForNtscContent() {
+        // 23.976fps: 48Hz misses 2x by 0.048, 120Hz misses 5x by 0.12. 48Hz
+        // judders on a 120Hz panel; 120Hz is a clean 5:5.
+        val fortyEight = Mode(modeId = 6, refreshRate = 48.0, width = 3840, height = 2160)
+        val candidates = listOf(sixty, fortyEight, oneTwenty)
+        val result = DisplayModeSelector.bestMode(candidates, currentModeId = 1, targetFps = 23.976)
+        assertEquals(oneTwenty, result)
+    }
+
+    @Test
+    fun keepsTheActiveModeWhenItIsAlreadyACleanMultiple() {
+        // 30fps on a panel already at 60Hz: 120Hz is a larger multiple, but
+        // switching to it would only cost an HDMI renegotiation.
+        val result = DisplayModeSelector.bestMode(listOf(sixty, oneTwenty), currentModeId = 1, targetFps = 30.0)
+        assertEquals(sixty, result)
+    }
+
+    @Test
+    fun picksTheNearerExactRateOverTheActiveMode() {
+        // 59.94fps: a panel on 60.000004Hz is within tolerance, but its true
+        // 59.94Hz mode is the nearer exact rate.
+        val activeSixty = Mode(modeId = 1, refreshRate = 60.000004, width = 3840, height = 2160)
+        val ntscSixty = Mode(modeId = 7, refreshRate = 59.94, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(activeSixty, ntscSixty), currentModeId = 1, targetFps = 59.94)
+        assertEquals(ntscSixty, result)
+    }
+
+    @Test
     fun returnsNullWhenCurrentModeIdIsNotAmongCandidates() {
         val result = DisplayModeSelector.bestMode(listOf(sixty, twentyFour), currentModeId = 99, targetFps = 24.0)
         assertNull(result)

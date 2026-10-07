@@ -63,11 +63,23 @@ class DevicePerformance {
           _is64Bit == false ||
           _isLowRam == true ||
           (_totalMemBytes != null && _totalMemBytes! <= _lowMemThresholdBytes);
+      if (_autoReduced) _capSkiaResourceCache();
     } on MissingPluginException {
       // Stale native build - stay on the full tier.
     } on PlatformException {
       // Signal query failed - stay on the full tier.
     }
+  }
+
+  /// Caps Skia's GPU resource cache on low-end hardware, where it is otherwise
+  /// sized from the surface area (hundreds of MB on a 4K-composited TV) and
+  /// drives LMK kills on 2GB boxes. MainActivity can't set this as a shell
+  /// arg because FlutterLoader appends its own threshold after it; an
+  /// override over flutter/skia sticks. Impeller ignores it.
+  static void _capSkiaResourceCache() {
+    SystemChannels.skia
+        .invokeMethod<void>('Skia.setResourceCacheMaxBytes', 48 << 20)
+        .ignore();
   }
 
   static bool get _isAndroid =>

@@ -128,7 +128,7 @@ class MainActivity : FlutterActivity() {
             is64Bit = Process.is64Bit(),
         )
         renderer.shellArgument?.let { args.add(it) }
-        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(renderer, isLowRamClass())
+        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(isLowRamClass(), totalMemBytes())
         memoryArgs.forEach { args.add(it) }
         rendererDescription = "${renderer.diagnosticName} $memoryArgs"
         Log.i(TAG, "Flutter renderer: $rendererDescription")
@@ -140,10 +140,14 @@ class MainActivity : FlutterActivity() {
     // slightly above 2 GiB after carve-outs).
     private fun isLowRamClass(): Boolean {
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
         return !Process.is64Bit() ||
             activityManager?.isLowRamDevice == true ||
-            memInfo.totalMem <= LOW_MEM_THRESHOLD_BYTES
+            totalMemBytes() <= LOW_MEM_THRESHOLD_BYTES
+    }
+
+    private fun totalMemBytes(): Long {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        return ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }.totalMem
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

@@ -43,26 +43,20 @@ class FlutterRendererPolicyTest {
     }
 
     @Test
-    fun lowRamSkiaGetsPlezyCaps() {
-        assertEquals(
-            listOf("--resource-cache-max-bytes-threshold=50331648", "--old-gen-heap-size=256"),
-            FlutterRendererPolicy.engineMemoryArgs(FlutterRenderer.SKIA, isLowRamClass = true),
-        )
-    }
-
-    @Test
-    fun lowRamImpellerGetsOnlyTheDartHeapCap() {
+    fun lowRamClassCapsTheDartHeapAt256Megabytes() {
         assertEquals(
             listOf("--old-gen-heap-size=256"),
-            FlutterRendererPolicy.engineMemoryArgs(FlutterRenderer.IMPELLER, isLowRamClass = true),
+            FlutterRendererPolicy.engineMemoryArgs(isLowRamClass = true, totalMemBytes = 2_000_000_000L),
         )
     }
 
     @Test
-    fun devicesAboveTheLowRamClassGetNoCaps() {
+    fun devicesAboveTheLowRamClassGetFlutterLoadersHalfOfRamDefault() {
+        // The manifest's OldGenHeapSize meta-data turns FlutterLoader's own
+        // default off, so this is passed explicitly for every other device.
         assertEquals(
-            emptyList<String>(),
-            FlutterRendererPolicy.engineMemoryArgs(FlutterRenderer.SKIA, isLowRamClass = false),
+            listOf("--old-gen-heap-size=1500"),
+            FlutterRendererPolicy.engineMemoryArgs(isLowRamClass = false, totalMemBytes = 3_000_000_000L),
         )
     }
 
