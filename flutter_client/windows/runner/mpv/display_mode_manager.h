@@ -68,10 +68,11 @@ class DisplayModeManager {
   // Changes the refresh rate at the *current* resolution only -- this app
   // never requests a resolution change, which is the higher-risk half of
   // what SetDisplayMode could do (a wrong resolution can blank the display;
-  // a wrong refresh rate at the same resolution cannot). Only exact matches
-  // (or within 0.05 Hz, since some drivers report a fractional NTSC rate
-  // like 23.976 imprecisely) at the current resolution are applied; no
-  // fallback resolution search is attempted. Returns true on success.
+  // a wrong refresh rate at the same resolution cannot). Picks the lowest
+  // whole multiple of `target_fps` within 0.5% among the current resolution's
+  // modes, reading Windows' whole-hertz NTSC rates (23, 29, 59, ...) as their
+  // 1000/1001 values (see refresh_rate_match.h); no fallback resolution
+  // search is attempted. Returns true on success.
   bool MatchRefreshRate(HWND window, double target_fps);
 
   // Restores the previously saved display mode. No-op if none is pending.

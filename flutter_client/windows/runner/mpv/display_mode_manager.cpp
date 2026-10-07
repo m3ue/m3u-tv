@@ -4,6 +4,7 @@
 #include <cmath>
 #include <mutex>
 
+#include "refresh_rate_match.h"
 #include "sdk_26100.h"
 
 // Win32 API sequences (DisplayConfig target lookup, Kodi's Win8+ workaround
@@ -241,17 +242,15 @@ bool DisplayModeManager::MatchRefreshRate(HWND window, double target_fps) {
   // Only a mode at the *current* resolution is a candidate -- no resolution
   // search, see the header comment on why that risk is deliberately not
   // taken here.
-  const DisplayMode* best = nullptr;
-  double best_distance = 1.0;  // Hz; anything farther than this is not "the same rate".
+  std::vector<uint32_t> rates;
   for (const DisplayMode& mode : EnumerateDisplayModes(window)) {
-    if (mode.width != current.width || mode.height != current.height) continue;
-    const double distance = std::fabs(static_cast<double>(mode.refresh_rate) - target_fps);
-    if (distance < best_distance) {
-      best_distance = distance;
-      best = &mode;
-    }
+    if (mode.width == current.width && mode.height == current.height) rates.push_back(mode.refresh_rate);
   }
-  if (best == nullptr || best->refresh_rate == current.refresh_rate) return false;
+  const uint32_t best_rate = refresh_rate_match::FindBestRefreshRate(target_fps, rates);
+  if (best_rate == 0 || best_rate == current.refresh_rate) return false;
+  // A copy: the enumerated modes are a temporary that ends with the loop.
+  const DisplayMode best_mode{current.width, current.height, best_rate};
+  const DisplayMode* best = &best_mode;
 
   const bool mode_was_changed = mode_changed_;
   if (!mode_changed_) {
