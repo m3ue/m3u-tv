@@ -1234,6 +1234,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get liveTvStopRecording => '停止录制';
 
   @override
+  String get playerEnterFullscreen => '全屏';
+
+  @override
+  String get playerExitFullscreen => '退出全屏';
+
+  @override
   String get playerSeekUnavailableTranscoding => '转码时无法跳转进度';
 
   @override

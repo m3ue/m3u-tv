@@ -2330,6 +2330,18 @@ abstract class AppLocalizations {
   /// **'Stop Recording'**
   String get liveTvStopRecording;
 
+  /// No description provided for @playerEnterFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get playerEnterFullscreen;
+
+  /// No description provided for @playerExitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit full screen'**
+  String get playerExitFullscreen;
+
   /// No description provided for @playerSeekUnavailableTranscoding.
   ///
   /// In en, this message translates to:

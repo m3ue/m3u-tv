@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -277,7 +278,10 @@ class _DvrSeriesRuleOptionsScreenState
     final l10n = AppLocalizations.of(context);
     final show = widget.show;
     final scale = FontSizeScope.scaleOf(context);
-    final macInset = _isMacDesktopWindow ? _kMacTrafficLightInset : 0.0;
+    final macInset =
+        _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)
+        ? _kMacTrafficLightInset
+        : 0.0;
 
     return Scaffold(
       resizeToAvoidBottomInset: !_isRemoteDrivenEnvironment(context),

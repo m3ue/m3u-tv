@@ -68,6 +68,8 @@ class PlaybackControls extends StatelessWidget {
     this.onHdrEnabledChanged,
     this.volume = 1.0,
     this.onVolumeChanged,
+    this.isFullscreen = false,
+    this.onToggleFullscreen,
     this.fallbackReason,
     this.playPauseFocusNode,
     this.onNextChannel,
@@ -112,6 +114,11 @@ class PlaybackControls extends StatelessWidget {
   /// mobile have their own hardware volume controls.
   final double volume;
   final ValueChanged<double>? onVolumeChanged;
+
+  /// Desktop window fullscreen. The toggle sits after the volume slider and
+  /// only renders when [onToggleFullscreen] is non-null (desktop only).
+  final bool isFullscreen;
+  final VoidCallback? onToggleFullscreen;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
   final VoidCallback? onNextChannel;
@@ -310,6 +317,14 @@ class PlaybackControls extends StatelessWidget {
               ),
             ),
           ),
+          if (onToggleFullscreen != null)
+            AppIconButton(
+              icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              tooltip: isFullscreen
+                  ? AppLocalizations.of(context).playerExitFullscreen
+                  : AppLocalizations.of(context).playerEnterFullscreen,
+              onPressed: onToggleFullscreen,
+            ),
         ],
       ),
     );
@@ -382,6 +397,9 @@ class PlaybackControls extends StatelessWidget {
   /// for [_buildControlRow]'s layout math rather than an exact measurement.
   static const double _volumeControlWidth = 180;
 
+  /// Extra reservation for the fullscreen toggle appended to the volume group.
+  static const double _fullscreenToggleWidth = 52;
+
   Widget _buildProgressBar(ColorScheme colorScheme) {
     return _SeekBar(
       currentPosition: currentPosition,
@@ -444,7 +462,11 @@ class PlaybackControls extends StatelessWidget {
             ? TrackSelector.controlsWidth * scale
             : 0.0;
         final volumeControlWidth = _showVolumeControl
-            ? _volumeControlWidth * scale
+            ? (_volumeControlWidth +
+                      (onToggleFullscreen != null
+                          ? _fullscreenToggleWidth
+                          : 0)) *
+                  scale
             : 0.0;
         final transportWidth =
             (isLive

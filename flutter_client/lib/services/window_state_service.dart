@@ -74,6 +74,12 @@ class WindowStateService with WindowListener {
     unawaited(_persist());
   }
 
+  // Leaving fullscreen animates back through intermediate sizes, and on macOS
+  // that programmatic resize doesn't end with `onWindowResized`; record the
+  // settled normal bounds once it lands.
+  @override
+  void onWindowLeaveFullScreen() => _persistDebounced();
+
   void _persistDebounced() {
     _debounce?.cancel();
     _debounce = Timer(
@@ -91,6 +97,10 @@ class WindowStateService with WindowListener {
 
   Future<void> _persist() async {
     try {
+      // A fullscreen window's bounds are the monitor's, not a size the user
+      // chose. macOS sets the fullscreen style at the start of its transition
+      // animation, so this also skips the resizes fired mid-animation.
+      if (await windowManager.isFullScreen()) return;
       // While maximized, getBounds() returns the maximized rect; keep the last
       // restored/normal rect by only recording size+position when not maximized.
       if (_maximized) {

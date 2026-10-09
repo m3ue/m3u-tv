@@ -8,6 +8,22 @@ import AppKit
 
 final class MpvPlayerNSView: NSView {
   override var isFlipped: Bool { true }
+
+  /// Fired when the view joins or leaves a window, or its backing scale
+  /// changes (window dragged to a display with a different scale). The core
+  /// re-syncs the metal layer and re-binds its window observers here, since
+  /// the view has no window yet when it is created with `frame: .zero`.
+  var onWindowOrScaleChange: (() -> Void)?
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    onWindowOrScaleChange?()
+  }
+
+  override func viewDidChangeBackingProperties() {
+    super.viewDidChangeBackingProperties()
+    onWindowOrScaleChange?()
+  }
 }
 
 final class MpvPlayerPlatformViewFactory: NSObject, FlutterPlatformViewFactory {

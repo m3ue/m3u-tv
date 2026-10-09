@@ -5,6 +5,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
@@ -70,7 +71,10 @@ class ItemDetailScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = FontSizeScope.scaleOf(context);
-    final macInset = _isMacDesktopWindow ? _kMacTrafficLightInset : 0.0;
+    final macInset =
+        _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)
+        ? _kMacTrafficLightInset
+        : 0.0;
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
       onEdge: (direction) {

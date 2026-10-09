@@ -1274,6 +1274,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveTvStopRecording => 'Stop Recording';
 
   @override
+  String get playerEnterFullscreen => 'Full screen';
+
+  @override
+  String get playerExitFullscreen => 'Exit full screen';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'Seeking isn\'t available while transcoding';
 

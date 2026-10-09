@@ -33,6 +33,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -2065,9 +2066,11 @@ class AppShellState extends ConsumerState<AppShell>
             return Scaffold(body: contentShell);
           }
 
-          final macTitlebarInset = _isMacDesktopWindow
-              ? _kMacTitlebarInset
-              : 0.0;
+          // Fullscreen has no titlebar or traffic lights to clear.
+          final showMacTitlebar =
+              _isMacDesktopWindow &&
+              !DesktopFullscreenScope.isFullscreenOf(context);
+          final macTitlebarInset = showMacTitlebar ? _kMacTitlebarInset : 0.0;
           final fullScreenDetail = _fullScreenDetailActive;
           final collapsedSidebarWidth =
               kSidebarRailInset * FontSizeScope.scaleOf(context);
@@ -2133,7 +2136,7 @@ class AppShellState extends ConsumerState<AppShell>
                 ),
                 content,
                 sidebar,
-                if (_isMacDesktopWindow)
+                if (showMacTitlebar)
                   Positioned(
                     top: 0,
                     left: 0,

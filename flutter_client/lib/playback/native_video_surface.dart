@@ -253,6 +253,11 @@ class _NativePlaneReporterState extends State<_NativePlaneReporter> {
 
   @override
   Widget build(BuildContext context) {
+    // Depend on the window size so a resize (entering or leaving fullscreen,
+    // dragging the window edge) rebuilds this and re-reports the rect; the
+    // native plane otherwise stays at the old size until something else
+    // happens to rebuild the player.
+    MediaQuery.sizeOf(context);
     WidgetsBinding.instance.addPostFrameCallback(_reportRect);
     return SizedBox.expand(
       key: _key,

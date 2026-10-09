@@ -716,6 +716,8 @@
   "dvrDeleteSuccess": "Recording deleted",
   "dvrDeleteFailed": "Could not delete recording",
   "liveTvStopRecording": "Stop Recording",
+  "playerEnterFullscreen": "Full screen",
+  "playerExitFullscreen": "Exit full screen",
   "playerSeekUnavailableTranscoding": "Seeking isn't available while transcoding",
   "playerRecordNowTooltip": "Record current program",
   "playerStopRecordingTooltip": "Stop recording",

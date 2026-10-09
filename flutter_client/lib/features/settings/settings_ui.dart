@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -356,7 +357,10 @@ Widget _settingsSubpageScaffold(
   required Widget body,
 }) {
   final scale = FontSizeScope.scaleOf(context);
-  final macInset = _isMacDesktopWindow ? _kMacTrafficLightInset : 0.0;
+  final macInset =
+      _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)
+      ? _kMacTrafficLightInset
+      : 0.0;
   return Scaffold(
     appBar: AppBar(
       title: Text(title(context)),

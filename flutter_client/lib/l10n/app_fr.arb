@@ -644,6 +644,8 @@
   "dvrDeleteSuccess": "Enregistrement supprimé",
   "dvrDeleteFailed": "Impossible de supprimer l'enregistrement",
   "liveTvStopRecording": "Arrêter l'enregistrement",
+  "playerEnterFullscreen": "Plein écran",
+  "playerExitFullscreen": "Quitter le plein écran",
   "playerSeekUnavailableTranscoding": "La recherche n'est pas disponible pendant le transcodage",
   "playerRecordNowTooltip": "Enregistrer le programme en cours",
   "playerStopRecordingTooltip": "Arrêter l'enregistrement",

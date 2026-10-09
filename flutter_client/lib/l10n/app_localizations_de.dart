@@ -1280,6 +1280,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveTvStopRecording => 'Aufnahme stoppen';
 
   @override
+  String get playerEnterFullscreen => 'Vollbild';
+
+  @override
+  String get playerExitFullscreen => 'Vollbild beenden';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'Spulen ist während der Transkodierung nicht verfügbar';
 

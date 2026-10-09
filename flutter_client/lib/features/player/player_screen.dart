@@ -23,6 +23,7 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_service.dart';
@@ -1925,6 +1926,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final desktopFullscreen = DesktopFullscreenScope.maybeOf(context);
     return Scaffold(
       backgroundColor: _isNativePlaneActive && _errorMessage == null
           ? Colors.transparent
@@ -2287,6 +2289,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onVolumeChanged: _isDesktop
                                 ? _handleVolumeChanged
                                 : null,
+                            isFullscreen:
+                                desktopFullscreen?.isFullscreen ?? false,
+                            onToggleFullscreen: desktopFullscreen == null
+                                ? null
+                                : () => unawaited(desktopFullscreen.toggle()),
                             onTrackDialogVisibilityChanged:
                                 _handleTrackDialogVisibilityChanged,
                             fallbackReason: _showPlaybackDiagnostics

@@ -644,6 +644,8 @@
   "dvrDeleteSuccess": "录制已删除",
   "dvrDeleteFailed": "无法删除录制",
   "liveTvStopRecording": "停止录制",
+  "playerEnterFullscreen": "全屏",
+  "playerExitFullscreen": "退出全屏",
   "playerSeekUnavailableTranscoding": "转码时无法跳转进度",
   "playerRecordNowTooltip": "录制当前节目",
   "playerStopRecordingTooltip": "停止录制",

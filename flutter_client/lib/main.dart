@@ -21,6 +21,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
@@ -64,8 +65,9 @@ Future<void> main() async {
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
   _configureImageCache(await appState.viewSettingsService.optimizeFor());
+  DesktopFullscreenService? desktopFullscreen;
   if (_isDesktop) {
-    await _configureDesktopWindow(appState);
+    desktopFullscreen = await _configureDesktopWindow(appState);
   }
   final nativeTelevisionHint = await resolveNativeTelevisionHint();
   if (_isMobilePushCapable(nativeTelevisionHint)) {
@@ -107,17 +109,19 @@ Future<void> main() async {
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.
   final startPage = await appState.viewSettingsService.defaultStartPage();
-  runApp(
-    ProviderScope(
-      overrides: [overrideAppState(appState)],
-      child: MyApp(
-        nativeTelevisionHint: nativeTelevisionHint,
-        appState: appState,
-        systemUiPolicy: systemUiPolicy,
-        initialLocation: startPage.route,
-      ),
+  Widget app = ProviderScope(
+    overrides: [overrideAppState(appState)],
+    child: MyApp(
+      nativeTelevisionHint: nativeTelevisionHint,
+      appState: appState,
+      systemUiPolicy: systemUiPolicy,
+      initialLocation: startPage.route,
     ),
   );
+  if (desktopFullscreen != null) {
+    app = DesktopFullscreenScope(service: desktopFullscreen, child: app);
+  }
+  runApp(app);
 }
 
 /// Raises Flutter's decoded-image memory cache above the 100 MB / 1000 entry
@@ -183,7 +187,12 @@ bool get _isDesktop =>
 /// paints the app's background color (0xFF09090b) into a DragToMoveArea + top
 /// inset for macOS desktop so the window stays draggable, the titlebar reads
 /// as a solid bar, and the sidebar logo doesn't sit under the traffic lights.
-Future<void> _configureDesktopWindow(AppStateController appState) async {
+///
+/// Returns the installed [DesktopFullscreenService] (F11 / Alt+Enter /
+/// Escape, and state for the titlebar insets and the player toggle).
+Future<DesktopFullscreenService> _configureDesktopWindow(
+  AppStateController appState,
+) async {
   await windowManager.ensureInitialized();
   final windowOptions = Platform.isMacOS
       ? const WindowOptions(
@@ -201,6 +210,9 @@ Future<void> _configureDesktopWindow(AppStateController appState) async {
     await windowManager.focus();
   });
   windowManager.addListener(windowState);
+  final fullscreen = DesktopFullscreenService();
+  await fullscreen.install();
+  return fullscreen;
 }
 
 /// Push is mobile-only: TV builds (Android TV, tvOS) rely on the existing

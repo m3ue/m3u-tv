@@ -58,6 +58,8 @@ final class MpvPlayerCore {
   private var disposed = false
   private var metalLayer: MpvMetalLayer?
   private var frameObserver: NSObjectProtocol?
+  private var windowObservers: [NSObjectProtocol] = []
+  private weak var observedWindow: NSWindow?
 
   // Set once from `attach(to:)` so `updateEDRMode` can check the actual
   // display's EDR headroom via `hostView.window?.screen`.
@@ -96,10 +98,19 @@ final class MpvPlayerCore {
       forName: NSView.frameDidChangeNotification,
       object: view,
       queue: .main
-    ) { [weak self, weak view] _ in
-      guard let self, let view, let metalLayer = self.metalLayer else { return }
-      self.updateMetalLayerGeometry(metalLayer, for: view)
+    ) { [weak self] _ in
+      self?.syncGeometry()
     }
+    // The view has no window at creation, and fullscreen moves the window into
+    // its own Space and can change its screen and backing scale. Re-sync on
+    // all of those rather than relying only on frame-change notifications,
+    // which can stop short of the final fullscreen size. Mirrors Plezy's
+    // windowDidEnterFullScreen/windowDidExitFullScreen -> updateFrame().
+    (view as? MpvPlayerNSView)?.onWindowOrScaleChange = { [weak self] in
+      self?.observeHostWindow()
+      self?.syncGeometry()
+    }
+    observeHostWindow()
 
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
@@ -181,14 +192,60 @@ final class MpvPlayerCore {
     }
   }
 
+  private func syncGeometry() {
+    guard let view = hostView, let metalLayer else { return }
+    updateMetalLayerGeometry(metalLayer, for: view)
+  }
+
+  /// Watches the window the view currently lives in. Called again whenever
+  /// the view moves to another window (or out of one), so the observers never
+  /// point at a stale window.
+  private func observeHostWindow() {
+    let window = hostView?.window
+    if window === observedWindow { return }
+    removeWindowObservers()
+    observedWindow = window
+    guard let window else { return }
+    let names: [Notification.Name] = [
+      NSWindow.didEnterFullScreenNotification,
+      NSWindow.didExitFullScreenNotification,
+      NSWindow.didChangeBackingPropertiesNotification,
+      NSWindow.didChangeScreenNotification,
+      NSWindow.didEndLiveResizeNotification,
+    ]
+    windowObservers = names.map { name in
+      NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) {
+        [weak self] _ in
+        self?.syncGeometry()
+      }
+    }
+  }
+
+  private func removeWindowObservers() {
+    for observer in windowObservers {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    windowObservers = []
+    observedWindow = nil
+  }
+
   private func updateMetalLayerGeometry(_ metalLayer: MpvMetalLayer, for view: NSView) {
-    let scale = view.window?.backingScaleFactor ?? 2.0
+    let scale = view.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+    // A sublayer's frame is implicitly animated by Core Animation (~0.25s),
+    // while drawableSize applies at once. During the fullscreen animation's
+    // stream of resizes that left mpv's swapchain rendering into a layer
+    // whose on-screen size lagged its drawable: stretched or frozen video and
+    // swapchain churn going in and out of fullscreen. Apply both atomically,
+    // as Plezy's `withoutLayerAnimations` does.
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
     metalLayer.frame = view.bounds
     metalLayer.contentsScale = scale
     metalLayer.drawableSize = CGSize(
       width: view.bounds.width * scale,
       height: view.bounds.height * scale
     )
+    CATransaction.commit()
   }
 
   func load(
@@ -364,6 +421,8 @@ final class MpvPlayerCore {
           NotificationCenter.default.removeObserver(frameObserver)
           self.frameObserver = nil
         }
+        self.removeWindowObservers()
+        (self.hostView as? MpvPlayerNSView)?.onWindowOrScaleChange = nil
         self.metalLayer?.removeFromSuperlayer()
         self.metalLayer = nil
         completion()

@@ -12,6 +12,7 @@ import 'package:m3u_tv/features/epg/epg_recording_state.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -391,7 +392,10 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
     final recordings = ref.watch(dvrRecordingsProvider);
     final recordingIndex = EpgRecordingIndex.fromRecordings(recordings);
     final scale = FontSizeScope.scaleOf(context);
-    final macInset = _isMacDesktopWindow ? _kMacTrafficLightInset : 0.0;
+    final macInset =
+        _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)
+        ? _kMacTrafficLightInset
+        : 0.0;
 
     return Scaffold(
       appBar: AppBar(
