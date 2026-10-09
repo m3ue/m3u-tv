@@ -1466,7 +1466,9 @@ class DvrSeriesRule {
   });
 
   final int id;
-  final int channelId;
+
+  /// The channel the rule is pinned to; null means "any channel".
+  final int? channelId;
   final String? channelName;
   final String seriesTitle;
   final DvrMatchMode matchMode;
@@ -1501,7 +1503,12 @@ class DvrSeriesRule {
         v is String ? DateTime.tryParse(v)?.toUtc() : null;
     return DvrSeriesRule(
       id: asIntOrNull(json['id']) ?? 0,
-      channelId: asIntOrNull(json['channel_id']) ?? 0,
+      // The server sends null for any-channel; older payloads and cached
+      // data used 0 for the same thing, so read both as null.
+      channelId: switch (asIntOrNull(json['channel_id'])) {
+        null || 0 => null,
+        final id => id,
+      },
       channelName: json['channel_name'] as String?,
       seriesTitle: (json['series_title'] as String?) ?? '',
       matchMode: dvrMatchModeFromWire(json['match_mode'] as String?),
@@ -1554,6 +1561,34 @@ class DvrSeriesRuleOptions {
 
   /// null = server default. Seconds to end recording late.
   final int? endLateSeconds;
+}
+
+/// A channel-scope edit for `XtreamService.updateDvrSeriesRule`. The server
+/// treats an omitted `channel_id` as "unchanged" and a blank one as "any
+/// channel", so an update needs three states, not a nullable int.
+class DvrRuleChannelChange {
+  /// Leave the rule's channel scope as it is (`channel_id` omitted).
+  const DvrRuleChannelChange.unchanged() : channelId = null, isChange = false;
+
+  /// Switch the rule to any channel (`channel_id` sent blank).
+  const DvrRuleChannelChange.anyChannel() : channelId = null, isChange = true;
+
+  /// Pin the rule to [channelId].
+  const DvrRuleChannelChange.channel(int this.channelId) : isChange = true;
+
+  /// The change that turns [current] into [selected] (null = any channel),
+  /// or [DvrRuleChannelChange.unchanged] when they already match.
+  factory DvrRuleChannelChange.between({
+    required int? current,
+    required int? selected,
+  }) {
+    if (current == selected) return const DvrRuleChannelChange.unchanged();
+    if (selected == null) return const DvrRuleChannelChange.anyChannel();
+    return DvrRuleChannelChange.channel(selected);
+  }
+
+  final int? channelId;
+  final bool isChange;
 }
 
 class EpgShowChannel {

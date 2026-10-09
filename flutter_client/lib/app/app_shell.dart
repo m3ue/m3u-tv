@@ -1210,7 +1210,12 @@ class AppShellState extends ConsumerState<AppShell>
   ) async {
     await _appState.xtreamService.updateDvrSeriesRule(
       ruleId: rule.id,
-      channelId: options.channelId,
+      // Only send a channel when the user actually changed it, so an edit to
+      // padding or priority can never move the rule's channel scope.
+      channel: DvrRuleChannelChange.between(
+        current: rule.channelId,
+        selected: options.channelId,
+      ),
       matchMode: options.matchMode,
       seriesMode: options.seriesMode,
       keepLast: options.keepLast,

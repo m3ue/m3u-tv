@@ -1398,12 +1398,11 @@ class XtreamService {
   ///
   /// Omit-to-inherit ON UPDATE differs from create: absent fields keep their
   /// current value (they are never nulled out). Only fields the caller passes
-  /// here are sent. [channelId] is special — null means "any channel", so it is
-  /// always sent (as an empty value) to distinguish an explicit switch to
-  /// any-channel from "leave unchanged".
+  /// here are sent. [channel] follows the same rule: unchanged omits
+  /// `channel_id`, any-channel sends it blank, and a pinned channel sends its id.
   Future<void> updateDvrSeriesRule({
     required int ruleId,
-    int? channelId,
+    DvrRuleChannelChange channel = const DvrRuleChannelChange.unchanged(),
     DvrMatchMode? matchMode,
     DvrSeriesMode? seriesMode,
     int? keepLast,
@@ -1413,7 +1412,7 @@ class XtreamService {
   }) async {
     final params = <String, String>{
       'rule_id': '$ruleId',
-      if (channelId == null) 'channel_id': '' else 'channel_id': '$channelId',
+      if (channel.isChange) 'channel_id': '${channel.channelId ?? ''}',
       if (matchMode != null) 'match_mode': matchMode.wireValue,
       if (seriesMode != null) 'series_mode': seriesMode.wireValue,
       if (keepLast != null) 'keep_last': '$keepLast',

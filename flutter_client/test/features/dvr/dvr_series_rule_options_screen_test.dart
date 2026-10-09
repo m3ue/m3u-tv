@@ -362,5 +362,62 @@ void main() {
       expect(result!.startEarlySeconds, equals(120));
       expect(result!.endLateSeconds, equals(180));
     });
+
+    testWidgets(
+      'an any-channel rule saved without touching the channel stays unchanged',
+      (tester) async {
+        const rule = DvrSeriesRule(
+          id: 12,
+          channelId: null,
+          seriesTitle: 'Any Channel Show',
+          matchMode: DvrMatchMode.contains,
+          seriesMode: DvrSeriesMode.all,
+          priority: 50,
+          enabled: true,
+          enableComskip: false,
+        );
+
+        DvrSeriesRuleOptions? result;
+
+        await tester.pumpWidget(
+          buildOptionsApp(
+            (context) => ElevatedButton(
+              onPressed: () async {
+                result = await openDvrSeriesRuleOptions(
+                  context,
+                  show: buildShowNoMatchingNextAiring(),
+                  initialRule: rule,
+                );
+              },
+              child: const Text('Open Options'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Open Options'));
+        await tester.pumpAndSettle();
+
+        final screenContext = tester.element(
+          find.byType(DvrSeriesRuleOptionsScreen),
+        );
+        final l10n = AppLocalizations.of(screenContext);
+        await tester.ensureVisible(find.text(l10n.dvrSeriesSave));
+        await tester.tap(find.text(l10n.dvrSeriesSave));
+        await tester.pumpAndSettle();
+
+        expect(result, isNotNull);
+        expect(result!.channelId, isNull);
+        // What AppShell sends: no channel_id at all, so the save can't move
+        // the rule's scope.
+        expect(
+          DvrRuleChannelChange.between(
+            current: rule.channelId,
+            selected: result!.channelId,
+          ).isChange,
+          isFalse,
+        );
+      },
+    );
   });
 }

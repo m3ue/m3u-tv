@@ -772,7 +772,7 @@ void main() {
     );
 
     test(
-      'updateDvrSeriesRule sends only present keys and always sends channel_id',
+      'updateDvrSeriesRule sends only present keys and omits an unchanged channel',
       () async {
         final transport = FakeXtreamTransport({
           'auth': xtreamAuth(auth: 1),
@@ -795,8 +795,8 @@ void main() {
 
         final request = transport.requests.last;
         expect(request.action, 'update_dvr_series_rule');
-        // channel_id always present: blank for any-channel (null).
-        expect(request.params['channel_id'], '');
+        // No channel change: channel_id omitted, so the server keeps it.
+        expect(request.params.containsKey('channel_id'), isFalse);
         expect(request.params['match_mode'], 'exact');
         expect(request.params['series_mode'], 'new_flag');
         // Absent (unspecified) fields are NOT sent.
@@ -828,7 +828,7 @@ void main() {
 
         await service.updateDvrSeriesRule(
           ruleId: 37,
-          channelId: 72,
+          channel: const DvrRuleChannelChange.channel(72),
           keepLast: 5,
           priority: 80,
         );
@@ -841,6 +841,61 @@ void main() {
         expect(request.params.containsKey('series_mode'), isFalse);
       },
     );
+
+    test(
+      'updateDvrSeriesRule sends a blank channel_id to switch to any channel',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'update_dvr_series_rule': <String, Object?>{'success': true},
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.updateDvrSeriesRule(
+          ruleId: 37,
+          channel: const DvrRuleChannelChange.anyChannel(),
+        );
+
+        expect(transport.requests.last.params['channel_id'], '');
+      },
+    );
+
+    test('DvrSeriesRule reads null and legacy 0 channel_id as any channel', () {
+      Map<String, Object?> json(Object? channelId) => <String, Object?>{
+        'id': 1,
+        'channel_id': channelId,
+        'series_title': 'Show',
+      };
+
+      expect(DvrSeriesRule.fromXtream(json(null)).channelId, isNull);
+      expect(DvrSeriesRule.fromXtream(json(0)).channelId, isNull);
+      expect(DvrSeriesRule.fromXtream(json('0')).channelId, isNull);
+      expect(DvrSeriesRule.fromXtream(json(72)).channelId, 72);
+    });
+
+    test('DvrRuleChannelChange.between only reports real changes', () {
+      expect(
+        DvrRuleChannelChange.between(current: 8, selected: 8).isChange,
+        isFalse,
+      );
+      expect(
+        DvrRuleChannelChange.between(current: null, selected: null).isChange,
+        isFalse,
+      );
+      final toAny = DvrRuleChannelChange.between(current: 8, selected: null);
+      expect(toAny.isChange, isTrue);
+      expect(toAny.channelId, isNull);
+      final toPinned = DvrRuleChannelChange.between(current: null, selected: 9);
+      expect(toPinned.isChange, isTrue);
+      expect(toPinned.channelId, 9);
+    });
 
     test(
       'expired credentials return typed auth error without cache corruption',

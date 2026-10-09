@@ -225,7 +225,7 @@ class _DvrSeriesRuleOptionsScreenState
       _selectedSeriesMode = null; // Use default = omit
       _selectedMatchMode = DvrMatchMode.contains;
     } else {
-      _selectedChannelId = rule.channelId == 0 ? null : rule.channelId;
+      _selectedChannelId = rule.channelId;
       _selectedSeriesMode = rule.seriesMode;
       _selectedMatchMode = rule.matchMode;
     }
