@@ -2305,14 +2305,25 @@ class NavigationSidebar extends StatelessWidget {
         curve: Curves.easeInOut,
         width: width,
         clipBehavior: Clip.hardEdge,
+        // Expanded: a card-coloured panel with a hairline edge and a soft,
+        // wide shadow over the content. Collapsed: no panel, no edge.
         decoration: BoxDecoration(
-          color: expanded ? theme.colorScheme.surface : Colors.transparent,
+          color: expanded
+              ? theme.colorScheme.surfaceContainerLow
+              : Colors.transparent,
+          border: Border(
+            right: BorderSide(
+              color: expanded
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.07)
+                  : Colors.transparent,
+            ),
+          ),
           boxShadow: expanded
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(2, 0),
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 32,
+                    offset: const Offset(8, 0),
                   ),
                 ]
               : null,
@@ -2327,92 +2338,150 @@ class NavigationSidebar extends StatelessWidget {
             }
             return KeyEventResult.ignored;
           },
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 72 * scale,
-                  child: Padding(
-                    // Horizontal (14) scales to keep the logo centered in
-                    // the collapsed rail, matching how SidebarDestinationItem
-                    // centers its icons (outer + inner padding + icon size
-                    // summing symmetrically around the rail's midpoint) - at
-                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
-                    // = 14, so left inset equals right space. Leaving this
-                    // unscaled while the logo itself scaled was the bug: the
-                    // logo drifted off-center as scale grew.
-                    padding: EdgeInsets.fromLTRB(
-                      14 * scale,
-                      20,
-                      14 * scale,
-                      16,
-                    ),
-                    child: OverflowBox(
-                      maxWidth: 200 * scale,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/logo.svg',
-                            width: 36 * scale,
-                            height: 36 * scale,
-                          ),
-                          if (expanded) ...[
-                            const SizedBox(width: 12),
-                            Text(
-                              'M3U TV',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
+          // Notifications and Settings sit at the bottom of the rail when
+          // they're the last destinations; everything else stacks from the
+          // top. The visual order matches the route order, so D-pad up/down
+          // traversal is unchanged.
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 72 * scale,
+                      child: Padding(
+                        // Horizontal (14) scales to keep the logo centered in
+                        // the collapsed rail, matching how SidebarDestinationItem
+                        // centers its icons (outer + inner padding + icon size
+                        // summing symmetrically around the rail's midpoint) - at
+                        // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
+                        // = 14, so left inset equals right space. Leaving this
+                        // unscaled while the logo itself scaled was the bug: the
+                        // logo drifted off-center as scale grew.
+                        padding: EdgeInsets.fromLTRB(
+                          14 * scale,
+                          20,
+                          14 * scale,
+                          16,
+                        ),
+                        child: OverflowBox(
+                          maxWidth: 200 * scale,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/logo.svg',
+                                width: 36 * scale,
+                                height: 36 * scale,
                               ),
-                            ),
-                          ],
-                        ],
+                              if (expanded) ...[
+                                const SizedBox(width: 12),
+                                Text(
+                                  'M3U TV',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    for (var index = 0; index < footerStart; index++)
+                      _destination(context, index, expanded, scale),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                ...List.generate(routes.length, (index) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8 * scale,
-                      vertical: 2 * scale,
-                    ),
-                    child: SidebarDestinationItem(
-                      label: _routeLabel(context, routes[index]),
-                      icon: _routeIcon(routes[index]),
-                      selected: index == currentIndex,
-                      expanded: expanded,
-                      focusNode: focusNodes[index],
-                      badgeCount: routes[index] == RouteNames.notifications
-                          ? unreadNotificationCount
-                          : 0,
-                      onTap: () => onNavigate(index),
-                    ),
-                  );
-                }),
-              ],
-            ),
+              ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (footerStart < routes.length) ...[
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16 * scale,
+                          vertical: 8 * scale,
+                        ),
+                        child: Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.07,
+                          ),
+                        ),
+                      ),
+                      for (
+                        var index = footerStart;
+                        index < routes.length;
+                        index++
+                      )
+                        _destination(context, index, expanded, scale),
+                      SizedBox(height: 12 * scale),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  /// Index of the first trailing Notifications/Settings destination, which
+  /// are pinned to the bottom of the rail; the length of [routes] when there are
+  /// none.
+  int get footerStart {
+    var start = routes.length;
+    while (start > 0 &&
+        (routes[start - 1] == RouteNames.settings ||
+            routes[start - 1] == RouteNames.notifications)) {
+      start--;
+    }
+    return start;
+  }
+
+  Widget _destination(
+    BuildContext context,
+    int index,
+    bool expanded,
+    double scale,
+  ) {
+    final route = routes[index];
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
+      child: SidebarDestinationItem(
+        label: _routeLabel(context, route),
+        icon: _routeIcon(route),
+        selected: index == currentIndex,
+        expanded: expanded,
+        focusNode: focusNodes[index],
+        badgeCount: route == RouteNames.notifications
+            ? unreadNotificationCount
+            : 0,
+        onTap: () => onNavigate(index),
+      ),
+    );
+  }
+
   IconData _routeIcon(String route) => switch (route) {
-    RouteNames.home => Icons.home,
-    RouteNames.search => Icons.search,
-    RouteNames.liveTv => Icons.live_tv,
-    RouteNames.vod => Icons.movie,
-    RouteNames.series => Icons.tv,
-    RouteNames.aiostreams => Icons.subscriptions,
-    RouteNames.dvr => Icons.video_library,
-    RouteNames.requests => Icons.playlist_add,
-    RouteNames.notifications => Icons.notifications,
-    RouteNames.settings => Icons.settings,
+    RouteNames.home => Icons.home_rounded,
+    RouteNames.search => Icons.search_rounded,
+    RouteNames.liveTv => Icons.live_tv_rounded,
+    RouteNames.vod => Icons.movie_rounded,
+    RouteNames.series => Icons.tv_rounded,
+    RouteNames.aiostreams => Icons.subscriptions_rounded,
+    RouteNames.dvr => Icons.video_library_rounded,
+    RouteNames.requests => Icons.playlist_add_rounded,
+    RouteNames.notifications => Icons.notifications_rounded,
+    RouteNames.settings => Icons.settings_rounded,
     _ => Icons.circle,
   };
 }
@@ -2432,6 +2501,7 @@ class SidebarDestinationItem extends StatefulWidget {
 
   final String label;
   final IconData icon;
+
   final bool selected;
   final FocusNode focusNode;
   final VoidCallback onTap;
@@ -2479,14 +2549,22 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Color? backgroundColor;
-    Color? foregroundColor;
+    // Current destination: brand colour on a soft neutral tint, with the
+    // brand gradient as a short bar on the leading edge (as in the editor's
+    // sidebar). Idle destinations are muted; focus and hover lift them to
+    // full strength on the same neutral tint.
+    final activeColor = colorScheme.primary;
+    final Color backgroundColor;
+    final Color foregroundColor;
     if (widget.selected) {
-      backgroundColor = colorScheme.primaryContainer;
-      foregroundColor = colorScheme.onPrimaryContainer;
+      backgroundColor = colorScheme.onSurface.withValues(alpha: 0.08);
+      foregroundColor = activeColor;
     } else if (_focused || _hovered) {
-      backgroundColor = colorScheme.surfaceContainerHigh;
+      backgroundColor = colorScheme.onSurface.withValues(alpha: 0.06);
       foregroundColor = colorScheme.onSurface;
+    } else {
+      backgroundColor = colorScheme.onSurface.withValues(alpha: 0);
+      foregroundColor = colorScheme.onSurface.withValues(alpha: 0.68);
     }
 
     final scale = FontSizeScope.scaleOf(context);
@@ -2524,7 +2602,8 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
           child: Stack(
             fit: StackFit.passthrough,
             children: [
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
                 height: itemHeight,
                 padding: EdgeInsets.symmetric(horizontal: hPad),
                 decoration: BoxDecoration(
@@ -2553,6 +2632,9 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                             widget.label,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: foregroundColor,
+                              fontWeight: widget.selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -2562,10 +2644,36 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                   ),
                 ),
               ),
+              Positioned(
+                left: 0,
+                top: itemHeight * 0.28,
+                bottom: itemHeight * 0.28,
+                width: 3,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: widget.selected ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.horizontal(
+                          right: Radius.circular(3),
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [colorScheme.secondary, colorScheme.primary],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // D-pad focus ring. Shown on the current destination too, so
+              // focus stays visible when it lands there.
               Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedOpacity(
-                    opacity: (_focused || _hovered) && !widget.selected
+                    opacity: _focused || (_hovered && !widget.selected)
                         ? 1.0
                         : 0.0,
                     duration: const Duration(milliseconds: 150),
