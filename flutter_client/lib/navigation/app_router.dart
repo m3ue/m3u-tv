@@ -47,6 +47,7 @@ class PlayerArgs {
     this.userAgent,
     this.headers = const <String, String>{},
     this.metadata = const <String, Object?>{},
+    this.transcoded = false,
   });
 
   final String streamUrl;
@@ -66,7 +67,16 @@ class PlayerArgs {
   final Map<String, String> headers;
   final Map<String, Object?> metadata;
 
-  PlayerArgs copyWith({String? streamUrl, double? startPosition}) {
+  /// The stream goes through an explicit editor transcoding profile (not
+  /// direct proxy). Transcoded output can't be seeked, so the player hides
+  /// seeking for VOD/series instead of offering a seek that silently fails.
+  final bool transcoded;
+
+  PlayerArgs copyWith({
+    String? streamUrl,
+    double? startPosition,
+    bool? transcoded,
+  }) {
     return PlayerArgs(
       streamUrl: streamUrl ?? this.streamUrl,
       title: title,
@@ -82,6 +92,7 @@ class PlayerArgs {
       userAgent: userAgent,
       headers: headers,
       metadata: metadata,
+      transcoded: transcoded ?? this.transcoded,
     );
   }
 

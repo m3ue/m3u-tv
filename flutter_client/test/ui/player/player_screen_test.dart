@@ -173,6 +173,29 @@ void main() {
       expect(tapped, isTrue);
     });
 
+    testWidgets('explains why seeking is unavailable when given a reason', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: false,
+            seekUnavailableMessage: 'No seeking here',
+            currentPosition: Duration.zero,
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+      expect(find.text('No seeking here'), findsOneWidget);
+      expect(find.byIcon(Icons.replay_10), findsNothing);
+      expect(find.byIcon(Icons.forward_10), findsNothing);
+    });
+
     testWidgets('hides seek controls for live content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -1212,6 +1235,78 @@ void main() {
   });
 
   group('PlayerScreen', () {
+    Future<void> pumpVod(
+      WidgetTester tester, {
+      required bool transcoded,
+    }) async {
+      final adapter = FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.desktopLibmpv,
+        textureId: 42,
+      );
+      final orchestrator = PlaybackOrchestrator(
+        platform: PlaybackPlatform.desktop,
+        adapters: <PlaybackBackend, PlayerAdapter>{
+          PlaybackBackend.desktopLibmpv: adapter,
+        },
+        transcodeGateway: FakeTranscodeGateway(),
+      );
+      addTearDown(orchestrator.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlayerScreen(
+            args: PlayerArgs(
+              streamUrl: 'https://example.com/movie.mkv',
+              title: 'Movie Fixture',
+              type: 'vod',
+              transcoded: transcoded,
+            ),
+            orchestrator: orchestrator,
+            epgService: EpgService(clock: () => DateTime.utc(2026)),
+          ),
+        ),
+      );
+      await tester.pump();
+      adapter.emitState(
+        const PlaybackState(
+          backend: PlaybackBackend.desktopLibmpv,
+          status: PlaybackStatus.playing,
+          duration: Duration(hours: 1),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('withholds seeking for transcoded VOD and says why (#98)', (
+      tester,
+    ) async {
+      await pumpVod(tester, transcoded: true);
+
+      expect(
+        tester.widget<PlaybackControls>(find.byType(PlaybackControls)).canSeek,
+        isFalse,
+      );
+      expect(
+        find.text("Seeking isn't available while transcoding"),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('keeps seeking for direct VOD', (tester) async {
+      await pumpVod(tester, transcoded: false);
+
+      expect(
+        tester.widget<PlaybackControls>(find.byType(PlaybackControls)).canSeek,
+        isTrue,
+      );
+      expect(
+        find.text("Seeking isn't available while transcoding"),
+        findsNothing,
+      );
+    });
+
     testWidgets(
       'active native plane makes the full-screen scaffold transparent but errors stay black',
       (tester) async {

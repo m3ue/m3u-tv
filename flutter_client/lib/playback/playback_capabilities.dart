@@ -187,7 +187,8 @@ class PlaybackCapabilities {
     supportsExternalSubtitles: false,
     supportsAdvancedSubtitleFormats: false,
     supportsPlaybackSpeed: false,
-    supportsSeek: true,
+    // Transcoded output can't be seeked (only direct proxy can); see #98.
+    supportsSeek: false,
     supportsLiveSeek: false,
     requiresNetworkTranscode: true,
   );

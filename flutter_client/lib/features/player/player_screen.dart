@@ -300,7 +300,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   PlatformViewProvider? _reopenPlatformView;
 
   bool get _isLive => widget.args.type == 'live';
-  bool get _canSeek => !_isLive && _duration > Duration.zero;
+  bool get _canSeek =>
+      !_isLive && _duration > Duration.zero && !_seekBlockedByTranscode;
+
+  /// Transcoded VOD/series output can't be seeked (only direct proxy can), so
+  /// seeking is withheld rather than offered and silently ignored (#98).
+  /// Catchup is left alone: its seeks reopen the timeshift stream at the
+  /// target instead of seeking the open one.
+  bool get _seekBlockedByTranscode =>
+      (widget.args.transcoded && (widget.args.type == 'vod' || _isSeries)) ||
+      widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode;
   bool get _isSeries => widget.args.type == 'series';
   bool get _isNativePlaneActive => widget.orchestrator.isNativePlaneActive;
 
@@ -2246,6 +2255,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             isPlaying: _isPlaying,
                             isLive: _isLive,
                             canSeek: _canSeek,
+                            seekUnavailableMessage:
+                                !_isLive &&
+                                    _duration > Duration.zero &&
+                                    _seekBlockedByTranscode
+                                ? AppLocalizations.of(
+                                    context,
+                                  ).playerSeekUnavailableTranscoding
+                                : null,
                             currentPosition:
                                 _skipScrubPosition ?? _currentPosition,
                             duration: _duration,

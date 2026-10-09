@@ -2330,6 +2330,12 @@ abstract class AppLocalizations {
   /// **'Stop Recording'**
   String get liveTvStopRecording;
 
+  /// No description provided for @playerSeekUnavailableTranscoding.
+  ///
+  /// In en, this message translates to:
+  /// **'Seeking isn\'t available while transcoding'**
+  String get playerSeekUnavailableTranscoding;
+
   /// No description provided for @playerRecordNowTooltip.
   ///
   /// In en, this message translates to:

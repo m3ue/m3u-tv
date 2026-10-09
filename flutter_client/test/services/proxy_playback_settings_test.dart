@@ -180,4 +180,56 @@ void main() {
       expect(restored.vodProfileId, ProxyPlaybackSettings.directProfileId);
     });
   });
+
+  group('ProxyPlaybackSettings.isTranscoding', () {
+    const server = 'https://editor.example';
+    const vodUrl = '$server/movie/user/pass/7.mkv';
+
+    bool check(ProxyPlaybackSettings s, {bool forced = false}) => s
+        .isTranscoding(vodUrl, type: 'vod', forced: forced, serverBase: server);
+
+    test('true for an explicit transcoding profile', () async {
+      final s = ProxyPlaybackSettings();
+      await s.setEnabled(enabled: true);
+      await s.setVodProfileId(5);
+
+      expect(check(s), isTrue);
+    });
+
+    test('false for direct proxy, the server default, or proxy off', () async {
+      final s = ProxyPlaybackSettings();
+      await s.setVodProfileId(5);
+      expect(check(s), isFalse, reason: 'proxy disabled');
+
+      await s.setEnabled(enabled: true);
+      await s.setVodProfileId(ProxyPlaybackSettings.directProfileId);
+      expect(check(s), isFalse, reason: 'direct proxy');
+
+      await s.setVodProfileId(null);
+      expect(check(s), isFalse, reason: 'server default');
+    });
+
+    test('true when the playlist forces the proxy', () async {
+      final s = ProxyPlaybackSettings();
+      await s.setVodProfileId(5);
+
+      expect(check(s, forced: true), isTrue);
+    });
+
+    test('false for URLs that are not on the editor', () async {
+      final s = ProxyPlaybackSettings();
+      await s.setEnabled(enabled: true);
+      await s.setVodProfileId(5);
+
+      expect(
+        s.isTranscoding(
+          'https://other.example/movie.mkv',
+          type: 'vod',
+          forced: false,
+          serverBase: server,
+        ),
+        isFalse,
+      );
+    });
+  });
 }

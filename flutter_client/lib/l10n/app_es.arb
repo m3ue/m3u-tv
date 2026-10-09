@@ -644,6 +644,7 @@
   "dvrDeleteSuccess": "Grabación eliminada",
   "dvrDeleteFailed": "No se pudo eliminar la grabación",
   "liveTvStopRecording": "Detener grabación",
+  "playerSeekUnavailableTranscoding": "No se puede avanzar ni retroceder durante la transcodificación",
   "playerRecordNowTooltip": "Grabar programa actual",
   "playerStopRecordingTooltip": "Detener grabación",
   "dvrMoreActions": "Más acciones",

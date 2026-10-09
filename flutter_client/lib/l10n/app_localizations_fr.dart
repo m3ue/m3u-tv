@@ -1285,6 +1285,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get liveTvStopRecording => 'Arrêter l\'enregistrement';
 
   @override
+  String get playerSeekUnavailableTranscoding =>
+      'La recherche n\'est pas disponible pendant le transcodage';
+
+  @override
   String get playerRecordNowTooltip => 'Enregistrer le programme en cours';
 
   @override

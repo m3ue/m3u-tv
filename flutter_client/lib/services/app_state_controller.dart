@@ -412,6 +412,20 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
+  /// Whether [applyProxyPlayback] sends [streamUrl] through an explicit
+  /// transcoding profile (see [ProxyPlaybackSettings.isTranscoding]).
+  bool isTranscodedPlayback(String streamUrl, {required String type}) {
+    final proxy = authNotifier.authResponse?.proxy;
+    final server = xtreamService.credentials?.server;
+    if (proxy == null || server == null) return false;
+    return proxyPlaybackSettings.isTranscoding(
+      streamUrl,
+      type: type,
+      forced: proxy.forced,
+      serverBase: server,
+    );
+  }
+
   /// Stops the editor proxy stream a player session opened as [clientId]
   /// (see `EditorStreamSessionGateway`). No-op when not connected.
   Future<void> stopPlayerStream({

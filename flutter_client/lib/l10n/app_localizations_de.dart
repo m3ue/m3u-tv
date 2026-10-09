@@ -1280,6 +1280,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveTvStopRecording => 'Aufnahme stoppen';
 
   @override
+  String get playerSeekUnavailableTranscoding =>
+      'Spulen ist während der Transkodierung nicht verfügbar';
+
+  @override
   String get playerRecordNowTooltip => 'Aktuelle Sendung aufnehmen';
 
   @override

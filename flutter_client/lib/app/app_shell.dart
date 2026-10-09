@@ -790,7 +790,14 @@ class AppShellState extends ConsumerState<AppShell>
       args.streamUrl,
       type: args.type,
     );
-    return updated == args.streamUrl ? args : args.copyWith(streamUrl: updated);
+    final transcoded = _appState.isTranscodedPlayback(
+      args.streamUrl,
+      type: args.type,
+    );
+    if (updated == args.streamUrl && transcoded == args.transcoded) {
+      return args;
+    }
+    return args.copyWith(streamUrl: updated, transcoded: transcoded);
   }
 
   void _openPlayerDirect(PlayerArgs rawArgs) {

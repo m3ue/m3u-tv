@@ -48,6 +48,7 @@ class PlaybackControls extends StatelessWidget {
     required this.isPlaying,
     required this.isLive,
     required this.canSeek,
+    this.seekUnavailableMessage,
     required this.currentPosition,
     required this.duration,
     required this.onPlayPause,
@@ -82,6 +83,11 @@ class PlaybackControls extends StatelessWidget {
   final bool isPlaying;
   final bool isLive;
   final bool canSeek;
+
+  /// Shown where the seek bar would be when seeking is withheld for a reason
+  /// the user should know about (e.g. transcoded playback). Ignored when
+  /// [canSeek] is true.
+  final String? seekUnavailableMessage;
   final Duration currentPosition;
   final Duration duration;
   final VoidCallback onPlayPause;
@@ -328,7 +334,16 @@ class PlaybackControls extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (canSeek) _buildProgressBar(colorScheme),
-          if (canSeek) SizedBox(height: compact ? 6 : 12),
+          if (!canSeek && seekUnavailableMessage != null)
+            Text(
+              seekUnavailableMessage!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+              ),
+            ),
+          if (canSeek || seekUnavailableMessage != null)
+            SizedBox(height: compact ? 6 : 12),
           _buildControlRow(context, colorScheme, compact: compact),
         ],
       ),
@@ -339,6 +354,11 @@ class PlaybackControls extends StatelessWidget {
       audioTracks.isNotEmpty || subtitleTracks.isNotEmpty || supportsHdrToggle;
 
   bool get _showVolumeControl => onVolumeChanged != null;
+
+  /// Skip back/forward are seeks, so they go when seeking is withheld for a
+  /// stated reason; with no reason (e.g. duration not known yet) they stay.
+  bool get _showSkipButtons =>
+      !isLive && (canSeek || seekUnavailableMessage == null);
 
   Widget _buildTrackControls() {
     return TrackSelector(
@@ -429,7 +449,7 @@ class PlaybackControls extends StatelessWidget {
         final transportWidth =
             (isLive
                 ? (_hasChannelControls ? _liveButtonCount * 56.0 : 56.0)
-                : 168.0) *
+                : (_showSkipButtons ? 168.0 : 56.0)) *
             scale;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >=
@@ -488,7 +508,7 @@ class PlaybackControls extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!isLive)
+        if (_showSkipButtons)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: AppIconButton(
@@ -544,7 +564,7 @@ class PlaybackControls extends StatelessWidget {
                   : AppLocalizations.of(context).playerRecordNowTooltip,
             ),
           ),
-        if (!isLive)
+        if (_showSkipButtons)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: AppIconButton(

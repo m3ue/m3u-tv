@@ -67,12 +67,11 @@ class ProxyPlaybackSettings extends ChangeNotifier {
     required bool forced,
     required String serverBase,
   }) {
-    if (!streamUrl.startsWith(serverBase)) return streamUrl;
-    if (!_enabled && !forced) return streamUrl;
+    if (!_appliesTo(streamUrl, forced: forced, serverBase: serverBase)) {
+      return streamUrl;
+    }
 
-    final profileId = type == 'live' || type == 'catchup'
-        ? _liveProfileId
-        : _vodProfileId;
+    final profileId = _profileIdFor(type);
     final params = <String>[
       if (!forced) 'proxy=true',
       if (profileId != null)
@@ -82,6 +81,31 @@ class ProxyPlaybackSettings extends ChangeNotifier {
     final separator = streamUrl.contains('?') ? '&' : '?';
     return '$streamUrl$separator${params.join('&')}';
   }
+
+  /// Whether [apply] routes [streamUrl] through an explicit transcoding
+  /// profile, as opposed to direct proxy, no proxy, or the server default
+  /// (which the client can't see into).
+  bool isTranscoding(
+    String streamUrl, {
+    required String type,
+    required bool forced,
+    required String serverBase,
+  }) {
+    if (!_appliesTo(streamUrl, forced: forced, serverBase: serverBase)) {
+      return false;
+    }
+    final profileId = _profileIdFor(type);
+    return profileId != null && profileId != directProfileId;
+  }
+
+  bool _appliesTo(
+    String streamUrl, {
+    required bool forced,
+    required String serverBase,
+  }) => streamUrl.startsWith(serverBase) && (_enabled || forced);
+
+  int? _profileIdFor(String type) =>
+      type == 'live' || type == 'catchup' ? _liveProfileId : _vodProfileId;
 
   Future<void> _persist() async {
     await _store?.write(_storeKey, <String, Object?>{

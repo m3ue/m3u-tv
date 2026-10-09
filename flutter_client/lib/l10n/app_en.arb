@@ -716,6 +716,7 @@
   "dvrDeleteSuccess": "Recording deleted",
   "dvrDeleteFailed": "Could not delete recording",
   "liveTvStopRecording": "Stop Recording",
+  "playerSeekUnavailableTranscoding": "Seeking isn't available while transcoding",
   "playerRecordNowTooltip": "Record current program",
   "playerStopRecordingTooltip": "Stop recording",
   "dvrMoreActions": "More actions",
