@@ -785,19 +785,10 @@ class AppShellState extends ConsumerState<AppShell>
     _openPlayerDirect(resolvedArgs);
   }
 
-  /// Applies the per-device proxy playback preferences (enable proxy +
-  /// live/VOD transcoding profile) to backend stream URLs. External URLs
-  /// (e.g. AIOStreams sources) pass through unchanged.
   PlayerArgs _applyProxyPlayback(PlayerArgs args) {
-    final proxy = _appState.authNotifier.authResponse?.proxy;
-    final server = _appState.xtreamService.credentials?.server;
-    if (proxy == null || server == null) return args;
-
-    final updated = _appState.proxyPlaybackSettings.apply(
+    final updated = _appState.applyProxyPlayback(
       args.streamUrl,
       type: args.type,
-      forced: proxy.forced,
-      serverBase: server,
     );
     return updated == args.streamUrl ? args : args.copyWith(streamUrl: updated);
   }
@@ -866,8 +857,17 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   Future<void> _closePlayer() async {
-    ref.read(playerOverlayActiveProvider.notifier).state = false;
     final orch = _playerOrchestrator;
+    final args = _playerArgs;
+    final handoff = ref.read(epgPreviewHandoffProvider);
+    if (handoff != null &&
+        args != null &&
+        args.type == 'live' &&
+        args.streamId == handoff.id) {
+      // The guide's preview is about to reopen this same channel; keep its
+      // proxy stream warm for it instead of stopping it.
+      orch?.detachStreamSession();
+    }
     final nativePlaneSub = _playerNativePlaneSub;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
@@ -888,6 +888,9 @@ class AppShellState extends ConsumerState<AppShell>
       // Fall through and close anyway -- better to leak a not-fully-disposed
       // adapter than leave the user stuck on a dead player screen.
     }
+    // Only after native teardown, so a listener can start its own player
+    // (the EPG preview) without two native players alive at once.
+    ref.read(playerOverlayActiveProvider.notifier).state = false;
     nativePlaneSub?.cancel().ignore();
     if (!mounted) return;
     setState(() {

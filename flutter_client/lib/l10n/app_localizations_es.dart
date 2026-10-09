@@ -318,6 +318,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get epgWatchLive => 'Ver en directo';
 
   @override
+  String get epgPreview => 'Vista previa';
+
+  @override
   String get epgWatchReplay => 'Ver repetición';
 
   @override
@@ -1613,6 +1616,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => 'Horario estelar';
+
+  @override
+  String get settingsEpgPreviewPlayback =>
+      'Reproducción en la vista previa de la guía';
+
+  @override
+  String get settingsEpgPreviewPlaybackOff => 'Desactivada';
+
+  @override
+  String get settingsEpgPreviewPlaybackPauseToPlay => 'Reproducir al detenerse';
+
+  @override
+  String get settingsEpgPreviewPlaybackClickToPreview =>
+      'Pulsar OK para previsualizar';
+
+  @override
+  String get settingsEpgPreviewDelay => 'Retraso de la vista previa';
+
+  @override
+  String settingsEpgPreviewDelaySeconds(int count) {
+    return '$count segundos';
+  }
 
   @override
   String get settingsFilterPersistence => 'Persistencia del filtro';

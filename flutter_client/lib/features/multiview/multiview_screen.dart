@@ -603,7 +603,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              NativeVideoSurface(
+              NativeVideoSurface.forBackend(
+                tile.backend,
                 // Reordering swaps which tile backs this grid position
                 // (_handleDirection moves entries within _tiles), but this
                 // widget's position in the tree stays put -- without a key
@@ -612,9 +613,6 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 // attached native view for the new tile instead of
                 // recreating it.
                 key: ValueKey(tile.playerId),
-                textureId: _textureIdFor(tile),
-                platformView: _platformViewFor(tile),
-                nativePlane: _nativePlaneFor(tile),
                 aspectRatio: state?.videoAspectRatio ?? 16 / 9,
                 wrapInBlackBackground: false,
                 clearAncestorPaintForNativePlane: nativePlaneActive,
@@ -677,22 +675,6 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
         ),
       ),
     );
-  }
-
-  int? _textureIdFor(_MultiviewTile tile) {
-    final backend = tile.backend;
-    if (backend is VideoTextureProvider) {
-      return (backend! as VideoTextureProvider).textureId;
-    }
-    return null;
-  }
-
-  PlatformViewProvider? _platformViewFor(_MultiviewTile tile) {
-    final backend = tile.backend;
-    if (backend is PlatformViewProvider) {
-      return backend! as PlatformViewProvider;
-    }
-    return null;
   }
 
   NativePlaneProvider? _nativePlaneFor(_MultiviewTile tile) {

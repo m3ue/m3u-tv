@@ -318,6 +318,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get epgWatchLive => 'Live ansehen';
 
   @override
+  String get epgPreview => 'Vorschau';
+
+  @override
   String get epgWatchReplay => 'Nachsehen';
 
   @override
@@ -1611,6 +1614,28 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => 'Prime Time';
+
+  @override
+  String get settingsEpgPreviewPlayback => 'Vorschau-Wiedergabe im Guide';
+
+  @override
+  String get settingsEpgPreviewPlaybackOff => 'Aus';
+
+  @override
+  String get settingsEpgPreviewPlaybackPauseToPlay =>
+      'Nach kurzem Verweilen abspielen';
+
+  @override
+  String get settingsEpgPreviewPlaybackClickToPreview =>
+      'Mit OK Vorschau starten';
+
+  @override
+  String get settingsEpgPreviewDelay => 'Vorschau-Verzögerung';
+
+  @override
+  String settingsEpgPreviewDelaySeconds(int count) {
+    return '$count Sekunden';
+  }
 
   @override
   String get settingsFilterPersistence => 'Filterpersistenz';

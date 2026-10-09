@@ -55,6 +55,17 @@ void main() {
       }
     });
 
+    test('persists and restores EPG preview playback and delay', () async {
+      expect(await service.epgPreviewPlayback(), EpgPreviewPlayback.off);
+      expect(await service.epgPreviewDelay(), const Duration(seconds: 5));
+      for (final mode in EpgPreviewPlayback.values) {
+        await service.setEpgPreviewPlayback(mode);
+        expect(await service.epgPreviewPlayback(), mode);
+      }
+      await service.setEpgPreviewDelay(const Duration(seconds: 8));
+      expect(await service.epgPreviewDelay(), const Duration(seconds: 8));
+    });
+
     test('persists and restores EPG start view', () async {
       for (final view in EpgStartView.values) {
         await service.setEpgStartView(view);

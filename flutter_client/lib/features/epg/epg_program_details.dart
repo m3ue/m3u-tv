@@ -149,7 +149,9 @@ class EpgProgramPreview extends StatelessWidget {
     required this.selection,
     this.showKeyHints = true,
     this.okAction,
+    this.okPreviews = false,
     this.canOpenOptions = true,
+    this.artwork,
   });
 
   final EpgGuideSelection selection;
@@ -160,6 +162,13 @@ class EpgProgramPreview extends StatelessWidget {
   /// What OK does, when it differs from [EpgGuideSelection.action] (on the
   /// channel cell OK always tunes, whatever programme the preview shows).
   final EpgGuideAction? okAction;
+
+  /// OK starts the live channel in the guide's preview player rather than
+  /// full-screen, so the hint reads "Preview".
+  final bool okPreviews;
+
+  /// Replaces the programme artwork (the guide's preview player).
+  final Widget? artwork;
 
   /// Whether holding OK opens anything, so the hint isn't offered when it
   /// would do nothing.
@@ -174,7 +183,7 @@ class EpgProgramPreview extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: EpgProgramArtwork(selection: selection),
+            child: artwork ?? EpgProgramArtwork(selection: selection),
           ),
           const SizedBox(width: 24),
           Expanded(
@@ -185,6 +194,7 @@ class EpgProgramPreview extends StatelessWidget {
                   ? _KeyHints(
                       selection: selection,
                       okAction: okAction ?? selection.action,
+                      okPreviews: okPreviews,
                       canOpenOptions: canOpenOptions,
                     )
                   : null,
@@ -869,17 +879,20 @@ class _KeyHints extends StatelessWidget {
     required this.selection,
     required this.okAction,
     required this.canOpenOptions,
+    this.okPreviews = false,
   });
 
   final EpgGuideSelection selection;
   final EpgGuideAction okAction;
   final bool canOpenOptions;
+  final bool okPreviews;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final primary = switch (okAction) {
-      EpgGuideAction.watchLive => l10n.epgWatchLive,
+      EpgGuideAction.watchLive =>
+        okPreviews ? l10n.epgPreview : l10n.epgWatchLive,
       EpgGuideAction.watchReplay => l10n.epgWatchReplay,
       EpgGuideAction.options => l10n.epgMoreOptions,
       EpgGuideAction.none => null,

@@ -206,17 +206,30 @@ final streamSessionGatewayProvider = Provider<PlaybackStreamSessionGateway>((
   );
 });
 
+/// Rewrites an editor stream URL with this device's proxy playback settings
+/// (see `AppStateController.applyProxyPlayback`), for players other than
+/// AppShell's that must request the same proxy stream.
+final applyProxyPlaybackProvider =
+    Provider<String Function(String streamUrl, {required String type})>((ref) {
+      return ref.read(appStateControllerProvider).appState.applyProxyPlayback;
+    });
+
+/// The live channel the Live TV guide handed from its preview player to the
+/// full-screen player, and will resume in the preview when that closes.
+/// AppShell leaves that channel's proxy stream running on close (see
+/// `PlaybackOrchestrator.detachStreamSession`) so the preview rejoins it warm.
+final epgPreviewHandoffProvider = StateProvider<Channel?>((ref) => null);
+
 // ---------------------------------------------------------------------------
 // Multiview: standalone session state, not backed by AppStateController (it
 // tracks an in-memory grid selection, not fetched domain data).
 // ---------------------------------------------------------------------------
 
 // Whether AppShell's single-player overlay (the normal full-screen
-// PlayerScreen) is currently showing. Multiview's grid pushes a tile's
-// channel through that same overlay to promote it to full-screen — set by
-// AppShell around `_playerArgs`/`_closePlayer` — and watches this to know
-// when to re-apply its own audio-follows-focus muting once the overlay
-// closes and the grid becomes visible (and audible) again.
+// PlayerScreen) is currently showing - set by AppShell around
+// `_playerArgs`/`_closePlayer`. Flips back to false only once the player's
+// native teardown has finished, so the Live TV guide can safely resume its
+// preview player when it does.
 final playerOverlayActiveProvider = StateProvider<bool>((ref) => false);
 
 final multiviewControllerProvider = ChangeNotifierProvider<MultiviewController>(

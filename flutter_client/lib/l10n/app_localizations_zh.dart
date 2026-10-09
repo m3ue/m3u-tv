@@ -309,6 +309,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get epgWatchLive => '观看直播';
 
   @override
+  String get epgPreview => '预览';
+
+  @override
   String get epgWatchReplay => '观看回放';
 
   @override
@@ -1555,6 +1558,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => '黄金时段';
+
+  @override
+  String get settingsEpgPreviewPlayback => '节目指南预览播放';
+
+  @override
+  String get settingsEpgPreviewPlaybackOff => '关闭';
+
+  @override
+  String get settingsEpgPreviewPlaybackPauseToPlay => '停留后播放';
+
+  @override
+  String get settingsEpgPreviewPlaybackClickToPreview => '按 OK 键预览';
+
+  @override
+  String get settingsEpgPreviewDelay => '预览延迟';
+
+  @override
+  String settingsEpgPreviewDelaySeconds(int count) {
+    return '$count 秒';
+  }
 
   @override
   String get settingsFilterPersistence => '筛选保留';

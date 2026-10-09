@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import 'package:m3u_tv/features/epg/epg_guide_navigation.dart';
+import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_program_details.dart';
 import 'package:m3u_tv/features/epg/epg_recording_state.dart';
 import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
@@ -15,7 +16,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart'
-    show ChannelColumnLayout, EpgStartView, OptimizeFor;
+    show ChannelColumnLayout, EpgPreviewPlayback, EpgStartView, OptimizeFor;
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -92,6 +93,9 @@ class TimelineEpgView extends StatefulWidget {
     this.tapOpensDetails = false,
     this.autofocus = true,
     this.onCursorMove,
+    this.previewPlayer,
+    this.previewPlayback = EpgPreviewPlayback.off,
+    this.previewDelay = const Duration(seconds: 5),
   });
 
   final List<Channel> channels;
@@ -148,6 +152,15 @@ class TimelineEpgView extends StatefulWidget {
   /// focus node, so cursor moves don't change focus and the app-wide
   /// focus-change navigation sound would otherwise stay silent here.
   final VoidCallback? onCursorMove;
+
+  /// Plays live channels in the preview panel, per [previewPlayback]. Only
+  /// used while the panel is actually showing (see [showPreview]).
+  final EpgPreviewPlayerController? previewPlayer;
+  final EpgPreviewPlayback previewPlayback;
+
+  /// How long the cursor rests on a live programme before
+  /// [EpgPreviewPlayback.pauseToPlay] starts it.
+  final Duration previewDelay;
 
   @override
   State<TimelineEpgView> createState() => TimelineEpgViewState();
@@ -273,6 +286,21 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   Timer? _clockTimer;
   bool _revalidateScheduled = false;
 
+  // Pause-to-play countdown, restarted on every cursor move.
+  Timer? _previewTimer;
+
+  // Set while [_revalidateCursor] adjusts the cursor on its own (data
+  // arriving, the first landing), which isn't the user resting anywhere.
+  bool _revalidating = false;
+
+  // Where the cursor was when the countdown last (re)started, so a focus-
+  // only change (the cursor also tracks focus) doesn't count as a move.
+  _GuideCursor? _previewTimerCursor;
+
+  // Whether the last layout had room for the preview panel; the preview
+  // player only runs while it does.
+  bool _previewPanelShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -282,6 +310,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     _clockTimer = Timer.periodic(_kClockTick, (_) {
       if (mounted) setState(() {});
     });
+    _previewTimerCursor = _cursor.value;
+    _cursor.addListener(_armPreviewTimer);
   }
 
   @override
@@ -293,6 +323,11 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     if (_selectedDate.isBefore(earliest) || _selectedDate.isAfter(latest)) {
       _selectedDate = _selectedDate.isBefore(earliest) ? earliest : latest;
       _initWindow();
+    }
+    if (widget.previewPlayback != oldWidget.previewPlayback ||
+        widget.previewDelay != oldWidget.previewDelay) {
+      _previewTimerCursor = null;
+      _armPreviewTimer();
     }
     if (widget.epgStartView != oldWidget.epgStartView) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToStart());
@@ -310,6 +345,12 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _previewTimer?.cancel();
+    _cursor.removeListener(_armPreviewTimer);
+    // Unmounted while previewing (e.g. a show search replaced the guide):
+    // nothing is left to show it in.
+    final previewPlayer = widget.previewPlayer;
+    if (previewPlayer?.channel != null) unawaited(previewPlayer!.stop());
     _hCtrlOrNull?.removeListener(_onHorizontalScroll);
     _hCtrlOrNull?.dispose();
     _vCtrl.dispose();
@@ -704,9 +745,18 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       return;
     }
     final target = EpgGuideNavigation.at(programs, _anchorInWindow());
-    _setCursor(
-      cursor.copyWith(row: row, program: target, clearProgram: target == null),
-    );
+    _revalidating = true;
+    try {
+      _setCursor(
+        cursor.copyWith(
+          row: row,
+          program: target,
+          clearProgram: target == null,
+        ),
+      );
+    } finally {
+      _revalidating = false;
+    }
   }
 
   void _scheduleRevalidate() {
@@ -812,7 +862,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     final channel = widget.channels[cursor.row];
     final program = cursor.program;
     if (cursor.onChannel || program == null) {
-      widget.onChannelSelect(channel);
+      _selectLive(channel);
       return;
     }
     _activateProgram(channel, program);
@@ -832,8 +882,68 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
       case EpgGuideAction.none:
         break;
       case EpgGuideAction.watchLive:
-        widget.onChannelSelect(channel);
+        _selectLive(channel);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Preview playback
+  // ---------------------------------------------------------------------------
+
+  EpgPreviewPlayerController? get _activePreviewPlayer =>
+      _previewPanelShown && widget.previewPlayback != EpgPreviewPlayback.off
+      ? widget.previewPlayer
+      : null;
+
+  /// Whether OK on a live programme of [channel] starts it in the preview
+  /// rather than opening the full-screen player.
+  bool _okPreviews(Channel channel) {
+    final player = _activePreviewPlayer;
+    return player != null &&
+        widget.previewPlayback == EpgPreviewPlayback.clickToPreview &&
+        !player.isPlaying(channel);
+  }
+
+  void _selectLive(Channel channel) {
+    if (_okPreviews(channel)) {
+      unawaited(_activePreviewPlayer!.play(channel));
+      return;
+    }
+    widget.onChannelSelect(channel);
+  }
+
+  void _openPreviewFullscreen() {
+    final channel = widget.previewPlayer?.channel;
+    if (channel != null) widget.onChannelSelect(channel);
+  }
+
+  void _armPreviewTimer() {
+    final cursor = _cursor.value.copyWith(focused: false);
+    if (_revalidating || cursor == _previewTimerCursor) return;
+    _previewTimerCursor = cursor;
+    _previewTimer?.cancel();
+    _previewTimer = null;
+    if (widget.previewPlayback != EpgPreviewPlayback.pauseToPlay) return;
+    if (_livePreviewChannelAtCursor() == null) return;
+    _previewTimer = Timer(widget.previewDelay, () {
+      // Re-resolved on fire: the programme may have ended meanwhile.
+      final channel = _livePreviewChannelAtCursor();
+      if (channel != null) unawaited(_activePreviewPlayer?.play(channel));
+    });
+  }
+
+  /// The cursor's channel when OK there would watch it live (a programme
+  /// airing now, or the channel cell) and the preview could play it.
+  Channel? _livePreviewChannelAtCursor() {
+    final player = _activePreviewPlayer;
+    if (player == null || !mounted) return null;
+    final cursor = _cursor.value;
+    final selection = _selectionFor(cursor);
+    if (selection == null) return null;
+    if (_okActionFor(cursor, selection) != EpgGuideAction.watchLive) {
+      return null;
+    }
+    return player.isPlaying(selection.channel) ? null : selection.channel;
   }
 
   bool get _hasLongPress =>
@@ -909,7 +1019,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   void _onChannelTap(int row) {
     _setCursor(_cursor.value.copyWith(row: row, onChannel: true));
     if (!widget.tapOpensDetails) _gridFocusNode.requestFocus();
-    widget.onChannelSelect(widget.channels[row]);
+    _selectLive(widget.channels[row]);
   }
 
   Future<void> _showDetails(Channel channel, EpgProgram program) {
@@ -979,6 +1089,23 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     );
   }
 
+  /// Tracks whether the preview panel fits. When it stops fitting (window
+  /// resized smaller) a playing preview has nowhere to show, so stop it.
+  void _onPreviewPanelLayout(bool shown) {
+    if (_previewPanelShown == shown) return;
+    _previewPanelShown = shown;
+    if (!shown) {
+      _previewTimer?.cancel();
+      // Called from layout; stop() notifies listeners, so defer it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final player = widget.previewPlayer;
+        if (!_previewPanelShown && player?.channel != null) {
+          unawaited(player!.stop());
+        }
+      });
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -1006,20 +1133,34 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
           200.0,
           360.0,
         );
+        _onPreviewPanelLayout(showPreview);
+        final previewPlayer = widget.previewPlayer;
         return Column(
           children: [
             if (showPreview)
               SizedBox(
                 height: previewHeight,
-                child: ValueListenableBuilder<_GuideCursor>(
-                  valueListenable: _cursor,
-                  builder: (context, cursor, _) {
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([_cursor, previewPlayer]),
+                  builder: (context, _) {
+                    final cursor = _cursor.value;
                     final selection = _selectionFor(cursor);
                     if (selection == null) return const SizedBox.shrink();
+                    final okAction = _okActionFor(cursor, selection);
                     return EpgProgramPreview(
                       selection: selection,
-                      okAction: _okActionFor(cursor, selection),
+                      okAction: okAction,
+                      okPreviews:
+                          okAction == EpgGuideAction.watchLive &&
+                          _okPreviews(selection.channel),
                       canOpenOptions: _canOpenOptions(cursor),
+                      artwork:
+                          previewPlayer != null && previewPlayer.backend != null
+                          ? EpgPreviewVideo(
+                              controller: previewPlayer,
+                              onTap: _openPreviewFullscreen,
+                            )
+                          : null,
                     );
                   },
                 ),

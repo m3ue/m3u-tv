@@ -316,6 +316,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get epgWatchLive => 'Watch live';
 
   @override
+  String get epgPreview => 'Preview';
+
+  @override
   String get epgWatchReplay => 'Watch replay';
 
   @override
@@ -1602,6 +1605,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEpgStartViewPrimeTime => 'Prime time';
+
+  @override
+  String get settingsEpgPreviewPlayback => 'Guide preview playback';
+
+  @override
+  String get settingsEpgPreviewPlaybackOff => 'Off';
+
+  @override
+  String get settingsEpgPreviewPlaybackPauseToPlay => 'Play after pausing';
+
+  @override
+  String get settingsEpgPreviewPlaybackClickToPreview => 'Press OK to preview';
+
+  @override
+  String get settingsEpgPreviewDelay => 'Preview delay';
+
+  @override
+  String settingsEpgPreviewDelaySeconds(int count) {
+    return '$count seconds';
+  }
 
   @override
   String get settingsFilterPersistence => 'Filter Persistence';

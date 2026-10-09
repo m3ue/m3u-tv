@@ -353,6 +353,19 @@ class PlaybackOrchestrator {
 
   Future<void> cancel() => stop();
 
+  /// Forgets the active stream session without asking the server to stop
+  /// it, so the next [stop]/[dispose] leaves the editor proxy stream (and
+  /// any transcode) running on its idle timeout. For handing a live stream
+  /// to another player that is about to request the same URL (the EPG
+  /// preview <-> full-screen player), which then joins it while it's warm
+  /// instead of restarting it.
+  void detachStreamSession() {
+    final session = _activeStreamSession;
+    if (session == null) return;
+    _activeStreamSession = null;
+    _diagnostics.add('cleanup:stream-session:detached:${session.clientId}');
+  }
+
   Future<void> dispose() async {
     if (_disposed) return;
     await stop();

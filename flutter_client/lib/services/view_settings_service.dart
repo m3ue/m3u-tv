@@ -58,6 +58,29 @@ enum EpgStartView {
       );
 }
 
+/// Whether the EPG timeline's preview panel plays the live channel.
+enum EpgPreviewPlayback {
+  /// Static artwork only.
+  off('off'),
+
+  /// Resting on a live programme for [ViewSettingsService.epgPreviewDelay]
+  /// starts it in the preview.
+  pauseToPlay('pauseToPlay'),
+
+  /// OK on a live programme starts it in the preview; OK again on the same
+  /// channel opens the full-screen player.
+  clickToPreview('clickToPreview');
+
+  const EpgPreviewPlayback(this.value);
+  final String value;
+
+  static EpgPreviewPlayback fromValue(String? value) =>
+      EpgPreviewPlayback.values.firstWhere(
+        (mode) => mode.value == value,
+        orElse: () => EpgPreviewPlayback.off,
+      );
+}
+
 /// What to display for each row of the EPG timeline's fixed Channels column.
 enum ChannelColumnLayout {
   logoAndTitle('logoAndTitle'),
@@ -175,6 +198,12 @@ class ViewSettingsService extends ChangeNotifier {
   static const liveTvLayoutKey = 'm3ue_tv_live_layout';
   static const epgStartViewKey = 'm3ue_tv_epg_start_view';
   static const channelColumnLayoutKey = 'm3ue_tv_channel_column_layout';
+  static const epgPreviewPlaybackKey = 'm3ue_tv_epg_preview_playback';
+  static const epgPreviewDelayKey = 'm3ue_tv_epg_preview_delay_seconds';
+
+  /// Choices offered for [epgPreviewDelay], in seconds.
+  static const epgPreviewDelayOptions = <int>[2, 3, 5, 8, 10];
+  static const defaultEpgPreviewDelaySeconds = 5;
   static const hdrEnabledKey = 'm3ue_tv_hdr_enabled';
   static const rememberMediaSortKey = 'm3ue_tv_remember_vod_sort';
   static const vodSortOptionKey = 'm3ue_tv_vod_sort_option';
@@ -242,6 +271,31 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setEpgStartView(EpgStartView view) async {
     await _write(epgStartViewKey, view.value);
+    notifyListeners();
+  }
+
+  Future<EpgPreviewPlayback> epgPreviewPlayback() async {
+    final raw = await _read(epgPreviewPlaybackKey);
+    return EpgPreviewPlayback.fromValue(raw as String?);
+  }
+
+  Future<void> setEpgPreviewPlayback(EpgPreviewPlayback mode) async {
+    await _write(epgPreviewPlaybackKey, mode.value);
+    notifyListeners();
+  }
+
+  /// How long the guide cursor must rest on a live programme before
+  /// [EpgPreviewPlayback.pauseToPlay] starts it.
+  Future<Duration> epgPreviewDelay() async {
+    final raw = await _read(epgPreviewDelayKey);
+    final seconds = raw is num && raw > 0
+        ? raw.toInt()
+        : defaultEpgPreviewDelaySeconds;
+    return Duration(seconds: seconds);
+  }
+
+  Future<void> setEpgPreviewDelay(Duration delay) async {
+    await _write(epgPreviewDelayKey, delay.inSeconds);
     notifyListeners();
   }
 

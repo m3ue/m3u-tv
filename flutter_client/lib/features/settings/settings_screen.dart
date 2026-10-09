@@ -2229,6 +2229,10 @@ class _ViewSettingsSection extends StatefulWidget {
 class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   LiveTvLayout _liveTvLayout = LiveTvLayout.list;
   EpgStartView _epgStartView = EpgStartView.currentTime;
+  EpgPreviewPlayback _epgPreviewPlayback = EpgPreviewPlayback.off;
+  Duration _epgPreviewDelay = const Duration(
+    seconds: ViewSettingsService.defaultEpgPreviewDelaySeconds,
+  );
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   bool _rememberMediaSort = false;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
@@ -2265,6 +2269,11 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
       widget.deviceType == DeviceType.tv ||
       widget.deviceType == DeviceType.desktop;
 
+  // The guide's preview panel only exists on TV/desktop (touch devices open a
+  // details sheet instead), and the preview player is a native one, so web
+  // has nothing to play it with.
+  bool get _showEpgPreviewPlayback => !kIsWeb && _showNavigationSoundToggle;
+
   @override
   void initState() {
     super.initState();
@@ -2281,6 +2290,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   Future<void> _refresh() async {
     final layout = await widget.service.liveTvLayout();
     final startView = await widget.service.epgStartView();
+    final epgPreviewPlayback = await widget.service.epgPreviewPlayback();
+    final epgPreviewDelay = await widget.service.epgPreviewDelay();
     final channelColumnLayout = await widget.service.channelColumnLayout();
     final rememberMediaSort = await widget.service.rememberMediaSort();
     final defaultStartPage = await widget.service.defaultStartPage();
@@ -2299,6 +2310,8 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     setState(() {
       _liveTvLayout = layout;
       _epgStartView = startView;
+      _epgPreviewPlayback = epgPreviewPlayback;
+      _epgPreviewDelay = epgPreviewDelay;
       _channelColumnLayout = channelColumnLayout;
       _rememberMediaSort = rememberMediaSort;
       _defaultStartPage = defaultStartPage;
@@ -2431,6 +2444,62 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                 ),
               ),
             ),
+            if (_showEpgPreviewPlayback)
+              SettingsRow(
+                title: l.settingsEpgPreviewPlayback,
+                subtitle: _epgPreviewPlaybackLabel(l, _epgPreviewPlayback),
+                icon: Icons.smart_display_outlined,
+                trailing: const SettingsChevron(),
+                onTap: () => unawaited(
+                  pushSettingsPicker<EpgPreviewPlayback>(
+                    context,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsEpgPreviewPlayback,
+                    onBack: widget.onHandleTopLevelBack,
+                    selected: _epgPreviewPlayback,
+                    options: [
+                      for (final mode in EpgPreviewPlayback.values)
+                        SettingsPickerOption(
+                          value: mode,
+                          label: _epgPreviewPlaybackLabel(l, mode),
+                        ),
+                    ],
+                    onSelected: widget.service.setEpgPreviewPlayback,
+                  ),
+                ),
+              ),
+            if (_showEpgPreviewPlayback &&
+                _epgPreviewPlayback == EpgPreviewPlayback.pauseToPlay)
+              SettingsRow(
+                title: l.settingsEpgPreviewDelay,
+                subtitle: l.settingsEpgPreviewDelaySeconds(
+                  _epgPreviewDelay.inSeconds,
+                ),
+                icon: Icons.timer_outlined,
+                trailing: const SettingsChevron(),
+                onTap: () => unawaited(
+                  pushSettingsPicker<int>(
+                    context,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsEpgPreviewDelay,
+                    onBack: widget.onHandleTopLevelBack,
+                    selected: _epgPreviewDelay.inSeconds,
+                    options: [
+                      for (final seconds
+                          in ViewSettingsService.epgPreviewDelayOptions)
+                        SettingsPickerOption(
+                          value: seconds,
+                          label: l.settingsEpgPreviewDelaySeconds(seconds),
+                        ),
+                    ],
+                    onSelected: (seconds) => unawaited(
+                      widget.service.setEpgPreviewDelay(
+                        Duration(seconds: seconds),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
 
@@ -2622,6 +2691,16 @@ String _epgStartViewLabel(AppLocalizations l, EpgStartView view) =>
       EpgStartView.currentTime => l.settingsEpgStartViewCurrentTime,
       EpgStartView.primeTime => l.settingsEpgStartViewPrimeTime,
     };
+
+String _epgPreviewPlaybackLabel(
+  AppLocalizations l,
+  EpgPreviewPlayback mode,
+) => switch (mode) {
+  EpgPreviewPlayback.off => l.settingsEpgPreviewPlaybackOff,
+  EpgPreviewPlayback.pauseToPlay => l.settingsEpgPreviewPlaybackPauseToPlay,
+  EpgPreviewPlayback.clickToPreview =>
+    l.settingsEpgPreviewPlaybackClickToPreview,
+};
 
 String _optimizeForLabel(AppLocalizations l, OptimizeFor optimizeFor) =>
     switch (optimizeFor) {

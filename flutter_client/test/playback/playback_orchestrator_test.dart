@@ -975,6 +975,27 @@ void main() {
       await orchestrator.dispose();
     });
 
+    test('a detached session is left running when the player stops', () async {
+      final direct = _FakePlayerAdapter(
+        capabilities: PlaybackCapabilities.androidExoPlayer,
+      );
+      final sessions = _FakeStreamSessionGateway();
+      final orchestrator = sessionOrchestrator(direct, sessions);
+
+      await orchestrator.open(_source());
+      orchestrator.detachStreamSession();
+      await orchestrator.dispose();
+
+      expect(sessions.attached, hasLength(1));
+      expect(sessions.released, isEmpty);
+      expect(
+        orchestrator.diagnostics,
+        contains(
+          'cleanup:stream-session:detached:${sessions.attached.first.clientId}',
+        ),
+      );
+    });
+
     test('sources the gateway does not track load unchanged', () async {
       final direct = _FakePlayerAdapter(
         capabilities: PlaybackCapabilities.androidExoPlayer,

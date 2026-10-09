@@ -27,6 +27,32 @@ class NativeVideoSurface extends StatelessWidget {
     this.clearAncestorPaintForNativePlane = false,
   });
 
+  /// Picks the surface off whichever provider interface [backend]
+  /// implements. Used by the small embedded players (Multiview tiles, the
+  /// EPG preview), which hold a single concrete backend rather than an
+  /// orchestrator-selected adapter.
+  factory NativeVideoSurface.forBackend(
+    PlayerAdapter? backend, {
+    Key? key,
+    required double aspectRatio,
+    bool wrapInBlackBackground = true,
+    bool clearAncestorPaintForNativePlane = false,
+  }) => NativeVideoSurface(
+    key: key,
+    textureId: backend is VideoTextureProvider
+        ? (backend! as VideoTextureProvider).textureId
+        : null,
+    platformView: backend is PlatformViewProvider
+        ? backend! as PlatformViewProvider
+        : null,
+    nativePlane: backend is NativePlaneProvider
+        ? backend! as NativePlaneProvider
+        : null,
+    aspectRatio: aspectRatio,
+    wrapInBlackBackground: wrapInBlackBackground,
+    clearAncestorPaintForNativePlane: clearAncestorPaintForNativePlane,
+  );
+
   final int? textureId;
   final PlatformViewProvider? platformView;
   final NativePlaneProvider? nativePlane;

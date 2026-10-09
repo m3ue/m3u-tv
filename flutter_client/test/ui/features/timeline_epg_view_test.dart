@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_program_details.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -49,6 +50,9 @@ void main() {
     bool inRegion = false,
     Key? guideKey,
     VoidCallback? onCursorMove,
+    EpgPreviewPlayerController? previewPlayer,
+    EpgPreviewPlayback previewPlayback = EpgPreviewPlayback.off,
+    Duration previewDelay = const Duration(seconds: 5),
   }) async {
     Widget guide = SizedBox(
       width: width,
@@ -68,6 +72,9 @@ void main() {
         tapOpensDetails: tapOpensDetails,
         clock: clock ?? DateTime.now,
         onCursorMove: onCursorMove,
+        previewPlayer: previewPlayer,
+        previewPlayback: previewPlayback,
+        previewDelay: previewDelay,
       ),
     );
     if (inRegion) {
@@ -1040,6 +1047,87 @@ void main() {
       expect(selected, hasLength(2));
     });
 
+    testWidgets('pause to play starts a live programme once the cursor rests', (
+      tester,
+    ) async {
+      final preview = _FakePreviewPlayer();
+      addTearDown(preview.dispose);
+      final selected = <Channel>[];
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        showPreview: true,
+        width: 1200,
+        height: 800,
+        channels: const [channelA, channelB, channelC],
+        epgService: service(),
+        onChannelSelect: selected.add,
+        previewPlayer: preview,
+        previewPlayback: EpgPreviewPlayback.pauseToPlay,
+        previewDelay: const Duration(seconds: 3),
+      );
+
+      // Landing on the guide doesn't start anything by itself.
+      await tester.pump(const Duration(seconds: 4));
+      expect(preview.played, isEmpty);
+
+      // Moving on before the delay restarts the countdown.
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      await tester.pump(const Duration(seconds: 2));
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await tester.pump(const Duration(seconds: 2));
+      expect(preview.played, isEmpty);
+      await tester.pump(const Duration(seconds: 2));
+      expect(preview.played, [channelB]);
+
+      // An upcoming programme never starts the preview.
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(cursorOn(programCell(b2)), isTrue);
+      await tester.pump(const Duration(seconds: 4));
+      expect(preview.played, [channelB]);
+
+      // OK on a live programme still goes full-screen.
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(selected, [channelC]);
+    });
+
+    testWidgets('click to preview: OK previews, OK again goes full-screen', (
+      tester,
+    ) async {
+      final preview = _FakePreviewPlayer();
+      addTearDown(preview.dispose);
+      final selected = <Channel>[];
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        showPreview: true,
+        width: 1200,
+        height: 800,
+        channels: const [channelA, channelB, channelC],
+        epgService: service(),
+        onChannelSelect: selected.add,
+        previewPlayer: preview,
+        previewPlayback: EpgPreviewPlayback.clickToPreview,
+      );
+
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(find.text('Preview'), findsOneWidget);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(preview.played, [channelA]);
+      expect(selected, isEmpty);
+
+      expect(find.text('Watch live'), findsOneWidget);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(selected, [channelA]);
+
+      // Another live channel replaces the preview rather than opening.
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(preview.played, [channelA, channelB]);
+      expect(selected, [channelA]);
+    });
+
     testWidgets('right past the last programme moves to the next day', (
       tester,
     ) async {
@@ -1554,4 +1642,38 @@ double _horizontalScrollOffset(WidgetTester tester) {
         .first,
   );
   return scrollable.controller!.offset;
+}
+
+/// Records what the guide asks the preview to play; never builds a player.
+class _FakePreviewPlayer extends EpgPreviewPlayerController {
+  _FakePreviewPlayer() : super(buildPlayer: (_) => throw UnimplementedError());
+
+  final played = <Channel>[];
+  Channel? _playing;
+  bool _isDisposed = false;
+
+  @override
+  Channel? get channel => _playing;
+
+  @override
+  bool isPlaying(Channel channel) => _playing?.id == channel.id;
+
+  @override
+  Future<void> play(Channel channel) async {
+    played.add(channel);
+    _playing = channel;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> stop({bool keepStreamWarm = false}) async {
+    _playing = null;
+    if (!_isDisposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 }

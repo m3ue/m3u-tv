@@ -644,6 +644,12 @@ abstract class AppLocalizations {
   /// **'Watch live'**
   String get epgWatchLive;
 
+  /// No description provided for @epgPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get epgPreview;
+
   /// No description provided for @epgWatchReplay.
   ///
   /// In en, this message translates to:
@@ -2839,6 +2845,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prime time'**
   String get settingsEpgStartViewPrimeTime;
+
+  /// No description provided for @settingsEpgPreviewPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide preview playback'**
+  String get settingsEpgPreviewPlayback;
+
+  /// No description provided for @settingsEpgPreviewPlaybackOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingsEpgPreviewPlaybackOff;
+
+  /// No description provided for @settingsEpgPreviewPlaybackPauseToPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play after pausing'**
+  String get settingsEpgPreviewPlaybackPauseToPlay;
+
+  /// No description provided for @settingsEpgPreviewPlaybackClickToPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Press OK to preview'**
+  String get settingsEpgPreviewPlaybackClickToPreview;
+
+  /// No description provided for @settingsEpgPreviewDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview delay'**
+  String get settingsEpgPreviewDelay;
+
+  /// No description provided for @settingsEpgPreviewDelaySeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} seconds'**
+  String settingsEpgPreviewDelaySeconds(int count);
 
   /// No description provided for @settingsFilterPersistence.
   ///

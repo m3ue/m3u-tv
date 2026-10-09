@@ -205,6 +205,7 @@
   },
   "epgEnded": "Ended",
   "epgWatchLive": "Watch live",
+  "epgPreview": "Preview",
   "epgWatchReplay": "Watch replay",
   "epgMoreOptions": "More options",
   "epgKeyOk": "OK",
@@ -936,6 +937,19 @@
   "settingsEpgStartView": "EPG starts at",
   "settingsEpgStartViewCurrentTime": "Current time",
   "settingsEpgStartViewPrimeTime": "Prime time",
+  "settingsEpgPreviewPlayback": "Guide preview playback",
+  "settingsEpgPreviewPlaybackOff": "Off",
+  "settingsEpgPreviewPlaybackPauseToPlay": "Play after pausing",
+  "settingsEpgPreviewPlaybackClickToPreview": "Press OK to preview",
+  "settingsEpgPreviewDelay": "Preview delay",
+  "settingsEpgPreviewDelaySeconds": "{count} seconds",
+  "@settingsEpgPreviewDelaySeconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsFilterPersistence": "Filter Persistence",
   "settingsFilterPersistenceRemember": "Remember",
   "settingsFilterPersistenceReset": "Reset Each Time",

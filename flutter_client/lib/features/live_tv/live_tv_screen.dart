@@ -2,16 +2,19 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueListenable, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/catchup_shows_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart'
+    show buildMultiviewTilePlayer;
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
@@ -147,7 +150,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   // Multiview drives several concurrent player instances. tvOS, iOS, and
   // Android multiplex them over their one native channel pair by playerId
   // (see AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS and
@@ -175,7 +178,24 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   bool _favoritesFirst = true;
   EpgStartView _epgStartView = EpgStartView.currentTime;
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
+  EpgPreviewPlayback _epgPreviewPlayback = EpgPreviewPlayback.off;
+  Duration _epgPreviewDelay = const Duration(
+    seconds: ViewSettingsService.defaultEpgPreviewDelaySeconds,
+  );
   int _viewSettingsGeneration = 0;
+
+  // The guide's preview player; null unless EPG preview playback is on.
+  // Built on the same per-platform embedded player as a Multiview tile, so
+  // it's offered exactly where Multiview is.
+  EpgPreviewPlayerController? _previewPlayer;
+
+  // The live channel last opened full-screen from the guide, resumed in the
+  // preview once that player closes. Shared with AppShell, which keeps that
+  // channel's proxy stream warm on close for the preview to rejoin.
+  Channel? get _resumePreviewChannel => ref.read(epgPreviewHandoffProvider);
+  set _resumePreviewChannel(Channel? channel) =>
+      ref.read(epgPreviewHandoffProvider.notifier).state = channel;
+  ValueListenable<TickerModeData>? _tickerModeNotifier;
   // Shared across all three view modes since only one is ever mounted at a
   // time (see the `switch (_viewMode)` in build()).
   final FocusScopeNode _gridFocusNode = FocusScopeNode();
@@ -206,6 +226,114 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     unawaited(_initCategory());
     widget.onBackHandlerReady?.call(_handleBackFromEpg);
     _showSearchController.addListener(_onShowSearchChanged);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  // A plain observer rather than AppLifecycleListener, which asserts on
+  // state jumps (paused -> resumed) that some platforms and tests deliver.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _stopPreview();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // go_router disables tickers on inactive shell branches (and the Overlay
+    // does for routes covered by an opaque one), while this screen stays
+    // mounted in its IndexedStack - so this is the "left Live TV" signal.
+    final notifier = TickerMode.getValuesNotifier(context);
+    if (!identical(notifier, _tickerModeNotifier)) {
+      _tickerModeNotifier?.removeListener(_onTickerModeChanged);
+      _tickerModeNotifier = notifier..addListener(_onTickerModeChanged);
+    }
+  }
+
+  void _onTickerModeChanged() {
+    if (!_isTabVisible) _stopPreview();
+  }
+
+  bool get _isTabVisible => _tickerModeNotifier?.value.enabled ?? true;
+
+  void _stopPreview() {
+    _resumePreviewChannel = null;
+    final player = _previewPlayer;
+    if (player != null) unawaited(player.stop());
+  }
+
+  /// Creates or drops the preview player to match the loaded settings.
+  Future<void> _syncPreviewPlayer() async {
+    final wanted =
+        _multiviewSupported &&
+        widget.useSidebarLayout &&
+        _epgPreviewPlayback != EpgPreviewPlayback.off;
+    final current = _previewPlayer;
+    if (wanted && current == null) {
+      setState(() {
+        final applyProxyPlayback = ref.read(applyProxyPlaybackProvider);
+        _previewPlayer = EpgPreviewPlayerController(
+          buildPlayer: (playerId) => buildMultiviewTilePlayer(
+            playerId,
+            streamSessionGateway: ref.read(streamSessionGatewayProvider),
+          ),
+          streamUrlFor: (channel) =>
+              applyProxyPlayback(channel.streamUrl, type: 'live'),
+        );
+      });
+    } else if (!wanted && current != null) {
+      _resumePreviewChannel = null;
+      // Native teardown first, then the surface leaves the tree.
+      await current.stop();
+      if (!mounted || !identical(_previewPlayer, current)) return;
+      setState(() => _previewPlayer = null);
+      current.dispose();
+    }
+  }
+
+  /// Opens [channel] full-screen from the guide. The preview player is torn
+  /// down first so two native players are never alive at once, and
+  /// remembered so Back from the player resumes it in the preview. When the
+  /// preview was already on this channel its proxy stream is left running,
+  /// so the full-screen player joins it rather than restarting it.
+  Future<void> _watchLiveFromGuide(
+    Channel channel,
+    List<Channel> channels,
+  ) async {
+    final player = _previewPlayer;
+    if (player != null) {
+      await player.stop(keepStreamWarm: player.isPlaying(channel));
+      _resumePreviewChannel = channel;
+    }
+    if (!mounted) return;
+    widget.onChannelContextChanged?.call(channels);
+    widget.onChannelSelect(channel);
+  }
+
+  Future<void> _watchReplayFromGuide(
+    Channel channel,
+    EpgProgram program,
+  ) async {
+    _resumePreviewChannel = null;
+    await _previewPlayer?.stop();
+    if (!mounted) return;
+    widget.onCatchupProgramSelect?.call(channel, program);
+  }
+
+  void _onPlayerOverlayChanged(bool? wasActive, bool isActive) {
+    if (wasActive != true || isActive) return;
+    final channel = _resumePreviewChannel;
+    final player = _previewPlayer;
+    _resumePreviewChannel = null;
+    if (channel == null ||
+        player == null ||
+        _viewMode != _ViewMode.epgGrid ||
+        !_isTabVisible) {
+      return;
+    }
+    unawaited(player.play(channel));
   }
 
   void _onShowSearchChanged() {
@@ -257,6 +385,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _tickerModeNotifier?.removeListener(_onTickerModeChanged);
+    _previewPlayer?.dispose();
     widget.favoritesService.removeListener(_onFavoritesChanged);
     _detachViewSettingsListener(widget.viewSettingsService);
     _gridFocusNode.dispose();
@@ -290,7 +421,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _viewMode = _layoutToViewMode(loaded.layout);
       _epgStartView = loaded.epgStartView;
       _channelColumnLayout = loaded.channelColumnLayout;
+      _epgPreviewPlayback = loaded.epgPreviewPlayback;
+      _epgPreviewDelay = loaded.epgPreviewDelay;
     });
+    await _syncPreviewPlayer();
   }
 
   Future<
@@ -298,6 +432,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       LiveTvLayout layout,
       EpgStartView epgStartView,
       ChannelColumnLayout channelColumnLayout,
+      EpgPreviewPlayback epgPreviewPlayback,
+      Duration epgPreviewDelay,
     })?
   >
   _loadViewSettings() async {
@@ -307,11 +443,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       viewSettings.liveTvLayout(),
       viewSettings.epgStartView(),
       viewSettings.channelColumnLayout(),
+      viewSettings.epgPreviewPlayback(),
+      viewSettings.epgPreviewDelay(),
     ]);
     return (
       layout: results[0] as LiveTvLayout,
       epgStartView: results[1] as EpgStartView,
       channelColumnLayout: results[2] as ChannelColumnLayout,
+      epgPreviewPlayback: results[3] as EpgPreviewPlayback,
+      epgPreviewDelay: results[4] as Duration,
     );
   }
 
@@ -342,8 +482,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             _viewMode = _layoutToViewMode(loaded.layout);
             _epgStartView = loaded.epgStartView;
             _channelColumnLayout = loaded.channelColumnLayout;
+            _epgPreviewPlayback = loaded.epgPreviewPlayback;
+            _epgPreviewDelay = loaded.epgPreviewDelay;
           }
         });
+        await _syncPreviewPlayer();
       }
     } else {
       final lastMode = await widget.favoritesService.getLastViewMode();
@@ -615,7 +758,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           epgLoad: epgLoad,
         );
         if (program != null) {
-          widget.onCatchupProgramSelect?.call(channel, program);
+          await _watchReplayFromGuide(channel, program);
         }
       case _ChannelContextAction.toggleMultiview:
         final added = ref.read(multiviewControllerProvider).toggle(channel);
@@ -669,6 +812,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final categories = ref.watch(liveCategoriesProvider);
     final epgService = ref.watch(epgServiceProvider);
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    ref.listen<bool>(playerOverlayActiveProvider, _onPlayerOverlayChanged);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -871,12 +1015,17 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     return AppButton(
       icon: icon,
       label: label,
-      onPressed: () {
+      onPressed: () async {
         final next = switch (_viewMode) {
           _ViewMode.list => _ViewMode.logoGrid,
           _ViewMode.logoGrid => _ViewMode.epgGrid,
           _ViewMode.epgGrid => _ViewMode.list,
         };
+        // Leaving the guide unmounts the preview's surface; stop its native
+        // player before that happens.
+        _resumePreviewChannel = null;
+        await _previewPlayer?.stop();
+        if (!mounted) return;
         setState(() => _viewMode = next);
         final viewSettings = widget.viewSettingsService;
         if (viewSettings != null) {
@@ -990,11 +1139,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           programEnd: program.end,
         ),
         epgStartView: _epgStartView,
-        onChannelSelect: (channel) {
-          widget.onChannelContextChanged?.call(channels);
-          widget.onChannelSelect(channel);
-        },
-        onCatchupProgramSelect: widget.onCatchupProgramSelect,
+        previewPlayer: _previewPlayer,
+        previewPlayback: _epgPreviewPlayback,
+        previewDelay: _epgPreviewDelay,
+        onChannelSelect: (channel) =>
+            unawaited(_watchLiveFromGuide(channel, channels)),
+        onCatchupProgramSelect: widget.onCatchupProgramSelect == null
+            ? null
+            : (channel, program) =>
+                  unawaited(_watchReplayFromGuide(channel, program)),
         onEnsureEpg: widget.onEnsureEpg,
         onChannelLongPress: (channel, program) => unawaited(
           // Pass the exact programme that was selected - schedulable for

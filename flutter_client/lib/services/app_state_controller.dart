@@ -395,6 +395,23 @@ class AppStateController extends ChangeNotifier {
     return _tvNotificationService.uploadLogs(credentials, report);
   }
 
+  /// Applies the per-device proxy playback preferences (enable proxy +
+  /// live/VOD transcoding profile) to a backend stream URL. External URLs
+  /// (e.g. AIOStreams sources) pass through unchanged. Every player of an
+  /// editor stream (full-screen, the EPG preview) must go through this, so
+  /// they request the same proxy stream and can share it.
+  String applyProxyPlayback(String streamUrl, {required String type}) {
+    final proxy = authNotifier.authResponse?.proxy;
+    final server = xtreamService.credentials?.server;
+    if (proxy == null || server == null) return streamUrl;
+    return proxyPlaybackSettings.apply(
+      streamUrl,
+      type: type,
+      forced: proxy.forced,
+      serverBase: server,
+    );
+  }
+
   /// Stops the editor proxy stream a player session opened as [clientId]
   /// (see `EditorStreamSessionGateway`). No-op when not connected.
   Future<void> stopPlayerStream({
