@@ -141,14 +141,15 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
   final adapters = <PlaybackBackend, PlayerAdapter>{};
 
   if (platform == PlaybackPlatform.android) {
-    // Native mpv via a Flutter PlatformView (`AndroidView` hosting a
-    // `SurfaceView`, `vo=gpu-next` + `gpu-context=android` +
-    // `hwdec=mediacodec`), registered as primary -- same architecture as
-    // `MacMpvNativeBackend`/`AppleMpvNativeBackend` above, modeled on the
-    // open-source Plezy player. `AndroidPlaybackAdapter` (ExoPlayer) stays
-    // registered as an automatic fallback via `PlaybackOrchestrator`'s own
-    // native multi-backend fallback -- do not wrap it in
-    // `FallbackPlayerAdapter`, see the desktop branch below for why.
+    // `AndroidPlaybackAdapter` (Media3/ExoPlayer rendering into a real
+    // `SurfaceView`, needed for HDR output) is primary: `PlaybackCapabilities
+    // .forPlatform` lists it first, and `PlaybackOrchestrator` tries backends
+    // in that order. Native mpv (`AndroidMpvBackend`, a PlatformView hosting a
+    // `SurfaceView`) is the automatic fallback; ExoPlayer was made primary to
+    // avoid mpv GPU/Tegra issues (e.g. Shield), where mpv also tone-maps HDR
+    // to SDR. Registration order in this map doesn't decide priority. Do not
+    // wrap either in `FallbackPlayerAdapter`, see the desktop branch below for
+    // why.
     adapters[PlaybackBackend.androidMpv] = AndroidMpvBackend();
     adapters[PlaybackBackend.androidExoPlayer] = AndroidPlaybackAdapter(
       probe: const AndroidPlaybackProbe(
