@@ -7,13 +7,15 @@ flutter_native_splash:
   color_dark: "#0a0a0f"
   image_dark: assets/icons/splash-icon.png
 
-  # Android 12+ splash API — icon is shown inside a circle
+  # Android 12+ splash API - the icon is drawn at 240dp and clipped to the
+  # inner 160dp circle, so it needs its own image with the logo inside that
+  # circle (see splash-icon-android12.png in scripts/setup-icons.sh).
   android_12:
     color: "#0a0a0f"
-    image: assets/icons/splash-icon.png
+    image: assets/icons/splash-icon-android12.png
     icon_background_color: "#0a0a0f"
     color_dark: "#0a0a0f"
-    image_dark: assets/icons/splash-icon.png
+    image_dark: assets/icons/splash-icon-android12.png
 
   # windowDrawsSystemBarBackgrounds is tied directly to this flag by the
   # flutter_native_splash package (android.dart) - it hardcodes that value to

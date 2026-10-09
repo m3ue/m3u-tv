@@ -12,7 +12,27 @@
             <rect key="frame" x="0.0" y="0.0" width="1920" height="1080"/>
             <autoresizingMask key="autoresizingMask"
                               widthSizable="YES" heightSizable="YES"/>
-            <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+            <subviews>
+              <!-- 205pt logo centred on the full screen; LaunchSplash
+                   (lib/app/launch_splash.dart) takes over at this exact size
+                   and position. -->
+              <imageView userInteractionEnabled="NO" contentMode="center"
+                         image="LaunchLogo"
+                         translatesAutoresizingMaskIntoConstraints="NO"
+                         id="LgI-mv-001"/>
+            </subviews>
+            <!-- #0a0a0f, the app background (scripts/setup-icons.sh APP_BG) -->
+            <color key="backgroundColor" red="0.0392156862745098"
+                   green="0.0392156862745098" blue="0.058823529411764705"
+                   alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <constraints>
+              <constraint firstItem="LgI-mv-001" firstAttribute="centerX"
+                          secondItem="Ze5-6b-2t3" secondAttribute="centerX"
+                          id="LgX-cn-001"/>
+              <constraint firstItem="LgI-mv-001" firstAttribute="centerY"
+                          secondItem="Ze5-6b-2t3" secondAttribute="centerY"
+                          id="LgY-cn-002"/>
+            </constraints>
           </view>
         </viewController>
         <placeholder placeholderIdentifier="IBFirstResponder"
@@ -22,4 +42,7 @@
       <point key="canvasLocation" x="0" y="0"/>
     </scene>
   </scenes>
+  <resources>
+    <image name="LaunchLogo" width="205" height="205"/>
+  </resources>
 </document>

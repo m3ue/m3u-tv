@@ -2338,97 +2338,76 @@ class NavigationSidebar extends StatelessWidget {
             }
             return KeyEventResult.ignored;
           },
-          // Notifications and Settings sit at the bottom of the rail when
-          // they're the last destinations; everything else stacks from the
-          // top. The visual order matches the route order, so D-pad up/down
-          // traversal is unchanged.
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      height: 72 * scale,
-                      child: Padding(
-                        // Horizontal (14) scales to keep the logo centered in
-                        // the collapsed rail, matching how SidebarDestinationItem
-                        // centers its icons (outer + inner padding + icon size
-                        // summing symmetrically around the rail's midpoint) - at
-                        // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
-                        // = 14, so left inset equals right space. Leaving this
-                        // unscaled while the logo itself scaled was the bug: the
-                        // logo drifted off-center as scale grew.
-                        padding: EdgeInsets.fromLTRB(
-                          14 * scale,
-                          20,
-                          14 * scale,
-                          16,
-                        ),
-                        child: OverflowBox(
-                          maxWidth: 200 * scale,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SvgPicture.asset(
-                                'assets/icons/logo.svg',
-                                width: 36 * scale,
-                                height: 36 * scale,
-                              ),
-                              if (expanded) ...[
-                                const SizedBox(width: 12),
-                                Text(
-                                  'M3U TV',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ],
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 72 * scale,
+                  child: Padding(
+                    // Horizontal (14) scales to keep the logo centered in
+                    // the collapsed rail, matching how SidebarDestinationItem
+                    // centers its icons (outer + inner padding + icon size
+                    // summing symmetrically around the rail's midpoint) - at
+                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
+                    // = 14, so left inset equals right space. Leaving this
+                    // unscaled while the logo itself scaled was the bug: the
+                    // logo drifted off-center as scale grew.
+                    padding: EdgeInsets.fromLTRB(
+                      14 * scale,
+                      20,
+                      14 * scale,
+                      16,
+                    ),
+                    child: OverflowBox(
+                      maxWidth: 200 * scale,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/icons/logo.svg',
+                            width: 36 * scale,
+                            height: 36 * scale,
                           ),
-                        ),
+                          if (expanded) ...[
+                            const SizedBox(width: 12),
+                            Text(
+                              'M3U TV',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    for (var index = 0; index < footerStart; index++)
-                      _destination(context, index, expanded, scale),
-                  ],
+                  ),
                 ),
-              ),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (footerStart < routes.length) ...[
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16 * scale,
-                          vertical: 8 * scale,
-                        ),
-                        child: Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.07,
-                          ),
-                        ),
+                const SizedBox(height: 12),
+                for (var index = 0; index < footerStart; index++)
+                  _destination(context, index, expanded, scale),
+                // A hairline sets Notifications and Settings apart from
+                // the content destinations.
+                if (footerStart < routes.length)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16 * scale,
+                      vertical: 6 * scale,
+                    ),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.07,
                       ),
-                      for (
-                        var index = footerStart;
-                        index < routes.length;
-                        index++
-                      )
-                        _destination(context, index, expanded, scale),
-                      SizedBox(height: 12 * scale),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                    ),
+                  ),
+                for (var index = footerStart; index < routes.length; index++)
+                  _destination(context, index, expanded, scale),
+              ],
+            ),
           ),
         ),
       ),
@@ -2436,8 +2415,7 @@ class NavigationSidebar extends StatelessWidget {
   }
 
   /// Index of the first trailing Notifications/Settings destination, which
-  /// are pinned to the bottom of the rail; the length of [routes] when there are
-  /// none.
+  /// sit below a divider; the length of [routes] when there are none.
   int get footerStart {
     var start = routes.length;
     while (start > 0 &&
@@ -2458,6 +2436,11 @@ class NavigationSidebar extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
       child: SidebarDestinationItem(
+        // Keyed by route: gated destinations (DVR, Requests, ...) appear
+        // after the first build, and without a key Flutter would hand an
+        // existing item's state (and its focus listener) to a different
+        // destination.
+        key: ValueKey(route),
         label: _routeLabel(context, route),
         icon: _routeIcon(route),
         selected: index == currentIndex,
@@ -2525,6 +2508,16 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(SidebarDestinationItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _focused = widget.focusNode.hasFocus;
+    }
   }
 
   @override
@@ -2668,14 +2661,15 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
                   ),
                 ),
               ),
-              // D-pad focus ring. Shown on the current destination too, so
-              // focus stays visible when it lands there.
+              // D-pad/keyboard focus ring, also on the current destination
+              // so focus stays visible when it lands there. Mouse hover only
+              // gets the tint: on desktop the pointer can rest over one item
+              // while the keyboard moves focus to another, and two rings would
+              // make it unclear which one is focused.
               Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedOpacity(
-                    opacity: _focused || (_hovered && !widget.selected)
-                        ? 1.0
-                        : 0.0,
+                    opacity: _focused ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 150),
                     child: CustomPaint(
                       painter: GradientBorderPainter(

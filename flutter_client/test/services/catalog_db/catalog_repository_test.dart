@@ -58,6 +58,24 @@ void main() {
   );
 
   test(
+    'allItems decodes large catalogs off the main isolate, in order',
+    () async {
+      // Above the inline threshold, so the rows decode on a spawned isolate and
+      // the models come back across it.
+      await repo.replaceItems(
+        sourceKey: 's1',
+        kind: kCatalogKindLive,
+        items: [for (var i = 1; i <= 1200; i++) _channel(i, 'Channel $i')],
+      );
+
+      final items = await repo.allItems<Channel>('s1', kCatalogKindLive);
+      expect(items, hasLength(1200));
+      expect(items.first.name, 'Channel 1');
+      expect(items.last.streamUrl, 'http://host/live/1200.m3u8');
+    },
+  );
+
+  test(
     'replaceItems keeps every element when stream ids are missing or duplicated',
     () async {
       await repo.replaceItems(

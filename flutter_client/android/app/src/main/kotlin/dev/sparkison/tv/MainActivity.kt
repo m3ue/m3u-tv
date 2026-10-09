@@ -41,7 +41,13 @@ class MainActivity : FlutterActivity() {
     // What getFlutterShellArgs picked, for the Logs & Diagnostics header.
     private var rendererDescription = "unknown"
 
+    // The real display density, before the TV override below. The system
+    // draws the launch splash at this density, so LaunchSplash (Dart) needs it
+    // to take over at the same on-screen logo size.
+    private var launchDensity = 1f
+
     override fun attachBaseContext(newBase: Context) {
+        launchDensity = newBase.resources.displayMetrics.density
         // UiModeManager.getCurrentModeType() calls getDisplayId() internally on Android 17+,
         // which NPEs here because the display isn't attached until after attachBaseContext returns.
         val isTV = newBase.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -175,6 +181,7 @@ class MainActivity : FlutterActivity() {
                     "isTelevision" -> result.success(isTelevisionDevice())
                     "getPerformanceSignals" -> result.success(performanceSignals())
                     "getRenderer" -> result.success(rendererDescription)
+                    "getLaunchDensity" -> result.success(launchDensity.toDouble())
                     else -> result.notImplemented()
                 }
             }

@@ -130,6 +130,18 @@ composite_square 1024 20 "$APP_BG" "$LOGO_614" "$ICONS_DIR/adaptive-icon.png"
 # splash-icon.png — dark background + 10 % padding
 composite_square 512 10 "$APP_BG" "$LOGO_409" "$ICONS_DIR/splash-icon.png"
 
+# splash-icon-android12.png - the Android 12+ splash API clips its icon to
+# a 192dp circle (160dp, scaled 192/160 because icon_background_color matches
+# the splash colour, which Android treats as "no background") and, as a
+# non-adaptive icon, draws the image 1.5x that: 288dp. splash-icon.png's 80%
+# logo was cut off at the circle edge. A 341 px logo on a 960 px canvas sits at
+# 288 * 341 / 960 = ~102dp, inside the circle and the exact size the pre-12
+# Android and iOS splashes show (128 * 409 / 512). LaunchSplash
+# (lib/app/launch_splash.dart) draws its logo at that size to take over
+# seamlessly, so keep these in sync (and re-check the maths if the icon
+# background colour ever stops matching the splash colour).
+composite_square 960 0 "$APP_BG" "$(render_logo 341)" "$ICONS_DIR/splash-icon-android12.png"
+
 # icon-desktop.png — Windows/Linux app-icon look: full-bleed gradient squircle
 # (Windows doesn't frame/mask icons, so no outer padding - only the rounded
 # corners are transparent), logo filling ~78 % of the canvas.
@@ -290,6 +302,38 @@ with open(path, "w") as f:
 PYEOF
 
 echo "  tvOS layered icons and Top Shelf image (regular + wide, 1x/2x) written to $TVOS_ASSETS"
+
+# Launch logo for tvos/Runner/Base.lproj/LaunchScreen.storyboard (a 205pt
+# centred image view on the app background). Twice the mobile splash logo so
+# it reads the same share of a 1920pt-wide TV screen as Android TV's ~102dp
+# does of 960dp; LaunchSplash takes over from it at the same size.
+LAUNCH_LOGO="$FLUTTER_DIR/tvos/Runner/Assets.xcassets/LaunchLogo.imageset"
+mkdir -p "$LAUNCH_LOGO"
+magick "$(render_logo 205)" -depth 8 "PNG32:$LAUNCH_LOGO/launch_logo.png"
+magick "$(render_logo 410)" -depth 8 "PNG32:$LAUNCH_LOGO/launch_logo@2x.png"
+
+cat > "$LAUNCH_LOGO/Contents.json" <<'EOF'
+{
+  "images" : [
+    {
+      "idiom" : "tv",
+      "filename" : "launch_logo.png",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "tv",
+      "filename" : "launch_logo@2x.png",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+EOF
+
+echo "  tvOS launch logo (1x/2x) written to $LAUNCH_LOGO"
 
 if [[ "$TVOS_ONLY" -eq 1 ]]; then
     echo ""

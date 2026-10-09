@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -58,9 +59,17 @@ Future<void> main() async {
       dispatcher.onSemanticsActionEvent,
     );
   }
+  // Synchronous (parses the whole tz database), so it runs while the static
+  // native splash is still up rather than stalling the animated one.
+  tz_data.initializeTimeZones();
+  // Mobile and TV launch behind a static native splash; replace it with the
+  // animated LaunchSplash right away so the startup work below and the first
+  // boot() play out behind it instead of a frozen logo. Desktop has no native
+  // splash and only opens its window once startup is done, so it keeps
+  // starting straight into the app.
+  final launchSplash = _isDesktop ? null : await showLaunchSplash();
   await DevicePerformance.ensureDetected();
   debugPrint(DevicePerformance.describe());
-  tz_data.initializeTimeZones();
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
@@ -121,7 +130,15 @@ Future<void> main() async {
   if (desktopFullscreen != null) {
     app = DesktopFullscreenScope(service: desktopFullscreen, child: app);
   }
-  runApp(app);
+  if (launchSplash != null) {
+    launchSplash.attach(
+      app,
+      bootState: appState,
+      isBooting: () => appState.isBootstrapping,
+    );
+  } else {
+    runApp(app);
+  }
 }
 
 /// Raises Flutter's decoded-image memory cache above the 100 MB / 1000 entry

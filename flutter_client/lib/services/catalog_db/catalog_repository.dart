@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 
@@ -238,7 +239,7 @@ class CatalogRepository {
   /// column's int, or null for anything absent/malformed.
   int? _parseYear(String? year) => year == null ? null : int.tryParse(year);
 
-  Object _decodeRow(String kind, String json) {
+  static Object _decodeRow(String kind, String json) {
     final map = asMap(jsonDecode(json));
     return switch (kind) {
       kCatalogKindLive => decodeChannel(map),
@@ -258,9 +259,29 @@ class CatalogRepository {
               )
               ..orderBy([(t) => OrderingTerm(expression: t.sortIndex)]))
             .get();
-    return rows
-        .map((r) => _decodeRow(kind, r.json) as T)
-        .toList(growable: false);
+    final decoded = await _decodeRowsOffMainIsolate(kind, [
+      for (final row in rows) row.json,
+    ]);
+    return List<T>.from(decoded, growable: false);
+  }
+
+  /// Below this many rows the decode is quicker than spawning an isolate.
+  static const int _offloadThresholdRows = 500;
+
+  /// Decodes whole-catalog reads (tens of thousands of rows, one jsonDecode
+  /// each) on a short-lived isolate: inline, it blocked the UI thread for
+  /// seconds during boot's cache hydration, stalling every frame of the
+  /// launch splash. Static so the closure can't capture the repository, and
+  /// Isolate.run hands the result back without copying it.
+  static Future<List<Object>> _decodeRowsOffMainIsolate(
+    String kind,
+    List<String> jsons,
+  ) {
+    List<Object> decodeAll() => [
+      for (final json in jsons) _decodeRow(kind, json),
+    ];
+    if (jsons.length < _offloadThresholdRows) return Future.value(decodeAll());
+    return Isolate.run(decodeAll);
   }
 
   /// A windowed slice of [kind], provider order, optionally filtered to
