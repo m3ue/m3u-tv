@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/connection_form.dart';
@@ -875,6 +876,40 @@ void main() {
       final pairingService = await startedPairing(tester, DeviceType.tv);
 
       expect(find.text('Open in browser'), findsNothing);
+      expect(find.text('Copy code'), findsNothing);
+
+      pairingService.dispose();
+    });
+
+    testWidgets('copies the pairing code on non-TV devices', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final pairingService = await startedPairing(tester, DeviceType.desktop);
+
+      await tester.ensureVisible(find.text('Copy code'));
+      await tester.tap(find.text('Copy code'));
+      await tester.pump();
+
+      expect(copied, 'ABCD-1234');
+      expect(find.text('Copied'), findsOneWidget);
+
+      // Let the confirmation reset timer fire so no timer is left pending.
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Copy code'), findsOneWidget);
 
       pairingService.dispose();
     });

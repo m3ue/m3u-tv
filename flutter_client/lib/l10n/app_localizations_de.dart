@@ -829,6 +829,12 @@ class AppLocalizationsDe extends AppLocalizations {
       'Scanne, um die Kopplungsseite auf deinem Handy zu öffnen';
 
   @override
+  String get pairingCopyCode => 'Code kopieren';
+
+  @override
+  String get pairingCodeCopied => 'Kopiert';
+
+  @override
   String get pairingOpenBrowser => 'Im Browser öffnen';
 
   @override

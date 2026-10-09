@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/clear_cache_dialog.dart';
@@ -659,13 +660,20 @@ class _DevicePairingWide extends StatelessWidget {
               ),
               if (linksAreTappable && uri.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                AppButton(
-                  icon: Icons.open_in_new,
-                  label: l.pairingOpenBrowser,
-                  onPressed: () => launchUrl(
-                    Uri.parse(uri),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _CopyPairingCodeButton(userCode: userCode),
+                    AppButton(
+                      icon: Icons.open_in_new,
+                      label: l.pairingOpenBrowser,
+                      onPressed: () => launchUrl(
+                        Uri.parse(uri),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -727,7 +735,12 @@ class _DevicePairingNarrow extends StatelessWidget {
           uriTappable: linksAreTappable,
         ),
         const SizedBox(height: 20),
-        if (linksAreTappable && uri.isNotEmpty)
+        if (linksAreTappable && uri.isNotEmpty) ...[
+          SizedBox(
+            width: double.infinity,
+            child: _CopyPairingCodeButton(userCode: userCode),
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: AppButton(
@@ -739,6 +752,7 @@ class _DevicePairingNarrow extends StatelessWidget {
               ),
             ),
           ),
+        ],
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -748,6 +762,48 @@ class _DevicePairingNarrow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Copies the pairing code so it can be pasted into the m3u-editor pairing
+/// page, then briefly flips to a "Copied" confirmation.
+class _CopyPairingCodeButton extends StatefulWidget {
+  const _CopyPairingCodeButton({required this.userCode});
+
+  final String userCode;
+
+  @override
+  State<_CopyPairingCodeButton> createState() => _CopyPairingCodeButtonState();
+}
+
+class _CopyPairingCodeButtonState extends State<_CopyPairingCodeButton> {
+  Timer? _resetTimer;
+  bool _copied = false;
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.userCode));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    _resetTimer?.cancel();
+    _resetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AppButton(
+      icon: _copied ? Icons.check : Icons.copy,
+      label: _copied ? l.pairingCodeCopied : l.pairingCopyCode,
+      onPressed: _copy,
     );
   }
 }

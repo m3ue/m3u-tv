@@ -343,6 +343,8 @@
   "pairingEnterServerFirst": "Entrez d'abord l'URL de votre serveur",
   "pairingErrorGeneric": "Le couplage a échoué ou le code a expiré. Veuillez réessayer.",
   "pairingScanQr": "Scannez pour ouvrir la page de couplage sur votre téléphone",
+  "pairingCopyCode": "Copier le code",
+  "pairingCodeCopied": "Copié",
   "pairingOpenBrowser": "Ouvrir dans le navigateur",
   "pairingPendingGoTo": "Sur votre téléphone ou ordinateur, allez sur :",
   "pairingPendingEnterCode": "Code d'appairage :",

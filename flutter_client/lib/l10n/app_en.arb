@@ -440,6 +440,8 @@
   "pairingEnterServerFirst": "Enter your server URL first",
   "pairingErrorGeneric": "Pairing failed or the code expired. Please try again.",
   "pairingScanQr": "Scan to open the pairing page on your phone",
+  "pairingCopyCode": "Copy code",
+  "pairingCodeCopied": "Copied",
   "pairingOpenBrowser": "Open in browser",
   "pairingPendingGoTo": "On your phone or computer, go to:",
   "pairingPendingEnterCode": "Pairing code:",

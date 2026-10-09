@@ -343,6 +343,8 @@
   "pairingEnterServerFirst": "Ingresa primero la URL de tu servidor",
   "pairingErrorGeneric": "La vinculación falló o el código expiró. Inténtalo de nuevo.",
   "pairingScanQr": "Escanea para abrir la página de vinculación en tu teléfono",
+  "pairingCopyCode": "Copiar código",
+  "pairingCodeCopied": "Copiado",
   "pairingOpenBrowser": "Abrir en el navegador",
   "pairingPendingGoTo": "En tu teléfono u ordenador, ve a:",
   "pairingPendingEnterCode": "Código de emparejamiento:",

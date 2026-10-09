@@ -343,6 +343,8 @@
   "pairingEnterServerFirst": "请先输入您的服务器地址",
   "pairingErrorGeneric": "配对失败或代码已过期，请重试。",
   "pairingScanQr": "扫描以在手机上打开配对页面",
+  "pairingCopyCode": "复制代码",
+  "pairingCodeCopied": "已复制",
   "pairingOpenBrowser": "在浏览器中打开",
   "pairingPendingGoTo": "在您的手机或电脑上，访问：",
   "pairingPendingEnterCode": "配对代码：",

@@ -824,6 +824,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairingScanQr => 'Scan to open the pairing page on your phone';
 
   @override
+  String get pairingCopyCode => 'Copy code';
+
+  @override
+  String get pairingCodeCopied => 'Copied';
+
+  @override
   String get pairingOpenBrowser => 'Open in browser';
 
   @override

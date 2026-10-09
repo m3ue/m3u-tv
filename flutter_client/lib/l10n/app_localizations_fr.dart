@@ -832,6 +832,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Scannez pour ouvrir la page de couplage sur votre téléphone';
 
   @override
+  String get pairingCopyCode => 'Copier le code';
+
+  @override
+  String get pairingCodeCopied => 'Copié';
+
+  @override
   String get pairingOpenBrowser => 'Ouvrir dans le navigateur';
 
   @override

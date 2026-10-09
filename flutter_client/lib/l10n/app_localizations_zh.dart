@@ -800,6 +800,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pairingScanQr => '扫描以在手机上打开配对页面';
 
   @override
+  String get pairingCopyCode => '复制代码';
+
+  @override
+  String get pairingCodeCopied => '已复制';
+
+  @override
   String get pairingOpenBrowser => '在浏览器中打开';
 
   @override

@@ -343,6 +343,8 @@
   "pairingEnterServerFirst": "Gib zuerst deine Server-URL ein",
   "pairingErrorGeneric": "Kopplung fehlgeschlagen oder der Code ist abgelaufen. Bitte versuche es erneut.",
   "pairingScanQr": "Scanne, um die Kopplungsseite auf deinem Handy zu öffnen",
+  "pairingCopyCode": "Code kopieren",
+  "pairingCodeCopied": "Kopiert",
   "pairingOpenBrowser": "Im Browser öffnen",
   "pairingPendingGoTo": "Gehe auf deinem Telefon oder Computer zu:",
   "pairingPendingEnterCode": "Kopplungscode:",

@@ -830,6 +830,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Escanea para abrir la página de vinculación en tu teléfono';
 
   @override
+  String get pairingCopyCode => 'Copiar código';
+
+  @override
+  String get pairingCodeCopied => 'Copiado';
+
+  @override
   String get pairingOpenBrowser => 'Abrir en el navegador';
 
   @override

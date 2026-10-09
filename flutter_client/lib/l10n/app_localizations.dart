@@ -1562,6 +1562,18 @@ abstract class AppLocalizations {
   /// **'Scan to open the pairing page on your phone'**
   String get pairingScanQr;
 
+  /// No description provided for @pairingCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get pairingCopyCode;
+
+  /// No description provided for @pairingCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get pairingCodeCopied;
+
   /// No description provided for @pairingOpenBrowser.
   ///
   /// In en, this message translates to:
