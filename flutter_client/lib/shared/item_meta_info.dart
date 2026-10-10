@@ -279,8 +279,10 @@ class MetaCreditLineText extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: MediaBrowsingMetrics.chipGap),
-      child: RichText(
-        text: TextSpan(
+      // Text.rich, not RichText: RichText ignores the app's TextScaler, which
+      // left credit lines at normal size under the larger font settings.
+      child: Text.rich(
+        TextSpan(
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
