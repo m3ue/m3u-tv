@@ -1648,6 +1648,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDefaultStartPage => '默认启动页面';
 
   @override
+  String get settingsHomeScreenStyle => '主屏幕';
+
+  @override
+  String get settingsHomeScreenStyleSimplified => '简洁';
+
+  @override
+  String get settingsHomeScreenStyleRich => '丰富';
+
+  @override
   String get settingsHdrMode => 'HDR 模式';
 
   @override

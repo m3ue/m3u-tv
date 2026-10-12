@@ -1185,6 +1185,28 @@ class $EpgProgrammesTable extends EpgProgrammes
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _posterUrlMeta = const VerificationMeta(
+    'posterUrl',
+  );
+  @override
+  late final GeneratedColumn<String> posterUrl = GeneratedColumn<String>(
+    'poster_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _backdropUrlMeta = const VerificationMeta(
+    'backdropUrl',
+  );
+  @override
+  late final GeneratedColumn<String> backdropUrl = GeneratedColumn<String>(
+    'backdrop_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _categoryMeta = const VerificationMeta(
     'category',
   );
@@ -1301,6 +1323,8 @@ class $EpgProgrammesTable extends EpgProgrammes
     subtitle,
     description,
     iconUrl,
+    posterUrl,
+    backdropUrl,
     category,
     rating,
     season,
@@ -1372,6 +1396,21 @@ class $EpgProgrammesTable extends EpgProgrammes
       context.handle(
         _iconUrlMeta,
         iconUrl.isAcceptableOrUnknown(data['icon_url']!, _iconUrlMeta),
+      );
+    }
+    if (data.containsKey('poster_url')) {
+      context.handle(
+        _posterUrlMeta,
+        posterUrl.isAcceptableOrUnknown(data['poster_url']!, _posterUrlMeta),
+      );
+    }
+    if (data.containsKey('backdrop_url')) {
+      context.handle(
+        _backdropUrlMeta,
+        backdropUrl.isAcceptableOrUnknown(
+          data['backdrop_url']!,
+          _backdropUrlMeta,
+        ),
       );
     }
     if (data.containsKey('category')) {
@@ -1468,6 +1507,14 @@ class $EpgProgrammesTable extends EpgProgrammes
         DriftSqlType.string,
         data['${effectivePrefix}icon_url'],
       ),
+      posterUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}poster_url'],
+      ),
+      backdropUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}backdrop_url'],
+      ),
       category: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}category'],
@@ -1521,6 +1568,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   final String? subtitle;
   final String description;
   final String? iconUrl;
+  final String? posterUrl;
+  final String? backdropUrl;
   final String? category;
   final String? rating;
   final int? season;
@@ -1538,6 +1587,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     this.subtitle,
     required this.description,
     this.iconUrl,
+    this.posterUrl,
+    this.backdropUrl,
     this.category,
     this.rating,
     this.season,
@@ -1561,6 +1612,12 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     map['description'] = Variable<String>(description);
     if (!nullToAbsent || iconUrl != null) {
       map['icon_url'] = Variable<String>(iconUrl);
+    }
+    if (!nullToAbsent || posterUrl != null) {
+      map['poster_url'] = Variable<String>(posterUrl);
+    }
+    if (!nullToAbsent || backdropUrl != null) {
+      map['backdrop_url'] = Variable<String>(backdropUrl);
     }
     if (!nullToAbsent || category != null) {
       map['category'] = Variable<String>(category);
@@ -1597,6 +1654,12 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       iconUrl: iconUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(iconUrl),
+      posterUrl: posterUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(posterUrl),
+      backdropUrl: backdropUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backdropUrl),
       category: category == null && nullToAbsent
           ? const Value.absent()
           : Value(category),
@@ -1630,6 +1693,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       subtitle: serializer.fromJson<String?>(json['subtitle']),
       description: serializer.fromJson<String>(json['description']),
       iconUrl: serializer.fromJson<String?>(json['iconUrl']),
+      posterUrl: serializer.fromJson<String?>(json['posterUrl']),
+      backdropUrl: serializer.fromJson<String?>(json['backdropUrl']),
       category: serializer.fromJson<String?>(json['category']),
       rating: serializer.fromJson<String?>(json['rating']),
       season: serializer.fromJson<int?>(json['season']),
@@ -1652,6 +1717,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
       'subtitle': serializer.toJson<String?>(subtitle),
       'description': serializer.toJson<String>(description),
       'iconUrl': serializer.toJson<String?>(iconUrl),
+      'posterUrl': serializer.toJson<String?>(posterUrl),
+      'backdropUrl': serializer.toJson<String?>(backdropUrl),
       'category': serializer.toJson<String?>(category),
       'rating': serializer.toJson<String?>(rating),
       'season': serializer.toJson<int?>(season),
@@ -1672,6 +1739,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     Value<String?> subtitle = const Value.absent(),
     String? description,
     Value<String?> iconUrl = const Value.absent(),
+    Value<String?> posterUrl = const Value.absent(),
+    Value<String?> backdropUrl = const Value.absent(),
     Value<String?> category = const Value.absent(),
     Value<String?> rating = const Value.absent(),
     Value<int?> season = const Value.absent(),
@@ -1689,6 +1758,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     subtitle: subtitle.present ? subtitle.value : this.subtitle,
     description: description ?? this.description,
     iconUrl: iconUrl.present ? iconUrl.value : this.iconUrl,
+    posterUrl: posterUrl.present ? posterUrl.value : this.posterUrl,
+    backdropUrl: backdropUrl.present ? backdropUrl.value : this.backdropUrl,
     category: category.present ? category.value : this.category,
     rating: rating.present ? rating.value : this.rating,
     season: season.present ? season.value : this.season,
@@ -1710,6 +1781,10 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           ? data.description.value
           : this.description,
       iconUrl: data.iconUrl.present ? data.iconUrl.value : this.iconUrl,
+      posterUrl: data.posterUrl.present ? data.posterUrl.value : this.posterUrl,
+      backdropUrl: data.backdropUrl.present
+          ? data.backdropUrl.value
+          : this.backdropUrl,
       category: data.category.present ? data.category.value : this.category,
       rating: data.rating.present ? data.rating.value : this.rating,
       season: data.season.present ? data.season.value : this.season,
@@ -1736,6 +1811,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           ..write('subtitle: $subtitle, ')
           ..write('description: $description, ')
           ..write('iconUrl: $iconUrl, ')
+          ..write('posterUrl: $posterUrl, ')
+          ..write('backdropUrl: $backdropUrl, ')
           ..write('category: $category, ')
           ..write('rating: $rating, ')
           ..write('season: $season, ')
@@ -1758,6 +1835,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     subtitle,
     description,
     iconUrl,
+    posterUrl,
+    backdropUrl,
     category,
     rating,
     season,
@@ -1779,6 +1858,8 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
           other.subtitle == this.subtitle &&
           other.description == this.description &&
           other.iconUrl == this.iconUrl &&
+          other.posterUrl == this.posterUrl &&
+          other.backdropUrl == this.backdropUrl &&
           other.category == this.category &&
           other.rating == this.rating &&
           other.season == this.season &&
@@ -1798,6 +1879,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   final Value<String?> subtitle;
   final Value<String> description;
   final Value<String?> iconUrl;
+  final Value<String?> posterUrl;
+  final Value<String?> backdropUrl;
   final Value<String?> category;
   final Value<String?> rating;
   final Value<int?> season;
@@ -1816,6 +1899,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.subtitle = const Value.absent(),
     this.description = const Value.absent(),
     this.iconUrl = const Value.absent(),
+    this.posterUrl = const Value.absent(),
+    this.backdropUrl = const Value.absent(),
     this.category = const Value.absent(),
     this.rating = const Value.absent(),
     this.season = const Value.absent(),
@@ -1835,6 +1920,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.subtitle = const Value.absent(),
     this.description = const Value.absent(),
     this.iconUrl = const Value.absent(),
+    this.posterUrl = const Value.absent(),
+    this.backdropUrl = const Value.absent(),
     this.category = const Value.absent(),
     this.rating = const Value.absent(),
     this.season = const Value.absent(),
@@ -1856,6 +1943,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Expression<String>? subtitle,
     Expression<String>? description,
     Expression<String>? iconUrl,
+    Expression<String>? posterUrl,
+    Expression<String>? backdropUrl,
     Expression<String>? category,
     Expression<String>? rating,
     Expression<int>? season,
@@ -1875,6 +1964,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
       if (subtitle != null) 'subtitle': subtitle,
       if (description != null) 'description': description,
       if (iconUrl != null) 'icon_url': iconUrl,
+      if (posterUrl != null) 'poster_url': posterUrl,
+      if (backdropUrl != null) 'backdrop_url': backdropUrl,
       if (category != null) 'category': category,
       if (rating != null) 'rating': rating,
       if (season != null) 'season': season,
@@ -1896,6 +1987,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Value<String?>? subtitle,
     Value<String>? description,
     Value<String?>? iconUrl,
+    Value<String?>? posterUrl,
+    Value<String?>? backdropUrl,
     Value<String?>? category,
     Value<String?>? rating,
     Value<int?>? season,
@@ -1915,6 +2008,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
       subtitle: subtitle ?? this.subtitle,
       description: description ?? this.description,
       iconUrl: iconUrl ?? this.iconUrl,
+      posterUrl: posterUrl ?? this.posterUrl,
+      backdropUrl: backdropUrl ?? this.backdropUrl,
       category: category ?? this.category,
       rating: rating ?? this.rating,
       season: season ?? this.season,
@@ -1951,6 +2046,12 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     }
     if (iconUrl.present) {
       map['icon_url'] = Variable<String>(iconUrl.value);
+    }
+    if (posterUrl.present) {
+      map['poster_url'] = Variable<String>(posterUrl.value);
+    }
+    if (backdropUrl.present) {
+      map['backdrop_url'] = Variable<String>(backdropUrl.value);
     }
     if (category.present) {
       map['category'] = Variable<String>(category.value);
@@ -1995,6 +2096,8 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
           ..write('subtitle: $subtitle, ')
           ..write('description: $description, ')
           ..write('iconUrl: $iconUrl, ')
+          ..write('posterUrl: $posterUrl, ')
+          ..write('backdropUrl: $backdropUrl, ')
           ..write('category: $category, ')
           ..write('rating: $rating, ')
           ..write('season: $season, ')
@@ -2883,6 +2986,8 @@ typedef $$EpgProgrammesTableCreateCompanionBuilder =
       Value<String?> subtitle,
       Value<String> description,
       Value<String?> iconUrl,
+      Value<String?> posterUrl,
+      Value<String?> backdropUrl,
       Value<String?> category,
       Value<String?> rating,
       Value<int?> season,
@@ -2903,6 +3008,8 @@ typedef $$EpgProgrammesTableUpdateCompanionBuilder =
       Value<String?> subtitle,
       Value<String> description,
       Value<String?> iconUrl,
+      Value<String?> posterUrl,
+      Value<String?> backdropUrl,
       Value<String?> category,
       Value<String?> rating,
       Value<int?> season,
@@ -2956,6 +3063,16 @@ class $$EpgProgrammesTableFilterComposer
 
   ColumnFilters<String> get iconUrl => $composableBuilder(
     column: $table.iconUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get posterUrl => $composableBuilder(
+    column: $table.posterUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get backdropUrl => $composableBuilder(
+    column: $table.backdropUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3049,6 +3166,16 @@ class $$EpgProgrammesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get posterUrl => $composableBuilder(
+    column: $table.posterUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get backdropUrl => $composableBuilder(
+    column: $table.backdropUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get category => $composableBuilder(
     column: $table.category,
     builder: (column) => ColumnOrderings(column),
@@ -3127,6 +3254,14 @@ class $$EpgProgrammesTableAnnotationComposer
   GeneratedColumn<String> get iconUrl =>
       $composableBuilder(column: $table.iconUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get posterUrl =>
+      $composableBuilder(column: $table.posterUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get backdropUrl => $composableBuilder(
+    column: $table.backdropUrl,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
 
@@ -3203,6 +3338,8 @@ class $$EpgProgrammesTableTableManager
                 Value<String?> subtitle = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<String?> iconUrl = const Value.absent(),
+                Value<String?> posterUrl = const Value.absent(),
+                Value<String?> backdropUrl = const Value.absent(),
                 Value<String?> category = const Value.absent(),
                 Value<String?> rating = const Value.absent(),
                 Value<int?> season = const Value.absent(),
@@ -3221,6 +3358,8 @@ class $$EpgProgrammesTableTableManager
                 subtitle: subtitle,
                 description: description,
                 iconUrl: iconUrl,
+                posterUrl: posterUrl,
+                backdropUrl: backdropUrl,
                 category: category,
                 rating: rating,
                 season: season,
@@ -3241,6 +3380,8 @@ class $$EpgProgrammesTableTableManager
                 Value<String?> subtitle = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<String?> iconUrl = const Value.absent(),
+                Value<String?> posterUrl = const Value.absent(),
+                Value<String?> backdropUrl = const Value.absent(),
                 Value<String?> category = const Value.absent(),
                 Value<String?> rating = const Value.absent(),
                 Value<int?> season = const Value.absent(),
@@ -3259,6 +3400,8 @@ class $$EpgProgrammesTableTableManager
                 subtitle: subtitle,
                 description: description,
                 iconUrl: iconUrl,
+                posterUrl: posterUrl,
+                backdropUrl: backdropUrl,
                 category: category,
                 rating: rating,
                 season: season,

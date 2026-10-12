@@ -1180,6 +1180,8 @@ void main() {
                 'start': '2026-01-01 12:00:00',
                 'end': '2026-01-01 13:00:00',
                 'icon': 'https://images.example/rich.jpg',
+                'poster_url': 'https://images.example/poster.jpg',
+                'backdrop_url': 'https://images.example/backdrop.jpg',
                 'category': 'Drama',
                 'rating': 'TV-14',
                 'season': 2,
@@ -1221,6 +1223,8 @@ void main() {
       expect(requests.single.params['details'], '1');
       final rich = programs.singleWhere((p) => p.title == 'Detective Show');
       expect(rich.iconUrl, 'https://images.example/rich.jpg');
+      expect(rich.posterUrl, 'https://images.example/poster.jpg');
+      expect(rich.backdropUrl, 'https://images.example/backdrop.jpg');
       expect(rich.category, 'Drama');
       expect(rich.rating, 'TV-14');
       expect(rich.season, 2);
@@ -1234,6 +1238,7 @@ void main() {
       final placeholder = programs.singleWhere((p) => p.title == 'BBC One');
       expect(placeholder.isPlaceholder, isTrue);
       expect(placeholder.iconUrl, isNull);
+      expect(placeholder.backdropUrl, isNull);
       expect(placeholder.category, isNull);
       expect(placeholder.season, isNull);
       expect(placeholder.isNew, isFalse);

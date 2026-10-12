@@ -1707,6 +1707,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDefaultStartPage => 'Standardstartseite';
 
   @override
+  String get settingsHomeScreenStyle => 'Startbildschirm';
+
+  @override
+  String get settingsHomeScreenStyleSimplified => 'Vereinfacht';
+
+  @override
+  String get settingsHomeScreenStyleRich => 'Erweitert';
+
+  @override
   String get settingsHdrMode => 'HDR-Modus';
 
   @override

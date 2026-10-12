@@ -2292,6 +2292,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
   bool _rememberMediaSort = false;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
+  HomeScreenStyle _homeScreenStyle = HomeScreenStyle.simplified;
   bool _hdrEnabled = true;
   bool _matchRefreshRate = false;
   bool _deinterlace = false;
@@ -2351,6 +2352,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
     final channelColumnLayout = await widget.service.channelColumnLayout();
     final rememberMediaSort = await widget.service.rememberMediaSort();
     final defaultStartPage = await widget.service.defaultStartPage();
+    final homeScreenStyle = await widget.service.homeScreenStyle();
     final hdrEnabled = await widget.service.hdrEnabled();
     final matchRefreshRate = await widget.service.matchRefreshRate();
     final deinterlace = await widget.service.deinterlace();
@@ -2371,6 +2373,7 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
       _channelColumnLayout = channelColumnLayout;
       _rememberMediaSort = rememberMediaSort;
       _defaultStartPage = defaultStartPage;
+      _homeScreenStyle = homeScreenStyle;
       _hdrEnabled = hdrEnabled;
       _matchRefreshRate = matchRefreshRate;
       _deinterlace = deinterlace;
@@ -2413,6 +2416,32 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
                 ),
               ),
             ),
+            // The rich Home's spotlight follows D-pad/mouse focus, which touch
+            // layouts don't have - they always render the simplified Home.
+            if (_showNavigationSoundToggle)
+              SettingsRow(
+                title: l.settingsHomeScreenStyle,
+                subtitle: _homeScreenStyleLabel(l, _homeScreenStyle),
+                icon: Icons.dashboard_outlined,
+                trailing: const SettingsChevron(),
+                onTap: () => unawaited(
+                  pushSettingsPicker<HomeScreenStyle>(
+                    context,
+                    title: (context) =>
+                        AppLocalizations.of(context).settingsHomeScreenStyle,
+                    onBack: widget.onHandleTopLevelBack,
+                    selected: _homeScreenStyle,
+                    options: [
+                      for (final style in HomeScreenStyle.values)
+                        SettingsPickerOption(
+                          value: style,
+                          label: _homeScreenStyleLabel(l, style),
+                        ),
+                    ],
+                    onSelected: widget.service.setHomeScreenStyle,
+                  ),
+                ),
+              ),
             SettingsRow(
               title: l.settingsLiveTvLayout,
               subtitle: _liveTvLayoutLabel(l, _liveTvLayout),
@@ -2717,6 +2746,12 @@ String _startPageLabel(AppLocalizations l, DefaultStartPage page) =>
       DefaultStartPage.liveTv => l.navLiveTv,
       DefaultStartPage.movies => l.navVod,
       DefaultStartPage.series => l.navSeries,
+    };
+
+String _homeScreenStyleLabel(AppLocalizations l, HomeScreenStyle style) =>
+    switch (style) {
+      HomeScreenStyle.simplified => l.settingsHomeScreenStyleSimplified,
+      HomeScreenStyle.rich => l.settingsHomeScreenStyleRich,
     };
 
 String _intervalLabel(AppLocalizations l, Duration d) {

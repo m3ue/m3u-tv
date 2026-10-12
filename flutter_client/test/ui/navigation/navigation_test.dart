@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
+import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -2179,6 +2180,66 @@ void main() {
     expect(liveTop, lessThan(moviesTop));
     expect(moviesTop, lessThan(seriesTop));
     expect(seriesTop, lessThan(dvrTop));
+  });
+
+  group('Home screen style', () {
+    Future<AppStateController> connectedAppState() async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+      return appState;
+    }
+
+    testWidgets('TV defaults to the simplified Home', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(RichHomeLayout), findsNothing);
+      expect(find.text('Movies'), findsAtLeast(1));
+    });
+
+    testWidgets('TV renders the rich Home when selected', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await appState.viewSettingsService.setHomeScreenStyle(
+        HomeScreenStyle.rich,
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(RichHomeLayout), findsOneWidget);
+      expect(find.text('Movies'), findsAtLeast(1));
+    });
+
+    testWidgets('phones keep the simplified Home even when rich is set', (
+      tester,
+    ) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await appState.viewSettingsService.setHomeScreenStyle(
+        HomeScreenStyle.rich,
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.phone, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(RichHomeLayout), findsNothing);
+    });
   });
 
   group('Focus restoration', () {

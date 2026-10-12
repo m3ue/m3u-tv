@@ -26,6 +26,7 @@ List<MediaPreviewItem> continueWatchingPreviewItems(
   required List<VodItem> vodItems,
   required List<Series> seriesList,
   required void Function(Progress) onProgressSelect,
+  void Function(Progress)? onProgressFocused,
 }) => progressList
     .where(isContinueWatchingEligible)
     .map(
@@ -35,6 +36,7 @@ List<MediaPreviewItem> continueWatchingPreviewItems(
         vodItems,
         seriesList,
         onProgressSelect,
+        onProgressFocused,
       ),
     )
     .whereType<MediaPreviewItem>()
@@ -50,6 +52,7 @@ Future<List<MediaPreviewItem>> continueWatchingPreviewItemsFromRepo(
   required List<Progress> progressList,
   required CatalogRepository repo,
   required void Function(Progress) onProgressSelect,
+  void Function(Progress)? onProgressFocused,
 }) async {
   final eligible = progressList.where(isContinueWatchingEligible).toList();
   final vodIds = <int>{
@@ -80,6 +83,7 @@ Future<List<MediaPreviewItem>> continueWatchingPreviewItemsFromRepo(
     vodItems: vodItems,
     seriesList: seriesList,
     onProgressSelect: onProgressSelect,
+    onProgressFocused: onProgressFocused,
   );
 }
 
@@ -89,7 +93,11 @@ MediaPreviewItem? _resumePreviewItem(
   List<VodItem> vodItems,
   List<Series> seriesList,
   void Function(Progress) onProgressSelect,
+  void Function(Progress)? onProgressFocused,
 ) {
+  final onFocused = onProgressFocused == null
+      ? null
+      : () => onProgressFocused(progress);
   final vodById = _catalogLookup.vodById(vodItems);
   final seriesById = _catalogLookup.seriesById(seriesList);
   if (progress.contentType == ContentType.vod) {
@@ -125,6 +133,7 @@ MediaPreviewItem? _resumePreviewItem(
           if (progress.runtime != null) progress.runtime!,
         ],
         onTap: () => onProgressSelect(progress),
+        onFocused: onFocused,
       );
     }
     final item = vodById[progress.streamId];
@@ -148,6 +157,7 @@ MediaPreviewItem? _resumePreviewItem(
         if (item.rating != null) '★ ${item.rating!.toStringAsFixed(1)}',
       ],
       onTap: () => onProgressSelect(progress),
+      onFocused: onFocused,
     );
   }
 
@@ -190,6 +200,7 @@ MediaPreviewItem? _resumePreviewItem(
           if (progress.runtime != null) progress.runtime!,
         ],
         onTap: () => onProgressSelect(progress),
+        onFocused: onFocused,
       );
     }
     if (progress.seriesId != null) {
@@ -204,6 +215,7 @@ MediaPreviewItem? _resumePreviewItem(
         fallbackIcon: Icons.tv,
         fallbackTitle: series.name,
         onTap: () => onProgressSelect(progress),
+        onFocused: onFocused,
       );
     }
   }

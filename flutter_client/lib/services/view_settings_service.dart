@@ -27,6 +27,24 @@ enum DefaultStartPage {
       );
 }
 
+/// Which Home screen layout TV/desktop show. [simplified] is the original
+/// rows-only page and stays the default; [rich] adds a fixed spotlight hero
+/// (backdrop, title, metadata) above the rows that follows the focused item.
+/// Touch layouts always render [simplified].
+enum HomeScreenStyle {
+  simplified('simplified'),
+  rich('rich');
+
+  const HomeScreenStyle(this.value);
+  final String value;
+
+  static HomeScreenStyle fromValue(String? value) =>
+      HomeScreenStyle.values.firstWhere(
+        (style) => style.value == value,
+        orElse: () => HomeScreenStyle.simplified,
+      );
+}
+
 /// Available layouts for the Live TV browsing screen.
 enum LiveTvLayout {
   list('list'),
@@ -215,6 +233,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
+  static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
   static const optimizeForKey = 'm3ue_tv_optimize_for';
   static const fontSizeKey = 'm3ue_tv_font_size';
@@ -236,6 +255,16 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setDefaultStartPage(DefaultStartPage page) async {
     await _write(defaultStartPageKey, page.value);
+    notifyListeners();
+  }
+
+  Future<HomeScreenStyle> homeScreenStyle() async {
+    final raw = await _read(homeScreenStyleKey);
+    return HomeScreenStyle.fromValue(raw as String?);
+  }
+
+  Future<void> setHomeScreenStyle(HomeScreenStyle style) async {
+    await _write(homeScreenStyleKey, style.value);
     notifyListeners();
   }
 

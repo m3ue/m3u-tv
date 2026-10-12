@@ -1023,6 +1023,7 @@ class MediaPreviewItem {
     this.ratingLabel,
     this.cornerBadgeIcon,
     this.cornerBadgeColor,
+    this.onFocused,
   });
 
   final String title;
@@ -1032,6 +1033,11 @@ class MediaPreviewItem {
   final VoidCallback onTap;
   final VoidCallback? onLongTap;
   final bool isFavorite;
+
+  /// Fires when D-pad/mouse focus lands on this card. The rich Home uses it
+  /// to drive its spotlight hero; null (every other rail) adds nothing to the
+  /// card's widget tree.
+  final VoidCallback? onFocused;
 
   /// Icon shown as a small circular corner badge over the poster (top-left),
   /// the same treatment [isFavorite] gives its star. Only rendered by
@@ -1360,7 +1366,7 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             : MediaBrowsingMetrics.previewCardWidth);
     final width = baseWidth * FontSizeScope.scaleOf(context);
 
-    return SizedBox(
+    final card = SizedBox(
       width: width,
       child: DpadInkWell(
         autofocus: widget.autofocus,
@@ -1377,6 +1383,16 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             ? _buildLandscapeContent(context, colorScheme, width)
             : _buildDefaultContent(context, colorScheme),
       ),
+    );
+    final onFocused = item.onFocused;
+    if (onFocused == null) return card;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (hasFocus) {
+        if (hasFocus) onFocused();
+      },
+      child: card,
     );
   }
 

@@ -3014,6 +3014,24 @@ abstract class AppLocalizations {
   /// **'Default start page'**
   String get settingsDefaultStartPage;
 
+  /// No description provided for @settingsHomeScreenStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Home screen'**
+  String get settingsHomeScreenStyle;
+
+  /// No description provided for @settingsHomeScreenStyleSimplified.
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified'**
+  String get settingsHomeScreenStyleSimplified;
+
+  /// No description provided for @settingsHomeScreenStyleRich.
+  ///
+  /// In en, this message translates to:
+  /// **'Rich'**
+  String get settingsHomeScreenStyleRich;
+
   /// No description provided for @settingsHdrMode.
   ///
   /// In en, this message translates to:
