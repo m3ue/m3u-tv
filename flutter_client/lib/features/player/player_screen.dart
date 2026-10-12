@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpClient, HttpStatus, Platform;
+import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
@@ -2091,11 +2092,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 final diagnosticsWidth = _showPlaybackDiagnostics
                     ? (isCompact ? 200.0 : 300.0) * fontScale
                     : 0.0;
+                // Same for the header clock (and "Ends at" under it) that
+                // PlaybackControls shows in that corner; the diagnostics
+                // panel sits below it in the same right-hand column.
+                final clockWidth = 112.0 * fontScale;
+                final rightColumnWidth = diagnosticsWidth > 0
+                    ? math.max(diagnosticsWidth + 12, clockWidth)
+                    : clockWidth;
                 final desktopMaxWidth =
                     mediaQuery.size.width -
                     overlayLeft -
                     (mediaQuery.padding.right + edgePadding) -
-                    (diagnosticsWidth > 0 ? diagnosticsWidth + 12 : 0);
+                    rightColumnWidth;
                 final overlayWidth = isCompact
                     ? desktopMaxWidth
                     : (420.0 * fontScale < desktopMaxWidth
@@ -2375,6 +2383,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             skipPrompt: skipPrompt,
                             upNextPrompt: upNextPrompt,
                             showControlsBar: _hasStartedPlayback,
+                            // The EPG's programme end; the stream itself has
+                            // no length while live.
+                            liveProgrammeEnd: _isLive
+                                ? _epgData?.current.end.toLocal()
+                                : null,
                           ),
                         ),
                       ),
@@ -2383,7 +2396,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         _overlayVisible &&
                         _errorMessage == null)
                       Positioned(
-                        top: overlayTop,
+                        // Below the header row (back button height + gap),
+                        // so the clock and "Ends at" above it stay visible.
+                        top: overlayTop + 44.0 * fontScale + 12,
                         right: mediaQuery.padding.right + edgePadding,
                         child: _PlaybackDiagnosticsPanel(
                           compact: isCompact,

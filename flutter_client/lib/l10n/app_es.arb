@@ -191,6 +191,7 @@
   "playerSkipCredits": "Omitir créditos",
   "playerSkipIntro": "Omitir introducción",
   "playerUpNext": "A continuación",
+  "playerEndsAt": "Termina a las {time}",
   "playerUpNextPlay": "Reproducir siguiente",
   "playerUpNextDismiss": "Descartar",
   "playerLiveStreamEnded": "Transmisión finalizada",

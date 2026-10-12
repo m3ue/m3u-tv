@@ -11,6 +11,7 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/system_clock.dart';
 
 /// Edge padding for [PlaybackControls]' back-button corner. tvOS gets a
 /// much smaller value since `SafeArea` already insets for its focus-safe
@@ -79,6 +80,7 @@ class PlaybackControls extends StatelessWidget {
     this.skipPrompt,
     this.upNextPrompt,
     this.showControlsBar = true,
+    this.liveProgrammeEnd,
     super.key,
   });
 
@@ -145,6 +147,10 @@ class PlaybackControls extends StatelessWidget {
   /// since its buttons do nothing while the stream is still loading; the
   /// header's back button stays available either way.
   final bool showControlsBar;
+
+  /// Live TV only: when the current EPG programme ends. A live stream has no
+  /// length of its own, so this is what "Ends at" shows for it.
+  final DateTime? liveProgrammeEnd;
 
   static const Duration seekStep = Duration(seconds: 10);
 
@@ -264,7 +270,41 @@ class PlaybackControls extends StatelessWidget {
               ),
             ),
           ),
+        const Spacer(),
+        // "Ends at" rides under the clock as a second line: the header is
+        // already as tall as the back button, so it costs no space, and it
+        // keeps the time info together for live and on-demand alike.
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const SystemClock(
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            ?_buildEndsAt(),
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget? _buildEndsAt() {
+    if (isLive) {
+      // A live stream has no length of its own; the EPG programme's end is
+      // the meaningful one.
+      final end = liveProgrammeEnd;
+      if (end == null || !end.isAfter(DateTime.now())) return null;
+      return _EndsAtText(time: end);
+    }
+    if (duration <= Duration.zero) return null;
+    return _EndsAtLabel(
+      position: currentPosition,
+      duration: duration,
+      isPlaying: isPlaying,
     );
   }
 
@@ -604,6 +644,124 @@ class PlaybackControls extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "Ends at 9:42 PM": when playback would finish if it ran from now. Ported
+/// from Plezy's `FinishTimeBuilder`. While playing, the estimate holds still,
+/// so it is only re-read when the whole minutes left change - re-reading on
+/// every position tick would let tick jitter flip a boundary minute back and
+/// forth. While paused the estimate moves with the wall clock instead, so a
+/// timer re-arms onto each minute boundary it crosses.
+class _EndsAtLabel extends StatefulWidget {
+  const _EndsAtLabel({
+    required this.position,
+    required this.duration,
+    required this.isPlaying,
+  });
+
+  final Duration position;
+  final Duration duration;
+  final bool isPlaying;
+
+  @override
+  State<_EndsAtLabel> createState() => _EndsAtLabelState();
+}
+
+class _EndsAtLabelState extends State<_EndsAtLabel>
+    with WidgetsBindingObserver {
+  Timer? _tick;
+  DateTime? _finishMinute;
+  int? _minutesLeft;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _finishMinute = _sync();
+  }
+
+  @override
+  void didUpdateWidget(_EndsAtLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final steady =
+        widget.isPlaying &&
+        oldWidget.isPlaying &&
+        widget.duration == oldWidget.duration &&
+        _wholeMinutesLeft() == _minutesLeft;
+    if (!steady) _finishMinute = _sync();
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    final finishMinute = _sync();
+    if (finishMinute != _finishMinute) {
+      setState(() => _finishMinute = finishMinute);
+    }
+  }
+
+  int? _wholeMinutesLeft() {
+    final remaining = widget.duration - widget.position;
+    return remaining.inSeconds > 0 ? remaining.inMinutes : null;
+  }
+
+  DateTime? _sync() {
+    _tick?.cancel();
+    _tick = null;
+    _minutesLeft = _wholeMinutesLeft();
+    if (_minutesLeft == null) return null;
+    final finishTime = DateTime.now().add(widget.duration - widget.position);
+    final finishMinute = DateTime(
+      finishTime.year,
+      finishTime.month,
+      finishTime.day,
+      finishTime.hour,
+      finishTime.minute,
+    );
+    if (!widget.isPlaying) {
+      _tick = Timer(
+        finishMinute.add(const Duration(minutes: 1)).difference(finishTime),
+        _refresh,
+      );
+    }
+    return finishMinute;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final finishMinute = _finishMinute;
+    if (finishMinute == null) return const SizedBox.shrink();
+    return _EndsAtText(time: finishMinute);
+  }
+}
+
+class _EndsAtText extends StatelessWidget {
+  const _EndsAtText({required this.time});
+
+  final DateTime time;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      AppLocalizations.of(context).playerEndsAt(formatClockTime(context, time)),
+      key: const Key('playback-ends-at'),
+      style: const TextStyle(color: Colors.white54, fontSize: 12),
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.fade,
     );
   }
 }

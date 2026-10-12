@@ -794,6 +794,12 @@ abstract class AppLocalizations {
   /// **'Up next'**
   String get playerUpNext;
 
+  /// No description provided for @playerEndsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends at {time}'**
+  String playerEndsAt(String time);
+
   /// No description provided for @playerUpNextPlay.
   ///
   /// In en, this message translates to:

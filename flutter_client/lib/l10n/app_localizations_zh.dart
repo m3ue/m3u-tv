@@ -390,6 +390,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerUpNext => '即将播放';
 
   @override
+  String playerEndsAt(String time) {
+    return '$time 结束';
+  }
+
+  @override
   String get playerUpNextPlay => '播放下一集';
 
   @override

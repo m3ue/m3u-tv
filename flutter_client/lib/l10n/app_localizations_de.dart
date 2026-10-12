@@ -399,6 +399,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerUpNext => 'Als Nächstes';
 
   @override
+  String playerEndsAt(String time) {
+    return 'Endet um $time';
+  }
+
+  @override
   String get playerUpNextPlay => 'Nächste Folge';
 
   @override

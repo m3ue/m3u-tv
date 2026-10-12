@@ -263,6 +263,14 @@
   "playerSkipCredits": "Skip Credits",
   "playerSkipIntro": "Skip Intro",
   "playerUpNext": "Up next",
+  "playerEndsAt": "Ends at {time}",
+  "@playerEndsAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "playerUpNextPlay": "Play next",
   "playerUpNextDismiss": "Dismiss",
   "playerLiveStreamEnded": "Stream ended",

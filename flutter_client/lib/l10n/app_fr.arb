@@ -191,6 +191,7 @@
   "playerSkipCredits": "Ignorer le générique",
   "playerSkipIntro": "Ignorer l'intro",
   "playerUpNext": "À suivre",
+  "playerEndsAt": "Se termine à {time}",
   "playerUpNextPlay": "Lire la suite",
   "playerUpNextDismiss": "Ignorer",
   "playerLiveStreamEnded": "Diffusion terminée",

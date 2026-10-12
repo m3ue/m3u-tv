@@ -118,6 +118,8 @@ void main() {
     testWidgets('shows play button when paused', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: false,
             isLive: false,
@@ -136,6 +138,8 @@ void main() {
     testWidgets('shows pause button when playing', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -157,6 +161,8 @@ void main() {
       var tapped = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: false,
             isLive: false,
@@ -178,6 +184,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -199,6 +207,8 @@ void main() {
     testWidgets('hides seek controls for live content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: true,
@@ -220,6 +230,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: true,
@@ -243,6 +255,8 @@ void main() {
       var previousPressed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -325,6 +339,8 @@ void main() {
     testWidgets('shows seek controls for VOD content', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -344,6 +360,8 @@ void main() {
     testWidgets('orders VOD seek controls around play pause', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -373,6 +391,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -390,6 +410,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -436,6 +458,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -487,6 +511,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -532,6 +558,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -582,6 +610,8 @@ void main() {
       ) async {
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlaybackControls(
               isPlaying: true,
               isLive: false,
@@ -621,6 +651,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -643,6 +675,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -665,6 +699,8 @@ void main() {
       final seekTargets = <Duration>[];
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -690,6 +726,8 @@ void main() {
       Duration? seekTarget;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -719,6 +757,8 @@ void main() {
       final seekTargets = <Duration>[];
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -750,6 +790,8 @@ void main() {
     testWidgets('displays formatted time', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -770,6 +812,8 @@ void main() {
       var backPressed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -789,6 +833,8 @@ void main() {
     testWidgets('shows fallback reason badge when provided', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlaybackControls(
             isPlaying: true,
             isLive: false,
@@ -810,6 +856,8 @@ void main() {
     testWidgets('shows audio track selector button', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -829,6 +877,8 @@ void main() {
     testWidgets('shows subtitle track selector button', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -847,6 +897,8 @@ void main() {
     testWidgets('opens audio track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -870,6 +922,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -901,6 +955,8 @@ void main() {
     testWidgets('opens subtitle track dialog on tap', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -926,6 +982,8 @@ void main() {
       ) async {
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: TrackSelector(
               audioTracks: const [],
               subtitleTracks: const [
@@ -958,6 +1016,8 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [],
             subtitleTracks: const [
@@ -989,6 +1049,8 @@ void main() {
       String? selectedTrack;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: const [
               PlaybackTrack(id: '1', label: 'English'),
@@ -1017,6 +1079,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: TrackSelector(
             audioTracks: List<PlaybackTrack>.generate(
               12,
@@ -1177,6 +1241,8 @@ void main() {
     testWidgets('shows resume and start over options', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5, seconds: 30),
             onResume: () {},
@@ -1191,6 +1257,8 @@ void main() {
     testWidgets('shows formatted position in prompt', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5, seconds: 30),
             onResume: () {},
@@ -1205,6 +1273,8 @@ void main() {
       var resumed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5),
             onResume: () => resumed = true,
@@ -1222,6 +1292,8 @@ void main() {
       var startedOver = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ResumePrompt(
             position: const Duration(minutes: 5),
             onResume: () {},
@@ -1571,6 +1643,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: PlayerScreen(
               args: const PlayerArgs(
                 streamUrl: 'https://example.com/live.m3u8',
@@ -1760,6 +1834,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1817,6 +1893,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -1907,6 +1985,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2273,6 +2353,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2352,6 +2434,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2439,6 +2523,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2529,6 +2615,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: PlayerScreen(
             args: const PlayerArgs(
               streamUrl: 'https://example.com/live.m3u8',
@@ -2953,6 +3041,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: StatefulBuilder(
               builder: (context, setState) {
                 setArgs = setState;
@@ -3026,6 +3116,8 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: StatefulBuilder(
               builder: (context, setState) {
                 setArgs = setState;

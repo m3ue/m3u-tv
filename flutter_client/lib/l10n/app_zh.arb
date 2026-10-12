@@ -191,6 +191,7 @@
   "playerSkipCredits": "跳过片尾",
   "playerSkipIntro": "跳过片头",
   "playerUpNext": "即将播放",
+  "playerEndsAt": "{time} 结束",
   "playerUpNextPlay": "播放下一集",
   "playerUpNextDismiss": "关闭",
   "playerLiveStreamEnded": "直播已结束",

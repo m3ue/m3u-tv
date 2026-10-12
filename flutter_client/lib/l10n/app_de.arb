@@ -191,6 +191,7 @@
   "playerSkipCredits": "Abspann überspringen",
   "playerSkipIntro": "Intro überspringen",
   "playerUpNext": "Als Nächstes",
+  "playerEndsAt": "Endet um {time}",
   "playerUpNextPlay": "Nächste Folge",
   "playerUpNextDismiss": "Schließen",
   "playerLiveStreamEnded": "Übertragung beendet",
