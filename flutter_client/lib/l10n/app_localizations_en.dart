@@ -953,6 +953,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeNoSeries => 'No Series available';
 
   @override
+  String get homeDvrRecordings => 'DVR Recordings';
+
+  @override
+  String get homeDvrRecordingsBrowse =>
+      'Browse completed and in-progress recordings';
+
+  @override
   String homeSeason(int number) {
     return 'Season $number';
   }

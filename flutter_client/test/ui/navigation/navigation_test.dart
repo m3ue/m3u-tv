@@ -2383,6 +2383,40 @@ void main() {
       });
     }
 
+    testWidgets('a parked mouse does not steal focus from the keyboard', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = await richAppStateWithProgress([
+        resumeEntry(201, 'First Resume'),
+      ]);
+      addTearDown(appState.dispose);
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await tester.pumpAndSettle();
+      expect(focusIsOn('First Resume'), isTrue);
+
+      // Park the pointer over the Live row's tile, then go straight to the
+      // keyboard: Down docks the rows, sliding other cards under the
+      // pointer, which never moves again.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.text('Route News').first));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(focusIsOn('Route News'), isTrue);
+
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+      expect(focusIsOn('Route News'), isTrue);
+    });
+
     testWidgets('a rested mouse hover moves D-pad focus to the card', (
       tester,
     ) async {
@@ -2403,7 +2437,11 @@ void main() {
 
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(mouse.removePointer);
-      await mouse.addPointer(location: Offset.zero);
+      // Start over the sidebar rail (it expands and takes focus, then hands
+      // focus back to the content as the pointer leaves). Placed explicitly:
+      // where (0,0) lands depends on the host, since macOS adds a titlebar
+      // strip there, which is why this once passed locally but not on CI.
+      await mouse.addPointer(location: const Offset(10, 300));
       await mouse.moveTo(tester.getCenter(find.text('Second Resume').first));
       await tester.pump(const Duration(milliseconds: 300));
       expect(focusIsOn('First Resume'), isTrue);

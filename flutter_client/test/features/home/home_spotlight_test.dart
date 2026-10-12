@@ -343,7 +343,7 @@ void main() {
       });
     });
 
-    test('leaving the card or a D-pad move cancels a pending hover', () {
+    test('leaving the card or a key press cancels a pending hover', () {
       fakeAsync((async) {
         final controller = HomeSpotlightController()
           ..select(vod)
@@ -354,9 +354,9 @@ void main() {
 
         controller
           ..hover(live)
-          ..select(dvr);
+          ..cancelHover();
         async.elapse(const Duration(seconds: 1));
-        expect(controller.value?.key, dvr.key);
+        expect(controller.value?.key, vod.key);
 
         // Leaving a different card doesn't cancel the pending one.
         controller
@@ -364,6 +364,38 @@ void main() {
           ..endHover(vod);
         async.elapse(const Duration(seconds: 1));
         expect(controller.value?.key, live.key);
+        controller.dispose();
+      });
+    });
+
+    test('a focus change does not cancel a pending hover', () {
+      fakeAsync((async) {
+        var rested = false;
+        // E.g. the shell restoring content focus as the pointer leaves the
+        // sidebar for a card.
+        final controller = HomeSpotlightController()
+          ..select(vod)
+          ..hover(live, onRest: () => rested = true)
+          ..select(dvr);
+        async.elapse(const Duration(seconds: 1));
+        expect(rested, isTrue);
+        expect(controller.value?.key, live.key);
+        controller.dispose();
+      });
+    });
+
+    test('reset forgets the item and pending work', () {
+      fakeAsync((async) {
+        final controller = HomeSpotlightController()
+          ..select(vod)
+          ..hover(live)
+          ..reset();
+        expect(controller.value, isNull);
+        async.elapse(const Duration(seconds: 1));
+        expect(controller.value, isNull);
+        // The next selection shows immediately again.
+        controller.select(dvr);
+        expect(controller.value?.key, dvr.key);
         controller.dispose();
       });
     });

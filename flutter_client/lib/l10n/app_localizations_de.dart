@@ -958,6 +958,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeNoSeries => 'Keine Serien verfügbar';
 
   @override
+  String get homeDvrRecordings => 'DVR-Aufnahmen';
+
+  @override
+  String get homeDvrRecordingsBrowse =>
+      'Abgeschlossene und laufende Aufnahmen durchsuchen';
+
+  @override
   String homeSeason(int number) {
     return 'Staffel $number';
   }

@@ -1772,6 +1772,18 @@ abstract class AppLocalizations {
   /// **'No Series available'**
   String get homeNoSeries;
 
+  /// No description provided for @homeDvrRecordings.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR Recordings'**
+  String get homeDvrRecordings;
+
+  /// No description provided for @homeDvrRecordingsBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse completed and in-progress recordings'**
+  String get homeDvrRecordingsBrowse;
+
   /// No description provided for @homeSeason.
   ///
   /// In en, this message translates to:

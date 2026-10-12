@@ -446,6 +446,8 @@
     }
   },
   "homeNoSeries": "暂无剧集",
+  "homeDvrRecordings": "DVR 录制",
+  "homeDvrRecordingsBrowse": "浏览已完成和进行中的录制",
   "homeSeason": "第{number}季",
   "@homeSeason": {
     "placeholders": {

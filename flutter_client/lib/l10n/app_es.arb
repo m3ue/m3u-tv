@@ -446,6 +446,8 @@
     }
   },
   "homeNoSeries": "No hay series disponibles",
+  "homeDvrRecordings": "Grabaciones DVR",
+  "homeDvrRecordingsBrowse": "Explora las grabaciones completadas y en curso",
   "homeSeason": "Temporada {number}",
   "@homeSeason": {
     "placeholders": {

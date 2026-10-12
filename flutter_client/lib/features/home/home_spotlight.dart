@@ -178,9 +178,14 @@ Duration? parseRuntimeText(String? text) {
 /// Mouse hover (desktop) goes through [hover] instead: the hero follows the
 /// pointer only once it rests on a card for [hoverDelay], and the caller's
 /// `onRest` then moves D-pad focus there too, so switching between mouse and
-/// remote/keyboard carries on from the same card. Every card the pointer
-/// enters restarts the wait, so sweeping across a row changes nothing until
-/// it stops.
+/// remote/keyboard carries on from the same card. Every pointer move restarts
+/// the wait, so sweeping across a row changes nothing until it stops.
+///
+/// A pending hover is cancelled by [cancelHover] (a key press: the keyboard
+/// wins) or by leaving the card - not by [select]. Focus also changes for
+/// reasons other than the user, such as the shell restoring content focus
+/// when the pointer leaves the sidebar, and those must not discard a hover
+/// that is about to land.
 class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   HomeSpotlightController({
     this.settleDelay = const Duration(milliseconds: 150),
@@ -194,7 +199,6 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   String? _hoverKey;
 
   void select(HomeSpotlightTarget target) {
-    _cancelHover();
     _settle?.cancel();
     if (value == null || settleDelay == Duration.zero) {
       _apply(target);
@@ -204,7 +208,7 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   }
 
   void hover(HomeSpotlightTarget target, {VoidCallback? onRest}) {
-    _cancelHover();
+    cancelHover();
     _hoverKey = target.key;
     _hover = Timer(hoverDelay, () {
       _hoverKey = null;
@@ -215,13 +219,21 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
 
   /// The pointer left [target]'s card before its hover delay elapsed.
   void endHover(HomeSpotlightTarget target) {
-    if (_hoverKey == target.key) _cancelHover();
+    if (_hoverKey == target.key) cancelHover();
   }
 
-  void _cancelHover() {
+  void cancelHover() {
     _hover?.cancel();
     _hover = null;
     _hoverKey = null;
+  }
+
+  /// Forgets the current item, so the next selection shows immediately
+  /// (e.g. after the Home layout is switched and its rows remount).
+  void reset() {
+    _settle?.cancel();
+    cancelHover();
+    value = null;
   }
 
   void _apply(HomeSpotlightTarget target) {

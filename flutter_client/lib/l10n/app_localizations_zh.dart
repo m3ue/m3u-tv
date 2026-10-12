@@ -919,6 +919,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNoSeries => '暂无剧集';
 
   @override
+  String get homeDvrRecordings => 'DVR 录制';
+
+  @override
+  String get homeDvrRecordingsBrowse => '浏览已完成和进行中的录制';
+
+  @override
   String homeSeason(int number) {
     return '第$number季';
   }

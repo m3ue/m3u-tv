@@ -170,16 +170,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Remembers the first card Home's autofocus landed on.
+  /// Only needed until that first target is known (or the hand-off is off
+  /// the table), so it unregisters itself.
   void _onPrimaryFocusChanged() {
-    if (_initialFocus != null) return;
     final primary = FocusManager.instance.primaryFocus;
     if (primary != null && primary.ancestors.contains(_homeNode)) {
       _initialFocus = primary;
+      _stopWatchingInitialFocus();
     }
   }
 
+  void _stopWatchingInitialFocus() =>
+      FocusManager.instance.removeListener(_onPrimaryFocusChanged);
+
   bool _onKey(KeyEvent event) {
-    if (event is KeyDownEvent) _canClaimInitialFocus = false;
+    if (event is! KeyDownEvent) return false;
+    if (_canClaimInitialFocus) {
+      _canClaimInitialFocus = false;
+      _stopWatchingInitialFocus();
+    }
+    // The keyboard/remote wins over a hover still waiting to land.
+    _spotlight.cancelHover();
     return false;
   }
 
@@ -193,6 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onContinueWatchingShown() {
     if (!_canClaimInitialFocus) return;
     _canClaimInitialFocus = false;
+    _stopWatchingInitialFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final primary = FocusManager.instance.primaryFocus;
@@ -207,7 +219,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadStyle() async {
     final style = await _viewSettings.homeScreenStyle();
-    if (mounted && style != _style) setState(() => _style = style);
+    if (!mounted || style == _style) return;
+    // The rows remount under the new layout; without this the hero would
+    // describe whatever was focused before the switch until focus moves.
+    _spotlight.reset();
+    setState(() => _style = style);
   }
 
   void _onChannelFavoritesChanged() {
@@ -534,34 +550,11 @@ class _LiveRow extends ConsumerWidget {
         );
         if (spotlight == null) return tile;
         final target = ChannelSpotlightTarget(channel);
-        final onHoverChanged = spotlight.hoverHandler(target);
-        return Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          onFocusChange: (hasFocus) {
-            if (hasFocus) spotlight.select(target);
-          },
-          child: Builder(
-            builder: (anchorContext) {
-              // The Focus just above is the tile's anchor; its first
-              // traversable descendant is the tile's own focus node.
-              void focusTile() {
-                final node = Focus.of(
-                  anchorContext,
-                ).traversalDescendants.firstOrNull;
-                if (node != null && !node.hasFocus) node.requestFocus();
-              }
-
-              return MouseRegion(
-                opaque: false,
-                onEnter: (_) =>
-                    onHoverChanged(hovered: true, focusCard: focusTile),
-                onExit: (_) =>
-                    onHoverChanged(hovered: false, focusCard: focusTile),
-                child: tile,
-              );
-            },
-          ),
+        return PreviewFocusAnchor(
+          onFocused: () => spotlight.select(target),
+          onHoverChanged: spotlight.hoverHandler(target),
+          contentKey: channel.id,
+          child: tile,
         );
       },
       useSidebarLayout: useSidebarLayout,
@@ -755,21 +748,22 @@ class _RecordingsRow extends ConsumerWidget {
     if (!hasDvrFeature) return const SizedBox.shrink();
     final dvrRecordings = ref.watch(dvrRecordingsProvider);
     final spotlight = this.spotlight;
+    final l = AppLocalizations.of(context);
     final subtitle = dvrRecordings.isEmpty
-        ? 'Browse completed and in-progress recordings'
-        : '${dvrRecordings.length} recordings';
+        ? l.homeDvrRecordingsBrowse
+        : l.dvrStorageRecordingCount(dvrRecordings.length);
     final dvrTarget = StaticSpotlightTarget(
       id: 'dvr',
-      title: 'DVR Recordings',
+      title: l.homeDvrRecordings,
       description: subtitle,
     );
     return MediaPreviewSection(
-      title: 'DVR',
+      title: l.navDvr,
       titleIcon: Icons.video_library,
-      emptyLabel: 'No DVR recordings available',
+      emptyLabel: l.dvrNoRecordings,
       items: [
         MediaPreviewItem(
-          title: 'DVR Recordings',
+          title: l.homeDvrRecordings,
           subtitle: subtitle,
           fallbackIcon: Icons.video_library,
           onTap: onRecordingsSelect,

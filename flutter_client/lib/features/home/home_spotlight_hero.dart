@@ -384,7 +384,14 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
     final url = widget.spotlight?.toneUrl;
     if (url == _toneUrl) return;
     _toneUrl = url;
-    if (url == null) return;
+    // No image at all: fade the glow out rather than keep the last item's
+    // colour. (A failed extraction below still keeps it, which reads better
+    // than flashing to nothing.) Called from initState/didUpdateWidget, so
+    // the build that follows picks this up without a setState.
+    if (url == null) {
+      _tone = null;
+      return;
+    }
     unawaited(
       resolveDominantBackdropColor(url).then((color) {
         // Keep the previous tone on failure rather than snapping to black.
@@ -512,6 +519,13 @@ class _CrossfadeBackdropState extends State<_CrossfadeBackdrop> {
   final List<String> _layers = [];
   final Set<String> _loaded = {};
 
+  /// URLs that failed to load. A failed top layer fades the held frame out
+  /// instead of leaving the previous item's art under the new title - dead
+  /// EPG icon URLs (the Live TV fallback) make this common.
+  final Set<String> _failed = {};
+
+  bool get _topFailed => _layers.isNotEmpty && _failed.contains(_layers.last);
+
   @override
   void initState() {
     super.initState();
@@ -527,6 +541,7 @@ class _CrossfadeBackdropState extends State<_CrossfadeBackdrop> {
     if (url == null) {
       _layers.clear();
       _loaded.clear();
+      _failed.clear();
       return;
     }
     // Drop any layer that never finished loading (focus moved on before it
@@ -536,6 +551,12 @@ class _CrossfadeBackdropState extends State<_CrossfadeBackdrop> {
       ..clear()
       ..addAll([if (base.isNotEmpty && base != url) base, url]);
     _loaded.removeWhere((loaded) => !_layers.contains(loaded));
+    _failed.removeWhere((failed) => !_layers.contains(failed));
+  }
+
+  void _onError(String url) {
+    if (!mounted || !_layers.contains(url)) return;
+    setState(() => _failed.add(url));
   }
 
   void _onLoaded(String url) {
@@ -544,7 +565,17 @@ class _CrossfadeBackdropState extends State<_CrossfadeBackdrop> {
   }
 
   void _onFadeEnd(String url) {
-    if (!mounted || _layers.isEmpty || _layers.last != url) return;
+    if (!mounted || _layers.isEmpty) return;
+    if (_topFailed) {
+      // The held frame has faded out; drop it along with the failed layer.
+      setState(() {
+        _layers.clear();
+        _loaded.clear();
+        _failed.clear();
+      });
+      return;
+    }
+    if (_layers.last != url) return;
     if (_layers.length == 1) return;
     setState(() {
       _layers.removeRange(0, _layers.length - 1);
@@ -560,11 +591,15 @@ class _CrossfadeBackdropState extends State<_CrossfadeBackdrop> {
         for (final url in _layers)
           AnimatedOpacity(
             key: ValueKey(url),
-            opacity: _loaded.contains(url) ? 1 : 0,
+            opacity: !_topFailed && _loaded.contains(url) ? 1 : 0,
             duration: _fade,
             curve: Curves.easeOut,
             onEnd: () => _onFadeEnd(url),
-            child: CachedBackdropImage(url, onLoaded: () => _onLoaded(url)),
+            child: CachedBackdropImage(
+              url,
+              onLoaded: () => _onLoaded(url),
+              onError: () => _onError(url),
+            ),
           ),
       ],
     );

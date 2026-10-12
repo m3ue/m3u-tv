@@ -525,6 +525,8 @@
     }
   },
   "homeNoSeries": "No Series available",
+  "homeDvrRecordings": "DVR Recordings",
+  "homeDvrRecordingsBrowse": "Browse completed and in-progress recordings",
   "homeSeason": "Season {number}",
   "@homeSeason": {
     "placeholders": {
