@@ -962,6 +962,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeNoSeries => 'Pas de séries disponibles';
 
   @override
+  String get homeDvrRecordings => 'Enregistrements DVR';
+
+  @override
+  String get homeDvrRecordingsBrowse =>
+      'Parcourir les enregistrements terminés et en cours';
+
+  @override
   String homeSeason(int number) {
     return 'Saison $number';
   }
@@ -1709,6 +1716,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsDefaultStartPage => 'Page de démarrage par défaut';
+
+  @override
+  String get settingsHomeScreenStyle => 'Écran d\'accueil';
+
+  @override
+  String get settingsHomeScreenStyleSimplified => 'Simplifié';
+
+  @override
+  String get settingsHomeScreenStyleRich => 'Enrichi';
 
   @override
   String get settingsHdrMode => 'Mode HDR';

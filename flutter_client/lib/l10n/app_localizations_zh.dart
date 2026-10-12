@@ -919,6 +919,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNoSeries => '暂无剧集';
 
   @override
+  String get homeDvrRecordings => 'DVR 录制';
+
+  @override
+  String get homeDvrRecordingsBrowse => '浏览已完成和进行中的录制';
+
+  @override
   String homeSeason(int number) {
     return '第$number季';
   }
@@ -1646,6 +1652,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDefaultStartPage => '默认启动页面';
+
+  @override
+  String get settingsHomeScreenStyle => '主屏幕';
+
+  @override
+  String get settingsHomeScreenStyleSimplified => '简洁';
+
+  @override
+  String get settingsHomeScreenStyleRich => '丰富';
 
   @override
   String get settingsHdrMode => 'HDR 模式';

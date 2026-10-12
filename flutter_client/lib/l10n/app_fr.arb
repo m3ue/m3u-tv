@@ -446,6 +446,8 @@
     }
   },
   "homeNoSeries": "Pas de séries disponibles",
+  "homeDvrRecordings": "Enregistrements DVR",
+  "homeDvrRecordingsBrowse": "Parcourir les enregistrements terminés et en cours",
   "homeSeason": "Saison {number}",
   "@homeSeason": {
     "placeholders": {
@@ -893,6 +895,9 @@
   "channelSortAlphabeticalAsc": "Alphabétique (A-Z)",
   "channelSortAlphabeticalDesc": "Alphabétique (Z-A)",
   "settingsDefaultStartPage": "Page de démarrage par défaut",
+  "settingsHomeScreenStyle": "Écran d'accueil",
+  "settingsHomeScreenStyleSimplified": "Simplifié",
+  "settingsHomeScreenStyleRich": "Enrichi",
   "settingsHdrMode": "Mode HDR",
   "settingsHdrModeHint": "Autoriser les vidéos HDR à basculer l'écran en mode HDR. Windows et Linux uniquement.",
   "settingsMatchRefreshRate": "Adapter la fréquence de rafraîchissement",

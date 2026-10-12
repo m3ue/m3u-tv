@@ -1119,6 +1119,8 @@ class EpgProgram {
     required this.end,
     this.subtitle,
     this.iconUrl,
+    this.posterUrl,
+    this.backdropUrl,
     this.category,
     this.rating,
     this.season,
@@ -1145,6 +1147,12 @@ class EpgProgram {
   // the client asks for it (`details=1`). All optional: sources that don't
   // carry a value leave it null/false.
   final String? iconUrl;
+
+  /// Role-specific programme artwork (m3u-editor #1568): a portrait poster
+  /// and a landscape backdrop, each only when the source EPG actually
+  /// carries one. [iconUrl] stays the guide's 16:9-preferred pick.
+  final String? posterUrl;
+  final String? backdropUrl;
   final String? category;
   final String? rating;
   final int? season;

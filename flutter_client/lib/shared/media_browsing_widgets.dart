@@ -1023,6 +1023,8 @@ class MediaPreviewItem {
     this.ratingLabel,
     this.cornerBadgeIcon,
     this.cornerBadgeColor,
+    this.onFocused,
+    this.onHoverChanged,
   });
 
   final String title;
@@ -1032,6 +1034,15 @@ class MediaPreviewItem {
   final VoidCallback onTap;
   final VoidCallback? onLongTap;
   final bool isFavorite;
+
+  /// Fires when D-pad/mouse focus lands on this card. The rich Home uses it
+  /// to drive its spotlight hero; null (every other rail) adds nothing to the
+  /// card's widget tree.
+  final VoidCallback? onFocused;
+
+  /// Mouse hover over this card; see [HoverIntentCallback]. Like
+  /// [onFocused], null adds nothing.
+  final HoverIntentCallback? onHoverChanged;
 
   /// Icon shown as a small circular corner badge over the poster (top-left),
   /// the same treatment [isFavorite] gives its star. Only rendered by
@@ -1081,6 +1092,94 @@ class MediaPreviewItem {
   /// but read only by `_buildLandscapeContent` (L745-878), so they silently do
   /// nothing on default cards. Do not add to that trap.
   final String? emphasisLabel;
+}
+
+/// Mouse hover over a card. Fires with `hovered: true` each time the pointer
+/// itself moves over the card (so a caller can wait for it to rest), and
+/// `hovered: false` when it leaves. Content sliding under a pointer that
+/// hasn't moved (a row docking or auto-scrolling for the keyboard) does not
+/// count as hovering. `focusCard` moves D-pad focus to the card.
+typedef HoverIntentCallback =
+    void Function({required bool hovered, required VoidCallback focusCard});
+
+/// Non-focusable wrapper that reports focus entering [child] and mouse hover
+/// over it, and can move focus to [child]'s own focus node on request. Shared
+/// by preview cards and the Home Live row's channel tiles.
+class PreviewFocusAnchor extends StatefulWidget {
+  const PreviewFocusAnchor({
+    super.key,
+    required this.child,
+    this.onFocused,
+    this.onHoverChanged,
+    this.contentKey,
+  });
+
+  final Widget child;
+  final VoidCallback? onFocused;
+  final HoverIntentCallback? onHoverChanged;
+
+  /// Identity of what [child] shows. When it changes while [child] holds
+  /// focus, [onFocused] fires again, since nothing about focus changed.
+  final Object? contentKey;
+
+  @override
+  State<PreviewFocusAnchor> createState() => _PreviewFocusAnchorState();
+}
+
+class _PreviewFocusAnchorState extends State<PreviewFocusAnchor> {
+  final FocusNode _anchor = FocusNode(
+    debugLabel: 'preview-focus-anchor',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  @override
+  void didUpdateWidget(PreviewFocusAnchor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final onFocused = widget.onFocused;
+    if (onFocused == null ||
+        !_anchor.hasFocus ||
+        widget.contentKey == oldWidget.contentKey) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _anchor.hasFocus) onFocused();
+    });
+  }
+
+  @override
+  void dispose() {
+    _anchor.dispose();
+    super.dispose();
+  }
+
+  void _focusChild() {
+    final node = _anchor.traversalDescendants.firstOrNull;
+    if (node != null && !node.hasFocus) node.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onHoverChanged = widget.onHoverChanged;
+    return Focus(
+      focusNode: _anchor,
+      onFocusChange: (hasFocus) {
+        if (hasFocus) widget.onFocused?.call();
+      },
+      child: onHoverChanged == null
+          ? widget.child
+          : MouseRegion(
+              opaque: false,
+              // onHover, not onEnter: onEnter also fires when a card slides
+              // under a pointer that never moved.
+              onHover: (_) =>
+                  onHoverChanged(hovered: true, focusCard: _focusChild),
+              onExit: (_) =>
+                  onHoverChanged(hovered: false, focusCard: _focusChild),
+              child: widget.child,
+            ),
+    );
+  }
 }
 
 /// Builds one card of a [MediaPreviewSection.builder] row at [cardSize].
@@ -1360,7 +1459,7 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             : MediaBrowsingMetrics.previewCardWidth);
     final width = baseWidth * FontSizeScope.scaleOf(context);
 
-    return SizedBox(
+    final card = SizedBox(
       width: width,
       child: DpadInkWell(
         autofocus: widget.autofocus,
@@ -1377,6 +1476,16 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             ? _buildLandscapeContent(context, colorScheme, width)
             : _buildDefaultContent(context, colorScheme),
       ),
+    );
+    if (item.onFocused == null && item.onHoverChanged == null) return card;
+    return PreviewFocusAnchor(
+      onFocused: item.onFocused,
+      onHoverChanged: item.onHoverChanged,
+      // Rows rebuild cards in place by index, so a focused card can start
+      // showing a different entry (e.g. Continue Watching dropping one after
+      // syncing with the server) without focus changing.
+      contentKey: (item.title, item.subtitle, item.imageUrl),
+      child: card,
     );
   }
 

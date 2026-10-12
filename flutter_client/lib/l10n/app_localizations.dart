@@ -1772,6 +1772,18 @@ abstract class AppLocalizations {
   /// **'No Series available'**
   String get homeNoSeries;
 
+  /// No description provided for @homeDvrRecordings.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR Recordings'**
+  String get homeDvrRecordings;
+
+  /// No description provided for @homeDvrRecordingsBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse completed and in-progress recordings'**
+  String get homeDvrRecordingsBrowse;
+
   /// No description provided for @homeSeason.
   ///
   /// In en, this message translates to:
@@ -3013,6 +3025,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default start page'**
   String get settingsDefaultStartPage;
+
+  /// No description provided for @settingsHomeScreenStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Home screen'**
+  String get settingsHomeScreenStyle;
+
+  /// No description provided for @settingsHomeScreenStyleSimplified.
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified'**
+  String get settingsHomeScreenStyleSimplified;
+
+  /// No description provided for @settingsHomeScreenStyleRich.
+  ///
+  /// In en, this message translates to:
+  /// **'Rich'**
+  String get settingsHomeScreenStyleRich;
 
   /// No description provided for @settingsHdrMode.
   ///

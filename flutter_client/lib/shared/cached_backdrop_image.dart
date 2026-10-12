@@ -24,6 +24,7 @@ class CachedBackdropImage extends StatefulWidget {
     this.url, {
     this.fit = BoxFit.cover,
     this.onLoaded,
+    this.onError,
     super.key,
   });
 
@@ -31,17 +32,36 @@ class CachedBackdropImage extends StatefulWidget {
   final BoxFit fit;
   final VoidCallback? onLoaded;
 
+  /// Fires once (post-frame) if the image fails to load or decode; the
+  /// widget then renders nothing. Callers holding a previous image until
+  /// this one arrives (the rich Home hero) use it to stop waiting.
+  final VoidCallback? onError;
+
   @override
   State<CachedBackdropImage> createState() => _CachedBackdropImageState();
 }
 
 class _CachedBackdropImageState extends State<CachedBackdropImage> {
   bool _notifiedLoaded = false;
+  bool _notifiedError = false;
 
   @override
   void didUpdateWidget(CachedBackdropImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) _notifiedLoaded = false;
+    if (oldWidget.url != widget.url) {
+      _notifiedLoaded = false;
+      _notifiedError = false;
+    }
+  }
+
+  void _handleError() {
+    if (_notifiedError) return;
+    _notifiedError = true;
+    final callback = widget.onError;
+    if (callback == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) callback();
+    });
   }
 
   void _handleFrame(bool hasFrame) {
@@ -84,6 +104,12 @@ class _CachedBackdropImageState extends State<CachedBackdropImage> {
             _handleFrame(wasSynchronouslyLoaded || frame != null);
             return child;
           },
+          errorBuilder: widget.onError == null
+              ? null
+              : (context, error, stackTrace) {
+                  _handleError();
+                  return const SizedBox.shrink();
+                },
         );
       },
     );

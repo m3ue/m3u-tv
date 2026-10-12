@@ -114,6 +114,10 @@ Future<void> main() async {
     appState.viewSettingsService.deinterlace(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
+    // Home picks its layout synchronously on first build; reading the style
+    // later swapped Simplified for Rich a frame in (a flash, and a full row
+    // remount that lost the initial focus).
+    appState.viewSettingsService.homeScreenStyle(),
   ]);
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.

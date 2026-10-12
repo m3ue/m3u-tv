@@ -104,6 +104,8 @@ void main() {
           end: start.add(const Duration(minutes: 30)),
           subtitle: 'Lunchtime edition',
           iconUrl: 'https://images.example/noon.jpg',
+          posterUrl: 'https://images.example/noon-poster.jpg',
+          backdropUrl: 'https://images.example/noon-backdrop.jpg',
           category: 'News',
           rating: 'TV-G',
           season: 3,
@@ -135,6 +137,14 @@ void main() {
       expect(programs[0].end, start.add(const Duration(minutes: 30)));
       expect(programs[0].subtitle, 'Lunchtime edition');
       expect(programs[0].iconUrl, 'https://images.example/noon.jpg');
+      expect(
+        programs[0].posterUrl,
+        'https://images.example/noon-poster.jpg',
+      );
+      expect(
+        programs[0].backdropUrl,
+        'https://images.example/noon-backdrop.jpg',
+      );
       expect(programs[0].category, 'News');
       expect(programs[0].rating, 'TV-G');
       expect(programs[0].season, 3);
@@ -147,6 +157,7 @@ void main() {
       expect(programs[1].channelId, 'bbc.two');
       expect(programs[1].subtitle, isNull);
       expect(programs[1].iconUrl, isNull);
+      expect(programs[1].backdropUrl, isNull);
       expect(programs[1].isNew, isFalse);
     },
   );

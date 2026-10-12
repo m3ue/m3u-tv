@@ -81,6 +81,8 @@ class EpgProgrammes extends Table {
   TextColumn get subtitle => text().nullable()();
   TextColumn get description => text().withDefault(const Constant(''))();
   TextColumn get iconUrl => text().nullable()();
+  TextColumn get posterUrl => text().nullable()();
+  TextColumn get backdropUrl => text().nullable()();
   TextColumn get category => text().nullable()();
   TextColumn get rating => text().nullable()();
   IntColumn get season => integer().nullable()();
@@ -147,7 +149,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

@@ -156,7 +156,7 @@ class ItemMetaInfo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _TitleHeading(name: name, clearLogoUrl: clearLogoUrl),
+        ItemTitleHeading(name: name, clearLogoUrl: clearLogoUrl),
         const SizedBox(height: MediaBrowsingMetrics.itemGap),
         if (chipWidgets.isNotEmpty)
           Wrap(
@@ -201,12 +201,25 @@ class ItemMetaInfo extends StatelessWidget {
 /// The heading at the top of an [ItemMetaInfo] column: a transparent title
 /// logo when the server supplied one (`clearlogo`), otherwise the plain text
 /// name. A logo that fails to load falls back to the same text, so the title
-/// is never missing.
-class _TitleHeading extends StatelessWidget {
-  const _TitleHeading({required this.name, this.clearLogoUrl});
+/// is never missing. Also used by the rich Home spotlight, which passes a
+/// smaller [logoMaxHeight] to fit its fixed-height hero.
+class ItemTitleHeading extends StatelessWidget {
+  const ItemTitleHeading({
+    super.key,
+    required this.name,
+    this.clearLogoUrl,
+    this.logoMaxHeight,
+    this.maxLines,
+  });
 
   final String name;
   final String? clearLogoUrl;
+
+  /// Overrides the default (scaled) logo height cap.
+  final double? logoMaxHeight;
+
+  /// Caps the text heading's lines (with an ellipsis). Null is unbounded.
+  final int? maxLines;
 
   // Caps for the transparent logo. Provider logos have wildly inconsistent
   // aspect ratios (long wordmarks vs. tall stacked marks), so both dimensions
@@ -217,12 +230,17 @@ class _TitleHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final text = Text(name, style: theme.textTheme.headlineMedium);
+    final text = Text(
+      name,
+      style: theme.textTheme.headlineMedium,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
+    );
     final logo = clearLogoUrl?.trim();
     if (logo == null || logo.isEmpty) return text;
 
     final scale = FontSizeScope.scaleOf(context);
-    final logoMaxHeight = _logoMaxHeight * scale;
+    final logoMaxHeight = this.logoMaxHeight ?? _logoMaxHeight * scale;
     final logoMaxWidth = _logoMaxWidth * scale;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final decodeWidth = (logoMaxWidth * devicePixelRatio).round();

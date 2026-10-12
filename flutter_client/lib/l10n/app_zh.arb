@@ -446,6 +446,8 @@
     }
   },
   "homeNoSeries": "暂无剧集",
+  "homeDvrRecordings": "DVR 录制",
+  "homeDvrRecordingsBrowse": "浏览已完成和进行中的录制",
   "homeSeason": "第{number}季",
   "@homeSeason": {
     "placeholders": {
@@ -893,6 +895,9 @@
   "channelSortAlphabeticalAsc": "字母顺序 (A-Z)",
   "channelSortAlphabeticalDesc": "字母顺序 (Z-A)",
   "settingsDefaultStartPage": "默认启动页面",
+  "settingsHomeScreenStyle": "主屏幕",
+  "settingsHomeScreenStyleSimplified": "简洁",
+  "settingsHomeScreenStyleRich": "丰富",
   "settingsHdrMode": "HDR 模式",
   "settingsHdrModeHint": "允许 HDR 视频将显示器切换到 HDR 模式。仅限 Windows 和 Linux。",
   "settingsMatchRefreshRate": "匹配显示器刷新率",

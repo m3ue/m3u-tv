@@ -1735,6 +1735,8 @@ EpgProgram? _epgProgramFromMap(
     end: end,
     subtitle: _decodedSubtitle(json['subtitle']),
     iconUrl: nullIfBlank(_stringOrNull(json['icon'])),
+    posterUrl: nullIfBlank(_stringOrNull(json['poster_url'])),
+    backdropUrl: nullIfBlank(_stringOrNull(json['backdrop_url'])),
     category: nullIfBlank(_stringOrNull(json['category'])),
     rating: nullIfBlank(_stringOrNull(json['rating'])),
     season: _positiveIntOrNull(json['season']),
