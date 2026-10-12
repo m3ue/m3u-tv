@@ -218,6 +218,10 @@ class AppShellState extends ConsumerState<AppShell>
   // whatever the native side currently has loaded (the new channel).
   int _playerSessionId = 0;
 
+  // How a Back that reaches AppShell (the platform popRoute, or the key path
+  // via [_handleShortcutBack]) gets the player's own handling.
+  final PlayerBackController _playerBackController = PlayerBackController();
+
   // Channels the user was browsing when the live player opened (filtered
   // category/favorites/search list), so skip-previous/skip-next in
   // PlaybackControls stays within that view instead of always cycling the
@@ -922,7 +926,9 @@ class AppShellState extends ConsumerState<AppShell>
 
   bool _handleBackPress() {
     if (_playerArgs != null) {
-      unawaited(_closePlayer());
+      // The player decides: an open OSD is hidden first, and only a Back
+      // with nothing left to dismiss closes it (via its onClose).
+      if (!_playerBackController.handleBack()) unawaited(_closePlayer());
       return true;
     }
 
@@ -2042,6 +2048,11 @@ class AppShellState extends ConsumerState<AppShell>
                     unawaited(_systemUiPolicy.applyBrowsing());
                   },
                   onClose: _closePlayer,
+                  backController: _playerBackController,
+                  // Through the shared echo guard: the player handles the key
+                  // and the platform popRoute that follows it would otherwise
+                  // close the player right after the key hid its OSD.
+                  onBackKey: _handleShortcutBack,
                 ),
           ),
         ],

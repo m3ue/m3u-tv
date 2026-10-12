@@ -579,12 +579,12 @@ void main() {
       await tester.pump();
       expect(browsingPaintSuppressed(), isTrue);
 
-      expect(
-        await tester
-            .state<_TestAppState>(find.byType(_TestApp))
-            .dispatchRouterBack(),
-        isTrue,
-      );
+      // First Back hides the OSD the player opens with, the second closes it.
+      final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
+      expect(await testApp.dispatchRouterBack(), isTrue);
+      await tester.pump();
+      expect(find.byType(PlayerScreen), findsOneWidget);
+      expect(await testApp.dispatchRouterBack(), isTrue);
       await tester.pumpAndSettle();
 
       expect(find.byType(PlayerScreen), findsNothing);
@@ -1521,6 +1521,12 @@ void main() {
     expect(find.text('Audio Track'), findsNothing);
     expect(find.byType(PlayerScreen), findsOneWidget);
 
+    // The OSD the audio button lives on is still up: Back hides it first.
+    await _sendPlatformNavigationMethod(tester, const MethodCall('popRoute'));
+    await _pumpAppFrame(tester);
+    expect(find.byType(PlayerScreen), findsOneWidget);
+    expect(find.byIcon(Icons.audiotrack), findsNothing);
+
     await _sendPlatformNavigationMethod(tester, const MethodCall('popRoute'));
     await _pumpAppFrame(tester);
     expect(find.byType(PlayerScreen), findsNothing);
@@ -1988,6 +1994,69 @@ void main() {
 
         expect(find.text('Play movie'), findsNothing);
         expect(find.text('Route Movie'), findsWidgets);
+        expect(
+          tester
+              .widget<NavigationSidebar>(find.byType(NavigationSidebar))
+              .sidebarActive,
+          isFalse,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
+      'single hardware back on TV hides the player OSD without closing it',
+      (tester) async {
+        final adapter = _NavigationPlayerAdapter();
+        final appState = _testAppState(
+          xtreamService: _NavigationXtreamService(),
+        );
+        addTearDown(appState.dispose);
+        await appState.connectXtream(
+          const UserCredentials(
+            server: 'http://example.com',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+
+        await tester.pumpWidget(
+          _TestApp(
+            deviceType: DeviceType.tv,
+            appState: appState,
+            useProductionPlayer: true,
+            playbackOrchestratorBuilder: () =>
+                _testPlaybackOrchestrator(adapter),
+          ),
+        );
+        await _pumpAppFrame(tester);
+        await tester.tap(find.text('Route News').last);
+        await _pumpAppFrame(tester);
+        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+
+        // The key event (Escape here, like goBack) reaches the player and
+        // hides its OSD; the popRoute echo of the same press must not then
+        // close the player.
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await _sendPlatformNavigationMethod(
+          tester,
+          const MethodCall('popRoute'),
+        );
+        await _pumpAppFrame(tester);
+
+        expect(find.byType(PlayerScreen), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_back), findsNothing);
+
+        // Same pair in the other arrival order, now with the OSD hidden,
+        // closes the player exactly once.
+        await _sendPlatformNavigationMethod(
+          tester,
+          const MethodCall('popRoute'),
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(PlayerScreen), findsNothing);
         expect(
           tester
               .widget<NavigationSidebar>(find.byType(NavigationSidebar))

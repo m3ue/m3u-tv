@@ -35,14 +35,36 @@ protocol MpvPlayerCoreDelegate: AnyObject {
 /// MoltenVK's `vkCreateMetalSurfaceEXT` (`MVKSurface::initLayer`) requires an
 /// actual `CAMetalLayer` -- handing mpv a plain `NSView`-backed layer via
 /// `wid` crashes inside MoltenVK trying to treat it as one. Ported from
-/// Plezy's `MpvMetalLayer`; the zero-drawable-size guard matches
-/// https://github.com/mpv-player/mpv/pull/13651.
+/// Plezy's `MpvMetalLayer` (shared/apple/MpvPlayer/MpvPlayerCoreBase.swift).
 final class MpvMetalLayer: CAMetalLayer {
+  // MoltenVK can write a 1x1 drawable size while it rebuilds the swapchain;
+  // the moltenvk context polls drawableSize every frame, so accepting it
+  // resizes mpv to 1x1 and back - a swapchain rebuild loop that shows as
+  // flicker. Rejecting <= 1 (not just 0) is the actual workaround from
+  // https://github.com/mpv-player/mpv/pull/13651, as upstream mpv and Plezy
+  // apply it.
   override var drawableSize: CGSize {
     get { super.drawableSize }
     set {
-      guard newValue.width > 0, newValue.height > 0 else { return }
+      guard Int(newValue.width) > 1, Int(newValue.height) > 1 else { return }
       super.drawableSize = newValue
+    }
+  }
+
+  // MoltenVK sets this from libmpv's VO thread when it tags the layer for the
+  // negotiated swapchain colorspace. Core Animation layer state written off
+  // the main thread is unsafe, and the screen only enters EDR mode for a
+  // main-thread write, so marshal it there (as Plezy does).
+  override var wantsExtendedDynamicRangeContent: Bool {
+    get { super.wantsExtendedDynamicRangeContent }
+    set {
+      if Thread.isMainThread {
+        super.wantsExtendedDynamicRangeContent = newValue
+      } else {
+        DispatchQueue.main.async {
+          super.wantsExtendedDynamicRangeContent = newValue
+        }
+      }
     }
   }
 }
@@ -237,14 +259,37 @@ final class MpvPlayerCore {
     // whose on-screen size lagged its drawable: stretched or frozen video and
     // swapchain churn going in and out of fullscreen. Apply both atomically,
     // as Plezy's `withoutLayerAnimations` does.
+    //
+    // Only writes what actually changed: this runs on every frame-change
+    // notification of the platform view (plus window/scale events), and
+    // re-asserting identical geometry on the live swapchain's layer gives
+    // MoltenVK reason to treat the surface as changed and rebuild it.
+    //
+    // The view is sized by Flutter's AspectRatio, so its bounds are usually
+    // fractional (1493pt wide at 16:9 is 839.81pt tall). Swapchain extents
+    // are whole pixels, and MoltenVK reports the surface suboptimal - forcing
+    // a rebuild on every present - whenever drawableSize differs from the
+    // layer's bounds x contentsScale. Snap the drawable to whole pixels and
+    // size the layer to exactly that, so the two always agree.
+    let bounds = view.bounds
+    let drawableSize = CGSize(
+      width: (bounds.width * scale).rounded(),
+      height: (bounds.height * scale).rounded()
+    )
+    let frame = CGRect(
+      origin: bounds.origin,
+      size: CGSize(width: drawableSize.width / scale, height: drawableSize.height / scale)
+    )
+    guard
+      metalLayer.frame != frame
+        || metalLayer.contentsScale != scale
+        || metalLayer.drawableSize != drawableSize
+    else { return }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    metalLayer.frame = view.bounds
-    metalLayer.contentsScale = scale
-    metalLayer.drawableSize = CGSize(
-      width: view.bounds.width * scale,
-      height: view.bounds.height * scale
-    )
+    if metalLayer.frame != frame { metalLayer.frame = frame }
+    if metalLayer.contentsScale != scale { metalLayer.contentsScale = scale }
+    if metalLayer.drawableSize != drawableSize { metalLayer.drawableSize = drawableSize }
     CATransaction.commit()
   }
 

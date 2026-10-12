@@ -29,7 +29,8 @@ class _WindowManagerFullscreenWindow implements FullscreenWindow {
 /// State follows the window manager's enter/leave events, so the macOS green
 /// button and View > Enter Full Screen (Ctrl+Cmd+F) stay in sync with the
 /// in-app toggle. Shortcuts: F11 everywhere, Alt+Enter on Windows/Linux, and
-/// Escape leaves fullscreen before it is treated as Back.
+/// Escape leaves fullscreen before it is treated as Back (unless
+/// [deferEscape] claims it).
 ///
 /// Toggles are ignored while a transition is in flight. macOS animates into
 /// its own Space for most of a second, and a second `toggleFullScreen` during
@@ -61,6 +62,10 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
   final Set<PhysicalKeyboardKey> _swallowedKeys = <PhysicalKeyboardKey>{};
 
   bool get isFullscreen => _isFullscreen;
+
+  /// Returns true while something on screen should get Escape as Back before
+  /// fullscreen does - the player sets it so an open OSD is hidden first.
+  bool Function()? deferEscape;
 
   /// True between a toggle request and the window confirming it.
   bool get isTransitioning => _transitioning;
@@ -150,7 +155,8 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
       consume = true;
     } else if (logical == LogicalKeyboardKey.escape &&
         (_isFullscreen || _transitioning) &&
-        !_dialogHasFocus()) {
+        !_dialogHasFocus() &&
+        !(deferEscape?.call() ?? false)) {
       unawaited(setFullscreen(fullscreen: false));
       consume = true;
     } else {

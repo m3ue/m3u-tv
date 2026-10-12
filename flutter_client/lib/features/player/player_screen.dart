@@ -58,6 +58,22 @@ const _kUpNextDelayAfterCredits = Duration(seconds: 5);
 
 /// Full-screen player screen with playback controls, EPG overlay,
 /// resume prompt, backend fallback display, and progress reporting.
+/// Lets a host route a Back press into the mounted player's own handling
+/// (dismiss the track dialog / up-next card / OSD first, close last), so a
+/// back that reaches the host instead of the player still behaves the same.
+class PlayerBackController {
+  VoidCallback? _handler;
+
+  /// Runs the attached player's Back handling. False when no player is
+  /// attached.
+  bool handleBack() {
+    final handler = _handler;
+    if (handler == null) return false;
+    handler();
+    return true;
+  }
+}
+
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     required this.args,
@@ -78,6 +94,8 @@ class PlayerScreen extends StatefulWidget {
     this.onReplaceItem,
     this.onRecordProgram,
     this.onTrackDialogVisibilityChanged,
+    this.backController,
+    this.onBackKey,
     this.isRecordingCurrentChannel = false,
     this.viewSettingsService,
     this.isHandheld = false,
@@ -108,6 +126,15 @@ class PlayerScreen extends StatefulWidget {
   final void Function(PlayerArgs args)? onReplaceItem;
   final Future<void> Function(EpgProgram program)? onRecordProgram;
   final ValueChanged<bool>? onTrackDialogVisibilityChanged;
+
+  /// Attached to this player's Back handling while it is mounted.
+  final PlayerBackController? backController;
+
+  /// Host hook for an Escape/GoBack key press, so a host that also receives
+  /// the platform's own back message (Android TV, tvOS) can treat the pair
+  /// as one press and route it back through [backController]. Null handles
+  /// the key directly.
+  final VoidCallback? onBackKey;
   final bool isRecordingCurrentChannel;
 
   /// True for phones/tablets (never TV/desktop -- see `DeviceType` in
@@ -358,6 +385,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // not just while actively playing — e.g. staying paused on an overlay
     // shouldn't let the screen sleep. Enabled here, disabled in dispose().
     unawaited(widget.wakelockController.enable());
+    widget.backController?._handler = _handleBack;
+    DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
     if (widget.isHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([
@@ -1097,6 +1126,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _disposed = true;
+    // A new session's player can mount before this one unmounts, so only
+    // detach what is still ours.
+    final backController = widget.backController;
+    if (backController?._handler == _handleBack) {
+      backController!._handler = null;
+    }
+    final fullscreen = DesktopFullscreenService.instance;
+    if (fullscreen?.deferEscape == _defersFullscreenEscape) {
+      fullscreen!.deferEscape = null;
+    }
     if (widget.isHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
@@ -1885,6 +1924,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  /// Escape hides an open OSD before it leaves desktop fullscreen.
+  bool _defersFullscreenEscape() => _overlayVisible && _errorMessage == null;
+
   void _handleBack() {
     if (_trackDialogVisible) {
       Navigator.of(context, rootNavigator: true).maybePop();
@@ -1968,7 +2010,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         },
         child: Actions(
           actions: <Type, Action<Intent>>{
-            _BackIntent: _BackAction(_handleBack),
+            _BackIntent: _BackAction(widget.onBackKey ?? _handleBack),
             _PlayPauseIntent: _PlayPauseAction(_togglePlayPause),
             _SeekBackIntent: _SeekAction(() => _adjustSkip(-1)),
             _SeekForwardIntent: _SeekAction(() => _adjustSkip(1)),
