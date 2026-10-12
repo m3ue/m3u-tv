@@ -311,6 +311,64 @@ void main() {
     });
   });
 
+  group('HomeSpotlightController hover', () {
+    const vod = VodSpotlightTarget(movie);
+    const live = ChannelSpotlightTarget(channel);
+    const dvr = StaticSpotlightTarget(id: 'dvr', title: 'DVR Recordings');
+
+    test('applies only after the pointer rests for the hover delay', () {
+      fakeAsync((async) {
+        final controller = HomeSpotlightController()
+          ..select(vod)
+          ..hover(live);
+        async.elapse(const Duration(milliseconds: 400));
+        expect(controller.value?.key, vod.key);
+        async.elapse(const Duration(milliseconds: 100));
+        expect(controller.value?.key, live.key);
+        controller.dispose();
+      });
+    });
+
+    test('sweeping across cards restarts the wait', () {
+      fakeAsync((async) {
+        final controller = HomeSpotlightController()..select(vod);
+        for (final target in [live, dvr, live, dvr]) {
+          controller.hover(target);
+          async.elapse(const Duration(milliseconds: 300));
+        }
+        expect(controller.value?.key, vod.key);
+        async.elapse(const Duration(milliseconds: 200));
+        expect(controller.value?.key, dvr.key);
+        controller.dispose();
+      });
+    });
+
+    test('leaving the card or a D-pad move cancels a pending hover', () {
+      fakeAsync((async) {
+        final controller = HomeSpotlightController()
+          ..select(vod)
+          ..hover(live)
+          ..endHover(live);
+        async.elapse(const Duration(seconds: 1));
+        expect(controller.value?.key, vod.key);
+
+        controller
+          ..hover(live)
+          ..select(dvr);
+        async.elapse(const Duration(seconds: 1));
+        expect(controller.value?.key, dvr.key);
+
+        // Leaving a different card doesn't cancel the pending one.
+        controller
+          ..hover(live)
+          ..endHover(vod);
+        async.elapse(const Duration(seconds: 1));
+        expect(controller.value?.key, live.key);
+        controller.dispose();
+      });
+    });
+  });
+
   group('HomeSpotlightEnricher', () {
     test('dedupes in-flight fetches and caches failures', () async {
       var calls = 0;

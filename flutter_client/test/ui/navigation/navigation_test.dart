@@ -2253,6 +2253,53 @@ void main() {
       expect(moviesTop(), closeTo(initial, 1));
     });
 
+    for (final style in HomeScreenStyle.values) {
+      testWidgets('${style.name} Home starts focus on Continue Watching', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1600, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final appState = _testAppState(
+          xtreamService: _NavigationXtreamService(
+            recentlyWatched: const <Progress>[
+              Progress(
+                viewerId: 'viewer-1',
+                contentType: ContentType.vod,
+                streamId: 201,
+                positionSeconds: 600,
+                durationSeconds: 3600,
+                title: 'Resume Movie',
+              ),
+            ],
+          ),
+        );
+        addTearDown(appState.dispose);
+        await appState.connectXtream(
+          const UserCredentials(
+            server: 'http://example.com',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+        await appState.viewSettingsService.setHomeScreenStyle(style);
+
+        await tester.pumpWidget(
+          _TestApp(deviceType: DeviceType.tv, appState: appState),
+        );
+        await _pumpAppFrame(tester);
+        await tester.pumpAndSettle();
+
+        final focused = FocusManager.instance.primaryFocus!.context!;
+        expect(
+          find.descendant(
+            of: find.byWidget(focused.widget),
+            matching: find.text('Resume Movie'),
+          ),
+          findsAtLeast(1),
+        );
+      });
+    }
+
     testWidgets('phones keep the simplified Home even when rich is set', (
       tester,
     ) async {

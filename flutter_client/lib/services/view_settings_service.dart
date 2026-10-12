@@ -263,6 +263,13 @@ class ViewSettingsService extends ChangeNotifier {
     return HomeScreenStyle.fromValue(raw as String?);
   }
 
+  /// The style from the in-memory cache, or null before [homeScreenStyle]
+  /// (or [setHomeScreenStyle]) has run once.
+  HomeScreenStyle? get homeScreenStyleCached =>
+      _memory.containsKey(homeScreenStyleKey)
+      ? HomeScreenStyle.fromValue(_memory[homeScreenStyleKey] as String?)
+      : null;
+
   Future<void> setHomeScreenStyle(HomeScreenStyle style) async {
     await _write(homeScreenStyleKey, style.value);
     notifyListeners();

@@ -1024,6 +1024,7 @@ class MediaPreviewItem {
     this.cornerBadgeIcon,
     this.cornerBadgeColor,
     this.onFocused,
+    this.onHoverChanged,
   });
 
   final String title;
@@ -1038,6 +1039,10 @@ class MediaPreviewItem {
   /// to drive its spotlight hero; null (every other rail) adds nothing to the
   /// card's widget tree.
   final VoidCallback? onFocused;
+
+  /// Fires with true when a mouse pointer enters this card and false when it
+  /// leaves (hover doesn't move focus). Like [onFocused], null adds nothing.
+  final ValueChanged<bool>? onHoverChanged;
 
   /// Icon shown as a small circular corner badge over the poster (top-left),
   /// the same treatment [isFavorite] gives its star. Only rendered by
@@ -1384,16 +1389,28 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             : _buildDefaultContent(context, colorScheme),
       ),
     );
+    Widget result = card;
+    final onHoverChanged = item.onHoverChanged;
+    if (onHoverChanged != null) {
+      result = MouseRegion(
+        opaque: false,
+        onEnter: (_) => onHoverChanged(true),
+        onExit: (_) => onHoverChanged(false),
+        child: result,
+      );
+    }
     final onFocused = item.onFocused;
-    if (onFocused == null) return card;
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onFocusChange: (hasFocus) {
-        if (hasFocus) onFocused();
-      },
-      child: card,
-    );
+    if (onFocused != null) {
+      result = Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (hasFocus) {
+          if (hasFocus) onFocused();
+        },
+        child: result,
+      );
+    }
+    return result;
   }
 
   Widget _buildLandscapeContent(

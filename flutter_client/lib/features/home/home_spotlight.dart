@@ -172,21 +172,51 @@ Duration? parseRuntimeText(String? text) {
 /// row every ~50-100ms; without the settle delay every step would decode a
 /// backdrop and extract its palette. The first selection applies at once so
 /// the hero is never blank on arrival.
+///
+/// Mouse hover (desktop) goes through [hover] instead: hovering doesn't move
+/// focus, so the hero follows the pointer only once it rests on a card for
+/// [hoverDelay]. Every card the pointer enters restarts the wait, so sweeping
+/// across a row changes nothing until it stops.
 class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   HomeSpotlightController({
     this.settleDelay = const Duration(milliseconds: 150),
+    this.hoverDelay = const Duration(milliseconds: 500),
   }) : super(null);
 
   final Duration settleDelay;
+  final Duration hoverDelay;
   Timer? _settle;
+  Timer? _hover;
+  String? _hoverKey;
 
   void select(HomeSpotlightTarget target) {
+    _cancelHover();
     _settle?.cancel();
     if (value == null || settleDelay == Duration.zero) {
       _apply(target);
       return;
     }
     _settle = Timer(settleDelay, () => _apply(target));
+  }
+
+  void hover(HomeSpotlightTarget target) {
+    _cancelHover();
+    _hoverKey = target.key;
+    _hover = Timer(hoverDelay, () {
+      _hoverKey = null;
+      _apply(target);
+    });
+  }
+
+  /// The pointer left [target]'s card before its hover delay elapsed.
+  void endHover(HomeSpotlightTarget target) {
+    if (_hoverKey == target.key) _cancelHover();
+  }
+
+  void _cancelHover() {
+    _hover?.cancel();
+    _hover = null;
+    _hoverKey = null;
   }
 
   void _apply(HomeSpotlightTarget target) {
@@ -201,8 +231,15 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   @override
   void dispose() {
     _settle?.cancel();
+    _hover?.cancel();
     super.dispose();
   }
+}
+
+/// Wiring for a card's `onHoverChanged`.
+extension HomeSpotlightHover on HomeSpotlightController {
+  ValueChanged<bool> hoverHandler(HomeSpotlightTarget target) =>
+      (hovered) => hovered ? hover(target) : endHover(target);
 }
 
 /// Lazily fetched extras the list payloads don't carry: `get_vod_info` for

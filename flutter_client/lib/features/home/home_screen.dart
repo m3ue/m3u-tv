@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:m3u_tv/features/home/home_spotlight.dart';
@@ -82,7 +83,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final FavoritesService _seriesFavoritesService;
   late final ViewSettingsService _viewSettings;
 
-  HomeScreenStyle _style = HomeScreenStyle.simplified;
+  /// Null until the stored style has been read. Sidebar layouts render
+  /// nothing until then: building Simplified first and swapping to Rich a
+  /// frame later flashed, and remounted every row (losing initial focus).
+  HomeScreenStyle? _style;
   final HomeSpotlightController _spotlight = HomeSpotlightController();
   late final HomeSpotlightEnricher _enricher = HomeSpotlightEnricher(
     fetchVodInfo: widget.fetchVodInfo,
@@ -94,10 +98,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     },
   );
 
+  // Startup focus hand-off to Continue Watching: see
+  // [_onContinueWatchingShown].
+  final FocusNode _homeNode = FocusNode(
+    debugLabel: 'home',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+  final FocusNode _continueWatchingNode = FocusNode(
+    debugLabel: 'home-continue-watching',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+  FocusNode? _initialFocus;
+  bool _canClaimInitialFocus = true;
+
   @override
   void initState() {
     super.initState();
+    FocusManager.instance.addListener(_onPrimaryFocusChanged);
+    HardwareKeyboard.instance.addHandler(_onKey);
     _viewSettings = ref.read(viewSettingsServiceProvider);
+    _style = _viewSettings.homeScreenStyleCached;
     _viewSettings.addListener(_onViewSettingsChanged);
     unawaited(_loadStyle());
     _liveFavoritesService = ref.read(liveFavoritesServiceProvider);
@@ -109,6 +131,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_onPrimaryFocusChanged);
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _homeNode.dispose();
+    _continueWatchingNode.dispose();
     _viewSettings.removeListener(_onViewSettingsChanged);
     _liveFavoritesService.removeListener(_onChannelFavoritesChanged);
     _spotlight.dispose();
@@ -116,6 +142,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onViewSettingsChanged() => unawaited(_loadStyle());
+
+  /// Remembers the first card Home's autofocus landed on.
+  void _onPrimaryFocusChanged() {
+    if (_initialFocus != null) return;
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary != null && primary.ancestors.contains(_homeNode)) {
+      _initialFocus = primary;
+    }
+  }
+
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent) _canClaimInitialFocus = false;
+    return false;
+  }
+
+  /// Continue Watching resolves asynchronously (a catalog lookup, and the
+  /// progress list itself can arrive from the server after launch), so a
+  /// lower row's first card has usually autofocused by the time its cards
+  /// exist - and autofocus never steals focus that is already placed. When
+  /// its cards first appear, hand focus up to them, but only while focus is
+  /// still on that initial autofocus target and no key has been pressed, so
+  /// it never pulls focus away from someone already navigating.
+  void _onContinueWatchingShown() {
+    if (!_canClaimInitialFocus) return;
+    _canClaimInitialFocus = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final primary = FocusManager.instance.primaryFocus;
+      // No recorded target means the Continue Watching cards' own autofocus
+      // already applies (nothing else had focus) or focus is elsewhere.
+      if (_initialFocus == null || primary != _initialFocus) return;
+      final first = _continueWatchingNode.traversalDescendants.firstOrNull;
+      if (first == null || first == primary) return;
+      first.requestFocus();
+    });
+  }
 
   Future<void> _loadStyle() async {
     final style = await _viewSettings.homeScreenStyle();
@@ -161,17 +223,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
+    if (widget.useSidebarLayout && _style == null) return const Scaffold();
+
     // The spotlight follows D-pad/mouse focus, so touch layouts always get
     // the simplified Home.
     final rich = widget.useSidebarLayout && _style == HomeScreenStyle.rich;
     final spotlight = rich ? _spotlight : null;
     final rows = <Widget>[
-      _ContinueWatchingRow(
-        onProgressSelect: widget.onProgressSelect,
-        onContinueWatchingMore: widget.onContinueWatchingMore,
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
+      Focus(
+        focusNode: _continueWatchingNode,
+        child: _ContinueWatchingRow(
+          onProgressSelect: widget.onProgressSelect,
+          onContinueWatchingMore: widget.onContinueWatchingMore,
+          useSidebarLayout: widget.useSidebarLayout,
+          onSidebarActivate: widget.onSidebarActivate,
+          spotlight: spotlight,
+          onItemsShown: _onContinueWatchingShown,
+        ),
       ),
       _LiveRow(
         favoriteChannelIds: _favoriteChannelIds,
@@ -221,32 +289,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (rich) {
       return Scaffold(
-        body: RichHomeLayout(
-          controller: _spotlight,
-          enricher: _enricher,
-          header: hasSourceError
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: MediaBrowsingMetrics.pagePadding,
-                  ),
-                  child: _OfflineBanner(message: sourceError),
-                )
-              : null,
-          rows: rows,
+        body: Focus(
+          focusNode: _homeNode,
+          child: RichHomeLayout(
+            controller: _spotlight,
+            enricher: _enricher,
+            header: hasSourceError
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MediaBrowsingMetrics.pagePadding,
+                    ),
+                    child: _OfflineBanner(message: sourceError),
+                  )
+                : null,
+            rows: rows,
+          ),
         ),
       );
     }
 
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-        children: [
-          if (hasSourceError) ...[
-            _OfflineBanner(message: sourceError),
-            const SizedBox(height: MediaBrowsingMetrics.pagePadding),
+      body: Focus(
+        focusNode: _homeNode,
+        child: ListView(
+          padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+          children: [
+            if (hasSourceError) ...[
+              _OfflineBanner(message: sourceError),
+              const SizedBox(height: MediaBrowsingMetrics.pagePadding),
+            ],
+            ...rows,
           ],
-          ...rows,
-        ],
+        ),
       ),
     );
   }
@@ -268,10 +342,14 @@ class _ContinueWatchingRow extends ConsumerStatefulWidget {
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
+    this.onItemsShown,
   });
 
   final void Function(Progress) onProgressSelect;
   final VoidCallback onContinueWatchingMore;
+
+  /// Fires when the row first goes from no cards to some.
+  final VoidCallback? onItemsShown;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -305,9 +383,15 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
         onProgressFocused: spotlight == null
             ? null
             : (progress) => spotlight.select(ProgressSpotlightTarget(progress)),
+        onProgressHoverChanged: spotlight == null
+            ? null
+            : (progress) =>
+                  spotlight.hoverHandler(ProgressSpotlightTarget(progress)),
       ).then((items) {
         if (mounted && identical(_resolvedFor, progressList)) {
+          final wasEmpty = _items.isEmpty;
           setState(() => _items = items);
+          if (wasEmpty && items.isNotEmpty) widget.onItemsShown?.call();
         }
       }),
     );
@@ -323,6 +407,11 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
     const continueWatchingRowLimit = 4;
     final continueWatchingOverflow = _items.length - continueWatchingRowLimit;
     final spotlight = widget.spotlight;
+    final seeAllTarget = StaticSpotlightTarget(
+      id: 'continue-watching-more',
+      title: l.homeContinueWatching,
+      description: l.homeContinueWatchingMoreCount(continueWatchingOverflow),
+    );
     final continueWatchingRowItems = [
       ..._items.take(continueWatchingRowLimit),
       if (continueWatchingOverflow > 0)
@@ -333,15 +422,8 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
           onTap: widget.onContinueWatchingMore,
           onFocused: spotlight == null
               ? null
-              : () => spotlight.select(
-                  StaticSpotlightTarget(
-                    id: 'continue-watching-more',
-                    title: l.homeContinueWatching,
-                    description: l.homeContinueWatchingMoreCount(
-                      continueWatchingOverflow,
-                    ),
-                  ),
-                ),
+              : () => spotlight.select(seeAllTarget),
+          onHoverChanged: spotlight?.hoverHandler(seeAllTarget),
         ),
     ];
     return MediaPreviewSection(
@@ -421,13 +503,20 @@ class _LiveRow extends ConsumerWidget {
           ),
         );
         if (spotlight == null) return tile;
+        final target = ChannelSpotlightTarget(channel);
+        final onHoverChanged = spotlight.hoverHandler(target);
         return Focus(
           canRequestFocus: false,
           skipTraversal: true,
           onFocusChange: (hasFocus) {
-            if (hasFocus) spotlight.select(ChannelSpotlightTarget(channel));
+            if (hasFocus) spotlight.select(target);
           },
-          child: tile,
+          child: MouseRegion(
+            opaque: false,
+            onEnter: (_) => onHoverChanged(true),
+            onExit: (_) => onHoverChanged(false),
+            child: tile,
+          ),
         );
       },
       useSidebarLayout: useSidebarLayout,
@@ -508,6 +597,7 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
               onFocused: spotlight == null
                   ? null
                   : () => spotlight.select(VodSpotlightTarget(item)),
+              onHoverChanged: spotlight?.hoverHandler(VodSpotlightTarget(item)),
             ),
           )
           .toList(growable: false),
@@ -589,6 +679,9 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
               onFocused: spotlight == null
                   ? null
                   : () => spotlight.select(SeriesSpotlightTarget(series)),
+              onHoverChanged: spotlight?.hoverHandler(
+                SeriesSpotlightTarget(series),
+              ),
             ),
           )
           .toList(growable: false),
@@ -620,6 +713,11 @@ class _RecordingsRow extends ConsumerWidget {
     final subtitle = dvrRecordings.isEmpty
         ? 'Browse completed and in-progress recordings'
         : '${dvrRecordings.length} recordings';
+    final dvrTarget = StaticSpotlightTarget(
+      id: 'dvr',
+      title: 'DVR Recordings',
+      description: subtitle,
+    );
     return MediaPreviewSection(
       title: 'DVR',
       titleIcon: Icons.video_library,
@@ -632,13 +730,8 @@ class _RecordingsRow extends ConsumerWidget {
           onTap: onRecordingsSelect,
           onFocused: spotlight == null
               ? null
-              : () => spotlight.select(
-                  StaticSpotlightTarget(
-                    id: 'dvr',
-                    title: 'DVR Recordings',
-                    description: subtitle,
-                  ),
-                ),
+              : () => spotlight.select(dvrTarget),
+          onHoverChanged: spotlight?.hoverHandler(dvrTarget),
         ),
       ],
       useSidebarLayout: useSidebarLayout,
