@@ -83,10 +83,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final FavoritesService _seriesFavoritesService;
   late final ViewSettingsService _viewSettings;
 
-  /// Null until the stored style has been read. Sidebar layouts render
-  /// nothing until then: building Simplified first and swapping to Rich a
-  /// frame later flashed, and remounted every row (losing initial focus).
-  HomeScreenStyle? _style;
+  /// Seeded from the cache `main.dart` fills before the first frame, so the
+  /// right layout builds immediately (a Simplified-then-Rich swap flashed and
+  /// remounted every row). Falls back to Simplified if nothing was cached.
+  late HomeScreenStyle _style;
   final HomeSpotlightController _spotlight = HomeSpotlightController();
   late final HomeSpotlightEnricher _enricher = HomeSpotlightEnricher(
     fetchVodInfo: widget.fetchVodInfo,
@@ -119,7 +119,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     FocusManager.instance.addListener(_onPrimaryFocusChanged);
     HardwareKeyboard.instance.addHandler(_onKey);
     _viewSettings = ref.read(viewSettingsServiceProvider);
-    _style = _viewSettings.homeScreenStyleCached;
+    _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.simplified;
     _viewSettings.addListener(_onViewSettingsChanged);
     unawaited(_loadStyle());
     _liveFavoritesService = ref.read(liveFavoritesServiceProvider);
@@ -142,6 +142,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onViewSettingsChanged() => unawaited(_loadStyle());
+
+  /// Continue Watching re-syncs with the server after launch and can drop
+  /// entries. A focused card that is rebuilt in place with another entry
+  /// re-announces itself (see MediaPreviewCard), but one that disappears
+  /// outright takes focus with it, leaving the spotlight on an item that is
+  /// gone. Put focus back on the row (or the page) so both recover.
+  void _onContinueWatchingChanged() {
+    if (_spotlight.value == null || _style != HomeScreenStyle.rich) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _spotlight.value;
+      final fromContinueWatching =
+          target is ProgressSpotlightTarget ||
+          target?.key == 'static:continue-watching-more';
+      if (!fromContinueWatching) return;
+      final primary = FocusManager.instance.primaryFocus;
+      // Only when focus was actually lost - never pull it back from the
+      // sidebar or anywhere else the user has moved to.
+      final focusLost = primary == null || primary is FocusScopeNode;
+      if (!focusLost) return;
+      final next =
+          _continueWatchingNode.traversalDescendants.firstOrNull ??
+          _homeNode.traversalDescendants.firstOrNull;
+      next?.requestFocus();
+    });
+  }
 
   /// Remembers the first card Home's autofocus landed on.
   void _onPrimaryFocusChanged() {
@@ -223,8 +249,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (widget.useSidebarLayout && _style == null) return const Scaffold();
-
     // The spotlight follows D-pad/mouse focus, so touch layouts always get
     // the simplified Home.
     final rich = widget.useSidebarLayout && _style == HomeScreenStyle.rich;
@@ -239,6 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onSidebarActivate: widget.onSidebarActivate,
           spotlight: spotlight,
           onItemsShown: _onContinueWatchingShown,
+          onItemsChanged: _onContinueWatchingChanged,
         ),
       ),
       _LiveRow(
@@ -343,6 +368,7 @@ class _ContinueWatchingRow extends ConsumerStatefulWidget {
     required this.onSidebarActivate,
     required this.spotlight,
     this.onItemsShown,
+    this.onItemsChanged,
   });
 
   final void Function(Progress) onProgressSelect;
@@ -350,6 +376,9 @@ class _ContinueWatchingRow extends ConsumerStatefulWidget {
 
   /// Fires when the row first goes from no cards to some.
   final VoidCallback? onItemsShown;
+
+  /// Fires after every change to the row's cards.
+  final VoidCallback? onItemsChanged;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -392,6 +421,7 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
           final wasEmpty = _items.isEmpty;
           setState(() => _items = items);
           if (wasEmpty && items.isNotEmpty) widget.onItemsShown?.call();
+          widget.onItemsChanged?.call();
         }
       }),
     );
@@ -511,11 +541,26 @@ class _LiveRow extends ConsumerWidget {
           onFocusChange: (hasFocus) {
             if (hasFocus) spotlight.select(target);
           },
-          child: MouseRegion(
-            opaque: false,
-            onEnter: (_) => onHoverChanged(true),
-            onExit: (_) => onHoverChanged(false),
-            child: tile,
+          child: Builder(
+            builder: (anchorContext) {
+              // The Focus just above is the tile's anchor; its first
+              // traversable descendant is the tile's own focus node.
+              void focusTile() {
+                final node = Focus.of(
+                  anchorContext,
+                ).traversalDescendants.firstOrNull;
+                if (node != null && !node.hasFocus) node.requestFocus();
+              }
+
+              return MouseRegion(
+                opaque: false,
+                onEnter: (_) =>
+                    onHoverChanged(hovered: true, focusCard: focusTile),
+                onExit: (_) =>
+                    onHoverChanged(hovered: false, focusCard: focusTile),
+                child: tile,
+              );
+            },
           ),
         );
       },

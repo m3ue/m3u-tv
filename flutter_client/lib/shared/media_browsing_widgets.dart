@@ -1040,9 +1040,11 @@ class MediaPreviewItem {
   /// card's widget tree.
   final VoidCallback? onFocused;
 
-  /// Fires with true when a mouse pointer enters this card and false when it
-  /// leaves (hover doesn't move focus). Like [onFocused], null adds nothing.
-  final ValueChanged<bool>? onHoverChanged;
+  /// Fires when a mouse pointer enters (`hovered: true`) or leaves this card;
+  /// hover doesn't move focus on its own, so the `focusCard` argument
+  /// lets the caller move D-pad focus here once the pointer has rested. Like
+  /// [onFocused], null adds nothing.
+  final HoverIntentCallback? onHoverChanged;
 
   /// Icon shown as a small circular corner badge over the poster (top-left),
   /// the same treatment [isFavorite] gives its star. Only rendered by
@@ -1093,6 +1095,11 @@ class MediaPreviewItem {
   /// nothing on default cards. Do not add to that trap.
   final String? emphasisLabel;
 }
+
+/// See [MediaPreviewItem.onHoverChanged]. [focusCard] moves D-pad focus to
+/// the hovered card.
+typedef HoverIntentCallback =
+    void Function({required bool hovered, required VoidCallback focusCard});
 
 /// Builds one card of a [MediaPreviewSection.builder] row at [cardSize].
 typedef PreviewCardBuilder =
@@ -1350,8 +1357,50 @@ class MediaPreviewCard extends StatefulWidget {
 
 class _MediaPreviewCardState extends State<MediaPreviewCard>
     with AutomaticKeepAliveClientMixin {
+  /// Non-focusable wrapper around the card for [MediaPreviewItem.onFocused] /
+  /// [MediaPreviewItem.onHoverChanged]: reports focus entering the card and
+  /// finds the card's own focus node to move focus to on hover.
+  final FocusNode _anchor = FocusNode(
+    debugLabel: 'preview-card-anchor',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
   @override
   bool get wantKeepAlive => widget.keepAlive;
+
+  @override
+  void didUpdateWidget(MediaPreviewCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Rows rebuild cards in place by index, so when an entry drops out of a
+    // row (e.g. Continue Watching syncing with the server) the focused card
+    // can start showing a different item without focus ever changing.
+    // Re-announce it so whatever follows focus (the rich Home's spotlight)
+    // doesn't keep describing the item that's gone.
+    final onFocused = widget.item.onFocused;
+    if (onFocused == null || !_anchor.hasFocus) return;
+    final previous = oldWidget.item;
+    final current = widget.item;
+    if (previous.title == current.title &&
+        previous.subtitle == current.subtitle &&
+        previous.imageUrl == current.imageUrl) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _anchor.hasFocus) onFocused();
+    });
+  }
+
+  @override
+  void dispose() {
+    _anchor.dispose();
+    super.dispose();
+  }
+
+  void _focusCard() {
+    final card = _anchor.traversalDescendants.firstOrNull;
+    if (card != null && !card.hasFocus) card.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1389,28 +1438,25 @@ class _MediaPreviewCardState extends State<MediaPreviewCard>
             : _buildDefaultContent(context, colorScheme),
       ),
     );
-    Widget result = card;
-    final onHoverChanged = item.onHoverChanged;
-    if (onHoverChanged != null) {
-      result = MouseRegion(
-        opaque: false,
-        onEnter: (_) => onHoverChanged(true),
-        onExit: (_) => onHoverChanged(false),
-        child: result,
-      );
-    }
     final onFocused = item.onFocused;
-    if (onFocused != null) {
-      result = Focus(
-        canRequestFocus: false,
-        skipTraversal: true,
-        onFocusChange: (hasFocus) {
-          if (hasFocus) onFocused();
-        },
-        child: result,
-      );
-    }
-    return result;
+    final onHoverChanged = item.onHoverChanged;
+    if (onFocused == null && onHoverChanged == null) return card;
+    return Focus(
+      focusNode: _anchor,
+      onFocusChange: (hasFocus) {
+        if (hasFocus) onFocused?.call();
+      },
+      child: onHoverChanged == null
+          ? card
+          : MouseRegion(
+              opaque: false,
+              onEnter: (_) =>
+                  onHoverChanged(hovered: true, focusCard: _focusCard),
+              onExit: (_) =>
+                  onHoverChanged(hovered: false, focusCard: _focusCard),
+              child: card,
+            ),
+    );
   }
 
   Widget _buildLandscapeContent(

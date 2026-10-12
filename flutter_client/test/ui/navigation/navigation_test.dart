@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:clock/clock.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -2299,6 +2300,122 @@ void main() {
         );
       });
     }
+
+    Future<AppStateController> richAppStateWithProgress(
+      List<Progress> progress,
+    ) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(recentlyWatched: progress),
+      );
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+      await appState.viewSettingsService.setHomeScreenStyle(
+        HomeScreenStyle.rich,
+      );
+      return appState;
+    }
+
+    Progress resumeEntry(int streamId, String title) => Progress(
+      viewerId: 'viewer-1',
+      contentType: ContentType.vod,
+      streamId: streamId,
+      positionSeconds: 600,
+      durationSeconds: 3600,
+      title: title,
+    );
+
+    bool focusIsOn(String text) {
+      final focused = FocusManager.instance.primaryFocus?.context;
+      if (focused == null) return false;
+      return find
+          .descendant(
+            of: find.byWidget(focused.widget),
+            matching: find.text(text),
+          )
+          .evaluate()
+          .isNotEmpty;
+    }
+
+    for (final dropped in const ['First Resume', 'Second Resume']) {
+      testWidgets('spotlight moves on when focused entry "$dropped" drops', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(1600, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final first = resumeEntry(201, 'First Resume');
+        final second = resumeEntry(202, 'Second Resume');
+        final appState = await richAppStateWithProgress([first, second]);
+        addTearDown(appState.dispose);
+
+        await tester.pumpWidget(
+          _TestApp(deviceType: DeviceType.tv, appState: appState),
+        );
+        await _pumpAppFrame(tester);
+        await tester.pumpAndSettle();
+        if (dropped == 'Second Resume') {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+        }
+        expect(focusIsOn(dropped), isTrue);
+
+        appState.removeProgressEntry(
+          dropped == 'First Resume' ? first : second,
+        );
+        await tester.pumpAndSettle();
+        // Past the spotlight's settle delay.
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pumpAndSettle();
+
+        // The dropped title is gone everywhere, hero included, and focus
+        // sits on the entry that remains.
+        expect(find.text(dropped), findsNothing);
+        expect(
+          focusIsOn(
+            dropped == 'First Resume' ? 'Second Resume' : 'First Resume',
+          ),
+          isTrue,
+        );
+      });
+    }
+
+    testWidgets('a rested mouse hover moves D-pad focus to the card', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = await richAppStateWithProgress([
+        resumeEntry(201, 'First Resume'),
+        resumeEntry(202, 'Second Resume'),
+      ]);
+      addTearDown(appState.dispose);
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+      await tester.pumpAndSettle();
+      expect(focusIsOn('First Resume'), isTrue);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.text('Second Resume').first));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(focusIsOn('First Resume'), isTrue);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(focusIsOn('Second Resume'), isTrue);
+
+      // The D-pad carries on from the hovered card.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(focusIsOn('First Resume'), isTrue);
+    });
 
     testWidgets('phones keep the simplified Home even when rich is set', (
       tester,

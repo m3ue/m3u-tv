@@ -27,7 +27,7 @@ List<MediaPreviewItem> continueWatchingPreviewItems(
   required List<Series> seriesList,
   required void Function(Progress) onProgressSelect,
   void Function(Progress)? onProgressFocused,
-  ValueChanged<bool> Function(Progress)? onProgressHoverChanged,
+  HoverIntentCallback Function(Progress)? onProgressHoverChanged,
 }) => progressList
     .where(isContinueWatchingEligible)
     .map(
@@ -55,7 +55,7 @@ Future<List<MediaPreviewItem>> continueWatchingPreviewItemsFromRepo(
   required CatalogRepository repo,
   required void Function(Progress) onProgressSelect,
   void Function(Progress)? onProgressFocused,
-  ValueChanged<bool> Function(Progress)? onProgressHoverChanged,
+  HoverIntentCallback Function(Progress)? onProgressHoverChanged,
 }) async {
   final eligible = progressList.where(isContinueWatchingEligible).toList();
   final vodIds = <int>{
@@ -98,7 +98,7 @@ MediaPreviewItem? _resumePreviewItem(
   List<Series> seriesList,
   void Function(Progress) onProgressSelect,
   void Function(Progress)? onProgressFocused,
-  ValueChanged<bool> Function(Progress)? onProgressHoverChanged,
+  HoverIntentCallback Function(Progress)? onProgressHoverChanged,
 ) {
   final onFocused = onProgressFocused == null
       ? null

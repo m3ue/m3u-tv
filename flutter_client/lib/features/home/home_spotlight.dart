@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart'
+    show HoverIntentCallback;
 
 /// What the rich Home's spotlight hero is currently describing: the card
 /// that last took focus in one of the rows below it.
@@ -173,10 +175,12 @@ Duration? parseRuntimeText(String? text) {
 /// backdrop and extract its palette. The first selection applies at once so
 /// the hero is never blank on arrival.
 ///
-/// Mouse hover (desktop) goes through [hover] instead: hovering doesn't move
-/// focus, so the hero follows the pointer only once it rests on a card for
-/// [hoverDelay]. Every card the pointer enters restarts the wait, so sweeping
-/// across a row changes nothing until it stops.
+/// Mouse hover (desktop) goes through [hover] instead: the hero follows the
+/// pointer only once it rests on a card for [hoverDelay], and the caller's
+/// `onRest` then moves D-pad focus there too, so switching between mouse and
+/// remote/keyboard carries on from the same card. Every card the pointer
+/// enters restarts the wait, so sweeping across a row changes nothing until
+/// it stops.
 class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   HomeSpotlightController({
     this.settleDelay = const Duration(milliseconds: 150),
@@ -199,12 +203,13 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
     _settle = Timer(settleDelay, () => _apply(target));
   }
 
-  void hover(HomeSpotlightTarget target) {
+  void hover(HomeSpotlightTarget target, {VoidCallback? onRest}) {
     _cancelHover();
     _hoverKey = target.key;
     _hover = Timer(hoverDelay, () {
       _hoverKey = null;
       _apply(target);
+      onRest?.call();
     });
   }
 
@@ -236,10 +241,12 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
   }
 }
 
-/// Wiring for a card's `onHoverChanged`.
+/// Wiring for a card's `onHoverChanged`: a rested hover shows the item and
+/// moves D-pad focus to its card.
 extension HomeSpotlightHover on HomeSpotlightController {
-  ValueChanged<bool> hoverHandler(HomeSpotlightTarget target) =>
-      (hovered) => hovered ? hover(target) : endHover(target);
+  HoverIntentCallback hoverHandler(HomeSpotlightTarget target) =>
+      ({required hovered, required focusCard}) =>
+          hovered ? hover(target, onRest: focusCard) : endHover(target);
 }
 
 /// Lazily fetched extras the list payloads don't carry: `get_vod_info` for

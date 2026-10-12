@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:m3u_tv/features/epg/epg_program_details.dart'
@@ -103,8 +104,9 @@ class RichHomeLayout extends StatelessWidget {
 /// (worst moving up, and on desktop whenever focus was re-applied). Here the
 /// cards' auto-scroll only reaches their own horizontal row, and one animated
 /// offset owned by this widget positions the column. Mouse wheel / trackpad
-/// drive the same offset; pointer-driven focus (a click) doesn't re-dock, so
-/// nothing shifts under the cursor.
+/// drive the same offset; focus that follows the mouse (a click, or a rested
+/// hover) doesn't re-dock, so nothing shifts under the cursor - only focus
+/// moved by a key (remote / keyboard) docks.
 class _DockedRows extends StatefulWidget {
   const _DockedRows({required this.rows});
 
@@ -129,7 +131,28 @@ class _DockedRowsState extends State<_DockedRows> {
   double _offset = 0;
   double _viewportHeight = 0;
   Duration _duration = _dockDuration;
-  DateTime _lastPointerAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Whether the most recent input was the mouse rather than a key. A hover
+  /// moves focus long after the pointer last moved, so a time window can't
+  /// tell the two apart; the last input type can.
+  bool _pointerIsLastInput = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    super.dispose();
+  }
+
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent) _pointerIsLastInput = false;
+    return false;
+  }
 
   GlobalKey _rowKey(int index) {
     while (_rowKeys.length <= index) {
@@ -155,10 +178,7 @@ class _DockedRowsState extends State<_DockedRows> {
   }
 
   void _onRowFocused(int index) {
-    final pointerDriven =
-        DateTime.now().difference(_lastPointerAt) <
-        const Duration(milliseconds: 300);
-    if (pointerDriven) return;
+    if (_pointerIsLastInput) return;
     // After layout, so a row that just built (first autofocus) has a size.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -171,7 +191,7 @@ class _DockedRowsState extends State<_DockedRows> {
     });
   }
 
-  void _notePointer(PointerEvent _) => _lastPointerAt = DateTime.now();
+  void _notePointer(PointerEvent _) => _pointerIsLastInput = true;
 
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
