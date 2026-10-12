@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +15,7 @@ import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/system_clock.dart';
 
 /// The rich Home layout: a fixed spotlight hero (backdrop, colour-matched
 /// wash, title and metadata for the focused card) over the scrolling [rows].
@@ -68,6 +71,11 @@ class RichHomeLayout extends StatelessWidget {
                     height: heroHeight,
                     child: _SpotlightInfo(spotlight: spotlight),
                   ),
+                  Positioned(
+                    top: MediaBrowsingMetrics.pagePadding,
+                    right: MediaBrowsingMetrics.pagePadding,
+                    child: _SpotlightClock(spotlight: spotlight),
+                  ),
                 ],
               ),
             ),
@@ -76,19 +84,7 @@ class RichHomeLayout extends StatelessWidget {
               children: [
                 SizedBox(height: heroHeight),
                 ?header,
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      MediaBrowsingMetrics.pagePadding,
-                      MediaBrowsingMetrics.contentPadding,
-                      MediaBrowsingMetrics.pagePadding,
-                      MediaBrowsingMetrics.pagePadding,
-                    ),
-                    children: [
-                      for (final row in rows) _DockOnFocus(child: row),
-                    ],
-                  ),
-                ),
+                Expanded(child: _DockedRows(rows: rows)),
               ],
             ),
           ],
@@ -98,37 +94,144 @@ class RichHomeLayout extends StatelessWidget {
   }
 }
 
-/// Scrolls the row list so the focused row sits directly under the hero
-/// (top-aligned), the way streaming apps dock the active rail.
+/// The rows under the hero, docked so the focused row sits directly below
+/// it (top-aligned), the way streaming apps lock the active rail.
 ///
-/// The card's own DpadFocusable auto-scroll also animates this list
-/// (minimally, just into view) from a post-frame callback; the microtask
-/// queued here runs after every post-frame callback, so this alignment is
-/// the one that wins instead of the two animations fighting.
-class _DockOnFocus extends StatelessWidget {
-  const _DockOnFocus({required this.child});
+/// Deliberately not a vertical [Scrollable]: every DpadFocusable card runs
+/// its own padded auto-scroll on all scrollable ancestors, and a second
+/// scroller animating the same list to a different target made rows jump
+/// (worst moving up, and on desktop whenever focus was re-applied). Here the
+/// cards' auto-scroll only reaches their own horizontal row, and one animated
+/// offset owned by this widget positions the column. Mouse wheel / trackpad
+/// drive the same offset; pointer-driven focus (a click) doesn't re-dock, so
+/// nothing shifts under the cursor.
+class _DockedRows extends StatefulWidget {
+  const _DockedRows({required this.rows});
 
-  final Widget child;
+  final List<Widget> rows;
+
+  @override
+  State<_DockedRows> createState() => _DockedRowsState();
+}
+
+class _DockedRowsState extends State<_DockedRows> {
+  static const EdgeInsets _padding = EdgeInsets.fromLTRB(
+    MediaBrowsingMetrics.pagePadding,
+    MediaBrowsingMetrics.contentPadding,
+    MediaBrowsingMetrics.pagePadding,
+    MediaBrowsingMetrics.pagePadding,
+  );
+  static const Duration _dockDuration = Duration(milliseconds: 280);
+  static const Duration _wheelDuration = Duration(milliseconds: 120);
+
+  final GlobalKey _columnKey = GlobalKey();
+  final List<GlobalKey> _rowKeys = [];
+  double _offset = 0;
+  double _viewportHeight = 0;
+  Duration _duration = _dockDuration;
+  DateTime _lastPointerAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  GlobalKey _rowKey(int index) {
+    while (_rowKeys.length <= index) {
+      _rowKeys.add(GlobalKey());
+    }
+    return _rowKeys[index];
+  }
+
+  double get _maxOffset {
+    final column = _columnKey.currentContext?.findRenderObject();
+    if (column is! RenderBox || !column.hasSize) return 0;
+    final content = column.size.height + _padding.vertical;
+    return (content - _viewportHeight).clamp(0.0, double.infinity);
+  }
+
+  void _setOffset(double offset, Duration duration) {
+    final clamped = offset.clamp(0.0, _maxOffset);
+    if ((clamped - _offset).abs() < 0.5) return;
+    setState(() {
+      _offset = clamped;
+      _duration = duration;
+    });
+  }
+
+  void _onRowFocused(int index) {
+    final pointerDriven =
+        DateTime.now().difference(_lastPointerAt) <
+        const Duration(milliseconds: 300);
+    if (pointerDriven) return;
+    // After layout, so a row that just built (first autofocus) has a size.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final row = _rowKeys[index].currentContext?.findRenderObject();
+      final column = _columnKey.currentContext?.findRenderObject();
+      if (row is! RenderBox || column is! RenderBox) return;
+      if (!row.hasSize || !column.hasSize) return;
+      final top = row.localToGlobal(Offset.zero, ancestor: column).dy;
+      _setOffset(top, _dockDuration);
+    });
+  }
+
+  void _notePointer(PointerEvent _) => _lastPointerAt = DateTime.now();
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      _setOffset(_offset + event.scrollDelta.dy, _wheelDuration);
+    }
+  }
+
+  void _onPanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    _notePointer(event);
+    _setOffset(_offset - event.localPanDelta.dy, Duration.zero);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onFocusChange: (hasFocus) {
-        if (!hasFocus) return;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          scheduleMicrotask(() {
-            if (!context.mounted) return;
-            Scrollable.ensureVisible(
-              context,
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
+    return Listener(
+      onPointerHover: _notePointer,
+      onPointerDown: _notePointer,
+      onPointerSignal: _onPointerSignal,
+      onPointerPanZoomUpdate: _onPanZoomUpdate,
+      child: ClipRect(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            _viewportHeight = constraints.maxHeight;
+            return OverflowBox(
+              alignment: Alignment.topCenter,
+              minHeight: 0,
+              maxHeight: double.infinity,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: _offset),
+                duration: _duration,
+                curve: Curves.easeOutCubic,
+                builder: (context, offset, child) => Transform.translate(
+                  offset: Offset(0, -offset),
+                  child: child,
+                ),
+                child: Padding(
+                  padding: _padding,
+                  child: Column(
+                    key: _columnKey,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < widget.rows.length; i++)
+                        Focus(
+                          key: _rowKey(i),
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                          onFocusChange: (hasFocus) {
+                            if (hasFocus) _onRowFocused(i);
+                          },
+                          child: widget.rows[i],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             );
-          });
-        });
-      },
-      child: child,
+          },
+        ),
+      ),
     );
   }
 }
@@ -273,78 +376,98 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
 
   @override
   Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(end: _tone ?? Colors.transparent),
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOut,
-      builder: (context, tone, child) {
-        final wash = tone ?? Colors.transparent;
-        // Gradients fade into the wash where there is one, and into the
-        // page surface before the first tone resolves.
-        final fade = (tone == null || tone.a == 0) ? surface : wash;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            ColoredBox(color: wash),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: widget.artHeight,
-              child: child!,
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: widget.artHeight,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        fade.withValues(alpha: 0.96),
-                        fade.withValues(alpha: 0.7),
-                        fade.withValues(alpha: 0),
-                      ],
-                      stops: const [0.0, 0.42, 0.75],
-                    ),
-                  ),
+    final backdrop = RepaintBoundary(
+      child: _EdgeFade(
+        child: _CrossfadeBackdrop(url: widget.spotlight?.backdropUrl),
+      ),
+    );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // The colour-match wash is a glow strongest behind the art (top
+        // right) that fades to nothing toward the rows and the sidebar, so
+        // the app's own gradient background shows through instead of a
+        // solid fill with hard edges.
+        TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: _tone ?? Colors.transparent),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOut,
+          builder: (context, tone, _) {
+            final glow = tone ?? Colors.transparent;
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.55, -1.1),
+                  radius: 1.35,
+                  colors: [
+                    glow.withValues(alpha: glow.a * 0.95),
+                    glow.withValues(alpha: glow.a * 0.55),
+                    glow.withValues(alpha: 0),
+                  ],
+                  stops: const [0, 0.45, 1],
                 ),
               ),
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: widget.artHeight,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        fade.withValues(alpha: 0),
-                        fade.withValues(alpha: 0.35),
-                        fade,
-                      ],
-                      stops: const [0.0, 0.55, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-      child: Align(
-        alignment: Alignment.topRight,
-        child: FractionallySizedBox(
-          widthFactor: 0.72,
-          child: _CrossfadeBackdrop(url: widget.spotlight?.backdropUrl),
+            );
+          },
         ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: widget.artHeight,
+          child: Align(
+            alignment: Alignment.topRight,
+            child: FractionallySizedBox(widthFactor: 0.72, child: backdrop),
+          ),
+        ),
+        // Keeps the title/plot legible where they overlap the faded-in art.
+        // Smooth on every edge, so it adds no seam of its own.
+        const IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0x73000000),
+                  Color(0x33000000),
+                  Color(0x00000000),
+                ],
+                stops: [0, 0.35, 0.6],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Alpha-masks the backdrop so it dissolves into whatever is behind it: a
+/// long fade on the left (under the title and metadata) and toward the
+/// bottom (under the rows), plus a short one on the right edge. A plain
+/// colour overlay can't do this without leaving a visible seam wherever its
+/// colour doesn't exactly match what sits beside the image.
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0x00FFFFFF), Color(0x99FFFFFF), Color(0xFFFFFFFF)],
+        stops: [0, 0.3, 0.55],
+      ).createShader(bounds),
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFFFF), Color(0xB3FFFFFF), Color(0x00FFFFFF)],
+          stops: [0, 0.5, 1],
+        ).createShader(bounds),
+        child: child,
       ),
     );
   }
@@ -656,5 +779,86 @@ class _SpotlightProgress extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Top-right time readout, matching the player's header: the current time
+/// and, when the highlighted item can be played straight away, when it would
+/// end ("Ends at"). Sits on a frosted pill so it stays legible over bright
+/// backdrops.
+class _SpotlightClock extends StatelessWidget {
+  const _SpotlightClock({required this.spotlight});
+
+  final HomeSpotlight? spotlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12 * scale),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF09090b).withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(12 * scale),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 12 * scale,
+              vertical: 6 * scale,
+            ),
+            child: SystemClock(
+              builder: (context, now) {
+                final endsAt = _endsAt();
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatClockTime(context, now),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (endsAt != null)
+                      Text(
+                        AppLocalizations.of(
+                          context,
+                        ).playerEndsAt(formatClockTime(context, endsAt)),
+                        key: const Key('home-spotlight-ends-at'),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Read against the real current time rather than the clock's
+  /// minute-aligned tick, so switching items mid-minute doesn't lag by up to
+  /// a minute.
+  DateTime? _endsAt() {
+    final current = spotlight;
+    if (current == null) return null;
+    final now = DateTime.now();
+    final fixed = current.endsAt?.toLocal();
+    if (fixed != null) return fixed.isAfter(now) ? fixed : null;
+    final length = current.playLength;
+    return length == null || length <= Duration.zero ? null : now.add(length);
   }
 }

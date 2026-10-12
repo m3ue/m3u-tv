@@ -83,6 +83,8 @@ void main() {
         expect(spotlight.clearLogoUrl, 'http://img/logo.png');
         expect(spotlight.chips, ['1995', 'R', 'Crime', '2h 50m', '★ 8.3']);
         expect(spotlight.plot, 'A crew of thieves.');
+        expect(spotlight.playLength, const Duration(hours: 2, minutes: 50));
+        expect(spotlight.endsAt, isNull);
       },
     );
 
@@ -146,6 +148,7 @@ void main() {
       expect(spotlight.progressLabel, contains('45 min left'));
       expect(spotlight.plot, 'The Doctor returns.');
       expect(spotlight.footnote, contains('News'));
+      expect(spotlight.endsAt, DateTime.utc(2026, 10, 12, 21));
     });
 
     test('live programme without a backdrop falls back to its icon', () {
@@ -194,6 +197,7 @@ void main() {
 
       expect(spotlight.plot, l10n.epgNoData);
       expect(spotlight.progress, isNull);
+      expect(spotlight.endsAt, isNull);
     });
 
     test(
@@ -235,6 +239,7 @@ void main() {
         expect(spotlight.progress, closeTo(0.2, 1e-9));
         expect(spotlight.progressLabel, '40 min left');
         expect(spotlight.badge, isNull);
+        expect(spotlight.playLength, const Duration(minutes: 40));
       },
     );
 
@@ -257,6 +262,30 @@ void main() {
       expect(spotlight.badge, l10n.homeUpNext);
       expect(spotlight.progress, isNull);
       expect(spotlight.progressLabel, isNull);
+      expect(spotlight.playLength, const Duration(minutes: 50));
+    });
+  });
+
+  group('parseRuntimeText', () {
+    test('reads the runtime formats the payloads carry', () {
+      expect(
+        parseRuntimeText('01:40:09'),
+        const Duration(hours: 1, minutes: 40, seconds: 9),
+      );
+      expect(parseRuntimeText('1:45'), const Duration(hours: 1, minutes: 45));
+      expect(parseRuntimeText('2h 50m'), const Duration(hours: 2, minutes: 50));
+      expect(parseRuntimeText('2h'), const Duration(hours: 2));
+      expect(parseRuntimeText('50m'), const Duration(minutes: 50));
+      expect(parseRuntimeText('95 min'), const Duration(minutes: 95));
+      expect(parseRuntimeText('120'), const Duration(minutes: 120));
+    });
+
+    test('returns null for empty or unreadable text', () {
+      expect(parseRuntimeText(null), isNull);
+      expect(parseRuntimeText(''), isNull);
+      expect(parseRuntimeText('0'), isNull);
+      expect(parseRuntimeText('00:00:00'), isNull);
+      expect(parseRuntimeText('unknown'), isNull);
     });
   });
 

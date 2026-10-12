@@ -17,9 +17,18 @@ String formatClockTime(BuildContext context, DateTime time) {
 /// rebuilds once a minute and never flips late; resyncs on resume, since a
 /// suspended process runs no timers.
 class SystemClock extends StatefulWidget {
-  const SystemClock({super.key, this.style, this.now = DateTime.now});
+  const SystemClock({
+    super.key,
+    this.style,
+    this.now = DateTime.now,
+    this.builder,
+  });
 
   final TextStyle? style;
+
+  /// Replaces the plain time label with custom content that rebuilds on the
+  /// same minute ticks (the rich Home pairs the time with "Ends at").
+  final Widget Function(BuildContext context, DateTime now)? builder;
 
   /// Wall-clock source, overridden by tests.
   final DateTime Function() now;
@@ -73,6 +82,8 @@ class _SystemClockState extends State<SystemClock> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final builder = widget.builder;
+    if (builder != null) return builder(context, _now);
     return Text(
       formatClockTime(context, _now),
       style: widget.style,

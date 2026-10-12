@@ -89,6 +89,8 @@ class HomeSpotlight {
     this.progressLabel,
     this.plot,
     this.footnote,
+    this.endsAt,
+    this.playLength,
   });
 
   final String key;
@@ -121,6 +123,49 @@ class HomeSpotlight {
 
   /// Trailing muted line (the next programme for live items).
   final String? footnote;
+
+  /// Fixed end time of what playing this would show (a live programme's
+  /// end). Takes precedence over [playLength].
+  final DateTime? endsAt;
+
+  /// How long playing this would run from now (movie runtime, or what is
+  /// left of a resume point); the hero clock adds it to the current time.
+  final Duration? playLength;
+}
+
+/// Parses the runtime text the Xtream payloads carry ("01:40:09", "2h 50m",
+/// "50m", "95 min", or bare minutes) into a [Duration]. Null when it can't
+/// tell.
+Duration? parseRuntimeText(String? text) {
+  final value = text?.trim().toLowerCase();
+  if (value == null || value.isEmpty) return null;
+  if (value.contains(':')) {
+    final parts = value.split(':').map(int.tryParse).toList();
+    if (parts.any((part) => part == null)) return null;
+    final numbers = parts.cast<int>();
+    final duration = switch (numbers.length) {
+      3 => Duration(
+        hours: numbers[0],
+        minutes: numbers[1],
+        seconds: numbers[2],
+      ),
+      2 => Duration(hours: numbers[0], minutes: numbers[1]),
+      _ => null,
+    };
+    return duration == null || duration <= Duration.zero ? null : duration;
+  }
+  final minutesOnly = int.tryParse(value);
+  if (minutesOnly != null) {
+    return minutesOnly > 0 ? Duration(minutes: minutesOnly) : null;
+  }
+  final hours = RegExp(r'(\d+)\s*h').firstMatch(value);
+  final minutes = RegExp(r'(\d+)\s*m').firstMatch(value);
+  if (hours == null && minutes == null) return null;
+  final duration = Duration(
+    hours: hours == null ? 0 : int.parse(hours.group(1)!),
+    minutes: minutes == null ? 0 : int.parse(minutes.group(1)!),
+  );
+  return duration > Duration.zero ? duration : null;
 }
 
 /// Debounces focus changes into the hero. A D-pad held down steps through a
@@ -298,6 +343,7 @@ HomeSpotlight resolveHomeSpotlight(
           if (rating != null && rating > 0) _ratingLabel(rating),
         ],
         plot: _notEmpty(info?.plot),
+        playLength: parseRuntimeText(info?.duration),
       );
 
     case SeriesSpotlightTarget(:final series):
@@ -388,6 +434,7 @@ HomeSpotlight _channelSpotlight(
         ? null
         : '${l.homeUpNext}: ${format.timeOfDay(next.start)}  '
               '${next.displayTitle}',
+    endsAt: program.end,
   );
 }
 
@@ -405,6 +452,17 @@ HomeSpotlight _progressSpotlight(
       ? (progress.positionSeconds / progress.durationSeconds!).clamp(0.0, 1.0)
       : null;
   final timeLeft = fraction == null ? null : _timeLeft(l, progress);
+  final totalSeconds = progress.durationSeconds;
+  final playLength = totalSeconds != null && totalSeconds > 0
+      ? Duration(
+          seconds: progress.upNext
+              ? totalSeconds
+              : (totalSeconds - progress.positionSeconds).clamp(
+                  0,
+                  totalSeconds,
+                ),
+        )
+      : parseRuntimeText(progress.runtime);
   final runtime = _notEmpty(progress.runtime);
   final genre = _notEmpty(progress.genre);
   final rating = _notEmpty(progress.rating);
@@ -447,6 +505,7 @@ HomeSpotlight _progressSpotlight(
       progress: fraction,
       progressLabel: timeLeft,
       plot: _notEmpty(progress.plot) ?? _notEmpty(series?.plot),
+      playLength: playLength,
     );
   }
 
@@ -476,6 +535,7 @@ HomeSpotlight _progressSpotlight(
     progress: fraction,
     progressLabel: timeLeft,
     plot: _notEmpty(progress.plot) ?? _notEmpty(info?.plot),
+    playLength: playLength ?? parseRuntimeText(info?.duration),
   );
 }
 

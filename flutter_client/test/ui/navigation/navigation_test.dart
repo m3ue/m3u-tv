@@ -2224,6 +2224,35 @@ void main() {
       expect(find.text('Movies'), findsAtLeast(1));
     });
 
+    testWidgets('rich Home docks the focused row under the hero', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await appState.viewSettingsService.setHomeScreenStyle(
+        HomeScreenStyle.rich,
+      );
+
+      await tester.pumpWidget(
+        _TestApp(deviceType: DeviceType.tv, appState: appState),
+      );
+      await _pumpAppFrame(tester);
+
+      double moviesTop() => tester.getTopLeft(find.text('Movies').last).dy;
+      final initial = moviesTop();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      final docked = moviesTop();
+      expect(docked, lessThan(initial));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(moviesTop(), closeTo(initial, 1));
+    });
+
     testWidgets('phones keep the simplified Home even when rich is set', (
       tester,
     ) async {
