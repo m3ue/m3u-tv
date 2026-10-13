@@ -616,11 +616,13 @@ class _SpotlightInfo extends StatelessWidget {
     final current = spotlight;
     return ClipRect(
       child: Padding(
+        // Left inset matches the docked rows; the bottom gap keeps the plot
+        // clear of the row header that docks right under the hero.
         padding: const EdgeInsets.fromLTRB(
-          MediaBrowsingMetrics.pagePadding * 1.5,
           MediaBrowsingMetrics.pagePadding,
           MediaBrowsingMetrics.pagePadding,
-          0,
+          MediaBrowsingMetrics.pagePadding,
+          MediaBrowsingMetrics.pagePadding,
         ),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
