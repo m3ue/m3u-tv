@@ -130,11 +130,16 @@ class _DockedRowsState extends State<_DockedRows> {
   static const Duration _dockDuration = Duration(milliseconds: 280);
   static const Duration _wheelDuration = Duration(milliseconds: 120);
 
+  /// Quiet time after the last wheel / trackpad event before the rows settle
+  /// onto the nearest row.
+  static const Duration _settleDelay = Duration(milliseconds: 180);
+
   final GlobalKey _columnKey = GlobalKey();
   final List<GlobalKey> _rowKeys = [];
   double _offset = 0;
   double _viewportHeight = 0;
   Duration _duration = _dockDuration;
+  Timer? _settleTimer;
 
   /// Whether the most recent input was the mouse rather than a key. A hover
   /// moves focus long after the pointer last moved, so a time window can't
@@ -157,6 +162,7 @@ class _DockedRowsState extends State<_DockedRows> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
+    _settleTimer?.cancel();
     super.dispose();
   }
 
@@ -190,6 +196,7 @@ class _DockedRowsState extends State<_DockedRows> {
 
   void _onRowFocused(int index) {
     if (_pointerIsLastInput) return;
+    _settleTimer?.cancel();
     // After layout, so a row that just built (first autofocus) has a size.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -207,23 +214,57 @@ class _DockedRowsState extends State<_DockedRows> {
   void _notePointer(PointerEvent _) => _pointerIsLastInput = true;
 
   void _onPointerSignal(PointerSignalEvent event) {
-    if (event is PointerScrollEvent) {
+    if (event is PointerScrollEvent && event.scrollDelta.dy != 0) {
       _setOffset(_offset + event.scrollDelta.dy, _wheelDuration);
+      _scheduleSettle();
     }
   }
 
   void _onPanZoomUpdate(PointerPanZoomUpdateEvent event) {
     _notePointer(event);
+    _settleTimer?.cancel();
     _setOffset(_offset - event.localPanDelta.dy, Duration.zero);
+  }
+
+  void _scheduleSettle() {
+    _settleTimer?.cancel();
+    _settleTimer = Timer(_settleDelay, _settle);
+  }
+
+  /// Snaps a mouse-scrolled offset to the nearest row top (clamped, so the
+  /// last rows settle on the end of the list), matching where a key docks.
+  void _settle() {
+    if (!mounted) return;
+    final column = _columnKey.currentContext?.findRenderObject();
+    if (column is! RenderBox || !column.hasSize) return;
+    final maxOffset = _maxOffset;
+    double? nearest;
+    for (final key in _rowKeys) {
+      final row = key.currentContext?.findRenderObject();
+      if (row is! RenderBox || !row.hasSize || row.size.height == 0) continue;
+      final top = row
+          .localToGlobal(Offset.zero, ancestor: column)
+          .dy
+          .clamp(0.0, maxOffset);
+      if (nearest == null ||
+          (top - _offset).abs() < (nearest - _offset).abs()) {
+        nearest = top;
+      }
+    }
+    if (nearest != null) _setOffset(nearest, _dockDuration);
   }
 
   @override
   Widget build(BuildContext context) {
     return Listener(
+      // Translucent so the wheel also scrolls over the gaps between rows,
+      // where no row widget is hit (the default deferToChild missed them).
+      behavior: HitTestBehavior.translucent,
       onPointerHover: _notePointer,
       onPointerDown: _notePointer,
       onPointerSignal: _onPointerSignal,
       onPointerPanZoomUpdate: _onPanZoomUpdate,
+      onPointerPanZoomEnd: (_) => _scheduleSettle(),
       child: ShaderMask(
         blendMode: BlendMode.dstIn,
         shaderCallback: (bounds) => LinearGradient(

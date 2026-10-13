@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/view_settings_service.dart' show OptimizeFor;
 import 'package:m3u_tv/shared/app_button.dart' show kStadiumFocusEffects;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
@@ -1209,7 +1210,7 @@ class MediaPreviewSection extends StatefulWidget {
 
   /// A row of caller-built cards (e.g. the Home Live TV row's
   /// `ChannelGridTile`s) that keeps this section's header, D-pad region,
-  /// scrollbar and width-responsive card sizing. [itemBuilder] receives the
+  /// hover scroll arrows and width-responsive card sizing. [itemBuilder] receives the
   /// final card size and must size its card to it; the first card should
   /// honor `autofocus`.
   const MediaPreviewSection.builder({
@@ -1363,10 +1364,11 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       widget.onSidebarActivate?.call();
                     }
                   },
-                  child: Scrollbar(
+                  // No Scrollbar, matching the detail screens' episode + cast
+                  // strips: desktop mouse users get hover arrows instead, and
+                  // TV / phone pass straight through.
+                  child: HoverScrollArrows(
                     controller: _controller,
-                    thumbVisibility: true,
-                    trackVisibility: true,
                     child: ListView.separated(
                       controller: _controller,
                       scrollDirection: Axis.horizontal,
