@@ -31,6 +31,7 @@ import 'package:m3u_tv/services/window_state_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/notification_toast.dart';
 import 'package:m3u_tv/shared/tv_remote_input_governor_scope.dart';
 import 'package:m3u_tv/shared/tvos_scroll_semantics.dart';
 import 'package:path_provider/path_provider.dart';
@@ -547,12 +548,28 @@ class _MyAppState extends State<MyApp> {
                 child: Builder(
                   builder: (context) {
                     final scale = FontSizeScope.scaleOf(context);
-                    if (scale == 1) return routerChild;
+                    // Floating snackbars span the screen by default; on wide
+                    // screens cap them to the push toasts' width.
+                    final theme = Theme.of(context);
+                    final themedChild = MediaQuery.sizeOf(context).width >= 720
+                        ? Theme(
+                            data: theme.copyWith(
+                              snackBarTheme: theme.snackBarTheme.copyWith(
+                                width: 480 * scale,
+                              ),
+                            ),
+                            child: routerChild,
+                          )
+                        : routerChild;
+                    final messengerChild = SnackBarTrackingMessenger(
+                      child: themedChild,
+                    );
+                    if (scale == 1) return messengerChild;
                     return MediaQuery(
                       data: MediaQuery.of(
                         context,
                       ).copyWith(textScaler: TextScaler.linear(scale)),
-                      child: routerChild,
+                      child: messengerChild,
                     );
                   },
                 ),
@@ -599,14 +616,18 @@ class _MyAppState extends State<MyApp> {
             return null;
           }),
         ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: primary,
-          contentTextStyle: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-          ),
+        // Neutral card, text first, matching the push toasts in
+        // shared/notification_toast.dart
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: card,
+          contentTextStyle: TextStyle(color: Color(0xFFEDEDED), fontSize: 15),
+          actionTextColor: Color(0xFFEDEDED),
+          elevation: 6,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          insetPadding: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
         ),
       ),
       themeMode: ThemeMode.dark,

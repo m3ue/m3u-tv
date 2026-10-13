@@ -27,7 +27,7 @@ class NotificationToastOverlay extends StatefulWidget {
   final Widget child;
   final void Function(TvNotificationItem item)? onNotificationTap;
 
-  /// Enables horizontal swipe-to-dismiss on the toast cards. Only meaningful
+  /// Enables swipe-down-to-dismiss on the toast cards. Only meaningful
   /// on touch (phone/tablet) form factors - TV/desktop stay D-pad/mouse
   /// driven and skip the drag recognizer entirely.
   final bool swipeToDismiss;
@@ -77,19 +77,28 @@ class NotificationToastOverlayState extends State<NotificationToastOverlay> {
   Widget build(BuildContext context) {
     final safePadding = MediaQuery.of(context).padding;
     final scale = FontSizeScope.scaleOf(context);
+    // Snackbars use the same bottom slot, so the stack steps up above one
+    // while it is showing.
+    final snackBarLift = SnackBarTrackingMessenger.isShowingOf(context)
+        ? 56 * scale
+        : 0.0;
     return Stack(
       children: [
         widget.child,
-        Positioned(
-          top: safePadding.top + 8,
+        // Bottom-centre stack, newest at the bottom, in the same spot and
+        // width as the app's floating snackbars.
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          bottom: safePadding.bottom + 16 + snackBarLift,
           left: safePadding.left + 16,
           right: safePadding.right + 16,
           child: Align(
-            alignment: Alignment.topRight,
+            alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 360 * scale),
+              constraints: BoxConstraints(maxWidth: 480 * scale),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: _queue
                     .map(
@@ -111,6 +120,61 @@ class NotificationToastOverlayState extends State<NotificationToastOverlay> {
       ],
     );
   }
+}
+
+/// App-wide [ScaffoldMessenger] (installed in `MaterialApp.builder`) that
+/// tracks whether a snackbar is showing or queued, so
+/// [NotificationToastOverlay] can keep its bottom stack clear of it. Behaves
+/// exactly like the default messenger otherwise.
+class SnackBarTrackingMessenger extends ScaffoldMessenger {
+  const SnackBarTrackingMessenger({super.key, required super.child});
+
+  /// Whether a snackbar is on screen or queued. Rebuilds [context] when that
+  /// changes; false when no tracking messenger is installed.
+  static bool isShowingOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_SnackBarShowingScope>()
+          ?.showing ??
+      false;
+
+  @override
+  ScaffoldMessengerState createState() => _SnackBarTrackingMessengerState();
+}
+
+class _SnackBarTrackingMessengerState extends ScaffoldMessengerState {
+  int _open = 0;
+
+  @override
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showSnackBar(
+    SnackBar snackBar, {
+    AnimationStyle? snackBarAnimationStyle,
+  }) {
+    final controller = super.showSnackBar(
+      snackBar,
+      snackBarAnimationStyle: snackBarAnimationStyle,
+    );
+    setState(() => _open++);
+    unawaited(
+      controller.closed.whenComplete(() {
+        if (mounted) setState(() => _open--);
+      }),
+    );
+    return controller;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _SnackBarShowingScope(showing: _open > 0, child: super.build(context));
+}
+
+class _SnackBarShowingScope extends InheritedWidget {
+  const _SnackBarShowingScope({required this.showing, required super.child});
+
+  final bool showing;
+
+  @override
+  bool updateShouldNotify(_SnackBarShowingScope oldWidget) =>
+      showing != oldWidget.showing;
 }
 
 class _ToastEntry {
@@ -166,10 +230,13 @@ class _NotificationToastState extends State<_NotificationToast>
     );
 
     _opacity = CurvedAnimation(parent: _enterController, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-      begin: const Offset(0.4, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _enterController, curve: Curves.easeOut));
+    _slide =
+        Tween<Offset>(
+          begin: const Offset(0, 0.25),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: _enterController, curve: Curves.easeOutCubic),
+        );
 
     _enterController.forward();
 
@@ -208,27 +275,16 @@ class _NotificationToastState extends State<_NotificationToast>
     }
   }
 
-  Widget _buildProgressBar(Color accentColor) {
-    final valueColor = AlwaysStoppedAnimation<Color>(
-      accentColor.withValues(alpha: 0.75),
-    );
-    if (widget.item.sticky) {
-      return LinearProgressIndicator(
-        value: widget.item.progressValue,
-        minHeight: 3,
-        borderRadius: BorderRadius.circular(2),
-        backgroundColor: Colors.white.withValues(alpha: 0.1),
-        valueColor: valueColor,
-      );
-    }
-    return AnimatedBuilder(
-      animation: _progressController,
-      builder: (_, _) => LinearProgressIndicator(
-        value: 1.0 - _progressController.value,
-        minHeight: 3,
-        borderRadius: BorderRadius.circular(2),
-        backgroundColor: Colors.white.withValues(alpha: 0.1),
-        valueColor: valueColor,
+  /// Only sticky toasts that report real progress draw a bar; the
+  /// auto-dismiss countdown still runs (and pauses on focus/hover) unseen.
+  Widget _buildProgressBar(Color textColor) {
+    return LinearProgressIndicator(
+      value: widget.item.progressValue,
+      minHeight: 2,
+      borderRadius: BorderRadius.circular(1),
+      backgroundColor: textColor.withValues(alpha: 0.12),
+      valueColor: AlwaysStoppedAnimation<Color>(
+        textColor.withValues(alpha: 0.7),
       ),
     );
   }
@@ -267,8 +323,14 @@ class _NotificationToastState extends State<_NotificationToast>
 
   @override
   Widget build(BuildContext context) {
-    final (accentColor, icon) = _statusAccent(widget.item.status);
+    final scheme = Theme.of(context).colorScheme;
     final scale = FontSizeScope.scaleOf(context);
+    final radius = BorderRadius.circular(12 * scale);
+    // Neutral card like the rest of the app; only errors take a colour.
+    final isDanger = widget.item.status == 'danger';
+    final background = isDanger ? _dangerBackground : scheme.surfaceContainer;
+    const textColor = Color(0xFFEDEDED);
+    final hasBody = widget.item.body != null && widget.item.body!.isNotEmpty;
 
     Widget card = Focus(
       focusNode: _focusNode,
@@ -288,91 +350,50 @@ class _NotificationToastState extends State<_NotificationToast>
           onTap: _handleTap,
           child: Stack(
             clipBehavior: Clip.none,
+            fit: StackFit.passthrough,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xEE1C1C1E),
-                  borderRadius: BorderRadius.circular(14 * scale),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
+              Material(
+                color: background,
+                elevation: 6,
+                shadowColor: Colors.black,
+                borderRadius: radius,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 * scale,
+                    vertical: 14 * scale,
                   ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x60000000),
-                      blurRadius: 20,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.hardEdge,
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(width: 4 * scale, color: accentColor),
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            14 * scale,
-                            14 * scale,
-                            14 * scale,
-                            0,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    icon,
-                                    color: accentColor,
-                                    size: 18 * scale,
-                                  ),
-                                  SizedBox(width: 10 * scale),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          widget.item.title,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.3,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
-                                        if (widget.item.body != null &&
-                                            widget.item.body!.isNotEmpty) ...[
-                                          SizedBox(height: 4 * scale),
-                                          Text(
-                                            widget.item.body!,
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.7,
-                                              ),
-                                              fontSize: 15,
-                                              height: 1.4,
-                                              decoration: TextDecoration.none,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 12 * scale),
-                              _buildProgressBar(accentColor),
-                              SizedBox(height: 10 * scale),
-                            ],
-                          ),
+                      Text(
+                        widget.item.title,
+                        style: const TextStyle(
+                          color: textColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
+                          decoration: TextDecoration.none,
                         ),
                       ),
+                      if (hasBody) ...[
+                        SizedBox(height: 2 * scale),
+                        Text(
+                          widget.item.body!,
+                          style: TextStyle(
+                            color: textColor.withValues(
+                              alpha: isDanger ? 0.85 : 0.6,
+                            ),
+                            fontSize: 14,
+                            height: 1.4,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ],
+                      if (widget.item.sticky) ...[
+                        SizedBox(height: 10 * scale),
+                        _buildProgressBar(textColor),
+                      ],
                     ],
                   ),
                 ),
@@ -385,17 +406,12 @@ class _NotificationToastState extends State<_NotificationToast>
                     duration: const Duration(milliseconds: 150),
                     child: CustomPaint(
                       painter: GradientBorderPainter(
-                        borderRadius: BorderRadius.all(
-                          Radius.circular(14 * scale),
-                        ),
+                        borderRadius: radius,
                         width: 2,
                         gradient: LinearGradient(
                           begin: Alignment.topRight,
                           end: Alignment.bottomLeft,
-                          colors: [
-                            accentColor,
-                            accentColor.withValues(alpha: 0.4),
-                          ],
+                          colors: [scheme.primary, scheme.secondary],
                         ),
                       ),
                     ),
@@ -411,6 +427,8 @@ class _NotificationToastState extends State<_NotificationToast>
     if (widget.swipeToDismiss) {
       card = Dismissible(
         key: ValueKey(widget.item.id),
+        // Swipe down, like the floating snackbars that share this slot
+        direction: DismissDirection.down,
         onUpdate: _onDragUpdate,
         onDismissed: (_) => widget.onDismiss(),
         child: card,
@@ -418,7 +436,7 @@ class _NotificationToastState extends State<_NotificationToast>
     }
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 10 * scale),
+      padding: EdgeInsets.only(top: 8 * scale),
       child: FadeTransition(
         opacity: _opacity,
         child: SlideTransition(position: _slide, child: card),
@@ -426,16 +444,5 @@ class _NotificationToastState extends State<_NotificationToast>
     );
   }
 
-  static (Color, IconData) _statusAccent(String status) => switch (status) {
-    'success' => (
-      const Color(0xFF4CAF50),
-      Icons.check_circle_outline,
-    ),
-    'warning' => (
-      const Color(0xFFFFA726),
-      Icons.warning_amber_outlined,
-    ),
-    'danger' => (const Color(0xFFF44336), Icons.error_outline),
-    _ => (const Color(0xFF42A5F5), Icons.info_outline),
-  };
+  static const _dangerBackground = Color(0xFFC62828);
 }

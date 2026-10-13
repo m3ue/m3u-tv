@@ -264,11 +264,19 @@ class PersistentJsonStore {
   static String _defaultPath(String fileName) =>
       '${defaultDirectoryPath()}/$fileName';
 
+  /// Test-only replacement for [defaultDirectoryPath], set once per test
+  /// process in `test/flutter_test_config.dart`. Without it, any test that
+  /// builds a default store reads and writes the developer's real app-data
+  /// directory, and parallel test processes race on the same files.
+  static String? debugDirectoryOverride;
+
   /// The directory the default-constructed store writes into. Exposed so
   /// siblings that must live next to `app_state.json` / `cache.json` on the
   /// desktop path (e.g. the SQLite catalog database) can resolve the same
   /// location without duplicating the per-OS rules.
   static String defaultDirectoryPath() {
+    final override = debugDirectoryOverride;
+    if (override != null) return override;
     final env = Platform.environment;
     final base = switch (Platform.operatingSystem) {
       'windows' =>
