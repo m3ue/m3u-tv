@@ -1,4 +1,3 @@
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -72,98 +71,83 @@ class _ResumeModal extends StatelessWidget {
 
     final scale = FontSizeScope.scaleOf(context);
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 400 * scale),
-        child: DpadRegion(
-          verticalEdge: DpadEdgeBehavior.stop,
-          horizontalEdge: DpadEdgeBehavior.stop,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l.playerResumeWatching,
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 20),
-                DialogPrimaryOption(
-                  icon: Icons.play_arrow,
-                  title: l.playerContinue,
-                  subtitle: l.playerFromTime(
-                    formatTime(Duration(seconds: positionSeconds)),
-                  ),
-                  onTap: () => Navigator.of(context).pop(
-                    ResumeModalResult(
-                      ResumeAction.resume,
-                      startPositionSeconds: positionSeconds.toDouble(),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DialogActionTile(
-                  icon: Icons.replay,
-                  label: l.playerStartFromBeginning,
-                  onTap: () => Navigator.of(
-                    context,
-                  ).pop(const ResumeModalResult(ResumeAction.startOver)),
-                ),
-                if (showManageActions) ...[
-                  const SizedBox(height: 8),
-                  DialogActionTile(
-                    icon: Icons.remove_done,
-                    label: l.playerClearProgress,
-                    onTap: () => Navigator.of(context).pop(
-                      const ResumeModalResult(ResumeAction.clearProgress),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DialogActionTile(
-                    icon: Icons.done_all,
-                    label: l.seriesMarkWatched,
-                    onTap: () => Navigator.of(context).pop(
-                      const ResumeModalResult(ResumeAction.markWatched),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: l.cancel,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 8),
-                    AppButton(
-                      autofocus: true,
-                      variant: AppButtonVariant.primary,
-                      label: l.playerResume,
-                      onPressed: () => Navigator.of(context).pop(
-                        ResumeModalResult(
-                          ResumeAction.resume,
-                          startPositionSeconds: positionSeconds.toDouble(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+    return OptionsDialog(
+      maxWidth: 400 * scale,
+      children: [
+        Text(
+          l.playerResumeWatching,
+          style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 20),
+        DialogPrimaryOption(
+          icon: Icons.play_arrow,
+          title: l.playerContinue,
+          subtitle: l.playerFromTime(
+            formatTime(Duration(seconds: positionSeconds)),
+          ),
+          onTap: () => Navigator.of(context).pop(
+            ResumeModalResult(
+              ResumeAction.resume,
+              startPositionSeconds: positionSeconds.toDouble(),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 8),
+        DialogActionTile(
+          icon: Icons.replay,
+          label: l.playerStartFromBeginning,
+          onTap: () => Navigator.of(
+            context,
+          ).pop(const ResumeModalResult(ResumeAction.startOver)),
+        ),
+        if (showManageActions) ...[
+          const SizedBox(height: 8),
+          DialogActionTile(
+            icon: Icons.remove_done,
+            label: l.playerClearProgress,
+            onTap: () => Navigator.of(context).pop(
+              const ResumeModalResult(ResumeAction.clearProgress),
+            ),
+          ),
+          const SizedBox(height: 8),
+          DialogActionTile(
+            icon: Icons.done_all,
+            label: l.seriesMarkWatched,
+            onTap: () => Navigator.of(context).pop(
+              const ResumeModalResult(ResumeAction.markWatched),
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        OptionsDialogActions(
+          children: [
+            AppButton(
+              label: l.cancel,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            AppButton(
+              autofocus: true,
+              variant: AppButtonVariant.primary,
+              label: l.playerResume,
+              onPressed: () => Navigator.of(context).pop(
+                ResumeModalResult(
+                  ResumeAction.resume,
+                  startPositionSeconds: positionSeconds.toDouble(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
