@@ -157,6 +157,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           target is ProgressSpotlightTarget ||
           target?.key == 'static:continue-watching-more';
       if (!fromContinueWatching) return;
+      // An entry removed while the hero shows it (e.g. tapped and found to
+      // be gone) must not stay on screen - with a pointer tap focus may not
+      // have moved at all, so nothing else would replace it.
+      if (target is ProgressSpotlightTarget &&
+          !ref
+              .read(progressListProvider)
+              .any((p) => ProgressSpotlightTarget(p).key == target.key)) {
+        _spotlight.forget(target.key);
+      }
       final primary = FocusManager.instance.primaryFocus;
       // Only when focus was actually lost - never pull it back from the
       // sidebar or anywhere else the user has moved to.

@@ -3041,7 +3041,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsHomeScreenStyleRich.
   ///
   /// In en, this message translates to:
-  /// **'Rich'**
+  /// **'Spotlight'**
   String get settingsHomeScreenStyleRich;
 
   /// No description provided for @settingsHdrMode.

@@ -1722,7 +1722,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsHomeScreenStyleSimplified => 'Simplificada';
 
   @override
-  String get settingsHomeScreenStyleRich => 'Enriquecida';
+  String get settingsHomeScreenStyleRich => 'Spotlight';
 
   @override
   String get settingsHdrMode => 'Modo HDR';

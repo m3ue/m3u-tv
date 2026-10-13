@@ -1660,7 +1660,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHomeScreenStyleSimplified => '简洁';
 
   @override
-  String get settingsHomeScreenStyleRich => '丰富';
+  String get settingsHomeScreenStyleRich => '聚光灯';
 
   @override
   String get settingsHdrMode => 'HDR 模式';

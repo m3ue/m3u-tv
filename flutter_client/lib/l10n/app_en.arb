@@ -983,7 +983,7 @@
   "settingsDefaultStartPage": "Default start page",
   "settingsHomeScreenStyle": "Home screen",
   "settingsHomeScreenStyleSimplified": "Simplified",
-  "settingsHomeScreenStyleRich": "Rich",
+  "settingsHomeScreenStyleRich": "Spotlight",
   "settingsHdrMode": "HDR mode",
   "settingsHdrModeHint": "Let HDR videos switch the display into HDR mode. Windows and Linux only.",
   "settingsMatchRefreshRate": "Match display refresh rate",

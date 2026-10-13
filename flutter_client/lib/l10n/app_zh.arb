@@ -897,7 +897,7 @@
   "settingsDefaultStartPage": "默认启动页面",
   "settingsHomeScreenStyle": "主屏幕",
   "settingsHomeScreenStyleSimplified": "简洁",
-  "settingsHomeScreenStyleRich": "丰富",
+  "settingsHomeScreenStyleRich": "聚光灯",
   "settingsHdrMode": "HDR 模式",
   "settingsHdrModeHint": "允许 HDR 视频将显示器切换到 HDR 模式。仅限 Windows 和 Linux。",
   "settingsMatchRefreshRate": "匹配显示器刷新率",

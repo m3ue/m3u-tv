@@ -2913,6 +2913,32 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
     }
     return committed;
   }
+
+  // ResumeService.saveRecent stores a viewer's whole Continue Watching list
+  // (and its resume entries) in one conditional replace.
+  @override
+  Future<bool> replaceWhereIf(
+    bool Function(String key) test,
+    Map<String, Object?> replacement,
+    bool Function() shouldCommit,
+  ) async {
+    final resumePrefix = 'm3ue_resume_${_blockedResumeViewer}_';
+    final resumeKey = replacement.keys
+        .where((key) => key.startsWith(resumePrefix))
+        .firstOrNull;
+    if (resumeKey != null) {
+      await _blockWrite(resumeKey, replacement[resumeKey]);
+    }
+    final committed = await super.replaceWhereIf(
+      test,
+      replacement,
+      shouldCommit,
+    );
+    if (resumeKey != null && !blockedResumeWriteCompleted.isCompleted) {
+      blockedResumeWriteCompleted.complete();
+    }
+    return committed;
+  }
 }
 
 class _ThreeSourceXtreamTransport {

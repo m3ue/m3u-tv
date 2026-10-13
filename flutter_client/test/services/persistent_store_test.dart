@@ -95,6 +95,47 @@ void main() {
     );
   });
 
+  test(
+    'stale replaceWhereIf rollback restores every touched key only',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'm3u-tv-replace-where-if-rollback-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final stateFile = File('${directory.path}/app_state.json');
+      final store = PersistentJsonStore(file: stateFile);
+      await store.write('resume_a_1', 'old-1');
+      await store.write('resume_a_2', 'old-2');
+      await store.write('other', 'kept');
+      var ownershipChecks = 0;
+
+      final accepted = await store.replaceWhereIf(
+        (key) => key.startsWith('resume_a_'),
+        {'resume_a_3': 'new-3', 'recent_a': 'list'},
+        () {
+          ownershipChecks += 1;
+          if (ownershipChecks < 3) return true;
+          final concurrent = (jsonDecode(stateFile.readAsStringSync()) as Map)
+              .cast<String, Object?>();
+          concurrent['concurrent'] = 'committed';
+          stateFile.writeAsStringSync(jsonEncode(concurrent), flush: true);
+          return false;
+        },
+      );
+
+      expect(accepted, isFalse);
+      expect(
+        await PersistentJsonStore(file: stateFile).snapshot(),
+        <String, Object?>{
+          'resume_a_1': 'old-1',
+          'resume_a_2': 'old-2',
+          'other': 'kept',
+          'concurrent': 'committed',
+        },
+      );
+    },
+  );
+
   test('same-file instances preserve each other writes', () async {
     final directory = await Directory.systemTemp.createTemp(
       'm3u-tv-same-file-stores-',

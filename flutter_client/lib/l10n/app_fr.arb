@@ -897,7 +897,7 @@
   "settingsDefaultStartPage": "Page de démarrage par défaut",
   "settingsHomeScreenStyle": "Écran d'accueil",
   "settingsHomeScreenStyleSimplified": "Simplifié",
-  "settingsHomeScreenStyleRich": "Enrichi",
+  "settingsHomeScreenStyleRich": "Spotlight",
   "settingsHdrMode": "Mode HDR",
   "settingsHdrModeHint": "Autoriser les vidéos HDR à basculer l'écran en mode HDR. Windows et Linux uniquement.",
   "settingsMatchRefreshRate": "Adapter la fréquence de rafraîchissement",

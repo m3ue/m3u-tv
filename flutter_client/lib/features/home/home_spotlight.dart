@@ -236,6 +236,14 @@ class HomeSpotlightController extends ValueNotifier<HomeSpotlightTarget?> {
     value = null;
   }
 
+  /// Clears the current item if it is still [key] (e.g. its Continue
+  /// Watching entry was just removed). Unlike [reset], pending selections
+  /// are kept, so a card that re-announced itself in the gone item's place
+  /// still lands.
+  void forget(String key) {
+    if (value?.key == key) value = null;
+  }
+
   void _apply(HomeSpotlightTarget target) {
     if (value?.key == target.key) {
       // Same item, possibly a fresher object (e.g. reloaded catalog).

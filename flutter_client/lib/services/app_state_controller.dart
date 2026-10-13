@@ -2689,12 +2689,18 @@ class AppStateController extends ChangeNotifier {
     // recently-watched list. Updating an existing entry in place left it
     // wherever it was (often down in the "See All" overflow) until the next
     // hard reload re-sorted it.
+    final alreadyFirst =
+        _progressList.isNotEmpty && sameItem(_progressList.first);
     _progressList = [
       updated,
       for (final p in _progressList)
         if (!sameItem(p)) p,
     ];
     notifyListeners();
+    // Playback reports every few seconds; positions already reach the resume
+    // store (and ResumeService.recent overlays them), so only a change in
+    // order needs a snapshot write.
+    if (!alreadyFirst) _persistRecentlyWatched();
   }
 
   /// Drops a Continue Watching entry that no longer resolves to any catalog
@@ -2716,7 +2722,26 @@ class AppStateController extends ChangeNotifier {
     if (next.length == _progressList.length) return;
     _progressList = next;
     notifyListeners();
+    _runBackgroundPersistence(resumeService.remove(stale));
+    _persistRecentlyWatched();
   }
+
+  /// Stores the in-memory Continue Watching list as the cold-start snapshot,
+  /// so a local change (an item played, a dead entry dropped) survives a
+  /// relaunch that happens before the next server sync.
+  void _persistRecentlyWatched() {
+    final viewer = _activeViewer;
+    if (viewer == null) return;
+    _runBackgroundPersistence(
+      resumeService.saveRecent(viewer.ulid, _progressList),
+    );
+  }
+
+  /// The Continue Watching list last stored for [viewerId], falling back to
+  /// every saved resume entry when nothing has been stored yet (first launch
+  /// after upgrading).
+  Future<List<Progress>> _storedRecentlyWatched(String viewerId) async =>
+      await resumeService.recent(viewerId) ?? await resumeService.all(viewerId);
 
   Future<bool> _replaceWithXtreamContent({
     required bool clearCache,
@@ -3050,7 +3075,7 @@ class AppStateController extends ChangeNotifier {
     }
     final progress = activeViewer == null
         ? const <Progress>[]
-        : await resumeService.all(activeViewer.ulid);
+        : await _storedRecentlyWatched(activeViewer.ulid);
     if (_sourceOperationGeneration.isStale(sourceGeneration) ||
         _viewerOperationGeneration.isStale(viewerGeneration)) {
       return false;
@@ -3248,19 +3273,21 @@ class AppStateController extends ChangeNotifier {
     ];
 
     // Remote is authoritative for all content types. Items absent from the
-    // server response were either cleared or are beyond the top-20 window —
-    // either way, don't show them. Persist so future metadata lookups are fast.
-    if (persist) {
-      for (final p in result) {
-        if (!ownsWork()) return const <Progress>[];
-        // Never cache synthetic "up next" rows - a later load would read the
-        // cached copy back as a plain 0-position episode and drop the flag,
-        // so the suggestion silently vanishes after the first refresh.
-        if (p.upNext) continue;
-        if (!await resumeService.save(p, shouldCommit: ownsWork)) {
-          return const <Progress>[];
-        }
-      }
+    // server response were either cleared or are beyond the top-20 window -
+    // either way, don't show them. Persist the list as the next cold start's
+    // snapshot and prune local entries it no longer contains (e.g. copies
+    // left under an old stream_id after a media-server library flush), so a
+    // relaunch never paints those stale cards again. saveRecent never stores
+    // synthetic "up next" rows as resume entries - a later load would read
+    // them back as plain 0-position episodes and drop the flag.
+    if (persist &&
+        !await resumeService.saveRecent(
+          viewerId,
+          result,
+          prune: true,
+          shouldCommit: ownsWork,
+        )) {
+      return const <Progress>[];
     }
 
     return ownsWork() ? result : const <Progress>[];

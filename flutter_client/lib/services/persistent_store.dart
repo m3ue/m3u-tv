@@ -46,6 +46,16 @@ class PersistentJsonStore {
     String key,
     Object? value,
     bool Function() shouldCommit,
+  ) => replaceWhereIf((_) => false, {key: value}, shouldCommit);
+
+  /// [replaceWhere] with [writeIf]'s ownership guarantees: [shouldCommit] is
+  /// checked inside the write queue, again before the staged file is
+  /// committed and once more after, rolling every touched key back if
+  /// ownership was lost in between.
+  Future<bool> replaceWhereIf(
+    bool Function(String key) test,
+    Map<String, Object?> replacement,
+    bool Function() shouldCommit,
   ) => _writeQueue.run(() async {
     if (!shouldCommit()) return false;
     final previousCache = _cache;
@@ -53,9 +63,13 @@ class PersistentJsonStore {
         ? await _file.readAsBytes()
         : null;
     final previous = Map<String, Object?>.from(await _readAllUnlocked());
-    final hadPreviousValue = previous.containsKey(key);
-    final previousValue = previous[key];
-    final data = Map<String, Object?>.from(previous)..[key] = value;
+    final data = Map<String, Object?>.from(previous)
+      ..removeWhere((key, value) => test(key))
+      ..addAll(replacement);
+    final touchedKeys = <String>{
+      ...replacement.keys,
+      ...previous.keys.where(test),
+    };
     // Encode off the calling isolate for large maps, same as [_writeAll]. This
     // store is shared with the content cache, so a single-key write (e.g. the
     // resume tracker every ~10s during playback) would otherwise re-serialize
@@ -96,10 +110,12 @@ class PersistentJsonStore {
             : ((await decodeJsonOffMainIsolate(utf8.decode(currentBytes)))!
                       as Map)
                   .cast<String, Object?>();
-        if (hadPreviousValue) {
-          current[key] = previousValue;
-        } else {
-          current.remove(key);
+        for (final key in touchedKeys) {
+          if (previous.containsKey(key)) {
+            current[key] = previous[key];
+          } else {
+            current.remove(key);
+          }
         }
         if (current.isEmpty && previousBytes == null) {
           _cache = current;

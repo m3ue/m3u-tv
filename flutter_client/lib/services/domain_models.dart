@@ -1350,6 +1350,7 @@ class Progress {
     if (year != null) 'year': year,
     if (aioItemId != null) 'aio_item_id': aioItemId,
     if (aioIntegrationId != null) 'aio_integration_id': aioIntegrationId,
+    if (upNext) 'up_next': true,
   };
 
   @override
