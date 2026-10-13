@@ -41,6 +41,10 @@ class RichHomeLayout extends StatelessWidget {
   /// Share of the pane the hero's text area takes.
   static const double heroFraction = 0.4;
 
+  /// Height of the band where the rows fade into the hero. It overlaps the
+  /// hero's bottom padding, so it never covers the spotlight text.
+  static const double rowsFadeExtent = MediaBrowsingMetrics.pagePadding;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -83,9 +87,11 @@ class RichHomeLayout extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(height: heroHeight),
+                SizedBox(height: heroHeight - rowsFadeExtent),
                 ?header,
-                Expanded(child: _DockedRows(rows: rows)),
+                Expanded(
+                  child: _DockedRows(rows: rows, fadeExtent: rowsFadeExtent),
+                ),
               ],
             ),
           ],
@@ -108,21 +114,19 @@ class RichHomeLayout extends StatelessWidget {
 /// hover) doesn't re-dock, so nothing shifts under the cursor - only focus
 /// moved by a key (remote / keyboard) docks.
 class _DockedRows extends StatefulWidget {
-  const _DockedRows({required this.rows});
+  const _DockedRows({required this.rows, required this.fadeExtent});
 
   final List<Widget> rows;
+
+  /// Top band that fades to transparent; the focused row docks just below
+  /// it, so only rows scrolling past are faded.
+  final double fadeExtent;
 
   @override
   State<_DockedRows> createState() => _DockedRowsState();
 }
 
 class _DockedRowsState extends State<_DockedRows> {
-  static const EdgeInsets _padding = EdgeInsets.fromLTRB(
-    MediaBrowsingMetrics.pagePadding,
-    MediaBrowsingMetrics.contentPadding,
-    MediaBrowsingMetrics.pagePadding,
-    MediaBrowsingMetrics.pagePadding,
-  );
   static const Duration _dockDuration = Duration(milliseconds: 280);
   static const Duration _wheelDuration = Duration(milliseconds: 120);
 
@@ -136,6 +140,13 @@ class _DockedRowsState extends State<_DockedRows> {
   /// moves focus long after the pointer last moved, so a time window can't
   /// tell the two apart; the last input type can.
   bool _pointerIsLastInput = false;
+
+  EdgeInsets get _padding => EdgeInsets.fromLTRB(
+    MediaBrowsingMetrics.pagePadding,
+    widget.fadeExtent,
+    MediaBrowsingMetrics.pagePadding,
+    MediaBrowsingMetrics.pagePadding,
+  );
 
   @override
   void initState() {
@@ -187,6 +198,8 @@ class _DockedRowsState extends State<_DockedRows> {
       if (row is! RenderBox || column is! RenderBox) return;
       if (!row.hasSize || !column.hasSize) return;
       final top = row.localToGlobal(Offset.zero, ancestor: column).dy;
+      // The column is offset by the top padding, so docking at the row's
+      // column-relative top lands it right under the fade band.
       _setOffset(top, _dockDuration);
     });
   }
@@ -211,45 +224,58 @@ class _DockedRowsState extends State<_DockedRows> {
       onPointerDown: _notePointer,
       onPointerSignal: _onPointerSignal,
       onPointerPanZoomUpdate: _onPanZoomUpdate,
-      child: ClipRect(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            _viewportHeight = constraints.maxHeight;
-            return OverflowBox(
-              alignment: Alignment.topCenter,
-              minHeight: 0,
-              maxHeight: double.infinity,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: _offset),
-                duration: _duration,
-                curve: Curves.easeOutCubic,
-                builder: (context, offset, child) => Transform.translate(
-                  offset: Offset(0, -offset),
-                  child: child,
-                ),
-                child: Padding(
-                  padding: _padding,
-                  child: Column(
-                    key: _columnKey,
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < widget.rows.length; i++)
-                        Focus(
-                          key: _rowKey(i),
-                          canRequestFocus: false,
-                          skipTraversal: true,
-                          onFocusChange: (hasFocus) {
-                            if (hasFocus) _onRowFocused(i);
-                          },
-                          child: widget.rows[i],
-                        ),
-                    ],
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [Colors.transparent, Colors.black],
+          stops: [
+            0,
+            (widget.fadeExtent / bounds.height.clamp(1.0, double.infinity))
+                .clamp(0.0, 1.0),
+          ],
+        ).createShader(bounds),
+        child: ClipRect(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _viewportHeight = constraints.maxHeight;
+              return OverflowBox(
+                alignment: Alignment.topCenter,
+                minHeight: 0,
+                maxHeight: double.infinity,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: _offset),
+                  duration: _duration,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, offset, child) => Transform.translate(
+                    offset: Offset(0, -offset),
+                    child: child,
+                  ),
+                  child: Padding(
+                    padding: _padding,
+                    child: Column(
+                      key: _columnKey,
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < widget.rows.length; i++)
+                          Focus(
+                            key: _rowKey(i),
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            onFocusChange: (hasFocus) {
+                              if (hasFocus) _onRowFocused(i);
+                            },
+                            child: widget.rows[i],
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
