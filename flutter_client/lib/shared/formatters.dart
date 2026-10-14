@@ -19,8 +19,13 @@ String formatRuntime(Duration duration) {
 }
 
 /// Parses the runtime text the Xtream payloads carry ("01:40:09", "2h 50m",
-/// "50m", "95 min", or bare minutes) into a [Duration]. Null when it can't
-/// tell.
+/// "50m", "95 min", "1:45", "45:00", or a bare count) into a [Duration]. Null
+/// when it can't tell.
+///
+/// Two-part times are H:MM unless the first part is 10 or more, which no
+/// runtime reaches in hours, so "45:00" reads as MM:SS. A bare count over 300
+/// is seconds (matching `_durationText` in domain_models.dart), otherwise
+/// minutes.
 Duration? parseRuntimeText(String? text) {
   final value = text?.trim().toLowerCase();
   if (value == null || value.isEmpty) return null;
@@ -34,14 +39,19 @@ Duration? parseRuntimeText(String? text) {
         minutes: numbers[1],
         seconds: numbers[2],
       ),
+      2 when numbers[0] >= 10 => Duration(
+        minutes: numbers[0],
+        seconds: numbers[1],
+      ),
       2 => Duration(hours: numbers[0], minutes: numbers[1]),
       _ => null,
     };
     return duration == null || duration <= Duration.zero ? null : duration;
   }
-  final minutesOnly = int.tryParse(value);
-  if (minutesOnly != null) {
-    return minutesOnly > 0 ? Duration(minutes: minutesOnly) : null;
+  final count = int.tryParse(value);
+  if (count != null) {
+    if (count <= 0) return null;
+    return count > 300 ? Duration(seconds: count) : Duration(minutes: count);
   }
   final hours = RegExp(r'(\d+)\s*h').firstMatch(value);
   final minutes = RegExp(r'(\d+)\s*m').firstMatch(value);

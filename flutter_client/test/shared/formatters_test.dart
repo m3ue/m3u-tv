@@ -32,6 +32,13 @@ void main() {
       expect(parseRuntimeText('50m'), const Duration(minutes: 50));
       expect(parseRuntimeText('95 min'), const Duration(minutes: 95));
       expect(parseRuntimeText('120'), const Duration(minutes: 120));
+      expect(parseRuntimeText('45:00'), const Duration(minutes: 45));
+      expect(
+        parseRuntimeText('12:30'),
+        const Duration(minutes: 12, seconds: 30),
+      );
+      expect(parseRuntimeText('2700'), const Duration(minutes: 45));
+      expect(parseRuntimeText('300'), const Duration(hours: 5));
     });
 
     test('returns null for empty or unreadable text', () {

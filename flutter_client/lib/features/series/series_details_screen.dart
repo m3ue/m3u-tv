@@ -729,7 +729,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     final minutes = <int>[];
     for (final list in info.episodesBySeason.values) {
       for (final episode in list) {
-        final value = _durationTextToMinutes(episode.duration);
+        final value = parseRuntimeText(episode.duration)?.inMinutes;
         if (value != null && value > 0) minutes.add(value);
       }
     }
@@ -737,34 +737,6 @@ class _SeriesDetailsBody extends StatelessWidget {
     final avg = (minutes.reduce((a, b) => a + b) / minutes.length).round();
     return '~${formatRuntime(Duration(minutes: avg))}';
   }
-}
-
-/// Parses the loose runtime strings the editor emits ("45m", "1h 2m",
-/// "45 min", "45:00", "01:02:00", "2700") into whole minutes. Null when
-/// nothing usable.
-int? _durationTextToMinutes(String? raw) {
-  if (raw == null) return null;
-  final text = raw.trim().toLowerCase();
-  if (text.isEmpty) return null;
-  final h = RegExp(r'(\d+)\s*h').firstMatch(text);
-  final m = RegExp(r'(\d+)\s*m').firstMatch(text);
-  if (h != null || m != null) {
-    return (int.tryParse(h?.group(1) ?? '0') ?? 0) * 60 +
-        (int.tryParse(m?.group(1) ?? '0') ?? 0);
-  }
-  if (text.contains(':')) {
-    final parts = text.split(':').map(int.tryParse).toList();
-    if (!parts.contains(null)) {
-      final nums = parts.cast<int>();
-      if (nums.length == 3) return nums[0] * 60 + nums[1];
-      if (nums.length == 2) return nums[0];
-    }
-  }
-  final bare = int.tryParse(text);
-  if (bare == null) return null;
-  // Match `_durationText`'s own convention (domain_models.dart): a bare count
-  // over 300 is seconds, otherwise minutes.
-  return bare > 300 ? (bare / 60).round() : bare;
 }
 
 extension _IterableX<T> on Iterable<T> {
