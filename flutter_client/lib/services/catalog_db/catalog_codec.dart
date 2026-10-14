@@ -24,6 +24,7 @@ Map<String, Object?> encodeChannel(Channel channel) => <String, Object?>{
   if (channel.catchupSupported) 'catchup_supported': channel.catchupSupported,
   if (channel.catchupDays != null) 'catchup_days': channel.catchupDays,
   if (channel.catchupSource != null) 'catchup_source': channel.catchupSource,
+  if (channel.channelNumber != null) 'num': channel.channelNumber,
 };
 
 Channel decodeChannel(Map<String, Object?> json) => Channel(
@@ -38,6 +39,7 @@ Channel decodeChannel(Map<String, Object?> json) => Channel(
   catchupSupported: asBool(json['catchup_supported']),
   catchupDays: asIntOrNull(json['catchup_days']),
   catchupSource: nullableString(json['catchup_source']),
+  channelNumber: asIntOrNull(json['num']),
 );
 
 Map<String, Object?> encodeVod(VodItem item) => <String, Object?>{
@@ -49,6 +51,7 @@ Map<String, Object?> encodeVod(VodItem item) => <String, Object?>{
   if (item.categoryId != null) 'category_id': item.categoryId,
   if (item.categoryIds.isNotEmpty) 'category_ids': item.categoryIds,
   if (item.rating != null) 'rating': item.rating,
+  if (item.year != null) 'year': item.year,
 };
 
 VodItem decodeVod(Map<String, Object?> json) => VodItem(
@@ -60,6 +63,7 @@ VodItem decodeVod(Map<String, Object?> json) => VodItem(
   categoryId: nullableString(json['category_id']),
   categoryIds: stringList(json['category_ids']),
   rating: asDouble(json['rating']),
+  year: nullableString(json['year']),
 );
 
 Map<String, Object?> encodeSeries(Series series) => <String, Object?>{

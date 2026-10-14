@@ -3,6 +3,54 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 
 void main() {
+  group('channel codec', () {
+    test('round-trips the channel number', () {
+      final channel = Channel.fromXtream(const {
+        'stream_id': 12,
+        'name': 'BBC One',
+        'num': 101,
+      }, 'http://host/live/12.ts');
+
+      final decoded = decodeChannel(encodeChannel(channel));
+
+      expect(decoded.channelNumber, 101);
+    });
+
+    test('leaves an absent channel number absent', () {
+      final channel = Channel.fromXtream(const {
+        'stream_id': 13,
+        'name': 'Unnumbered',
+      }, 'http://host/live/13.ts');
+
+      expect(encodeChannel(channel).containsKey('num'), isFalse);
+      expect(decodeChannel(encodeChannel(channel)).channelNumber, isNull);
+    });
+  });
+
+  group('vod codec', () {
+    test('round-trips the release year', () {
+      final item = VodItem.fromXtream(const {
+        'stream_id': 7,
+        'name': 'Dune',
+        'year': 2021,
+      }, 'http://host/movie/7.mkv');
+
+      final decoded = decodeVod(encodeVod(item));
+
+      expect(decoded.year, '2021');
+    });
+
+    test('leaves an absent year absent', () {
+      final item = VodItem.fromXtream(const {
+        'stream_id': 8,
+        'name': 'Undated',
+      }, 'http://host/movie/8.mkv');
+
+      expect(encodeVod(item).containsKey('year'), isFalse);
+      expect(decodeVod(encodeVod(item)).year, isNull);
+    });
+  });
+
   group('series codec', () {
     test('round-trips the fields the Home spotlight shows', () {
       final series = Series.fromXtream(const {
