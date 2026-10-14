@@ -934,5 +934,8 @@
   "diagnosticsNotConnected": "Conéctate a un servidor para subir los registros.",
   "diagnosticsDeviceHeading": "Dispositivo",
   "diagnosticsLogsHeading": "Registros ({count})",
-  "diagnosticsNoLogs": "Aún no hay nada registrado en esta sesión."
+  "diagnosticsNoLogs": "Aún no hay nada registrado en esta sesión.",
+  "trailerButton": "Tráiler",
+  "trailerSeasonButton": "Tráiler de la temporada {season}",
+  "trailerWatch": "Ver tráiler"
 }

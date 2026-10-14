@@ -44,6 +44,7 @@ class MovieDetailBody extends StatefulWidget {
     this.richRelated,
     this.onRelatedTap,
     this.onStartOver,
+    this.extraActions = const [],
     this.progressValue,
     this.dominantColor,
     this.fallbackIcon = Icons.movie,
@@ -87,6 +88,9 @@ class MovieDetailBody extends StatefulWidget {
 
   /// Resume affordances - only VOD passes these; AIOStreams leaves them null.
   final VoidCallback? onStartOver;
+
+  /// Passed to [ItemMetaInfo.extraActions].
+  final List<Widget> extraActions;
   final double? progressValue;
 
   final bool isLoading;
@@ -352,6 +356,7 @@ class _MovieDetailBodyState extends State<MovieDetailBody> {
           onPlay: widget.onPrimary,
           primaryIcon: widget.primaryIcon,
           onStartOver: widget.onStartOver,
+          extraActions: widget.extraActions,
           progressValue: widget.progressValue,
           fullWidthButton: fullWidthButton,
           isLoading: widget.isLoading,

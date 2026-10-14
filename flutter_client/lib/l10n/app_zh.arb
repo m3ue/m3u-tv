@@ -934,5 +934,8 @@
   "diagnosticsNotConnected": "请先连接服务器再上传日志。",
   "diagnosticsDeviceHeading": "设备",
   "diagnosticsLogsHeading": "日志（{count}）",
-  "diagnosticsNoLogs": "本次会话尚无日志。"
+  "diagnosticsNoLogs": "本次会话尚无日志。",
+  "trailerButton": "预告片",
+  "trailerSeasonButton": "第 {season} 季预告片",
+  "trailerWatch": "观看预告片"
 }

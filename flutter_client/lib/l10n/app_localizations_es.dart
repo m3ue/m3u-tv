@@ -1850,4 +1850,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get diagnosticsNoLogs => 'Aún no hay nada registrado en esta sesión.';
+
+  @override
+  String get trailerButton => 'Tráiler';
+
+  @override
+  String trailerSeasonButton(int season) {
+    return 'Tráiler de la temporada $season';
+  }
+
+  @override
+  String get trailerWatch => 'Ver tráiler';
 }

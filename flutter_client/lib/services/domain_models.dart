@@ -194,6 +194,7 @@ class VodInfo {
     this.tmdbId,
     this.edlUrl,
     this.related,
+    this.trailerUrl,
   });
 
   final int id;
@@ -225,6 +226,10 @@ class VodInfo {
   final String? containerExtension;
   final int? tmdbId;
   final String? edlUrl;
+
+  /// YouTube trailer watch URL (`youtube_trailer`), opened externally - see
+  /// `openTrailer`.
+  final String? trailerUrl;
 
   factory VodInfo.fromXtream(Map<String, Object?> json) {
     final info = _asMap(json['info']);
@@ -276,6 +281,7 @@ class VodInfo {
       tmdbId: _asIntOrNull(pick(['tmdb_id', 'tmdb'])),
       edlUrl: _asNullableString(pick(['edl_url'])),
       related: _parseRelatedList(pick(['related'])),
+      trailerUrl: _youtubeTrailerUrl(pick(['youtube_trailer'])),
     );
   }
 }
@@ -533,6 +539,7 @@ class Series {
     this.genre,
     this.episodeRunTime,
     this.related,
+    this.trailerUrl,
   });
 
   final int id;
@@ -573,6 +580,10 @@ class Series {
   /// "Related" row below the cast row.
   final List<RelatedItem>? related;
 
+  /// YouTube trailer watch URL (`youtube_trailer`) for the show as a whole.
+  /// [Season.trailerUrl] takes precedence on the detail page when present.
+  final String? trailerUrl;
+
   factory Series.fromXtream(Map<String, Object?> json) => Series(
     id: _asInt(json['series_id']),
     name: '${json['name'] ?? ''}',
@@ -595,6 +606,7 @@ class Series {
       _ => null,
     },
     related: _parseRelatedList(json['related']),
+    trailerUrl: _youtubeTrailerUrl(json['youtube_trailer']),
   );
 }
 
@@ -606,6 +618,7 @@ class Season {
     this.coverUrl,
     this.overview,
     this.releaseDate,
+    this.trailerUrl,
   });
 
   final int number;
@@ -620,6 +633,10 @@ class Season {
   final String? overview;
   final String? releaseDate;
 
+  /// Season-specific YouTube trailer watch URL (`youtube_trailer`), from
+  /// m3u-editor's TMDB season fetch.
+  final String? trailerUrl;
+
   factory Season.fromXtream(Map<String, Object?> json) {
     final number = _asInt(json['season_number']);
     return Season(
@@ -633,6 +650,7 @@ class Season {
       releaseDate: _asNullableString(
         json['releaseDate'] ?? json['air_date'],
       ),
+      trailerUrl: _youtubeTrailerUrl(json['youtube_trailer']),
     );
   }
 }
@@ -1879,6 +1897,44 @@ String? _contentRating(List<Object?> candidates) {
     if (text != null && text.isNotEmpty && text != '0') return text;
   }
   return null;
+}
+
+final RegExp _youtubeVideoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
+
+/// The 11-character YouTube video id in [value]: a bare id, a
+/// `youtube.com/watch?v=` link, a `youtu.be/` short link, or an
+/// `/embed/` / `/shorts/` path. Null for anything not recognisably YouTube.
+String? youtubeVideoId(String? value) {
+  final raw = value?.trim() ?? '';
+  if (_youtubeVideoIdPattern.hasMatch(raw)) return raw;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || !uri.hasScheme) return null;
+  final host = uri.host.toLowerCase();
+  final segments = uri.pathSegments;
+  final String? id;
+  if (host == 'youtu.be') {
+    id = segments.firstOrNull;
+  } else if (host == 'youtube.com' ||
+      host.endsWith('.youtube.com') ||
+      host.endsWith('youtube-nocookie.com')) {
+    id =
+        uri.queryParameters['v'] ??
+        (segments.length >= 2 &&
+                const {'embed', 'shorts', 'v', 'live'}.contains(segments[0])
+            ? segments[1]
+            : null);
+  } else {
+    id = null;
+  }
+  return id != null && _youtubeVideoIdPattern.hasMatch(id) ? id : null;
+}
+
+/// Canonical `https://www.youtube.com/watch?v=` URL for a `youtube_trailer`
+/// wire value. m3u-editor's TMDB fetch stores a full watch URL, while Xtream
+/// providers commonly send only the bare video id.
+String? _youtubeTrailerUrl(Object? value) {
+  final id = youtubeVideoId(_asNullableString(value));
+  return id == null ? null : 'https://www.youtube.com/watch?v=$id';
 }
 
 String? _yearString(Object? value) {

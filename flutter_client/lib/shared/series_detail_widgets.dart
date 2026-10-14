@@ -1610,6 +1610,7 @@ class SeriesDetailBody extends StatelessWidget {
     required this.fallbackPosterUrl,
     required this.meta,
     required this.primaryActions,
+    this.trailingActions = const [],
     required this.richCast,
     required this.castSemanticLabel,
     this.onTapMember,
@@ -1659,6 +1660,9 @@ class SeriesDetailBody extends StatelessWidget {
   /// Play / Start-over buttons on the same line as the season picker. Empty
   /// for AIOStreams (no hero play button).
   final List<Widget> primaryActions;
+
+  /// Secondary buttons after the season picker (e.g. a trailer link).
+  final List<Widget> trailingActions;
 
   final List<CastMember>? richCast;
   final String castSemanticLabel;
@@ -1796,6 +1800,7 @@ class SeriesDetailBody extends StatelessWidget {
               onMarkSeason: (watched) =>
                   onMarkSeason(episodes, watched: watched),
             ),
+            ...trailingActions,
             if (compact && richCast != null && richCast!.isNotEmpty)
               CastMemberRow(
                 members: richCast,

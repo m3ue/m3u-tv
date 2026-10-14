@@ -12,6 +12,7 @@ import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
+import 'package:m3u_tv/shared/trailer_button.dart';
 
 /// Below this window width the series detail lays out for a phone: smaller
 /// poster, full-width description, narrower episode cards. The episode-card
@@ -613,6 +614,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       fallbackPosterUrl: trimmedOrNull(info.series.coverUrl),
       meta: _seriesMetaInfo(context, target, description, plotMaxWidth),
       primaryActions: _primaryActions(context, target),
+      trailingActions: [?_trailerButton(context)],
       richCast: info.series.richCast,
       castSemanticLabel: AppLocalizations.of(context).seriesCast,
       richRelated: info.series.related,
@@ -722,6 +724,20 @@ class _SeriesDetailsBody extends StatelessWidget {
           autoScroll: false,
         ),
     ];
+  }
+
+  /// The shown season's own trailer when it has one, else the show's.
+  Widget? _trailerButton(BuildContext context) {
+    final season = _selectedSeasonObj;
+    final seasonTrailer = season?.trailerUrl;
+    if (season != null && seasonTrailer != null) {
+      return TrailerButton(
+        url: seasonTrailer,
+        label: AppLocalizations.of(context).trailerSeasonButton(season.number),
+      );
+    }
+    final seriesTrailer = info.series.trailerUrl;
+    return seriesTrailer == null ? null : TrailerButton(url: seriesTrailer);
   }
 
   /// Mean episode runtime across the whole series, rendered as a "~45m" chip.

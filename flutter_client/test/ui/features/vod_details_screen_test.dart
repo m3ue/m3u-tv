@@ -46,9 +46,31 @@ void main() {
       expect(find.text('Movie details'), findsNothing);
       expect(find.text('Ready to play in-app.'), findsNothing);
       expect(find.text('Play movie'), findsOneWidget);
+      expect(find.text('Trailer'), findsNothing);
 
       // Flush the palette-generator timeout timer the cover kicks off.
       await tester.pump(const Duration(seconds: 16));
+    });
+
+    testWidgets('shows a trailer button when the movie has one', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: const VodInfo(
+              id: 201,
+              name: 'Big Buck Bunny',
+              containerExtension: 'mkv',
+              trailerUrl: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Play movie'), findsOneWidget);
+      expect(find.text('Trailer'), findsOneWidget);
     });
 
     testWidgets('keeps play action in app with metadata fallback', (

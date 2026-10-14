@@ -5,6 +5,12 @@
 <dict>
   <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>youtube</string>
+    <string>vnd.youtube</string>
+    <string>youtubetv</string>
+  </array>
   <key>CFBundleDisplayName</key>
   <string>M3U TV</string>
   <key>CFBundleExecutable</key>

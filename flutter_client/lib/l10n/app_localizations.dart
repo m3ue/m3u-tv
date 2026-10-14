@@ -3265,6 +3265,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing logged yet this session.'**
   String get diagnosticsNoLogs;
+
+  /// No description provided for @trailerButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Trailer'**
+  String get trailerButton;
+
+  /// No description provided for @trailerSeasonButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Season {season} Trailer'**
+  String trailerSeasonButton(int season);
+
+  /// No description provided for @trailerWatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch Trailer'**
+  String get trailerWatch;
 }
 
 class _AppLocalizationsDelegate

@@ -934,5 +934,8 @@
   "diagnosticsNotConnected": "Connectez-vous à un serveur pour envoyer les journaux.",
   "diagnosticsDeviceHeading": "Appareil",
   "diagnosticsLogsHeading": "Journaux ({count})",
-  "diagnosticsNoLogs": "Rien n'a encore été journalisé pendant cette session."
+  "diagnosticsNoLogs": "Rien n'a encore été journalisé pendant cette session.",
+  "trailerButton": "Bande-annonce",
+  "trailerSeasonButton": "Bande-annonce saison {season}",
+  "trailerWatch": "Regarder la bande-annonce"
 }

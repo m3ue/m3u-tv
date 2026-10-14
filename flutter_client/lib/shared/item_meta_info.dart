@@ -37,6 +37,7 @@ class ItemMetaInfo extends StatelessWidget {
     this.primaryActionFocusNode,
     this.progressValue,
     this.onStartOver,
+    this.extraActions = const [],
     this.isLoading = false,
     this.plot,
     this.plotMaxWidth,
@@ -91,6 +92,9 @@ class ItemMetaInfo extends StatelessWidget {
   /// restart from when nothing has been watched yet.
   final VoidCallback? onStartOver;
 
+  /// Secondary buttons after play / start-over (e.g. a trailer link).
+  final List<Widget> extraActions;
+
   final bool isLoading;
   final String? plot;
 
@@ -138,13 +142,13 @@ class ItemMetaInfo extends StatelessWidget {
     // of overflowing when the info column is too narrow to fit both -
     // narrow layouts, and a full-width primary button always claims the
     // whole line on its own run.
-    final buttonRow = startOverButton == null
+    final buttonRow = startOverButton == null && extraActions.isEmpty
         ? sizedButton
         : Wrap(
             spacing: MediaBrowsingMetrics.itemGap,
             runSpacing: MediaBrowsingMetrics.itemGap,
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [sizedButton, startOverButton],
+            children: [sizedButton, ?startOverButton, ...extraActions],
           );
     final hasPlot = plot != null && plot!.trim().isNotEmpty;
     final chipWidgets = <Widget>[

@@ -11,6 +11,7 @@ import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
+import 'package:m3u_tv/shared/trailer_button.dart';
 
 class VodDetailsScreen extends StatefulWidget {
   const VodDetailsScreen({
@@ -195,6 +196,10 @@ class _VodDetailsBody extends StatelessWidget {
       onStartOver: progress == null
           ? null
           : () => _play(details, startPosition: 0),
+      extraActions: [
+        if (details.trailerUrl case final trailerUrl?)
+          TrailerButton(url: trailerUrl),
+      ],
       progressValue: _progressValue(progress),
       isLoading: isLoading,
       dominantColor: dominantColor,
@@ -283,4 +288,5 @@ class _ResolvedVodDetails {
       nullIfBlank(info?.containerExtension) ?? item.containerExtension;
   int? get tmdbId => info?.tmdbId;
   String? get edlUrl => nullIfBlank(info?.edlUrl);
+  String? get trailerUrl => info?.trailerUrl;
 }

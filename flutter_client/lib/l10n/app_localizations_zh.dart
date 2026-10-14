@@ -1780,4 +1780,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get diagnosticsNoLogs => '本次会话尚无日志。';
+
+  @override
+  String get trailerButton => '预告片';
+
+  @override
+  String trailerSeasonButton(int season) {
+    return '第 $season 季预告片';
+  }
+
+  @override
+  String get trailerWatch => '观看预告片';
 }

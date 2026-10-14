@@ -934,5 +934,8 @@
   "diagnosticsNotConnected": "Verbinde dich mit einem Server, um Protokolle hochzuladen.",
   "diagnosticsDeviceHeading": "Gerät",
   "diagnosticsLogsHeading": "Protokolle ({count})",
-  "diagnosticsNoLogs": "In dieser Sitzung wurde noch nichts protokolliert."
+  "diagnosticsNoLogs": "In dieser Sitzung wurde noch nichts protokolliert.",
+  "trailerButton": "Trailer",
+  "trailerSeasonButton": "Trailer Staffel {season}",
+  "trailerWatch": "Trailer ansehen"
 }

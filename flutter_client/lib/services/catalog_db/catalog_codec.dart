@@ -82,6 +82,7 @@ Map<String, Object?> encodeSeries(Series series) => <String, Object?>{
   if (series.year != null) 'year': series.year,
   if (series.genre != null) 'genre': series.genre,
   if (series.episodeRunTime != null) 'episode_run_time': series.episodeRunTime,
+  if (series.trailerUrl != null) 'youtube_trailer': series.trailerUrl,
 };
 
 Series decodeSeries(Map<String, Object?> json) => Series.fromXtream(json);

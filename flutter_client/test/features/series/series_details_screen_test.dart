@@ -93,6 +93,59 @@ Progress _prog(
 );
 
 void main() {
+  group('trailer button', () {
+    SeriesInfo trailerInfo({String? seriesTrailer, String? seasonTrailer}) =>
+        SeriesInfo(
+          series: Series(
+            id: 7,
+            name: 'Fixture Show',
+            trailerUrl: seriesTrailer,
+          ),
+          seasons: [
+            Season(number: 1, name: 'Season 1', trailerUrl: seasonTrailer),
+          ],
+          episodesBySeason: {
+            1: [_ep(1, 1)],
+          },
+        );
+
+    testWidgets('prefers the shown season trailer', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          trailerInfo(
+            seriesTrailer: 'https://www.youtube.com/watch?v=aaaaaaaaaaa',
+            seasonTrailer: 'https://www.youtube.com/watch?v=bbbbbbbbbbb',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Season 1 Trailer'), findsOneWidget);
+      expect(find.text('Trailer'), findsNothing);
+    });
+
+    testWidgets('falls back to the series trailer', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          trailerInfo(
+            seriesTrailer: 'https://www.youtube.com/watch?v=aaaaaaaaaaa',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trailer'), findsOneWidget);
+    });
+
+    testWidgets('is hidden when there is no trailer', (tester) async {
+      await tester.pumpWidget(_app(trailerInfo()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trailer'), findsNothing);
+      expect(find.text('Season 1 Trailer'), findsNothing);
+    });
+  });
+
   testWidgets('episode cards show plot, formatted date and runtime', (
     tester,
   ) async {

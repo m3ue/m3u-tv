@@ -12,7 +12,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:m3u_tv/shared/qr_link_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Settings "What's New" sub-page: read the `m3u-tv` GitHub release notes one
@@ -203,7 +203,13 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
       unawaited(
         showDialog<void>(
           context: context,
-          builder: (_) => const _GithubQrDialog(url: _githubReleasesUrl),
+          builder: (dialogContext) => QrLinkDialog(
+            title: AppLocalizations.of(
+              dialogContext,
+            ).settingsReleaseNotesViewOnGithub,
+            url: _githubReleasesUrl,
+            memoryKey: 'release-notes-github-qr',
+          ),
         ),
       );
       return;
@@ -638,59 +644,6 @@ class _Pill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GithubQrDialog extends StatelessWidget {
-  const _GithubQrDialog({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scale = FontSizeScope.scaleOf(context);
-
-    return Dialog(
-      child: DpadRegion(
-        memoryKey: 'release-notes-github-qr',
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l.settingsReleaseNotesViewOnGithub,
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: QrImageView(
-                  data: url,
-                  size: 200 * scale,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l.settingsAppScanQr,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              AppButton(
-                label: MaterialLocalizations.of(context).closeButtonLabel,
-                autofocus: true,
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

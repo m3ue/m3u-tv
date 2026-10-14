@@ -1854,4 +1854,15 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get diagnosticsNoLogs =>
       'Rien n\'a encore été journalisé pendant cette session.';
+
+  @override
+  String get trailerButton => 'Bande-annonce';
+
+  @override
+  String trailerSeasonButton(int season) {
+    return 'Bande-annonce saison $season';
+  }
+
+  @override
+  String get trailerWatch => 'Regarder la bande-annonce';
 }

@@ -1041,5 +1041,15 @@
       }
     }
   },
-  "diagnosticsNoLogs": "Nothing logged yet this session."
+  "diagnosticsNoLogs": "Nothing logged yet this session.",
+  "trailerButton": "Trailer",
+  "trailerSeasonButton": "Season {season} Trailer",
+  "@trailerSeasonButton": {
+    "placeholders": {
+      "season": {
+        "type": "int"
+      }
+    }
+  },
+  "trailerWatch": "Watch Trailer"
 }
