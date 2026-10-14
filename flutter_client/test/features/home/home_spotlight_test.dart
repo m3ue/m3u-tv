@@ -99,13 +99,15 @@ void main() {
         rating: 8.7,
         contentRating: 'TV-MA',
         year: '2022',
+        genre: 'Drama',
+        episodeRunTime: 55,
       );
 
       final spotlight = resolve(const SeriesSpotlightTarget(series));
 
       expect(spotlight.backdropUrl, 'http://img/sev.jpg');
       expect(spotlight.clearLogoUrl, 'http://img/sev-logo.png');
-      expect(spotlight.chips, ['2022', 'TV-MA', '★ 8.7']);
+      expect(spotlight.chips, ['2022', 'TV-MA', 'Drama', '55m', '★ 8.7']);
       expect(spotlight.plot, 'Work-life balance.');
     });
 

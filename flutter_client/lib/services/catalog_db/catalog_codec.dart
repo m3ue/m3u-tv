@@ -67,12 +67,17 @@ Map<String, Object?> encodeSeries(Series series) => <String, Object?>{
   'name': series.name,
   if (series.coverUrl != null) 'cover': series.coverUrl,
   if (series.backdropUrl != null) 'backdrop_path': series.backdropUrl,
+  if (series.clearLogoUrl != null) 'clearlogo': series.clearLogoUrl,
   if (series.categoryId != null) 'category_id': series.categoryId,
   // Decoded via Series.fromXtream, which reads `category_ids` natively.
   if (series.categoryIds.isNotEmpty) 'category_ids': series.categoryIds,
   if (series.plot != null) 'plot': series.plot,
   if (series.rating != null) 'rating': series.rating,
   if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+  if (series.contentRating != null) 'mpaa_rating': series.contentRating,
+  if (series.year != null) 'year': series.year,
+  if (series.genre != null) 'genre': series.genre,
+  if (series.episodeRunTime != null) 'episode_run_time': series.episodeRunTime,
 };
 
 Series decodeSeries(Map<String, Object?> json) => Series.fromXtream(json);

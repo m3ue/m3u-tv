@@ -530,6 +530,8 @@ class Series {
     this.tmdbId,
     this.richCast,
     this.year,
+    this.genre,
+    this.episodeRunTime,
     this.related,
   });
 
@@ -561,6 +563,12 @@ class Series {
   /// `releaseDate` field (a date string) or a bare `year` when present.
   final String? year;
 
+  final String? genre;
+
+  /// Typical episode length, from the `episode_run_time` wire key (minutes;
+  /// the editor sends "0" when unknown).
+  final int? episodeRunTime;
+
   /// TMDB recommendations already in the user's library. Rendered as the
   /// "Related" row below the cast row.
   final List<RelatedItem>? related;
@@ -581,6 +589,11 @@ class Series {
     year: _yearString(
       json['releaseDate'] ?? json['release_date'] ?? json['year'],
     ),
+    genre: nullIfBlank(_asNullableString(json['genre'])),
+    episodeRunTime: switch (_asIntOrNull(json['episode_run_time'])) {
+      final minutes? when minutes > 0 => minutes,
+      _ => null,
+    },
     related: _parseRelatedList(json['related']),
   );
 }

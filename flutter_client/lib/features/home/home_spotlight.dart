@@ -380,6 +380,9 @@ HomeSpotlight resolveHomeSpotlight(
         chips: [
           ?series.year,
           ?nullIfBlank(series.contentRating),
+          ?series.genre,
+          if (series.episodeRunTime case final minutes?)
+            formatRuntime(Duration(minutes: minutes)),
           if (rating != null && rating > 0) formatRating(rating),
         ],
         plot: nullIfBlank(series.plot),
