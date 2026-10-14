@@ -6,7 +6,7 @@
 #
 #   tv*.png      → Apple tvOS (1920×1080, 3840×2160)
 #              → Android TV (1920×1080, 1280×720)
-#   mobile*.png  → Apple iPhone (6.7", 6.5", 5.5")
+#   mobile*.png  → Apple iPhone (6.9", 6.3", 6.7", 6.5", 5.5")
 #              → Android Phone (1080×2340)
 #   tablet/*.png  → Apple iPad (12.9", 11")
 #                 → Android Tablet (7", 10")
@@ -116,23 +116,31 @@ done
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Apple iOS (iPhone) ---"
-# App Store Connect requires at least the 6.5" size for modern submissions.
-# The 6.7" is required for iPhone 14 Plus / 15 Plus devices.
+# App Store Connect groups iPhone screenshots by display class. Each slot
+# only accepts its own exact pixel sizes (portrait or landscape):
 #
-#   6.7"  1290×2796  (iPhone 14 Plus, 15 Plus, 15 Pro Max)
+#   6.9"  1320×2868  (iPhone 16 Pro Max and newer Pro Max)
+#   6.3"  1206×2622  (iPhone 16 Pro and newer, 6.1"/6.3" slot - matches source)
+#   6.7"  1290×2796  (iPhone 14 Plus, 15 Plus, 15 Pro Max - also accepted in 6.9" slot)
 #   6.5"  1242×2688  (iPhone 11 Pro Max, XS Max, 12/13 Pro Max)
 #   5.5"  1242×2208  (iPhone 8 Plus — covers legacy device class)
 # ---------------------------------------------------------------------------
+IOS_69="$OUT_DIR/apple/ios/6.9in-1320x2868"
+IOS_63="$OUT_DIR/apple/ios/6.3in-1206x2622"
 IOS_67="$OUT_DIR/apple/ios/6.7in-1290x2796"
 IOS_65="$OUT_DIR/apple/ios/6.5in-1242x2688"
 IOS_55="$OUT_DIR/apple/ios/5.5in-1242x2208"
-mkdir -p "$IOS_67" "$IOS_65" "$IOS_55"
+mkdir -p "$IOS_69" "$IOS_63" "$IOS_67" "$IOS_65" "$IOS_55"
 
 for src in "$SRC_DIR"/mobile*.png; do
     name=$(basename "$src")
     # Source (1206×2622) and 6.7"/6.5" targets share nearly identical aspect
     # ratios (~2.17), so cropping is negligible. The 5.5" target is shorter
     # (ratio ~1.78) and requires a more visible crop from the bottom.
+    echo "  [iPhone 6.9\"  1320×2868] $name"
+    resize_fill "$src" "$IOS_69/$name" 1320 2868
+    echo "  [iPhone 6.3\"  1206×2622] $name"
+    resize_fill "$src" "$IOS_63/$name" 1206 2622
     echo "  [iPhone 6.7\"  1290×2796] $name"
     resize_fill "$src" "$IOS_67/$name" 1290 2796
     echo "  [iPhone 6.5\"  1242×2688] $name"
@@ -279,7 +287,9 @@ echo ""
 echo "Store upload checklist:"
 echo "  Apple tvOS       → apple/tvos/1920x1080/          (required)"
 echo "                     apple/tvos/3840x2160/           (optional 4K)"
-echo "  Apple iOS        → apple/ios/6.7in-1290x2796/     (required for iPhone 14+/15+)"
+echo "  Apple iOS        → apple/ios/6.9in-1320x2868/     (6.9\" slot)"
+echo "                     apple/ios/6.3in-1206x2622/     (6.1\"/6.3\" slot)"
+echo "                     apple/ios/6.7in-1290x2796/     (also accepted in 6.9\" slot)"
 echo "                     apple/ios/6.5in-1242x2688/     (required for older iPhones)"
 echo "                     apple/ios/5.5in-1242x2208/     (optional legacy)"
 echo "  Apple macOS      → apple/macos/1440x900/"
