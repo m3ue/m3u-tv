@@ -937,5 +937,7 @@
   "diagnosticsNoLogs": "Aún no hay nada registrado en esta sesión.",
   "trailerButton": "Tráiler",
   "trailerSeasonButton": "Tráiler de la temporada {season}",
-  "trailerWatch": "Ver tráiler"
+  "trailerWatch": "Ver tráiler",
+  "mediaSortRecentlyAdded": "Añadido recientemente",
+  "mediaSortRecentlyUpdated": "Actualizado recientemente"
 }

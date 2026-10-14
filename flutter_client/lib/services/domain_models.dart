@@ -138,6 +138,7 @@ class VodItem {
     this.categoryIds = const [],
     this.rating,
     this.year,
+    this.addedAt,
   });
 
   final int id;
@@ -159,6 +160,10 @@ class VodItem {
   /// (emitted as an int by `VodFileNameService::resolveMovieYearAsInt`).
   final String? year;
 
+  /// When the title was added to the provider's catalog, as Unix seconds
+  /// (Xtream `added`). Drives the "Recently Added" sort.
+  final int? addedAt;
+
   factory VodItem.fromXtream(Map<String, Object?> json, String streamUrl) =>
       VodItem(
         id: _asInt(json['stream_id']),
@@ -170,6 +175,7 @@ class VodItem {
         categoryIds: _asStringList(json['category_ids']),
         rating: _asDoubleOrNull(json['rating']),
         year: _yearString(json['year']),
+        addedAt: _epochSeconds(json['added']),
       );
 }
 
@@ -540,6 +546,7 @@ class Series {
     this.episodeRunTime,
     this.related,
     this.trailerUrl,
+    this.lastModifiedAt,
   });
 
   final int id;
@@ -584,6 +591,10 @@ class Series {
   /// [Season.trailerUrl] takes precedence on the detail page when present.
   final String? trailerUrl;
 
+  /// When the show last changed upstream (typically a new episode), as Unix
+  /// seconds (Xtream `last_modified`). Drives the "Recently Updated" sort.
+  final int? lastModifiedAt;
+
   factory Series.fromXtream(Map<String, Object?> json) => Series(
     id: _asInt(json['series_id']),
     name: '${json['name'] ?? ''}',
@@ -607,6 +618,7 @@ class Series {
     },
     related: _parseRelatedList(json['related']),
     trailerUrl: _youtubeTrailerUrl(json['youtube_trailer']),
+    lastModifiedAt: _epochSeconds(json['last_modified']),
   );
 }
 
@@ -1935,6 +1947,13 @@ String? youtubeVideoId(String? value) {
 String? _youtubeTrailerUrl(Object? value) {
   final id = youtubeVideoId(_asNullableString(value));
   return id == null ? null : 'https://www.youtube.com/watch?v=$id';
+}
+
+/// A positive Unix-seconds timestamp from an Xtream field the provider may
+/// send as an int or a numeric string; null for blank, `0`, or garbage.
+int? _epochSeconds(Object? value) {
+  final seconds = _asIntOrNull(value);
+  return seconds != null && seconds > 0 ? seconds : null;
 }
 
 String? _yearString(Object? value) {

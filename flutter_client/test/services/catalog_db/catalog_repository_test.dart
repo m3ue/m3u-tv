@@ -10,6 +10,7 @@ VodItem _vod(
   String? category,
   double? rating,
   String? year,
+  int? addedAt,
 }) => VodItem(
   id: id,
   name: name,
@@ -18,6 +19,7 @@ VodItem _vod(
   categoryId: category,
   rating: rating,
   year: year,
+  addedAt: addedAt,
 );
 
 Channel _channel(int id, String name, {String? category}) => Channel(
@@ -239,10 +241,10 @@ void main() {
         sourceKey: 's1',
         kind: kCatalogKindVod,
         items: [
-          _vod(1, 'AAAA Highest', rating: 9, year: '2020'),
-          _vod(2, 'BBBB Mid', rating: 7, year: '1999'),
+          _vod(1, 'AAAA Highest', rating: 9, year: '2020', addedAt: 1000),
+          _vod(2, 'BBBB Mid', rating: 7, year: '1999', addedAt: 3000),
           _vod(3, 'CCCC Unrated'),
-          _vod(4, 'DDDD Third', rating: 8, year: '2010'),
+          _vod(4, 'DDDD Third', rating: 8, year: '2010', addedAt: 2000),
         ],
       );
     });
@@ -299,6 +301,43 @@ void main() {
         ]);
       },
     );
+
+    test(
+      'recentDesc (newest first) sinks undated rows to the bottom',
+      () async {
+        expect(await namesFor(CatalogSort.recentDesc), [
+          'BBBB Mid', // added 3000
+          'DDDD Third', // added 2000
+          'AAAA Highest', // added 1000
+          'CCCC Unrated', // no added date
+        ]);
+      },
+    );
+
+    test('recentDesc orders series by last_modified', () async {
+      await repo.replaceItems(
+        sourceKey: 's1',
+        kind: kCatalogKindSeries,
+        items: const [
+          Series(id: 1, name: 'Old Show', lastModifiedAt: 100),
+          Series(id: 2, name: 'Unknown Show'),
+          Series(id: 3, name: 'Fresh Show', lastModifiedAt: 900),
+        ],
+      );
+
+      final rows = await repo.pageItems<Series>(
+        sourceKey: 's1',
+        kind: kCatalogKindSeries,
+        sort: CatalogSort.recentDesc,
+        offset: 0,
+        limit: 50,
+      );
+      expect(rows.map((s) => s.name), [
+        'Fresh Show',
+        'Old Show',
+        'Unknown Show',
+      ]);
+    });
 
     test(
       'favoritesFirst floats favorites above the rest, each group in sort order',

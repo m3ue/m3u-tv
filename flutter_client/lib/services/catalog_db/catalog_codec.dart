@@ -52,6 +52,7 @@ Map<String, Object?> encodeVod(VodItem item) => <String, Object?>{
   if (item.categoryIds.isNotEmpty) 'category_ids': item.categoryIds,
   if (item.rating != null) 'rating': item.rating,
   if (item.year != null) 'year': item.year,
+  if (item.addedAt != null) 'added': item.addedAt,
 };
 
 VodItem decodeVod(Map<String, Object?> json) => VodItem(
@@ -64,6 +65,7 @@ VodItem decodeVod(Map<String, Object?> json) => VodItem(
   categoryIds: stringList(json['category_ids']),
   rating: asDouble(json['rating']),
   year: nullableString(json['year']),
+  addedAt: asIntOrNull(json['added']),
 );
 
 Map<String, Object?> encodeSeries(Series series) => <String, Object?>{
@@ -83,6 +85,7 @@ Map<String, Object?> encodeSeries(Series series) => <String, Object?>{
   if (series.genre != null) 'genre': series.genre,
   if (series.episodeRunTime != null) 'episode_run_time': series.episodeRunTime,
   if (series.trailerUrl != null) 'youtube_trailer': series.trailerUrl,
+  if (series.lastModifiedAt != null) 'last_modified': series.lastModifiedAt,
 };
 
 Series decodeSeries(Map<String, Object?> json) => Series.fromXtream(json);

@@ -1846,4 +1846,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trailerWatch => 'Watch Trailer';
+
+  @override
+  String get mediaSortRecentlyAdded => 'Recently Added';
+
+  @override
+  String get mediaSortRecentlyUpdated => 'Recently Updated';
 }

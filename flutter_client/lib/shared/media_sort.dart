@@ -13,6 +13,8 @@ CatalogSort catalogSortFor(MediaSortOption option) => switch (option) {
   MediaSortOption.ratingDesc => CatalogSort.ratingDesc,
   MediaSortOption.releaseDateDesc => CatalogSort.yearDesc,
   MediaSortOption.releaseDateAsc => CatalogSort.yearAsc,
+  MediaSortOption.recentlyAdded ||
+  MediaSortOption.recentlyUpdated => CatalogSort.recentDesc,
 };
 
 /// The sort button's label: generic "Sort" at the default order (matching
@@ -24,6 +26,8 @@ String mediaSortButtonLabel(AppLocalizations l, MediaSortOption option) =>
       MediaSortOption.ratingDesc => l.mediaSortRating,
       MediaSortOption.releaseDateDesc => l.mediaSortReleaseDateNewest,
       MediaSortOption.releaseDateAsc => l.mediaSortReleaseDateOldest,
+      MediaSortOption.recentlyAdded => l.mediaSortRecentlyAdded,
+      MediaSortOption.recentlyUpdated => l.mediaSortRecentlyUpdated,
     };
 
 /// Sorts a small, fully-materialized list (e.g. a Favorites tab) per
@@ -31,7 +35,7 @@ String mediaSortButtonLabel(AppLocalizations l, MediaSortOption option) =>
 /// [CatalogRepository.pageActiveItems]/[catalogSortFor] instead - this is
 /// only for lists too small to be worth a windowed query.
 ///
-/// [ratingOf]/[yearOf] extract the comparison fields from [T] (`VodItem` and
+/// [ratingOf]/[yearOf]/[recencyOf] extract the comparison fields from [T] (`VodItem` and
 /// `Series` share no common interface for these, so callers supply the
 /// accessors rather than this being generic over a shared base type).
 List<T> sortMediaItems<T>(
@@ -39,6 +43,7 @@ List<T> sortMediaItems<T>(
   MediaSortOption option, {
   required double? Function(T item) ratingOf,
   required int? Function(T item) yearOf,
+  required int? Function(T item) recencyOf,
 }) {
   if (option == MediaSortOption.defaultOrder) return items;
   final list = items.toList(growable: false);
@@ -65,6 +70,8 @@ List<T> sortMediaItems<T>(
         if (by == null) return -1;
         return ay.compareTo(by);
       });
+    case MediaSortOption.recentlyAdded || MediaSortOption.recentlyUpdated:
+      list.sort((a, b) => (recencyOf(b) ?? -1).compareTo(recencyOf(a) ?? -1));
   }
   return list;
 }

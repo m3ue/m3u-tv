@@ -1051,5 +1051,7 @@
       }
     }
   },
-  "trailerWatch": "Watch Trailer"
+  "trailerWatch": "Watch Trailer",
+  "mediaSortRecentlyAdded": "Recently Added",
+  "mediaSortRecentlyUpdated": "Recently Updated"
 }

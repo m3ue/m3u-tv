@@ -220,6 +220,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     _sortOption,
     ratingOf: (item) => item.rating,
     yearOf: (item) => int.tryParse(item.year ?? ''),
+    recencyOf: (item) => item.addedAt,
   );
 
   /// Refreshes tab-count labels (total / favorites / per-category) when the
@@ -514,6 +515,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
       context,
       title: AppLocalizations.of(context).vodSortDialogTitle,
       current: _sortOption,
+      recentOption: MediaSortOption.recentlyAdded,
       favoritesFirst: favoritesFirst,
       // Applied once the dialog closes rather than per flip: reloading the
       // grid behind the open dialog rebuilds its autofocus card, which can

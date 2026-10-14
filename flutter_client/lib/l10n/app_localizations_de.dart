@@ -1860,4 +1860,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get trailerWatch => 'Trailer ansehen';
+
+  @override
+  String get mediaSortRecentlyAdded => 'Kürzlich hinzugefügt';
+
+  @override
+  String get mediaSortRecentlyUpdated => 'Kürzlich aktualisiert';
 }

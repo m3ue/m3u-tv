@@ -937,5 +937,7 @@
   "diagnosticsNoLogs": "本次会话尚无日志。",
   "trailerButton": "预告片",
   "trailerSeasonButton": "第 {season} 季预告片",
-  "trailerWatch": "观看预告片"
+  "trailerWatch": "观看预告片",
+  "mediaSortRecentlyAdded": "最近添加",
+  "mediaSortRecentlyUpdated": "最近更新"
 }

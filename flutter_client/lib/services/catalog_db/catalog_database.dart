@@ -42,6 +42,11 @@ class CatalogItems extends Table {
   /// instead of over a fully materialized list.
   IntColumn get year => integer().nullable()();
 
+  /// Unix seconds the provider reports for "newness": VOD `added`, series
+  /// `last_modified`. Null for live channels and rows the provider left
+  /// blank. Backs the Recently Added / Recently Updated sort.
+  IntColumn get recency => integer().nullable()();
+
   /// Position in the provider's original ordering, so the default sort is
   /// stable without a name comparison.
   IntColumn get sortIndex => integer()();
@@ -149,7 +154,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

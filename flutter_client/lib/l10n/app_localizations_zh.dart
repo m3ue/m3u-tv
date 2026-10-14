@@ -1791,4 +1791,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get trailerWatch => '观看预告片';
+
+  @override
+  String get mediaSortRecentlyAdded => '最近添加';
+
+  @override
+  String get mediaSortRecentlyUpdated => '最近更新';
 }

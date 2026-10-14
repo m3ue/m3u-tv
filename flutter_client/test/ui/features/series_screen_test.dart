@@ -417,6 +417,8 @@ void main() {
         expect(find.text('Sort Series By'), findsOneWidget);
         expect(find.text('Default'), findsOneWidget);
         expect(find.text('Rating'), findsOneWidget);
+        expect(find.text('Recently Updated'), findsOneWidget);
+        expect(find.text('Recently Added'), findsNothing);
         expect(find.text('Close'), findsOneWidget);
       },
     );

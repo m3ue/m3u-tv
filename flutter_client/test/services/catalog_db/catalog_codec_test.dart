@@ -40,6 +40,17 @@ void main() {
       expect(decoded.year, '2021');
     });
 
+    test('round-trips the added timestamp', () {
+      final item = VodItem.fromXtream(const {
+        'stream_id': 9,
+        'name': 'Dune',
+        'added': '1700000000',
+      }, 'http://host/movie/9.mkv');
+
+      expect(item.addedAt, 1700000000);
+      expect(decodeVod(encodeVod(item)).addedAt, 1700000000);
+    });
+
     test('leaves an absent year absent', () {
       final item = VodItem.fromXtream(const {
         'stream_id': 8,
@@ -76,6 +87,29 @@ void main() {
       expect(decoded.episodeRunTime, 55);
       expect(decoded.rating, 8.7);
       expect(decoded.backdropUrl, 'http://img/sev.jpg');
+    });
+
+    test('round-trips last_modified and treats blank/zero as absent', () {
+      final series = Series.fromXtream(const {
+        'series_id': 5,
+        'name': 'Andor',
+        'last_modified': '1700000000',
+      });
+      final blank = Series.fromXtream(const {
+        'series_id': 6,
+        'name': 'Unknown',
+        'last_modified': '',
+      });
+      final zero = Series.fromXtream(const {
+        'series_id': 7,
+        'name': 'Zero',
+        'last_modified': '0',
+      });
+
+      expect(decodeSeries(encodeSeries(series)).lastModifiedAt, 1700000000);
+      expect(blank.lastModifiedAt, isNull);
+      expect(zero.lastModifiedAt, isNull);
+      expect(encodeSeries(zero).containsKey('last_modified'), isFalse);
     });
 
     test('treats blank genre and a zero runtime as absent', () {

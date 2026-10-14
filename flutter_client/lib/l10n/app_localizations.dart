@@ -3283,6 +3283,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Watch Trailer'**
   String get trailerWatch;
+
+  /// No description provided for @mediaSortRecentlyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently Added'**
+  String get mediaSortRecentlyAdded;
+
+  /// No description provided for @mediaSortRecentlyUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently Updated'**
+  String get mediaSortRecentlyUpdated;
 }
 
 class _AppLocalizationsDelegate

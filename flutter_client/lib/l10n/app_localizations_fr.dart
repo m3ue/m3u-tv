@@ -1865,4 +1865,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get trailerWatch => 'Regarder la bande-annonce';
+
+  @override
+  String get mediaSortRecentlyAdded => 'Ajouts récents';
+
+  @override
+  String get mediaSortRecentlyUpdated => 'Mis à jour récemment';
 }

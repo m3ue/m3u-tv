@@ -123,7 +123,13 @@ enum MediaSortOption {
   defaultOrder('defaultOrder'),
   ratingDesc('ratingDesc'),
   releaseDateDesc('releaseDateDesc'),
-  releaseDateAsc('releaseDateAsc');
+  releaseDateAsc('releaseDateAsc'),
+
+  /// VOD only: newest `added` first.
+  recentlyAdded('recentlyAdded'),
+
+  /// Series only: newest `last_modified` (typically a new episode) first.
+  recentlyUpdated('recentlyUpdated');
 
   const MediaSortOption(this.value);
   final String value;

@@ -215,6 +215,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     _sortOption,
     ratingOf: (item) => item.rating,
     yearOf: (item) => int.tryParse(item.year ?? ''),
+    recencyOf: (item) => item.lastModifiedAt,
   );
 
   /// Refreshes tab-count labels (total / favorites / per-category) when the
@@ -510,6 +511,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       context,
       title: AppLocalizations.of(context).seriesSortDialogTitle,
       current: _sortOption,
+      recentOption: MediaSortOption.recentlyUpdated,
       favoritesFirst: favoritesFirst,
       // Applied once the dialog closes rather than per flip: reloading the
       // grid behind the open dialog rebuilds its autofocus card, which can

@@ -707,6 +707,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Sort Movies By'), findsOneWidget);
+        expect(find.text('Recently Added'), findsOneWidget);
+        expect(find.text('Recently Updated'), findsNothing);
         await tester.tap(find.text('Rating'));
         await tester.pumpAndSettle();
 

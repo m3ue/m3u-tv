@@ -937,5 +937,7 @@
   "diagnosticsNoLogs": "In dieser Sitzung wurde noch nichts protokolliert.",
   "trailerButton": "Trailer",
   "trailerSeasonButton": "Trailer Staffel {season}",
-  "trailerWatch": "Trailer ansehen"
+  "trailerWatch": "Trailer ansehen",
+  "mediaSortRecentlyAdded": "Kürzlich hinzugefügt",
+  "mediaSortRecentlyUpdated": "Kürzlich aktualisiert"
 }

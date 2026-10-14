@@ -937,5 +937,7 @@
   "diagnosticsNoLogs": "Rien n'a encore été journalisé pendant cette session.",
   "trailerButton": "Bande-annonce",
   "trailerSeasonButton": "Bande-annonce saison {season}",
-  "trailerWatch": "Regarder la bande-annonce"
+  "trailerWatch": "Regarder la bande-annonce",
+  "mediaSortRecentlyAdded": "Ajouts récents",
+  "mediaSortRecentlyUpdated": "Mis à jour récemment"
 }

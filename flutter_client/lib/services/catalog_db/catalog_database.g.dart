@@ -100,6 +100,17 @@ class $CatalogItemsTable extends CatalogItems
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _recencyMeta = const VerificationMeta(
+    'recency',
+  );
+  @override
+  late final GeneratedColumn<int> recency = GeneratedColumn<int>(
+    'recency',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _sortIndexMeta = const VerificationMeta(
     'sortIndex',
   );
@@ -131,6 +142,7 @@ class $CatalogItemsTable extends CatalogItems
     categoryIdsJson,
     rating,
     year,
+    recency,
     sortIndex,
     json,
   ];
@@ -213,6 +225,12 @@ class $CatalogItemsTable extends CatalogItems
         year.isAcceptableOrUnknown(data['year']!, _yearMeta),
       );
     }
+    if (data.containsKey('recency')) {
+      context.handle(
+        _recencyMeta,
+        recency.isAcceptableOrUnknown(data['recency']!, _recencyMeta),
+      );
+    }
     if (data.containsKey('sort_index')) {
       context.handle(
         _sortIndexMeta,
@@ -274,6 +292,10 @@ class $CatalogItemsTable extends CatalogItems
         DriftSqlType.int,
         data['${effectivePrefix}year'],
       ),
+      recency: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}recency'],
+      ),
       sortIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_index'],
@@ -320,6 +342,11 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
   /// instead of over a fully materialized list.
   final int? year;
 
+  /// Unix seconds the provider reports for "newness": VOD `added`, series
+  /// `last_modified`. Null for live channels and rows the provider left
+  /// blank. Backs the Recently Added / Recently Updated sort.
+  final int? recency;
+
   /// Position in the provider's original ordering, so the default sort is
   /// stable without a name comparison.
   final int sortIndex;
@@ -337,6 +364,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     this.categoryIdsJson,
     this.rating,
     this.year,
+    this.recency,
     required this.sortIndex,
     required this.json,
   });
@@ -360,6 +388,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     if (!nullToAbsent || year != null) {
       map['year'] = Variable<int>(year);
     }
+    if (!nullToAbsent || recency != null) {
+      map['recency'] = Variable<int>(recency);
+    }
     map['sort_index'] = Variable<int>(sortIndex);
     map['json'] = Variable<String>(json);
     return map;
@@ -382,6 +413,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           ? const Value.absent()
           : Value(rating),
       year: year == null && nullToAbsent ? const Value.absent() : Value(year),
+      recency: recency == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recency),
       sortIndex: Value(sortIndex),
       json: Value(json),
     );
@@ -402,6 +436,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       categoryIdsJson: serializer.fromJson<String?>(json['categoryIdsJson']),
       rating: serializer.fromJson<double?>(json['rating']),
       year: serializer.fromJson<int?>(json['year']),
+      recency: serializer.fromJson<int?>(json['recency']),
       sortIndex: serializer.fromJson<int>(json['sortIndex']),
       json: serializer.fromJson<String>(json['json']),
     );
@@ -419,6 +454,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       'categoryIdsJson': serializer.toJson<String?>(categoryIdsJson),
       'rating': serializer.toJson<double?>(rating),
       'year': serializer.toJson<int?>(year),
+      'recency': serializer.toJson<int?>(recency),
       'sortIndex': serializer.toJson<int>(sortIndex),
       'json': serializer.toJson<String>(json),
     };
@@ -434,6 +470,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     Value<String?> categoryIdsJson = const Value.absent(),
     Value<double?> rating = const Value.absent(),
     Value<int?> year = const Value.absent(),
+    Value<int?> recency = const Value.absent(),
     int? sortIndex,
     String? json,
   }) => CatalogItemRow(
@@ -448,6 +485,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
         : this.categoryIdsJson,
     rating: rating.present ? rating.value : this.rating,
     year: year.present ? year.value : this.year,
+    recency: recency.present ? recency.value : this.recency,
     sortIndex: sortIndex ?? this.sortIndex,
     json: json ?? this.json,
   );
@@ -466,6 +504,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           : this.categoryIdsJson,
       rating: data.rating.present ? data.rating.value : this.rating,
       year: data.year.present ? data.year.value : this.year,
+      recency: data.recency.present ? data.recency.value : this.recency,
       sortIndex: data.sortIndex.present ? data.sortIndex.value : this.sortIndex,
       json: data.json.present ? data.json.value : this.json,
     );
@@ -483,6 +522,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           ..write('categoryIdsJson: $categoryIdsJson, ')
           ..write('rating: $rating, ')
           ..write('year: $year, ')
+          ..write('recency: $recency, ')
           ..write('sortIndex: $sortIndex, ')
           ..write('json: $json')
           ..write(')'))
@@ -500,6 +540,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     categoryIdsJson,
     rating,
     year,
+    recency,
     sortIndex,
     json,
   );
@@ -516,6 +557,7 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           other.categoryIdsJson == this.categoryIdsJson &&
           other.rating == this.rating &&
           other.year == this.year &&
+          other.recency == this.recency &&
           other.sortIndex == this.sortIndex &&
           other.json == this.json);
 }
@@ -530,6 +572,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
   final Value<String?> categoryIdsJson;
   final Value<double?> rating;
   final Value<int?> year;
+  final Value<int?> recency;
   final Value<int> sortIndex;
   final Value<String> json;
   final Value<int> rowid;
@@ -543,6 +586,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     this.categoryIdsJson = const Value.absent(),
     this.rating = const Value.absent(),
     this.year = const Value.absent(),
+    this.recency = const Value.absent(),
     this.sortIndex = const Value.absent(),
     this.json = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -557,6 +601,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     this.categoryIdsJson = const Value.absent(),
     this.rating = const Value.absent(),
     this.year = const Value.absent(),
+    this.recency = const Value.absent(),
     required int sortIndex,
     required String json,
     this.rowid = const Value.absent(),
@@ -577,6 +622,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     Expression<String>? categoryIdsJson,
     Expression<double>? rating,
     Expression<int>? year,
+    Expression<int>? recency,
     Expression<int>? sortIndex,
     Expression<String>? json,
     Expression<int>? rowid,
@@ -591,6 +637,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
       if (categoryIdsJson != null) 'category_ids_json': categoryIdsJson,
       if (rating != null) 'rating': rating,
       if (year != null) 'year': year,
+      if (recency != null) 'recency': recency,
       if (sortIndex != null) 'sort_index': sortIndex,
       if (json != null) 'json': json,
       if (rowid != null) 'rowid': rowid,
@@ -607,6 +654,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     Value<String?>? categoryIdsJson,
     Value<double?>? rating,
     Value<int?>? year,
+    Value<int?>? recency,
     Value<int>? sortIndex,
     Value<String>? json,
     Value<int>? rowid,
@@ -621,6 +669,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
       categoryIdsJson: categoryIdsJson ?? this.categoryIdsJson,
       rating: rating ?? this.rating,
       year: year ?? this.year,
+      recency: recency ?? this.recency,
       sortIndex: sortIndex ?? this.sortIndex,
       json: json ?? this.json,
       rowid: rowid ?? this.rowid,
@@ -657,6 +706,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     if (year.present) {
       map['year'] = Variable<int>(year.value);
     }
+    if (recency.present) {
+      map['recency'] = Variable<int>(recency.value);
+    }
     if (sortIndex.present) {
       map['sort_index'] = Variable<int>(sortIndex.value);
     }
@@ -681,6 +733,7 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
           ..write('categoryIdsJson: $categoryIdsJson, ')
           ..write('rating: $rating, ')
           ..write('year: $year, ')
+          ..write('recency: $recency, ')
           ..write('sortIndex: $sortIndex, ')
           ..write('json: $json, ')
           ..write('rowid: $rowid')
@@ -2410,6 +2463,7 @@ typedef $$CatalogItemsTableCreateCompanionBuilder =
       Value<String?> categoryIdsJson,
       Value<double?> rating,
       Value<int?> year,
+      Value<int?> recency,
       required int sortIndex,
       required String json,
       Value<int> rowid,
@@ -2425,6 +2479,7 @@ typedef $$CatalogItemsTableUpdateCompanionBuilder =
       Value<String?> categoryIdsJson,
       Value<double?> rating,
       Value<int?> year,
+      Value<int?> recency,
       Value<int> sortIndex,
       Value<String> json,
       Value<int> rowid,
@@ -2481,6 +2536,11 @@ class $$CatalogItemsTableFilterComposer
 
   ColumnFilters<int> get year => $composableBuilder(
     column: $table.year,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get recency => $composableBuilder(
+    column: $table.recency,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2549,6 +2609,11 @@ class $$CatalogItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get recency => $composableBuilder(
+    column: $table.recency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortIndex => $composableBuilder(
     column: $table.sortIndex,
     builder: (column) => ColumnOrderings(column),
@@ -2599,6 +2664,9 @@ class $$CatalogItemsTableAnnotationComposer
 
   GeneratedColumn<int> get year =>
       $composableBuilder(column: $table.year, builder: (column) => column);
+
+  GeneratedColumn<int> get recency =>
+      $composableBuilder(column: $table.recency, builder: (column) => column);
 
   GeneratedColumn<int> get sortIndex =>
       $composableBuilder(column: $table.sortIndex, builder: (column) => column);
@@ -2653,6 +2721,7 @@ class $$CatalogItemsTableTableManager
                 Value<String?> categoryIdsJson = const Value.absent(),
                 Value<double?> rating = const Value.absent(),
                 Value<int?> year = const Value.absent(),
+                Value<int?> recency = const Value.absent(),
                 Value<int> sortIndex = const Value.absent(),
                 Value<String> json = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2666,6 +2735,7 @@ class $$CatalogItemsTableTableManager
                 categoryIdsJson: categoryIdsJson,
                 rating: rating,
                 year: year,
+                recency: recency,
                 sortIndex: sortIndex,
                 json: json,
                 rowid: rowid,
@@ -2681,6 +2751,7 @@ class $$CatalogItemsTableTableManager
                 Value<String?> categoryIdsJson = const Value.absent(),
                 Value<double?> rating = const Value.absent(),
                 Value<int?> year = const Value.absent(),
+                Value<int?> recency = const Value.absent(),
                 required int sortIndex,
                 required String json,
                 Value<int> rowid = const Value.absent(),
@@ -2694,6 +2765,7 @@ class $$CatalogItemsTableTableManager
                 categoryIdsJson: categoryIdsJson,
                 rating: rating,
                 year: year,
+                recency: recency,
                 sortIndex: sortIndex,
                 json: json,
                 rowid: rowid,

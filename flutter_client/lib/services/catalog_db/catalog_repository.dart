@@ -18,6 +18,9 @@ enum CatalogSort {
   ratingDesc,
   yearDesc,
   yearAsc,
+
+  /// [CatalogItems.recency], newest first.
+  recentDesc,
 }
 
 /// Domain-facing wrapper over [CatalogDatabase]. Encodes/decodes rows through
@@ -210,6 +213,7 @@ class CatalogRepository {
           ),
           rating: Value(vod.rating),
           year: Value(_parseYear(vod.year)),
+          recency: Value(vod.addedAt),
           sortIndex: sortIndex,
           json: jsonEncode(encodeVod(vod)),
         );
@@ -227,6 +231,7 @@ class CatalogRepository {
           ),
           rating: Value(series.rating),
           year: Value(_parseYear(series.year)),
+          recency: Value(series.lastModifiedAt),
           sortIndex: sortIndex,
           json: jsonEncode(encodeSeries(series)),
         );
@@ -317,7 +322,7 @@ class CatalogRepository {
   }
 
   /// Ordering terms for [sort], always ending in [CatalogItems.sortIndex] as
-  /// a stable tiebreaker. `ratingDesc`/`yearDesc` rely on SQLite's default
+  /// a stable tiebreaker. `ratingDesc`/`yearDesc`/`recentDesc` rely on SQLite's default
   /// NULL-sorts-smaller-than-anything behavior to sink unrated/unknown-year
   /// rows to the bottom for free; `yearAsc` orders oldest-first but still
   /// wants unknown years last rather than first, so it asks for that
@@ -342,6 +347,10 @@ class CatalogRepository {
           expression: t.year,
           nulls: NullsOrder.last,
         ),
+        tiebreaker,
+      ],
+      CatalogSort.recentDesc => [
+        (t) => OrderingTerm(expression: t.recency, mode: OrderingMode.desc),
         tiebreaker,
       ],
     };

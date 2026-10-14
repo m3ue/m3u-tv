@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/media_sort.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
 
 /// Shows the "Sort By" modal shared by every sortable media grid (VOD,
@@ -10,10 +11,14 @@ import 'package:m3u_tv/shared/sort_option_row.dart';
 /// dialog was dismissed (Close, back, tap outside) without one. The
 /// Favorites First switch reports through [onFavoritesFirstChanged] as it
 /// is flipped, independent of the return value.
+///
+/// [recentOption] is the screen's "newest" sort: [MediaSortOption
+/// .recentlyAdded] for VOD, [MediaSortOption.recentlyUpdated] for Series.
 Future<MediaSortOption?> showMediaSortDialog(
   BuildContext context, {
   required String title,
   required MediaSortOption current,
+  required MediaSortOption recentOption,
   required bool favoritesFirst,
   required ValueChanged<bool> onFavoritesFirstChanged,
 }) {
@@ -30,6 +35,11 @@ Future<MediaSortOption?> showMediaSortDialog(
       Icons.north,
       l.mediaSortReleaseDateOldest,
       MediaSortOption.releaseDateAsc,
+    ),
+    (
+      Icons.new_releases_outlined,
+      mediaSortButtonLabel(l, recentOption),
+      recentOption,
     ),
   ];
   return showDialog<MediaSortOption>(
