@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/catalog_window_grid.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
@@ -379,7 +380,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           title: item.name,
           imageUrl: item.coverUrl,
           subtitle: item.year,
-          ratingLabel: item.rating == null ? null : '★ ${item.rating}',
+          ratingLabel: item.rating == null ? null : formatRating(item.rating!),
           fallbackIcon: Icons.tv,
           isFavorite: _favoriteIds.contains(item.id),
           onTap: () => widget.onSeriesSelect(item),

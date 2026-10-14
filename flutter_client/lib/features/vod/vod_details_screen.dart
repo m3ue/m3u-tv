@@ -7,6 +7,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
@@ -47,8 +48,8 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
       .then((info) {
         unawaited(
           _resolveDominantColor(
-            _notEmpty(info.backdropUrl) ??
-                _notEmpty(info.coverUrl) ??
+            nullIfBlank(info.backdropUrl) ??
+                nullIfBlank(info.coverUrl) ??
                 widget.item.logoUrl,
           ),
         );
@@ -169,8 +170,8 @@ class _VodDetailsBody extends StatelessWidget {
       contentRating: details.contentRating,
       chips: [
         if (details.genre != null) details.genre!,
-        if (details.duration != null) details.duration!,
-        if (details.rating != null) '★ ${details.rating}',
+        ?formatRuntimeText(details.duration),
+        if (details.rating != null) formatRating(details.rating!),
         if (details.containerExtension != null)
           details.containerExtension!.toUpperCase(),
       ],
@@ -263,27 +264,23 @@ class _ResolvedVodDetails {
   final VodItem item;
   final VodInfo? info;
 
-  String get name => _notEmpty(info?.name) ?? item.name;
-  String? get plot => _notEmpty(info?.plot);
-  String? get genre => _notEmpty(info?.genre);
-  String? get director => _notEmpty(info?.director);
-  String? get cast => _notEmpty(info?.cast);
+  String get name => nullIfBlank(info?.name) ?? item.name;
+  String? get plot => nullIfBlank(info?.plot);
+  String? get genre => nullIfBlank(info?.genre);
+  String? get director => nullIfBlank(info?.director);
+  String? get cast => nullIfBlank(info?.cast);
   List<CastMember>? get richCast => info?.richCast;
   List<RelatedItem>? get related => info?.related;
-  String? get year => _notEmpty(info?.year) ?? _notEmpty(info?.releaseDate);
-  String? get duration => _notEmpty(info?.duration);
+  String? get year => nullIfBlank(info?.year) ?? nullIfBlank(info?.releaseDate);
+  String? get duration => nullIfBlank(info?.duration);
   double? get rating => info?.rating ?? item.rating;
   String? get contentRating => info?.contentRating;
-  String? get coverUrl => _notEmpty(info?.coverUrl) ?? _notEmpty(item.logoUrl);
-  String? get backdropUrl => _notEmpty(info?.backdropUrl);
-  String? get clearLogoUrl => _notEmpty(info?.clearLogoUrl);
+  String? get coverUrl =>
+      nullIfBlank(info?.coverUrl) ?? nullIfBlank(item.logoUrl);
+  String? get backdropUrl => nullIfBlank(info?.backdropUrl);
+  String? get clearLogoUrl => nullIfBlank(info?.clearLogoUrl);
   String? get containerExtension =>
-      _notEmpty(info?.containerExtension) ?? item.containerExtension;
+      nullIfBlank(info?.containerExtension) ?? item.containerExtension;
   int? get tmdbId => info?.tmdbId;
-  String? get edlUrl => _notEmpty(info?.edlUrl);
-}
-
-String? _notEmpty(String? value) {
-  final text = value?.trim();
-  return text == null || text.isEmpty ? null : text;
+  String? get edlUrl => nullIfBlank(info?.edlUrl);
 }

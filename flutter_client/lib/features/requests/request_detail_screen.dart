@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
@@ -166,11 +167,9 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
     final chips = [
       if (result.year != null) result.year!,
       if (result.certification != null) result.certification!,
-      if (rating != null && rating.source == null)
-        '★ ${rating.value.toStringAsFixed(1)}',
-      if (rating != null && rating.source != null)
-        '★ ${rating.value.toStringAsFixed(1)} ${rating.source!.toUpperCase()}',
-      if (result.runtimeMinutes != null) _formatRuntime(result.runtimeMinutes!),
+      if (rating != null) formatRating(rating.value, source: rating.source),
+      if (result.runtimeMinutes != null)
+        formatRuntime(Duration(minutes: result.runtimeMinutes!)),
       ...result.genres.take(3),
     ];
 
@@ -237,14 +236,6 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
         MediaRequestStatus.completed => l.requestsStatusCompleted,
         MediaRequestStatus.unknown => l.requestsStatusUnknown,
       };
-
-  String _formatRuntime(int minutes) {
-    final hours = minutes ~/ 60;
-    final mins = minutes % 60;
-    if (hours > 0 && mins > 0) return '${hours}h ${mins}m';
-    if (hours > 0) return '${hours}h';
-    return '${mins}m';
-  }
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

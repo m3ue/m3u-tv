@@ -5,6 +5,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 /// Whether [progress] belongs in "Continue Watching": not live, not
@@ -135,7 +136,7 @@ MediaPreviewItem? _resumePreviewItem(
         progressFraction: fraction,
         overlayLabel: progress.year,
         overlayBadges: <String>[
-          if (progress.rating != null) '★ ${progress.rating}',
+          ?formatRatingText(progress.rating),
           if (progress.runtime != null) progress.runtime!,
         ],
         onTap: () => onProgressSelect(progress),
@@ -161,7 +162,7 @@ MediaPreviewItem? _resumePreviewItem(
       fallbackTitle: item.name,
       progressFraction: fraction,
       overlayBadges: <String>[
-        if (item.rating != null) '★ ${item.rating!.toStringAsFixed(1)}',
+        if (item.rating != null) formatRating(item.rating!),
       ],
       onTap: () => onProgressSelect(progress),
       onFocused: onFocused,
@@ -204,7 +205,7 @@ MediaPreviewItem? _resumePreviewItem(
             ? 'S${progress.seasonNumber}${progress.episodeNumber != null ? ' E${progress.episodeNumber}' : ''}'
             : null,
         overlayBadges: <String>[
-          if (progress.rating != null) '★ ${progress.rating}',
+          ?formatRatingText(progress.rating),
           if (progress.runtime != null) progress.runtime!,
         ],
         onTap: () => onProgressSelect(progress),

@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
     if (dart.library.io) 'xtream_http_transport_io.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 typedef XtreamTransport = Future<Object?> Function(XtreamRequest request);

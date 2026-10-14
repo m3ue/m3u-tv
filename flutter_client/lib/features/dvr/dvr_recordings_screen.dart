@@ -13,6 +13,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -623,10 +624,10 @@ class _DvrStorageSummary extends StatelessWidget {
     final percentUsed = info.percentUsed;
     final hasQuota = quotaBytes != null && percentUsed != null;
 
-    final usedLabel = _formatBytes(info.usedBytes);
+    final usedLabel = formatBytes(info.usedBytes);
     final summary = quotaBytes == null
         ? l10n.dvrStorageUsedUnlimited(usedLabel)
-        : l10n.dvrStorageUsedWithQuota(usedLabel, _formatBytes(quotaBytes));
+        : l10n.dvrStorageUsedWithQuota(usedLabel, formatBytes(quotaBytes));
 
     final Color barColor;
     if (percentUsed == null) {
@@ -733,13 +734,6 @@ class _DvrStorageSummary extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatBytes(int bytes) {
-  final gib = bytes / (1024 * 1024 * 1024);
-  if (gib >= 1) return '${gib.toStringAsFixed(1)} GB';
-  final mib = bytes / (1024 * 1024);
-  return '${mib.toStringAsFixed(0)} MB';
 }
 
 class _RecordingList extends ConsumerStatefulWidget {
@@ -1198,11 +1192,16 @@ class _MetaLine extends StatelessWidget {
     }
     if (duration != null && duration > 0) {
       appendSeparator();
-      spans.add(TextSpan(text: _durationLabel(duration), style: muted));
+      spans.add(
+        TextSpan(
+          text: formatRuntime(Duration(seconds: duration)),
+          style: muted,
+        ),
+      );
     }
     if (size != null && size > 0) {
       appendSeparator();
-      spans.add(TextSpan(text: _sizeLabel(size), style: muted));
+      spans.add(TextSpan(text: formatBytes(size), style: muted));
     }
 
     return Text.rich(
@@ -1210,21 +1209,6 @@ class _MetaLine extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
-  }
-
-  String _durationLabel(int seconds) {
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
-    if (hours > 0) return '${hours}h';
-    return '${minutes}m';
-  }
-
-  String _sizeLabel(int bytes) {
-    final gib = bytes / (1024 * 1024 * 1024);
-    if (gib >= 1) return '${gib.toStringAsFixed(1)} GB';
-    final mib = bytes / (1024 * 1024);
-    return '${mib.toStringAsFixed(0)} MB';
   }
 }
 

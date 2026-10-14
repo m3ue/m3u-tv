@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
@@ -275,8 +276,8 @@ class _MovieBody extends StatelessWidget {
       clearLogoUrl: item.clearLogoUrl,
       chips: [
         if (item.year != null) item.year!,
-        if (item.imdbRating != null) '★ ${item.imdbRating}',
-        ?_runtimeChip(item.runtime),
+        ?formatRatingText(item.imdbRating),
+        ?formatRuntimeText(item.runtime),
         ...item.genres.take(3),
       ],
       plot: item.description,
@@ -302,15 +303,6 @@ class _MovieBody extends StatelessWidget {
       colorMatchReady: colorMatchReady,
     );
   }
-}
-
-/// Renders a runtime value ("136", "136 min") as a "136m" chip, or null when
-/// there is nothing parseable.
-String? _runtimeChip(String? runtime) {
-  if (runtime == null) return null;
-  final match = RegExp(r'(\d+)').firstMatch(runtime);
-  if (match == null) return null;
-  return '${match.group(1)}m';
 }
 
 // ---------------------------------------------------------------------------
@@ -540,8 +532,8 @@ class _SeriesBodyState extends State<_SeriesBody> {
 
     final chips = <String>[
       if (seasons.isNotEmpty) '${seasons.length} ${l.seriesSeasons}',
-      if (item.imdbRating != null) '★ ${item.imdbRating}',
-      ?_runtimeChip(item.runtime),
+      ?formatRatingText(item.imdbRating),
+      ?formatRuntimeText(item.runtime),
     ];
 
     final meta = ItemMetaInfo(

@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -267,9 +268,7 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
             title: result.item.name,
             imageUrl: result.item.poster,
             subtitle: result.item.year ?? result.item.type,
-            ratingLabel: result.item.imdbRating == null
-                ? null
-                : '★ ${result.item.imdbRating}',
+            ratingLabel: formatRatingText(result.item.imdbRating),
             fallbackIcon: result.item.type == 'series' ? Icons.tv : Icons.movie,
             fallbackTitle: result.item.name,
             isFavorite: _favoriteIds.contains(result.item.id),

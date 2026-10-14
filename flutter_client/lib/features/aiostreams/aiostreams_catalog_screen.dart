@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -231,9 +232,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                           title: item.name,
                           imageUrl: item.poster,
                           subtitle: item.year ?? item.type,
-                          ratingLabel: item.imdbRating == null
-                              ? null
-                              : '★ ${item.imdbRating}',
+                          ratingLabel: formatRatingText(item.imdbRating),
                           fallbackIcon: item.type == 'series'
                               ? Icons.tv
                               : Icons.movie,
@@ -579,7 +578,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                         upNextLabel: p.upNext ? l.homeUpNext : null,
                         isFavorite: _favoriteIds.contains(itemId),
                         overlayBadges: <String>[
-                          if (p.rating != null) '★ ${p.rating}',
+                          ?formatRatingText(p.rating),
                           if (p.runtime != null) p.runtime!,
                         ],
                         onTap: () => _playContinueWatching(

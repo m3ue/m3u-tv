@@ -13,6 +13,7 @@ import 'package:m3u_tv/shared/catalog_text_filter.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/show_search_results_view.dart';
 
@@ -537,7 +538,7 @@ class _VodListTile extends StatelessWidget {
           oversample: 2,
         ),
         title: Text(item.name),
-        subtitle: item.rating != null ? Text('★ ${item.rating}') : null,
+        subtitle: item.rating != null ? Text(formatRating(item.rating!)) : null,
         onTap: onTap,
       ),
     );
@@ -569,7 +570,7 @@ class _SeriesListTile extends StatelessWidget {
           oversample: 2,
         ),
         title: Text(item.name),
-        subtitle: item.rating != null ? Text('★ ${item.rating}') : null,
+        subtitle: item.rating != null ? Text(formatRating(item.rating!)) : null,
         onTap: onTap,
       ),
     );

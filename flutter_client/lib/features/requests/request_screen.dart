@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
@@ -343,7 +344,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                     subtitle: result.year,
                     ratingLabel: result.rating == null
                         ? null
-                        : '★ ${result.rating!.value.toStringAsFixed(1)}',
+                        : formatRating(result.rating!.value),
                     fallbackIcon: result.type == 'series'
                         ? Icons.tv
                         : Icons.movie,

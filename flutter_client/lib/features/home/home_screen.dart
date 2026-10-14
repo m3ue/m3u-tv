@@ -18,6 +18,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 class _OfflineBanner extends StatelessWidget {
@@ -635,7 +636,9 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
               title: item.name,
               imageUrl: item.logoUrl,
               subtitle: item.year ?? l.homeMovie,
-              ratingLabel: item.rating == null ? null : '★ ${item.rating}',
+              ratingLabel: item.rating == null
+                  ? null
+                  : formatRating(item.rating!),
               fallbackIcon: Icons.movie,
               fallbackTitle: item.name,
               isFavorite: widget.favoriteVodIds.contains(item.id),
@@ -717,7 +720,9 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
               title: series.name,
               imageUrl: series.coverUrl,
               subtitle: series.year ?? l.navSeries,
-              ratingLabel: series.rating == null ? null : '★ ${series.rating}',
+              ratingLabel: series.rating == null
+                  ? null
+                  : formatRating(series.rating!),
               fallbackIcon: Icons.tv,
               fallbackTitle: series.name,
               isFavorite: widget.favoriteSeriesIds.contains(series.id),

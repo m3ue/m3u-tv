@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
@@ -646,7 +647,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     final avgRuntime = _averageRuntimeLabel;
     final chips = <String>[
       if (seasonCount > 0) '$seasonCount ${l.seriesSeasons}',
-      if (info.series.rating != null) '★ ${info.series.rating}',
+      if (info.series.rating != null) formatRating(info.series.rating!),
       ?avgRuntime,
     ];
 
@@ -734,12 +735,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     }
     if (minutes.isEmpty) return null;
     final avg = (minutes.reduce((a, b) => a + b) / minutes.length).round();
-    if (avg >= 60) {
-      final h = avg ~/ 60;
-      final m = avg % 60;
-      return m == 0 ? '~${h}h' : '~${h}h ${m}m';
-    }
-    return '~${avg}m';
+    return '~${formatRuntime(Duration(minutes: avg))}';
   }
 }
 

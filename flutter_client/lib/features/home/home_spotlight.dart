@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
     show HoverIntentCallback;
 
@@ -133,41 +134,6 @@ class HomeSpotlight {
   /// How long playing this would run from now (movie runtime, or what is
   /// left of a resume point); the hero clock adds it to the current time.
   final Duration? playLength;
-}
-
-/// Parses the runtime text the Xtream payloads carry ("01:40:09", "2h 50m",
-/// "50m", "95 min", or bare minutes) into a [Duration]. Null when it can't
-/// tell.
-Duration? parseRuntimeText(String? text) {
-  final value = text?.trim().toLowerCase();
-  if (value == null || value.isEmpty) return null;
-  if (value.contains(':')) {
-    final parts = value.split(':').map(int.tryParse).toList();
-    if (parts.any((part) => part == null)) return null;
-    final numbers = parts.cast<int>();
-    final duration = switch (numbers.length) {
-      3 => Duration(
-        hours: numbers[0],
-        minutes: numbers[1],
-        seconds: numbers[2],
-      ),
-      2 => Duration(hours: numbers[0], minutes: numbers[1]),
-      _ => null,
-    };
-    return duration == null || duration <= Duration.zero ? null : duration;
-  }
-  final minutesOnly = int.tryParse(value);
-  if (minutesOnly != null) {
-    return minutesOnly > 0 ? Duration(minutes: minutesOnly) : null;
-  }
-  final hours = RegExp(r'(\d+)\s*h').firstMatch(value);
-  final minutes = RegExp(r'(\d+)\s*m').firstMatch(value);
-  if (hours == null && minutes == null) return null;
-  final duration = Duration(
-    hours: hours == null ? 0 : int.parse(hours.group(1)!),
-    minutes: minutes == null ? 0 : int.parse(minutes.group(1)!),
-  );
-  return duration > Duration.zero ? duration : null;
 }
 
 /// Debounces focus changes into the hero. A D-pad held down steps through a
@@ -359,14 +325,6 @@ class HomeSpotlightEnricher {
   }
 }
 
-String? _notEmpty(String? value) {
-  final text = value?.trim();
-  return text == null || text.isEmpty ? null : text;
-}
-
-String _ratingLabel(double rating) =>
-    '★ ${rating == rating.roundToDouble() ? rating.toStringAsFixed(0) : rating.toStringAsFixed(1)}';
-
 /// Formatting hooks [resolveHomeSpotlight] needs from the widget layer, kept
 /// as plain functions so the resolver stays testable without a context.
 class HomeSpotlightFormat {
@@ -391,40 +349,40 @@ HomeSpotlight resolveHomeSpotlight(
   switch (target) {
     case VodSpotlightTarget(:final item):
       final info = enricher.vodInfo(item.id);
-      final backdrop = _notEmpty(info?.backdropUrl);
+      final backdrop = nullIfBlank(info?.backdropUrl);
       final rating = info?.rating ?? item.rating;
       return HomeSpotlight(
         key: target.key,
-        title: _notEmpty(info?.name) ?? item.name,
-        clearLogoUrl: _notEmpty(info?.clearLogoUrl),
+        title: nullIfBlank(info?.name) ?? item.name,
+        clearLogoUrl: nullIfBlank(info?.clearLogoUrl),
         backdropUrl: backdrop,
-        toneUrl: backdrop ?? _notEmpty(info?.coverUrl) ?? item.logoUrl,
+        toneUrl: backdrop ?? nullIfBlank(info?.coverUrl) ?? item.logoUrl,
         chips: [
-          ?(_notEmpty(info?.year) ?? item.year),
-          ?_notEmpty(info?.contentRating),
-          ?_notEmpty(info?.genre),
-          ?_notEmpty(info?.duration),
-          if (rating != null && rating > 0) _ratingLabel(rating),
+          ?(nullIfBlank(info?.year) ?? item.year),
+          ?nullIfBlank(info?.contentRating),
+          ?nullIfBlank(info?.genre),
+          ?formatRuntimeText(info?.duration),
+          if (rating != null && rating > 0) formatRating(rating),
         ],
-        plot: _notEmpty(info?.plot),
+        plot: nullIfBlank(info?.plot),
         playLength: parseRuntimeText(info?.duration),
       );
 
     case SeriesSpotlightTarget(:final series):
-      final backdrop = _notEmpty(series.backdropUrl);
+      final backdrop = nullIfBlank(series.backdropUrl);
       final rating = series.rating;
       return HomeSpotlight(
         key: target.key,
         title: series.name,
-        clearLogoUrl: _notEmpty(series.clearLogoUrl),
+        clearLogoUrl: nullIfBlank(series.clearLogoUrl),
         backdropUrl: backdrop,
         toneUrl: backdrop ?? series.coverUrl,
         chips: [
           ?series.year,
-          ?_notEmpty(series.contentRating),
-          if (rating != null && rating > 0) _ratingLabel(rating),
+          ?nullIfBlank(series.contentRating),
+          if (rating != null && rating > 0) formatRating(rating),
         ],
-        plot: _notEmpty(series.plot),
+        plot: nullIfBlank(series.plot),
       );
 
     case ChannelSpotlightTarget(:final channel):
@@ -464,20 +422,21 @@ HomeSpotlight _channelSpotlight(
       plot: l.epgNoData,
     );
   }
-  final backdrop = _notEmpty(program.backdropUrl) ?? _notEmpty(program.iconUrl);
+  final backdrop =
+      nullIfBlank(program.backdropUrl) ?? nullIfBlank(program.iconUrl);
   final remaining = program.end.difference(now);
   final next = epg!.next;
   final episodeLabel = _episodeLabel(l, program);
-  final subtitle = _notEmpty(program.subtitle);
+  final subtitle = nullIfBlank(program.subtitle);
   final secondary = [
     ?episodeLabel,
     if (subtitle != null && subtitle != program.title.trim()) subtitle,
   ].join(' - ');
   return HomeSpotlight(
     key: target.key,
-    title: _notEmpty(program.title) ?? channel.name,
+    title: nullIfBlank(program.title) ?? channel.name,
     backdropUrl: backdrop,
-    toneUrl: backdrop ?? _notEmpty(program.posterUrl) ?? channel.logoUrl,
+    toneUrl: backdrop ?? nullIfBlank(program.posterUrl) ?? channel.logoUrl,
     badge: l.epgLiveBadge,
     kicker: channel.name,
     kickerLogoUrl: channel.logoUrl,
@@ -485,15 +444,15 @@ HomeSpotlight _channelSpotlight(
     chips: [
       if (program.isNew) l.epgBadgeNew,
       if (program.isPremiere) l.epgBadgePremiere,
-      ?_notEmpty(program.category),
+      ?nullIfBlank(program.category),
       if (program.year != null) '${program.year}',
-      ?_notEmpty(program.rating),
+      ?nullIfBlank(program.rating),
     ],
     progress: epg.progress,
     progressLabel:
         '${format.timeOfDay(program.start)} - ${format.timeOfDay(program.end)}'
         '${remaining.isNegative ? '' : '  ·  ${l.epgTimeLeft(format.duration(remaining))}'}',
-    plot: _notEmpty(program.description),
+    plot: nullIfBlank(program.description),
     footnote: next == null || next.isPlaceholder
         ? null
         : '${l.homeUpNext}: ${format.timeOfDay(next.start)}  '
@@ -527,16 +486,16 @@ HomeSpotlight _progressSpotlight(
                 ),
         )
       : parseRuntimeText(progress.runtime);
-  final runtime = _notEmpty(progress.runtime);
-  final genre = _notEmpty(progress.genre);
-  final rating = _notEmpty(progress.rating);
+  final runtime = formatRuntimeText(progress.runtime);
+  final genre = nullIfBlank(progress.genre);
+  final rating = nullIfBlank(progress.rating);
 
   if (progress.contentType == ContentType.episode) {
     final series = progress.seriesId == null
         ? null
         : enricher.series(progress.seriesId!);
     final backdrop =
-        _notEmpty(progress.backdropUrl) ?? _notEmpty(series?.backdropUrl);
+        nullIfBlank(progress.backdropUrl) ?? nullIfBlank(series?.backdropUrl);
     final season = progress.seasonNumber;
     final episode = progress.episodeNumber;
     final numbering = season != null && episode != null
@@ -544,61 +503,62 @@ HomeSpotlight _progressSpotlight(
         : season != null
         ? l.epgSeasonNumber(season)
         : null;
-    final secondary = [?numbering, ?_notEmpty(progress.episodeTitle)].join(
+    final secondary = [?numbering, ?nullIfBlank(progress.episodeTitle)].join(
       ' - ',
     );
     return HomeSpotlight(
       key: target.key,
       title:
-          _notEmpty(progress.seriesName) ??
+          nullIfBlank(progress.seriesName) ??
           series?.name ??
-          _notEmpty(progress.title) ??
+          nullIfBlank(progress.title) ??
           '',
-      clearLogoUrl: _notEmpty(series?.clearLogoUrl),
+      clearLogoUrl: nullIfBlank(series?.clearLogoUrl),
       backdropUrl: backdrop,
-      toneUrl: backdrop ?? _notEmpty(progress.thumbnailUrl) ?? series?.coverUrl,
+      toneUrl:
+          backdrop ?? nullIfBlank(progress.thumbnailUrl) ?? series?.coverUrl,
       badge: progress.upNext ? l.homeUpNext : null,
       secondaryTitle: secondary.isEmpty ? null : secondary,
       chips: [
         ?series?.year,
-        ?_notEmpty(series?.contentRating),
+        ?nullIfBlank(series?.contentRating),
         ?genre,
         ?runtime,
-        if (rating != null) '★ $rating',
+        ?formatRatingText(rating),
       ],
       progress: fraction,
       progressLabel: timeLeft,
-      plot: _notEmpty(progress.plot) ?? _notEmpty(series?.plot),
+      plot: nullIfBlank(progress.plot) ?? nullIfBlank(series?.plot),
       playLength: playLength,
     );
   }
 
   final info = enricher.vodInfo(progress.streamId);
   final backdrop =
-      _notEmpty(progress.backdropUrl) ?? _notEmpty(info?.backdropUrl);
+      nullIfBlank(progress.backdropUrl) ?? nullIfBlank(info?.backdropUrl);
   final infoRating = info?.rating;
   return HomeSpotlight(
     key: target.key,
-    title: _notEmpty(progress.title) ?? _notEmpty(info?.name) ?? '',
-    clearLogoUrl: _notEmpty(info?.clearLogoUrl),
+    title: nullIfBlank(progress.title) ?? nullIfBlank(info?.name) ?? '',
+    clearLogoUrl: nullIfBlank(info?.clearLogoUrl),
     backdropUrl: backdrop,
     toneUrl:
         backdrop ??
-        _notEmpty(progress.thumbnailUrl) ??
-        _notEmpty(info?.coverUrl),
+        nullIfBlank(progress.thumbnailUrl) ??
+        nullIfBlank(info?.coverUrl),
     chips: [
-      ?(_notEmpty(info?.year) ?? _notEmpty(progress.year)),
-      ?_notEmpty(info?.contentRating),
-      ?(genre ?? _notEmpty(info?.genre)),
-      ?(runtime ?? _notEmpty(info?.duration)),
+      ?(nullIfBlank(info?.year) ?? nullIfBlank(progress.year)),
+      ?nullIfBlank(info?.contentRating),
+      ?(genre ?? nullIfBlank(info?.genre)),
+      ?(runtime ?? formatRuntimeText(info?.duration)),
       if (rating != null)
-        '★ $rating'
+        formatRatingText(rating)!
       else if (infoRating != null && infoRating > 0)
-        _ratingLabel(infoRating),
+        formatRating(infoRating),
     ],
     progress: fraction,
     progressLabel: timeLeft,
-    plot: _notEmpty(progress.plot) ?? _notEmpty(info?.plot),
+    plot: nullIfBlank(progress.plot) ?? nullIfBlank(info?.plot),
     playLength: playLength ?? parseRuntimeText(info?.duration),
   );
 }

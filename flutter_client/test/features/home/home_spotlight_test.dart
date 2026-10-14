@@ -266,29 +266,6 @@ void main() {
     });
   });
 
-  group('parseRuntimeText', () {
-    test('reads the runtime formats the payloads carry', () {
-      expect(
-        parseRuntimeText('01:40:09'),
-        const Duration(hours: 1, minutes: 40, seconds: 9),
-      );
-      expect(parseRuntimeText('1:45'), const Duration(hours: 1, minutes: 45));
-      expect(parseRuntimeText('2h 50m'), const Duration(hours: 2, minutes: 50));
-      expect(parseRuntimeText('2h'), const Duration(hours: 2));
-      expect(parseRuntimeText('50m'), const Duration(minutes: 50));
-      expect(parseRuntimeText('95 min'), const Duration(minutes: 95));
-      expect(parseRuntimeText('120'), const Duration(minutes: 120));
-    });
-
-    test('returns null for empty or unreadable text', () {
-      expect(parseRuntimeText(null), isNull);
-      expect(parseRuntimeText(''), isNull);
-      expect(parseRuntimeText('0'), isNull);
-      expect(parseRuntimeText('00:00:00'), isNull);
-      expect(parseRuntimeText('unknown'), isNull);
-    });
-  });
-
   group('HomeSpotlightController', () {
     test('applies the first selection at once and debounces the rest', () {
       fakeAsync((async) {

@@ -15,6 +15,7 @@ import 'package:m3u_tv/shared/cast_strip.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart' show isDesktopPlatform;
+import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -1008,7 +1009,7 @@ class EpisodeCard extends StatelessWidget {
                             if (episode.rating != null)
                               _pillText(
                                 context,
-                                '★ ${episode.rating!.toStringAsFixed(1)}',
+                                formatRating(episode.rating!),
                               ),
                             if (runtime != null && runtime.isNotEmpty)
                               _pillText(context, runtime),
@@ -1086,7 +1087,7 @@ class EpisodeCard extends StatelessWidget {
     const thumbHeight = thumbWidth * 9 / 16;
     final metaParts = <String>[
       'S${episode.seasonNumber}E${episode.episodeNumber}',
-      if (episode.rating != null) '★ ${episode.rating!.toStringAsFixed(1)}',
+      if (episode.rating != null) formatRating(episode.rating!),
       if (runtime != null && runtime.isNotEmpty) runtime,
     ];
 

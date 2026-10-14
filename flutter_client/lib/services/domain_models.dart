@@ -1,5 +1,7 @@
 // ignore_for_file: sort_constructors_first
 
+import 'package:m3u_tv/shared/formatters.dart';
+
 enum ContentType { live, vod, episode, aiostreams }
 
 final RegExp _schemePattern = RegExp('^[a-zA-Z][a-zA-Z0-9+.-]*://');
@@ -1813,20 +1815,14 @@ Map<String, Object?> _asMap(Object? value) {
 
 String? _durationText(Object? value) {
   if (value == null) return null;
-  if (value is num) return _durationFromSeconds(value.toInt());
+  if (value is num) return formatRuntime(Duration(seconds: value.toInt()));
   final text = '$value'.trim();
   if (text.isEmpty) return null;
   final seconds = int.tryParse(text);
-  if (seconds != null && seconds > 300) return _durationFromSeconds(seconds);
+  if (seconds != null && seconds > 300) {
+    return formatRuntime(Duration(seconds: seconds));
+  }
   return text;
-}
-
-String _durationFromSeconds(int seconds) {
-  final hours = seconds ~/ 3600;
-  final minutes = (seconds % 3600) ~/ 60;
-  if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
-  if (hours > 0) return '${hours}h';
-  return '${minutes}m';
 }
 
 Object? _firstListItem(Object? value) {
@@ -1880,12 +1876,6 @@ String? _yearString(Object? value) {
   return _yearFromDate(text) ??
       (RegExp(r'^\d{4}$').hasMatch(text) ? text : null);
 }
-
-/// Treats `null` and blank/whitespace-only strings as "absent" so optional
-/// fields fall back cleanly at the display site without leaking the upstream
-/// `''` placeholder.
-String? nullIfBlank(String? value) =>
-    (value == null || value.trim().isEmpty) ? null : value;
 
 /// A tick of `AppStateController`'s background EPG sweep
 /// (`epgSweepProgress`), for driving an in-app "loading guide" indicator.
