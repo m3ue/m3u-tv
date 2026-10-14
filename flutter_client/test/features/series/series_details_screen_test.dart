@@ -231,6 +231,19 @@ void main() {
     expect(find.byType(Scrollbar), findsNothing);
   });
 
+  testWidgets('shows the series genre as a metadata chip', (tester) async {
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Fixture Show', genre: 'Drama, Mystery'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      episodesBySeason: {},
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Drama, Mystery'), findsOneWidget);
+  });
+
   testWidgets('play button takes focus once the series loads', (tester) async {
     await tester.pumpWidget(_app(_info()));
     await tester.pumpAndSettle();

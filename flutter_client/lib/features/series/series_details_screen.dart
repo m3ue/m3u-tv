@@ -646,6 +646,7 @@ class _SeriesDetailsBody extends StatelessWidget {
         : info.episodesBySeason.length;
     final avgRuntime = _averageRuntimeLabel;
     final chips = <String>[
+      ?info.series.genre,
       if (seasonCount > 0) '$seasonCount ${l.seriesSeasons}',
       if (info.series.rating != null) formatRating(info.series.rating!),
       ?avgRuntime,
