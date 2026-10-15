@@ -77,6 +77,13 @@ final class MpvPlayerCore {
       mpv_set_option_string(handle, "hwdec-software-fallback", "yes")
       mpv_set_option_string(handle, "keep-open", "yes")
       mpv_set_option_string(handle, "vd-lavc-dr", "yes")
+      // AVFoundation output first: mpv's default, ao_audiounit, sizes its
+      // output from the route's hardware channels, and AirPods report 2 even
+      // with Spatial Audio, so every 5.1/7.1 source was folded to stereo.
+      // AVSampleBufferAudioRenderer takes the decoder's full layout, which
+      // the system spatializes. audiounit stays as the fallback if it fails
+      // to open (Plezy f1708dd6e).
+      mpv_set_option_string(handle, "ao", "avfoundation,audiounit")
       // `fuzzy` auto-loads sidecar subtitle files (`.srt`/`.vtt`) next to a
       // local/network URI whose filename fuzzily matches, in addition to
       // whatever `sub-add` calls `load(subtitles:)` issues explicitly below.

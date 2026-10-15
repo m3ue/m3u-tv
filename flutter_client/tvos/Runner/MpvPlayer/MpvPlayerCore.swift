@@ -50,8 +50,9 @@ private struct DisplayCriteriaInputs: Equatable {
   var doviProfile: Int64 = 0
   var doviLevel: Int64 = 0
   var containerFps: Double = 0
-  /// `estimated-vf-fps` at the first shown frame. Changes every frame, so it
-  /// is read at PLAYBACK_RESTART only, never observed.
+  /// `estimated-vf-fps`. Changes every frame, so it is read at
+  /// PLAYBACK_RESTART (and once more a second later when the file declares
+  /// no frame rate), never observed.
   var estimatedFps: Double = 0
   var deinterlaceActive = false
   var gamma: String?
@@ -85,6 +86,13 @@ final class MpvPlayerCore {
   // renegotiating HDMI for seconds per transition (Plezy e30ba79c5).
   private var displayCriteriaInputs = DisplayCriteriaInputs()
   private var displayCriteriaHeld = true
+  // A file that declares no frame rate (a Matroska track without
+  // DefaultDuration) waits for a measured one before its first commit, so an
+  // HDR file doesn't switch the TV twice (dynamic range, then rate). The
+  // generation ties the delayed measurement to the file that asked for it.
+  private var displayCriteriaAwaitingMeasuredRate = false
+  private var displayCriteriaFileGeneration = 0
+  private static let measuredRateDelay: DispatchTimeInterval = .seconds(1)
 
   // Set fresh on every `load()`, read only on `queue` (see
   // `commitDisplayCriteria`, which captures it into the main-thread
@@ -419,6 +427,8 @@ final class MpvPlayerCore {
     switch event.event_id {
     case MPV_EVENT_START_FILE:
       displayCriteriaHeld = true
+      displayCriteriaAwaitingMeasuredRate = false
+      displayCriteriaFileGeneration += 1
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:
       readyEmitted = true
@@ -432,7 +442,11 @@ final class MpvPlayerCore {
       if let handle = mpv {
         displayCriteriaInputs = readDisplayCriteriaInputs(handle)
         displayCriteriaHeld = false
-        commitDisplayCriteria()
+        if displayCriteriaInputs.containerFps <= 0 && matchRefreshRateEnabled {
+          awaitMeasuredFrameRate()
+        } else {
+          commitDisplayCriteria()
+        }
       }
       emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
@@ -689,15 +703,23 @@ final class MpvPlayerCore {
   /// Hands the current inputs to `updateDisplayCriteria` on main (where
   /// `AVDisplayManager` must be touched). Runs on `queue`; never while held.
   private func commitDisplayCriteria() {
-    guard !displayCriteriaHeld else { return }
+    guard !displayCriteriaHeld, !displayCriteriaAwaitingMeasuredRate else { return }
     let inputs = displayCriteriaInputs
-    // Presented one frame per field when mpv's deinterlacer runs, or when
-    // the first frame's cadence says the decoder deinterlaced by itself:
-    // either way the display should run at twice the container rate.
-    let fieldOutput =
-      inputs.deinterlaceActive
-      || Self.presentsFields(container: inputs.containerFps, presented: inputs.estimatedFps)
-    let fps = Self.nominalRefreshRate(fieldOutput ? inputs.containerFps * 2 : inputs.containerFps)
+    let fps: Double
+    if inputs.containerFps > 0 {
+      // Presented one frame per field when mpv's deinterlacer runs, or when
+      // the first frame's cadence says the decoder deinterlaced by itself:
+      // either way the display should run at twice the container rate.
+      let fieldOutput =
+        inputs.deinterlaceActive
+        || Self.presentsFields(container: inputs.containerFps, presented: inputs.estimatedFps)
+      fps = Self.nominalRefreshRate(fieldOutput ? inputs.containerFps * 2 : inputs.containerFps)
+    } else {
+      // No declared rate: the measured output rate, already counting fields,
+      // when it lands on a standard rate. Variable-rate content lands on
+      // none and switches nothing (Plezy d090257d0).
+      fps = Self.standardRefreshRate(near: inputs.estimatedFps) ?? 0
+    }
     // Read here, on `queue` -- see `matchRefreshRateEnabled`'s doc comment.
     let matchRefreshRateEnabled = self.matchRefreshRateEnabled
 
@@ -741,9 +763,33 @@ final class MpvPlayerCore {
   /// nominal rates, so the request itself has to be nominal (Plezy
   /// 81f0b49cb).
   private static func nominalRefreshRate(_ fps: Double) -> Double {
-    guard fps > 0 else { return 0 }
-    guard let nearest = nominalRefreshRates.min(by: { abs($0 - fps) < abs($1 - fps) }) else { return fps }
-    return abs(nearest - fps) / nearest < 0.01 ? nearest : fps
+    standardRefreshRate(near: fps) ?? (fps > 0 ? fps : 0)
+  }
+
+  /// The nominal rate within 1% of `fps`, or nil when there is none.
+  private static func standardRefreshRate(near fps: Double) -> Double? {
+    guard fps > 0, let nearest = nominalRefreshRates.min(by: { abs($0 - fps) < abs($1 - fps) }) else {
+      return nil
+    }
+    return abs(nearest - fps) / nearest < 0.01 ? nearest : nil
+  }
+
+  /// Reads `estimated-vf-fps` once mpv has averaged it over about a second of
+  /// frames (at the first frame it has one sample at most), then makes the
+  /// file's first commit with it. Runs on `queue`.
+  private func awaitMeasuredFrameRate() {
+    displayCriteriaAwaitingMeasuredRate = true
+    let generation = displayCriteriaFileGeneration
+    queue.asyncAfter(deadline: .now() + Self.measuredRateDelay) { [weak self] in
+      guard let self, let handle = self.mpv, !self.disposed,
+        generation == self.displayCriteriaFileGeneration, self.displayCriteriaAwaitingMeasuredRate
+      else { return }
+      var measured: Double = 0
+      _ = mpv_get_property(handle, "estimated-vf-fps", MPV_FORMAT_DOUBLE, &measured)
+      self.displayCriteriaInputs.estimatedFps = measured
+      self.displayCriteriaAwaitingMeasuredRate = false
+      self.commitDisplayCriteria()
+    }
   }
 
   /// Requests an HDMI display-mode switch matching the current source's
