@@ -1993,10 +1993,27 @@ void main() {
           isTrue,
         );
 
-        // The revoked flag is handled on the (unawaited) notifications
-        // reconcile kicked off by connectXtream.
+        // The revoked flag fires an unawaited disconnect(). Credentials are
+        // nulled partway through it, so asserting on them alone let the test
+        // end while disconnect() was still clearing the catalog - tearDown
+        // then closed the database underneath it ("Can't re-open a database
+        // after closing it", reported as failed after test completion).
+        // Wait for disconnect() to reach its final step (source reset) so
+        // nothing is still in flight when the fixture is disposed.
+        final disconnected = Completer<void>();
+        void onChange() {
+          if (fixture.controller.sourceType == AppSourceType.none &&
+              !disconnected.isCompleted) {
+            disconnected.complete();
+          }
+        }
+
+        fixture.controller.addListener(onChange);
+        addTearDown(() => fixture.controller.removeListener(onChange));
+
         await fixture.controller.reconcileNotifications();
-        await pumpEventQueue();
+        onChange();
+        await disconnected.future.timeout(const Duration(seconds: 5));
 
         expect(fixture.auth.credentials, isNull);
       },
