@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 
@@ -10,6 +11,14 @@ import UIKit
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // Declares that playback can carry 5.1/7.1 and Dolby audio, so the
+        // system offers multichannel Spatial Audio on AirPods. mpv's
+        // AVFoundation output only declares it for sources above stereo.
+        do {
+            try AVAudioSession.sharedInstance().setSupportsMultichannelContent(true)
+        } catch {
+            NSLog("[AppDelegate] Failed to declare multichannel audio content: %@", error.localizedDescription)
+        }
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
