@@ -28,7 +28,12 @@ class MediaImageHttpFileService extends HttpFileService {
     final httpClient = HttpClient()
       ..maxConnectionsPerHost = reduced ? 4 : 8
       ..connectionTimeout = const Duration(seconds: 15)
-      ..idleTimeout = const Duration(seconds: 30);
+      // Under the 20 s keep-alive common on reverse proxies: past it, a TLS
+      // server can stop answering an idle socket before closing it, dart:io
+      // hands that dead socket the next request, and never resends a request
+      // that fails on a reused connection (dart-lang/sdk#21798), so a run of
+      // posters fails at once (Plezy e190d5175).
+      ..idleTimeout = const Duration(seconds: 15);
     return MediaImageHttpFileService._(_DrainingClient(IOClient(httpClient)));
   }
 

@@ -2012,8 +2012,8 @@ class AppShellState extends ConsumerState<AppShell>
                       if (_appState.sourceType == AppSourceType.xtream) {
                         unawaited(
                           _appState.xtreamService
-                              .updateProgress(aioToSave)
-                              .catchError((_) {}),
+                              .reportPlaybackProgress(aioToSave)
+                              .catchError((_) => false),
                         );
                       }
                       unawaited(
@@ -2027,8 +2027,8 @@ class AppShellState extends ConsumerState<AppShell>
                       if (_appState.sourceType == AppSourceType.xtream) {
                         unawaited(
                           _appState.xtreamService
-                              .updateProgress(toSave)
-                              .catchError((_) {}),
+                              .reportPlaybackProgress(toSave)
+                              .catchError((_) => false),
                         );
                       }
                       unawaited(

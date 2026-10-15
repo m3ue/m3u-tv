@@ -5,7 +5,11 @@ import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
 XtreamTransport createDefaultXtreamTransport() {
-  final client = HttpClient();
+  // Bounds only the socket connect (the OS default runs to a minute or more
+  // against an unreachable host). Deliberately no response timeout: this
+  // client also downloads whole catalogs, which a large playlist can take a
+  // long time to generate.
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
   return (XtreamRequest request) => _send(client, request);
 }
 

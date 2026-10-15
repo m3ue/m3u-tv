@@ -1034,6 +1034,26 @@ class XtreamService {
     );
   }
 
+  Future<void>? _playbackProgressInFlight;
+
+  /// The player's periodic progress report, skipped (resolving `false`)
+  /// while the previous one is still pending: against an editor that stopped
+  /// answering, a report every few seconds otherwise piles up in the
+  /// connection pool, and the next tick carries a fresher position anyway
+  /// (Plezy a63c80ced). Explicit writes such as mark watched go through
+  /// [updateProgress] and are never skipped.
+  Future<bool> reportPlaybackProgress(Progress progress) async {
+    if (_playbackProgressInFlight != null) return false;
+    final inFlight = updateProgress(progress);
+    _playbackProgressInFlight = inFlight;
+    try {
+      await inFlight;
+    } finally {
+      _playbackProgressInFlight = null;
+    }
+    return true;
+  }
+
   Future<List<Progress>> getSeriesProgress(
     String viewerId,
     int seriesId,
