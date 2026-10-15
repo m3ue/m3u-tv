@@ -9,6 +9,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import dev.sparkison.tv.FrameRateManager
 import dev.sparkison.tv.libmpv.EndFileReason
+import dev.sparkison.tv.libmpv.LogLevel
 import dev.sparkison.tv.libmpv.MpvEvent
 import dev.sparkison.tv.libmpv.MpvException
 import dev.sparkison.tv.libmpv.MpvPlayer
@@ -42,10 +43,10 @@ import kotlinx.coroutines.sync.withLock
  * itself, rather than going through a Flutter texture/SurfaceTexture
  * bridge. Subtitles are rendered natively (mpv's own libass compositing).
  *
- * Unlike the Apple/macOS cores, the underlying `dev.sparkison.tv.libmpv.MpvPlayer` is
- * a process-wide singleton (one native mpv handle via static JNI bindings) --
- * [MpvPlayerPlugin] enforces that only one [MpvPlayerCore] is ever attached
- * at a time, fully closing any previous instance before creating the next.
+ * Each `dev.sparkison.tv.libmpv.MpvPlayer` owns its own native session, and
+ * the JNI layer refuses calls and drops callbacks for a session it retired, so
+ * a closing core can never touch its successor. [MpvPlayerPlugin] still keeps
+ * only one [MpvPlayerCore] attached at a time, closing the previous one first.
  */
 class MpvPlayerCore(
     private val viewId: Int,
@@ -70,7 +71,7 @@ class MpvPlayerCore(
     // "Skipped N frames!" and visibly janky UI on real Android TV hardware).
     // `limitedParallelism(1)` moves all of that off the UI thread while
     // still confining it to one thread at a time, same as Main was -- other
-    // fields in this class (readyEmitted, lastLogText, disposed) are read
+    // fields in this class (readyEmitted, lastErrorLogText, disposed) are read
     // and written without their own synchronization, relying on exactly that
     // single-threaded assumption; a plain multi-threaded Dispatchers.IO would
     // turn those into real data races between e.g. the event pump and a
@@ -85,14 +86,13 @@ class MpvPlayerCore(
     private var readyEmitted = false
     private var disposed = false
 
-    // mpv's EndFileReason enum carries no detail beyond the reason code
-    // (unlike the raw C API's mpv_event_end_file, which also has an error
-    // code) -- dev.sparkison.tv.libmpv's Kotlin binding doesn't expose it. Tracking
-    // the most recent log line here (mirroring the Windows/Linux C++ cores'
-    // own `last_log_message` pattern) is the only way to surface mpv's own
-    // diagnostic text (e.g. "No format found, try lowering probescore or
-    // forcing the format") instead of a generic "mpv end-file error".
-    private var lastLogText: String? = null
+    // The last error-level line mpv logged for the current file, reported with
+    // a failed end-file: it names the actual failure (ffmpeg's "HTTP error
+    // 404", "No format found, try lowering probescore or forcing the
+    // format"), where the end-file's own error string only classifies it.
+    // Reliable because the libmpv module delivers a failure's log lines ahead
+    // of its end-file, in the same stream (Plezy 89f026b67).
+    private var lastErrorLogText: String? = null
 
     // Dedup so an unrelated VIDEO_RECONFIG (e.g. an audio-only track change)
     // doesn't re-trigger a display-mode switch for the same fps.
@@ -215,7 +215,6 @@ class MpvPlayerCore(
                     }
                     player = created
                     collectEvents(created)
-                    collectLogMessages(created)
                     if (surfaceView.holder.surface?.isValid == true) {
                         attachSurfaceLocked(created, surfaceView.holder.surface)
                     }
@@ -272,12 +271,12 @@ class MpvPlayerCore(
             mutex.withLock {
                 val current = player ?: return@withLock
                 readyEmitted = false
-                lastLogText = null
+                lastErrorLogText = null
                 lastAppliedFps = 0.0
                 reportedMissingFps = false
                 // Written here, not synchronously in load()'s caller-thread
                 // body, so it's only ever touched from this single-threaded
-                // scope -- same invariant [readyEmitted]/[lastLogText] rely on.
+                // scope -- same invariant [readyEmitted]/[lastErrorLogText] rely on.
                 this@MpvPlayerCore.matchDisplayRefreshRate = matchDisplayRefreshRate
                 if (matchDisplayRefreshRate) {
                     mainHandler.post { frameRateManager.log("mpv load: Auto Frame Rate on") }
@@ -302,8 +301,7 @@ class MpvPlayerCore(
                     // so this only widens ffmpeg's own auto-probe window rather
                     // than assuming a container. Always set explicitly (not
                     // just when live) -- unlike the desktop backends, this mpv
-                    // handle is a process-wide singleton reused across every
-                    // load, so a live-set override must not leak into a
+                    // handle is reused across every load of this core, so a live-set override must not leak into a
                     // subsequent VOD/Series load on the same handle; the
                     // non-live values below match ffmpeg's own stock defaults,
                     // so this is a no-op for VOD, not a behavior change.
@@ -327,14 +325,19 @@ class MpvPlayerCore(
                     // Queued right after loadfile -- mpv processes commands in
                     // order, so each sidecar subtitle is attached to the file
                     // that was just queued rather than whatever was previously
-                    // playing.
+                    // playing. A sidecar mpv can't load is skipped, not a
+                    // failed load: command() throws on a rejected command.
                     for ((subtitleUri, title, language) in externalSubtitles) {
                         val subArgs = mutableListOf("sub-add", subtitleUri, "auto")
                         if (!title.isNullOrEmpty()) {
                             subArgs.add(title)
                             if (!language.isNullOrEmpty()) subArgs.add(language)
                         }
-                        current.command(*subArgs.toTypedArray())
+                        try {
+                            current.command(*subArgs.toTypedArray())
+                        } catch (error: MpvException) {
+                            Log.w(TAG, "sub-add failed: ${error.message}")
+                        }
                     }
                 } catch (error: Exception) {
                     emitError("load failed: ${error.message}", "android-mpv-load-failed")
@@ -438,7 +441,15 @@ class MpvPlayerCore(
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             player.eventFlow.collect { event ->
                 when (event) {
-                    is MpvEvent.StartFile -> emit("START_FILE", emptyMap())
+                    is MpvEvent.StartFile -> {
+                        lastErrorLogText = null
+                        emit("START_FILE", emptyMap())
+                    }
+                    is MpvEvent.LogMessage -> {
+                        if (event.level == LogLevel.Error || event.level == LogLevel.Fatal) {
+                            lastErrorLogText = event.text.trim().takeIf { it.isNotEmpty() }
+                        }
+                    }
                     is MpvEvent.FileLoaded -> {
                         readyEmitted = true
                         emit("FILE_LOADED", snapshot(player, includeTracks = true))
@@ -459,7 +470,8 @@ class MpvPlayerCore(
                     }
                     is MpvEvent.EndFile -> {
                         if (event.reason == EndFileReason.Error) {
-                            val detail = lastLogText
+                            val detail = lastErrorLogText ?: event.errorMessage
+                            lastErrorLogText = null
                             val message = if (detail.isNullOrEmpty()) {
                                 "mpv end-file error"
                             } else {
@@ -480,16 +492,6 @@ class MpvPlayerCore(
                     }
                     is MpvEvent.Shutdown -> emit("SHUTDOWN", emptyMap())
                 }
-            }
-        }
-    }
-
-    // Tracks the most recent mpv log line so an EndFile.Error above can
-    // report *why* mpv gave up, not just that it did -- see [lastLogText].
-    private fun collectLogMessages(player: MpvPlayer) {
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            player.logFlow.collect { message ->
-                lastLogText = message.text.trim()
             }
         }
     }

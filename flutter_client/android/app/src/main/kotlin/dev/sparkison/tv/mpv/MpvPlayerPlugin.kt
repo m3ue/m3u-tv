@@ -20,14 +20,13 @@ import kotlinx.coroutines.sync.withLock
  * Method/event channel plugin for `m3u_tv/android_mpv` + `m3u_tv/android_mpv/events`.
  *
  * Modeled on `macos/Runner/MpvPlayer/MpvPlayerPlugin.swift`, with one added
- * constraint the Apple plugins don't have: the underlying
- * `dev.sparkison.tv.libmpv.MpvPlayer` is a process-wide singleton (see
- * `MpvPlayerCore`'s header comment), so at most one [MpvPlayerCore] is ever
+ * constraint the Apple plugins don't have: at most one [MpvPlayerCore] is ever
  * active. `attachCore` fully disposes any previous core -- awaiting its
- * native mpv handle actually closing -- before creating and initializing
- * the next one, serialized through [mutex] so concurrent attach/dispose
- * calls (e.g. rapid channel switching recreating the platform view) can't
- * interleave and violate that constraint.
+ * native session's retirement -- before creating and initializing the next
+ * one, serialized through [mutex] so concurrent attach/dispose calls (e.g.
+ * rapid channel switching recreating the platform view) can't interleave.
+ * Two decoders opened at once would also compete for the device's limited
+ * MediaCodec instances.
  */
 class MpvPlayerPlugin(
     val context: Context,

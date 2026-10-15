@@ -1,10 +1,7 @@
 #pragma once
 
 #include <jni.h>
-#include <mpv/client.h>
 
-#include <atomic>
-
+// The process's JavaVM, published once by the first nativeCreate (see
+// prepare_environment) and read by every thread that needs a JNIEnv.
 extern JavaVM* g_vm;
-extern mpv_handle* g_mpv;
-extern std::atomic<bool> g_event_thread_request_exit;
