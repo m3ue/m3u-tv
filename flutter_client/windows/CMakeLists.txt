@@ -25,14 +25,14 @@ set(BINARY_NAME "m3u_tv")
 # not link against libmpv.dll.a or include mpv/client.h at build time (see
 # the ABI structs hand-declared in desktop_libmpv_backend.cpp); it dlopens
 # the DLL at runtime instead, so MPV_INCLUDE_DIR is unused here.
-set(MPV_KEY "b31729582f95")
+set(MPV_KEY "488b8e8ab49c")
 set(MPV_ASSET_BASE "https://github.com/edde746/mpv-build/releases/download/binaries-windows")
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64")
   set(MPV_ARCH "aarch64")
-  set(MPV_SHA256 "686ae302c102665c336f9c56190635d0ecdfb6b0937d2dd26ec080bc04c56bcf")
+  set(MPV_SHA256 "12be20eadfe5946f5a5c813ea80ed4fa4b7cb012af8762e707d1581e86e9261a")
 else()
   set(MPV_ARCH "x86_64")
-  set(MPV_SHA256 "4e74cc3f72ab0fdb191aa0719e3f3b2b9c46c7d499021c5c943cfb9177ae07de")
+  set(MPV_SHA256 "ddf1bdb4af7d3470f53054fc2aebfea60856409e303a475423b852d7bf2b960e")
 endif()
 
 # Plain zips extract with CMake's built-in libarchive on every host arch, so
