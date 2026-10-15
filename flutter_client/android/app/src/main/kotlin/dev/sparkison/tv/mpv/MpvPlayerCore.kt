@@ -1,12 +1,14 @@
 package dev.sparkison.tv.mpv
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import dev.sparkison.tv.DeviceMemoryClass
 import dev.sparkison.tv.FrameRateManager
 import dev.sparkison.tv.libmpv.EndFileReason
 import dev.sparkison.tv.libmpv.LogLevel
@@ -178,6 +180,14 @@ class MpvPlayerCore(
                         setOption("opengl-es", "yes")
                         setOption("hwdec", "mediacodec-copy")
                         setOption("hwdec-codecs", "all")
+                        // Async MediaCodec (API 31+) and a decoder thread with
+                        // a frame queue, so a decoder that falls behind no
+                        // longer stalls audio and frame presentation; see
+                        // MpvDecoderPolicy.
+                        setOption("vd-lavc-o", MpvDecoderPolicy.decoderOptions(Build.VERSION.SDK_INT))
+                        for ((name, value) in MpvDecoderPolicy.queueOptions(DeviceMemoryClass.isLowRam(context))) {
+                            setOption(name, value)
+                        }
                         setOption("ao", "audiotrack,opensles")
                         // Pause on the last frame at EOF instead of unloading,
                         // so a seek after the video ends still works (matches
