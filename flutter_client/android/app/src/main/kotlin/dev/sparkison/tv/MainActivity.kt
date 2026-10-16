@@ -134,26 +134,14 @@ class MainActivity : FlutterActivity() {
             is64Bit = Process.is64Bit(),
         )
         renderer.shellArgument?.let { args.add(it) }
-        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(isLowRamClass(), totalMemBytes())
+        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(
+            DeviceMemoryClass.isLowRam(this),
+            DeviceMemoryClass.totalMemBytes(this),
+        )
         memoryArgs.forEach { args.add(it) }
         rendererDescription = "${renderer.diagnosticName} $memoryArgs"
         Log.i(TAG, "Flutter renderer: $rendererDescription")
         return args
-    }
-
-    // Mirrors DevicePerformance's reduced-tier triple: a 32-bit process, the
-    // platform low-RAM flag, or <= ~2.2 GiB (nominal 2GB boxes report
-    // slightly above 2 GiB after carve-outs).
-    private fun isLowRamClass(): Boolean {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        return !Process.is64Bit() ||
-            activityManager?.isLowRamDevice == true ||
-            totalMemBytes() <= LOW_MEM_THRESHOLD_BYTES
-    }
-
-    private fun totalMemBytes(): Long {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        return ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }.totalMem
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -275,7 +263,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val LOW_MEM_THRESHOLD_BYTES = 2252L shl 20
         private const val DEVICE_INFO_CHANNEL = "m3u_tv/device_info"
         private const val SYSTEM_UI_CHANNEL = "m3u_tv/system_ui"
         private const val TEXT_INPUT_CHANNEL = "m3u_tv/text_input"
