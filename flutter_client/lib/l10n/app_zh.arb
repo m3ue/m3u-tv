@@ -219,6 +219,8 @@
   "settingsSectionFilters": "筛选",
   "settingsSectionStreaming": "流媒体",
   "settingsSectionServices": "服务",
+  "settingsIntroDb": "TheIntroDB",
+  "settingsIntroDbSubtitle": "使用社区时间戳显示跳过片头和跳过片尾提示",
   "settingsLanguage": "语言",
   "settingsLanguageSystem": "系统语言",
   "settingsLangEnglish": "英语",

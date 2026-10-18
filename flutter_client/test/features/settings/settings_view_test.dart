@@ -4,6 +4,7 @@ import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
@@ -35,6 +36,7 @@ void main() {
     late TraktService traktService;
     late ProxyPlaybackSettings proxyPlaybackSettings;
     late ComskipSettings comskipSettings;
+    late IntroDbSettings introDbSettings;
 
     setUp(() {
       viewSettingsService = ViewSettingsService();
@@ -46,6 +48,7 @@ void main() {
       traktService = TraktService(storage: secureStorage);
       proxyPlaybackSettings = ProxyPlaybackSettings();
       comskipSettings = ComskipSettings();
+      introDbSettings = IntroDbSettings();
     });
 
     tearDown(() {
@@ -54,6 +57,7 @@ void main() {
       viewSettingsService.dispose();
       proxyPlaybackSettings.dispose();
       comskipSettings.dispose();
+      introDbSettings.dispose();
     });
 
     Future<void> pumpSettingsScreen(WidgetTester tester) async {
@@ -69,6 +73,7 @@ void main() {
             viewSettingsService: viewSettingsService,
             proxyPlaybackSettings: proxyPlaybackSettings,
             comskipSettings: comskipSettings,
+            introDbSettings: introDbSettings,
           ),
         ),
       );
@@ -162,5 +167,29 @@ void main() {
         DefaultStartPage.liveTv,
       );
     });
+
+    testWidgets(
+      'TheIntroDB toggle defaults on and turns off from Integrations',
+      (
+        tester,
+      ) async {
+        await pumpSettingsScreen(tester);
+        final l = await AppLocalizations.delegate.load(const Locale('en'));
+
+        await tester.tap(find.text(l.settingsIntegrations));
+        await tester.pumpAndSettle();
+
+        expect(find.text(l.settingsIntroDb), findsOneWidget);
+        expect(introDbSettings.enabled, isTrue);
+
+        final introDbRow = find.text(l.settingsIntroDb);
+        await tester.ensureVisible(introDbRow);
+        await tester.pumpAndSettle();
+        await tester.tap(introDbRow);
+        await tester.pumpAndSettle();
+
+        expect(introDbSettings.enabled, isFalse);
+      },
+    );
   });
 }

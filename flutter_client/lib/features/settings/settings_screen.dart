@@ -18,6 +18,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -56,6 +57,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
     this.comskipSettings,
+    this.introDbSettings,
     this.viewSettingsService,
     this.deviceType,
     this.onHandleTopLevelBack,
@@ -70,6 +72,7 @@ class SettingsScreen extends StatefulWidget {
   final DeviceType? deviceType;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
+  final IntroDbSettings? introDbSettings;
   final ViewSettingsService? viewSettingsService;
   final Viewer? activeViewer;
   final List<Viewer> viewers;
@@ -190,6 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onLocaleChanged: widget.onLocaleChanged,
         proxyPlaybackSettings: widget.proxyPlaybackSettings,
         comskipSettings: widget.comskipSettings,
+        introDbSettings: widget.introDbSettings,
         viewSettingsService: widget.viewSettingsService,
         deviceType: widget.deviceType,
         onHandleTopLevelBack: widget.onHandleTopLevelBack,
@@ -914,6 +918,7 @@ class _ConnectedView extends StatefulWidget {
     this.onLocaleChanged,
     this.proxyPlaybackSettings,
     this.comskipSettings,
+    this.introDbSettings,
     this.viewSettingsService,
     this.deviceType,
     this.onHandleTopLevelBack,
@@ -923,6 +928,7 @@ class _ConnectedView extends StatefulWidget {
   final TraktService traktService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
+  final IntroDbSettings? introDbSettings;
   final ViewSettingsService? viewSettingsService;
   final DeviceType? deviceType;
   final bool Function()? onHandleTopLevelBack;
@@ -1089,6 +1095,30 @@ class _ConnectedViewState extends State<_ConnectedView> {
                             ),
                           ),
                         ),
+                        if (widget.introDbSettings != null) ...[
+                          const SizedBox(height: 12),
+                          ListenableBuilder(
+                            listenable: widget.introDbSettings!,
+                            builder: (context, _) => SettingsGroup(
+                              children: [
+                                SettingsSwitchRow(
+                                  title: l.settingsIntroDb,
+                                  subtitle: l.settingsIntroDbSubtitle,
+                                  leading: SvgPicture.asset(
+                                    'assets/icons/introdb-logo.svg',
+                                    height: 40 * FontSizeScope.scaleOf(context),
+                                  ),
+                                  value: widget.introDbSettings!.enabled,
+                                  onChanged: (enabled) => unawaited(
+                                    widget.introDbSettings!.setEnabled(
+                                      enabled: enabled,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

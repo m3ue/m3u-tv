@@ -219,6 +219,8 @@
   "settingsSectionFilters": "Filtros",
   "settingsSectionStreaming": "Transmisión",
   "settingsSectionServices": "Servicios",
+  "settingsIntroDb": "TheIntroDB",
+  "settingsIntroDbSubtitle": "Muestra Omitir introducción y Omitir créditos con marcas de tiempo de la comunidad",
   "settingsLanguage": "Idioma",
   "settingsLanguageSystem": "Idioma del sistema",
   "settingsLangEnglish": "Inglés",

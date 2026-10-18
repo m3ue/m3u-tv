@@ -476,6 +476,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionServices => '服务';
 
   @override
+  String get settingsIntroDb => 'TheIntroDB';
+
+  @override
+  String get settingsIntroDbSubtitle => '使用社区时间戳显示跳过片头和跳过片尾提示';
+
+  @override
   String get settingsLanguage => '语言';
 
   @override

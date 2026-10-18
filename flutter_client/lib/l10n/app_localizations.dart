@@ -962,6 +962,18 @@ abstract class AppLocalizations {
   /// **'Services'**
   String get settingsSectionServices;
 
+  /// No description provided for @settingsIntroDb.
+  ///
+  /// In en, this message translates to:
+  /// **'TheIntroDB'**
+  String get settingsIntroDb;
+
+  /// No description provided for @settingsIntroDbSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Skip Intro and Skip Credits prompts using community timestamps'**
+  String get settingsIntroDbSubtitle;
+
   /// No description provided for @settingsLanguage.
   ///
   /// In en, this message translates to:

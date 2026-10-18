@@ -117,6 +117,7 @@ class SettingsRow extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.icon,
+    this.leading,
     this.trailing,
     this.onTap,
     this.destructive = false,
@@ -126,6 +127,9 @@ class SettingsRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData? icon;
+
+  /// Custom leading visual (e.g. a service logo) shown in place of [icon].
+  final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool destructive;
@@ -143,7 +147,10 @@ class SettingsRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (icon != null) ...[
+          if (leading != null) ...[
+            leading!,
+            SizedBox(width: 16 * scale),
+          ] else if (icon != null) ...[
             Icon(
               icon,
               size: 22 * scale,
@@ -217,6 +224,7 @@ class SettingsSwitchRow extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.icon,
+    this.leading,
     required this.value,
     required this.onChanged,
   });
@@ -224,6 +232,7 @@ class SettingsSwitchRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData? icon;
+  final Widget? leading;
   final bool value;
   final ValueChanged<bool> onChanged;
 
@@ -233,6 +242,7 @@ class SettingsSwitchRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       icon: icon,
+      leading: leading,
       trailing: Switch(value: value, onChanged: onChanged),
       onTap: () => onChanged(!value),
     );

@@ -22,6 +22,7 @@ import 'package:m3u_tv/services/diagnostics_report.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/push_notification_service.dart';
@@ -90,6 +91,7 @@ class AppStateController extends ChangeNotifier {
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
     ComskipSettings? comskipSettings,
+    IntroDbSettings? introDbSettings,
     PushNotificationService? pushNotificationService,
     DevicePairingService? devicePairingService,
     DeviceIdentityService? deviceIdentityService,
@@ -163,6 +165,7 @@ class AppStateController extends ChangeNotifier {
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
       comskipSettings: comskipSettings ?? ComskipSettings(store: store),
+      introDbSettings: introDbSettings ?? IntroDbSettings(store: store),
       pushNotificationService:
           pushNotificationService ?? PushNotificationService(),
       viewSettingsService:
@@ -193,6 +196,7 @@ class AppStateController extends ChangeNotifier {
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
     required this.comskipSettings,
+    required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
   }) {
@@ -261,6 +265,7 @@ class AppStateController extends ChangeNotifier {
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
   final ComskipSettings comskipSettings;
+  final IntroDbSettings introDbSettings;
   final ViewSettingsService viewSettingsService;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
@@ -626,6 +631,7 @@ class AppStateController extends ChangeNotifier {
     unawaited(traktService.init());
     unawaited(proxyPlaybackSettings.load());
     unawaited(comskipSettings.load());
+    unawaited(introDbSettings.load());
 
     // One-time move of the content cache into its own file for installs that
     // predate the split. No-op once done, or when a single store is in use.

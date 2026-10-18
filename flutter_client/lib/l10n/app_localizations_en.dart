@@ -483,6 +483,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionServices => 'Services';
 
   @override
+  String get settingsIntroDb => 'TheIntroDB';
+
+  @override
+  String get settingsIntroDbSubtitle =>
+      'Show Skip Intro and Skip Credits prompts using community timestamps';
+
+  @override
   String get settingsLanguage => 'Language';
 
   @override

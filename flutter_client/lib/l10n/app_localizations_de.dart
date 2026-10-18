@@ -485,6 +485,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionServices => 'Dienste';
 
   @override
+  String get settingsIntroDb => 'TheIntroDB';
+
+  @override
+  String get settingsIntroDbSubtitle =>
+      'Zeigt Intro überspringen und Abspann überspringen anhand von Community-Zeitstempeln';
+
+  @override
   String get settingsLanguage => 'Sprache';
 
   @override

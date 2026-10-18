@@ -219,6 +219,8 @@
   "settingsSectionFilters": "Filter",
   "settingsSectionStreaming": "Streaming",
   "settingsSectionServices": "Dienste",
+  "settingsIntroDb": "TheIntroDB",
+  "settingsIntroDbSubtitle": "Zeigt Intro überspringen und Abspann überspringen anhand von Community-Zeitstempeln",
   "settingsLanguage": "Sprache",
   "settingsLanguageSystem": "Systemsprache",
   "settingsLangEnglish": "Englisch",

@@ -219,6 +219,8 @@
   "settingsSectionFilters": "Filtres",
   "settingsSectionStreaming": "Streaming",
   "settingsSectionServices": "Services",
+  "settingsIntroDb": "TheIntroDB",
+  "settingsIntroDbSubtitle": "Affiche Ignorer l'intro et Ignorer le générique grâce aux horodatages de la communauté",
   "settingsLanguage": "Langue",
   "settingsLanguageSystem": "Langue du système",
   "settingsLangEnglish": "Anglais",

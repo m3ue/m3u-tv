@@ -485,6 +485,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionServices => 'Services';
 
   @override
+  String get settingsIntroDb => 'TheIntroDB';
+
+  @override
+  String get settingsIntroDbSubtitle =>
+      'Affiche Ignorer l\'intro et Ignorer le générique grâce aux horodatages de la communauté';
+
+  @override
   String get settingsLanguage => 'Langue';
 
   @override

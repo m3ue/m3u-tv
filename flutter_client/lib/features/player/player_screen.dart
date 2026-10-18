@@ -28,6 +28,7 @@ import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_service.dart';
+import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -82,6 +83,7 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.comskipSettings,
+    this.introDbSettings,
     this.hasDvrFeature = false,
     this.progressReporter,
     this.traktService,
@@ -108,6 +110,9 @@ class PlayerScreen extends StatefulWidget {
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
+
+  /// Null behaves as enabled (the setting's default).
+  final IntroDbSettings? introDbSettings;
   final bool hasDvrFeature;
   final void Function(Progress progress)? progressReporter;
   final TraktService? traktService;
@@ -823,12 +828,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static final RegExp _imdbIdPattern = RegExp(r'^tt[0-9]{7,8}$');
 
   /// Fetches intro/credits timestamps for the currently playing VOD/series
-  /// item. Fire-and-forget, mirroring `_initComskip`: no tmdb_id/imdb_id, an
-  /// older/unlisted title, or any fetch failure just leaves
+  /// item. Fire-and-forget, mirroring `_initComskip`: TheIntroDB disabled in
+  /// settings, no tmdb_id/imdb_id, an older/unlisted title, or any fetch
+  /// failure just leaves
   /// `_introDbSegments` null, so the rest of the player behaves exactly as
   /// if this title had no TheIntroDB data at all.
   Future<void> _initIntroDb(PlayerArgs args) async {
     if (args.type != 'vod' && args.type != 'series') return;
+    if (widget.introDbSettings?.enabled == false) return;
 
     final tmdbId = args.metadata['tmdb_id'] as int?;
     final aioItemId = args.metadata['aio_item_id'] as String?;

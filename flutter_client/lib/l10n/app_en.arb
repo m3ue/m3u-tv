@@ -298,6 +298,8 @@
   "settingsSectionFilters": "Filters",
   "settingsSectionStreaming": "Streaming",
   "settingsSectionServices": "Services",
+  "settingsIntroDb": "TheIntroDB",
+  "settingsIntroDbSubtitle": "Show Skip Intro and Skip Credits prompts using community timestamps",
   "settingsLanguage": "Language",
   "settingsLanguageSystem": "System language",
   "settingsLangEnglish": "English",

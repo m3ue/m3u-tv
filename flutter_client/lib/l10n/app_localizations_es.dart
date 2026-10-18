@@ -485,6 +485,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSectionServices => 'Servicios';
 
   @override
+  String get settingsIntroDb => 'TheIntroDB';
+
+  @override
+  String get settingsIntroDbSubtitle =>
+      'Muestra Omitir introducción y Omitir créditos con marcas de tiempo de la comunidad';
+
+  @override
   String get settingsLanguage => 'Idioma';
 
   @override
