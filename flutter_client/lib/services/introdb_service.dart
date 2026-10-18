@@ -55,11 +55,13 @@ class _IntroDbCacheEntry {
 }
 
 const _kCacheTtl = Duration(minutes: 30);
-const _kBaseUrl = 'https://api.theintrodb.org/v3';
+const _kBaseUrl = 'https://api.theintrodb.org/v4';
 
 /// Client for TheIntroDB (https://theintrodb.org), a free community-run API
-/// of crowd-verified intro/credits timestamps keyed by TMDB (or IMDb) id.
-/// Read-only, unauthenticated — no API key required.
+/// of crowd-verified intro/credits timestamps. v4 keys media by TVDB id, but
+/// still accepts a TMDB or IMDb id and resolves it (including TMDB episode
+/// numbering) server-side, so that's what we send. Read-only and
+/// unauthenticated, no API key required.
 class IntroDbService {
   IntroDbService() : _httpClient = HttpClient();
 
