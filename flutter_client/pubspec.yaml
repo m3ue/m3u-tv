@@ -100,7 +100,7 @@ msix_config:
   identity_name: sparkison.M3UTV
   publisher: CN=72E1AAD5-EAA8-421E-AEFE-473CFDE56550
   msix_version: 1.2.3.0
-  logo_path: assets/icons/icon.png
+  logo_path: assets/icons/icon-desktop.png
   capabilities: internetClient
   store: true
   languages: en-us

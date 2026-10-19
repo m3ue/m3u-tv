@@ -11,12 +11,14 @@
 #   tablet/*.png  → Apple iPad (12.9", 11")
 #                 → Android Tablet (7", 10")
 #   desktop*.png → Apple macOS (1440×900)
-#   logo.svg     → Google Play feature graphic (1024×500, generated)
+#
+# Store headers and banners (Google feature graphic, Android TV banner, iOS
+# product page header, Microsoft art) come from generate-store-assets.sh.
 #
 # Outputs are written to screenshots/store/<platform>/<size>/.
 #
-# Prerequisites: ImageMagick (magick), librsvg (rsvg-convert)
-#   brew install imagemagick librsvg
+# Prerequisites: ImageMagick (magick)
+#   brew install imagemagick
 #
 # Run from anywhere — the script resolves its own paths.
 
@@ -24,21 +26,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FLUTTER_DIR="$(dirname "$SCRIPT_DIR")"
-TV_ROOT="$(dirname "$FLUTTER_DIR")"
 SRC_DIR="$FLUTTER_DIR/screenshots/app-screenshots"
 OUT_DIR="$FLUTTER_DIR/screenshots/store"
-SVG="$TV_ROOT/logo.svg"
-APP_BG="#09090b"        # App background (near-black)
-GRADIENT_START="#1a1528" # Top-left purple — matches app gradient (go_router_config.dart)
-GRADIENT_END="#09090b"   # Bottom-right dark — transition completes at 45% in-app
 
 # ---------------------------------------------------------------------------
 # Prerequisites
 # ---------------------------------------------------------------------------
-for cmd in magick rsvg-convert; do
+for cmd in magick; do
     command -v "$cmd" &>/dev/null || {
         echo "Error: '$cmd' not found."
-        echo "Install with: brew install imagemagick librsvg"
+        echo "Install with: brew install imagemagick"
         exit 1
     }
 done
@@ -46,37 +43,6 @@ done
 [[ -d "$SRC_DIR" ]] || {
     echo "Error: source screenshots not found at $SRC_DIR"
     exit 1
-}
-
-[[ -f "$SVG" ]] || {
-    echo "Error: logo SVG not found at $SVG"
-    exit 1
-}
-
-# Render the SVG logo at a given size and add a soft drop shadow.
-# Shadow: 55% opacity, 18 px blur sigma, 0 px X / 8 px Y offset.
-# Layers are merged on a transparent canvas so the result can be composited
-# onto any background without a baked-in fill colour.
-logo_with_shadow() {
-    local size="$1" dst="$2"
-    local raw="$TMP/logo_raw_${size}.png"
-    rsvg-convert -w "$size" -h "$size" "$SVG" -o "$raw"
-    magick "$raw" \
-        \( +clone -background black -shadow "55x18+0+8" \) \
-        +swap -background none -layers merge +repage \
-        "$dst"
-}
-
-# Diagonal gradient background matching the app's _kGradientBg in go_router_config.dart:
-#   topLeft=#1a1528 → bottomRight=#09090b
-# gradient:vector pins the start/end colours to exact pixel coordinates so
-# ImageMagick never extrapolates outside the specified range.
-gradient_bg() {
-    local dst="$1" w="$2" h="$3"
-    magick -size "${w}x${h}" \
-        -define "gradient:vector=0,0,$((w-1)),$((h-1))" \
-        gradient:"${GRADIENT_START}-${GRADIENT_END}" \
-        "$dst"
 }
 
 # Scale to fill exact dimensions, then center-crop any overflow.
@@ -191,42 +157,6 @@ done
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Google Play: Android Feature Graphic ---"
-# Google Play requires a single 1024×500 feature graphic (mandatory).
-# It appears as the hero banner at the top of the store listing.
-# Logo at 260 px gives ~120 px breathing room top/bottom (~24% padding).
-# ---------------------------------------------------------------------------
-FEATURE_DIR="$OUT_DIR/google/android-feature-graphic"
-mkdir -p "$FEATURE_DIR"
-
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-
-echo "  [Android Feature Graphic 1024×500] feature-graphic.png"
-logo_with_shadow 260 "$TMP/logo_feature.png"
-gradient_bg "$TMP/feature_bg.png" 1024 500
-magick "$TMP/feature_bg.png" \
-    "$TMP/logo_feature.png" -gravity center -composite \
-    "$FEATURE_DIR/feature-graphic.png"
-
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Google Play: Android TV Banner ---"
-# Displayed on Android TV home screen. PNG or JPEG, 1280×720 (16:9).
-# Logo at 300 px gives ~210 px breathing room top/bottom (~29% padding).
-# ---------------------------------------------------------------------------
-ATV_BANNER_DIR="$OUT_DIR/google/android-tv-banner"
-mkdir -p "$ATV_BANNER_DIR"
-
-echo "  [Android TV Banner 1280×720] tv-banner.png"
-logo_with_shadow 300 "$TMP/logo_banner.png"
-gradient_bg "$TMP/banner_bg.png" 1280 720
-magick "$TMP/banner_bg.png" \
-    "$TMP/logo_banner.png" -gravity center -composite \
-    "$ATV_BANNER_DIR/tv-banner.png"
-
-# ---------------------------------------------------------------------------
-echo ""
 echo "--- Google Play: Android TV ---"
 # Google Play TV screenshot requirements (landscape, exactly 16:9):
 #   1920×1080  recommended
@@ -293,8 +223,9 @@ echo "                     apple/ios/6.7in-1290x2796/     (also accepted in 6.9\
 echo "                     apple/ios/6.5in-1242x2688/     (required for older iPhones)"
 echo "                     apple/ios/5.5in-1242x2208/     (optional legacy)"
 echo "  Apple macOS      → apple/macos/1440x900/"
-echo "  Android Feature  → google/android-feature-graphic/feature-graphic.png  (required — 1 image)"
-echo "  Android TV Banner→ google/android-tv-banner/tv-banner.png              (required for TV listing)"
 echo "  Android TV       → google/android-tv/1920x1080/   (required)"
 echo "                     google/android-tv/1280x720/    (optional legacy)"
 echo "  Android Phone    → google/android-phone/1080x2340/"
+echo ""
+echo "Headers/banners (feature graphic, TV banner, iOS header, Microsoft art):"
+echo "  scripts/generate-store-assets.sh"

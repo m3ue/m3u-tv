@@ -1,0 +1,149 @@
+<!doctype html>
+<!--
+  Store header art, rendered by scripts/generate-store-assets.sh.
+
+  ?art=hero     Device trio centred, no text. Microsoft Super hero art and
+                the Apple product page header.
+  ?art=feature  The docs TV social card: copy on the left, devices bleeding
+                off the right edge.
+  &url=0        Drop the site URL (Apple prohibits URLs in creative assets).
+
+  Designed in a 1200x675 space. The page can be any aspect ratio: the
+  background fills the viewport and the copy/devices groups are scaled to fit
+  the height (or width) and anchored left/right/centre, so wide (2.33:1),
+  16:9, and 3:2 outputs all come from the same layout.
+
+  Background, device frames, and copy mirror the TV social card in
+  m3u-editor-docs-v2/scripts/social-cards/card.html.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Store art</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=block">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+
+  body {
+    position: relative;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: #fff;
+    background:
+      radial-gradient(ellipse 60% 70% at 10% 10%, rgba(244, 63, 94, 0.45), transparent 60%),
+      radial-gradient(ellipse 55% 60% at 90% 20%, rgba(99, 102, 241, 0.5), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 50% 110%, rgba(179, 80, 159, 0.45), transparent 60%),
+      #0b1020;
+    --accent: linear-gradient(90deg, #fda4af 0%, #ff4d6d 50%, #fb2c36 100%);
+    --glow: 0 0 30px rgba(255, 32, 86, 0.45), 0 0 50px rgba(251, 44, 54, 0.3);
+    --s: 1;
+  }
+
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+  }
+
+  /* 1200x675 design-space groups, scaled by --s */
+  .copy, .devices { position: absolute; top: 50%; }
+
+  .copy {
+    left: calc(72px * var(--s));
+    width: 560px;
+    z-index: 2;
+    transform: translateY(-50%) scale(var(--s));
+    transform-origin: left center;
+  }
+
+  .devices { width: 1200px; height: 675px; z-index: 1; }
+  .feature .devices { right: 0; transform: translateY(-50%) scale(var(--s)); transform-origin: right center; }
+  .hero .devices { left: 50%; transform: translate(-50%, -50%) scale(var(--s)); transform-origin: center; }
+  .hero .copy { display: none; }
+  .no-url .url { display: none; }
+
+  .brand { display: flex; align-items: center; gap: 18px; margin-bottom: 40px; }
+
+  .brand .mark {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: var(--glow);
+  }
+
+  .brand .mark img { display: block; width: 100%; height: 100%; }
+
+  .brand span { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+
+  h1 { font-size: 60px; white-space: nowrap; line-height: 1.08; font-weight: 800; letter-spacing: -0.035em; }
+
+  h1 em {
+    font-style: normal;
+    background: var(--accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  p { margin-top: 26px; font-size: 22px; line-height: 1.55; color: rgba(226, 232, 240, 0.9); }
+
+  .url { margin-top: 28px; font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.62); }
+
+  .device { position: absolute; background: #07070b; border: 1px solid rgba(255, 255, 255, 0.14); }
+  .device img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  .device-tv { padding: 6px; border-radius: 10px; box-shadow: 0 0 60px rgba(99, 102, 241, 0.35), 0 30px 60px rgba(0, 0, 0, 0.45); }
+  .device-tv img { border-radius: 5px; }
+  .device-tablet { padding: 7px; border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); }
+  .device-tablet img { border-radius: 9px; }
+  .device-phone { padding: 5px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); }
+  .device-phone img { border-radius: 15px; }
+
+  /* feature: social card positions, shifted down to centre in 675px */
+  .feature .device-tv { left: 640px; top: 116px; width: 680px; height: 382px; }
+  .feature .device-tablet { left: 600px; top: 340px; width: 172px; height: 240px; }
+  .feature .device-phone { left: 972px; top: 308px; width: 118px; height: 240px; }
+
+  /* hero: centred trio, bottoms ending around the two-thirds line */
+  .hero .device-tv { left: 270px; top: 56px; width: 660px; height: 371px; }
+  .hero .device-tablet { left: 190px; top: 250px; width: 190px; height: 268px; }
+  .hero .device-phone { left: 850px; top: 228px; width: 134px; height: 276px; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+
+  <div class="copy">
+    <div class="brand">
+      <div class="mark"><img src="../../../logo.svg" alt=""></div>
+      <span>M3U TV</span>
+    </div>
+    <h1>Your library,<br><em>on every screen.</em></h1>
+    <p>Live TV, guide, movies, series, and DVR on your TV, phone, tablet, and desktop.</p>
+    <div class="url">m3ue.sparkison.dev/tv</div>
+  </div>
+
+  <div class="devices">
+    <div class="device device-tv"><img src="../../screenshots/app-screenshots/tv1.png" alt=""></div>
+    <div class="device device-tablet"><img src="../../screenshots/app-screenshots/tablet3.png" alt=""></div>
+    <div class="device device-phone"><img src="../../screenshots/app-screenshots/mobile5.png" alt=""></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    document.body.className = params.get('art') || 'hero';
+    if (params.get('url') === '0') document.body.classList.add('no-url');
+    const fit = () => document.body.style.setProperty(
+      '--s', Math.min(innerWidth / 1200, innerHeight / 675));
+    fit();
+    addEventListener('resize', fit);
+  </script>
+</body>
+</html>
