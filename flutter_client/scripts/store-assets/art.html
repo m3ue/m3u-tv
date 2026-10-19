@@ -7,6 +7,9 @@
   ?art=feature  The docs TV social card: copy on the left, devices bleeding
                 off the right edge.
   &url=0        Drop the site URL (Apple prohibits URLs in creative assets).
+  &safe=1.7778  Keep copy and devices inside a centred box of this aspect
+                ratio (background still fills). Google crops the feature
+                graphic to a centred 16:9 on some surfaces.
 
   Designed in a 1200x675 space. The page can be any aspect ratio: the
   background fills the viewport and the copy/devices groups are scaled to fit
@@ -38,6 +41,7 @@
     --accent: linear-gradient(90deg, #fda4af 0%, #ff4d6d 50%, #fb2c36 100%);
     --glow: 0 0 30px rgba(255, 32, 86, 0.45), 0 0 50px rgba(251, 44, 54, 0.3);
     --s: 1;
+    --m: 0px;
   }
 
   .grid {
@@ -54,7 +58,7 @@
   .copy, .devices { position: absolute; top: 50%; }
 
   .copy {
-    left: calc(72px * var(--s));
+    left: calc(var(--m) + 72px * var(--s));
     width: 560px;
     z-index: 2;
     transform: translateY(-50%) scale(var(--s));
@@ -62,7 +66,7 @@
   }
 
   .devices { width: 1200px; height: 675px; z-index: 1; }
-  .feature .devices { right: 0; transform: translateY(-50%) scale(var(--s)); transform-origin: right center; }
+  .feature .devices { right: var(--m); transform: translateY(-50%) scale(var(--s)); transform-origin: right center; }
   .hero .devices { left: 50%; transform: translate(-50%, -50%) scale(var(--s)); transform-origin: center; }
   .hero .copy { display: none; }
   .no-url .url { display: none; }
@@ -140,8 +144,13 @@
     const params = new URLSearchParams(location.search);
     document.body.className = params.get('art') || 'hero';
     if (params.get('url') === '0') document.body.classList.add('no-url');
-    const fit = () => document.body.style.setProperty(
-      '--s', Math.min(innerWidth / 1200, innerHeight / 675));
+    const safe = parseFloat(params.get('safe')) || 0;
+    const fit = () => {
+      const safeWidth = safe ? Math.min(innerWidth, innerHeight * safe) : innerWidth;
+      const margin = (innerWidth - safeWidth) / 2;
+      document.body.style.setProperty('--s', Math.min(safeWidth / 1200, innerHeight / 675));
+      document.body.style.setProperty('--m', margin + 'px');
+    };
     fit();
     addEventListener('resize', fit);
   </script>

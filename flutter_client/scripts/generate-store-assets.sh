@@ -8,7 +8,8 @@
 #                                      Copy + devices, plus -notext variants in case
 #                                      the English copy is a problem for other locales.
 #   Google Play
-#     google/android-feature-graphic/  Feature graphic (1024x500). Copy + devices.
+#     google/android-feature-graphic/  Feature graphic (1024x500). Copy + devices, kept
+#                                      inside the centred 16:9 Play crops it to.
 #     google/android-tv-banner/        TV banner (1280x720). Copy + devices.
 #   Microsoft Store (Partner Center > Store listings)
 #     microsoft/app-tile-icon-300x300.png     "1:1 App tile icon". Overrides the
@@ -100,7 +101,7 @@ done
 
 echo ""
 echo "--- Google Play ---"
-render "art=feature&url=0" 1024 500 "$OUT_DIR/google/android-feature-graphic/feature-graphic.png"
+render "art=feature&url=0&safe=1.7778" 1024 500 "$OUT_DIR/google/android-feature-graphic/feature-graphic.png"
 render "art=feature&url=0" 1280 720 "$OUT_DIR/google/android-tv-banner/tv-banner.png"
 
 echo ""
