@@ -34,4 +34,4 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check pinned asset URLs are servable
-        run: ./scripts/check-mpv-build-pins.sh
+        run: bash ./scripts/check-mpv-build-pins.sh
