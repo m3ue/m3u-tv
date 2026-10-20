@@ -1,5 +1,10 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:m3u_tv/services/app_version_service.dart';
 
 /// A single segment range (start/end in milliseconds) as returned by
 /// TheIntroDB's `/media` endpoint. Either bound may be null per the API's
@@ -56,17 +61,45 @@ class _IntroDbCacheEntry {
 
 const _kCacheTtl = Duration(minutes: 30);
 const _kBaseUrl = 'https://api.theintrodb.org/v4';
+const _kUserAgentProduct = 'm3u-tv';
 
 /// Client for TheIntroDB (https://theintrodb.org), a free community-run API
 /// of crowd-verified intro/credits timestamps. v4 keys media by TVDB id, but
 /// still accepts a TMDB or IMDb id and resolves it (including TMDB episode
 /// numbering) server-side, so that's what we send. Read-only and
-/// unauthenticated, no API key required.
+/// unauthenticated, no API key required. Requests carry an app-identifying
+/// `User-Agent` (see [userAgentFor]) so TheIntroDB can attribute traffic.
 class IntroDbService {
-  IntroDbService() : _httpClient = HttpClient();
+  IntroDbService({
+    HttpClient? httpClient,
+    Future<String?> Function()? appVersionResolver,
+    @visibleForTesting String baseUrl = _kBaseUrl,
+  }) : _httpClient = httpClient ?? HttpClient(),
+       _appVersionResolver =
+           appVersionResolver ?? AppVersionService().currentVersion,
+       _baseUrl = baseUrl;
 
   final HttpClient _httpClient;
+  final Future<String?> Function() _appVersionResolver;
+  final String _baseUrl;
   final Map<String, _IntroDbCacheEntry> _cache = {};
+  Future<String>? _userAgent;
+
+  /// `m3u-tv/<version>`, or just `m3u-tv` when the version can't be
+  /// resolved.
+  @visibleForTesting
+  static String userAgentFor(String? version) =>
+      version == null || version.isEmpty
+      ? _kUserAgentProduct
+      : '$_kUserAgentProduct/$version';
+
+  Future<String> _resolveUserAgent() async {
+    try {
+      return userAgentFor(await _appVersionResolver());
+    } on Object catch (_) {
+      return userAgentFor(null);
+    }
+  }
 
   void clearCache() => _cache.clear();
 
@@ -100,10 +133,12 @@ class IntroDbService {
     final cached = _cache[cacheKey];
     if (cached != null && !cached.isExpired) return cached.data;
 
-    final uri = Uri.parse('$_kBaseUrl/media').replace(queryParameters: params);
+    final uri = Uri.parse('$_baseUrl/media').replace(queryParameters: params);
+    final userAgent = await (_userAgent ??= _resolveUserAgent());
     IntroDbSegments? result;
     try {
       final request = await _httpClient.getUrl(uri);
+      request.headers.set(HttpHeaders.userAgentHeader, userAgent);
       final response = await request.close().timeout(
         const Duration(seconds: 8),
       );

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/introdb_service.dart';
 
@@ -52,6 +56,68 @@ void main() {
       });
 
       expect(segments.isEmpty, isTrue);
+    });
+  });
+  group('IntroDbService User-Agent', () {
+    test('identifies the app by name and version', () {
+      expect(
+        IntroDbService.userAgentFor('1.2.3'),
+        'm3u-tv/1.2.3',
+      );
+    });
+
+    test('drops the version when it cannot be resolved', () {
+      expect(
+        IntroDbService.userAgentFor(null),
+        'm3u-tv',
+      );
+      expect(
+        IntroDbService.userAgentFor(''),
+        'm3u-tv',
+      );
+    });
+
+    test('sends the User-Agent on /media requests', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final requests = <HttpRequest>[];
+      server.listen((request) {
+        requests.add(request);
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'tvdb_id': 81189,
+              'type': 'tv',
+              'season': 1,
+              'episode': 1,
+              'intro': [
+                {'start_ms': 1000, 'end_ms': 2000},
+              ],
+            }),
+          );
+        unawaited(request.response.close());
+      });
+
+      final service = IntroDbService(
+        appVersionResolver: () async => '9.9.9',
+        baseUrl: 'http://${server.address.host}:${server.port}/v4',
+      );
+      final segments = await service.getSegments(
+        tmdbId: 1396,
+        isSeries: true,
+        season: 1,
+        episode: 1,
+      );
+
+      expect(segments?.intro?.endMs, 2000);
+      expect(requests, hasLength(1));
+      expect(requests.single.uri.path, '/v4/media');
+      expect(
+        requests.single.headers.value(HttpHeaders.userAgentHeader),
+        'm3u-tv/9.9.9',
+      );
     });
   });
 }
