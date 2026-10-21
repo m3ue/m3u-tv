@@ -151,14 +151,16 @@ def check(ok, label):
 
 for platform, entry in lock.items():
     libraries = platforms.get(platform, {}).get("libraries", {})
-    published = next(iter(libraries.values()), None)
+    # The lock pins the libmpv-<platform> tarballs. Android also lists the
+    # mpv-android AAR, which has no prebuilt tarballs, so never fall back to it.
+    published = libraries.get(f"libmpv-{platform}")
     if published is None:
-        check(False, f"{platform}: artifacts.json at the lock commit has no {platform} library")
+        check(False, f"{platform}: artifacts.json at the lock commit has no libmpv-{platform} library")
         continue
     check(entry["key"] == published["key"],
           f"{platform}: lock key {entry['key']} vs artifacts.json key {published['key']}")
     for arch, asset in entry["assets"].items():
-        expected = published["prebuilt"].get(arch, {})
+        expected = published.get("prebuilt", {}).get(arch, {})
         check(asset == {"asset": expected.get("asset"), "checksum": expected.get("checksum")},
               f"{platform}/{arch}: lock asset + checksum match artifacts.json")
 

@@ -4,40 +4,40 @@
       "assetBase": "https://github.com/edde746/mpv-build/releases/download/binaries-android",
       "assets": {
         "arm64-v8a": {
-          "asset": "libmpv-android-9c0390e954bf-arm64-v8a.tar.gz",
-          "checksum": "c18796bff00ad3c77c39e6c8451dea224a9c5b5633172335c7ff0ad490b7fd66"
+          "asset": "libmpv-android-c9437477e85b-arm64-v8a.tar.gz",
+          "checksum": "5e6e37bdc5d94a0ddc16e76a9808c402d7ccc8b6ff56a84aec96e47e1d1832d8"
         },
         "armeabi-v7a": {
-          "asset": "libmpv-android-9c0390e954bf-armeabi-v7a.tar.gz",
-          "checksum": "54f3bdc374e791f63e13d7546e95396191a521e8048e5568b8497ad17b600c91"
+          "asset": "libmpv-android-c9437477e85b-armeabi-v7a.tar.gz",
+          "checksum": "cb46137434ba47bdb90be7e0b3b8c53e57a1ce1044856f7d9c2f475c2ebe3091"
         },
         "x86": {
-          "asset": "libmpv-android-9c0390e954bf-x86.tar.gz",
-          "checksum": "aed21a1778a0d8077c4f0d721772d409e2fb8c5dd438b2fcf5e0c22e8e279a66"
+          "asset": "libmpv-android-c9437477e85b-x86.tar.gz",
+          "checksum": "a85562805e2cfffe76d27546060965dbd2500e29abcca8a6cdfd534dff559cbd"
         },
         "x86_64": {
-          "asset": "libmpv-android-9c0390e954bf-x86_64.tar.gz",
-          "checksum": "94cc2b8e4e8abb0a4990cc5c4ac0d739f3b62c8224f72d8e1852396f7b68ac1b"
+          "asset": "libmpv-android-c9437477e85b-x86_64.tar.gz",
+          "checksum": "2ad3a7c2907b363f7d029cfb107dacca5ad2ef3eb1262a36acf33ef19bfbf665"
         }
       },
-      "key": "9c0390e954bf"
+      "key": "c9437477e85b"
     },
     "windows": {
       "assetBase": "https://github.com/edde746/mpv-build/releases/download/binaries-windows",
       "assets": {
         "aarch64": {
-          "asset": "libmpv-windows-488b8e8ab49c-aarch64.zip",
-          "checksum": "12be20eadfe5946f5a5c813ea80ed4fa4b7cb012af8762e707d1581e86e9261a"
+          "asset": "libmpv-windows-3b5fe9282d30-aarch64.zip",
+          "checksum": "0ba6efa84fea30dbfc6247f473ce98ba1e65035d63493474959895aa578feefb"
         },
         "x86_64": {
-          "asset": "libmpv-windows-488b8e8ab49c-x86_64.zip",
-          "checksum": "ddf1bdb4af7d3470f53054fc2aebfea60856409e303a475423b852d7bf2b960e"
+          "asset": "libmpv-windows-3b5fe9282d30-x86_64.zip",
+          "checksum": "2bcdcd594b94c3dda436585716bfa7b4e55a39f7ac2e048f0b6e37edb3cb92ef"
         }
       },
-      "key": "488b8e8ab49c"
+      "key": "3b5fe9282d30"
     }
   },
-  "commit": "7361a5a6cdb38dd02e6a13451f6d16197e257c48",
+  "commit": "8ad6d9b8290c4705573969415e9d97f7bffd51ff",
   "formatVersion": 1,
   "repo": "edde746/mpv-build"
 }

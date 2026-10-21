@@ -200,7 +200,11 @@ void main() {
           transcodeGateway: transcode,
         );
 
-        await orchestrator.open(_source(videoCodec: 'hevc'));
+        await orchestrator.open(
+          _source(
+            videoCodec: 'hevc',
+          ).copyWith(deinterlace: true, prebufferLive: true),
+        );
         await orchestrator.play();
 
         expect(transcode.startedServerRequests.single.videoCodec, 'hevc');
@@ -216,6 +220,9 @@ void main() {
           serverPlayer.loadedSources.single.startPosition,
           const Duration(minutes: 3),
         );
+        // The transcoded stream keeps the player settings the source carried.
+        expect(serverPlayer.loadedSources.single.deinterlace, isTrue);
+        expect(serverPlayer.loadedSources.single.prebufferLive, isTrue);
         expect(orchestrator.activeBackend, PlaybackBackend.serverTranscode);
         expect(
           orchestrator.diagnostics,

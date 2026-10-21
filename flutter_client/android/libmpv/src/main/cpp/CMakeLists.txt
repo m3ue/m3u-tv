@@ -38,8 +38,9 @@ set_target_properties(
         ${MPV_PREBUILT_ROOT}/jni/${ANDROID_ABI}/libavcodec.so
 )
 
-# mpv public headers ride in the extracted tarballs next to libmpv.so; the
-# vendored tree only carries FFmpeg's libavcodec/jni.h (see include/README.md).
-include_directories( ${MPV_PREBUILT_ROOT}/include ${CMAKE_CURRENT_SOURCE_DIR}/include )
+# mpv's public headers and FFmpeg's (libavcodec/jni.h as patched by the
+# mpv-build android series) ride in the extracted tarballs next to the .so
+# files they match.
+include_directories( ${MPV_PREBUILT_ROOT}/include )
 
 target_link_libraries( player mpv avcodec log )

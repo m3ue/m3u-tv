@@ -564,12 +564,6 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   @override
-  void didHaveMemoryPressure() {
-    super.didHaveMemoryPressure();
-    _memoryWatchdog.notifyMemoryPressure();
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     debugPrint('[Lifecycle] ${state.name}');
     if (state == AppLifecycleState.paused) {

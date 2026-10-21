@@ -238,6 +238,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const liveTvFavoritesFirstKey = 'm3ue_tv_live_tv_favorites_first';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
+  static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
@@ -542,6 +543,27 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(deinterlaceKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the mpv backends buffer a few seconds of a live stream before
+  /// it starts moving (mpv's `cache-pause-initial`). Defaults off: it adds
+  /// those seconds to every channel change. Resuming after a stall always
+  /// waits for the same headroom, with or without this. ExoPlayer and AVKit
+  /// ignore it.
+  Future<bool> prebufferLive() async {
+    final raw = await _read(prebufferLiveKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached live pre-buffer setting.
+  bool get prebufferLiveSync => (_memory[prebufferLiveKey] as bool?) ?? false;
+
+  Future<void> setPrebufferLive(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(prebufferLiveKey, enabled);
     notifyListeners();
   }
 

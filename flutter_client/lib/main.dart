@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/app/app_locales.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
@@ -97,10 +98,11 @@ Future<void> main() async {
   // focus change until Settings was opened once; volumeSync defaults to
   // full volume, so a custom desktop volume would similarly be ignored by
   // the very first stream opened in a session. The player reads
-  // hdrEnabledSync, matchRefreshRateSync and deinterlaceSync when it opens a
-  // stream, so without these an Android/Windows user's Auto Frame Rate stayed
-  // off (and a tvOS user's opt-out, or anyone's HDR opt-out, was undone)
-  // after every cold start until Settings was opened (issue #314).
+  // hdrEnabledSync, matchRefreshRateSync, deinterlaceSync and
+  // prebufferLiveSync when it opens a stream, so without these an
+  // Android/Windows user's Auto Frame Rate stayed off (and a tvOS user's
+  // opt-out, or anyone's HDR opt-out, was undone) after every cold start
+  // until Settings was opened (issue #314).
   await appState.viewSettingsService.fontSize();
   await Future.wait([
     appState.viewSettingsService.rememberMediaSort(),
@@ -113,6 +115,7 @@ Future<void> main() async {
     appState.viewSettingsService.hdrEnabled(),
     appState.viewSettingsService.matchRefreshRate(),
     appState.viewSettingsService.deinterlace(),
+    appState.viewSettingsService.prebufferLive(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
     // Home picks its layout synchronously on first build; reading the style
@@ -471,6 +474,7 @@ class _MyAppState extends State<MyApp> {
     const background = Color(0xFF09090b);
     const card = Color(0xFF18181b);
     const elevated = Color(0xFF18181b);
+    final locale = widget.appState?.locale;
 
     return MaterialApp.router(
       title: 'M3U TV',
@@ -485,8 +489,8 @@ class _MyAppState extends State<MyApp> {
           ? const TvosScrollBehavior()
           : null,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: widget.appState?.locale,
+      supportedLocales: appSupportedLocales,
+      locale: locale == null ? null : qualifiedAppLocale(locale),
       builder: (context, child) {
         final deviceType = resolveDeviceType(
           context,

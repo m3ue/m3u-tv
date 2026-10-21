@@ -261,6 +261,7 @@ void main() {
           'hdrEnabled': true,
           'matchRefreshRate': false,
           'deinterlace': false,
+          'prebufferLive': false,
           'externalSubtitles': <Map<String, Object?>>[],
         });
         expect(backend.textureId, isNull);
@@ -271,7 +272,8 @@ void main() {
     );
 
     test(
-      'load forwards the HDR, refresh-rate and deinterlace view settings',
+      'load forwards the HDR, refresh-rate, deinterlace and live pre-buffer '
+      'view settings',
       () async {
         final events = setupMockEvents();
         MethodCall? loadCall;
@@ -293,6 +295,7 @@ void main() {
               hdrEnabled: false,
               matchDisplayRefreshRate: true,
               deinterlace: true,
+              prebufferLive: true,
             ),
           ),
           throwsA(isA<BackendUnavailableException>()),
@@ -302,6 +305,7 @@ void main() {
         expect(args['hdrEnabled'], isFalse);
         expect(args['matchRefreshRate'], isTrue);
         expect(args['deinterlace'], isTrue);
+        expect(args['prebufferLive'], isTrue);
 
         await backend.dispose();
         await events.close();

@@ -473,6 +473,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionStreaming => '流媒体';
 
   @override
+  String get settingsSectionLiveTv => '直播电视';
+
+  @override
   String get settingsSectionServices => '服务';
 
   @override
@@ -1687,6 +1690,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
+
+  @override
+  String get settingsPrebufferLive => '播放前缓冲直播流';
+
+  @override
+  String get settingsPrebufferLiveHint =>
+      '频道开始播放前先缓冲几秒视频，让到达不稳定的直播流不再频繁暂停缓冲。切换频道会多花几秒。';
 
   @override
   String get settingsNavigationSound => '导航音效';

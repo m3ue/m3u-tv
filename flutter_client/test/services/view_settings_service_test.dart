@@ -160,6 +160,22 @@ void main() {
       },
     );
 
+    test(
+      'live pre-buffer defaults off and persists, sync getter included',
+      () async {
+        expect(service.prebufferLiveSync, isFalse);
+        expect(await service.prebufferLive(), isFalse);
+
+        await service.setPrebufferLive(true);
+        expect(await service.prebufferLive(), isTrue);
+        expect(service.prebufferLiveSync, isTrue);
+
+        final recreated = ViewSettingsService(memory: memory);
+        expect(recreated.prebufferLiveSync, isTrue);
+        expect(await recreated.prebufferLive(), isTrue);
+      },
+    );
+
     test('values survive service recreation with same store', () async {
       await service.setLiveTvLayout(LiveTvLayout.grid);
       await service.setEpgStartView(EpgStartView.primeTime);

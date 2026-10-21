@@ -1154,6 +1154,14 @@ bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
   }
   // The Deinterlace setting: `auto` filters only frames flagged interlaced.
   if (BoolArg(args, "deinterlace", false)) api.set_option_string(gpu_handle, "deinterlace", "auto");
+  // A live stream arrives at 1x, so mpv's default of resuming a stall once 1 s is buffered
+  // rides the live edge and stalls again on the next late segment. Resume with 6 s buffered
+  // instead (Plezy d74d3dafe). The Buffer Live Streams setting also holds the first frame
+  // until then, which costs that wait on every channel change.
+  if (BoolArg(args, "isLive", false)) {
+    api.set_option_string(gpu_handle, "cache-pause-wait", "6");
+    if (BoolArg(args, "prebufferLive", false)) api.set_option_string(gpu_handle, "cache-pause-initial", "yes");
+  }
   if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
   // mpv's own render-API output negotiates the swap chain's color space and
   // HDR metadata itself once the OS display is actually in HDR mode;
@@ -1345,6 +1353,11 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
         // permissions" end-file error even for plain local/network media.
         api.set_option_string(gpu_handle, "ytdl", "no");
         if (BoolArg(args, "deinterlace", false)) api.set_option_string(gpu_handle, "deinterlace", "auto");
+        // See the matching comment on the GPU-texture handle above.
+        if (BoolArg(args, "isLive", false)) {
+          api.set_option_string(gpu_handle, "cache-pause-wait", "6");
+          if (BoolArg(args, "prebufferLive", false)) api.set_option_string(gpu_handle, "cache-pause-initial", "yes");
+        }
         if (!start_value.empty()) api.set_option_string(gpu_handle, "start", start_value.c_str());
         // mpv's own D3D11 GPU-next VO negotiates the swap chain's color
         // space and HDR metadata itself once the OS display is actually in
@@ -1408,6 +1421,11 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
     api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
   if (BoolArg(args, "deinterlace", false)) api.set_option_string(handle, "deinterlace", "auto");
+  // See the matching comment on the GPU-path handle above.
+  if (BoolArg(args, "isLive", false)) {
+    api.set_option_string(handle, "cache-pause-wait", "6");
+    if (BoolArg(args, "prebufferLive", false)) api.set_option_string(handle, "cache-pause-initial", "yes");
+  }
   if (!start_value.empty()) api.set_option_string(handle, "start", start_value.c_str());
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   if (!headers.empty()) api.set_option_string(handle, "http-header-fields", headers.c_str());

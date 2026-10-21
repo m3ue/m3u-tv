@@ -13,13 +13,13 @@ import 'package:m3u_tv/services/device_performance.dart';
 /// system low-memory killer sits well below that ceiling and can kill the
 /// process without ever delivering a trim callback. This watchdog samples the
 /// process RSS on a timer and clears the image caches when it climbs past a
-/// device-scaled threshold, and also reacts to the platform memory-pressure
-/// signal ([notifyMemoryPressure], wired from the app-shell observer).
+/// device-scaled threshold.
 ///
-/// iOS / tvOS get the pressure signal only (jetsam pressure arrives via
-/// `WidgetsBindingObserver.didHaveMemoryPressure`); the RSS poll runs on
-/// desktop and Android where `ProcessInfo.currentRss` is meaningful and trim
-/// callbacks are unreliable.
+/// The platform memory-pressure signal needs nothing from it: Flutter's own
+/// `PaintingBinding.handleMemoryPressure` empties the image cache before any
+/// observer runs, and `MemoryPressureLog` records what was held. The RSS poll
+/// runs on desktop and Android, where `ProcessInfo.currentRss` is meaningful
+/// and trim callbacks are unreliable; iOS / tvOS rely on the signal alone.
 class MemoryWatchdog {
   MemoryWatchdog({
     ImageCache? imageCache,
@@ -79,22 +79,6 @@ class MemoryWatchdog {
       'max=${cache.maximumSize}img/${cache.maximumSizeBytes >> 20}MB '
       'live=${cache.liveImageCount} pending=${cache.pendingImageCount}',
     );
-  }
-
-  /// Platform memory-pressure hook. Shares the RSS-poll path's cooldown and
-  /// cache-floor guard: the OS can (and on some Android TV boxes under
-  /// sustained pressure, does) deliver this signal repeatedly within a few
-  /// seconds, and clearing an already-small cache - or re-clearing right
-  /// after the last clear, before anything has been re-decoded into it - buys
-  /// nothing and just forces avoidable re-decode churn on top of the memory
-  /// pressure that triggered this in the first place.
-  void notifyMemoryPressure() {
-    debugPrint('[MemoryWatchdog] system memory pressure');
-    if (_imageCache.currentSizeBytes < _cacheFloorBytes) return;
-    final now = _clock();
-    if (now.difference(_lastEviction) < _cooldown) return;
-    _lastEviction = now;
-    _evict();
   }
 
   /// Exposed for tests: run one sample against [thresholdBytes].
