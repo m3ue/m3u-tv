@@ -65,6 +65,9 @@ jobs:
           flutter-version: '3.47.7'
           cache: true
 
+      - name: Set up Android NDK
+        uses: ./.github/actions/android-ndk
+
       - name: Get dependencies
         run: flutter pub get
 

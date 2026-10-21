@@ -1,0 +1,73 @@
+name: Android NDK
+description: >-
+  Puts the NDK that Flutter's Gradle plugin builds with (flutter.ndkVersion,
+  which :app and :libmpv both use) in place before Gradle runs, so Gradle never
+  downloads it mid-build. Restores it from the Actions cache, or installs it
+  with retries on a miss. Run after subosito/flutter-action.
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve NDK version
+      id: ndk
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Ask Flutter for its root rather than walking up from `which flutter`,
+        # which can be a symlink outside the SDK.
+        FLUTTER_SDK="${FLUTTER_ROOT:-$(flutter --version --machine | jq -r .flutterRoot)}"
+        EXTENSION="$FLUTTER_SDK/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt"
+        VERSION="$(sed -nE 's/.*val ndkVersion: String = "([^"]+)".*/\1/p' "$EXTENSION")"
+        if [ -z "$VERSION" ]; then
+          echo "::error::Could not read ndkVersion from $EXTENSION"
+          exit 1
+        fi
+        echo "Flutter's NDK: $VERSION"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "dir=$ANDROID_HOME/ndk/$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Restore NDK from cache
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.ndk.outputs.dir }}
+        key: android-ndk-${{ runner.os }}-${{ steps.ndk.outputs.version }}
+
+    - name: Install NDK
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        NDK_DIR: ${{ steps.ndk.outputs.dir }}
+      run: |
+        set -euo pipefail
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        [ -x "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager)"
+        # The download has come back truncated before ("Archive is not a ZIP
+        # archive"), so check the result rather than trusting the exit code.
+        for attempt in 1 2 3; do
+          "$SDKMANAGER" --install "ndk;$NDK_VERSION" > /dev/null || true
+          if grep -qx "Pkg.Revision = $NDK_VERSION" "$NDK_DIR/source.properties" 2>/dev/null; then
+            echo "Installed NDK $NDK_VERSION (attempt $attempt)"
+            exit 0
+          fi
+          echo "NDK install attempt $attempt failed"
+          rm -rf "$NDK_DIR"
+          sleep $((attempt * 15))
+        done
+        echo "::error::Could not install NDK $NDK_VERSION after 3 attempts"
+        exit 1
+
+    # Saved only from branch pushes (dev/master): pull requests restore from
+    # their base branch and tag releases from the default branch, while a cache
+    # saved under a PR or tag ref is only visible to re-runs of that same ref -
+    # roughly 1 GB of repo cache quota per copy for no reuse.
+    - name: Save NDK to cache
+      if: >-
+        steps.cache.outputs.cache-hit != 'true' &&
+        github.event_name == 'push' &&
+        startsWith(github.ref, 'refs/heads/')
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.ndk.outputs.dir }}
+        key: android-ndk-${{ runner.os }}-${{ steps.ndk.outputs.version }}
