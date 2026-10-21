@@ -242,13 +242,13 @@ final class MpvPlayerCore {
       self.readyEmitted = false
       self.matchRefreshRateEnabled = matchRefreshRate
 
-      if let userAgent, !userAgent.isEmpty {
-        mpv_set_option_string(handle, "user-agent", userAgent)
-      }
-      if let headers, !headers.isEmpty {
-        let headerString = headers.map { "\($0.key): \($0.value)" }.joined(separator: ",")
-        mpv_set_option_string(handle, "http-header-fields", headerString)
-      }
+      // Set on every load, like the options below: this handle persists across loads, so
+      // a stream without its own headers or user agent must not inherit the previous
+      // stream's (an AIOStreams proxy's headers can carry credentials). `libmpv` is mpv's
+      // own default user agent.
+      mpv_set_option_string(handle, "user-agent", userAgent.flatMap { $0.isEmpty ? nil : $0 } ?? "libmpv")
+      let headerString = (headers ?? [:]).map { "\($0.key): \($0.value)" }.joined(separator: ",")
+      mpv_set_option_string(handle, "http-header-fields", headerString)
       // Live sources get a larger demuxer probe budget -- ffmpeg's default
       // analyzeduration/probesize can be too tight for a live MPEG-TS/HLS
       // stream under network jitter (VPN hops, slow first-byte), especially

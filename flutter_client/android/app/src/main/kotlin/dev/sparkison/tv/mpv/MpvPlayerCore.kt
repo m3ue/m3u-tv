@@ -292,13 +292,16 @@ class MpvPlayerCore(
                     mainHandler.post { frameRateManager.log("mpv load: Auto Frame Rate on") }
                 }
                 try {
-                    if (!userAgent.isNullOrEmpty()) {
-                        current.setProperty("user-agent", userAgent)
-                    }
-                    if (!headers.isNullOrEmpty()) {
-                        val headerString = headers.entries.joinToString(",") { "${it.key}: ${it.value}" }
-                        current.setProperty("http-header-fields", headerString)
-                    }
+                    // Set on every load, like the options below: this handle is
+                    // reused across loads, so a stream without its own headers
+                    // or user agent must not inherit the previous stream's (an
+                    // AIOStreams proxy's headers can carry credentials).
+                    // "libmpv" is mpv's own default user agent.
+                    current.setProperty("user-agent", userAgent?.takeIf { it.isNotEmpty() } ?: "libmpv")
+                    current.setProperty(
+                        "http-header-fields",
+                        headers.orEmpty().entries.joinToString(",") { "${it.key}: ${it.value}" },
+                    )
                     // Live sources get a larger demuxer probe budget -- ffmpeg's
                     // default analyzeduration/probesize can be too tight for a
                     // live MPEG-TS/HLS stream under network jitter (VPN hops,

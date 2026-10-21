@@ -61,8 +61,8 @@ void main() {
     expect(dispatches, 1);
     expect(
       lines.single,
-      '[MemoryPressure] rss=700MB maxRss=900MB imageCache=96MB/240img '
-      'liveImages=12 imageCacheAfter=0MB/0img liveImagesAfter=12',
+      '[MemoryPressure] rss=700MB maxRss=900MB cache=240img/96MB live=12 '
+      'cacheAfter=0img/0MB liveAfter=12',
     );
   });
 

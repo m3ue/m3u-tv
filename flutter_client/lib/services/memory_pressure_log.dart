@@ -7,10 +7,10 @@ import 'package:flutter/painting.dart';
 ///
 /// The framework's own handler runs first: [PaintingBinding.handleMemoryPressure]
 /// empties the image cache before any `didHaveMemoryPressure` observer is
-/// called, so `MemoryWatchdog` only ever sees an empty cache and the Logs &
-/// Diagnostics upload says nothing about what was resident before a
-/// low-memory kill. This wraps the whole dispatch instead: RSS and the image
-/// cache are read before it, and the cache again once every observer has run.
+/// called, so an observer only ever sees an empty cache and can't say what was
+/// resident before a low-memory kill. This wraps the whole dispatch instead:
+/// RSS and the image cache are read before it, and the cache again once every
+/// observer has run.
 ///
 /// iOS delivers warnings in bursts, so at most one line is logged per
 /// [interval]; the next one counts the warnings folded into it as
@@ -60,13 +60,13 @@ class MemoryPressureLog {
     final fields = <String>[
       ?_megabytes('rss', _currentRss),
       ?_megabytes('maxRss', _maxRss),
-      'imageCache=${cache.currentSizeBytes >> 20}MB/${cache.currentSize}img',
-      'liveImages=${cache.liveImageCount}',
+      'cache=${cache.currentSize}img/${cache.currentSizeBytes >> 20}MB',
+      'live=${cache.liveImageCount}',
     ];
     dispatch();
     fields.addAll([
-      'imageCacheAfter=${cache.currentSizeBytes >> 20}MB/${cache.currentSize}img',
-      'liveImagesAfter=${cache.liveImageCount}',
+      'cacheAfter=${cache.currentSize}img/${cache.currentSizeBytes >> 20}MB',
+      'liveAfter=${cache.liveImageCount}',
       if (_suppressed > 0) 'suppressed=$_suppressed',
     ]);
     _suppressed = 0;
