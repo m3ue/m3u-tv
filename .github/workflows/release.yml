@@ -62,7 +62,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies
@@ -96,7 +96,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies
@@ -211,24 +211,13 @@ jobs:
     defaults:
       run:
         working-directory: flutter_client
-    env:
-      # Flutter's Swift Package Manager integration hardcodes the generated
-      # FlutterGeneratedPluginSwiftPackage wrapper's minimum iOS version to
-      # 13.0 regardless of the project's actual deployment target (a Flutter
-      # SDK limitation, not a project misconfiguration - see
-      # packages/flutter_tools/lib/src/darwin/darwin.dart deploymentTarget()).
-      # firebase_core/firebase_messaging require iOS 15.0, so that wrapper
-      # package fails to resolve. Disabling SPM routes all plugins (Firebase
-      # included, via its still-published podspec) through CocoaPods instead,
-      # which honors the Podfile's real `platform :ios, '15.0'`.
-      FLUTTER_SWIFT_PACKAGE_MANAGER: false
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies
@@ -310,7 +299,7 @@ jobs:
         # provides the tvOS Flutter engine and build toolchain. It is separate from
         # the standard Flutter SDK and must be installed before building tvOS targets.
         run: |
-          git clone --depth 1 --branch v3.47.4-tvos.1.10.3 \
+          git clone --depth 1 --branch v3.47.7-tvos.1.11.3 \
             https://github.com/fluttertv/flutter-tvos.git $HOME/flutter-tvos
           echo "$HOME/flutter-tvos/bin" >> $GITHUB_PATH
 
@@ -487,7 +476,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies
@@ -518,9 +507,6 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo "$API_KEY_B64" | base64 --decode \
             > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
-
-      - name: Install CocoaPods dependencies
-        run: cd macos && pod install --repo-update
 
       - name: Build macOS app (unsigned)
         # Sign separately after build so we control the identity and entitlements.
@@ -633,7 +619,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies
@@ -834,7 +820,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
+          flutter-version: '3.47.7'
           cache: true
 
       - name: Get dependencies

@@ -31,7 +31,7 @@ void main() {
     final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
-    expect(workflow, contains("flutter-version: '3.47.4'"));
+    expect(workflow, contains("flutter-version: '3.47.7'"));
     expect(workflow, contains('run: flutter analyze'));
     expect(workflow, contains('run: flutter test'));
   });
@@ -105,7 +105,7 @@ void main() {
       wrapperProperties,
       contains(
         'distributionSha256Sum='
-        'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85',
+        '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
       ),
     );
   });
@@ -573,12 +573,26 @@ void main() {
     final gradleProperties = readFile('android/gradle.properties');
     final settingsGradle = readFile('android/settings.gradle.kts');
 
-    // builtInKotlin=false keeps Flutter's own bundled packages (e.g. integration_test)
-    // working because they still declare org.jetbrains.kotlin.android explicitly and break
-    // when AGP 9 enforces builtInKotlin=true.
-    expect(gradleProperties, contains('android.builtInKotlin=false'));
+    // AGP 9 compiles Kotlin itself (builtInKotlin=true), so no module applies
+    // org.jetbrains.kotlin.android - Flutter warns that doing so will fail future
+    // builds. settings.gradle.kts still declares it `apply false` so the Kotlin
+    // version on the build classpath stays pinned instead of AGP's bundled default.
+    expect(gradleProperties, contains('android.builtInKotlin=true'));
     expect(gradleProperties, contains('android.newDsl=false'));
-    expect(settingsGradle, contains('org.jetbrains.kotlin.android'));
+    expect(
+      settingsGradle,
+      contains('id("org.jetbrains.kotlin.android") version'),
+    );
+    for (final path in <String>[
+      'android/app/build.gradle.kts',
+      'android/libmpv/build.gradle.kts',
+    ]) {
+      expect(
+        readFile(path),
+        isNot(contains('id("org.jetbrains.kotlin.android")')),
+        reason: '$path must rely on built-in Kotlin, not apply KGP',
+      );
+    }
   });
 
   test('android publication requires and verifies stable release signing', () {
