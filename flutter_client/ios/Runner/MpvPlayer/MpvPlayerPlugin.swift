@@ -47,7 +47,7 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
 
     switch call.method {
     case "load":
-      waitForCore(viewId: viewId, attemptsRemaining: 100) { [weak self] core in
+      waitForCore(viewId: viewId, attemptsRemaining: 100) { core in
         guard let core else {
           result(["ok": false, "error": "mpv core not attached", "code": "backend_unavailable"])
           return
