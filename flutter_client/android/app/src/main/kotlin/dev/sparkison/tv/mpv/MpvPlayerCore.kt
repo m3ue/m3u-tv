@@ -324,6 +324,14 @@ class MpvPlayerCore(
                     // load, for the same reason as above.
                     current.setProperty("demuxer-lavf-o", if (isCatchup) "skip_estimate_duration_from_pts=1" else "")
                     current.setProperty("stream-buffer-size", if (isCatchup) "4MiB" else "128KiB")
+                    // A live stream arrives at 1x, so mpv's default of
+                    // resuming a stall once 1 s is buffered rides the live
+                    // edge and stalls again on the next late segment. Resume
+                    // with 6 s buffered instead (Plezy d74d3dafe; ExoPlayer
+                    // waits 5 s after a rebuffer by default). Only a stall
+                    // waits for it, never a channel start. Reset to mpv's
+                    // default for every other load, as above.
+                    current.setProperty("cache-pause-wait", if (isLive) "6" else "1")
 
                     val args = mutableListOf("loadfile", uri, "replace")
                     if (startPositionMs > 0) {

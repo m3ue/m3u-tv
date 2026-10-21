@@ -17,6 +17,7 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 
@@ -728,6 +729,37 @@ void main() {
       expect(find.text('Content Cache'), findsOneWidget);
     });
 
+    testWidgets('Playback page toggles live pre-buffering', (tester) async {
+      final viewSettings = ViewSettingsService();
+      await tester.pumpWidget(
+        _settingsApp(
+          AuthNotifier(
+            xtreamService: XtreamService(transport: _FakeTransport({}).call),
+            secureStorage: InMemorySecureStorage(),
+          ),
+          isConfiguredOverride: true,
+          viewSettingsService: viewSettings,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Playback'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Live TV'), findsOneWidget);
+      final row = find.widgetWithText(
+        SettingsSwitchRow,
+        'Buffer live streams before playing',
+      );
+      expect(tester.widget<SettingsSwitchRow>(row).value, isFalse);
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(viewSettings.prebufferLiveSync, isTrue);
+      expect(tester.widget<SettingsSwitchRow>(row).value, isTrue);
+    });
+
     testWidgets('shows viewer section when m3u-editor and viewer available', (
       tester,
     ) async {
@@ -1224,6 +1256,7 @@ Widget _settingsApp(
   VoidCallback? onDisconnect,
   DevicePairingService? devicePairingService,
   DeviceType? deviceType,
+  ViewSettingsService? viewSettingsService,
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
@@ -1240,6 +1273,7 @@ Widget _settingsApp(
         isConfiguredOverride: isConfiguredOverride,
         onClearCache: onClearCache,
         onDisconnect: onDisconnect ?? () => notifier.disconnect(),
+        viewSettingsService: viewSettingsService,
       ),
     ),
   );

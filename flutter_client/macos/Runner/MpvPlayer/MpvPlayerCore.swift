@@ -302,7 +302,8 @@ final class MpvPlayerCore {
     userAgent: String?,
     headers: [String: String]?,
     externalSubtitles: [(uri: String, title: String?, language: String?)] = [],
-    deinterlace: Bool = false
+    deinterlace: Bool = false,
+    prebufferLive: Bool = false
   ) {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }
@@ -336,6 +337,13 @@ final class MpvPlayerCore {
       // The Deinterlace setting: `auto` filters only frames flagged interlaced. Set on
       // every load, since this handle persists across loads.
       mpv_set_option_string(handle, "deinterlace", deinterlace ? "auto" : "no")
+      // A live stream arrives at 1x, so mpv's default of resuming a stall once 1 s is
+      // buffered rides the live edge and stalls again on the next late segment. Resume
+      // with 6 s buffered instead (Plezy d74d3dafe). The Buffer Live Streams setting
+      // also holds the first frame until then, which costs that wait on every channel
+      // change. Set on every load, since this handle persists across loads.
+      mpv_set_option_string(handle, "cache-pause-wait", isLive ? "6" : "1")
+      mpv_set_option_string(handle, "cache-pause-initial", isLive && prebufferLive ? "yes" : "no")
       if let headers, !headers.isEmpty {
         let headerString = headers.map { "\($0.key): \($0.value)" }.joined(separator: ",")
         mpv_set_option_string(handle, "http-header-fields", headerString)

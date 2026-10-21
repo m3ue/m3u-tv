@@ -1063,6 +1063,7 @@ class _ConnectedViewState extends State<_ConnectedView> {
                       proxyCapability: auth?.proxy,
                       proxyPlaybackSettings: widget.proxyPlaybackSettings,
                       comskipSettings: widget.comskipSettings,
+                      viewSettingsService: widget.viewSettingsService,
                       epgRefreshInterval: widget.epgRefreshInterval,
                       epgRefreshOptions: widget.epgRefreshOptions,
                       onEpgIntervalChanged: widget.onEpgIntervalChanged,
@@ -1342,21 +1343,29 @@ class _PlaybackSettingsPage extends StatelessWidget {
     required this.epgRefreshOptions,
     required this.onEpgIntervalChanged,
     required this.onClearCache,
+    this.viewSettingsService,
     this.onHandleTopLevelBack,
   });
 
   final ProxyCapability? proxyCapability;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
+  final ViewSettingsService? viewSettingsService;
   final Duration? epgRefreshInterval;
   final List<Duration> epgRefreshOptions;
   final void Function(Duration interval)? onEpgIntervalChanged;
   final VoidCallback onClearCache;
   final bool Function()? onHandleTopLevelBack;
 
+  // Pre-buffering is an mpv option. Android plays through ExoPlayer, which
+  // already buffers before it starts (mpv there is only a fallback), so hide
+  // it there, like Deinterlace.
+  static final bool _showPrebufferLiveToggle = !Platform.isAndroid;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final viewSettings = viewSettingsService;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1366,6 +1375,24 @@ class _PlaybackSettingsPage extends StatelessWidget {
           ListenableBuilder(
             listenable: proxyPlaybackSettings!,
             builder: (context, _) => _buildProxyGroup(context, l),
+          ),
+        ],
+
+        if (viewSettings != null && _showPrebufferLiveToggle) ...[
+          SettingsSectionHeader(l.settingsSectionLiveTv),
+          ListenableBuilder(
+            listenable: viewSettings,
+            builder: (context, _) => SettingsGroup(
+              children: [
+                SettingsSwitchRow(
+                  title: l.settingsPrebufferLive,
+                  subtitle: l.settingsPrebufferLiveHint,
+                  icon: Icons.hourglass_bottom,
+                  value: viewSettings.prebufferLiveSync,
+                  onChanged: viewSettings.setPrebufferLive,
+                ),
+              ],
+            ),
           ),
         ],
 

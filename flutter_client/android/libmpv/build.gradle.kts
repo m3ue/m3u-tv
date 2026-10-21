@@ -152,9 +152,10 @@ val downloadLibmpv = tasks.register("downloadLibmpv") {
 }
 
 // Each tarball is a native tree: lib/*.so (libmpv, seven FFmpeg libraries,
-// libc++_shared) + include/mpv/*.h. The .so files land in the per-ABI jniLibs
-// layout under native/jni, the headers under native/include for the CMake
-// glue build, and libc++ in a separate tree that the app packages at PROJECT
+// libc++_shared) + include/ (mpv's headers and the seven FFmpeg libraries',
+// libavcodec/jni.h carrying the android series' callback-class hook). The
+// .so files land in the per-ABI jniLibs layout under native/jni, the headers
+// under native/include for the CMake glue build, and libc++ in a separate tree that the app packages at PROJECT
 // scope so the tarball's 16 KB-capable runtime deterministically wins the
 // merge (see app/build.gradle.kts packaging { jniLibs } + sourceSets).
 val extractLibmpvNative = tasks.register("extractLibmpvNative") {
@@ -202,6 +203,7 @@ val extractLibmpvNative = tasks.register("extractLibmpvNative") {
           if (!File(libcxxStaging, "jni/$abi/libc++_shared.so").isFile) add("libcxx/jni/$abi/libc++_shared.so")
         }
         if (!File(nativeStaging, "include/mpv/client.h").isFile) add("native/include/mpv/client.h")
+        if (!File(nativeStaging, "include/libavcodec/jni.h").isFile) add("native/include/libavcodec/jni.h")
       }
       if (missing.isNotEmpty()) {
         throw GradleException(

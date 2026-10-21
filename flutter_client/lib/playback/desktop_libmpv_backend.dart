@@ -153,6 +153,7 @@ class DesktopLibmpvBackend
         'hdrEnabled': source.hdrEnabled,
         'matchRefreshRate': source.matchDisplayRefreshRate,
         'deinterlace': source.deinterlace,
+        'prebufferLive': source.prebufferLive,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

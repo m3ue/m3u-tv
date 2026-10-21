@@ -480,6 +480,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionStreaming => 'Streaming';
 
   @override
+  String get settingsSectionLiveTv => 'Live TV';
+
+  @override
   String get settingsSectionServices => 'Services';
 
   @override
@@ -1738,6 +1741,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.';
+
+  @override
+  String get settingsPrebufferLive => 'Buffer live streams before playing';
+
+  @override
+  String get settingsPrebufferLiveHint =>
+      'Wait for a few seconds of video before a channel starts moving, so streams that arrive unevenly stop pausing to buffer. Channel changes take a few seconds longer.';
 
   @override
   String get settingsNavigationSound => 'Navigation sound';

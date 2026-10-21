@@ -482,6 +482,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionStreaming => 'Streaming';
 
   @override
+  String get settingsSectionLiveTv => 'Télévision en direct';
+
+  @override
   String get settingsSectionServices => 'Services';
 
   @override
@@ -1754,6 +1757,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
+
+  @override
+  String get settingsPrebufferLive =>
+      'Mettre en mémoire tampon les flux en direct avant la lecture';
+
+  @override
+  String get settingsPrebufferLiveHint =>
+      'Attend quelques secondes de vidéo avant qu\'une chaîne ne démarre, pour que les flux irréguliers cessent de s\'interrompre pour charger. Les changements de chaîne prennent quelques secondes de plus.';
 
   @override
   String get settingsNavigationSound => 'Son de navigation';

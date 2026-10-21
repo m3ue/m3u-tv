@@ -99,6 +99,8 @@ abstract class MpvNativeBackendBase
         'matchRefreshRate': source.matchDisplayRefreshRate,
         // Read by the Apple mpv cores; the Android core ignores it.
         'deinterlace': source.deinterlace,
+        // Read by the Apple mpv cores; the Android core ignores it.
+        'prebufferLive': source.prebufferLive,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

@@ -1635,6 +1635,14 @@ FlMethodResponse* Load(FlValue* args) {
   // The system libmpv may predate `auto` and reject it, which leaves mpv's
   // default (off) rather than failing the open.
   if (BoolArg(args, "deinterlace", false)) api.set_option_string(handle, "deinterlace", "auto");
+  // A live stream arrives at 1x, so mpv's default of resuming a stall once 1 s is buffered
+  // rides the live edge and stalls again on the next late segment. Resume with 6 s buffered
+  // instead (Plezy d74d3dafe). The Buffer Live Streams setting also holds the first frame
+  // until then, which costs that wait on every channel change.
+  if (BoolArg(args, "isLive", false)) {
+    api.set_option_string(handle, "cache-pause-wait", "6");
+    if (BoolArg(args, "prebufferLive", false)) api.set_option_string(handle, "cache-pause-initial", "yes");
+  }
   std::string user_agent = StringArg(args, "userAgent");
   if (!user_agent.empty()) api.set_option_string(handle, "user-agent", user_agent.c_str());
   std::string headers = HeaderString(args);

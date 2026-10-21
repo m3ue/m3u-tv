@@ -956,6 +956,12 @@ abstract class AppLocalizations {
   /// **'Streaming'**
   String get settingsSectionStreaming;
 
+  /// No description provided for @settingsSectionLiveTv.
+  ///
+  /// In en, this message translates to:
+  /// **'Live TV'**
+  String get settingsSectionLiveTv;
+
   /// No description provided for @settingsSectionServices.
   ///
   /// In en, this message translates to:
@@ -3091,6 +3097,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
   String get settingsDeinterlaceHint;
+
+  /// No description provided for @settingsPrebufferLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Buffer live streams before playing'**
+  String get settingsPrebufferLive;
+
+  /// No description provided for @settingsPrebufferLiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for a few seconds of video before a channel starts moving, so streams that arrive unevenly stop pausing to buffer. Channel changes take a few seconds longer.'**
+  String get settingsPrebufferLiveHint;
 
   /// No description provided for @settingsNavigationSound.
   ///

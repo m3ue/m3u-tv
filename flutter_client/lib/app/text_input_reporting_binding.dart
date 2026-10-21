@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:m3u_tv/services/memory_pressure_log.dart';
 
 /// App binding that tells Android when a Flutter text field holds the text
 /// input connection (#309).
@@ -23,7 +24,11 @@ import 'package:flutter/widgets.dart';
 /// listener first), so this watches the outgoing text input messages instead
 /// and reports ahead of `setClient`. Platform messages are delivered in
 /// order, so Android always sees the flag first.
-class TextInputReportingBinding extends WidgetsFlutterBinding {
+///
+/// Being the app's binding, it also logs memory pressure
+/// ([MemoryPressureLogging]).
+class TextInputReportingBinding extends WidgetsFlutterBinding
+    with MemoryPressureLogging {
   /// Call once, in place of [WidgetsFlutterBinding.ensureInitialized], as the
   /// first thing in `main()`.
   static WidgetsBinding ensureInitialized() {

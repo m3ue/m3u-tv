@@ -151,7 +151,9 @@ def check(ok, label):
 
 for platform, entry in lock.items():
     libraries = platforms.get(platform, {}).get("libraries", {})
-    published = next(iter(libraries.values()), None)
+    # Android also lists the mpv-android AAR (no prebuilt tarballs); the lock
+    # pins the libmpv-<platform> tarballs.
+    published = libraries.get(f"libmpv-{platform}") or next(iter(libraries.values()), None)
     if published is None:
         check(False, f"{platform}: artifacts.json at the lock commit has no {platform} library")
         continue

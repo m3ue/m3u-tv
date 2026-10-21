@@ -1199,6 +1199,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         matchDisplayRefreshRate:
             widget.viewSettingsService?.matchRefreshRateSync ?? false,
         deinterlace: widget.viewSettingsService?.deinterlaceSync ?? false,
+        prebufferLive: widget.viewSettingsService?.prebufferLiveSync ?? false,
       ),
     );
   }

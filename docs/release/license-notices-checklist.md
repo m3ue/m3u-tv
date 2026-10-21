@@ -53,6 +53,12 @@ This document records the third-party dependency license notices that must be in
 - **Status**: Desktop-only, bundled with libmpv.
 - **Gate**: Verify libass and its dependency notices are present.
 
+### SpatialAudioBridge
+- **Scope**: Linked into the iOS and tvOS `Libmpv.framework` from mpv-build 8ad6d9b on (mpv-build 45b6173, `ao_spatial`). Not on macOS. The app does not select `ao=spatial`, so it is linked but unused.
+- **License**: Apache-2.0, with MIT/Apache-2.0 Rust crates and an FFmpeg-derived DTS decoder (`dca`) under LGPL-2.1-or-later. All GPL-3.0 compatible.
+- **Notice requirement**: The framework ships the full notices as `Libmpv.framework/LICENSE.SpatialAudioBridge`.
+- **Gate**: Include those notices wherever the libmpv/FFmpeg/libass notices are listed for iOS and tvOS.
+
 ## Apple Playback Dependencies
 
 ### AVKit / AVPlayer

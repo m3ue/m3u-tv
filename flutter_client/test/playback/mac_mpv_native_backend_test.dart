@@ -119,6 +119,40 @@ void main() {
       await backend.dispose();
     });
 
+    test('load forwards the live pre-buffer setting', () async {
+      setupMockEvents();
+      final loadCalls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(methodChannel, (call) async {
+            if (call.method == 'load') loadCalls.add(call);
+            return <String, Object?>{'ok': false, 'error': 'test'};
+          });
+
+      final backend = MacMpvNativeBackend();
+      for (final prebufferLive in [true, false]) {
+        await expectLater(
+          backend.load(
+            PlaybackSource(
+              uri: 'https://editor.test/live/u/p/1.ts',
+              isLive: true,
+              prebufferLive: prebufferLive,
+            ),
+          ),
+          throwsA(isA<PlaybackException>()),
+        );
+      }
+
+      // Sent on every load, off included, for the same reason as deinterlace.
+      expect(
+        loadCalls.map(
+          (call) => (call.arguments as Map<Object?, Object?>)['prebufferLive'],
+        ),
+        [isTrue, isFalse],
+      );
+
+      await backend.dispose();
+    });
+
     test('seekWindow reads the buffered ranges from the native core', () async {
       setupMockEvents();
       final calls = <MethodCall>[];

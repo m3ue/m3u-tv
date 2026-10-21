@@ -253,6 +253,7 @@ class PlaybackSource {
     this.hdrEnabled = true,
     this.matchDisplayRefreshRate = false,
     this.deinterlace = false,
+    this.prebufferLive = false,
   });
 
   final String uri;
@@ -295,6 +296,14 @@ class PlaybackSource {
   /// `ViewSettingsService.deinterlace`.
   final bool deinterlace;
 
+  /// Whether the Apple and desktop mpv backends hold a live stream at its
+  /// first frame until a few seconds have buffered (mpv's
+  /// `cache-pause-initial`), so a stream whose segments arrive late doesn't
+  /// stall right after it starts. Costs a few seconds per channel change.
+  /// Android ignores it: ExoPlayer already buffers before it starts, and the
+  /// setting is hidden there. Mirrors `ViewSettingsService.prebufferLive`.
+  final bool prebufferLive;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -312,6 +321,7 @@ class PlaybackSource {
     bool? hdrEnabled,
     bool? matchDisplayRefreshRate,
     bool? deinterlace,
+    bool? prebufferLive,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -329,6 +339,7 @@ class PlaybackSource {
       matchDisplayRefreshRate:
           matchDisplayRefreshRate ?? this.matchDisplayRefreshRate,
       deinterlace: deinterlace ?? this.deinterlace,
+      prebufferLive: prebufferLive ?? this.prebufferLive,
     );
   }
 }

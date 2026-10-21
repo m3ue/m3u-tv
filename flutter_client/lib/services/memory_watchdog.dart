@@ -88,8 +88,10 @@ class MemoryWatchdog {
   /// after the last clear, before anything has been re-decoded into it - buys
   /// nothing and just forces avoidable re-decode churn on top of the memory
   /// pressure that triggered this in the first place.
+  ///
+  /// The signal itself is logged by `MemoryPressureLog`, which sees the image
+  /// cache before the framework empties it.
   void notifyMemoryPressure() {
-    debugPrint('[MemoryWatchdog] system memory pressure');
     if (_imageCache.currentSizeBytes < _cacheFloorBytes) return;
     final now = _clock();
     if (now.difference(_lastEviction) < _cooldown) return;

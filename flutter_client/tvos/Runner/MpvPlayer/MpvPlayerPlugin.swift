@@ -68,7 +68,8 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
           // (Dart), which defaults tvOS on. See MpvPlayerCore's
           // matchRefreshRateEnabled doc comment.
           matchRefreshRate: args["matchRefreshRate"] as? Bool ?? true,
-          deinterlace: args["deinterlace"] as? Bool ?? false
+          deinterlace: args["deinterlace"] as? Bool ?? false,
+          prebufferLive: args["prebufferLive"] as? Bool ?? false
         )
         result(["ok": true])
       }

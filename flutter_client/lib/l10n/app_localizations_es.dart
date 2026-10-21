@@ -482,6 +482,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSectionStreaming => 'Transmisión';
 
   @override
+  String get settingsSectionLiveTv => 'Televisión en vivo';
+
+  @override
   String get settingsSectionServices => 'Servicios';
 
   @override
@@ -1751,6 +1754,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.';
+
+  @override
+  String get settingsPrebufferLive =>
+      'Almacenar en búfer las transmisiones en vivo antes de reproducir';
+
+  @override
+  String get settingsPrebufferLiveHint =>
+      'Espera unos segundos de vídeo antes de que un canal empiece a moverse, para que las transmisiones que llegan de forma irregular dejen de pausarse para cargar. Los cambios de canal tardan unos segundos más.';
 
   @override
   String get settingsNavigationSound => 'Sonido de navegación';
