@@ -128,14 +128,19 @@ void main() {
     testWidgets('holds the finish minute steady while playing', (
       tester,
     ) async {
-      await tester.pumpWidget(_app(_controls()));
+      await tester.pumpWidget(
+        _app(_controls(position: const Duration(minutes: 5, seconds: 1))),
+      );
       final before = tester
           .widget<Text>(find.byKey(const Key('playback-ends-at')))
           .data;
 
-      // A position tick a few seconds on, same whole minutes left.
+      // A position tick a few seconds on, same whole minutes left (54:59 and
+      // 54:56). Starting at exactly 5:00 would cross from 55 to 54, which
+      // correctly re-reads the wall clock and flips the minute whenever the
+      // test lands in the first seconds of one.
       await tester.pumpWidget(
-        _app(_controls(position: const Duration(minutes: 5, seconds: 3))),
+        _app(_controls(position: const Duration(minutes: 5, seconds: 4))),
       );
 
       expect(
