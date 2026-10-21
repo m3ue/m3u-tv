@@ -3,7 +3,7 @@ import Flutter
 import UIKit
 
 @main
-class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
     private var avKitPlugin: AvKitPlaybackPlugin?
     private var mpvPlugin: MpvPlayerPlugin?
 
@@ -11,21 +11,18 @@ class AppDelegate: FlutterAppDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        let flutterVC = FlutterViewController(project: nil, nibName: nil, bundle: nil)
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = flutterVC
-        window.makeKeyAndVisible()
-        self.window = window
-
-        // Register all plugins against the FlutterViewController's engine so
-        // Dart platform-channel calls (path_provider, secure_storage, etc.)
-        // reach the same engine that is actually running the Dart code.
-        GeneratedPluginRegistrant.register(with: flutterVC.pluginRegistry())
-        registerAvKitPlugin(with: flutterVC)
-        registerMpvPlugin(with: flutterVC)
-        registerExternalUrlChannel(with: flutterVC)
-
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    // UIScene lifecycle (required for apps built with the tvOS 27 SDK): the
+    // scene builds its window from Main.storyboard, whose FlutterViewController
+    // creates the implicit engine, so plugins register here, not against a
+    // window/view controller made in application(_:didFinishLaunchingWithOptions:).
+    func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+        GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+        registerAvKitPlugin(with: engineBridge.pluginRegistry)
+        registerMpvPlugin(with: engineBridge.pluginRegistry)
+        registerExternalUrlChannel(with: engineBridge.pluginRegistry)
     }
 
     /// `url_launcher` isn't registered on tvOS, so trailer links (see
@@ -33,8 +30,8 @@ class AppDelegate: FlutterAppDelegate {
     /// Replies `{opened, canOpen}`: `opened` is true only when the system
     /// actually handed the URL to an app; `canOpen` is `canOpenURL` (only
     /// meaningful for schemes listed in LSApplicationQueriesSchemes).
-    private func registerExternalUrlChannel(with controller: FlutterViewController) {
-        guard let registrar = controller.pluginRegistry().registrar(forPlugin: "ExternalUrlChannel") else { return }
+    private func registerExternalUrlChannel(with registry: FlutterPluginRegistry) {
+        guard let registrar = registry.registrar(forPlugin: "ExternalUrlChannel") else { return }
         FlutterMethodChannel(
             name: "m3u_tv/external_url",
             binaryMessenger: registrar.messenger()
@@ -56,8 +53,8 @@ class AppDelegate: FlutterAppDelegate {
         }
     }
 
-    private func registerAvKitPlugin(with controller: FlutterViewController) {
-        guard let registrar = controller.pluginRegistry().registrar(forPlugin: "AvKitPlaybackPlugin") else { return }
+    private func registerAvKitPlugin(with registry: FlutterPluginRegistry) {
+        guard let registrar = registry.registrar(forPlugin: "AvKitPlaybackPlugin") else { return }
         let plugin = AvKitPlaybackPlugin(textureRegistry: registrar.textures())
         avKitPlugin = plugin
 
@@ -74,8 +71,8 @@ class AppDelegate: FlutterAppDelegate {
         ).setStreamHandler(plugin)
     }
 
-    private func registerMpvPlugin(with controller: FlutterViewController) {
-        guard let registrar = controller.pluginRegistry().registrar(forPlugin: "MpvPlayerPlugin") else { return }
+    private func registerMpvPlugin(with registry: FlutterPluginRegistry) {
+        guard let registrar = registry.registrar(forPlugin: "MpvPlayerPlugin") else { return }
         let plugin = MpvPlayerPlugin()
         mpvPlugin = plugin
 
