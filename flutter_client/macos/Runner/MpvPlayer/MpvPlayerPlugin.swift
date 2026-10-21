@@ -46,7 +46,7 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
 
     switch call.method {
     case "load":
-      waitForCore(viewId: viewId, attemptsRemaining: 100) { [weak self] core in
+      waitForCore(viewId: viewId, attemptsRemaining: 100) { core in
         guard let core else {
           result(["ok": false, "error": "mpv core not attached", "code": "backend_unavailable"])
           return
@@ -156,7 +156,12 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       return
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
-      self?.waitForCore(viewId: viewId, attemptsRemaining: attemptsRemaining - 1, completion: completion)
+      // Torn down mid-poll: answer the pending Dart load instead of leaving it unresolved.
+      guard let self else {
+        completion(nil)
+        return
+      }
+      self.waitForCore(viewId: viewId, attemptsRemaining: attemptsRemaining - 1, completion: completion)
     }
   }
 

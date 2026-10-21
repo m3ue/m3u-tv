@@ -31,9 +31,27 @@ void main() {
     final workflow = readFile(ciWorkflowPath);
 
     expect(workflow, contains('working-directory: flutter_client'));
-    expect(workflow, contains("flutter-version: '3.47.4'"));
     expect(workflow, contains('run: flutter analyze'));
     expect(workflow, contains('run: flutter test'));
+  });
+
+  test('every workflow job pins the same Flutter SDK', () {
+    // Bumping Flutter means changing every pin; a missed one would ship
+    // release artifacts built by mixed SDKs.
+    const pinnedFlutterVersion = '3.47.7';
+    final pin = RegExp(r'''flutter-version:\s*['"]?([^'"\s]+)''');
+    for (final path in <String>[ciWorkflowPath, releaseWorkflowPath]) {
+      final versions = pin
+          .allMatches(readFile(path))
+          .map((match) => match.group(1))
+          .toList();
+      expect(versions, isNotEmpty, reason: '$path should pin Flutter');
+      expect(
+        versions,
+        everyElement(pinnedFlutterVersion),
+        reason: 'every flutter-version pin in $path must match',
+      );
+    }
   });
 
   test('release builds rely on the built-in public Trakt client id', () {
@@ -105,7 +123,7 @@ void main() {
       wrapperProperties,
       contains(
         'distributionSha256Sum='
-        'b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85',
+        '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
       ),
     );
   });
@@ -573,12 +591,42 @@ void main() {
     final gradleProperties = readFile('android/gradle.properties');
     final settingsGradle = readFile('android/settings.gradle.kts');
 
-    // builtInKotlin=false keeps Flutter's own bundled packages (e.g. integration_test)
-    // working because they still declare org.jetbrains.kotlin.android explicitly and break
-    // when AGP 9 enforces builtInKotlin=true.
-    expect(gradleProperties, contains('android.builtInKotlin=false'));
+    // AGP 9 compiles Kotlin itself (builtInKotlin=true), so no module applies
+    // org.jetbrains.kotlin.android - Flutter warns that doing so will fail future
+    // builds. settings.gradle.kts still declares it `apply false` so the Kotlin
+    // version on the build classpath stays pinned instead of AGP's bundled default.
+    expect(gradleProperties, contains('android.builtInKotlin=true'));
     expect(gradleProperties, contains('android.newDsl=false'));
-    expect(settingsGradle, contains('org.jetbrains.kotlin.android'));
+    expect(
+      settingsGradle,
+      contains('id("org.jetbrains.kotlin.android") version'),
+    );
+
+    // Every way a module can apply KGP: plugin id, kotlin("android") shorthand,
+    // the legacy kotlin-android id, and a version-catalog alias.
+    final appliesKgp = RegExp(
+      r'''org\.jetbrains\.kotlin\.android|kotlin\(\s*["']android["']\s*\)|'''
+      r'''["']kotlin-android["']|libs\.plugins\.[\w.]*kotlin''',
+    );
+    for (final sample in <String>[
+      'id("org.jetbrains.kotlin.android")',
+      'kotlin("android")',
+      'apply(plugin = "kotlin-android")',
+      "apply plugin: 'kotlin-android'",
+      'alias(libs.plugins.kotlin.android)',
+    ]) {
+      expect(appliesKgp.hasMatch(sample), isTrue, reason: sample);
+    }
+    for (final path in <String>[
+      'android/app/build.gradle.kts',
+      'android/libmpv/build.gradle.kts',
+    ]) {
+      expect(
+        appliesKgp.hasMatch(readFile(path)),
+        isFalse,
+        reason: '$path must rely on built-in Kotlin, not apply KGP',
+      );
+    }
   });
 
   test('android publication requires and verifies stable release signing', () {
@@ -735,6 +783,37 @@ void main() {
     expect(windowsJob, contains('runs-on: windows-latest'));
     expect(windowsJob, contains('flutter build windows --release'));
     expect(windowsJob, isNot(contains('upload-artifact')));
+  });
+
+  test('pull request CI compiles iOS and macOS runners', () {
+    final ciWorkflow = readFile(ciWorkflowPath);
+
+    expect(
+      ciWorkflow,
+      contains(
+        r"apple: ${{ github.event_name == 'workflow_dispatch' || "
+        "steps.filter.outputs.apple == 'true' }}",
+      ),
+    );
+    expect(ciWorkflow, contains("- 'flutter_client/ios/**'"));
+    expect(ciWorkflow, contains("- 'flutter_client/macos/**'"));
+
+    final appleJobIdx = ciWorkflow.indexOf('build-apple-native:');
+    expect(appleJobIdx, greaterThan(-1));
+    final appleJob = ciWorkflow.substring(appleJobIdx);
+
+    expect(appleJob, contains("if: needs.changes.outputs.apple == 'true'"));
+    expect(appleJob, contains('runs-on: macos-latest'));
+    expect(
+      appleJob,
+      contains(
+        'run: cp ci/GoogleService-Info.stub.plist ios/GoogleService-Info.plist',
+      ),
+    );
+    expect(appleJob, contains('flutter build ios --release --no-codesign'));
+    expect(appleJob, contains('flutter build macos --release'));
+    expect(appleJob, isNot(contains('pod install')));
+    expect(appleJob, isNot(contains('upload-artifact')));
   });
 
   test('android manifest exposes Android TV launcher metadata', () {

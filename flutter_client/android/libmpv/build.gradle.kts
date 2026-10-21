@@ -54,7 +54,6 @@ fun promoteDirectory(staging: File, destination: File) {
 // trees carried by the mpv-build per-ABI tarballs pinned below.
 plugins {
   id("com.android.library")
-  id("org.jetbrains.kotlin.android")
 }
 
 // Single source for the pinned native artifacts: the repo-root

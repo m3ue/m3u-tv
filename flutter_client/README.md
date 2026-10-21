@@ -38,13 +38,9 @@ flutter run                       # debug on simulator or device
 flutter build ios --no-codesign   # CI smoke build
 ```
 
-If you hit `Package product 'firebase-core' requires minimum platform version 15.0 ... but this target supports 13.0`, set this for every iOS command (`flutter clean`, `flutter pub get`, `flutter run`, `flutter build ios`, `pod install`):
+iOS and macOS resolve every plugin (and mpv-build) through Swift Package Manager - there is no Podfile and no `pod install` step. If a build fails resolving packages after an old CocoaPods-era checkout, make sure `FLUTTER_SWIFT_PACKAGE_MANAGER` isn't set to `false` in your shell and that `flutter config` doesn't show `--no-enable-swift-package-manager`, then run `flutter clean && flutter pub get`. tvOS is separate: `flutter-tvos` still runs `pod install` in `tvos/` for its podspec-only plugins (see below).
 
-```bash
-export FLUTTER_SWIFT_PACKAGE_MANAGER=false
-```
-
-This is a Flutter SDK limitation, not a project misconfig: Flutter hardcodes the auto-generated `FlutterGeneratedPluginSwiftPackage` wrapper's minimum iOS version to 13.0 regardless of `IPHONEOS_DEPLOYMENT_TARGET` (which is correctly 15.0 here), and `firebase_core`/`firebase_messaging` require 15.0. It regenerates on every `flutter clean`/`pub get`, so the error resurfaces even if you haven't touched anything. Disabling SPM routes all plugins - Firebase included, via its still-published podspec - through CocoaPods instead, which honors the Podfile's real `platform :ios, '15.0'`. CI (`release.yml`) sets this env var for the `build-ios` job already.
+If a build fails with `Package product '<plugin>' requires minimum platform version X ... but this target supports Y` (Firebase has done this before), a plugin raised its minimum above ours. Flutter generates `FlutterGeneratedPluginSwiftPackage` at its own minimum (iOS 15.0 / macOS 12.0) and only raises it to match the Runner project's deployment target. Fix it by raising `IPHONEOS_DEPLOYMENT_TARGET` (iOS) or `MACOSX_DEPLOYMENT_TARGET` (macOS) in the Runner project for every build configuration. The next `flutter build` raises the generated package to match. Don't disable SPM to get around it: there's no Podfile to fall back to anymore.
 
 ### macOS / Linux / Windows
 
@@ -92,7 +88,7 @@ Each fork's `PORTING_REPORT.md` records which upstream package and version it ca
 
 #### Plugins that add tvOS support upstream instead (no fork needed)
 
-Some plugins (e.g. `wakelock_plus` >= 1.8.0) add tvOS support directly to their existing `ios/*.podspec` (`s.tvos.deployment_target`) rather than shipping a separate `tvos/` folder. `tvos/Podfile` links these straight from the plugin's `ios/` directory instead of requiring a `_tvos` fork - `flutter-tvos`'s own Podfile template (as of 1.10.3) does not yet handle this pattern, so this project's `Podfile` does it by hand, including a locally-generated placeholder `Flutter` pod (mirroring `flutter_install_ios_engine_pod` in Flutter's `podhelper.rb`) and a `FRAMEWORK_SEARCH_PATHS` override in `post_install`, since the upstream podspec was never adapted to skip `s.dependency 'Flutter'` the way a real port does. If `pod install` for tvOS ever fails with `Module 'Flutter' not found` or `Module '<plugin>' not found` again, check whether a plugin newly declares `tvos:` in its `pubspec.yaml`'s `plugin.platforms` without a matching `tvos/` folder - it needs this fallback path, not a fork.
+Some plugins (e.g. `wakelock_plus` >= 1.8.0) add tvOS support directly to their existing `ios/*.podspec` (`s.tvos.deployment_target`) rather than shipping a separate `tvos/` folder. `tvos/Podfile` links these straight from the plugin's `ios/` directory instead of requiring a `_tvos` fork - `flutter-tvos`'s own Podfile template (as of 1.11.3) does not yet handle this pattern, so this project's `Podfile` does it by hand, including a locally-generated placeholder `Flutter` pod (mirroring `flutter_install_ios_engine_pod` in Flutter's `podhelper.rb`) and a `FRAMEWORK_SEARCH_PATHS` override in `post_install`, since the upstream podspec was never adapted to skip `s.dependency 'Flutter'` the way a real port does. If `pod install` for tvOS ever fails with `Module 'Flutter' not found` or `Module '<plugin>' not found` again, check whether a plugin newly declares `tvos:` in its `pubspec.yaml`'s `plugin.platforms` without a matching `tvos/` folder - it needs this fallback path, not a fork.
 
 ## Release builds
 
@@ -390,6 +386,6 @@ See [../docs/release/platform-release-matrix.md](../docs/release/platform-releas
 
 | Tool | Version |
 |---|---|
-| Flutter SDK | `^3.12.0` (see `pubspec.yaml`) |
-| flutter-tvos | 1.10.3 (Flutter 3.47.4) |
+| Flutter SDK | 3.47.7 (pinned in `.github/workflows`) |
+| flutter-tvos | 1.11.3 (Flutter 3.47.7) |
 | Dart | `^3.12.0` |
