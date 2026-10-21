@@ -40,6 +40,8 @@ flutter build ios --no-codesign   # CI smoke build
 
 iOS and macOS resolve every plugin (and mpv-build) through Swift Package Manager - there is no Podfile and no `pod install` step. If a build fails resolving packages after an old CocoaPods-era checkout, make sure `FLUTTER_SWIFT_PACKAGE_MANAGER` isn't set to `false` in your shell and that `flutter config` doesn't show `--no-enable-swift-package-manager`, then run `flutter clean && flutter pub get`. tvOS is separate: `flutter-tvos` still runs `pod install` in `tvos/` for its podspec-only plugins (see below).
 
+If a build fails with `Package product '<plugin>' requires minimum platform version X ... but this target supports Y` (Firebase has done this before), a plugin raised its minimum above ours. Flutter generates `FlutterGeneratedPluginSwiftPackage` at its own minimum (iOS 15.0 / macOS 12.0) and only raises it to match the Runner project's deployment target. Fix it by raising `IPHONEOS_DEPLOYMENT_TARGET` (iOS) or `MACOSX_DEPLOYMENT_TARGET` (macOS) in the Runner project for every build configuration. The next `flutter build` raises the generated package to match. Don't disable SPM to get around it: there's no Podfile to fall back to anymore.
+
 ### macOS / Linux / Windows
 
 ```bash

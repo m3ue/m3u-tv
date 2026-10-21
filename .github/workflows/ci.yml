@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
+      apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -30,6 +31,15 @@ jobs:
               - 'flutter_client/lib/**'
               - 'flutter_client/pubspec.yaml'
               - 'flutter_client/pubspec.lock'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+            apple:
+              - 'flutter_client/ios/**'
+              - 'flutter_client/macos/**'
+              - 'flutter_client/lib/**'
+              - 'flutter_client/pubspec.yaml'
+              - 'flutter_client/pubspec.lock'
+              - 'flutter_client/ci/GoogleService-Info.stub.plist'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
 
@@ -167,3 +177,43 @@ jobs:
               throw "Required Windows bundle file is empty: $Path"
             }
           }
+
+  build-apple-native:
+    # iOS and macOS resolve every plugin through Swift Package Manager with no
+    # CocoaPods fallback, so a dependency bump that breaks package resolution
+    # or linking has to fail here, not first in release.yml at tag time.
+    name: Build iOS and macOS runners (verify only)
+    needs: changes
+    if: needs.changes.outputs.apple == 'true'
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Provide stub iOS Firebase config
+        # GoogleService-Info.plist is gitignored (the real one only exists on
+        # release builds via a repo secret, see release.yml), but the iOS Runner
+        # bundles it as a resource, so the build needs *a* file at that path.
+        run: cp ci/GoogleService-Info.stub.plist ios/GoogleService-Info.plist
+
+      - name: Build iOS app (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Build macOS app (unsigned)
+        env:
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: ""
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
+        run: flutter build macos --release

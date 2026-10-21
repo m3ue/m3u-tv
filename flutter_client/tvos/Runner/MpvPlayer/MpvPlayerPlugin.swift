@@ -160,7 +160,12 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       return
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
-      self?.waitForCore(viewId: viewId, attemptsRemaining: attemptsRemaining - 1, completion: completion)
+      // Torn down mid-poll: answer the pending Dart load instead of leaving it unresolved.
+      guard let self else {
+        completion(nil)
+        return
+      }
+      self.waitForCore(viewId: viewId, attemptsRemaining: attemptsRemaining - 1, completion: completion)
     }
   }
 
