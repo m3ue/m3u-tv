@@ -4,7 +4,7 @@
 
 Cross-platform TV front-end player for the [M3U Editor web app](https://github.com/m3ue/m3u-editor).
 
-![feature-card](https://m3ue.sparkison.dev/img/tv-social-card.jpg)
+![feature-card](https://m3ue.sparkison.dev/img/tv-social-card.jpg?v=2)
 
 ## Download
 

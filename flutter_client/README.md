@@ -42,6 +42,16 @@ iOS and macOS resolve every plugin (and mpv-build) through Swift Package Manager
 
 If a build fails with `Package product '<plugin>' requires minimum platform version X ... but this target supports Y` (Firebase has done this before), a plugin raised its minimum above ours. Flutter generates `FlutterGeneratedPluginSwiftPackage` at its own minimum (iOS 15.0 / macOS 12.0) and only raises it to match the Runner project's deployment target. Fix it by raising `IPHONEOS_DEPLOYMENT_TARGET` (iOS) or `MACOSX_DEPLOYMENT_TARGET` (macOS) in the Runner project for every build configuration. The next `flutter build` raises the generated package to match. Don't disable SPM to get around it: there's no Podfile to fall back to anymore.
 
+### Web (experimental)
+
+```bash
+scripts/fetch-web-assets.sh       # once, and again after bumping drift or sqlite3
+flutter run -d chrome --wasm      # add --release for realistic performance
+flutter build web --wasm
+```
+
+The script downloads `web/drift_worker.js` and `web/sqlite3.wasm` (drift's prebuilt worker and SQLite compiled to WebAssembly) at the versions in `pubspec.lock`. They're gitignored, and the catalog database can't start without them. Sign in on the Settings screen's **Sign In** tab: QR pairing and playback don't work on the web yet.
+
 ### macOS / Linux / Windows
 
 ```bash

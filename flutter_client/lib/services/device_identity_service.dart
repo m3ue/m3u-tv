@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Stable per-install identity the server keys its device registry on. The
 /// `deviceId` is generated once and persisted; everything else is resolved
@@ -130,16 +131,16 @@ Future<DeviceMeta> _defaultMetaResolver() async {
     // which need a native asset that isn't bundled for tvOS and crashes
     // the whole app at startup - so both cases skip device_info_plus
     // entirely and let _fallbackName() below supply "Apple TV" / hostname.
-    if (!kIsWeb && (Platform.operatingSystem == 'tvos' || Platform.isIOS)) {
+    if (HostPlatform.isTvOS || HostPlatform.isIOS) {
       name = null;
-    } else if (Platform.isAndroid) {
+    } else if (HostPlatform.isAndroid) {
       final android = await info.androidInfo;
       name = '${android.manufacturer} ${android.model}'.trim();
-    } else if (Platform.isMacOS) {
+    } else if (HostPlatform.isMacOS) {
       name = (await info.macOsInfo).computerName;
-    } else if (Platform.isWindows) {
+    } else if (HostPlatform.isWindows) {
       name = (await info.windowsInfo).computerName;
-    } else if (Platform.isLinux) {
+    } else if (HostPlatform.isLinux) {
       name = (await info.linuxInfo).prettyName;
     }
   } on Object catch (_) {
@@ -160,7 +161,9 @@ Future<bool> _safeTelevisionHint() async {
 }
 
 String _platformTag(bool televisionHint) {
-  if (!kIsWeb && Platform.operatingSystem == 'tvos') return 'tvos';
+  if (HostPlatform.isTvOS) return 'tvos';
+  // defaultTargetPlatform is the browser's host OS on the web.
+  if (HostPlatform.isWeb) return 'web';
 
   return switch (defaultTargetPlatform) {
     TargetPlatform.android => televisionHint ? 'androidtv' : 'android',
@@ -183,6 +186,7 @@ String? _fallbackName(String platform) {
   return switch (platform) {
     'tvos' => 'Apple TV',
     'androidtv' => 'Android TV',
+    'web' => 'Web Browser',
     _ => null,
   };
 }

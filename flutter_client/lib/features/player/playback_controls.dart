@@ -1,15 +1,14 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/system_clock.dart';
 
@@ -23,7 +22,7 @@ import 'package:m3u_tv/shared/system_clock.dart';
 /// Shared with `PlayerScreen`'s diagnostics overlay, which must position
 /// itself against this same value to line up with the back button.
 double overlayEdgePaddingFor(BuildContext context) {
-  if (Platform.operatingSystem == 'tvos') return 8;
+  if (HostPlatform.isTvOS) return 8;
   if (isHandheldLayout(context)) return 16;
   return 40;
 }
@@ -35,7 +34,7 @@ double overlayEdgePaddingFor(BuildContext context) {
 /// off depending on orientation and made the controls/overlays behave
 /// inconsistently between portrait and landscape on the same device.
 bool isHandheldLayout(BuildContext context) {
-  if (Platform.operatingSystem == 'tvos') return false;
+  if (HostPlatform.isTvOS) return false;
   return MediaQuery.sizeOf(context).shortestSide < 600;
 }
 

@@ -38,9 +38,11 @@ dependencies:
   qr_flutter: ^4.1.0
   sqflite_tvos:
     path: packages/sqflite_tvos
+  sqlite3: ^3.5.2
   timezone: ^0.11.1
   url_launcher: ^6.3.3
   wakelock_plus: ^1.8.1
+  web: ^1.1.1
   web_socket_channel: ^3.0.0
   window_manager: ^0.5.1
 

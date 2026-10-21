@@ -3,8 +3,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 enum TvNotificationDestination { notifications, dvr, requests }
 
@@ -171,10 +173,12 @@ class TvNotificationService {
   TvNotificationService({
     HttpClient? httpClient,
     DeviceIdentityService? deviceIdentity,
-  }) : _client = httpClient ?? HttpClient(),
+  }) : _injectedClient = httpClient,
        _deviceIdentity = deviceIdentity;
 
-  final HttpClient _client;
+  final HttpClient? _injectedClient;
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  late final HttpClient _client = _injectedClient ?? HttpClient();
 
   /// Supplied on the production path so [fetchUnread] can attach this install's
   /// identity to the boot/resume call. Null in tests, where the extra query
@@ -343,6 +347,7 @@ class TvNotificationService {
   static const Duration _requestTimeout = Duration(seconds: 15);
 
   Future<Object?> _get(Uri uri) async {
+    if (HostPlatform.isWeb) return _browserSend(http.Request('GET', uri));
     final request = await _client.getUrl(uri).timeout(_requestTimeout);
     final response = await request.close().timeout(_requestTimeout);
     final text = await utf8.decodeStream(response).timeout(_requestTimeout);
@@ -353,6 +358,13 @@ class TvNotificationService {
   }
 
   Future<Object?> _post(Uri uri, Map<String, String> body) async {
+    if (HostPlatform.isWeb) {
+      return _browserSend(
+        http.Request('POST', uri)
+          ..headers['content-type'] = 'application/json'
+          ..bodyBytes = utf8.encode(jsonEncode(body)),
+      );
+    }
     final request = await _client.postUrl(uri).timeout(_requestTimeout);
     final bytes = utf8.encode(jsonEncode(body));
     request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
@@ -363,6 +375,20 @@ class TvNotificationService {
     final text = await utf8.decodeStream(response).timeout(_requestTimeout);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw TvApiException(response.statusCode, text, uri);
+    }
+    return text.isEmpty ? null : jsonDecode(text);
+  }
+
+  late final http.Client _browserClient = http.Client();
+
+  /// [_get] and [_post] in a web build, through the browser's networking.
+  Future<Object?> _browserSend(http.Request request) async {
+    final response = await http.Response.fromStream(
+      await _browserClient.send(request).timeout(_requestTimeout),
+    ).timeout(_requestTimeout);
+    final text = utf8.decode(response.bodyBytes, allowMalformed: true);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw TvApiException(response.statusCode, text, request.url);
     }
     return text.isEmpty ? null : jsonDecode(text);
   }

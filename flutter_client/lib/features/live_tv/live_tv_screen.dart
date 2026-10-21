@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show ValueListenable, kIsWeb;
@@ -28,6 +27,7 @@ import 'package:m3u_tv/shared/channel_sort_dialog.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
@@ -166,7 +166,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   };
   static final bool _multiviewSupported =
       !kIsWeb &&
-      _multiviewSupportedOperatingSystems.contains(Platform.operatingSystem);
+      _multiviewSupportedOperatingSystems.contains(
+        HostPlatform.operatingSystem,
+      );
 
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;

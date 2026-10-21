@@ -1,13 +1,11 @@
-import 'dart:io' show Platform;
-
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -17,7 +15,7 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 /// `DeviceType`/`shouldUseSidebar` — that file imports this one transitively
 /// (via `dvr_recordings_screen.dart`), so importing it back would cycle.
 bool _isRemoteDrivenEnvironment(BuildContext context) {
-  if (!kIsWeb && Platform.operatingSystem == 'tvos') {
+  if (HostPlatform.isTvOS) {
     return true;
   }
   return MediaQuery.maybeNavigationModeOf(context) ==
@@ -30,7 +28,7 @@ const String _anyChannelTabId = '__any__';
 /// screen is pushed onto the root Navigator too (see
 /// [openDvrSeriesRuleOptions]'s doc comment), so its leading back button
 /// needs the same macOS traffic-light clearance.
-bool get _isMacDesktopWindow => !kIsWeb && Platform.isMacOS;
+bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
@@ -42,7 +40,7 @@ const double _kMacTrafficLightInset = 72;
 /// only. Mirrors go_router_config.dart's `_topLevelSafeArea`, duplicated
 /// here for the same reason `_withTopLevelBackHandling` below is: this file
 /// can't import app_shell.dart (cycle).
-bool get _isTvOS => !kIsWeb && Platform.operatingSystem == 'tvos';
+bool get _isTvOS => HostPlatform.isTvOS;
 
 Widget _topLevelSafeArea(Widget screen) => Builder(
   builder: (context) => _isTvOS

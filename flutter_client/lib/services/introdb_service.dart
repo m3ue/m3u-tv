@@ -74,12 +74,14 @@ class IntroDbService {
     HttpClient? httpClient,
     Future<String?> Function()? appVersionResolver,
     @visibleForTesting String baseUrl = _kBaseUrl,
-  }) : _httpClient = httpClient ?? HttpClient(),
+  }) : _injectedHttpClient = httpClient,
        _appVersionResolver =
            appVersionResolver ?? AppVersionService().currentVersion,
        _baseUrl = baseUrl;
 
-  final HttpClient _httpClient;
+  final HttpClient? _injectedHttpClient;
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  late final HttpClient _httpClient = _injectedHttpClient ?? HttpClient();
   final Future<String?> Function() _appVersionResolver;
   final String _baseUrl;
   final Map<String, _IntroDbCacheEntry> _cache = {};

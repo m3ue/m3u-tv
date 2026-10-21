@@ -59,7 +59,9 @@ class DevicePairingService extends ChangeNotifier {
     : _transport = transport;
 
   final DevicePairingTransport? _transport;
-  final _http = HttpClient();
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  HttpClient? _httpInstance;
+  HttpClient get _http => _httpInstance ??= HttpClient();
 
   DevicePairingStatus _status = DevicePairingStatus.idle;
   DevicePairingPending? _pending;
@@ -227,7 +229,7 @@ class DevicePairingService extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
-    _http.close();
+    _httpInstance?.close();
     super.dispose();
   }
 }

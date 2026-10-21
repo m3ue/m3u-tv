@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Override for the auto-detected performance tier. `auto` defers to hardware
 /// detection; `full` / `reduced` force it. Passed to [DevicePerformance
@@ -85,7 +84,7 @@ class DevicePerformance {
   static bool get _isAndroid =>
       !kIsWeb &&
       defaultTargetPlatform == TargetPlatform.android &&
-      Platform.isAndroid;
+      HostPlatform.isAndroid;
 
   /// Total device RAM as reported by the platform, or null off-Android /
   /// before [ensureDetected]. Used to scale the RSS-watchdog threshold.

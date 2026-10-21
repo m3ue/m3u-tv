@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HttpClient, HttpStatus, Platform;
+import 'dart:io' show HttpClient, HttpStatus;
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:m3u_tv/features/player/catchup_timeline.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
@@ -34,6 +33,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -45,7 +45,7 @@ const bool _showPlaybackDiagnostics = bool.fromEnvironment(
 /// own hardware/system volume controls and should always play at full
 /// volume through this app.
 bool get _isDesktop =>
-    Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+    HostPlatform.isMacOS || HostPlatform.isWindows || HostPlatform.isLinux;
 
 /// Which TheIntroDB segment a skip prompt refers to.
 enum _IntroDbSegmentKind { intro, credits }
@@ -2083,7 +2083,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // (40 edgePadding + 44 button + 20 gap).
                 final gap = isCompact
                     ? 12.0
-                    : (Platform.operatingSystem == 'tvos' ? 16.0 : 20.0);
+                    : (HostPlatform.isTvOS ? 16.0 : 20.0);
                 final overlayLeft =
                     mediaQuery.padding.left +
                     edgePadding +

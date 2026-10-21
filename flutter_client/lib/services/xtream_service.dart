@@ -1,13 +1,14 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:convert';
-import 'dart:isolate';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
-    if (dart.library.io) 'xtream_http_transport_io.dart';
+    if (dart.library.io) 'xtream_http_transport_io.dart'
+    if (dart.library.js_interop) 'xtream_http_transport_web.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -1583,7 +1584,7 @@ Future<List<Channel>> _parseLiveStreams(
 
   return rawJson.length < _rawParseOffloadBytes
       ? Future.value(parse())
-      : Isolate.run(parse);
+      : runOffMainIsolate(parse);
 }
 
 Future<List<VodItem>> _parseVodStreams(
@@ -1610,7 +1611,7 @@ Future<List<VodItem>> _parseVodStreams(
 
   return rawJson.length < _rawParseOffloadBytes
       ? Future.value(parse())
-      : Isolate.run(parse);
+      : runOffMainIsolate(parse);
 }
 
 Future<List<Series>> _parseSeries(String rawJson) {
@@ -1624,7 +1625,7 @@ Future<List<Series>> _parseSeries(String rawJson) {
 
   return rawJson.length < _rawParseOffloadBytes
       ? Future.value(parse())
-      : Isolate.run(parse);
+      : runOffMainIsolate(parse);
 }
 
 // EPG sweep batches recur throughout the background sweep (not a one-time
@@ -1646,7 +1647,7 @@ Future<List<EpgProgram>> _parseEpgProgramsFromRaw(
   String? fallbackChannelId,
   Map<String, String> channelIdsByStream = const <String, String>{},
   bool dropPlaceholders = false,
-}) => Isolate.run(
+}) => runOffMainIsolate(
   () => _parseEpgPrograms(
     jsonDecode(rawJson),
     fallbackChannelId: fallbackChannelId,

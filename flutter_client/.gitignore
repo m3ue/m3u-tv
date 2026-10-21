@@ -51,3 +51,9 @@ app.*.map.json
 /android/app/google-services.json
 /ios/GoogleService-Info.plist
 /ios/Runner/GoogleService-Info.plist
+
+# Prebuilt drift/sqlite3 web runtime, matched to pubspec.lock by
+# scripts/fetch-web-assets.sh.
+/web/drift_worker.js
+/web/sqlite3.wasm
+/web/.web_assets

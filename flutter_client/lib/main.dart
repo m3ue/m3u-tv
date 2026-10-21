@@ -30,6 +30,7 @@ import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
@@ -46,7 +47,7 @@ Future<void> main() async {
   // First, so everything after (including startup failures) lands in the
   // Logs & Diagnostics screen.
   AppLogBuffer.instance.install();
-  if (Platform.isAndroid) {
+  if (HostPlatform.isAndroid) {
     // Native decisions worth seeing in an uploaded log (Auto Frame Rate's
     // mode choice, see NativeLogChannel.kt) - debugPrint tees them into the
     // buffer, where android.util.Log output never reaches.
@@ -55,7 +56,7 @@ Future<void> main() async {
       onError: (Object _) {},
     );
   }
-  if (Platform.operatingSystem == 'tvos') {
+  if (HostPlatform.isTvOS) {
     final dispatcher = WidgetsBinding.instance.platformDispatcher;
     dispatcher.onSemanticsActionEvent = ignoreNativeScrollToOffset(
       dispatcher.onSemanticsActionEvent,
@@ -171,7 +172,7 @@ void _configureImageCache(OptimizeFor? optimizeFor) {
   if (_isDesktop) {
     maximumSizeBytes = 384 * 1024 * 1024;
     maximumSize = 1500;
-  } else if (Platform.isIOS) {
+  } else if (HostPlatform.isIOS) {
     // tvOS
     maximumSizeBytes = 256 * 1024 * 1024;
     maximumSize = 1200;
@@ -201,8 +202,7 @@ void _configureImageCache(OptimizeFor? optimizeFor) {
     ..maximumSize = maximumSize;
 }
 
-bool get _isDesktop =>
-    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+bool get _isDesktop => HostPlatform.isDesktop;
 
 /// Initializes the desktop window: restores the size/position the user left it
 /// at last run, then keeps it in sync via a [WindowStateService] listener.
@@ -219,7 +219,7 @@ Future<DesktopFullscreenService> _configureDesktopWindow(
   AppStateController appState,
 ) async {
   await windowManager.ensureInitialized();
-  final windowOptions = Platform.isMacOS
+  final windowOptions = HostPlatform.isMacOS
       ? const WindowOptions(
           titleBarStyle: TitleBarStyle.hidden,
           windowButtonVisibility: true,
@@ -227,7 +227,7 @@ Future<DesktopFullscreenService> _configureDesktopWindow(
       : const WindowOptions();
   final windowState = WindowStateService(appState.viewSettingsService);
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    if (Platform.isMacOS) {
+    if (HostPlatform.isMacOS) {
       await windowManager.setTitle('');
     }
     await windowState.restore();
@@ -244,7 +244,7 @@ Future<DesktopFullscreenService> _configureDesktopWindow(
 /// Reverb pipeline instead. tvOS reports `Platform.operatingSystem == 'tvos'`
 /// (not 'ios'), so `Platform.isIOS` alone already excludes it.
 bool _isMobilePushCapable(bool nativeTelevisionHint) =>
-    (Platform.isAndroid && !nativeTelevisionHint) || Platform.isIOS;
+    (HostPlatform.isAndroid && !nativeTelevisionHint) || HostPlatform.isIOS;
 
 Future<void> _initPushNotifications(AppStateController appState) async {
   try {
@@ -256,7 +256,7 @@ Future<void> _initPushNotifications(AppStateController appState) async {
 }
 
 Future<AppStateController> _buildAppState() async {
-  final operatingSystem = Platform.operatingSystem;
+  final operatingSystem = HostPlatform.operatingSystem;
   final (store, cacheStore, dataDir) = await _createAppStateStores(
     operatingSystem,
   );
@@ -270,7 +270,9 @@ Future<AppStateController> _buildAppState() async {
       credentialStorage: storage.credentialStorage,
     );
   }
-  final catalogRepository = await _openCatalogRepository(dataDir);
+  final catalogRepository = dataDir == null
+      ? await _openBrowserCatalogRepository()
+      : await _openCatalogRepository(dataDir);
   // The catalog is a disposable cache - it's re-fetched from the source on
   // every load - so there is nothing to migrate. Drop only the pre-SQLite
   // catalog blobs (`m3ue_cache_liveStreams`, ...) from the JSON stores;
@@ -332,6 +334,24 @@ Future<CatalogRepository> _openCatalogRepository(Directory dataDir) async {
   }
 }
 
+/// Web builds: the same catalog in browser storage, and in memory if the
+/// browser can't host it (e.g. storage disabled). No timeout on the probe:
+/// drift's own open already falls back between storage backends, and probing
+/// its shared worker can take several seconds on a cold start.
+Future<CatalogRepository> _openBrowserCatalogRepository() async {
+  final repository = CatalogRepository(CatalogDatabase.browser());
+  try {
+    await repository.isEmpty();
+    return repository;
+  } on Object catch (error) {
+    debugPrint(
+      '[Catalog] browser storage unavailable, using in-memory: $error',
+    );
+    await repository.close().catchError((_) {});
+    return CatalogRepository(CatalogDatabase.memory());
+  }
+}
+
 Future<CatalogRepository> _openAndProbeCatalog(Directory dataDir) async {
   final repository = CatalogRepository(CatalogDatabase.open(dataDir));
   try {
@@ -344,12 +364,21 @@ Future<CatalogRepository> _openAndProbeCatalog(Directory dataDir) async {
 }
 
 /// Returns the app-state store, the content-cache store, and the directory
-/// both live in. The cache (whole channel/VOD/series catalog) is a sibling
+/// both live in (none on the web). The cache (whole channel/VOD/series catalog) is a sibling
 /// `cache.json` so a small single-key write to `app_state.json` - e.g. the
 /// resume tracker every ~10s during playback - never has to re-serialize the
 /// catalog.
-Future<(PersistentJsonStore, PersistentJsonStore, Directory)>
+Future<(PersistentJsonStore, PersistentJsonStore, Directory?)>
 _createAppStateStores(String operatingSystem) async {
+  if (HostPlatform.isWeb) {
+    // Both stores live in browser storage and the catalog in drift's web
+    // database, so there is no directory.
+    return (
+      PersistentJsonStore(),
+      PersistentJsonStore(fileName: 'cache.json'),
+      null,
+    );
+  }
   if (operatingSystem == 'tvos') {
     // Documents exists but is read-only on a physical Apple TV; only
     // Library/Caches and tmp are writable there. See path_provider_tvos's
@@ -485,9 +514,7 @@ class _MyAppState extends State<MyApp> {
         'HIDE_DEBUG_BANNER',
       ),
       routerConfig: _router,
-      scrollBehavior: Platform.operatingSystem == 'tvos'
-          ? const TvosScrollBehavior()
-          : null,
+      scrollBehavior: HostPlatform.isTvOS ? const TvosScrollBehavior() : null,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: appSupportedLocales,
       locale: locale == null ? null : qualifiedAppLocale(locale),
@@ -544,7 +571,7 @@ class _MyAppState extends State<MyApp> {
                 }
               : null,
           child: TvRemoteInputGovernorScope(
-            enabled: Platform.operatingSystem == 'tvos',
+            enabled: HostPlatform.isTvOS,
             child: ImageQualityScope(
               optimizeFor: optimizeFor,
               child: FontSizeScope(

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +12,7 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/formatters.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -34,7 +33,7 @@ import 'package:m3u_tv/shared/row_action_menu.dart';
 /// would cycle. Same precedent as `_isRemoteDrivenEnvironment` in
 /// `dvr_series_rule_options_screen.dart`.
 bool _useInlineRowActions(BuildContext context) {
-  if (!kIsWeb && Platform.operatingSystem == 'tvos') return true;
+  if (HostPlatform.isTvOS) return true;
   if (MediaQuery.maybeNavigationModeOf(context) == NavigationMode.directional) {
     return true;
   }

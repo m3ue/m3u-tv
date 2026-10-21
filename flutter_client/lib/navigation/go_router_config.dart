@@ -1,7 +1,5 @@
 import 'dart:async' show unawaited;
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:go_router/go_router.dart';
@@ -28,6 +26,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 Widget _withGradient(Widget screen) => DecoratedBox(
   decoration: kAppGradientBg,
@@ -45,7 +44,7 @@ Widget _withGradient(Widget screen) => DecoratedBox(
 /// (other platforms report ~0 padding in a sidebar layout, so `SafeArea` was
 /// effectively a no-op there). Mirrors the same "strip it on tvOS" rule
 /// AppShell applies to its own content.
-bool get _isTvOS => !kIsWeb && Platform.operatingSystem == 'tvos';
+bool get _isTvOS => HostPlatform.isTvOS;
 
 Widget _topLevelSafeArea(Widget screen) => Builder(
   builder: (context) => _isTvOS

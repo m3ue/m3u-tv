@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/android_mpv_backend.dart';
@@ -12,6 +10,7 @@ import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
 
 /// Placeholder screen used when a route target cannot be resolved.
@@ -218,7 +217,7 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
     // entirely while keeping hardware video decode. macOS never hits #1404
     // (it renders through Metal, not EGL), so that specific bug never
     // applied there.
-    if (Platform.isMacOS) {
+    if (HostPlatform.isMacOS) {
       adapters[PlaybackBackend.macMpvNative] = MacMpvNativeBackend();
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
@@ -274,7 +273,7 @@ buildMultiviewTilePlayer(
       );
       backendKind = PlaybackBackend.androidExoPlayer;
     case PlaybackPlatform.desktop:
-      if (Platform.isMacOS) {
+      if (HostPlatform.isMacOS) {
         backend = MacMpvNativeBackend();
         backendKind = PlaybackBackend.macMpvNative;
       } else {

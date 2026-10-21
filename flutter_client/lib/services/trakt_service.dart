@@ -96,7 +96,9 @@ class TraktService extends ChangeNotifier {
   final String _clientId;
   final TraktTransport? _transport;
   final TraktCodeVerifierFactory _codeVerifierFactory;
-  final _http = HttpClient();
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  HttpClient? _httpInstance;
+  HttpClient get _http => _httpInstance ??= HttpClient();
 
   TraktAuthStatus _status = TraktAuthStatus.disconnected;
   TraktPendingAuth? _pending;
@@ -462,7 +464,7 @@ class TraktService extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _clearPendingAttempt();
-    _http.close();
+    _httpInstance?.close();
     super.dispose();
   }
 }

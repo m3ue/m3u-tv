@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -8,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Logo size the native launch screens show, in their own dp / pt.
 ///
@@ -18,8 +18,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// scripts/setup-icons.sh. [LaunchSplashHost] draws its logo at this size,
 /// centred on the full screen like the native splashes, so the handover is
 /// invisible.
-double get launchSplashLogoSize =>
-    Platform.operatingSystem == 'tvos' ? 205 : 128 * 409 / 512;
+double get launchSplashLogoSize => HostPlatform.isTvOS ? 205 : 128 * 409 / 512;
 
 const MethodChannel _deviceInfoChannel = MethodChannel('m3u_tv/device_info');
 
@@ -28,7 +27,7 @@ const MethodChannel _deviceInfoChannel = MethodChannel('m3u_tv/device_info');
 /// layouts are 1920 logical px wide (1.0x on a 1080p SHIELD, where the system
 /// splash is drawn at 2.0x). Null elsewhere, or on a stale native build.
 Future<double?> _launchDensity() async {
-  if (!Platform.isAndroid) return null;
+  if (!HostPlatform.isAndroid) return null;
   try {
     return await _deviceInfoChannel.invokeMethod<double>('getLaunchDensity');
   } on MissingPluginException {

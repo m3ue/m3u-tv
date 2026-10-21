@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'dart:isolate';
 
 import 'package:drift/drift.dart';
-
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/json_isolate.dart';
 
 /// Which promoted column (if any) a windowed page/count query orders by,
 /// beyond the provider's own [CatalogItems.sortIndex]. A dedicated enum
@@ -286,7 +285,7 @@ class CatalogRepository {
       for (final json in jsons) _decodeRow(kind, json),
     ];
     if (jsons.length < _offloadThresholdRows) return Future.value(decodeAll());
-    return Isolate.run(decodeAll);
+    return runOffMainIsolate(decodeAll);
   }
 
   /// A windowed slice of [kind], provider order, optionally filtered to

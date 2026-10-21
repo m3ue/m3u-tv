@@ -1,11 +1,9 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Mirrors `item_detail_scaffold.dart`/`dvr_series_rule_options_screen.dart`'s
@@ -13,7 +11,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 /// settings sub-pages are pushed on the root Navigator (see
 /// [pushSettingsSubpage]'s doc comment) so their leading back button needs
 /// the same macOS traffic-light clearance.
-bool get _isMacDesktopWindow => !kIsWeb && Platform.isMacOS;
+bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
@@ -23,7 +21,7 @@ const double _kMacTrafficLightInset = 72;
 /// on tvOS only. Mirrors `go_router_config.dart`'s `_topLevelSafeArea`,
 /// duplicated here for the same reason this file can't import that one
 /// (cycle risk / the value is trivial to redeclare).
-bool get _isTvOS => !kIsWeb && Platform.operatingSystem == 'tvos';
+bool get _isTvOS => HostPlatform.isTvOS;
 
 Widget _topLevelSafeArea(Widget screen) => Builder(
   builder: (context) => _isTvOS

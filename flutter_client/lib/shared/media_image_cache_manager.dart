@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-
 import 'package:m3u_tv/services/device_performance.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/media_image_http_file_service.dart';
 
 /// Disk cache for media poster/thumbnail images.
@@ -20,7 +20,7 @@ class MediaImageCacheManager extends CacheManager with ImageCacheManager {
 
   MediaImageCacheManager._()
     : super(
-        Platform.operatingSystem == 'tvos'
+        HostPlatform.isTvOS
             ? Config(
                 _key,
                 maxNrOfCacheObjects: _maxCacheObjects,
@@ -63,6 +63,12 @@ class MediaImageCacheManager extends CacheManager with ImageCacheManager {
   static Directory? tvosCacheDirectory;
 }
 
+/// The image cache manager to hand CachedNetworkImage, or null in a web
+/// build: [MediaImageCacheManager] is built on dart:io, and with no manager
+/// CachedNetworkImage lets the browser load and HTTP-cache images itself.
+MediaImageCacheManager? get mediaImageCacheManager =>
+    HostPlatform.isWeb ? null : MediaImageCacheManager();
+
 /// Empties the media image cache, skipping under `flutter test` (which sets
 /// the `FLUTTER_TEST` environment variable). Constructing
 /// [MediaImageCacheManager] there hits `path_provider`'s platform channel,
@@ -70,6 +76,6 @@ class MediaImageCacheManager extends CacheManager with ImageCacheManager {
 /// alone isn't a reliable signal since some tests call it for unrelated
 /// reasons, so this checks the environment variable directly instead.
 Future<void> emptyMediaImageCacheIfAvailable() async {
-  if (Platform.environment['FLUTTER_TEST'] == 'true') return;
-  await MediaImageCacheManager().emptyCache();
+  if (HostPlatform.environment['FLUTTER_TEST'] == 'true') return;
+  await mediaImageCacheManager?.emptyCache();
 }

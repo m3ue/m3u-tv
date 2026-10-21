@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_performance.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 const MethodChannel _deviceInfoChannel = MethodChannel('m3u_tv/device_info');
 
@@ -25,8 +26,9 @@ Future<String> buildDiagnosticsHeader({
 
   String mb(int bytes) => '${bytes >> 20}MB';
 
-  final os = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
-  final platform = identity?.platform ?? Platform.operatingSystem;
+  final os =
+      '${HostPlatform.operatingSystem} ${HostPlatform.operatingSystemVersion}';
+  final platform = identity?.platform ?? HostPlatform.operatingSystem;
   final display = view == null
       ? null
       : '${view.physicalSize.width.round()}x${view.physicalSize.height.round()}'
@@ -57,7 +59,7 @@ Future<String> buildDiagnosticsHeader({
 /// Impeller, plus any engine memory caps). Elsewhere there is no choice to
 /// report, so this returns null and the header says "default".
 Future<String?> _resolveRenderer() async {
-  if (!Platform.isAndroid) return null;
+  if (!HostPlatform.isAndroid) return null;
   try {
     return await _deviceInfoChannel.invokeMethod<String>('getRenderer');
   } on Object catch (_) {

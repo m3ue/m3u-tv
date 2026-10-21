@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
+import 'package:m3u_tv/services/browser_store_backend.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
+import 'package:m3u_tv/services/store_backend.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 class PersistentJsonStore {
   /// [fileName] picks the basename inside the platform app-data directory
@@ -10,17 +13,24 @@ class PersistentJsonStore {
   /// keep a large, frequently-rewritten section in its own file so an
   /// unrelated single-key write does not re-serialize it. Ignored when an
   /// explicit [file] is given (tests).
+  /// Web builds keep each store in browser storage under [fileName] instead.
   PersistentJsonStore({File? file, String fileName = 'app_state.json'})
-    : this._(file ?? File(_defaultPath(fileName)));
+    : this._(
+        file != null
+            ? FileStoreBackend(file)
+            : HostPlatform.isWeb
+            ? browserStoreBackend(fileName)
+            : FileStoreBackend(File(_defaultPath(fileName))),
+      );
 
-  PersistentJsonStore._(File file)
-    : _file = file,
+  PersistentJsonStore._(StoreBackend backend)
+    : _backend = backend,
       _state = _states.putIfAbsent(
-        file.absolute.path,
+        backend.identity,
         _PersistentJsonStoreState.new,
       );
 
-  final File _file;
+  final StoreBackend _backend;
   final _PersistentJsonStoreState _state;
   static final Map<String, _PersistentJsonStoreState> _states = {};
 
@@ -59,8 +69,8 @@ class PersistentJsonStore {
   ) => _writeQueue.run(() async {
     if (!shouldCommit()) return false;
     final previousCache = _cache;
-    final previousBytes = await _file.exists()
-        ? await _file.readAsBytes()
+    final previousBytes = await _backend.exists()
+        ? await _backend.readAsBytes()
         : null;
     final previous = Map<String, Object?>.from(await _readAllUnlocked());
     final data = Map<String, Object?>.from(previous)
@@ -87,20 +97,16 @@ class PersistentJsonStore {
       if (!shouldCommit()) return false;
       await _commitStaging(data);
       Future<void> restorePrevious() async {
-        final currentBytes = await _file.exists()
-            ? await _file.readAsBytes()
+        final currentBytes = await _backend.exists()
+            ? await _backend.readAsBytes()
             : null;
         if (_sameBytes(currentBytes, candidateBytes)) {
           _cache = previousCache;
           if (previousBytes == null) {
-            try {
-              await _file.delete();
-            } on PathNotFoundException {
-              return;
-            }
+            await _backend.delete();
           } else {
-            await _stagingFile.writeAsBytes(previousBytes, flush: true);
-            await _stagingFile.rename(_file.path);
+            await _backend.writeStaging(previousBytes);
+            await _backend.commitStaging();
           }
           return;
         }
@@ -119,11 +125,7 @@ class PersistentJsonStore {
         }
         if (current.isEmpty && previousBytes == null) {
           _cache = current;
-          try {
-            await _file.delete();
-          } on PathNotFoundException {
-            return;
-          }
+          await _backend.delete();
         } else {
           await _writeAll(current);
         }
@@ -224,11 +226,11 @@ class PersistentJsonStore {
     final cached = _cache;
     if (cached != null) return cached;
     await _deleteStaging();
-    if (!await _file.exists()) {
+    if (!await _backend.exists()) {
       _cache = <String, Object?>{};
       return _cache!;
     }
-    final text = await _file.readAsString();
+    final text = await _backend.readAsString();
     if (text.trim().isEmpty) {
       _cache = <String, Object?>{};
       return _cache!;
@@ -249,25 +251,14 @@ class PersistentJsonStore {
     }
   }
 
-  Future<void> _writeStaging(List<int> bytes) async {
-    await _file.parent.create(recursive: true);
-    await _stagingFile.writeAsBytes(bytes, flush: true);
-  }
+  Future<void> _writeStaging(List<int> bytes) => _backend.writeStaging(bytes);
 
   Future<void> _commitStaging(Map<String, Object?> data) async {
-    await _stagingFile.rename(_file.path);
+    await _backend.commitStaging();
     _cache = data;
   }
 
-  Future<void> _deleteStaging() async {
-    try {
-      await _stagingFile.delete();
-    } on PathNotFoundException {
-      // A successful rename already consumed the staging file.
-    }
-  }
-
-  File get _stagingFile => File('${_file.path}.tmp');
+  Future<void> _deleteStaging() => _backend.deleteStaging();
 
   static bool _sameBytes(List<int>? first, List<int> second) {
     if (first == null || first.length != second.length) return false;
@@ -293,8 +284,8 @@ class PersistentJsonStore {
   static String defaultDirectoryPath() {
     final override = debugDirectoryOverride;
     if (override != null) return override;
-    final env = Platform.environment;
-    final base = switch (Platform.operatingSystem) {
+    final env = HostPlatform.environment;
+    final base = switch (HostPlatform.operatingSystem) {
       'windows' =>
         env['APPDATA'] ?? env['LOCALAPPDATA'] ?? Directory.systemTemp.path,
       'macos' =>

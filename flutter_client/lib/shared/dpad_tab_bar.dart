@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// A [TabBar] replacement that integrates with the D-pad focus system.
 ///
@@ -139,7 +138,7 @@ class DpadTabBarView extends StatelessWidget {
 /// `app_shell.dart` transitively — the same import-cycle concern documented
 /// on `_useInlineRowActions` in `dvr_recordings_screen.dart`.
 bool isDesktopPlatform(BuildContext context) {
-  if (!kIsWeb && Platform.operatingSystem == 'tvos') return false;
+  if (HostPlatform.isTvOS) return false;
   if (MediaQuery.maybeNavigationModeOf(context) == NavigationMode.directional) {
     return false;
   }

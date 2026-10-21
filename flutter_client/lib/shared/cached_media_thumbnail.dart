@@ -68,7 +68,7 @@ class CachedMediaThumbnail extends StatelessWidget {
             : (decodeHeight * devicePixelRatio).round();
         final provider = CachedNetworkImageProvider(
           sizedImageUrl(url, decodeWidth: cacheWidth),
-          cacheManager: MediaImageCacheManager(),
+          cacheManager: mediaImageCacheManager,
         );
         return Image(
           image: cacheWidth == null && cacheHeight == null

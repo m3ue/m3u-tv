@@ -551,7 +551,7 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
           : (decodeHeight * devicePixelRatio).round();
       final provider = CachedNetworkImageProvider(
         sizedImageUrl(loadUrl!, decodeWidth: cacheWidth),
-        cacheManager: MediaImageCacheManager(),
+        cacheManager: mediaImageCacheManager,
       );
       return _buildImage(
         provider,
