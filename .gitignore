@@ -9,10 +9,13 @@
 *.sln
 *.sw?
 
-# GitHub Actions — keep CI workflows, Dependabot config, and release note categories
+# GitHub Actions - keep CI workflows, the local actions they use, Dependabot config, and release note categories
 .github/*
 !.github/dependabot.yml
 !.github/release.yml
+!.github/actions/
+.github/actions/*
+!.github/actions/android-ndk/
 !.github/workflows/
 .github/workflows/*
 !.github/workflows/ci.yml

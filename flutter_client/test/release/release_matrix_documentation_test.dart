@@ -99,6 +99,37 @@ void main() {
     }
   });
 
+  test('Android CI jobs put the NDK in place before Gradle runs', () {
+    // Gradle otherwise downloads the NDK mid-build on every run, and that
+    // download has come back corrupt before.
+    const ndkActionPath = '../.github/actions/android-ndk/action.yml';
+    final ndkAction = readFile(ndkActionPath);
+    expect(ndkAction, contains('val ndkVersion: String'));
+    expect(ndkAction, contains('uses: actions/cache/restore@'));
+    expect(ndkAction, contains('uses: actions/cache/save@'));
+    expect(ndkAction, contains("github.event_name == 'push'"));
+
+    // The cache key is Flutter's default NDK, so :app must keep building with it.
+    expect(
+      readFile('android/app/build.gradle.kts'),
+      contains('ndkVersion = flutter.ndkVersion'),
+    );
+
+    for (final workflow in [
+      readFile(ciWorkflowPath),
+      readFile(releaseWorkflowPath),
+    ]) {
+      expect(
+        workflowStep(workflow, 'Set up Android NDK'),
+        contains('uses: ./.github/actions/android-ndk'),
+      );
+      expect(
+        workflow.indexOf('      - name: Set up Android NDK'),
+        lessThan(workflow.indexOf('      - name: Test native Android code')),
+      );
+    }
+  });
+
   test('Android Gradle wrapper is committed and checksum pinned', () {
     final androidGitignore = readFile('android/.gitignore');
     final wrapperProperties = readFile(
