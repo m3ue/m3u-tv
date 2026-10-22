@@ -213,6 +213,12 @@ class PlaybackOrchestrator {
     return adapter! as NativePlaneProvider;
   }
 
+  HtmlViewProvider? get activeHtmlViewProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! HtmlViewProvider) return null;
+    return adapter! as HtmlViewProvider;
+  }
+
   HdrToggleProvider? get activeHdrToggleProvider {
     final adapter = _activeAdapter;
     if (adapter is! HdrToggleProvider) return null;

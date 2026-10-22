@@ -8,6 +8,7 @@ enum PlaybackBackend {
   desktopLibmpv,
   macMpvNative,
   serverTranscode,
+  webVideo,
 }
 
 class PlaybackCapabilities {
@@ -193,6 +194,37 @@ class PlaybackCapabilities {
     requiresNetworkTranscode: true,
   );
 
+  /// The browser `<video>` backend (hls.js / mpegts.js / native playback),
+  /// registered for [PlaybackPlatform.server] (`kIsWeb`). Unlike
+  /// [serverTranscode] -- a fallback other platforms reach only through
+  /// `PlaybackTranscodeGateway` when every native backend fails -- this is
+  /// the web target's own primary backend, loaded directly like
+  /// `androidExoPlayer`/`appleMpvNative` are on their platforms. Direct
+  /// streams are supported in the sense that the browser plays whatever the
+  /// resolved URL serves (HLS, MPEG-TS, or a native-playable container); a
+  /// web build always requests the editor's in-app-player transcoding path
+  /// (`proxy=true&player=true`) first, so a stream the browser can't
+  /// otherwise decode still gets a server-transcoded HLS rendition.
+  static const PlaybackCapabilities webVideo = PlaybackCapabilities(
+    platform: PlaybackPlatform.server,
+    backend: PlaybackBackend.webVideo,
+    displayName: 'Web browser video',
+    supportsDirectStreams: true,
+    supportsServerTranscodeFallback: false,
+    supportsHls: true,
+    supportsMpegTs: true,
+    supportsMp4: true,
+    supportsAdvancedCodecs: false,
+    supportsAudioTrackSelection: false,
+    supportsSubtitleTrackSelection: false,
+    supportsEmbeddedSubtitles: false,
+    supportsExternalSubtitles: false,
+    supportsAdvancedSubtitleFormats: false,
+    supportsPlaybackSpeed: true,
+    supportsSeek: true,
+    supportsLiveSeek: false,
+  );
+
   static const List<PlaybackCapabilities> matrix = <PlaybackCapabilities>[
     androidExoPlayer,
     androidMpv,
@@ -201,6 +233,7 @@ class PlaybackCapabilities {
     desktopLibmpv,
     macMpvNative,
     serverTranscode,
+    webVideo,
   ];
 
   /// The declared capability rows for [platform], in fallback order.
@@ -228,7 +261,7 @@ class PlaybackCapabilities {
         desktopLibmpv,
         serverTranscode,
       ],
-      PlaybackPlatform.server => const <PlaybackCapabilities>[serverTranscode],
+      PlaybackPlatform.server => const <PlaybackCapabilities>[webVideo],
     };
   }
 

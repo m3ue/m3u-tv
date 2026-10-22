@@ -12,16 +12,18 @@ import 'package:m3u_tv/shared/host_platform.dart';
 /// Renders whichever of [platformView] (a `PlatformViewProvider`-backed
 /// native mpv core), [nativePlane] (a `NativePlaneProvider`-backed backend
 /// rendering through a native surface outside Flutter's compositor, e.g. the
-/// Linux Wayland video plane), or [textureId] (a `VideoTextureProvider`-
-/// backed backend) is active, or a black placeholder while none is
-/// available yet. Shared by `PlayerScreen`'s `_VideoSurface` and
-/// `MultiviewScreen`'s `_TileVideoSurface`.
+/// Linux Wayland video plane), [htmlView] (an `HtmlViewProvider`-backed
+/// browser `<video>` element on Flutter web), or [textureId] (a
+/// `VideoTextureProvider`-backed backend) is active, or a black placeholder
+/// while none is available yet. Shared by `PlayerScreen`'s `_VideoSurface`
+/// and `MultiviewScreen`'s `_TileVideoSurface`.
 class NativeVideoSurface extends StatelessWidget {
   const NativeVideoSurface({
     super.key,
     required this.textureId,
     required this.platformView,
     required this.aspectRatio,
+    this.htmlView,
     this.nativePlane,
     this.wrapInBlackBackground = true,
     this.clearAncestorPaintForNativePlane = false,
@@ -45,6 +47,7 @@ class NativeVideoSurface extends StatelessWidget {
     platformView: backend is PlatformViewProvider
         ? backend! as PlatformViewProvider
         : null,
+    htmlView: backend is HtmlViewProvider ? backend! as HtmlViewProvider : null,
     nativePlane: backend is NativePlaneProvider
         ? backend! as NativePlaneProvider
         : null,
@@ -55,6 +58,7 @@ class NativeVideoSurface extends StatelessWidget {
 
   final int? textureId;
   final PlatformViewProvider? platformView;
+  final HtmlViewProvider? htmlView;
   final NativePlaneProvider? nativePlane;
   final double aspectRatio;
 
@@ -84,6 +88,17 @@ class NativeVideoSurface extends StatelessWidget {
                 const CustomPaint(painter: _NativePlaneHolePainter()),
               _NativePlaneReporter(plane: plane),
             ],
+          ),
+        ),
+      );
+    }
+    final html = htmlView;
+    if (html != null) {
+      return _wrap(
+        Center(
+          child: AspectRatio(
+            aspectRatio: aspectRatio,
+            child: HtmlElementView(viewType: html.platformViewType),
           ),
         ),
       );

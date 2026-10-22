@@ -784,6 +784,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsServerUrl => '服务器地址';
 
   @override
+  String get settingsServerUrlLocked => '使用本应用自带的服务器';
+
+  @override
   String get settingsUsername => '用户名';
 
   @override

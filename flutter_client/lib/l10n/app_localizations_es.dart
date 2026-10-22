@@ -812,6 +812,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsServerUrl => 'URL del servidor';
 
   @override
+  String get settingsServerUrlLocked => 'Usando el servidor de esta app';
+
+  @override
   String get settingsUsername => 'Usuario';
 
   @override

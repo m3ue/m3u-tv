@@ -52,8 +52,9 @@ app.*.map.json
 /ios/GoogleService-Info.plist
 /ios/Runner/GoogleService-Info.plist
 
-# Prebuilt drift/sqlite3 web runtime, matched to pubspec.lock by
-# scripts/fetch-web-assets.sh.
+# Prebuilt drift/sqlite3 web runtime, plus the pinned hls.js/mpegts.js
+# bundles WebVideoBackend loads, all fetched by scripts/fetch-web-assets.sh.
 /web/drift_worker.js
 /web/sqlite3.wasm
+/web/js/
 /web/.web_assets

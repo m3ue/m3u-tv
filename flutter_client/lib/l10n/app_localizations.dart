@@ -1526,6 +1526,12 @@ abstract class AppLocalizations {
   /// **'Server URL'**
   String get settingsServerUrl;
 
+  /// No description provided for @settingsServerUrlLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Using this app\'s own server'**
+  String get settingsServerUrlLocked;
+
   /// No description provided for @settingsUsername.
   ///
   /// In en, this message translates to:

@@ -114,7 +114,8 @@ class AndroidPlaybackAdapter
       PlaybackBackend.appleMpvNative ||
       PlaybackBackend.appleAvKit ||
       PlaybackBackend.desktopLibmpv ||
-      PlaybackBackend.macMpvNative => PlaybackCapabilities.androidExoPlayer,
+      PlaybackBackend.macMpvNative ||
+      PlaybackBackend.webVideo => PlaybackCapabilities.androidExoPlayer,
     };
   }
 

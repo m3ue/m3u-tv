@@ -72,6 +72,16 @@ abstract class NativePlaneProvider {
   );
 }
 
+/// A [PlayerAdapter] that renders through a browser `<video>` element on
+/// Flutter web, registered with `ui_web.platformViewRegistry` and hosted by
+/// an `HtmlElementView`. The counterpart of [PlatformViewProvider] for the
+/// web target, where there is no native `FlutterPlatformView` to speak of.
+abstract class HtmlViewProvider {
+  /// The view type this backend registered with
+  /// `ui_web.platformViewRegistry.registerViewFactory`.
+  String get platformViewType;
+}
+
 /// A [PlayerAdapter] that exposes a user-facing HDR on/off override, mirroring
 /// the same `hdr-enabled` control the open-source Plezy player exposes.
 /// Implemented by `DesktopLibmpvBackend` (Linux/Windows) only -- Apple's mpv

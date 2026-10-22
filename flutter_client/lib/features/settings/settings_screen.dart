@@ -25,6 +25,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/embedded_origin.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -259,8 +260,12 @@ class _ConnectionFormBody extends StatefulWidget {
 
 class _ConnectionFormBodyState extends State<_ConnectionFormBody>
     with SingleTickerProviderStateMixin {
+  /// Non-null when this web build is served by the editor itself at
+  /// /m3u-tv/ — the server URL is that editor's own origin, not something
+  /// the user should have to type or be able to change.
+  final String? _lockedServerUrl = embeddedEditorOrigin;
   late final _serverController = TextEditingController(
-    text: widget.initialValues?.server,
+    text: _lockedServerUrl ?? widget.initialValues?.server,
   );
   late final _usernameController = TextEditingController(
     text: widget.initialValues?.username,
@@ -424,10 +429,15 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
                     _buildError(theme, displayError),
                     TextFormField(
                       controller: _serverController,
-                      autofocus: true,
+                      autofocus: _lockedServerUrl == null,
+                      readOnly: _lockedServerUrl != null,
+                      enableInteractiveSelection: _lockedServerUrl == null,
                       decoration: InputDecoration(
                         labelText: l.settingsServerUrl,
                         hintText: 'example.com:8080',
+                        helperText: _lockedServerUrl != null
+                            ? l.settingsServerUrlLocked
+                            : null,
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 12 * FontSizeScope.scaleOf(context),
                           vertical: 16 * FontSizeScope.scaleOf(context),
@@ -514,10 +524,15 @@ class _ConnectionFormBodyState extends State<_ConnectionFormBody>
     return [
       TextFormField(
         controller: _serverController,
-        autofocus: autofocusServer,
+        autofocus: autofocusServer && _lockedServerUrl == null,
+        readOnly: _lockedServerUrl != null,
+        enableInteractiveSelection: _lockedServerUrl == null,
         decoration: InputDecoration(
           labelText: l.settingsServerUrl,
           hintText: 'example.com:8080',
+          helperText: _lockedServerUrl != null
+              ? l.settingsServerUrlLocked
+              : null,
           contentPadding: contentPadding,
         ),
         autocorrect: false,
@@ -1370,7 +1385,17 @@ class _PlaybackSettingsPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (proxyCapability != null && proxyPlaybackSettings != null) ...[
+        // Web always routes through the editor's in-app-player transcoding
+        // path (WebVideoBackend appends proxy=true&player=true to every
+        // stream URL -- see its doc comment), the same way the editor's own
+        // floating player does, with no user-facing profile picker. A
+        // client-selected profile here would be silently ignored (the
+        // in-app-player route only ever honors the channel/playlist-level
+        // default -- see M3uProxyApiController::channelPlayer), so showing
+        // it would just be misleading.
+        if (!HostPlatform.isWeb &&
+            proxyCapability != null &&
+            proxyPlaybackSettings != null) ...[
           SettingsSectionHeader(l.settingsSectionStreaming),
           ListenableBuilder(
             listenable: proxyPlaybackSettings!,

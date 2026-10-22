@@ -9,6 +9,7 @@ import 'package:m3u_tv/playback/mac_mpv_native_backend.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/web_video_backend.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
@@ -222,6 +223,14 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
     } else {
       adapters[PlaybackBackend.desktopLibmpv] = DesktopLibmpvBackend();
     }
+  } else if (platform == PlaybackPlatform.server) {
+    // Flutter web (kIsWeb) is the only target mapped to
+    // PlaybackPlatform.server. Registered directly as the primary backend
+    // for its platform, the same way the branches above register theirs --
+    // not through the serverTranscode/PlaybackTranscodeGateway fallback
+    // path other platforms reach only when every native backend fails (see
+    // PlaybackCapabilities.webVideo's doc comment).
+    adapters[PlaybackBackend.webVideo] = createWebVideoBackend();
   }
 
   return PlaybackOrchestrator(

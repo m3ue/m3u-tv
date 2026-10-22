@@ -337,6 +337,7 @@
   "settingsConnectionSettingsSubtitle": "Entrez vos identifiants Xtream Codes",
   "settingsConnectionSettingsHelp": "Utilisez les informations de connexion Xtream de la playlist m3u-editor, pas votre connexion web m3u-editor. Vous avez besoin de l'URL du serveur, du nom d'utilisateur Xtream et du mot de passe Xtream.",
   "settingsServerUrl": "URL du serveur",
+  "settingsServerUrlLocked": "Utilise le serveur de cette application",
   "settingsUsername": "Nom d'utilisateur",
   "settingsPassword": "Mot de passe",
   "settingsConnect": "Connecter",

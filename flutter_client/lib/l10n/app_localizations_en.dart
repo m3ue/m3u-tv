@@ -807,6 +807,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsServerUrl => 'Server URL';
 
   @override
+  String get settingsServerUrlLocked => 'Using this app\'s own server';
+
+  @override
   String get settingsUsername => 'Username';
 
   @override

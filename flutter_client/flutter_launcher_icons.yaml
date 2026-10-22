@@ -16,8 +16,13 @@ flutter_launcher_icons:
 
   web:
     generate: true
-    image_path: "assets/icons/icon.png"
-    background_color: "#0a0a0f"
+    # Just the brand mark (logo.svg rendered straight to PNG, no composited
+    # background panel) - a browser tab favicon sits on its own chrome, so
+    # any added background square/squircle reads as a dark blob at 16x16
+    # instead of the logo. Regenerate with:
+    #   rsvg-convert -w 1024 -h 1024 assets/icons/logo.svg -o assets/icons/favicon-source.png
+    image_path: "assets/icons/favicon-source.png"
+    background_color: "transparent"
     theme_color: "#0a0a0f"
 
   macos:

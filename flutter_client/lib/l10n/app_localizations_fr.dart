@@ -813,6 +813,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsServerUrl => 'URL du serveur';
 
   @override
+  String get settingsServerUrlLocked =>
+      'Utilise le serveur de cette application';
+
+  @override
   String get settingsUsername => 'Nom d\'utilisateur';
 
   @override

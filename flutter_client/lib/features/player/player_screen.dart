@@ -1255,7 +1255,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     PlaybackBackend.macMpvNative => true,
     PlaybackBackend.androidExoPlayer ||
     PlaybackBackend.appleAvKit ||
-    PlaybackBackend.serverTranscode => false,
+    PlaybackBackend.serverTranscode ||
+    PlaybackBackend.webVideo => false,
   };
 
   // `buffering` before the first frame is still the initial load (ExoPlayer
@@ -2154,6 +2155,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                       .orchestrator
                                       .activePlatformViewProvider ??
                                   _reopenPlatformView,
+                              htmlView:
+                                  widget.orchestrator.activeHtmlViewProvider,
                               nativePlane:
                                   widget.orchestrator.activeNativePlaneProvider,
                               aspectRatio: _videoAspectRatio,
@@ -2740,6 +2743,7 @@ class _PlaybackDiagnosticsSnapshot {
       'desktopLibmpv' => PlaybackBackend.desktopLibmpv,
       'macMpvNative' => PlaybackBackend.macMpvNative,
       'serverTranscode' => PlaybackBackend.serverTranscode,
+      'webVideo' => PlaybackBackend.webVideo,
       _ => null,
     };
   }
@@ -2753,6 +2757,7 @@ class _PlaybackDiagnosticsSnapshot {
       PlaybackBackend.desktopLibmpv => 'Desktop libmpv',
       PlaybackBackend.macMpvNative => 'macOS native mpv',
       PlaybackBackend.serverTranscode => 'Server transcode fallback',
+      PlaybackBackend.webVideo => 'Web browser video',
       null => 'Selecting backend',
     };
   }
