@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 const MethodChannel _deviceInfoChannel = MethodChannel('m3u_tv/device_info');
 
@@ -43,7 +42,7 @@ DeviceType deviceTypeForView({
   }
 
   // tvOS reports TargetPlatform.iOS at the Dart level; detect it by OS name.
-  if (!kIsWeb && Platform.operatingSystem == 'tvos') {
+  if (HostPlatform.isTvOS) {
     return DeviceType.tv;
   }
 

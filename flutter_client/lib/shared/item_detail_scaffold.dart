@@ -1,12 +1,10 @@
-import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// Screen space [ItemDetailScaffold]'s floating AppBar actually occupies
@@ -32,7 +30,7 @@ double detailAppBarHeight(BuildContext context) {
 /// leading back button sat directly under the traffic lights. Shifting it
 /// right by the traffic-light cluster's width clears them without
 /// disturbing the rest of the AppBar's vertical layout.
-bool get _isMacDesktopWindow => !kIsWeb && Platform.isMacOS;
+bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
 
 /// Shared outer chrome for standalone item detail screens (VOD, Series,

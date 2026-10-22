@@ -1,5 +1,4 @@
 import 'dart:async' show unawaited;
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show Factory;
 import 'package:flutter/gestures.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
 import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Renders whichever of [platformView] (a `PlatformViewProvider`-backed
 /// native mpv core), [nativePlane] (a `NativePlaneProvider`-backed backend
@@ -90,13 +90,13 @@ class NativeVideoSurface extends StatelessWidget {
     }
     final view = platformView;
     if (view != null) {
-      final child = Platform.isMacOS
+      final child = HostPlatform.isMacOS
           ? AppKitView(
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,
               creationParamsCodec: const StandardMessageCodec(),
             )
-          : Platform.isAndroid
+          : HostPlatform.isAndroid
           ? _androidHybridCompositionView(view)
           : UiKitView(
               viewType: view.platformViewType,

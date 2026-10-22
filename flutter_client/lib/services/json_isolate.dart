@@ -1,5 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+/// [Isolate.run], except on the web, which has no isolates: there
+/// [computation] runs inline, as Flutter's `compute` does.
+Future<R> runOffMainIsolate<R>(FutureOr<R> Function() computation) =>
+    kIsWeb ? Future<R>.sync(computation) : Isolate.run(computation);
 
 /// Below this size, `Isolate.run`'s spawn/copy overhead costs more than the
 /// decode itself would ever block a frame for, so we just decode inline.
@@ -12,7 +20,7 @@ Future<Object?> decodeJsonOffMainIsolate(String text) {
   if (text.length < _offloadThresholdBytes) {
     return Future.value(jsonDecode(text));
   }
-  return Isolate.run(() => jsonDecode(text));
+  return runOffMainIsolate(() => jsonDecode(text));
 }
 
 /// Encodes [data] as JSON, hopping off the calling isolate for large maps
@@ -28,5 +36,5 @@ Future<String> encodeJsonOffMainIsolate(
   if (!forceOffload && data.length < 64) {
     return Future.value(jsonEncode(data));
   }
-  return Isolate.run(() => jsonEncode(data));
+  return runOffMainIsolate(() => jsonEncode(data));
 }

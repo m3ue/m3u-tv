@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +17,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -26,7 +25,7 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 /// See `item_detail_scaffold.dart`'s identical constant/getter for why: this
 /// screen is a top-level route too (see go_router_config.dart), so its
 /// leading back button needs the same macOS traffic-light clearance.
-bool get _isMacDesktopWindow => !kIsWeb && Platform.isMacOS;
+bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
 
 /// Detail screen for a single EPG show. Receives the [EpgShow] as the route

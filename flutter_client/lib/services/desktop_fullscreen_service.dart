@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// Window manager calls the service needs, so tests can drive it without the
@@ -41,8 +40,7 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
     bool? altEnterToggles,
     this.transitionTimeout = const Duration(seconds: 3),
   }) : _altEnterToggles =
-           altEnterToggles ??
-           (!kIsWeb && (Platform.isWindows || Platform.isLinux));
+           altEnterToggles ?? (HostPlatform.isWindows || HostPlatform.isLinux);
 
   static DesktopFullscreenService? _instance;
 

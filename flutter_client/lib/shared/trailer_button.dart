@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/qr_link_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,7 +40,7 @@ Future<void> openTrailer(BuildContext context, String url) async {
 
 Future<bool> _launchExternally(String url) async {
   try {
-    if (!kIsWeb && Platform.operatingSystem == 'tvos') {
+    if (HostPlatform.isTvOS) {
       final id = youtubeVideoId(url);
       final candidates = [
         if (id != null) 'youtube://watch/$id',

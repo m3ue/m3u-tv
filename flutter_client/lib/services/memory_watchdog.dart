@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import 'package:m3u_tv/services/device_performance.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// RSS-based image-cache eviction backstop.
 ///
@@ -52,7 +53,7 @@ class MemoryWatchdog {
   /// Begin periodic RSS sampling. No-op on iOS / tvOS and under `flutter test`.
   void start() {
     if (_timer != null) return;
-    if (Platform.environment['FLUTTER_TEST'] == 'true') return;
+    if (HostPlatform.environment['FLUTTER_TEST'] == 'true') return;
     if (_diagnosticsEnabled) {
       _diagnosticsTimer = Timer.periodic(
         const Duration(seconds: 5),
@@ -89,7 +90,7 @@ class MemoryWatchdog {
     if (_isDesktop) {
       return (1536 << 20, const Duration(seconds: 30));
     }
-    if (Platform.isAndroid) {
+    if (HostPlatform.isAndroid) {
       final totalMem = DevicePerformance.totalMemBytes;
       final threshold = totalMem != null
           ? (totalMem * 0.45).round().clamp(512 << 20, 1536 << 20)
@@ -128,6 +129,5 @@ class MemoryWatchdog {
       ..clearLiveImages();
   }
 
-  static bool get _isDesktop =>
-      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  static bool get _isDesktop => HostPlatform.isDesktop;
 }

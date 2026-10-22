@@ -1,8 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
+import 'package:m3u_tv/services/catalog_db/catalog_connection.dart';
 
 part 'catalog_database.g.dart';
 
@@ -125,24 +124,17 @@ class CatalogDatabase extends _$CatalogDatabase {
   CatalogDatabase(super.e);
 
   /// In-memory database for tests.
-  CatalogDatabase.memory() : super(NativeDatabase.memory());
+  CatalogDatabase.memory() : super(openInMemoryCatalog());
 
   /// Opens (creating if needed) `m3u_tv_catalog.db` inside [directory], which
   /// callers resolve the same way `_createAppStateStores` resolves the JSON
   /// stores (Caches on tvOS, Documents on mobile, app-support on desktop).
-  factory CatalogDatabase.open(Directory directory) {
-    final file = File(p.join(directory.path, databaseFileName));
-    return CatalogDatabase(
-      NativeDatabase.createInBackground(
-        file,
-        setup: (db) {
-          db
-            ..execute('PRAGMA journal_mode=WAL')
-            ..execute('PRAGMA synchronous=NORMAL');
-        },
-      ),
-    );
-  }
+  factory CatalogDatabase.open(Directory directory) =>
+      CatalogDatabase(openCatalogFile(directory, databaseFileName));
+
+  /// Web builds: the same catalog, kept in browser storage.
+  factory CatalogDatabase.browser() =>
+      CatalogDatabase(openBrowserCatalog('m3u_tv_catalog'));
 
   /// The database file plus its WAL sidecars, so a caller that needs to
   /// discard a corrupt / stale-schema catalog can delete all of them.

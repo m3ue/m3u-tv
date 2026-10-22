@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
-
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
@@ -35,6 +33,7 @@ import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
 enum AppSourceType { none, xtream }
@@ -1208,7 +1207,7 @@ class AppStateController extends ChangeNotifier {
       await _pushNotificationService.registerToken(
         credentials,
         token: token,
-        platform: Platform.isIOS ? 'ios' : 'android',
+        platform: HostPlatform.isIOS ? 'ios' : 'android',
         deviceId: identity?.deviceId,
         deviceName: identity?.deviceName,
       );

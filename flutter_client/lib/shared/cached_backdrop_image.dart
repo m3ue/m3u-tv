@@ -84,7 +84,7 @@ class _CachedBackdropImageState extends State<CachedBackdropImage> {
             : null;
         final provider = CachedNetworkImageProvider(
           sizedImageUrl(widget.url, decodeWidth: cacheWidth),
-          cacheManager: MediaImageCacheManager(),
+          cacheManager: mediaImageCacheManager,
         );
         final cacheHeight = constraints.hasBoundedHeight
             ? (constraints.maxHeight * devicePixelRatio).round()

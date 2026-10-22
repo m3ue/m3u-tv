@@ -29,7 +29,7 @@ class AppVersionCheck {
 /// every platform.
 class AppVersionService {
   AppVersionService({HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+    : _injectedHttpClient = httpClient;
 
   static const _pubspecUrl =
       'https://raw.githubusercontent.com/m3ue/m3u-tv/master/flutter_client/pubspec.yaml';
@@ -38,7 +38,9 @@ class AppVersionService {
     multiLine: true,
   );
 
-  final HttpClient _httpClient;
+  final HttpClient? _injectedHttpClient;
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  late final HttpClient _httpClient = _injectedHttpClient ?? HttpClient();
 
   Future<String?> currentVersion() async {
     final pubspec = await rootBundle.loadString('pubspec.yaml');

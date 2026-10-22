@@ -94,10 +94,12 @@ class PushNotificationService {
   PushNotificationService({
     HttpClient? httpClient,
     PushMessagingClient? messagingClient,
-  }) : _client = httpClient ?? HttpClient(),
+  }) : _injectedClient = httpClient,
        _messagingClient = messagingClient ?? FirebasePushMessagingClient();
 
-  final HttpClient _client;
+  final HttpClient? _injectedClient;
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  late final HttpClient _client = _injectedClient ?? HttpClient();
   final PushMessagingClient _messagingClient;
   Future<String?>? _initialization;
   StreamSubscription<PushMessage>? _foregroundSubscription;

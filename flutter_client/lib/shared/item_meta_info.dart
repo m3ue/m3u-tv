@@ -263,7 +263,7 @@ class ItemTitleHeading extends StatelessWidget {
             image: ResizeImage(
               CachedNetworkImageProvider(
                 sizedImageUrl(logo, decodeWidth: decodeWidth),
-                cacheManager: MediaImageCacheManager(),
+                cacheManager: mediaImageCacheManager,
               ),
               // Bound the decode to the display cap: a wordmark clearlogo can
               // ship at 1500px+ wide and would otherwise decode at full source

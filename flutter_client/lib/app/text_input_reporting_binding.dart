@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:m3u_tv/services/memory_pressure_log.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// App binding that tells Android when a Flutter text field holds the text
 /// input connection (#309).
@@ -39,7 +39,7 @@ class TextInputReportingBinding extends WidgetsFlutterBinding
   @override
   BinaryMessenger createBinaryMessenger() {
     final messenger = super.createBinaryMessenger();
-    if (kIsWeb || !Platform.isAndroid) return messenger;
+    if (kIsWeb || !HostPlatform.isAndroid) return messenger;
     return TextInputReportingMessenger(messenger);
   }
 }

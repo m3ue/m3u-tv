@@ -250,11 +250,11 @@ class _AioCacheEntry<T> {
 /// Proxies AIOStreams Stremio addon requests via m3u-editor's proxy endpoints.
 /// Auth tokens stay on the server — clients authenticate with playlist credentials.
 class AIOStreamsApiService {
-  AIOStreamsApiService({required this.xtreamService})
-    : _httpClient = HttpClient();
+  AIOStreamsApiService({required this.xtreamService});
 
   final XtreamService xtreamService;
-  final HttpClient _httpClient;
+  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
+  late final HttpClient _httpClient = HttpClient();
   final Map<String, _AioCacheEntry<List<AIOStreamsItem>>> _catalogCache = {};
   final Map<String, _AioCacheEntry<AIOStreamsItem>> _metaCache = {};
 

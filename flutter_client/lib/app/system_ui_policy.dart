@@ -1,7 +1,5 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 enum SystemUiRouteMode { browsing, player }
 
@@ -11,7 +9,7 @@ class SystemUiPolicy {
   SystemUiPolicy({
     bool? isAndroid,
     ApplySystemUiRouteMode? applySystemUiRouteMode,
-  }) : _isAndroid = isAndroid ?? (!kIsWeb && Platform.isAndroid),
+  }) : _isAndroid = isAndroid ?? (HostPlatform.isAndroid),
        _applySystemUiRouteMode =
            applySystemUiRouteMode ?? _applyAndroidSystemUiRouteMode;
 

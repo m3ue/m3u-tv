@@ -46,7 +46,7 @@ Future<Color?> _extractSwatch(String url) async {
     // of a 4K backdrop cost ~33MB of GPU memory per title visited.
     final palette = await PaletteGeneratorMaster.fromImageProvider(
       ResizeImage(
-        CachedNetworkImageProvider(url, cacheManager: MediaImageCacheManager()),
+        CachedNetworkImageProvider(url, cacheManager: mediaImageCacheManager),
         width: 440,
         policy: ResizeImagePolicy.fit,
       ),

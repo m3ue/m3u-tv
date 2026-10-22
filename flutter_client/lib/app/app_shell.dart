@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
@@ -43,6 +42,7 @@ import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
@@ -61,7 +61,7 @@ const double _kMacTitlebarInset = 28;
 /// go_router_config.dart so both animations read as one motion.
 const Duration _kFullScreenDetailTransition = Duration(milliseconds: 300);
 
-bool get _isMacDesktopWindow => Platform.isMacOS;
+bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 
 /// Device type enum matching the RN useDeviceType hook.
 enum DeviceType { tv, desktop, tablet, phone }

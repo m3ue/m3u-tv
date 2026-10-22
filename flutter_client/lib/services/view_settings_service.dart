@@ -1,8 +1,7 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Which top-level screen the app opens on a fresh launch. Defaults to Home;
 /// Settings is deliberately not an option.
@@ -515,8 +514,7 @@ class ViewSettingsService extends ChangeNotifier {
   bool get matchRefreshRateSync =>
       (_memory[matchRefreshRateKey] as bool?) ?? _defaultMatchRefreshRate;
 
-  static bool get _defaultMatchRefreshRate =>
-      !kIsWeb && Platform.operatingSystem == 'tvos';
+  static bool get _defaultMatchRefreshRate => HostPlatform.isTvOS;
 
   Future<void> setMatchRefreshRate(
     // ignore: avoid_positional_boolean_parameters

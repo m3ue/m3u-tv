@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -26,6 +25,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1360,7 +1360,7 @@ class _PlaybackSettingsPage extends StatelessWidget {
   // Pre-buffering is an mpv option. Android plays through ExoPlayer, which
   // already buffers before it starts (mpv there is only a fallback), so hide
   // it there, like Deinterlace.
-  static final bool _showPrebufferLiveToggle = !Platform.isAndroid;
+  static final bool _showPrebufferLiveToggle = !HostPlatform.isAndroid;
 
   @override
   Widget build(BuildContext context) {
@@ -2365,17 +2365,18 @@ class _ViewSettingsSectionState extends State<_ViewSettingsSection> {
   // switch briefly blanks/flashes the display; tvOS defaults on, since it
   // shipped unconditionally before this toggle existed (see
   // ViewSettingsService.matchRefreshRate's platform-aware default).
-  static final bool _showHdrToggle = Platform.isWindows || Platform.isLinux;
+  static final bool _showHdrToggle =
+      HostPlatform.isWindows || HostPlatform.isLinux;
   static final bool _showRefreshRateToggle =
-      Platform.isWindows || Platform.isAndroid || _isTvOS;
+      HostPlatform.isWindows || HostPlatform.isAndroid || _isTvOS;
 
   // Deinterlacing is an mpv filter. Android plays through ExoPlayer, which
   // has no filter chain (mpv there is only a fallback), so hide it there.
-  static final bool _showDeinterlaceToggle = !Platform.isAndroid;
+  static final bool _showDeinterlaceToggle = !HostPlatform.isAndroid;
 
   // Mirrors the tvOS/Android-TV detection duplicated in go_router_config.dart
   // and dvr_series_rule_options_screen.dart -- no shared helper exists yet.
-  static bool get _isTvOS => !kIsWeb && Platform.operatingSystem == 'tvos';
+  static bool get _isTvOS => HostPlatform.isTvOS;
 
   // The navigation click sound only ever plays on TV/desktop (see main.dart);
   // hide the toggle where it would have no effect.
