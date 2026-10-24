@@ -504,4 +504,46 @@ void main() {
       );
     });
   });
+
+  group('ContentRequestSearchResult.fromJson TMDB enrichment fields', () {
+    test('parses clearlogo, cast_list, and director', () {
+      final result = ContentRequestSearchResult.fromJson(<String, Object?>{
+        'type': 'movie',
+        'external_id': '603',
+        'integration_id': 1,
+        'integration_name': 'Radarr',
+        'title': 'The Matrix',
+        'clearlogo': 'https://example.com/matrix-logo.png',
+        'cast_list': [
+          {
+            'id': 6384,
+            'name': 'Keanu Reeves',
+            'character': 'Neo',
+            'photo': 'https://example.com/keanu.jpg',
+          },
+        ],
+        'director': ['Lana Wachowski', 'Lilly Wachowski'],
+      });
+
+      expect(result.clearLogo, 'https://example.com/matrix-logo.png');
+      expect(result.castList, hasLength(1));
+      expect(result.castList.single.name, 'Keanu Reeves');
+      expect(result.castList.single.character, 'Neo');
+      expect(result.directors, ['Lana Wachowski', 'Lilly Wachowski']);
+    });
+
+    test('defaults TMDB fields to empty/null when absent', () {
+      final result = ContentRequestSearchResult.fromJson(<String, Object?>{
+        'type': 'movie',
+        'external_id': '603',
+        'integration_id': 1,
+        'integration_name': 'Radarr',
+        'title': 'The Matrix',
+      });
+
+      expect(result.clearLogo, isNull);
+      expect(result.castList, isEmpty);
+      expect(result.directors, isEmpty);
+    });
+  });
 }

@@ -74,6 +74,7 @@ class PlaybackControls extends StatelessWidget {
     this.playPauseFocusNode,
     this.onNextChannel,
     this.onPreviousChannel,
+    this.onEpisodePicker,
     this.onRecordNow,
     this.isRecording = false,
     this.skipPrompt,
@@ -124,6 +125,10 @@ class PlaybackControls extends StatelessWidget {
   final FocusNode? playPauseFocusNode;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
+
+  /// Opens the in-player episode picker. Only rendered for series playback
+  /// (non-live), when the caller has the current series' episode list.
+  final VoidCallback? onEpisodePicker;
   final VoidCallback? onRecordNow;
   final bool isRecording;
 
@@ -507,10 +512,13 @@ class PlaybackControls extends StatelessWidget {
                           : 0)) *
                   scale
             : 0.0;
+        final episodePickerWidth = (!isLive && onEpisodePicker != null)
+            ? 56.0
+            : 0.0;
         final transportWidth =
             (isLive
                 ? (_hasChannelControls ? _liveButtonCount * 56.0 : 56.0)
-                : (_showSkipButtons ? 168.0 : 56.0)) *
+                : (_showSkipButtons ? 168.0 : 56.0) + episodePickerWidth) *
             scale;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >=
@@ -640,6 +648,15 @@ class PlaybackControls extends StatelessWidget {
                 );
                 onSeek(clamped);
               },
+            ),
+          ),
+        if (!isLive && onEpisodePicker != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.layers,
+              onPressed: onEpisodePicker,
+              tooltip: AppLocalizations.of(context).playerEpisodesTooltip,
             ),
           ),
       ],

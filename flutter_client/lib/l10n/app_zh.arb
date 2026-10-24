@@ -173,7 +173,9 @@
   "playerClearProgress": "清除进度",
   "playerProgressCleared": "进度已清除",
   "playerSkipPreviousTooltip": "上一个频道",
-  "playerSkipNextTooltip": "下一个频道",  "playerNowPlayingMovie": "电影",
+  "playerSkipNextTooltip": "下一个频道",
+  "playerEpisodesTooltip": "剧集",
+  "playerEpisodePickerTitle": "剧集",  "playerNowPlayingMovie": "电影",
   "playerNowPlayingSeries": "剧集",
   "playerNowPlayingSeasonEpisode": "第{season}季 · 第{episode}集",
   "@playerNowPlayingSeasonEpisode": {

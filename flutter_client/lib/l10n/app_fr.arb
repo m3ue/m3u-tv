@@ -173,7 +173,9 @@
   "playerClearProgress": "Effacer la progression",
   "playerProgressCleared": "Progression effacée",
   "playerSkipPreviousTooltip": "Chaîne précédente",
-  "playerSkipNextTooltip": "Chaîne suivante",  "playerNowPlayingMovie": "Film",
+  "playerSkipNextTooltip": "Chaîne suivante",
+  "playerEpisodesTooltip": "Épisodes",
+  "playerEpisodePickerTitle": "Épisodes",  "playerNowPlayingMovie": "Film",
   "playerNowPlayingSeries": "Série",
   "playerNowPlayingSeasonEpisode": "S{season} · É{episode}",
   "@playerNowPlayingSeasonEpisode": {

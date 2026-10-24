@@ -364,6 +364,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerSkipNextTooltip => '下一个频道';
 
   @override
+  String get playerEpisodesTooltip => '剧集';
+
+  @override
+  String get playerEpisodePickerTitle => '剧集';
+
+  @override
   String get playerNowPlayingMovie => '电影';
 
   @override

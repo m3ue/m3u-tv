@@ -371,6 +371,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerSkipNextTooltip => 'Next channel';
 
   @override
+  String get playerEpisodesTooltip => 'Episodes';
+
+  @override
+  String get playerEpisodePickerTitle => 'Episodes';
+
+  @override
   String get playerNowPlayingMovie => 'Movie';
 
   @override

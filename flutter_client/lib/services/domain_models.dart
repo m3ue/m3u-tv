@@ -1054,6 +1054,9 @@ class ContentRequestSearchResult {
     this.certification,
     this.seasons = const <ContentRequestSeason>[],
     this.alreadyAvailable = false,
+    this.clearLogo,
+    this.castList = const <CastMember>[],
+    this.directors = const <String>[],
   });
 
   final String type;
@@ -1071,6 +1074,13 @@ class ContentRequestSearchResult {
   final String? certification;
   final List<ContentRequestSeason> seasons;
   final bool alreadyAvailable;
+
+  /// Transparent title logo and rich cast, TMDB-enriched server-side (best
+  /// effort - empty/null when TMDB isn't configured or the lookup fails).
+  /// Same shapes/wire keys as the AIOStreams/Xtream detail screens.
+  final String? clearLogo;
+  final List<CastMember> castList;
+  final List<String> directors;
 
   factory ContentRequestSearchResult.fromJson(Map<String, Object?> json) =>
       ContentRequestSearchResult(
@@ -1094,6 +1104,14 @@ class ContentRequestSearchResult {
             .map((season) => ContentRequestSeason.fromJson(_asMap(season)))
             .toList(growable: false),
         alreadyAvailable: json['already_available'] == true,
+        clearLogo: _asNullableString(json['clearlogo']),
+        castList: _asList(json['cast_list'])
+            .map(CastMember.fromXtream)
+            .whereType<CastMember>()
+            .toList(growable: false),
+        directors: _asList(
+          json['director'],
+        ).map((name) => '$name').toList(growable: false),
       );
 }
 

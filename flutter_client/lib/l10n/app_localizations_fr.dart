@@ -373,6 +373,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerSkipNextTooltip => 'Chaîne suivante';
 
   @override
+  String get playerEpisodesTooltip => 'Épisodes';
+
+  @override
+  String get playerEpisodePickerTitle => 'Épisodes';
+
+  @override
   String get playerNowPlayingMovie => 'Film';
 
   @override

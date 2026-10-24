@@ -31,6 +31,7 @@ PlayerArgs? episodePlayerArgs({
       'series_name': seriesName,
       if (series?.tmdbId != null) 'tmdb_id': series!.tmdbId,
       if (series?.backdropUrl != null) 'backdrop_url': series!.backdropUrl,
+      if (series?.coverUrl != null) 'poster_url': series!.coverUrl,
       if (episode.thumbnailUrl != null) 'thumbnail_url': episode.thumbnailUrl,
       if (episode.rating != null) 'rating': '${episode.rating}',
       if (episode.duration != null) 'duration': episode.duration,

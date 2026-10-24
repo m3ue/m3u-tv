@@ -12,6 +12,7 @@ import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
+import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
 
@@ -179,11 +180,19 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
         name: result.title,
         posterUrl: result.poster,
         backdropUrl: result.fanart,
+        clearLogoUrl: result.clearLogo,
         fallbackIcon: result.type == 'series' ? Icons.tv : Icons.movie,
         chips: chips,
         plot: result.overview,
-        credits: const [],
-        castSemanticLabel: '',
+        credits: [
+          if (result.directors.isNotEmpty)
+            MetaCreditLine(
+              label: 'Director',
+              value: result.directors.join(', '),
+            ),
+        ],
+        richCast: result.castList,
+        castSemanticLabel: l.vodCast,
         primaryButtonLabel: _primaryLabel(l, existing),
         primaryIcon: _primaryIcon(existing),
         onPrimary: _primaryAction(
