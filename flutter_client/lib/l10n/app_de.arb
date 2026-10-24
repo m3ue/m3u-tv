@@ -535,6 +535,7 @@
   "vodPlayMovie": "Film abspielen",
   "vodContinueMovie": "Film fortsetzen",
   "vodCast": "Besetzung",
+  "vodDirector": "Regie",
   "castShowAll": "Alle Darsteller anzeigen",
   "vodTimeLeftMinutes": "{minutes, plural, =1{noch 1 Min.} other{noch {minutes} Min.}}",
   "@vodTimeLeftMinutes": {

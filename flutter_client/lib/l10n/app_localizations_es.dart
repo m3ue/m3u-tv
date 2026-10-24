@@ -1107,6 +1107,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get vodCast => 'Reparto';
 
   @override
+  String get vodDirector => 'Director';
+
+  @override
   String get castShowAll => 'Ver todo el reparto';
 
   @override

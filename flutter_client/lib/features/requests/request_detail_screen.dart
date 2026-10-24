@@ -187,7 +187,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
         credits: [
           if (result.directors.isNotEmpty)
             MetaCreditLine(
-              label: 'Director',
+              label: l.vodDirector,
               value: result.directors.join(', '),
             ),
         ],

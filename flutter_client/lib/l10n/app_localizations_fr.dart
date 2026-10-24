@@ -1111,6 +1111,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vodCast => 'Casting';
 
   @override
+  String get vodDirector => 'Réalisateur';
+
+  @override
   String get castShowAll => 'Voir tout le casting';
 
   @override

@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -7,6 +8,22 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
     show ResilientMediaImage;
+import 'package:m3u_tv/shared/selectable_chip.dart';
+
+/// Seasons from [info] that actually have at least one episode - the only
+/// ones the picker can show. Exposed so a caller can decide whether the
+/// picker affordance (e.g. a toolbar button) has anything to open before
+/// enabling it, rather than enabling it unconditionally and letting
+/// [showEpisodePicker] silently no-op when there's nothing to pick from.
+List<Season> pickableSeasons(SeriesInfo info) =>
+    info.seasons
+        .where(
+          (season) =>
+              (info.episodesBySeason[season.number] ?? const <Episode>[])
+                  .isNotEmpty,
+        )
+        .toList()
+      ..sort((a, b) => a.number.compareTo(b.number));
 
 /// Opens a bottom drawer letting the viewer jump directly to another episode
 /// of the current series without leaving playback - a season selector (when
@@ -22,15 +39,7 @@ Future<void> showEpisodePicker(
   required String currentEpisodeId,
   required ValueChanged<Episode> onSelect,
 }) {
-  final seasons =
-      info.seasons
-          .where(
-            (season) =>
-                (info.episodesBySeason[season.number] ?? const <Episode>[])
-                    .isNotEmpty,
-          )
-          .toList()
-        ..sort((a, b) => a.number.compareTo(b.number));
+  final seasons = pickableSeasons(info);
   if (seasons.isEmpty) return Future<void>.value();
   final initialSeason =
       seasons.any((season) => season.number == currentSeasonNumber)
@@ -86,12 +95,28 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
     for (final season in widget.seasons) season.number: GlobalKey(),
   };
 
+  /// Owns the focus for whichever tile is currently playing, within
+  /// whichever season holds it - `ListView.builder` only builds tiles near
+  /// the viewport, so a plain per-tile `autofocus` silently does nothing for
+  /// an episode far down a long season (focus would fall through to episode
+  /// 1 with no indication anything was wrong). A large `cacheExtent` on the
+  /// episode list (below) guarantees this node's tile is actually built on
+  /// the first frame so `.context` and `.requestFocus()` both work.
+  final FocusNode _currentEpisodeFocusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollToSelectedSeason(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedSeason();
+      _focusCurrentEpisode();
+    });
+  }
+
+  @override
+  void dispose() {
+    _currentEpisodeFocusNode.dispose();
+    super.dispose();
   }
 
   void _scrollToSelectedSeason() {
@@ -104,11 +129,27 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
     );
   }
 
+  /// Scrolls the currently-playing episode into view and gives it focus, if
+  /// its tile is built (only true while the season actually showing it is
+  /// selected - switching away just leaves the season's own first-episode
+  /// autofocus in charge, which is already correct there).
+  void _focusCurrentEpisode() {
+    final context = _currentEpisodeFocusNode.context;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.5,
+      duration: const Duration(milliseconds: 200),
+    );
+    _currentEpisodeFocusNode.requestFocus();
+  }
+
   void _selectSeason(int seasonNumber) {
     setState(() => _season = seasonNumber);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollToSelectedSeason(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedSeason();
+      _focusCurrentEpisode();
+    });
   }
 
   @override
@@ -118,6 +159,9 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
     final episodes =
         (widget.info.episodesBySeason[_season] ?? const <Episode>[]).toList()
           ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
+    final hasCurrentEpisode = episodes.any(
+      (episode) => episode.id == widget.currentEpisodeId,
+    );
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final hasMultipleSeasons = widget.seasons.length > 1;
 
@@ -163,7 +207,7 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
               child: Row(
                 children: [
                   for (final season in widget.seasons) ...[
-                    _SeasonChip(
+                    SelectableChip(
                       key: _seasonKeys[season.number],
                       label: l.homeSeason(season.number),
                       selected: season.number == _season,
@@ -181,6 +225,13 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
               thumbVisibility: true,
               child: ListView.builder(
                 shrinkWrap: true,
+                // Generous enough to pre-build a full season's worth of
+                // tiles (even a 40+ episode anime season at "Very Large"
+                // scale) so the current episode's tile - however far down -
+                // is always built on the first frame, letting
+                // `_focusCurrentEpisode` actually find and focus it instead
+                // of silently falling back to episode 1.
+                scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
                 padding: EdgeInsets.fromLTRB(
                   12 * scale,
                   4 * scale,
@@ -194,7 +245,13 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
                   return _EpisodeTile(
                     episode: episode,
                     isCurrent: isCurrent,
-                    autofocus: isCurrent || index == 0,
+                    // The current episode's focus is driven explicitly by
+                    // `_focusCurrentEpisode` (via its own FocusNode) so it
+                    // doesn't race a plain `autofocus: true` here - only
+                    // fall back to autofocusing episode 1 when this season
+                    // doesn't contain the current episode at all.
+                    focusNode: isCurrent ? _currentEpisodeFocusNode : null,
+                    autofocus: !hasCurrentEpisode && index == 0,
                     onTap: () => widget.onSelect(episode),
                   );
                 },
@@ -207,72 +264,20 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
   }
 }
 
-/// Compact season pill - deliberately not `AppButton`, which is sized for
-/// primary actions and was too large for a strip of several of these in a
-/// row. Mirrors `request_detail_screen.dart`'s `_SeasonToggle` styling: a
-/// small pill with a leading check icon on the selected one.
-class _SeasonChip extends StatelessWidget {
-  const _SeasonChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = FontSizeScope.scaleOf(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final foreground = selected
-        ? scheme.onPrimaryContainer
-        : scheme.onSurfaceVariant;
-    return DpadInkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
-      color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 14 * scale,
-          vertical: 8 * scale,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selected) ...[
-              Icon(Icons.check, size: 16 * scale, color: foreground),
-              SizedBox(width: 6 * scale),
-            ],
-            Text(
-              label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: foreground,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _EpisodeTile extends StatelessWidget {
   const _EpisodeTile({
     required this.episode,
     required this.isCurrent,
     required this.autofocus,
     required this.onTap,
+    this.focusNode,
   });
 
   final Episode episode;
   final bool isCurrent;
   final bool autofocus;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +291,7 @@ class _EpisodeTile extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4 * scale),
       child: DpadInkWell(
+        focusNode: focusNode,
         autofocus: autofocus,
         borderRadius: BorderRadius.circular(8 * scale),
         clipBehavior: Clip.antiAlias,

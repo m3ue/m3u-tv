@@ -535,6 +535,7 @@
   "vodPlayMovie": "Lire le film",
   "vodContinueMovie": "Continuer le film",
   "vodCast": "Casting",
+  "vodDirector": "Réalisateur",
   "castShowAll": "Voir tout le casting",
   "vodTimeLeftMinutes": "{minutes, plural, =1{Il reste 1 min} other{Il reste {minutes} min}}",
   "@vodTimeLeftMinutes": {

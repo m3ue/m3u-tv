@@ -2018,6 +2018,12 @@ abstract class AppLocalizations {
   /// **'Cast'**
   String get vodCast;
 
+  /// No description provided for @vodDirector.
+  ///
+  /// In en, this message translates to:
+  /// **'Director'**
+  String get vodDirector;
+
   /// No description provided for @castShowAll.
   ///
   /// In en, this message translates to:

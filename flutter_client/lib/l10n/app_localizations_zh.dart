@@ -1061,6 +1061,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vodCast => '演员阵容';
 
   @override
+  String get vodDirector => '导演';
+
+  @override
   String get castShowAll => '查看全部演员';
 
   @override

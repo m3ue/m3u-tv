@@ -615,6 +615,7 @@
   "vodPlayMovie": "Play movie",
   "vodContinueMovie": "Continue movie",
   "vodCast": "Cast",
+  "vodDirector": "Director",
   "castShowAll": "Show all cast",
   "vodTimeLeftMinutes": "{minutes, plural, =1{1 min left} other{{minutes} min left}}",
   "@vodTimeLeftMinutes": {

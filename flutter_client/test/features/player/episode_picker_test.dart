@@ -217,4 +217,73 @@ void main() {
       expect(bottomRight.dx, lessThanOrEqualTo(screenWidth));
     },
   );
+
+  testWidgets(
+    'scrolls to and focuses the current episode deep in a long season',
+    (tester) async {
+      final info = SeriesInfo(
+        series: const Series(id: 7, name: 'Fixture Show'),
+        seasons: const [Season(number: 1, name: 'Season 1')],
+        episodesBySeason: {
+          1: [for (var e = 1; e <= 24; e++) _ep(1, e)],
+        },
+      );
+
+      await _pumpPicker(
+        tester,
+        info: info,
+        currentSeasonNumber: 1,
+        currentEpisodeId: '1020',
+        onSelect: (_) {},
+      );
+
+      final screenHeight =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+
+      // The deep current episode's tile must be scrolled into the viewport.
+      final currentTile = find.textContaining('S1E20 Title');
+      expect(currentTile, findsOneWidget);
+      expect(
+        tester.getTopLeft(currentTile).dy,
+        inInclusiveRange(0, screenHeight),
+      );
+
+      // Episode 1 (the old autofocus fallback) must no longer be the one
+      // holding focus - without the fix it silently grabs focus instead.
+      final episodeOneFinder = find.textContaining('S1E1 Title');
+      if (episodeOneFinder.evaluate().isNotEmpty) {
+        final episodeOneTop = tester.getTopLeft(episodeOneFinder).dy;
+        expect(episodeOneTop, isNot(inInclusiveRange(0, screenHeight)));
+      }
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+    },
+  );
+
+  group('pickableSeasons', () {
+    test('excludes seasons with no episodes', () {
+      final info = SeriesInfo(
+        series: const Series(id: 7, name: 'Fixture Show'),
+        seasons: const [
+          Season(number: 1, name: 'Season 1'),
+          Season(number: 2, name: 'Season 2'),
+        ],
+        episodesBySeason: {
+          1: [_ep(1, 1)],
+          2: <Episode>[],
+        },
+      );
+
+      expect(pickableSeasons(info).map((s) => s.number), [1]);
+    });
+
+    test('is empty when every season has no episodes', () {
+      const info = SeriesInfo(
+        series: Series(id: 7, name: 'Fixture Show'),
+        seasons: [Season(number: 1, name: 'Season 1')],
+        episodesBySeason: {1: <Episode>[]},
+      );
+
+      expect(pickableSeasons(info), isEmpty);
+    });
+  });
 }

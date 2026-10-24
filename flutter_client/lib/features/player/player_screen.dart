@@ -1090,13 +1090,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final season =
         widget.args.seasonNumber ??
         widget.args.metadata['season_number'] as int?;
+    // Prefer the authoritative string id (set by `episodePlayerArgs`) over
+    // `streamId`, which is a lossy `int.tryParse` of that same id and can be
+    // null - stringifying a null `streamId` directly would otherwise send
+    // the literal text "null" in as the "current episode" to match against.
+    final currentEpisodeId =
+        (widget.args.metadata['episode_id'] as String?) ??
+        widget.args.streamId?.toString() ??
+        '';
     _handleTrackDialogVisibilityChanged(true);
     unawaited(
       showEpisodePicker(
         context,
         info: info,
         currentSeasonNumber: season,
-        currentEpisodeId: '${widget.args.streamId}',
+        currentEpisodeId: currentEpisodeId,
         onSelect: _playEpisode,
       ).whenComplete(() => _handleTrackDialogVisibilityChanged(false)),
     );
@@ -2216,7 +2224,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
 
                     // Poster backdrop behind the loading indicator (VOD/series).
-                    if (_showLoadingOverlay && _loadingBackdropUrl != null)
+                    // Skipped on Android: `NativeVideoSurface` is already
+                    // mounted as a live Hybrid Composition `AndroidView` by
+                    // this point (`_videoSurfaceReady` flips true before
+                    // `_openSource` runs), and covering one with an opaque
+                    // Flutter overlay and later removing it does not
+                    // reliably restore its visibility - confirmed on a real
+                    // Pixel 7 during the EAC3 fallback work. Desktop/iOS/web
+                    // render through a `Texture`/html view instead, which
+                    // doesn't have this failure mode.
+                    if (_showLoadingOverlay &&
+                        _loadingBackdropUrl != null &&
+                        !HostPlatform.isAndroid)
                       Positioned.fill(
                         child: Stack(
                           fit: StackFit.expand,
@@ -2415,7 +2434,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             playPauseFocusNode: _controlsFocusNode,
                             onNextChannel: widget.onNextChannel,
                             onPreviousChannel: widget.onPreviousChannel,
-                            onEpisodePicker: _seriesInfo != null
+                            onEpisodePicker:
+                                _seriesInfo != null &&
+                                    pickableSeasons(_seriesInfo!).isNotEmpty
                                 ? _showEpisodePicker
                                 : null,
                             onRecordNow:

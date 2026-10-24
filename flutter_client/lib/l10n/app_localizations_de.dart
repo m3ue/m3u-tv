@@ -1106,6 +1106,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vodCast => 'Besetzung';
 
   @override
+  String get vodDirector => 'Regie';
+
+  @override
   String get castShowAll => 'Alle Darsteller anzeigen';
 
   @override
