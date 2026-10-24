@@ -5,14 +5,16 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart'
+    show ResilientMediaImage;
 
-/// Opens an in-player dialog letting the viewer jump directly to another
-/// episode of the current series without leaving playback - a season
-/// selector (when the series has more than one) plus the episode list for
-/// the selected season. Mirrors `TrackSelector`'s dialog-based picker
-/// pattern and `SeasonPicker`'s D-pad list-row styling. Returns the
-/// dialog's dismiss future so the caller can track its open/closed state
-/// (e.g. to keep the player's OSD pinned while it's up).
+/// Opens a bottom drawer letting the viewer jump directly to another episode
+/// of the current series without leaving playback - a season selector (when
+/// the series has more than one) plus the episode list for the selected
+/// season, each row showing its thumbnail and a truncated synopsis. Mirrors
+/// `SeasonPicker`'s bottom-sheet-with-header pattern. Returns the sheet's
+/// dismiss future so the caller can track its open/closed state (e.g. to
+/// keep the player's OSD pinned while it's up).
 Future<void> showEpisodePicker(
   BuildContext context, {
   required SeriesInfo info,
@@ -35,23 +37,27 @@ Future<void> showEpisodePicker(
       ? currentSeasonNumber!
       : seasons.first.number;
 
-  return showDialog<void>(
+  return showModalBottomSheet<void>(
     context: context,
-    builder: (dialogContext) => _EpisodePickerDialog(
-      info: info,
-      seasons: seasons,
-      initialSeason: initialSeason,
-      currentEpisodeId: currentEpisodeId,
-      onSelect: (episode) {
-        Navigator.of(dialogContext).pop();
-        onSelect(episode);
-      },
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: _EpisodePickerSheet(
+        info: info,
+        seasons: seasons,
+        initialSeason: initialSeason,
+        currentEpisodeId: currentEpisodeId,
+        onSelect: (episode) {
+          Navigator.of(sheetContext).pop();
+          onSelect(episode);
+        },
+      ),
     ),
   );
 }
 
-class _EpisodePickerDialog extends StatefulWidget {
-  const _EpisodePickerDialog({
+class _EpisodePickerSheet extends StatefulWidget {
+  const _EpisodePickerSheet({
     required this.info,
     required this.seasons,
     required this.initialSeason,
@@ -66,11 +72,44 @@ class _EpisodePickerDialog extends StatefulWidget {
   final ValueChanged<Episode> onSelect;
 
   @override
-  State<_EpisodePickerDialog> createState() => _EpisodePickerDialogState();
+  State<_EpisodePickerSheet> createState() => _EpisodePickerSheetState();
 }
 
-class _EpisodePickerDialogState extends State<_EpisodePickerDialog> {
+class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
   late int _season = widget.initialSeason;
+
+  /// One key per season chip, so the selected season can be scrolled fully
+  /// into view (it otherwise sits wherever the horizontal strip happens to
+  /// start, which clipped it against the sheet's edge when it wasn't the
+  /// first season).
+  late final Map<int, GlobalKey> _seasonKeys = {
+    for (final season in widget.seasons) season.number: GlobalKey(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToSelectedSeason(),
+    );
+  }
+
+  void _scrollToSelectedSeason() {
+    final context = _seasonKeys[_season]?.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.5,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  void _selectSeason(int seasonNumber) {
+    setState(() => _season = seasonNumber);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToSelectedSeason(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,76 +121,142 @@ class _EpisodePickerDialogState extends State<_EpisodePickerDialog> {
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final hasMultipleSeasons = widget.seasons.length > 1;
 
-    return AlertDialog(
-      clipBehavior: Clip.antiAlias,
-      title: Text(l.playerEpisodePickerTitle),
-      contentPadding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
-      content: SizedBox(
-        width: 460 * scale,
-        child: DpadRegion(
-          verticalEdge: DpadEdgeBehavior.stop,
-          horizontalEdge: DpadEdgeBehavior.stop,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (hasMultipleSeasons)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    height: 44 * scale,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: widget.seasons.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final season = widget.seasons[index];
-                        final selected = season.number == _season;
-                        return AppButton(
-                          label: l.homeSeason(season.number),
-                          variant: selected
-                              ? AppButtonVariant.primary
-                              : AppButtonVariant.tonal,
-                          autoScroll: false,
-                          onPressed: () =>
-                              setState(() => _season = season.number),
-                        );
-                      },
-                    ),
+    // One DpadRegion for the whole sheet - the close button, the season
+    // strip, and the episode list - so D-pad up/down/left/right can reach
+    // every control without escaping the sheet (same reasoning as
+    // `SeasonPicker._showPicker`'s pickerBody).
+    return DpadRegion(
+      verticalEdge: DpadEdgeBehavior.stop,
+      horizontalEdge: DpadEdgeBehavior.stop,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              20 * scale,
+              0,
+              12 * scale,
+              4 * scale,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.playerEpisodePickerTitle,
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-              if (hasMultipleSeasons) const SizedBox(height: 8),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: viewportHeight * 0.5),
-                child: Scrollbar(
-                  thumbVisibility: true,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: episodes.length,
-                    itemBuilder: (context, index) {
-                      final episode = episodes[index];
-                      final isCurrent = episode.id == widget.currentEpisodeId;
-                      return _EpisodeTile(
-                        episode: episode,
-                        isCurrent: isCurrent,
-                        autofocus: isCurrent || index == 0,
-                        onTap: () => widget.onSelect(episode),
-                      );
-                    },
-                  ),
+                AppIconButton(
+                  icon: Icons.close,
+                  dense: true,
+                  tooltip: l.cancel,
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          if (hasMultipleSeasons)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+              child: Row(
+                children: [
+                  for (final season in widget.seasons) ...[
+                    _SeasonChip(
+                      key: _seasonKeys[season.number],
+                      label: l.homeSeason(season.number),
+                      selected: season.number == _season,
+                      onTap: () => _selectSeason(season.number),
+                    ),
+                    SizedBox(width: 8 * scale),
+                  ],
+                ],
+              ),
+            ),
+          if (hasMultipleSeasons) SizedBox(height: 8 * scale),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: viewportHeight * 0.55),
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.fromLTRB(
+                  12 * scale,
+                  4 * scale,
+                  12 * scale,
+                  12 * scale,
+                ),
+                itemCount: episodes.length,
+                itemBuilder: (context, index) {
+                  final episode = episodes[index];
+                  final isCurrent = episode.id == widget.currentEpisodeId;
+                  return _EpisodeTile(
+                    episode: episode,
+                    isCurrent: isCurrent,
+                    autofocus: isCurrent || index == 0,
+                    onTap: () => widget.onSelect(episode),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact season pill - deliberately not `AppButton`, which is sized for
+/// primary actions and was too large for a strip of several of these in a
+/// row. Mirrors `request_detail_screen.dart`'s `_SeasonToggle` styling: a
+/// small pill with a leading check icon on the selected one.
+class _SeasonChip extends StatelessWidget {
+  const _SeasonChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = selected
+        ? scheme.onPrimaryContainer
+        : scheme.onSurfaceVariant;
+    return DpadInkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(50),
+      color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 14 * scale,
+          vertical: 8 * scale,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check, size: 16 * scale, color: foreground),
+              SizedBox(width: 6 * scale),
+            ],
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: foreground,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        AppButton(
-          label: l.cancel,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     );
   }
 }
@@ -173,39 +278,78 @@ class _EpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final thumbWidth = 96 * scale;
+    final thumbHeight = thumbWidth * 9 / 16;
+    final plot = episode.plot?.trim();
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: EdgeInsets.symmetric(vertical: 4 * scale),
       child: DpadInkWell(
         autofocus: autofocus,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8 * scale),
         clipBehavior: Clip.antiAlias,
         color: isCurrent ? scheme.primaryContainer : null,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: EdgeInsets.all(8 * scale),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 28,
-                child: Text(
-                  '${episode.episodeNumber}',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6 * scale),
+                child: ResilientMediaImage(
+                  imageUrl: episode.thumbnailUrl,
+                  fallbackIcon: Icons.tv,
+                  width: thumbWidth,
+                  height: thumbHeight,
+                  borderRadius: 0,
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 12 * scale),
               Expanded(
-                child: Text(
-                  episode.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${episode.episodeNumber}. ${episode.title}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: isCurrent
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (isCurrent) ...[
+                          SizedBox(width: 6 * scale),
+                          Icon(
+                            Icons.play_arrow,
+                            size: 18 * scale,
+                            color: scheme.primary,
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (plot != null && plot.isNotEmpty) ...[
+                      SizedBox(height: 4 * scale),
+                      Text(
+                        plot,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (isCurrent)
-                Icon(Icons.play_arrow, size: 18, color: scheme.primary),
             ],
           ),
         ),
