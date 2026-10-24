@@ -2230,9 +2230,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     // `_openSource` runs), and covering one with an opaque
                     // Flutter overlay and later removing it does not
                     // reliably restore its visibility - confirmed on a real
-                    // Pixel 7 during the EAC3 fallback work. Desktop/iOS/web
-                    // render through a `Texture`/html view instead, which
-                    // doesn't have this failure mode.
+                    // Pixel 7 during the EAC3 fallback work. Android gets the
+                    // same backdrop natively instead - a poster `ImageView`
+                    // living in the *same* native view as the `SurfaceView`
+                    // (see `PosterLoader.kt`/`Media3PlatformView.kt`/
+                    // `MpvPlayerPlatformView.kt`), which composites safely
+                    // where a Flutter-side overlay can't. Desktop/iOS/web
+                    // render through a `Texture`/html view, which doesn't
+                    // have this failure mode and so keeps this Flutter path.
                     if (_showLoadingOverlay &&
                         _loadingBackdropUrl != null &&
                         !HostPlatform.isAndroid)

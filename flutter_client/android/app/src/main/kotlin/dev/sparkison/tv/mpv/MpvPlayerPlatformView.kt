@@ -34,6 +34,13 @@ class MpvPlayerPlatformView(context: Context, viewId: Int, plugin: MpvPlayerPlug
             core.surfaceView,
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
         )
+        // Added last so it covers the SurfaceView while a stream loads -
+        // see `PosterLoader.kt`'s header comment for why this has to be a
+        // native view rather than a Flutter-side overlay.
+        container.addView(
+            core.posterOverlay.view,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
+        )
     }
 
     override fun getView(): View = container
