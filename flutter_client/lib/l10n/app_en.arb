@@ -245,7 +245,10 @@
   "playerClearProgress": "Clear progress",
   "playerProgressCleared": "Progress cleared",
   "playerSkipPreviousTooltip": "Previous channel",
-  "playerSkipNextTooltip": "Next channel",  "playerNowPlayingMovie": "Movie",
+  "playerSkipNextTooltip": "Next channel",
+  "playerEpisodesTooltip": "Episodes",
+  "playerEpisodePickerTitle": "Episodes",
+  "playerNowPlayingMovie": "Movie",
   "playerNowPlayingSeries": "Series",
   "playerNowPlayingSeasonEpisode": "S{season} · E{episode}",
   "@playerNowPlayingSeasonEpisode": {
@@ -612,6 +615,7 @@
   "vodPlayMovie": "Play movie",
   "vodContinueMovie": "Continue movie",
   "vodCast": "Cast",
+  "vodDirector": "Director",
   "castShowAll": "Show all cast",
   "vodTimeLeftMinutes": "{minutes, plural, =1{1 min left} other{{minutes} min left}}",
   "@vodTimeLeftMinutes": {

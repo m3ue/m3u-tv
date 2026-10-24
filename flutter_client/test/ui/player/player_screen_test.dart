@@ -23,6 +23,7 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 
 import 'fake_player_adapter.dart';
 import 'fake_transcode_gateway.dart';
@@ -1813,6 +1814,63 @@ void main() {
         // ExoPlayer `ready` means loaded with a frame up, just not playing.
         await emit(tester, adapter, PlaybackStatus.ready);
         expect(loading, findsNothing);
+      });
+
+      testWidgets('shows the item poster as a backdrop for VOD/series', (
+        tester,
+      ) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 42,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/movie.mkv',
+                title: 'A Movie',
+                type: 'vod',
+                metadata: <String, Object?>{
+                  'poster_url': 'https://example.com/poster.jpg',
+                },
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        await emit(tester, adapter, PlaybackStatus.loading);
+        expect(find.byType(CachedBackdropImage), findsOneWidget);
+
+        await emit(tester, adapter, PlaybackStatus.playing);
+        expect(find.byType(CachedBackdropImage), findsNothing);
+      });
+
+      testWidgets('shows no poster backdrop for live content', (
+        tester,
+      ) async {
+        final adapter = await pumpLoadingFixture(
+          tester,
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          platform: PlaybackPlatform.desktop,
+        );
+
+        await emit(tester, adapter, PlaybackStatus.loading);
+        expect(find.byType(CachedBackdropImage), findsNothing);
       });
     });
 

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.SurfaceView
+import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -35,6 +36,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Media3/ExoPlayer-based playback plugin for Android.
@@ -76,6 +80,8 @@ class Media3PlaybackPlugin(
     private val states = mutableMapOf<String, PlayerState>()
     private val surfaceViews = mutableMapOf<String, SurfaceView>()
     private val subtitleViews = mutableMapOf<String, SubtitleView>()
+    private val posterOverlays = mutableMapOf<String, PosterOverlay>()
+    private val posterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -121,6 +127,24 @@ class Media3PlaybackPlugin(
     fun detachSubtitleView(playerId: String, subtitleView: SubtitleView) {
         if (subtitleViews[playerId] === subtitleView) {
             subtitleViews.remove(playerId)
+        }
+    }
+
+    /**
+     * Creates (or returns the existing) poster overlay for [playerId],
+     * mirroring [attachSurfaceView]'s lifecycle. See `PosterLoader.kt`'s
+     * header comment for why this lives in the native view hierarchy
+     * instead of a Flutter-side overlay.
+     */
+    fun attachPosterView(playerId: String, viewContext: Context): FrameLayout {
+        val overlay = PosterOverlay(viewContext, posterScope)
+        posterOverlays[playerId] = overlay
+        return overlay.view
+    }
+
+    fun detachPosterView(playerId: String, view: FrameLayout) {
+        if (posterOverlays[playerId]?.view === view) {
+            posterOverlays.remove(playerId)
         }
     }
 
@@ -258,6 +282,13 @@ class Media3PlaybackPlugin(
 
         val source = arguments["source"] as? Map<*, *> ?: emptyMap<String, Any?>()
         val uri = source["uri"] as? String ?: throw IllegalStateException("Missing playback source uri")
+        val metadata = source["metadata"] as? Map<*, *>
+        // Prefers the wide backdrop over the portrait poster - same order
+        // the Flutter loading overlay uses on other platforms (see
+        // `player_screen.dart`'s `_loadingBackdropUrl`), so Android looks
+        // identical to the rest once this overlay is in place.
+        val posterUrl = (metadata?.get("backdrop_url") as? String) ?: (metadata?.get("poster_url") as? String)
+        posterOverlays[playerId]?.show(posterUrl)
         val headers = (source["headers"] as? Map<*, *>)
             ?.mapNotNull { entry ->
                 val key = entry.key as? String
@@ -606,6 +637,13 @@ class Media3PlaybackPlugin(
     }
 
     private inner class Media3Listener(private val playerId: String) : Player.Listener {
+        // The one reliable "a decoded frame is now actually on screen"
+        // signal - matches the Dart side's own `_awaitingFirstFrame` gating
+        // for non-mpv backends (see player_screen.dart).
+        override fun onRenderedFirstFrame() {
+            posterOverlays[playerId]?.hide()
+        }
+
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             val state = states[playerId] ?: return
             if (videoSize.width > 0 && videoSize.height > 0) {

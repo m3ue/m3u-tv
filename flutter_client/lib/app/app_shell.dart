@@ -1521,6 +1521,7 @@ class AppShellState extends ConsumerState<AppShell>
                   'backdrop_url': progress.backdropUrl,
                 if (progress.thumbnailUrl != null)
                   'thumbnail_url': progress.thumbnailUrl,
+                if (item.logoUrl != null) 'poster_url': item.logoUrl,
                 if (progress.rating != null) 'rating': progress.rating,
                 if (progress.runtime != null) 'duration': progress.runtime,
               },
@@ -1555,6 +1556,9 @@ class AppShellState extends ConsumerState<AppShell>
               seasonNumber: progress.seasonNumber,
               metadata: <String, Object?>{
                 if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+                if (series.coverUrl != null) 'poster_url': series.coverUrl,
+                if (series.backdropUrl != null)
+                  'backdrop_url': series.backdropUrl,
                 'series_name': progress.seriesName ?? series.name,
                 if (progress.episodeNumber != null)
                   'episode_number': progress.episodeNumber,

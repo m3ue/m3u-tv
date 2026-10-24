@@ -96,5 +96,22 @@ void main() {
       expect(args.metadata['series_name'], 'Show');
       expect(args.metadata['tmdb_id'], 42);
     });
+
+    test(
+      'carries the authoritative episode id, independent of streamId',
+      () {
+        final args = episodePlayerArgs(
+          episode: _ep(2, 5),
+          seriesId: 7,
+          seriesName: 'Show',
+        );
+        // streamId is a lossy `int.tryParse` of the episode's own id -
+        // callers that need to match "is this the current episode" (e.g.
+        // the episode picker) should read `episode_id` instead, which is
+        // never null even when streamId's parse fails.
+        expect(args!.metadata['episode_id'], '205');
+        expect(args.streamId, 205);
+      },
+    );
   });
 }

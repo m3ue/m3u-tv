@@ -254,6 +254,7 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.rating != null) 'rating': '${details.rating}',
           if (details.backdropUrl != null) 'backdrop_url': details.backdropUrl,
           if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
+          if (details.coverUrl != null) 'poster_url': details.coverUrl,
           if (details.tmdbId != null) 'tmdb_id': details.tmdbId,
           if (details.plot != null) 'plot': details.plot,
           if (details.edlUrl != null) 'edl_url': details.edlUrl,

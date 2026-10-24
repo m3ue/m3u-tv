@@ -4,13 +4,13 @@ import 'dart:io' show HttpClient, HttpStatus;
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
-import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/features/player/catchup_timeline.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
+import 'package:m3u_tv/features/player/episode_picker.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
@@ -32,7 +32,7 @@ import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -264,6 +264,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Episode? _nextEpisode;
   bool _upNextVisible = false;
   bool _upNextDismissed = false;
+
+  /// Full series/episode data from the same `get_series_info` fetch as
+  /// "up next", kept around so the episode picker (any episode, not just
+  /// the next one) doesn't need its own request.
+  SeriesInfo? _seriesInfo;
 
   /// Focus target for the up-next card's Play button - the player moves focus
   /// here the moment the card appears so the remote lands on it, not the
@@ -583,6 +588,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _upNextDismissed = false;
       _nextEpisode = null;
       _upNextSeries = null;
+      _seriesInfo = null;
       _resetCatchupTimeline(widget.args);
     });
 
@@ -991,6 +997,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (!mounted || !identical(args, widget.args)) return;
       setState(() {
         _upNextSeries = info.series;
+        _seriesInfo = info;
         _nextEpisode = nextEpisodeInSeries(
           info,
           seasonNumber: season,
@@ -1050,21 +1057,57 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _playNextEpisode() {
     final next = _nextEpisode;
-    final seriesId = widget.args.seriesId;
-    final onReplace = widget.onReplaceItem;
-    if (next == null || seriesId == null || onReplace == null) return;
+    if (next == null) return;
     // No startPosition: "up next" always begins the next episode from the
     // top, even if the viewer had previously sampled it. The in-place swap
     // path (_openPlayerDirect) doesn't consult the resume store, and that's
     // the intended behaviour here - not an oversight.
+    _playEpisode(next);
+  }
+
+  /// Swaps playback to any episode of the current series - shared by "up
+  /// next" (always the next episode) and the episode picker (any episode
+  /// the viewer chooses).
+  void _playEpisode(Episode episode) {
+    final seriesId = widget.args.seriesId;
+    final onReplace = widget.onReplaceItem;
+    if (seriesId == null || onReplace == null) return;
     final args = episodePlayerArgs(
-      episode: next,
+      episode: episode,
       seriesId: seriesId,
       seriesName:
           (widget.args.metadata['series_name'] as String?) ?? widget.args.title,
       series: _upNextSeries,
     );
     if (args != null) onReplace(args);
+  }
+
+  /// Opens the episode picker dialog for the current series, letting the
+  /// viewer jump directly to any episode without leaving playback.
+  void _showEpisodePicker() {
+    final info = _seriesInfo;
+    if (info == null) return;
+    final season =
+        widget.args.seasonNumber ??
+        widget.args.metadata['season_number'] as int?;
+    // Prefer the authoritative string id (set by `episodePlayerArgs`) over
+    // `streamId`, which is a lossy `int.tryParse` of that same id and can be
+    // null - stringifying a null `streamId` directly would otherwise send
+    // the literal text "null" in as the "current episode" to match against.
+    final currentEpisodeId =
+        (widget.args.metadata['episode_id'] as String?) ??
+        widget.args.streamId?.toString() ??
+        '';
+    _handleTrackDialogVisibilityChanged(true);
+    unawaited(
+      showEpisodePicker(
+        context,
+        info: info,
+        currentSeasonNumber: season,
+        currentEpisodeId: currentEpisodeId,
+        onSelect: _playEpisode,
+      ).whenComplete(() => _handleTrackDialogVisibilityChanged(false)),
+    );
   }
 
   /// The one active skip prompt (comskip or TheIntroDB — the two never
@@ -1267,6 +1310,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
           (_awaitingFirstFrame &&
               (_status == PlaybackStatus.ready ||
                   _status == PlaybackStatus.buffering)));
+
+  /// The item's art, shown full-bleed behind the loading indicator while a
+  /// VOD/series stream opens, so the screen doesn't sit on a flat black
+  /// background. Prefers the wide backdrop/fanart image (same art the
+  /// detail screens' hero uses) over the portrait poster, which `BoxFit
+  /// .cover` would otherwise have to crop in hard to fill a landscape
+  /// screen. Null for live/catchup, where there's no meaningful art (and
+  /// the channel logo badge already fills that role).
+  String? get _loadingBackdropUrl {
+    if (widget.args.type != 'vod' && widget.args.type != 'series') {
+      return null;
+    }
+    final metadata = widget.args.metadata;
+    return (metadata['backdrop_url'] as String?) ??
+        (metadata['poster_url'] as String?);
+  }
 
   void _startLoadingTimeout() {
     _loadingTimer?.cancel();
@@ -2164,6 +2223,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           : const ColoredBox(color: Colors.black),
                     ),
 
+                    // Poster backdrop behind the loading indicator (VOD/series).
+                    // Skipped on Android: `NativeVideoSurface` is already
+                    // mounted as a live Hybrid Composition `AndroidView` by
+                    // this point (`_videoSurfaceReady` flips true before
+                    // `_openSource` runs), and covering one with an opaque
+                    // Flutter overlay and later removing it does not
+                    // reliably restore its visibility - confirmed on a real
+                    // Pixel 7 during the EAC3 fallback work. Android gets the
+                    // same backdrop natively instead - a poster `ImageView`
+                    // living in the *same* native view as the `SurfaceView`
+                    // (see `PosterLoader.kt`/`Media3PlatformView.kt`/
+                    // `MpvPlayerPlatformView.kt`), which composites safely
+                    // where a Flutter-side overlay can't. Desktop/iOS/web
+                    // render through a `Texture`/html view, which doesn't
+                    // have this failure mode and so keeps this Flutter path.
+                    if (_showLoadingOverlay &&
+                        _loadingBackdropUrl != null &&
+                        !HostPlatform.isAndroid)
+                      Positioned.fill(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedBackdropImage(_loadingBackdropUrl!),
+                            const ColoredBox(color: Colors.black54),
+                          ],
+                        ),
+                      ),
+
                     // Loading indicator
                     if (_showLoadingOverlay)
                       Center(
@@ -2282,26 +2369,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 24),
-                              DpadFocusable(
+                              AppButton(
                                 focusNode: _errorButtonFocusNode,
-                                onSelect: _goBack,
-                                effects: const [
-                                  GradientBorderEffect(
-                                    borderRadius: BorderRadius.all(
-                                      Radius.circular(50),
-                                    ),
-                                  ),
-                                ],
-                                child: FilledButton.icon(
-                                  onPressed: _goBack,
-                                  icon: Icon(
-                                    Icons.arrow_back,
-                                    size: 24 * FontSizeScope.scaleOf(context),
-                                  ),
-                                  label: Text(
-                                    AppLocalizations.of(context).playerGoBack,
-                                  ),
-                                ),
+                                autofocus: true,
+                                icon: Icons.arrow_back,
+                                label: AppLocalizations.of(
+                                  context,
+                                ).playerGoBack,
+                                variant: AppButtonVariant.primary,
+                                onPressed: _goBack,
                               ),
                             ],
                           ),
@@ -2363,6 +2439,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             playPauseFocusNode: _controlsFocusNode,
                             onNextChannel: widget.onNextChannel,
                             onPreviousChannel: widget.onPreviousChannel,
+                            onEpisodePicker:
+                                _seriesInfo != null &&
+                                    pickableSeasons(_seriesInfo!).isNotEmpty
+                                ? _showEpisodePicker
+                                : null,
                             onRecordNow:
                                 (_isLive &&
                                     widget.onRecordProgram != null &&

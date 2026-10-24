@@ -39,6 +39,7 @@ class Media3PlatformView(context: Context, private val playerId: String, private
     private val container = FrameLayout(context)
     private val surfaceView = plugin.attachSurfaceView(playerId, context)
     private val subtitleView = plugin.attachSubtitleView(playerId, context)
+    private val posterView = plugin.attachPosterView(playerId, context)
 
     init {
         container.addView(
@@ -54,6 +55,13 @@ class Media3PlatformView(context: Context, private val playerId: String, private
             subtitleView,
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
         )
+        // Added last (topmost) so it covers both of the above while a
+        // stream loads - see `PosterLoader.kt`'s header comment for why
+        // this has to be a native view rather than a Flutter-side overlay.
+        container.addView(
+            posterView,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
+        )
     }
 
     override fun getView(): View = container
@@ -62,10 +70,11 @@ class Media3PlatformView(context: Context, private val playerId: String, private
     // Media3PlaybackPlugin.onMethodCall), which -- like the mpv/Apple
     // platform views -- must finish before Flutter unmounts this view
     // (PlaybackOrchestrator awaits PlatformViewProvider.releaseNativeView()
-    // first). Only detach the surface/subtitle references here so a later
-    // `load` for this playerId doesn't race against a torn-down view.
+    // first). Only detach the surface/subtitle/poster references here so a
+    // later `load` for this playerId doesn't race against a torn-down view.
     override fun dispose() {
         plugin.detachSurfaceView(playerId, surfaceView)
         plugin.detachSubtitleView(playerId, subtitleView)
+        plugin.detachPosterView(playerId, posterView)
     }
 }

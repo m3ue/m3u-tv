@@ -173,7 +173,9 @@
   "playerClearProgress": "Effacer la progression",
   "playerProgressCleared": "Progression effacée",
   "playerSkipPreviousTooltip": "Chaîne précédente",
-  "playerSkipNextTooltip": "Chaîne suivante",  "playerNowPlayingMovie": "Film",
+  "playerSkipNextTooltip": "Chaîne suivante",
+  "playerEpisodesTooltip": "Épisodes",
+  "playerEpisodePickerTitle": "Épisodes",  "playerNowPlayingMovie": "Film",
   "playerNowPlayingSeries": "Série",
   "playerNowPlayingSeasonEpisode": "S{season} · É{episode}",
   "@playerNowPlayingSeasonEpisode": {
@@ -533,6 +535,7 @@
   "vodPlayMovie": "Lire le film",
   "vodContinueMovie": "Continuer le film",
   "vodCast": "Casting",
+  "vodDirector": "Réalisateur",
   "castShowAll": "Voir tout le casting",
   "vodTimeLeftMinutes": "{minutes, plural, =1{Il reste 1 min} other{Il reste {minutes} min}}",
   "@vodTimeLeftMinutes": {

@@ -10,6 +10,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import dev.sparkison.tv.DeviceMemoryClass
 import dev.sparkison.tv.FrameRateManager
+import dev.sparkison.tv.PosterOverlay
 import dev.sparkison.tv.libmpv.EndFileReason
 import dev.sparkison.tv.libmpv.LogLevel
 import dev.sparkison.tv.libmpv.MpvEvent
@@ -110,6 +111,14 @@ class MpvPlayerCore(
     private var matchDisplayRefreshRate: Boolean = false
 
     val surfaceView: SurfaceView = SurfaceView(context)
+
+    // Runs the poster's async bitmap fetch on Main - [scope] above is
+    // confined to a single IO thread and must never touch Views directly.
+    // See `PosterLoader.kt`'s header comment for why this exists at all.
+    val posterOverlay: PosterOverlay = PosterOverlay(
+        context,
+        CoroutineScope(SupervisorJob() + Dispatchers.Main),
+    )
 
     init {
         // A plain SurfaceView punches a hole and composites *underneath* its
@@ -276,6 +285,7 @@ class MpvPlayerCore(
         headers: Map<String, String>?,
         externalSubtitles: List<Triple<String, String?, String?>>,
         matchDisplayRefreshRate: Boolean = false,
+        posterUrl: String? = null,
     ) {
         scope.launch {
             mutex.withLock {
@@ -284,6 +294,7 @@ class MpvPlayerCore(
                 lastErrorLogText = null
                 lastAppliedFps = 0.0
                 reportedMissingFps = false
+                mainHandler.post { posterOverlay.show(posterUrl) }
                 // Written here, not synchronously in load()'s caller-thread
                 // body, so it's only ever touched from this single-threaded
                 // scope -- same invariant [readyEmitted]/[lastErrorLogText] rely on.
@@ -427,6 +438,7 @@ class MpvPlayerCore(
      * visible restore-then-reswitch flicker. See [FrameRateManager]'s class doc.
      */
     fun dispose(preserveDisplayMode: Boolean = false, onComplete: () -> Unit) {
+        mainHandler.post { posterOverlay.hide() }
         scope.launch {
             mutex.withLock {
                 if (disposed) {
@@ -477,7 +489,13 @@ class MpvPlayerCore(
                         applyFrameRateFromContainer(player)
                     }
                     is MpvEvent.PlaybackRestart -> {
-                        if (readyEmitted) emit("PLAYBACK_RESTART", snapshot(player, includeTracks = false))
+                        if (readyEmitted) {
+                            emit("PLAYBACK_RESTART", snapshot(player, includeTracks = false))
+                            // Matches the Dart side's own `_awaitingFirstFrame`
+                            // gating, which also treats mpv's PLAYBACK_RESTART
+                            // as the first real frame (see player_screen.dart).
+                            mainHandler.post { posterOverlay.hide() }
+                        }
                     }
                     is MpvEvent.VideoReconfig -> {
                         if (readyEmitted) {

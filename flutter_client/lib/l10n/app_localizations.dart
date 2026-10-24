@@ -746,6 +746,18 @@ abstract class AppLocalizations {
   /// **'Next channel'**
   String get playerSkipNextTooltip;
 
+  /// No description provided for @playerEpisodesTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Episodes'**
+  String get playerEpisodesTooltip;
+
+  /// No description provided for @playerEpisodePickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Episodes'**
+  String get playerEpisodePickerTitle;
+
   /// No description provided for @playerNowPlayingMovie.
   ///
   /// In en, this message translates to:
@@ -2005,6 +2017,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cast'**
   String get vodCast;
+
+  /// No description provided for @vodDirector.
+  ///
+  /// In en, this message translates to:
+  /// **'Director'**
+  String get vodDirector;
 
   /// No description provided for @castShowAll.
   ///

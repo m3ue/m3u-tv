@@ -373,6 +373,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerSkipNextTooltip => 'Canal siguiente';
 
   @override
+  String get playerEpisodesTooltip => 'Episodios';
+
+  @override
+  String get playerEpisodePickerTitle => 'Episodios';
+
+  @override
   String get playerNowPlayingMovie => 'Película';
 
   @override
@@ -1099,6 +1105,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vodCast => 'Reparto';
+
+  @override
+  String get vodDirector => 'Director';
 
   @override
   String get castShowAll => 'Ver todo el reparto';

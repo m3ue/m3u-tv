@@ -364,6 +364,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerSkipNextTooltip => '下一个频道';
 
   @override
+  String get playerEpisodesTooltip => '剧集';
+
+  @override
+  String get playerEpisodePickerTitle => '剧集';
+
+  @override
   String get playerNowPlayingMovie => '电影';
 
   @override
@@ -1053,6 +1059,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vodCast => '演员阵容';
+
+  @override
+  String get vodDirector => '导演';
 
   @override
   String get castShowAll => '查看全部演员';

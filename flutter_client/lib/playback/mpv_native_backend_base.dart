@@ -97,6 +97,15 @@ abstract class MpvNativeBackendBase
         // Read only by the Android mpv core (FrameRateManager) -- inert on
         // iOS/macOS, whose mpv plugins don't read this key.
         'matchRefreshRate': source.matchDisplayRefreshRate,
+        // Read only by the Android mpv core's native poster overlay (see
+        // `PosterLoader.kt`) -- inert on iOS/macOS/web, whose mpv/video
+        // plugins render through a Texture and get the backdrop from
+        // Flutter's own loading overlay instead (player_screen.dart).
+        // Prefers the wide backdrop over the portrait poster, same order as
+        // that Flutter overlay.
+        'posterUrl':
+            (source.metadata['backdrop_url'] as String?) ??
+            (source.metadata['poster_url'] as String?),
         // Read by the Apple mpv cores; the Android core ignores it.
         'deinterlace': source.deinterlace,
         // Read by the Apple mpv cores; the Android core ignores it.

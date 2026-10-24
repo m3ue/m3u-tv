@@ -124,6 +124,7 @@ class MpvPlayerPlugin(
                         headers = headers,
                         externalSubtitles = parseExternalSubtitles(args["externalSubtitles"]),
                         matchDisplayRefreshRate = args["matchRefreshRate"] as? Boolean ?: false,
+                        posterUrl = args["posterUrl"] as? String,
                     )
                     result.success(mapOf("ok" to true))
                 }
