@@ -294,7 +294,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // kept from reappearing (_showOverlay below) for the duration.
   bool _isInPictureInPicture = false;
   static const _pipChannel = MethodChannel('m3u_tv/system_ui');
-  int _pipTransitionGeneration = 0;
 
   // Owns the outer Focus so we can steal focus from the content area when
   // the player opens, and reclaim it whenever the overlay hides.
@@ -1990,23 +1989,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else {
       _showOverlay();
     }
-    unawaited(_rideOutPipTransition());
-  }
-
-  // Exynos hardware decoders have been observed to wedge (video frozen,
-  // audio still playing) when the window resize that enters/exits PiP tears
-  // down and recreates the surface mid-decode. Pausing across the
-  // transition and resuming once it settles keeps the decoder from being
-  // fed through that window at all. No-op if playback was already paused,
-  // and a later PiP transition starting mid-wait cancels this one's resume
-  // rather than fighting over play state.
-  Future<void> _rideOutPipTransition() async {
-    if (!_isPlaying) return;
-    final generation = ++_pipTransitionGeneration;
-    unawaited(widget.orchestrator.pause());
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (!mounted || generation != _pipTransitionGeneration) return;
-    unawaited(widget.orchestrator.play());
   }
 
   void _showOverlay() {

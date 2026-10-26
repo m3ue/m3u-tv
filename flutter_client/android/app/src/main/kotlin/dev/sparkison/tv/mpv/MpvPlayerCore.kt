@@ -91,6 +91,20 @@ class MpvPlayerCore(
     private var readyEmitted = false
     private var disposed = false
 
+    // Surface lifecycle -- see MpvPlaceholderSurface's class doc for why a
+    // placeholder exists at all, and this class's own `surfaceCreated`/
+    // `surfaceDestroyed`/[refreshVideoOutput]/[handoffDestroyedSurface] for
+    // how it's used. All read/written only while holding [mutex], except
+    // [pendingSurface] and [videoOutputEpoch] -- both written from the
+    // SurfaceHolder.Callback (main thread) and read from inside a
+    // mutex-held block on [scope]'s IO thread, hence @Volatile.
+    private var placeholder: MpvPlaceholderSurface? = null
+    private var placeholderSurface: Surface? = null
+    @Volatile private var pendingSurface: Surface? = null
+    private var attachedSurface: Surface? = null
+    private var hasAttachedSurface = false
+    @Volatile private var videoOutputEpoch = 0L
+
     // The last error-level line mpv logged for the current file, reported with
     // a failed end-file: it names the actual failure (ffmpeg's "HTTP error
     // 404", "No format found, try lowering probescore or forcing the
@@ -136,15 +150,43 @@ class MpvPlayerCore(
         surfaceView.setZOrderMediaOverlay(true)
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
-                attachSurface(holder.surface)
+                pendingSurface = holder.surface.takeIf { it.isValid }
+                videoOutputEpoch++
+                refreshVideoOutput("surfaceCreated")
             }
 
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                detachSurface()
+                pendingSurface = null
+                handoffDestroyedSurface("surfaceDestroyed")
             }
         })
+
+        // Created once per core and kept for its whole life (closed in
+        // [dispose]) -- see MpvPlaceholderSurface's class doc for why.
+        scope.launch {
+            val created = try {
+                MpvPlaceholderSurface.create()
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to create MPV placeholder surface", error)
+                null
+            }
+            mutex.withLock {
+                if (disposed || created == null) {
+                    created?.close()
+                    return@withLock
+                }
+                placeholder = created
+                placeholderSurface = created.surface
+            }
+            // No-op (under the lock, [refreshVideoOutput] checks whether
+            // anything actually needs attaching) unless nothing has claimed
+            // the output yet -- the real surface may already have attached,
+            // or been destroyed and handed off to this same placeholder,
+            // before this finished.
+            refreshVideoOutput("placeholderReady")
+        }
     }
 
     /** Creates and initializes the mpv handle. Must be called once, before [load]. */
@@ -236,8 +278,21 @@ class MpvPlayerCore(
                     }
                     player = created
                     collectEvents(created)
-                    if (surfaceView.holder.surface?.isValid == true) {
-                        attachSurfaceLocked(created, surfaceView.holder.surface)
+                    // Already holds [mutex] here (can't call through
+                    // [refreshVideoOutput], which acquires it itself) --
+                    // same candidate-then-placeholder fallback, applied
+                    // directly.
+                    val surface = currentCandidateSurface()
+                        ?: surfaceView.holder.surface?.takeIf { it.isValid }
+                        ?: placeholderSurface
+                    if (surface != null) {
+                        try {
+                            created.attachSurface(surface)
+                            attachedSurface = surface
+                            hasAttachedSurface = true
+                        } catch (error: Exception) {
+                            emitError("attachSurface failed (initialize): ${error.message}", "android-mpv-error")
+                        }
                     }
                     onResult(true)
                 } catch (error: Exception) {
@@ -248,52 +303,92 @@ class MpvPlayerCore(
         }
     }
 
-    private fun attachSurface(surface: Surface) {
+    // Only [pendingSurface] (not yet handed to mpv, just the latest one the
+    // callback thread has seen) -- never [placeholderSurface], which
+    // [refreshVideoOutput]/[handoffDestroyedSurface] fall back to themselves
+    // when this is null or invalid.
+    private fun currentCandidateSurface(): Surface? = pendingSurface?.takeIf { it.isValid }
+
+    /**
+     * Attaches whichever of [currentCandidateSurface] or [placeholderSurface]
+     * mpv should be showing right now, unless a newer call already
+     * superseded [refreshEpoch] (a destroy, or another surfaceCreated,
+     * arrived before this one's turn on [scope]'s single-threaded queue) --
+     * without this check, a resize that fires several rapid
+     * destroy/create cycles (observed during a picture-in-picture window
+     * transition) would run every intermediate attach in full, each one a
+     * real mpv `wid` reassignment (a full VO + decoder reinit, not a cheap
+     * swap -- see MpvPlaceholderSurface's class doc), instead of collapsing
+     * straight to the last one.
+     */
+    private fun refreshVideoOutput(reason: String) {
+        val refreshEpoch = videoOutputEpoch
         scope.launch {
             mutex.withLock {
+                if (disposed || refreshEpoch != videoOutputEpoch) return@withLock
                 val current = player ?: return@withLock
-                attachSurfaceLocked(current, surface)
+                val surface = currentCandidateSurface() ?: placeholderSurface ?: return@withLock
+                if (hasAttachedSurface && attachedSurface === surface) return@withLock
+                try {
+                    current.attachSurface(surface)
+                    attachedSurface = surface
+                    hasAttachedSurface = true
+                } catch (error: Exception) {
+                    emitError("attachSurface failed ($reason): ${error.message}", "android-mpv-error")
+                }
             }
         }
     }
 
-    private fun attachSurfaceLocked(player: MpvPlayer, surface: Surface) {
-        try {
-            player.attachSurface(surface)
-        } catch (error: Exception) {
-            emitError("attachSurface failed: ${error.message}", "android-mpv-error")
-        }
-    }
-
-    private fun detachSurface() {
-        // SurfaceHolder.Callback#surfaceDestroyed must not return before mpv
-        // has released its native reference to this surface -- Android frees
-        // the underlying buffer queue the instant this call returns, so
-        // detaching via a bare scope.launch (which returns immediately,
-        // leaving the actual nativeDetachSurface call to run later on the
-        // IO-dispatcher queue) raced the real destruction. A rapid
-        // destroy/create cycle (e.g. entering/leaving picture-in-picture
-        // resizes the window, tearing down and recreating every SurfaceView)
-        // could then land mpv's GL renderer on an already-dead surface with
-        // nothing to signal it: audio kept playing, but video stayed frozen
-        // until a full reload. Blocking the caller (ported from Plezy's
-        // mpv/MpvPlayerCore.kt surface-retirement handling, which documents
-        // the same contract) closes that race; the bounded wait keeps a
-        // wedged write queue from hanging the UI thread forever.
+    /**
+     * SurfaceHolder.Callback#surfaceDestroyed must not return before mpv has
+     * released its native reference to this surface -- Android frees the
+     * underlying buffer queue the instant this call returns. Handing off to
+     * [placeholderSurface] (rather than detaching to nothing, as this used
+     * to) keeps mpv's decoder fed for however long the real surface stays
+     * away: with no surface at all, its finite output-buffer pool fills up
+     * and the hardware decoder itself stalls waiting for one to free up --
+     * observed on real hardware as a frozen picture (audio unaffected) that
+     * doesn't recover even once a real surface reattaches, because by then
+     * the decoder session is wedged, not just the display path. Blocking
+     * the caller for the handoff (bounded by [SURFACE_HANDOFF_TIMEOUT_MS] so
+     * a wedged write queue can't hang the UI thread forever) and the
+     * [videoOutputEpoch] check both ported from Plezy's mpv/MpvPlayerCore.kt
+     * surface-retirement handling, which documents the same contract and
+     * hazard; this core's simpler single-surface setup doesn't need the
+     * fuller epoch/placeholder machinery backing its OSD plane and GPU
+     * VO-target switching.
+     */
+    private fun handoffDestroyedSurface(reason: String) {
+        videoOutputEpoch++
+        val epoch = videoOutputEpoch
         val latch = CountDownLatch(1)
         scope.launch {
             mutex.withLock {
-                val current = player
                 try {
-                    current?.detachSurface()
-                } catch (_: Exception) {
-                    // Surface already gone -- nothing to detach.
+                    if (disposed || epoch != videoOutputEpoch) return@withLock
+                    val current = player ?: return@withLock
+                    val target = placeholderSurface ?: return@withLock
+                    if (hasAttachedSurface && attachedSurface === target) return@withLock
+                    try {
+                        current.attachSurface(target)
+                        attachedSurface = target
+                        hasAttachedSurface = true
+                    } catch (error: Exception) {
+                        emitError("attachSurface failed ($reason): ${error.message}", "android-mpv-error")
+                    }
                 } finally {
                     latch.countDown()
                 }
             }
         }
-        latch.await(500, TimeUnit.MILLISECONDS)
+        try {
+            if (!latch.await(SURFACE_HANDOFF_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "Surface handoff ($reason) unacknowledged after ${SURFACE_HANDOFF_TIMEOUT_MS}ms")
+            }
+        } catch (error: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     fun load(
@@ -483,6 +578,11 @@ class MpvPlayerCore(
                 } catch (_: Exception) {
                     // Already closed/closing.
                 }
+                hasAttachedSurface = false
+                attachedSurface = null
+                placeholder?.close()
+                placeholder = null
+                placeholderSurface = null
                 onComplete()
             }
         }
@@ -672,6 +772,14 @@ class MpvPlayerCore(
 
     companion object {
         private const val TAG = "MpvPlayerCore"
+
+        // How long surfaceDestroyed blocks waiting for the queued handoff to
+        // the placeholder to actually run -- ported from Plezy's own tuned
+        // value (mpv/MpvPlayerCore.kt's SURFACE_HANDOFF_TIMEOUT_MS). Past
+        // this, Android reclaims the surface regardless of what mpv is
+        // doing with it; the handoff itself stays queued and completes
+        // whenever the write queue gets to it.
+        private const val SURFACE_HANDOFF_TIMEOUT_MS = 2_000L
 
         // libass matches a subtitle's requested font against the name-table
         // family of every file it finds in sub-fonts-dir -- this has to be
