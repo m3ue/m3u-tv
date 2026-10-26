@@ -17,6 +17,8 @@ import dev.sparkison.tv.libmpv.MpvEvent
 import dev.sparkison.tv.libmpv.MpvException
 import dev.sparkison.tv.libmpv.MpvPlayer
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -264,16 +266,34 @@ class MpvPlayerCore(
     }
 
     private fun detachSurface() {
+        // SurfaceHolder.Callback#surfaceDestroyed must not return before mpv
+        // has released its native reference to this surface -- Android frees
+        // the underlying buffer queue the instant this call returns, so
+        // detaching via a bare scope.launch (which returns immediately,
+        // leaving the actual nativeDetachSurface call to run later on the
+        // IO-dispatcher queue) raced the real destruction. A rapid
+        // destroy/create cycle (e.g. entering/leaving picture-in-picture
+        // resizes the window, tearing down and recreating every SurfaceView)
+        // could then land mpv's GL renderer on an already-dead surface with
+        // nothing to signal it: audio kept playing, but video stayed frozen
+        // until a full reload. Blocking the caller (ported from Plezy's
+        // mpv/MpvPlayerCore.kt surface-retirement handling, which documents
+        // the same contract) closes that race; the bounded wait keeps a
+        // wedged write queue from hanging the UI thread forever.
+        val latch = CountDownLatch(1)
         scope.launch {
             mutex.withLock {
-                val current = player ?: return@withLock
+                val current = player
                 try {
-                    current.detachSurface()
+                    current?.detachSurface()
                 } catch (_: Exception) {
                     // Surface already gone -- nothing to detach.
+                } finally {
+                    latch.countDown()
                 }
             }
         }
+        latch.await(500, TimeUnit.MILLISECONDS)
     }
 
     fun load(

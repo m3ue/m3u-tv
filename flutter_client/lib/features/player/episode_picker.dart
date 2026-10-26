@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:m3u_tv/features/player/playback_controls.dart'
+    show isHandheldLayout;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -46,16 +50,31 @@ Future<void> showEpisodePicker(
       ? currentSeasonNumber!
       : seasons.first.number;
 
+  final isHandheld = isHandheldLayout(context);
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  // TV/desktop: Material's default modal-bottom-sheet width cap (~640dp)
+  // read as cramped on a wide TV screen - widen it well past that, still
+  // leaving side margins rather than spanning edge to edge. Phones/tablets
+  // keep the unconstrained default (full width), which is how a bottom
+  // sheet reads best there - same as `SeasonPicker`'s own phone sheet.
+  final constraints = isHandheld
+      ? null
+      : BoxConstraints(
+          maxWidth: math.min(screenWidth * 0.62, screenWidth - 48),
+        );
+
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
+    constraints: constraints,
     builder: (sheetContext) => SafeArea(
       child: _EpisodePickerSheet(
         info: info,
         seasons: seasons,
         initialSeason: initialSeason,
         currentEpisodeId: currentEpisodeId,
+        isHandheld: isHandheld,
         onSelect: (episode) {
           Navigator.of(sheetContext).pop();
           onSelect(episode);
@@ -71,6 +90,7 @@ class _EpisodePickerSheet extends StatefulWidget {
     required this.seasons,
     required this.initialSeason,
     required this.currentEpisodeId,
+    required this.isHandheld,
     required this.onSelect,
   });
 
@@ -78,6 +98,7 @@ class _EpisodePickerSheet extends StatefulWidget {
   final List<Season> seasons;
   final int initialSeason;
   final String currentEpisodeId;
+  final bool isHandheld;
   final ValueChanged<Episode> onSelect;
 
   @override
@@ -245,6 +266,7 @@ class _EpisodePickerSheetState extends State<_EpisodePickerSheet> {
                   return _EpisodeTile(
                     episode: episode,
                     isCurrent: isCurrent,
+                    isHandheld: widget.isHandheld,
                     // The current episode's focus is driven explicitly by
                     // `_focusCurrentEpisode` (via its own FocusNode) so it
                     // doesn't race a plain `autofocus: true` here - only
@@ -268,6 +290,7 @@ class _EpisodeTile extends StatelessWidget {
   const _EpisodeTile({
     required this.episode,
     required this.isCurrent,
+    required this.isHandheld,
     required this.autofocus,
     required this.onTap,
     this.focusNode,
@@ -275,6 +298,7 @@ class _EpisodeTile extends StatelessWidget {
 
   final Episode episode;
   final bool isCurrent;
+  final bool isHandheld;
   final bool autofocus;
   final VoidCallback onTap;
   final FocusNode? focusNode;
@@ -284,7 +308,10 @@ class _EpisodeTile extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final scale = FontSizeScope.scaleOf(context);
-    final thumbWidth = 96 * scale;
+    // Smaller on phones/tablets - leaves enough room for the title/plot
+    // text next to it instead of squeezing both into a narrow screen,
+    // especially at a larger display-size setting.
+    final thumbWidth = (isHandheld ? 72 : 96) * scale;
     final thumbHeight = thumbWidth * 9 / 16;
     final plot = episode.plot?.trim();
 

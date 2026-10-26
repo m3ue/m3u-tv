@@ -1,6 +1,7 @@
 package dev.sparkison.tv
 
 import android.app.ActivityManager
+import android.app.PictureInPictureParams
 import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -11,6 +12,7 @@ import android.os.Bundle
 import android.os.Process
 import android.util.DisplayMetrics
 import android.util.Log
+import android.util.Rational
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -33,6 +35,10 @@ class MainActivity : FlutterActivity() {
     private var systemUiChannel: MethodChannel? = null
     private var textInputChannel: MethodChannel? = null
     private var nativeLogChannel: NativeLogChannel? = null
+
+    // Mirrors the Dart-side player route (set via applySystemUiPolicy) so
+    // onUserLeaveHint knows whether leaving the app should enter PiP.
+    private var isPlayerRouteActive = false
 
     // Set from Dart (TextInputReportingBinding) while a Flutter text field
     // holds the text input connection; read by TextEditorProxyView.
@@ -77,6 +83,11 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Applied again per-route once Dart boots (applySystemUiPolicy), but
+        // decorFitsSystemWindows must be set before the first frame too, or
+        // Android 15's mandatory edge-to-edge enforcement letterboxes the
+        // launch theme behind the (still opaque) system bars for one frame.
+        applySystemUiPolicy("browsing")
         if (isTelevisionDevice()) installTextEditorProxy()
     }
 
@@ -215,12 +226,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun applySystemUiPolicy(route: String) {
+        isPlayerRouteActive = route == "player"
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isStatusBarContrastEnforced = false
-            window.isNavigationBarContrastEnforced = false
+        // Android 15+ (API 35) enforces edge-to-edge unconditionally and
+        // deprecates these setters/flags in favor of just leaving the system
+        // bars to draw over content; only needed below that for a transparent
+        // bar instead of the platform's default scrim.
+        if (Build.VERSION.SDK_INT < 35) {
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
         }
 
         val insetsController = WindowInsetsControllerCompat(window, window.decorView)
@@ -233,6 +251,35 @@ class MainActivity : FlutterActivity() {
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
             insetsController.show(systemBars)
         }
+    }
+
+    // Leaving the app (Home/recents/back-to-launcher) while a video is open
+    // drops into PiP instead of stopping playback. Not called on TV launcher
+    // navigation triggered by the remote's dedicated Home key in the same
+    // way as touch devices, but still fires for back/recents there.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!isPlayerRouteActive) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .build()
+        try {
+            enterPictureInPictureMode(params)
+        } catch (e: IllegalStateException) {
+            // Device/OEM refused (e.g. already in a transition) -- fall
+            // through to the normal background/stop behavior.
+            Log.w(TAG, "enterPictureInPictureMode failed", e)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        systemUiChannel?.invokeMethod("pipModeChanged", isInPictureInPictureMode)
     }
 
     /// Hardware signals the Dart-side [DevicePerformance] uses to pick the

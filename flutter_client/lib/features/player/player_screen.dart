@@ -288,6 +288,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _trackDialogVisible = false;
   bool _dvrSchedulePending = false;
 
+  // Android system Picture-in-Picture (entered via MainActivity's
+  // onUserLeaveHint while this screen is the active route). The transport
+  // controls are unusable at PiP's tiny window size, so they're hidden and
+  // kept from reappearing (_showOverlay below) for the duration.
+  bool _isInPictureInPicture = false;
+  static const _pipChannel = MethodChannel('m3u_tv/system_ui');
+  int _pipTransitionGeneration = 0;
+
   // Owns the outer Focus so we can steal focus from the content area when
   // the player opens, and reclaim it whenever the overlay hides.
   final FocusNode _screenFocusNode = FocusNode();
@@ -398,6 +406,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.wakelockController.enable());
     widget.backController?._handler = _handleBack;
     DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
+    if (HostPlatform.isAndroid) {
+      _pipChannel.setMethodCallHandler(_handlePipChannelCall);
+    }
     if (widget.isHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([
@@ -1187,6 +1198,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (fullscreen?.deferEscape == _defersFullscreenEscape) {
       fullscreen!.deferEscape = null;
     }
+    if (HostPlatform.isAndroid) {
+      _pipChannel.setMethodCallHandler(null);
+    }
     if (widget.isHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
@@ -1966,7 +1980,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.activeVolumeProvider?.setVolume(volume));
   }
 
+  Future<void> _handlePipChannelCall(MethodCall call) async {
+    if (call.method != 'pipModeChanged') return;
+    final isInPip = call.arguments as bool;
+    if (!mounted) return;
+    setState(() => _isInPictureInPicture = isInPip);
+    if (isInPip) {
+      _hideOverlay();
+    } else {
+      _showOverlay();
+    }
+    unawaited(_rideOutPipTransition());
+  }
+
+  // Exynos hardware decoders have been observed to wedge (video frozen,
+  // audio still playing) when the window resize that enters/exits PiP tears
+  // down and recreates the surface mid-decode. Pausing across the
+  // transition and resuming once it settles keeps the decoder from being
+  // fed through that window at all. No-op if playback was already paused,
+  // and a later PiP transition starting mid-wait cancels this one's resume
+  // rather than fighting over play state.
+  Future<void> _rideOutPipTransition() async {
+    if (!_isPlaying) return;
+    final generation = ++_pipTransitionGeneration;
+    unawaited(widget.orchestrator.pause());
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!mounted || generation != _pipTransitionGeneration) return;
+    unawaited(widget.orchestrator.play());
+  }
+
   void _showOverlay() {
+    // Transport controls are unusable at PiP's tiny window size.
+    if (_isInPictureInPicture) return;
     // No extra intro-db handling needed here — `_introDbPromptVisible` is
     // derived from `_overlayVisible`, so this setState alone re-shows the
     // prompt (without restarting its countdown) if one is still pending.

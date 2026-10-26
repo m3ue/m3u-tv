@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/episode_picker.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 Episode _ep(int season, int number) => Episode(
   id: '${season}0$number',
@@ -30,21 +32,25 @@ Future<void> _pumpPicker(
   int? currentSeasonNumber,
   required String currentEpisodeId,
   required ValueChanged<Episode> onSelect,
+  AppFontSize fontSize = AppFontSize.normal,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Builder(
-        builder: (context) => ElevatedButton(
-          onPressed: () => showEpisodePicker(
-            context,
-            info: info,
-            currentSeasonNumber: currentSeasonNumber,
-            currentEpisodeId: currentEpisodeId,
-            onSelect: onSelect,
+      home: FontSizeScope(
+        fontSize: fontSize,
+        child: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => showEpisodePicker(
+              context,
+              info: info,
+              currentSeasonNumber: currentSeasonNumber,
+              currentEpisodeId: currentEpisodeId,
+              onSelect: onSelect,
+            ),
+            child: const Text('Open'),
           ),
-          child: const Text('Open'),
         ),
       ),
     ),
@@ -285,5 +291,66 @@ void main() {
 
       expect(pickableSeasons(info), isEmpty);
     });
+  });
+
+  group('responsive width', () {
+    testWidgets('widens the sheet on TV/desktop beyond the Material default', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await _pumpPicker(
+        tester,
+        info: _info(),
+        currentSeasonNumber: 1,
+        currentEpisodeId: '101',
+        onSelect: (_) {},
+      );
+
+      final width = tester.getSize(find.byType(SafeArea)).width;
+      expect(width, closeTo(1920 * 0.62, 1.0));
+    });
+
+    testWidgets('spans full width on a phone instead of being capped', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await _pumpPicker(
+        tester,
+        info: _info(),
+        currentSeasonNumber: 1,
+        currentEpisodeId: '101',
+        onSelect: (_) {},
+      );
+
+      final width = tester.getSize(find.byType(SafeArea)).width;
+      expect(width, 360);
+    });
+
+    testWidgets(
+      'does not overflow on a narrow phone at the largest display scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await _pumpPicker(
+          tester,
+          info: _info(),
+          currentSeasonNumber: 1,
+          currentEpisodeId: '101',
+          onSelect: (_) {},
+          fontSize: AppFontSize.veryLarge,
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('S1E1 Title'), findsOneWidget);
+      },
+    );
   });
 }
