@@ -126,6 +126,13 @@ class MpvPlayerCore(
     // Android toggle, `matchContentFrameRate`, default off).
     private var matchDisplayRefreshRate: Boolean = false
 
+    // HDR GL surface -- see [applyHdrSurfaceIfNeeded]. User-facing toggle
+    // (mirrored from the app's HDR setting via [setHdrEnabled], default on);
+    // whether this core has already engaged a BT.2020 PQ surface, which is
+    // sticky for the core's whole life once true (see that function's doc).
+    private var hdrUserEnabled: Boolean = true
+    private var hdrSurfaceEngaged: Boolean = false
+
     val surfaceView: SurfaceView = SurfaceView(context)
 
     // Runs the poster's async bitmap fetch on Main - [scope] above is
@@ -621,6 +628,7 @@ class MpvPlayerCore(
                         if (readyEmitted) {
                             emit("VIDEO_RECONFIG", snapshot(player, includeTracks = false))
                             applyFrameRateFromContainer(player)
+                            applyHdrSurfaceIfNeeded(player)
                         }
                     }
                     is MpvEvent.AudioReconfig, is MpvEvent.Seek, is MpvEvent.QueueOverflow, is MpvEvent.Other -> {
@@ -674,6 +682,62 @@ class MpvPlayerCore(
         if (fps == lastAppliedFps) return
         lastAppliedFps = fps
         mainHandler.post { frameRateManager.applyForFrameRate(fps, "mpv container-fps") }
+    }
+
+    /**
+     * Engages a real BT.2020 PQ GL surface for HDR10/HLG content, instead of
+     * `vo=gpu`'s default software tone-map to SDR, the first time this core
+     * sees HDR video -- called alongside [applyFrameRateFromContainer] on
+     * every VIDEO_RECONFIG, which is mpv's own signal that `video-params` is
+     * worth reading again.
+     *
+     * Deliberately not latched to "once, before any file opens" the way the
+     * Plezy player this is ported from docs its own identical property
+     * writes (`mpv/MpvPlayerCore.kt`'s `applyContentColorTransfer`): that
+     * core is one mostly-single-title-per-core VOD/Series client, so
+     * deciding up front from server metadata is enough. This app reuses one
+     * core across many channel zaps/episodes within a session, often mixing
+     * SDR and HDR sources, and (unlike Plezy) has no reliable per-stream
+     * color-metadata from the server to decide with ahead of time -- so
+     * instead this reacts to mpv's own decoded `video-params` and engages
+     * the PQ surface the first time it actually sees HDR, then leaves it
+     * engaged (a PQ-capable surface still displays SDR content correctly,
+     * same as the Plezy core's own comment on this notes) rather than
+     * switching back and forth. That one switch is still a real mpv `wid`
+     * rebuild -- safe now that [handoffDestroyedSurface]'s placeholder keeps
+     * the decoder fed through it, but not free, hence only ever doing it
+     * once per core.
+     */
+    private suspend fun applyHdrSurfaceIfNeeded(player: MpvPlayer) {
+        if (hdrSurfaceEngaged || !hdrUserEnabled) return
+        if (!DisplayHdrCaps.supportsHdr(context)) return
+        val gamma = runCatching { player.getString("video-params/gamma") }.getOrNull()
+        if (gamma != "pq" && gamma != "hlg") return
+        val outputFormat = EglHdrCaps.pqOutputFormat() ?: return
+        try {
+            player.setProperty("android-surface-colorspace", "bt2020-pq")
+            player.setProperty("egl-output-format", outputFormat)
+            player.setProperty("target-trc", "pq")
+            player.setProperty("target-prim", "bt.2020")
+            hdrSurfaceEngaged = true
+            mainHandler.post { frameRateManager.log("mpv: HDR GL surface engaged ($gamma, $outputFormat)") }
+        } catch (error: MpvException) {
+            // Best-effort upgrade: a libmpv build missing one of these keeps
+            // the default sRGB surface and tone-maps HDR as it always did.
+            Log.w(TAG, "HDR GL surface not applied: ${error.message}")
+        }
+    }
+
+    /** Mirrors the app's HDR setting; see [applyHdrSurfaceIfNeeded]. */
+    fun setHdrEnabled(enabled: Boolean) {
+        // Written here, not synchronously on the caller's thread, so it's
+        // only ever touched from this single-threaded scope -- same
+        // invariant [matchDisplayRefreshRate] relies on in [load].
+        scope.launch {
+            mutex.withLock {
+                hdrUserEnabled = enabled
+            }
+        }
     }
 
     private suspend fun snapshot(player: MpvPlayer, includeTracks: Boolean): Map<String, Any?> {

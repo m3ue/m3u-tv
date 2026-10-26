@@ -53,15 +53,18 @@ int _nextViewId = 0;
 /// Shares its load/play/pause/stop/dispose/event-reduction state machine
 /// with the other native mpv backends via `MpvNativeBackendBase`.
 class AndroidMpvBackend extends MpvNativeBackendBase
-    implements PlatformViewProvider {
+    implements PlatformViewProvider, HdrToggleProvider {
   AndroidMpvBackend({MethodChannel? channel, EventChannel? eventChannel})
-    : super(
+    : _channel = channel ?? const MethodChannel(_methodChannelName),
+      super(
         viewId: _nextViewId++,
         channel: channel ?? const MethodChannel(_methodChannelName),
         events: _mpvEvents(
           eventChannel ?? const EventChannel(_eventChannelName),
         ),
       );
+
+  final MethodChannel _channel;
 
   static const String _methodChannelName = 'm3u_tv/android_mpv';
   static const String _eventChannelName = 'm3u_tv/android_mpv/events';
@@ -86,4 +89,16 @@ class AndroidMpvBackend extends MpvNativeBackendBase
 
   @override
   String get endedBeforeReadyCode => 'android-mpv-ended-before-ready';
+
+  // Engages a real BT.2020 PQ GL surface for HDR10/HLG content instead of
+  // the default software tone-map to SDR -- see MpvPlayerCore.kt's
+  // `applyHdrSurfaceIfNeeded`. Best-effort: the native side silently no-ops
+  // when the device/display can't do it.
+  @override
+  Future<void> setHdrEnabled(bool enabled) {
+    return _channel.invokeMethod<void>('setHdrEnabled', <String, Object?>{
+      'viewId': viewId,
+      'enabled': enabled,
+    });
+  }
 }
