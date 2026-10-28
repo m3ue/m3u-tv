@@ -51,10 +51,16 @@ class FirebasePushMessagingClient implements PushMessagingClient {
   }
 
   @override
+  // The relay sends through FCM HTTP v1 `message.token`, which needs a real
+  // FCM registration token. register()/onRegistered deliver a Firebase
+  // Installation ID instead, so stay on the deprecated token APIs until the
+  // relay supports FID direct-send.
+  // ignore: deprecated_member_use
   Future<String?> getToken() => FirebaseMessaging.instance.getToken();
 
   @override
   Stream<String> get onTokenRefresh =>
+      // ignore: deprecated_member_use
       FirebaseMessaging.instance.onTokenRefresh;
 
   @override
