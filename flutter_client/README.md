@@ -271,11 +271,19 @@ The feature graphic and TV banner are generated from `../logo.svg` on the app's 
 
 ### Source image conventions
 
+Apple listings use their own source sets, so Apple-specific screenshots stay out of every other store. The generic sets also feed the docs sliders and metadata cards.
+
 | Filename pattern | Used for |
 |---|---|
-| `tv*.png` | tvOS + Android TV screenshots (source: 3840 × 2160) |
-| `mobile*.png` | iOS + Android Phone screenshots (source: 1206 × 2622) |
-| `desktop*.png` | macOS screenshots (source: 1707 × 1160) |
+| `tvos*.png` | tvOS screenshots (source: 1920 × 1080 or 3840 × 2160) |
+| `ios*.png` | iPhone screenshots (source: 1206 × 2622) |
+| `ipados*.png` | iPad screenshots (source: 1668 × 2420) |
+| `tv*.png` | Android TV screenshots (source: 1920 × 1080 or 3840 × 2160) |
+| `mobile*.png` | Android Phone screenshots (source: 1206 × 2622) |
+| `tablet*.png` | Android Tablet screenshots (source: 1668 × 2420) |
+| `desktop*.png` | macOS screenshots (source: 1712 × 1115) |
+
+Only `<prefix><number>.png` matches, so `tv*` never picks up `tvos*` files. If an Apple set has no files, the generator falls back to its generic set (`tvos` → `tv`, `ios` → `mobile`, `ipados` → `tablet`). Each run clears the PNGs it previously generated in its output folders, so renamed or removed sources don't linger.
 
 ## Trakt setup
 
