@@ -2,7 +2,7 @@
 
 Source of truth for the copy pasted into App Store Connect, Google Play Console and Microsoft Partner Center. Update this file first, then copy into the stores, so the listings never live only in a store dashboard again.
 
-Last reviewed against: **v1.2.3** (2026-10-20). Store artwork is generated separately by `scripts/generate-store-assets.sh`.
+Last reviewed against: **v1.2.4** (2026-10-29). Store artwork is generated separately by `scripts/generate-store-assets.sh` (headers and banners) and `scripts/generate-screenshots.sh` (screenshots).
 
 ## Rules for every listing
 
@@ -12,7 +12,9 @@ Last reviewed against: **v1.2.3** (2026-10-20). Store artwork is generated separ
   - Never mention **AIOStreams** (Apple reviewers use it as a rejection keyword).
   - Never mention other platforms (Android, Google TV, Windows, Linux). Guideline 2.3.10 forbids it, and the old copy did it.
   - Say "Xtream API", never "Xtream Codes" (the name of a service that was shut down for piracy).
-  - Leave "IPTV" out of the keywords field. It is fine once, in context, in the description.
+  - Leave "IPTV" and "Xtream" out of the keywords field. Both are fine in context in the description.
+  - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels): the `tvos*`, `ios*` and `ipados*` sets in `screenshots/app-screenshots/`. Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this.
+  - The Support URL must be a real support page, not an issue tracker (rejected under 1.5).
 - **Trakt:** the app syncs **watch history** only. Don't claim watchlist or collection sync.
 
 ## Shared details
@@ -23,7 +25,8 @@ Last reviewed against: **v1.2.3** (2026-10-20). Store artwork is generated separ
 | Developer / publisher | sparkison (Shaun Parkison and contributors) |
 | Website / marketing URL | https://m3ue.sparkison.dev/tv |
 | Privacy policy URL | https://m3ue.sparkison.dev/privacy/ |
-| Support URL | https://github.com/m3ue/m3u-tv/issues |
+| Support URL | https://m3ue.sparkison.dev/support |
+| Issue tracker | https://github.com/m3ue/m3u-tv/issues |
 | Source code | https://github.com/m3ue/m3u-tv |
 | License | GPL-3.0 |
 | Copyright | © 2026 Shaun Parkison and contributors |
@@ -70,7 +73,7 @@ New: an optional Rich Home with a full-screen spotlight, a redesigned remote-fir
 #### Keywords (100)
 
 ```
-epg,xtream,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted
+epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,media
 ```
 
 #### Description (4000)
@@ -99,7 +102,8 @@ DVR
 
 MOVIES AND SERIES
 • Detail pages with cast, filmographies, trailers, ratings and related titles.
-• A season and episode browser with Up Next.
+• A season and episode browser with Up Next, plus an episode picker right in the player.
+• Artwork while movies and episodes load.
 • Skip Intro and Skip Credits prompts powered by TheIntroDB (optional).
 • Sort by recently added, recently updated, title and more.
 • Request new movies and shows through your server.
@@ -176,7 +180,7 @@ New: an optional Rich Home with a full-screen spotlight, a redesigned TV guide w
 #### Keywords (100)
 
 ```
-epg,xtream,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted
+epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,media
 ```
 
 #### Description (4000)
@@ -205,7 +209,8 @@ DVR
 
 MOVIES AND SERIES
 • Detail pages with cast, filmographies, trailers, ratings and related titles.
-• A season and episode browser with Up Next.
+• A season and episode browser with Up Next, plus an episode picker right in the player.
+• Artwork while movies and episodes load.
 • Skip Intro and Skip Credits prompts powered by TheIntroDB (optional).
 • Sort by recently added, recently updated, title and more.
 • Request new movies and shows through your server.
@@ -271,7 +276,8 @@ DVR
 
 MOVIES AND SERIES
 • Detail pages with cast, filmographies, trailers, ratings and related titles.
-• A season and episode browser with Up Next.
+• A season and episode browser with Up Next, plus an episode picker right in the player.
+• Artwork while movies and episodes load.
 • Skip Intro and Skip Credits prompts powered by TheIntroDB (optional).
 • Sort by recently added, recently updated, title and more.
 • Request new movies and shows through your server.
@@ -285,6 +291,7 @@ SEARCH
 
 PLAYBACK
 • ExoPlayer (Media3) with an automatic mpv fallback for streams ExoPlayer can't play.
+• True HDR playback on supported TVs and devices, and picture-in-picture on phones and tablets.
 • Audio and subtitle track selection, plus multichannel audio.
 • Optional automatic frame rate matching on Android TV.
 • A built-in Logs and Diagnostics screen for troubleshooting.
@@ -342,7 +349,8 @@ DVR
 
 MOVIES AND SERIES
 • Detail pages with cast, filmographies, trailers, ratings and related titles.
-• A season and episode browser with Up Next.
+• A season and episode browser with Up Next, plus an episode picker right in the player.
+• Artwork while movies and episodes load.
 • Skip Intro and Skip Credits prompts powered by TheIntroDB (optional).
 • Sort by recently added, recently updated, title and more.
 • Request new movies and shows through your server.
@@ -464,7 +472,7 @@ M3U TV is free software released under the GNU General Public License v3.0. Full
 
 Instructions for each store's reviewers. All stores use the same demo server, which serves only public-domain and freely licensed content. Never point a reviewer at a server with a commercial provider lineup: Apple and Google reject that as unauthorised content.
 
-- **Server URL:** `https://api-tester-fcn5.onrender.com`
+- **Server URL:** `https://api-tester-fcn5.onrender.com` (source: [m3u-api-tester](https://github.com/m3ue/m3u-api-tester); kept warm by an UptimeRobot ping every 5 minutes)
 - **Username:** `testuser`
 - **Password:** `testpass`
 
@@ -473,13 +481,23 @@ Instructions for each store's reviewers. All stores use the same demo server, wh
 Also fill in the separate "Sign-in required" username and password fields with the credentials above.
 
 ```
-M3U TV is a client for m3u editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply. A demo server with public-domain and freely licensed content is provided below.
+M3U TV is a client for m3u editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
 
-Third-party services used via their public APIs: Trakt (optional watch history sync), TheIntroDB (optional skip intro timestamps), YouTube (trailer links open externally). Artwork and metadata are supplied by the user's server from TMDB.
+DEMO SERVER
+A demo server is provided for review. It only serves Creative Commons licensed films from the Blender Foundation, public-domain classics and generated test channels. All artwork shown in the app and in our screenshots comes from these titles.
 
-Please use the following URL for the Server URL in settings: https://api-tester-fcn5.onrender.com
-username: testuser
-password: testpass
+To sign in:
+1. Launch the app. The Connection Settings screen opens.
+2. Server URL: https://api-tester-fcn5.onrender.com (please include https://)
+3. Username: testuser
+4. Password: testpass
+5. Select Connect.
+
+Connecting usually takes a few seconds. If a server does not respond, the app now shows "Server is currently unavailable." after 30 seconds instead of loading indefinitely, and Connect can be selected again.
+
+Third-party services used via their public APIs: Trakt (optional watch history sync), TheIntroDB (optional skip intro timestamps), YouTube (trailer links open externally).
+
+Support: https://m3ue.sparkison.dev/support
 ```
 
 ### Google Play: App content > App access
@@ -521,6 +539,40 @@ Add a new subsection at the top for each release, built from the GitHub release 
 | Microsoft Store | What's new in this version | 1500 |
 
 The Apple notes follow the Apple rules above (no AIOStreams, no other platforms). Leave out desktop-only items such as fullscreen shortcuts.
+
+### v1.2.4
+
+#### Apple (tvOS, iOS and iPadOS)
+
+```
+• New episode picker in the player: switch episodes or seasons without leaving playback.
+• Movies and episodes now show their artwork while loading.
+• Live channels stall less, plus a new option to buffer live streams before playing.
+• If a server doesn't respond, connecting now shows an error you can retry instead of loading forever.
+• Performance improvements and many fixes.
+```
+
+#### Google Play
+
+```
+• New episode picker in the player.
+• Artwork while movies and episodes load.
+• True HDR playback on supported Android TVs and devices.
+• Picture-in-picture and edge-to-edge on phones and tablets.
+• Live channels stall less on the mpv fallback player.
+• An unresponsive server now shows an error you can retry instead of loading forever.
+```
+
+#### Microsoft Store
+
+```
+• New episode picker in the player: switch episodes or seasons without leaving playback.
+• Movies and episodes now show their artwork while loading.
+• Live channels stall less, plus a new option to buffer live streams before playing.
+• Chinese text now uses Chinese fonts instead of Japanese glyph forms.
+• If a server doesn't respond, connecting now shows an error you can retry instead of loading forever.
+• Performance improvements and many fixes.
+```
 
 ### v1.2.3
 
