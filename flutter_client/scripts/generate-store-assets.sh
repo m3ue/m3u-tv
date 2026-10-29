@@ -22,8 +22,9 @@
 #
 # Everything but the tile icon is rendered from scripts/store-assets/art.html
 # with headless Chrome, using tv1/tablet3/mobile5 from
-# screenshots/app-screenshots/, so refreshing those screenshots and re-running
-# this is all an update needs. The template adapts to each output's aspect
+# screenshots/app-screenshots/ (the Apple art uses the Apple-only set,
+# tvos1/ipados3/ios2 by default, matching generate-screenshots.sh), so
+# refreshing those screenshots and re-running this is all an update needs. The template adapts to each output's aspect
 # ratio. Apple and Google variants drop the site URL (Apple prohibits URLs).
 #
 # Outputs are written to screenshots/store/.
@@ -34,6 +35,7 @@
 # Usage:
 #   scripts/generate-store-assets.sh
 #   TILE_PADDING=12 scripts/generate-store-assets.sh   # % of transparent margin
+#   APPLE_TV=tvos2 APPLE_TABLET=ipados1 APPLE_PHONE=ios1 scripts/generate-store-assets.sh
 
 set -euo pipefail
 
@@ -44,6 +46,22 @@ ICON="$FLUTTER_DIR/assets/icons/icon-desktop.png"
 OUT_DIR="$FLUTTER_DIR/screenshots/store"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 TILE_PADDING="${TILE_PADDING:-8}"
+SHOTS_DIR="$FLUTTER_DIR/screenshots/app-screenshots"
+
+# Apple listing art shows Apple screenshots; each falls back to the generic
+# shot when its Apple file is missing.
+apple_shot() {
+    local stem=$1 fallback=$2
+    if [[ -f "$SHOTS_DIR/$stem.png" ]]; then
+        echo "$stem"
+    else
+        echo "  ($stem.png not found, using $fallback.png)" >&2
+        echo "$fallback"
+    fi
+}
+APPLE_DEVICES="tv=$(apple_shot "${APPLE_TV:-tvos1}" tv1)"
+APPLE_DEVICES+="&tablet=$(apple_shot "${APPLE_TABLET:-ipados3}" tablet3)"
+APPLE_DEVICES+="&phone=$(apple_shot "${APPLE_PHONE:-ios2}" mobile5)"
 
 [[ -x "$CHROME" ]] || {
     echo "Error: Chrome not found at: $CHROME"
@@ -91,12 +109,12 @@ echo "Store listing art -> ${OUT_DIR#"$FLUTTER_DIR"/}"
 
 echo ""
 echo "--- Apple App Store (iOS) ---"
-render "art=hero" 5244 2950 "$OUT_DIR/apple/ios-header/header-5244x2950.png"
-render "art=hero" 3840 1646 "$OUT_DIR/apple/ios-header/header-3840x1646.png"
+render "art=hero&$APPLE_DEVICES" 5244 2950 "$OUT_DIR/apple/ios-header/header-5244x2950.png"
+render "art=hero&$APPLE_DEVICES" 3840 1646 "$OUT_DIR/apple/ios-header/header-3840x1646.png"
 for size in 5244x2950 3840x2560 1920x1280; do
     w=${size%x*} h=${size#*x}
-    render "art=feature&url=0" "$w" "$h" "$OUT_DIR/apple/ios-search-results/search-results-$size.png"
-    render "art=hero" "$w" "$h" "$OUT_DIR/apple/ios-search-results/search-results-$size-notext.png"
+    render "art=feature&url=0&$APPLE_DEVICES" "$w" "$h" "$OUT_DIR/apple/ios-search-results/search-results-$size.png"
+    render "art=hero&$APPLE_DEVICES" "$w" "$h" "$OUT_DIR/apple/ios-search-results/search-results-$size-notext.png"
 done
 
 echo ""

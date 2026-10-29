@@ -144,6 +144,15 @@
     const params = new URLSearchParams(location.search);
     document.body.className = params.get('art') || 'hero';
     if (params.get('url') === '0') document.body.classList.add('no-url');
+    // Optional screenshot overrides (file stems in screenshots/app-screenshots/),
+    // e.g. ?tv=tvos1&tablet=ipados3&phone=ios2 for the Apple listing art.
+    for (const device of ['tv', 'tablet', 'phone']) {
+      const stem = params.get(device);
+      if (stem && /^[a-z0-9_-]+$/.test(stem)) {
+        document.querySelector(`.device-${device} img`).src =
+          `../../screenshots/app-screenshots/${stem}.png`;
+      }
+    }
     const safe = parseFloat(params.get('safe')) || 0;
     const fit = () => {
       const safeWidth = safe ? Math.min(innerWidth, innerHeight * safe) : innerWidth;
