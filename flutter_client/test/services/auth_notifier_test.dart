@@ -75,6 +75,34 @@ void main() {
       );
     },
   );
+
+  test(
+    'connect fails with server unavailable when the handshake never answers',
+    () async {
+      final storage = _DelayedFirstWriteStorage()..releaseFirstWrite.complete();
+      final notifier = AuthNotifier(
+        xtreamService: XtreamService(
+          transport: (_) => Completer<Object?>().future,
+          authenticateTimeout: const Duration(milliseconds: 50),
+        ),
+        secureStorage: storage,
+      );
+
+      // Regression (App Review 2.1a): a host that accepts the socket but never
+      // responds left the connect spinner up indefinitely.
+      final connected = await notifier.connect(
+        const UserCredentials(
+          server: 'https://cold-start.invalid',
+          username: 'user1',
+          password: 'pass1',
+        ),
+      );
+
+      expect(connected, isFalse);
+      expect(notifier.isLoading, isFalse);
+      expect(notifier.error, serverUnavailableMessage);
+    },
+  );
 }
 
 Future<Object?> _authenticate(XtreamRequest request) async => <String, Object?>{

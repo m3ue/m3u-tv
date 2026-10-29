@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
@@ -69,6 +70,7 @@ class XtreamHttpException implements Exception {
 }
 
 String userFacingXtreamError(Object error) {
+  if (error is TimeoutException) return serverUnavailableMessage;
   if (error is XtreamHttpException && error.isServerUnavailable) {
     return serverUnavailableMessage;
   }
@@ -381,9 +383,13 @@ class XtreamSessionSnapshot {
 }
 
 class XtreamService {
-  XtreamService({XtreamTransport? transport, CacheService? cache})
-    : _transport = transport ?? createDefaultXtreamTransport(),
-      _cache = cache;
+  XtreamService({
+    XtreamTransport? transport,
+    CacheService? cache,
+    Duration authenticateTimeout = const Duration(seconds: 30),
+  }) : _transport = transport ?? createDefaultXtreamTransport(),
+       _cache = cache,
+       _authenticateTimeout = authenticateTimeout;
 
   static const _clientHeader = 'X-M3UE-Client';
   static const _clientValue = 'm3u-tv';
@@ -391,6 +397,12 @@ class XtreamService {
 
   final XtreamTransport _transport;
   final CacheService? _cache;
+
+  // The shared transport has no response timeout (catalog downloads can be
+  // slow), so the handshake bounds its own wait: a server that accepts the
+  // socket but never answers (e.g. a host still cold-starting) must surface an
+  // error instead of leaving the connect spinner up forever.
+  final Duration _authenticateTimeout;
   UserCredentials? _credentials;
   tz.Location _serverLocation = tz.UTC;
   bool _isM3UEditor = false;
@@ -428,7 +440,7 @@ class XtreamService {
       normalized,
       null,
       headers: const {_clientHeader: _clientValue},
-    );
+    ).timeout(_authenticateTimeout);
     final json = _asMap(response);
 
     if (json.containsKey('error')) {

@@ -7,7 +7,7 @@ PODS:
 DEPENDENCIES:
   - Flutter (from `/Users/shaunparkison/Sites/m3ue/m3u-tv/flutter_client/tvos/Flutter`)
   - sqflite_tvos (from `/Users/shaunparkison/Sites/m3ue/m3u-tv/flutter_client/packages/sqflite_tvos/tvos`)
-  - wakelock_plus (from `/Users/shaunparkison/.pub-cache/hosted/pub.dev/wakelock_plus-1.8.1/ios`)
+  - wakelock_plus (from `/Users/shaunparkison/.pub-cache/hosted/pub.dev/wakelock_plus-1.8.2/ios`)
 
 EXTERNAL SOURCES:
   Flutter:
@@ -15,7 +15,7 @@ EXTERNAL SOURCES:
   sqflite_tvos:
     :path: "/Users/shaunparkison/Sites/m3ue/m3u-tv/flutter_client/packages/sqflite_tvos/tvos"
   wakelock_plus:
-    :path: "/Users/shaunparkison/.pub-cache/hosted/pub.dev/wakelock_plus-1.8.1/ios"
+    :path: "/Users/shaunparkison/.pub-cache/hosted/pub.dev/wakelock_plus-1.8.2/ios"
 
 SPEC CHECKSUMS:
   Flutter: d8701521ffbbba1aa9b5e6d9e96573026affa27e
