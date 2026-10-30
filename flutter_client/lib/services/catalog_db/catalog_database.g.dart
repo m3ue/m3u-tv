@@ -122,6 +122,40 @@ class $CatalogItemsTable extends CatalogItems
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameSortKeyMeta = const VerificationMeta(
+    'nameSortKey',
+  );
+  @override
+  late final GeneratedColumn<String> nameSortKey = GeneratedColumn<String>(
+    'name_sort_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _channelNumberMeta = const VerificationMeta(
+    'channelNumber',
+  );
+  @override
+  late final GeneratedColumn<int> channelNumber = GeneratedColumn<int>(
+    'channel_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _catchupDaysMeta = const VerificationMeta(
+    'catchupDays',
+  );
+  @override
+  late final GeneratedColumn<int> catchupDays = GeneratedColumn<int>(
+    'catchup_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _jsonMeta = const VerificationMeta('json');
   @override
   late final GeneratedColumn<String> json = GeneratedColumn<String>(
@@ -144,6 +178,9 @@ class $CatalogItemsTable extends CatalogItems
     year,
     recency,
     sortIndex,
+    nameSortKey,
+    channelNumber,
+    catchupDays,
     json,
   ];
   @override
@@ -239,6 +276,33 @@ class $CatalogItemsTable extends CatalogItems
     } else if (isInserting) {
       context.missing(_sortIndexMeta);
     }
+    if (data.containsKey('name_sort_key')) {
+      context.handle(
+        _nameSortKeyMeta,
+        nameSortKey.isAcceptableOrUnknown(
+          data['name_sort_key']!,
+          _nameSortKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('channel_number')) {
+      context.handle(
+        _channelNumberMeta,
+        channelNumber.isAcceptableOrUnknown(
+          data['channel_number']!,
+          _channelNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('catchup_days')) {
+      context.handle(
+        _catchupDaysMeta,
+        catchupDays.isAcceptableOrUnknown(
+          data['catchup_days']!,
+          _catchupDaysMeta,
+        ),
+      );
+    }
     if (data.containsKey('json')) {
       context.handle(
         _jsonMeta,
@@ -300,6 +364,18 @@ class $CatalogItemsTable extends CatalogItems
         DriftSqlType.int,
         data['${effectivePrefix}sort_index'],
       )!,
+      nameSortKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_sort_key'],
+      )!,
+      channelNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}channel_number'],
+      ),
+      catchupDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}catchup_days'],
+      ),
       json: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}json'],
@@ -351,6 +427,21 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
   /// stable without a name comparison.
   final int sortIndex;
 
+  /// `NaturalSortKey.encode()` of [name], so an `ORDER BY` on it matches the
+  /// in-memory `compareNatural` order (Live TV's A-Z / Z-A sorts).
+  final String nameSortKey;
+
+  /// Live channels only: the provider-assigned channel number, null when the
+  /// provider left it blank or reported 0, so unnumbered channels sink below
+  /// numbered ones under the channel-number sort.
+  final int? channelNumber;
+
+  /// Live channels only: catchup retention in days (0 when the channel has
+  /// no catchup), as `EpgService.effectiveCatchupRetentionDays` resolves it,
+  /// so the guide can find the deepest retention in a slice without loading
+  /// every channel.
+  final int? catchupDays;
+
   /// The full serialized domain object (`Channel` / `VodItem` / `Series`),
   /// same shape `CacheService` used to persist.
   final String json;
@@ -366,6 +457,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     this.year,
     this.recency,
     required this.sortIndex,
+    required this.nameSortKey,
+    this.channelNumber,
+    this.catchupDays,
     required this.json,
   });
   @override
@@ -392,6 +486,13 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       map['recency'] = Variable<int>(recency);
     }
     map['sort_index'] = Variable<int>(sortIndex);
+    map['name_sort_key'] = Variable<String>(nameSortKey);
+    if (!nullToAbsent || channelNumber != null) {
+      map['channel_number'] = Variable<int>(channelNumber);
+    }
+    if (!nullToAbsent || catchupDays != null) {
+      map['catchup_days'] = Variable<int>(catchupDays);
+    }
     map['json'] = Variable<String>(json);
     return map;
   }
@@ -417,6 +518,13 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           ? const Value.absent()
           : Value(recency),
       sortIndex: Value(sortIndex),
+      nameSortKey: Value(nameSortKey),
+      channelNumber: channelNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(channelNumber),
+      catchupDays: catchupDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(catchupDays),
       json: Value(json),
     );
   }
@@ -438,6 +546,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       year: serializer.fromJson<int?>(json['year']),
       recency: serializer.fromJson<int?>(json['recency']),
       sortIndex: serializer.fromJson<int>(json['sortIndex']),
+      nameSortKey: serializer.fromJson<String>(json['nameSortKey']),
+      channelNumber: serializer.fromJson<int?>(json['channelNumber']),
+      catchupDays: serializer.fromJson<int?>(json['catchupDays']),
       json: serializer.fromJson<String>(json['json']),
     );
   }
@@ -456,6 +567,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       'year': serializer.toJson<int?>(year),
       'recency': serializer.toJson<int?>(recency),
       'sortIndex': serializer.toJson<int>(sortIndex),
+      'nameSortKey': serializer.toJson<String>(nameSortKey),
+      'channelNumber': serializer.toJson<int?>(channelNumber),
+      'catchupDays': serializer.toJson<int?>(catchupDays),
       'json': serializer.toJson<String>(json),
     };
   }
@@ -472,6 +586,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     Value<int?> year = const Value.absent(),
     Value<int?> recency = const Value.absent(),
     int? sortIndex,
+    String? nameSortKey,
+    Value<int?> channelNumber = const Value.absent(),
+    Value<int?> catchupDays = const Value.absent(),
     String? json,
   }) => CatalogItemRow(
     sourceKey: sourceKey ?? this.sourceKey,
@@ -487,6 +604,11 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     year: year.present ? year.value : this.year,
     recency: recency.present ? recency.value : this.recency,
     sortIndex: sortIndex ?? this.sortIndex,
+    nameSortKey: nameSortKey ?? this.nameSortKey,
+    channelNumber: channelNumber.present
+        ? channelNumber.value
+        : this.channelNumber,
+    catchupDays: catchupDays.present ? catchupDays.value : this.catchupDays,
     json: json ?? this.json,
   );
   CatalogItemRow copyWithCompanion(CatalogItemsCompanion data) {
@@ -506,6 +628,15 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
       year: data.year.present ? data.year.value : this.year,
       recency: data.recency.present ? data.recency.value : this.recency,
       sortIndex: data.sortIndex.present ? data.sortIndex.value : this.sortIndex,
+      nameSortKey: data.nameSortKey.present
+          ? data.nameSortKey.value
+          : this.nameSortKey,
+      channelNumber: data.channelNumber.present
+          ? data.channelNumber.value
+          : this.channelNumber,
+      catchupDays: data.catchupDays.present
+          ? data.catchupDays.value
+          : this.catchupDays,
       json: data.json.present ? data.json.value : this.json,
     );
   }
@@ -524,6 +655,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           ..write('year: $year, ')
           ..write('recency: $recency, ')
           ..write('sortIndex: $sortIndex, ')
+          ..write('nameSortKey: $nameSortKey, ')
+          ..write('channelNumber: $channelNumber, ')
+          ..write('catchupDays: $catchupDays, ')
           ..write('json: $json')
           ..write(')'))
         .toString();
@@ -542,6 +676,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
     year,
     recency,
     sortIndex,
+    nameSortKey,
+    channelNumber,
+    catchupDays,
     json,
   );
   @override
@@ -559,6 +696,9 @@ class CatalogItemRow extends DataClass implements Insertable<CatalogItemRow> {
           other.year == this.year &&
           other.recency == this.recency &&
           other.sortIndex == this.sortIndex &&
+          other.nameSortKey == this.nameSortKey &&
+          other.channelNumber == this.channelNumber &&
+          other.catchupDays == this.catchupDays &&
           other.json == this.json);
 }
 
@@ -574,6 +714,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
   final Value<int?> year;
   final Value<int?> recency;
   final Value<int> sortIndex;
+  final Value<String> nameSortKey;
+  final Value<int?> channelNumber;
+  final Value<int?> catchupDays;
   final Value<String> json;
   final Value<int> rowid;
   const CatalogItemsCompanion({
@@ -588,6 +731,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     this.year = const Value.absent(),
     this.recency = const Value.absent(),
     this.sortIndex = const Value.absent(),
+    this.nameSortKey = const Value.absent(),
+    this.channelNumber = const Value.absent(),
+    this.catchupDays = const Value.absent(),
     this.json = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -603,6 +749,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     this.year = const Value.absent(),
     this.recency = const Value.absent(),
     required int sortIndex,
+    this.nameSortKey = const Value.absent(),
+    this.channelNumber = const Value.absent(),
+    this.catchupDays = const Value.absent(),
     required String json,
     this.rowid = const Value.absent(),
   }) : sourceKey = Value(sourceKey),
@@ -624,6 +773,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     Expression<int>? year,
     Expression<int>? recency,
     Expression<int>? sortIndex,
+    Expression<String>? nameSortKey,
+    Expression<int>? channelNumber,
+    Expression<int>? catchupDays,
     Expression<String>? json,
     Expression<int>? rowid,
   }) {
@@ -639,6 +791,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
       if (year != null) 'year': year,
       if (recency != null) 'recency': recency,
       if (sortIndex != null) 'sort_index': sortIndex,
+      if (nameSortKey != null) 'name_sort_key': nameSortKey,
+      if (channelNumber != null) 'channel_number': channelNumber,
+      if (catchupDays != null) 'catchup_days': catchupDays,
       if (json != null) 'json': json,
       if (rowid != null) 'rowid': rowid,
     });
@@ -656,6 +811,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     Value<int?>? year,
     Value<int?>? recency,
     Value<int>? sortIndex,
+    Value<String>? nameSortKey,
+    Value<int?>? channelNumber,
+    Value<int?>? catchupDays,
     Value<String>? json,
     Value<int>? rowid,
   }) {
@@ -671,6 +829,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
       year: year ?? this.year,
       recency: recency ?? this.recency,
       sortIndex: sortIndex ?? this.sortIndex,
+      nameSortKey: nameSortKey ?? this.nameSortKey,
+      channelNumber: channelNumber ?? this.channelNumber,
+      catchupDays: catchupDays ?? this.catchupDays,
       json: json ?? this.json,
       rowid: rowid ?? this.rowid,
     );
@@ -712,6 +873,15 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
     if (sortIndex.present) {
       map['sort_index'] = Variable<int>(sortIndex.value);
     }
+    if (nameSortKey.present) {
+      map['name_sort_key'] = Variable<String>(nameSortKey.value);
+    }
+    if (channelNumber.present) {
+      map['channel_number'] = Variable<int>(channelNumber.value);
+    }
+    if (catchupDays.present) {
+      map['catchup_days'] = Variable<int>(catchupDays.value);
+    }
     if (json.present) {
       map['json'] = Variable<String>(json.value);
     }
@@ -735,6 +905,9 @@ class CatalogItemsCompanion extends UpdateCompanion<CatalogItemRow> {
           ..write('year: $year, ')
           ..write('recency: $recency, ')
           ..write('sortIndex: $sortIndex, ')
+          ..write('nameSortKey: $nameSortKey, ')
+          ..write('channelNumber: $channelNumber, ')
+          ..write('catchupDays: $catchupDays, ')
           ..write('json: $json, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2440,6 +2613,14 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
       $CatalogCategoriesTable(this);
   late final $EpgProgrammesTable epgProgrammes = $EpgProgrammesTable(this);
   late final $KvCacheTable kvCache = $KvCacheTable(this);
+  late final Index catalogItemsNameSort = Index(
+    'catalog_items_name_sort',
+    'CREATE INDEX catalog_items_name_sort ON catalog_items (source_key, kind, name_sort_key)',
+  );
+  late final Index epgProgrammesEnd = Index(
+    'epg_programmes_end',
+    'CREATE INDEX epg_programmes_end ON epg_programmes (end_ms)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2449,6 +2630,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     catalogCategories,
     epgProgrammes,
     kvCache,
+    catalogItemsNameSort,
+    epgProgrammesEnd,
   ];
 }
 
@@ -2465,6 +2648,9 @@ typedef $$CatalogItemsTableCreateCompanionBuilder =
       Value<int?> year,
       Value<int?> recency,
       required int sortIndex,
+      Value<String> nameSortKey,
+      Value<int?> channelNumber,
+      Value<int?> catchupDays,
       required String json,
       Value<int> rowid,
     });
@@ -2481,6 +2667,9 @@ typedef $$CatalogItemsTableUpdateCompanionBuilder =
       Value<int?> year,
       Value<int?> recency,
       Value<int> sortIndex,
+      Value<String> nameSortKey,
+      Value<int?> channelNumber,
+      Value<int?> catchupDays,
       Value<String> json,
       Value<int> rowid,
     });
@@ -2546,6 +2735,21 @@ class $$CatalogItemsTableFilterComposer
 
   ColumnFilters<int> get sortIndex => $composableBuilder(
     column: $table.sortIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameSortKey => $composableBuilder(
+    column: $table.nameSortKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get channelNumber => $composableBuilder(
+    column: $table.channelNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get catchupDays => $composableBuilder(
+    column: $table.catchupDays,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2619,6 +2823,21 @@ class $$CatalogItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameSortKey => $composableBuilder(
+    column: $table.nameSortKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get channelNumber => $composableBuilder(
+    column: $table.channelNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get catchupDays => $composableBuilder(
+    column: $table.catchupDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get json => $composableBuilder(
     column: $table.json,
     builder: (column) => ColumnOrderings(column),
@@ -2670,6 +2889,21 @@ class $$CatalogItemsTableAnnotationComposer
 
   GeneratedColumn<int> get sortIndex =>
       $composableBuilder(column: $table.sortIndex, builder: (column) => column);
+
+  GeneratedColumn<String> get nameSortKey => $composableBuilder(
+    column: $table.nameSortKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get channelNumber => $composableBuilder(
+    column: $table.channelNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get catchupDays => $composableBuilder(
+    column: $table.catchupDays,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get json =>
       $composableBuilder(column: $table.json, builder: (column) => column);
@@ -2723,6 +2957,9 @@ class $$CatalogItemsTableTableManager
                 Value<int?> year = const Value.absent(),
                 Value<int?> recency = const Value.absent(),
                 Value<int> sortIndex = const Value.absent(),
+                Value<String> nameSortKey = const Value.absent(),
+                Value<int?> channelNumber = const Value.absent(),
+                Value<int?> catchupDays = const Value.absent(),
                 Value<String> json = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CatalogItemsCompanion(
@@ -2737,6 +2974,9 @@ class $$CatalogItemsTableTableManager
                 year: year,
                 recency: recency,
                 sortIndex: sortIndex,
+                nameSortKey: nameSortKey,
+                channelNumber: channelNumber,
+                catchupDays: catchupDays,
                 json: json,
                 rowid: rowid,
               ),
@@ -2753,6 +2993,9 @@ class $$CatalogItemsTableTableManager
                 Value<int?> year = const Value.absent(),
                 Value<int?> recency = const Value.absent(),
                 required int sortIndex,
+                Value<String> nameSortKey = const Value.absent(),
+                Value<int?> channelNumber = const Value.absent(),
+                Value<int?> catchupDays = const Value.absent(),
                 required String json,
                 Value<int> rowid = const Value.absent(),
               }) => CatalogItemsCompanion.insert(
@@ -2767,6 +3010,9 @@ class $$CatalogItemsTableTableManager
                 year: year,
                 recency: recency,
                 sortIndex: sortIndex,
+                nameSortKey: nameSortKey,
+                channelNumber: channelNumber,
+                catchupDays: catchupDays,
                 json: json,
                 rowid: rowid,
               ),

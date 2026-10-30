@@ -283,13 +283,22 @@ class _MovieBody extends StatelessWidget {
       plot: item.description,
       credits: [
         if (item.director != null)
-          MetaCreditLine(label: 'Director', value: item.director!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodDirector,
+            value: item.director!,
+          ),
         if (item.writer != null)
-          MetaCreditLine(label: 'Writer', value: item.writer!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).metaWriter,
+            value: item.writer!,
+          ),
         // The comma-separated `cast` string only earns a credit line when
         // there is no rich cast row - otherwise it just repeats it.
         if ((richCast == null || richCast.isEmpty) && item.cast != null)
-          MetaCreditLine(label: 'Cast', value: item.cast!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodCast,
+            value: item.cast!,
+          ),
       ],
       richCast: richCast,
       castSemanticLabel: l.vodCast,
@@ -395,7 +404,10 @@ class _SeriesBodyState extends State<_SeriesBody> {
       .map((n) {
         return widget.item.seasons.firstWhere(
           (s) => s.number == n,
-          orElse: () => Season(number: n, name: 'Season $n'),
+          orElse: () => Season(
+            number: n,
+            name: AppLocalizations.of(context).homeSeason(n),
+          ),
         );
       })
       .toList(growable: false);
@@ -411,7 +423,8 @@ class _SeriesBodyState extends State<_SeriesBody> {
     if (n == null) return null;
     return widget.item.seasons.firstWhere(
       (s) => s.number == n,
-      orElse: () => Season(number: n, name: 'Season $n'),
+      orElse: () =>
+          Season(number: n, name: AppLocalizations.of(context).homeSeason(n)),
     );
   }
 
@@ -548,11 +561,20 @@ class _SeriesBodyState extends State<_SeriesBody> {
       plotMaxLines: 4,
       credits: [
         if (item.director != null)
-          MetaCreditLine(label: 'Director', value: item.director!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodDirector,
+            value: item.director!,
+          ),
         if (item.writer != null)
-          MetaCreditLine(label: 'Writer', value: item.writer!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).metaWriter,
+            value: item.writer!,
+          ),
         if ((richCast == null || richCast.isEmpty) && item.cast != null)
-          MetaCreditLine(label: 'Cast', value: item.cast!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodCast,
+            value: item.cast!,
+          ),
       ],
     );
 

@@ -3349,6 +3349,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recently Updated'**
   String get mediaSortRecentlyUpdated;
+
+  /// No description provided for @playerTrackAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get playerTrackAudio;
+
+  /// No description provided for @playerTrackSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles'**
+  String get playerTrackSubtitles;
+
+  /// No description provided for @playerTrackAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Track'**
+  String get playerTrackAudioTitle;
+
+  /// No description provided for @playerTrackSubtitleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle Track'**
+  String get playerTrackSubtitleTitle;
+
+  /// No description provided for @playerTrackAudioDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get playerTrackAudioDisabled;
+
+  /// No description provided for @playerTrackSubtitlesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get playerTrackSubtitlesOff;
+
+  /// No description provided for @playerHdrOn.
+  ///
+  /// In en, this message translates to:
+  /// **'HDR On'**
+  String get playerHdrOn;
+
+  /// No description provided for @playerHdrOff.
+  ///
+  /// In en, this message translates to:
+  /// **'HDR Off'**
+  String get playerHdrOff;
+
+  /// No description provided for @playerStartOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Over'**
+  String get playerStartOver;
+
+  /// No description provided for @playerDiagBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend'**
+  String get playerDiagBackend;
+
+  /// No description provided for @playerDiagFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback'**
+  String get playerDiagFallback;
+
+  /// No description provided for @playerDiagCodec.
+  ///
+  /// In en, this message translates to:
+  /// **'Codec'**
+  String get playerDiagCodec;
+
+  /// No description provided for @playerDiagTranscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcode'**
+  String get playerDiagTranscode;
+
+  /// No description provided for @playerDiagCleanup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup'**
+  String get playerDiagCleanup;
+
+  /// No description provided for @metaWriter.
+  ///
+  /// In en, this message translates to:
+  /// **'Writer'**
+  String get metaWriter;
+
+  /// No description provided for @mediaClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get mediaClearSearch;
+
+  /// No description provided for @seriesEpisodesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load episodes: {error}'**
+  String seriesEpisodesLoadFailed(String error);
+
+  /// No description provided for @seriesNoEpisodes.
+  ///
+  /// In en, this message translates to:
+  /// **'No episodes available'**
+  String get seriesNoEpisodes;
+
+  /// No description provided for @settingsConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get settingsConnecting;
+
+  /// No description provided for @favoritesNoChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite channels'**
+  String get favoritesNoChannels;
+
+  /// No description provided for @favoritesNoMovies.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite movies'**
+  String get favoritesNoMovies;
+
+  /// No description provided for @favoritesNoSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite series'**
+  String get favoritesNoSeries;
+
+  /// No description provided for @seriesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load series'**
+  String get seriesLoadFailed;
+
+  /// No description provided for @vodLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load movies'**
+  String get vodLoadFailed;
+
+  /// No description provided for @vodNoSynopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'No synopsis available.'**
+  String get vodNoSynopsis;
+
+  /// No description provided for @settingsConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed. Please check your credentials.'**
+  String get settingsConnectionFailed;
+
+  /// No description provided for @settingsConnectingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait while we connect to your service'**
+  String get settingsConnectingSubtitle;
+
+  /// No description provided for @settingsCreateViewerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create viewer. Please try again.'**
+  String get settingsCreateViewerFailed;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get searchNoResults;
+
+  /// No description provided for @playerLoadTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream loading timed out. The server may be unreachable or the stream URL is invalid.'**
+  String get playerLoadTimedOut;
+
+  /// No description provided for @playerErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback error'**
+  String get playerErrorTitle;
 }
 
 class _AppLocalizationsDelegate

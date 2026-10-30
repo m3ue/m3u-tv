@@ -99,6 +99,9 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     super.initState();
     _sortOption = _initialSortOption();
     _favoritesFirst = _initialFavoritesFirst();
+    // Like Live TV and Home: pick up changes made elsewhere (a detail page,
+    // a server sync) rather than only after this screen's own toggles.
+    widget.favoritesService?.addListener(_onFavoritesChanged);
     unawaited(_loadFavorites());
     _reconfigureWindow();
   }
@@ -130,6 +133,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
 
   @override
   void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
     _debounce?.cancel();
     _gridFocusNode.dispose();
     _window.dispose();
@@ -187,6 +191,8 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     setState(() => _selectedCategory = id);
     if (id != _kFavoritesCategoryId) _reconfigureWindow();
   }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
 
   Future<void> _loadFavorites() async {
     final service = widget.favoritesService;
@@ -281,7 +287,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -329,7 +335,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     if (_favoriteItems.isEmpty) {
       return Center(
         child: Text(
-          'No movies available',
+          AppLocalizations.of(context).homeNoMovies,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       );
@@ -414,7 +420,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
         if (window.error != null && !window.hasLoadedOnce) {
           return Center(
             child: Text(
-              'Unable to load movies',
+              AppLocalizations.of(context).vodLoadFailed,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );
@@ -422,7 +428,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
         if (window.totalCount == 0) {
           return Center(
             child: Text(
-              'No movies available',
+              AppLocalizations.of(context).homeNoMovies,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );

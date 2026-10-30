@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +13,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/frosted_surface.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -918,57 +918,46 @@ class _SpotlightClock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = FontSizeScope.scaleOf(context);
-    return ClipRRect(
+    return FrostedSurface(
       borderRadius: BorderRadius.circular(12 * scale),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF09090b).withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(12 * scale),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 12 * scale,
-              vertical: 6 * scale,
-            ),
-            child: SystemClock(
-              builder: (context, now) {
-                final endsAt = _endsAt();
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatClockTime(context, now),
-                      maxLines: 1,
-                      softWrap: false,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (endsAt != null)
-                      Text(
-                        AppLocalizations.of(
-                          context,
-                        ).playerEndsAt(formatClockTime(context, endsAt)),
-                        key: const Key('home-spotlight-ends-at'),
-                        maxLines: 1,
-                        softWrap: false,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
+      tintAlpha: 0.45,
+      padding: EdgeInsets.symmetric(
+        horizontal: 12 * scale,
+        vertical: 6 * scale,
+      ),
+      child: SystemClock(
+        builder: (context, now) {
+          final endsAt = _endsAt();
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                formatClockTime(context, now),
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (endsAt != null)
+                Text(
+                  AppLocalizations.of(
+                    context,
+                  ).playerEndsAt(formatClockTime(context, endsAt)),
+                  key: const Key('home-spotlight-ends-at'),
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

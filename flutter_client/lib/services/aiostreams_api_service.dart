@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/domain_models.dart'
     show CastMember, RelatedItem, Season;
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -250,11 +248,13 @@ class _AioCacheEntry<T> {
 /// Proxies AIOStreams Stremio addon requests via m3u-editor's proxy endpoints.
 /// Auth tokens stay on the server — clients authenticate with playlist credentials.
 class AIOStreamsApiService {
-  AIOStreamsApiService({required this.xtreamService});
+  AIOStreamsApiService({required this.xtreamService, ApiClient? apiClient})
+    : _api = apiClient ?? ApiClient(timeout: const Duration(seconds: 30));
 
   final XtreamService xtreamService;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  late final HttpClient _httpClient = HttpClient();
+  // Longer than the default: catalog pages are proxied through the editor to
+  // the addon, which can be slow to build them.
+  final ApiClient _api;
   final Map<String, _AioCacheEntry<List<AIOStreamsItem>>> _catalogCache = {};
   final Map<String, _AioCacheEntry<AIOStreamsItem>> _metaCache = {};
 
@@ -271,11 +271,9 @@ class AIOStreamsApiService {
 
   Future<Map<String, dynamic>?> _get(Uri uri) async {
     try {
-      final request = await _httpClient.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) return null;
-      final body = await utf8.decodeStream(response);
-      final decoded = jsonDecode(body);
+      final response = await _api.send('GET', uri);
+      if (response.statusCode != 200) return null;
+      final decoded = await response.json();
       return decoded is Map<String, dynamic> ? decoded : null;
     } on Exception catch (_) {
       return null;

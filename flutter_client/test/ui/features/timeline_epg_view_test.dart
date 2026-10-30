@@ -13,7 +13,16 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+
+import '../../fixtures/list_channel_rows.dart';
+
+/// One [ListChannelRows] per list, so re-pumping the same list doesn't read
+/// as new content to the guide.
+final _rows = Expando<ListChannelRows>();
+ListChannelRows _rowsFor(List<Channel> channels) =>
+    _rows[channels] ??= ListChannelRows(channels);
 
 void main() {
   final observesBerlinDst =
@@ -34,6 +43,7 @@ void main() {
   Future<void> pumpGuide(
     WidgetTester tester, {
     required List<Channel> channels,
+    ChannelRows? rows,
     required EpgService epgService,
     DateTime Function()? clock,
     void Function(Channel)? onChannelSelect,
@@ -59,7 +69,7 @@ void main() {
       height: height,
       child: TimelineEpgView(
         key: guideKey,
-        channels: channels,
+        channels: rows ?? _rowsFor(channels),
         epgService: epgService,
         onChannelSelect: onChannelSelect ?? (_) {},
         onCatchupProgramSelect: onCatchupProgramSelect,
@@ -146,6 +156,36 @@ void main() {
   }
 
   group('TimelineEpgView', () {
+    testWidgets('a row still loading renders a placeholder and asks for it', (
+      tester,
+    ) async {
+      final rows = _PartialRows([bbcOne, null]);
+      Channel? selected;
+      await pumpGuide(
+        tester,
+        channels: const [],
+        rows: rows,
+        epgService: EpgService(),
+        onChannelSelect: (channel) => selected = channel,
+      );
+
+      expect(find.byKey(const ValueKey('timeline-row-101')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('timeline-placeholder-1')),
+        findsOneWidget,
+      );
+      expect(rows.requested, contains(1));
+
+      // Moving onto the loading row and pressing OK does nothing.
+      await tester.tap(find.byKey(const ValueKey('timeline-row-101')));
+      await tester.pump();
+      selected = null;
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(selected, isNull);
+    });
+
     testWidgets('catchup channels show replay availability indicator', (
       tester,
     ) async {
@@ -1786,4 +1826,28 @@ class _FakePreviewPlayer extends EpgPreviewPlayerController {
     _isDisposed = true;
     super.dispose();
   }
+}
+
+/// Rows where a null entry is still loading; records what was asked for.
+class _PartialRows implements ChannelRows {
+  _PartialRows(this.rows);
+
+  final List<Channel?> rows;
+  final Set<int> requested = {};
+
+  @override
+  int get length => rows.length;
+
+  @override
+  Channel? operator [](int index) => rows[index];
+
+  @override
+  void ensureLoaded(int index, int count) {
+    for (var i = index; i < index + count && i < rows.length; i++) {
+      if (rows[i] == null) requested.add(i);
+    }
+  }
+
+  @override
+  int get maxCatchupDays => 0;
 }

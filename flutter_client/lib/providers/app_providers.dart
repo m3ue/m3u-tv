@@ -80,10 +80,6 @@ final epgServiceProvider = ChangeNotifierProvider<EpgService>((ref) {
 // AppStateController.notifyListeners() fires.
 // ---------------------------------------------------------------------------
 
-final liveChannelsProvider = Provider<List<Channel>>((ref) {
-  return ref.watch(appStateControllerProvider).appState.channels;
-});
-
 final liveCategoriesProvider = Provider<List<Category>>((ref) {
   return ref.watch(appStateControllerProvider).appState.liveCategories;
 });

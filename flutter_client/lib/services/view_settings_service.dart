@@ -142,8 +142,8 @@ enum MediaSortOption {
 
 /// Sort order for the Live TV channel list/grid. A separate enum from
 /// [MediaSortOption] rather than appended values on it - VOD/Series sort by
-/// rating/release date via a windowed SQL query, while channels have neither
-/// field and are sorted in memory instead (see `sortChannels` in
+/// rating/release date, while channels have neither field and sort by
+/// number or natural name instead (see `catalogSortForChannels` in
 /// `shared/channel_sort.dart`), so the two option sets share no cases and
 /// would only strain `catalogSortFor`'s exhaustive switch to pretend
 /// otherwise.

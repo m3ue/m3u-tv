@@ -6,10 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
-    show kCatalogKindSeries, kCatalogKindVod;
+    show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/catalog_text_filter.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
@@ -47,7 +47,7 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// Called with the current search-result channel list right before
   /// [onChannelSelect], so the player's skip-previous/skip-next stays within
   /// these search results instead of the full unfiltered channel list.
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final VoidCallback? onSidebarActivate;
@@ -83,15 +83,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   Timer? _debounce;
 
   final _showSearchController = EpgShowSearchController();
-  final CatalogTextFilter<Channel> _channelFilter = CatalogTextFilter(
-    (c) => c.name,
-  );
 
   /// The query these results were fetched for - re-fetch only when
   /// [_appliedQuery] moves past this, not on every unrelated rebuild.
   String? _catalogResultsFor;
+  List<Channel> _channelResults = const [];
   List<VodItem> _vodResults = const [];
   List<Series> _seriesResults = const [];
+
+  /// The On Now rows' channels, read from the catalog.
+  final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
 
   @override
   void initState() {
@@ -141,9 +142,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   String get _normalizedQuery => _query.trim().toLowerCase();
   bool get _hasQuery => _normalizedQuery.isNotEmpty;
 
-  List<Channel> _filterChannels(List<Channel> channels) =>
-      _channelFilter.filterWhole(channels, _appliedQuery);
-
   /// Kicks off (or skips, if already resolved for [_appliedQuery]) the VOD/
   /// series catalog search. Called from [build] - `setState` inside is safe
   /// because it only fires from the async completion callback, never
@@ -153,12 +151,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     _catalogResultsFor = _appliedQuery;
     final query = _appliedQuery;
     if (query.trim().isEmpty) {
+      _channelResults = const [];
       _vodResults = const [];
       _seriesResults = const [];
       return;
     }
     unawaited(
       Future.wait([
+        repo.pageActiveItems<Channel>(
+          kind: kCatalogKindLive,
+          search: query,
+          offset: 0,
+          limit: _searchResultLimit,
+        ),
         repo.pageActiveItems<VodItem>(
           kind: kCatalogKindVod,
           search: query,
@@ -174,8 +179,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       ]).then((results) {
         if (mounted && _catalogResultsFor == query) {
           setState(() {
-            _vodResults = results[0] as List<VodItem>;
-            _seriesResults = results[1] as List<Series>;
+            _channelResults = results[0] as List<Channel>;
+            _vodResults = results[1] as List<VodItem>;
+            _seriesResults = results[2] as List<Series>;
           });
         }
       }),
@@ -192,7 +198,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
-    final channels = ref.watch(liveChannelsProvider);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -202,21 +207,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
       );
     }
 
-    _ensureCatalogResults(ref.watch(catalogRepositoryProvider));
-    final filteredChannels = _filterChannels(channels);
+    final repo = ref.watch(catalogRepositoryProvider);
+    _ensureCatalogResults(repo);
+    final filteredChannels = _channelResults;
     final filteredVodItems = _vodResults;
     final filteredSeries = _seriesResults;
-    // Build from the FULL channel list (not the filtered one) - EPG
-    // show-result channel lookups must work even when the show's
-    // channel name doesn't match the current query.
-    final channelsById = {for (final c in channels) c.id: c};
+    // Resolved by id from the whole catalog, not the name-filtered results:
+    // a show's channel needn't match the query.
+    final channelsById = _showResultChannels.channelsFor(
+      _showSearchController.results,
+      repo,
+      onResolved: () {
+        if (mounted) setState(() {});
+      },
+    );
     // Computed once per build and threaded through to both the All tab and
     // the Live TV tab's ShowSearchResultsView - both are built eagerly by
     // TabBarView on every keystroke, so without sharing this the On-Now/
@@ -288,7 +299,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         seriesList.isEmpty &&
         onNowEntries.isEmpty &&
         upcomingEntries.isEmpty) {
-      return _buildEmptyState('No results found');
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
 
     final l = AppLocalizations.of(context);
@@ -337,7 +348,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             return _ChannelListTile(
               channel: row,
               onTap: () {
-                widget.onChannelContextChanged?.call(channels);
+                widget.onChannelContextChanged?.call(
+                  ListChannelContext(channels),
+                );
                 widget.onChannelSelect(row);
               },
             );
@@ -390,7 +403,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         precomputedResult: showResult,
       );
     }
-    if (channels.isEmpty) return _buildEmptyState('No results found');
+    if (channels.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/live-tv',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -405,7 +420,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           channel: channels[index],
           autofocus: index == 0,
           onTap: () {
-            widget.onChannelContextChanged?.call(channels);
+            widget.onChannelContextChanged?.call(ListChannelContext(channels));
             widget.onChannelSelect(channels[index]);
           },
         ),
@@ -415,7 +430,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildMoviesTab(List<VodItem> vodItems) {
     if (!_hasQuery) return _buildPromptState();
-    if (vodItems.isEmpty) return _buildEmptyState('No results found');
+    if (vodItems.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/movies',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -437,7 +454,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildSeriesTab(List<Series> seriesList) {
     if (!_hasQuery) return _buildPromptState();
-    if (seriesList.isEmpty) return _buildEmptyState('No results found');
+    if (seriesList.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/series',
       horizontalEdge: DpadEdgeBehavior.stop,

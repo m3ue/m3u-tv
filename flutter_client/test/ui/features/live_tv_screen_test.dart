@@ -9,13 +9,17 @@ import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+
+import '../../fixtures/seeded_catalog.dart';
 
 /// #217 made the Live TV search field `activateOnSelect: true` - on TV it
 /// renders as a non-editing button facade until activated, so there is no
@@ -27,6 +31,17 @@ Future<void> enterQuery(WidgetTester tester, String query) async {
     await tester.pumpAndSettle();
   }
   await tester.enterText(field, query);
+}
+
+/// Inside `tester.runAsync`, a catalog page is only requested by a build and
+/// lands on the real event loop, so frames and real time have to alternate
+/// before the tree can settle.
+Future<void> settleWithRealIo(WidgetTester tester) async {
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+  }
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -634,7 +649,9 @@ void main() {
             viewSettingsService: serviceA,
           ),
         );
-        await tester.pumpAndSettle();
+        // The channel list waits for A's slow first read (its remembered
+        // category and layout) before loading.
+        await settleWithRealIo(tester);
 
         final storeB = PersistentJsonStore(file: secondFile);
         final serviceB = ViewSettingsService(store: storeB);
@@ -648,7 +665,7 @@ void main() {
             viewSettingsService: serviceB,
           ),
         );
-        await tester.pumpAndSettle();
+        await settleWithRealIo(tester);
 
         expect(
           find.byKey(const ValueKey('timeline-previous-day')),
@@ -2015,10 +2032,10 @@ class _TestApp extends StatelessWidget {
     final epg = epgService ?? EpgService();
     return ProviderScope(
       overrides: [
+        catalogRepositoryProvider.overrideWith((_) => catalogWith(channels)),
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
         isLoadingContentProvider.overrideWith((_) => isLoading),
-        liveChannelsProvider.overrideWith((_) => channels),
         liveCategoriesProvider.overrideWith((_) => categories),
         epgServiceProvider.overrideWith((_) => epg),
         dvrRecordingsProvider.overrideWith((_) => dvrRecordings),
@@ -2038,12 +2055,32 @@ class _TestApp extends StatelessWidget {
           viewSettingsService: viewSettingsService,
           onChannelSelect: onChannelSelect ?? (_) {},
           useSidebarLayout: useSidebarLayout,
-          onChannelContextChanged: onChannelContextChanged,
+          onChannelContextChanged: onChannelContextChanged == null
+              ? null
+              : (context) => _reportContext(
+                  context,
+                  catalogWith(channels),
+                  onChannelContextChanged!,
+                ),
           onScheduleProgram: onScheduleProgram,
           onSearchShows: onSearchShows,
           onShowSelect: onShowSelect,
         ),
       ),
     );
+  }
+}
+
+/// Hands a test the channels [context] holds, in order: read from the
+/// catalog for a [CatalogChannelContext].
+void _reportContext(
+  ChannelContext context,
+  CatalogRepository repository,
+  void Function(List<Channel>) report,
+) {
+  if (context is CatalogChannelContext) {
+    unawaited(context.query.page(repository, 0, 1000).then(report));
+  } else if (context is ListChannelContext) {
+    report(context.channels);
   }
 }

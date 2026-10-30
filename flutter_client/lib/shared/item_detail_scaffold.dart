@@ -1,8 +1,7 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
+import 'package:m3u_tv/shared/frosted_surface.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -150,26 +149,19 @@ class _GlassTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ClipRRect(
+    return FrostedSurface(
       borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 14 * scale,
-            vertical: 6 * scale,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFF09090b).withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          ),
-          child: Text(
-            title,
-            overflow: TextOverflow.ellipsis,
-            style: theme.appBarTheme.titleTextStyle,
-          ),
-        ),
+      sigma: 16,
+      tintAlpha: 0.55,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.symmetric(
+        horizontal: 14 * scale,
+        vertical: 6 * scale,
+      ),
+      child: Text(
+        title,
+        overflow: TextOverflow.ellipsis,
+        style: theme.appBarTheme.titleTextStyle,
       ),
     );
   }

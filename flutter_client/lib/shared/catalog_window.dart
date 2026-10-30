@@ -72,6 +72,16 @@ class CatalogWindow<T> extends ChangeNotifier {
   /// [ensureVisible] is what actually schedules the fetch.
   T? itemAt(int index) => _items[index];
 
+  /// The index of the first resident row matching [test], or null when none
+  /// of the loaded rows does.
+  int? indexWhere(bool Function(T item) test) {
+    int? found;
+    for (final MapEntry(key: index, value: item) in _items.entries) {
+      if (test(item) && (found == null || index < found)) found = index;
+    }
+    return found;
+  }
+
   /// Swap the underlying query (new category / search text), then [load].
   Future<void> configure({
     required CatalogPageFetcher<T> fetchPage,

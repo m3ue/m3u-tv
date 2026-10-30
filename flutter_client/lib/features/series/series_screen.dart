@@ -100,6 +100,9 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     super.initState();
     _sortOption = _initialSortOption();
     _favoritesFirst = _initialFavoritesFirst();
+    // Like Live TV and Home: pick up changes made elsewhere (a detail page,
+    // a server sync) rather than only after this screen's own toggles.
+    widget.favoritesService?.addListener(_onFavoritesChanged);
     unawaited(_loadFavorites());
     _reconfigureWindow();
   }
@@ -125,6 +128,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 
   @override
   void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
     _debounce?.cancel();
     _gridFocusNode.dispose();
     _window.dispose();
@@ -182,6 +186,8 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     setState(() => _selectedCategory = id);
     if (id != _kFavoritesCategoryId) _reconfigureWindow();
   }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
 
   Future<void> _loadFavorites() async {
     final service = widget.favoritesService;
@@ -276,7 +282,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -324,7 +330,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     if (_favoriteItems.isEmpty) {
       return Center(
         child: Text(
-          'No series available',
+          AppLocalizations.of(context).homeNoSeries,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       );
@@ -410,7 +416,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         if (window.error != null && !window.hasLoadedOnce) {
           return Center(
             child: Text(
-              'Unable to load series',
+              AppLocalizations.of(context).seriesLoadFailed,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );
@@ -418,7 +424,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         if (window.totalCount == 0) {
           return Center(
             child: Text(
-              'No series available',
+              AppLocalizations.of(context).homeNoSeries,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );

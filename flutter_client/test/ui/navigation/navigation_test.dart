@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';

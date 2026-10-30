@@ -14,8 +14,8 @@ This is the TV frontend for the `m3u-editor` system. It focuses on video playbac
 ## Architecture
 
 - **Navigation**: `dpad` package v3 (Shortcuts + Actions based spatial traversal) + `Navigator` for in-content routing.
-- **State**: Riverpod 2 (`flutter_riverpod`). Providers live in `lib/providers/app_providers.dart`. `AppStateController` is the underlying orchestrator — Riverpod owns a thin `_AppStateProxy` wrapper so widgets never reference `AppStateController` directly.
-- **Player**: `video_player` / platform player via `PlaybackOrchestrator`.
+- **State**: Riverpod 3 (`flutter_riverpod`), currently through its `legacy.dart` APIs (`ChangeNotifierProvider`, `StateProvider`); prefer `Notifier`/`AsyncNotifier` for new standalone state. Providers live in `lib/providers/app_providers.dart`. `AppStateController` is the underlying orchestrator - Riverpod owns a thin `_AppStateProxy` wrapper so widgets never reference `AppStateController` directly.
+- **Player**: `PlaybackOrchestrator` over per-platform backends (ExoPlayer and mpv on Android, mpv/AVKit on Apple, libmpv on desktop, `<video>` on web, server transcode fallback). There is no `video_player` dependency.
 - **UI**: Material 3, `DpadFocusable` for all interactive items, `DpadRegion` for focus grouping.
 
 ## Rules
@@ -39,7 +39,7 @@ The app uses Flutter `gen_l10n`. All user-visible strings **must** be localized 
 
 ### State Management (Riverpod — mandatory for new features)
 
-The app uses Riverpod 2 for reactive UI state. All new feature screens must follow this pattern:
+The app uses Riverpod 3 for reactive UI state. All new feature screens must follow this pattern:
 
 **Reading data — always use providers, never `AppStateController` directly:**
 ```dart
@@ -47,14 +47,14 @@ class MyScreen extends ConsumerStatefulWidget { ... }
 class _MyScreenState extends ConsumerState<MyScreen> {
   @override
   Widget build(BuildContext context) {
-    final channels = ref.watch(liveChannelsProvider);   // ✓
-    // NOT: widget.appState.channels                    // ✗
+    final categories = ref.watch(liveCategoriesProvider); // ✓
+    // NOT: widget.appState.liveCategories               // ✗
   }
 }
 ```
 
 **Existing providers** (all in `lib/providers/app_providers.dart`):
-- Data: `liveChannelsProvider`, `liveCategoriesProvider`, `vodItemsProvider`, `vodCategoriesProvider`, `seriesListProvider`, `seriesCategoriesProvider`
+- Data: `liveCategoriesProvider`, `vodCategoriesProvider`, `seriesCategoriesProvider`, and `catalogRepositoryProvider` for catalog rows. Channels, movies and series live in the SQLite catalog, not in memory: page them (`CatalogWindow`, `LiveChannelQuery`) or resolve ids (`activeItemsByIds`).
 - Status: `isConfiguredProvider`, `isBootstrappingProvider`, `isLoadingContentProvider`
 - Services (stable, use `ref.read`): `epgServiceProvider`, `liveFavoritesServiceProvider`, `vodFavoritesServiceProvider`, `seriesFavoritesServiceProvider`
 - Home extras: `progressListProvider`, `dvrRecordingsProvider`, `sourceLabelProvider`, `sourceErrorProvider`, `hasDvrFeatureProvider`
@@ -70,14 +70,23 @@ final myNewProvider = Provider<MyType>((ref) {
 
 **Tests** — wrap with `ProviderScope` and override only the providers the screen watches:
 ```dart
+// Seed an in-memory CatalogRepository inside tester.runAsync: drift's real
+// I/O doesn't resolve under the test's fakeAsync zone.
 ProviderScope(
   overrides: [
     isConfiguredProvider.overrideWith((_) => true),
-    liveChannelsProvider.overrideWith((_) => fakeChannels),
+    catalogRepositoryProvider.overrideWith((_) => repo),
   ],
   child: MaterialApp(home: MyScreen(...)),
 )
 ```
+
+### Performance (keep work off the UI isolate)
+- **JSON/HTTP**: REST calls go through `ApiClient` (`lib/services/api_client.dart`) - shared timeout, `ApiException`, web-safe, large bodies decoded off-isolate. Don't hand-roll `HttpClient` + `jsonDecode` in a service or widget. Exceptions: Xtream catalog downloads (their own byte-streaming transport) and the live-stream preflight probes in `PlaybackOrchestrator`, which must abort mid-body.
+- **Big payloads**: use `json_isolate.dart` (`runOffMainIsolate`, `decodeJsonBytesOffMainIsolate`, `BackgroundWorker` for recurring bursts). Pass bytes, not decoded Strings, to an isolate.
+- **SQLite**: bulk catalog/EPG writes and full-guide reads go through `CatalogDatabase.computeWithDatabase` above `_offloadThresholdRows`; closures sent to it must capture only sendable values (static helpers, no `this`).
+- **build()**: never sort, filter or look up per-item data for a whole list in `build()`. Memoize derived lists on their inputs and do per-item lookups in the item builder. Large catalogs (channels, movies, series) are paged from SQLite rather than filtered in Dart: sort and filter in the query (`CatalogSort`, `nameSortKey` for natural order). Sort large lists with `sortByNatural` (precomputed keys), not `list.sort(compareNatural)`.
+- **High-frequency state** (playback position, clocks): use a `ValueNotifier` + `ValueListenableBuilder` scoped to the widgets that show it, not `setState` on a large screen.
 
 ### Style
 - Material 3 throughout. No `OutlinedButton` — use `FilledButton`, `FilledButton.tonal`, `FilledButton.icon`, or `FilledButton.tonalIcon`.
@@ -85,5 +94,5 @@ ProviderScope(
 
 ### Commands
 - **Analyze**: `cd flutter_client && flutter analyze lib test` (scoped to avoid the analyzer treating vendored SPM checkouts under `ios/build/`/`macos/build/` — e.g. `firebase_messaging`'s own `pubspec.yaml` — as a nested project to lint; `analyzer.exclude` globs don't suppress this once a directory has its own `pubspec.yaml`)
-- **Test**: `cd flutter_client && flutter test`
+- **Test**: `cd flutter_client && flutter test test/path/to/file_test.dart` - run only the files covering the change (optionally `--plain-name`), not the whole suite.
 - **Run (Android TV)**: `cd flutter_client && flutter run -d <device-id>`

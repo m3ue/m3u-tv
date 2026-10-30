@@ -94,6 +94,45 @@ void main() {
     },
   );
 
+  test(
+    'evicting a channel schedule forgets its catchup fetch, so the next '
+    'open fetches again',
+    () async {
+      final transport = _CatchupTransport();
+      final epgService = EpgService(residentCapacity: 1);
+      final controller = _controller(transport, epgService: epgService);
+      addTearDown(controller.dispose);
+      expect(await controller.connectXtream(_credentials), isTrue);
+      await controller.ensureCatchupEpgForChannel(_catchupChannel);
+
+      // Another channel's schedule becoming resident (a guide row scrolled
+      // to a dated range) pushes this one out of memory.
+      final now = DateTime.now().toUtc();
+      epgService.mergePrograms(
+        [
+          EpgProgram(
+            channelId: 'plain.epg',
+            title: 'Other',
+            description: '',
+            start: now,
+            end: now.add(const Duration(hours: 1)),
+          ),
+        ],
+        channelIds: ['plain.epg'],
+        replaceExisting: false,
+        markFresh: false,
+      );
+      for (var i = 0; i < 4; i++) {
+        await pumpEventQueue();
+        await epgService.flushStore();
+      }
+
+      transport.epgDates.clear();
+      await controller.ensureCatchupEpgForChannel(_catchupChannel);
+      expect(transport.epgDates, isNotEmpty);
+    },
+  );
+
   test('channels without catchup never trigger a fetch', () async {
     final transport = _CatchupTransport();
     final controller = _controller(transport);
@@ -267,7 +306,10 @@ String _ymd(DateTime value) {
       '${two(value.month)}-${two(value.day)}';
 }
 
-AppStateController _controller(_CatchupTransport transport) {
+AppStateController _controller(
+  _CatchupTransport transport, {
+  EpgService? epgService,
+}) {
   final memory = <String, Object?>{};
   return AppStateController(
     xtreamService: XtreamService(
@@ -276,7 +318,7 @@ AppStateController _controller(_CatchupTransport transport) {
     ),
     secureStorage: InMemorySecureStorage(),
     cacheService: CacheService(memory: <String, Object?>{}),
-    epgService: EpgService(),
+    epgService: epgService ?? EpgService(),
     favoritesService: FavoritesService(memory: memory),
     vodFavoritesService: FavoritesService(memory: memory, namespace: 'vod'),
     seriesFavoritesService: FavoritesService(

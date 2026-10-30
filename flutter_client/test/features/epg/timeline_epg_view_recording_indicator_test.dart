@@ -6,6 +6,8 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 
+import '../../fixtures/list_channel_rows.dart';
+
 void main() {
   final now = DateTime(2026, 6, 1, 12);
 
@@ -45,7 +47,7 @@ void main() {
           width: width,
           height: height,
           child: TimelineEpgView(
-            channels: [channelOverride ?? channel],
+            channels: ListChannelRows([channelOverride ?? channel]),
             epgService: epgService,
             onChannelSelect: (_) {},
             clock: () => now,

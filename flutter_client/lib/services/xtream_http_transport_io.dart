@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:m3u_tv/services/xtream_http_transport_common.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -32,11 +33,16 @@ Future<Object?> _send(HttpClient client, XtreamRequest request) async {
   }
 
   final response = await httpRequest.close();
+  // Kept as bytes: decoding to a String here would run the UTF-8 pass for a
+  // whole catalog on the UI isolate, then copy the String to the parse
+  // isolate.
+  final body = BytesBuilder(copy: false);
+  await response.forEach(body.add);
   return handleXtreamResponse(
     request: request,
     uri: uri,
     statusCode: response.statusCode,
     reasonPhrase: response.reasonPhrase,
-    text: await utf8.decodeStream(response),
+    bytes: body.takeBytes(),
   );
 }

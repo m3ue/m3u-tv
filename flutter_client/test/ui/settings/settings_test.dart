@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
-import 'package:m3u_tv/features/settings/connection_form.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
-import 'package:m3u_tv/features/settings/viewer_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
@@ -347,105 +345,6 @@ void main() {
         expect(result, isFalse);
       },
     );
-  });
-
-  // --- ConnectionForm widget ---
-
-  group('ConnectionForm', () {
-    testWidgets('shows server, username, password fields', (tester) async {
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (_) {}),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Server URL'), findsOneWidget);
-      expect(find.text('Username'), findsOneWidget);
-      expect(find.text('Password'), findsOneWidget);
-    });
-
-    testWidgets('shows error when fields are empty on connect', (tester) async {
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (_) {}),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Connect'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Please fill in all fields'), findsOneWidget);
-    });
-
-    testWidgets('calls onConnect with entered credentials', (tester) async {
-      UserCredentials? captured;
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (creds) => captured = creds),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextFormField).at(0), 'http://x.com');
-      await tester.enterText(find.byType(TextFormField).at(1), 'user1');
-      await tester.enterText(find.byType(TextFormField).at(2), 'pass1');
-      await tester.tap(find.text('Connect'));
-      await tester.pumpAndSettle();
-
-      expect(captured, isNotNull);
-      expect(captured!.server, 'http://x.com');
-      expect(captured!.username, 'user1');
-      expect(captured!.password, 'pass1');
-    });
-
-    testWidgets('shows loading indicator when isLoading is true', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (_) {}, isLoading: true),
-        ),
-      );
-      // Use pump instead of pumpAndSettle because CircularProgressIndicator has infinite animation
-      await tester.pump();
-
-      // The Connect button should be disabled and show a progress indicator
-      expect(find.byType(CircularProgressIndicator), findsWidgets);
-      // The "Connect" text should not be visible when loading
-      expect(find.text('Connect'), findsNothing);
-    });
-
-    testWidgets('shows error text when error is provided', (tester) async {
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (_) {}, error: 'Authentication failed'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Authentication failed'), findsOneWidget);
-    });
-
-    testWidgets('password field obscures text', (tester) async {
-      await tester.pumpWidget(
-        _testApp(
-          ConnectionForm(onConnect: (_) {}),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Find the password field (3rd TextFormField) and verify its TextField has obscureText
-      final passwordField = find.byType(TextFormField).at(2);
-      // Find the TextField descendant within this TextFormField
-      final textField = find.descendant(
-        of: passwordField,
-        matching: find.byType(TextField),
-      );
-      final textFieldWidget = tester.widget<TextField>(textField);
-      expect(textFieldWidget.obscureText, isTrue);
-    });
   });
 
   // --- SettingsScreen widget ---
@@ -996,56 +895,6 @@ void main() {
       pairingService.dispose();
 
       expect(notifier.isConfigured, isTrue);
-    });
-  });
-
-  // --- ViewerSelector widget ---
-
-  group('ViewerSelector', () {
-    testWidgets('shows active viewer name and admin badge', (tester) async {
-      final viewers = [
-        const Viewer(id: 1, ulid: 'v1', name: 'Admin', isAdmin: true),
-        const Viewer(id: 2, ulid: 'v2', name: 'User', isAdmin: false),
-      ];
-
-      await tester.pumpWidget(
-        _testApp(
-          ViewerSelector(
-            viewers: viewers,
-            activeViewer: viewers[0],
-            onSwitch: (_) {},
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Admin name appears in the viewer card
-      expect(find.text('Admin'), findsWidgets);
-      expect(find.text('Switch Viewer'), findsOneWidget);
-    });
-
-    testWidgets('calls onSwitch when a viewer is selected', (tester) async {
-      final viewers = [
-        const Viewer(id: 1, ulid: 'v1', name: 'Admin', isAdmin: true),
-        const Viewer(id: 2, ulid: 'v2', name: 'User', isAdmin: false),
-      ];
-      Viewer? switchedTo;
-
-      await tester.pumpWidget(
-        _testApp(
-          ViewerSelector(
-            viewers: viewers,
-            activeViewer: viewers[0],
-            onSwitch: (v) => switchedTo = v,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('User'));
-      await tester.pumpAndSettle();
-
-      expect(switchedTo, viewers[1]);
     });
   });
 

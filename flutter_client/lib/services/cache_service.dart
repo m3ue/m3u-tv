@@ -65,6 +65,9 @@ class CacheService {
   final CatalogRepository _repo;
   Duration refreshInterval;
 
+  /// The SQLite catalog the large keys are stored in.
+  CatalogRepository get catalogRepository => _repo;
+
   static const String _sourceKey = CatalogRepository.activeSource;
 
   static const Map<String, String> _itemKinds = {
@@ -117,6 +120,19 @@ class CacheService {
     );
   }
 
+  /// How many rows a catalog item key (`liveStreams` / `vodStreams` /
+  /// `seriesStreams`) holds, or null when it has never been written. Lets a
+  /// caller check for cached content without decoding every row.
+  Future<int?> itemCount(String key) async {
+    final kind = _itemKinds[key];
+    if (kind == null) throw ArgumentError.value(key, 'key', 'not an item key');
+    final repo = _repo;
+    if (repo.isClosed || await repo.kvUpdatedAt(_tsKey(key)) == null) {
+      return null;
+    }
+    return repo.countItems(sourceKey: _sourceKey, kind: kind);
+  }
+
   Future<CacheSnapshot> snapshot() async {
     final memory = Map<String, Object?>.fromEntries(
       _memory.entries.where((entry) => entry.key.startsWith('m3ue_cache_')),
@@ -127,11 +143,17 @@ class CacheService {
     return CacheSnapshot._(memory, persisted, await _repo.snapshot());
   }
 
+  /// A [replace] value meaning "leave this key's stored data as it is"
+  /// (rather than wiping it, as [replace] does to keys it isn't given). Used
+  /// for the guide, which `EpgService` writes through on its own.
+  static const Object keepExisting = _KeepExisting();
+
   Future<void> replace(Map<String, Object?> values) async {
     final timestamp = DateTime.now();
     final memory = <String, Object?>{};
     final persisted = <String, Object?>{};
     for (final entry in values.entries) {
+      if (identical(entry.value, keepExisting)) continue;
       if (_isRepoKey(entry.key)) {
         await _writeRepoKey(entry.key, entry.value, timestamp);
         continue;
@@ -317,4 +339,8 @@ Object? _decodeCacheData(String key, Object? raw) {
       list?.map((item) => Viewer.fromJson(asMap(item))).toList(growable: false),
     _ => raw,
   };
+}
+
+class _KeepExisting {
+  const _KeepExisting();
 }

@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -124,6 +129,45 @@ ShowResultEntries buildShowResultEntries(
   );
 }
 
+/// Resolves the channels a show search's On Now rows tune to straight from
+/// the catalog, for screens that don't hold the whole lineup in memory (the
+/// `channelsById` [buildShowResultEntries] needs).
+class ShowResultChannelLookup {
+  List<EpgShow>? _shows;
+  Map<int, Channel> _channelsById = const <int, Channel>{};
+  int _generation = 0;
+
+  /// The channels resolved for [shows] so far. A new [shows] list starts a
+  /// catalog read and calls [onResolved] once it lands; until then this
+  /// returns the previous result.
+  Map<int, Channel> channelsFor(
+    List<EpgShow> shows,
+    CatalogRepository repository, {
+    required VoidCallback onResolved,
+  }) {
+    if (identical(shows, _shows)) return _channelsById;
+    _shows = shows;
+    final generation = ++_generation;
+    final ids = {
+      for (final show in shows)
+        for (final episode in show.airingNow) episode.channelId,
+    };
+    if (ids.isEmpty) return _channelsById = const <int, Channel>{};
+    unawaited(
+      repository
+          .activeItemsByIds<Channel>(kind: kCatalogKindLive, ids: ids)
+          .then((channels) {
+            if (generation != _generation) return;
+            _channelsById = {
+              for (final channel in channels) channel.id: channel,
+            };
+            onResolved();
+          }),
+    );
+    return _channelsById;
+  }
+}
+
 /// Single row style shared by On Now and Upcoming results so the merged
 /// "All" tab reads as one consistent list rather than mixed layouts. On
 /// Now rows tap straight to the channel (skip-previous/next then stays
@@ -146,7 +190,7 @@ class ShowResultRow extends StatelessWidget {
   final Channel? channel;
   final List<Channel> onNowChannels;
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(EpgShow)? onShowSelect;
   final String languageTag;
   final bool autofocus;
@@ -187,7 +231,9 @@ class ShowResultRow extends StatelessWidget {
         ? (onNowChannel == null
               ? null
               : () {
-                  onChannelContextChanged?.call(onNowChannels);
+                  onChannelContextChanged?.call(
+                    ListChannelContext(onNowChannels),
+                  );
                   onChannelSelect(onNowChannel);
                 })
         : () => onShowSelect?.call(entry.show);

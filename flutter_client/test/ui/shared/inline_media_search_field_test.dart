@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
 void main() {
@@ -15,6 +16,8 @@ void main() {
         StatefulBuilder(
           builder: (context, setState) {
             return MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               theme: ThemeData.dark(useMaterial3: true),
               home: Scaffold(
                 body: InlineMediaSearchField(
@@ -70,6 +73,8 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark(useMaterial3: true),
           home: Scaffold(
             body: InlineMediaSearchField(
@@ -108,6 +113,8 @@ void main() {
         StatefulBuilder(
           builder: (context, setState) {
             return MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               theme: ThemeData.dark(useMaterial3: true),
               home: Scaffold(
                 body: InlineMediaSearchField(

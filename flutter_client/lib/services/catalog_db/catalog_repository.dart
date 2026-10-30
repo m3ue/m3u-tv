@@ -1,10 +1,14 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/epg_store.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
+import 'package:m3u_tv/shared/natural_sort.dart';
 
 /// Which promoted column (if any) a windowed page/count query orders by,
 /// beyond the provider's own [CatalogItems.sortIndex]. A dedicated enum
@@ -20,13 +24,23 @@ enum CatalogSort {
 
   /// [CatalogItems.recency], newest first.
   recentDesc,
+
+  /// [CatalogItems.channelNumber] ascending, unnumbered rows last, then
+  /// natural name order.
+  channelNumber,
+
+  /// [CatalogItems.nameSortKey]: `compareNatural` order, A-Z.
+  nameNatural,
+
+  /// [CatalogItems.nameSortKey] reversed: Z-A.
+  nameNaturalDesc,
 }
 
 /// Domain-facing wrapper over [CatalogDatabase]. Encodes/decodes rows through
 /// `catalog_codec`, keeps the promoted columns in sync, and exposes both the
 /// full-list reads the app still relies on and the windowed page/count reads
 /// the grids will move to.
-class CatalogRepository {
+class CatalogRepository implements EpgProgrammeStore {
   CatalogRepository(this._db);
 
   final CatalogDatabase _db;
@@ -55,6 +69,7 @@ class CatalogRepository {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
     CatalogSort sort = CatalogSort.providerOrder,
     Set<int> favoritesFirst = const {},
     required int offset,
@@ -64,6 +79,7 @@ class CatalogRepository {
     kind: kind,
     categoryId: categoryId,
     search: search,
+    ids: ids,
     sort: sort,
     favoritesFirst: favoritesFirst,
     offset: offset,
@@ -74,12 +90,39 @@ class CatalogRepository {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
   }) => countItems(
     sourceKey: activeSource,
     kind: kind,
     categoryId: categoryId,
     search: search,
+    ids: ids,
   );
+
+  /// The deepest catchup retention, in days, among the active live channels
+  /// matching the same filters as [pageActiveItems]. 0 when none has catchup.
+  Future<int> maxActiveCatchupDays({
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+  }) async {
+    final table = _db.catalogItems;
+    final max = table.catchupDays.max();
+    final query = _db.selectOnly(table)
+      ..addColumns([max])
+      ..where(
+        _itemFilter(
+          table,
+          activeSource,
+          kCatalogKindLive,
+          categoryId,
+          search,
+          ids,
+        ),
+      );
+    final row = await query.getSingle();
+    return row.read(max) ?? 0;
+  }
 
   /// A single active-source row by id, or null if it isn't in the current
   /// catalog. For resolving a bare id (a deep link, a push notification, a
@@ -151,9 +194,30 @@ class CatalogRepository {
     required String sourceKey,
     required String kind,
     required List<Object> items,
-  }) async {
-    await _db.transaction(() async {
-      await (_db.delete(_db.catalogItems)
+  }) {
+    // Every row is a jsonEncode plus a companion; for a large library that
+    // per-row work (not the SQL, which drift already runs off-thread) blocked
+    // the UI isolate for the length of a catalog refresh.
+    if (!_offloadWrites || items.length < _offloadThresholdRows) {
+      return _replaceItemsOn(_db, sourceKey, kind, items);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _replaceItemsOn(db, sourceKey, kind, items),
+    );
+  }
+
+  /// No isolates (and so no `computeWithDatabase`) on the web.
+  static const bool _offloadWrites = !kIsWeb;
+
+  static Future<void> _replaceItemsOn(
+    CatalogDatabase db,
+    String sourceKey,
+    String kind,
+    List<Object> items,
+  ) async {
+    await db.transaction(() async {
+      await (db.delete(db.catalogItems)
             ..where((t) => t.sourceKey.equals(sourceKey) & t.kind.equals(kind)))
           .go();
       // The PK is (sourceKey, kind, streamId). Provider payloads are not
@@ -165,7 +229,7 @@ class CatalogRepository {
       // Nothing reads a row back by this column; the decoded `.id` comes from
       // the json payload.
       final usedIds = <int>{};
-      await _db.batch((batch) {
+      await db.batch((batch) {
         for (var i = 0; i < items.length; i++) {
           var row = _rowFor(sourceKey, kind, items[i], i);
           if (row.streamId.value <= 0 || !usedIds.add(row.streamId.value)) {
@@ -173,13 +237,13 @@ class CatalogRepository {
             usedIds.add(surrogate);
             row = row.copyWith(streamId: Value(surrogate));
           }
-          batch.insert(_db.catalogItems, row, mode: InsertMode.insertOrReplace);
+          batch.insert(db.catalogItems, row, mode: InsertMode.insertOrReplace);
         }
       });
     });
   }
 
-  CatalogItemsCompanion _rowFor(
+  static CatalogItemsCompanion _rowFor(
     String sourceKey,
     String kind,
     Object item,
@@ -188,13 +252,22 @@ class CatalogRepository {
     switch (kind) {
       case kCatalogKindLive:
         final channel = item as Channel;
+        final number = channel.channelNumber;
         return CatalogItemsCompanion.insert(
           sourceKey: sourceKey,
           kind: kind,
           streamId: channel.id,
           name: channel.name,
           nameFold: channel.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(channel.name).encode()),
           categoryId: Value(channel.categoryId),
+          channelNumber: Value(number == 0 ? null : number),
+          catchupDays: Value(
+            EpgService.effectiveCatchupRetentionDays(
+              channel.catchupSupported,
+              channel.catchupDays,
+            ),
+          ),
           sortIndex: sortIndex,
           json: jsonEncode(encodeChannel(channel)),
         );
@@ -206,6 +279,7 @@ class CatalogRepository {
           streamId: vod.id,
           name: vod.name,
           nameFold: vod.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(vod.name).encode()),
           categoryId: Value(vod.categoryId),
           categoryIdsJson: Value(
             vod.categoryIds.isEmpty ? null : jsonEncode(vod.categoryIds),
@@ -224,6 +298,7 @@ class CatalogRepository {
           streamId: series.id,
           name: series.name,
           nameFold: series.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(series.name).encode()),
           categoryId: Value(series.categoryId),
           categoryIdsJson: Value(
             series.categoryIds.isEmpty ? null : jsonEncode(series.categoryIds),
@@ -241,7 +316,8 @@ class CatalogRepository {
 
   /// Parses a domain object's four-digit `year` string into the promoted
   /// column's int, or null for anything absent/malformed.
-  int? _parseYear(String? year) => year == null ? null : int.tryParse(year);
+  static int? _parseYear(String? year) =>
+      year == null ? null : int.tryParse(year);
 
   static Object _decodeRow(String kind, String json) {
     final map = asMap(jsonDecode(json));
@@ -289,36 +365,69 @@ class CatalogRepository {
   }
 
   /// A windowed slice of [kind], provider order, optionally filtered to
-  /// [categoryId] and/or a case-insensitive [search] substring of the name,
-  /// ordered per [sort] (see [_orderingFor]). Rows whose id is in
-  /// [favoritesFirst] are ordered ahead of the rest, each group still in
-  /// [sort] order.
+  /// [categoryId], a case-insensitive [search] substring of the name and/or
+  /// the rows whose id is in [ids], ordered per [sort] (see [_orderingFor]).
+  /// Rows whose id is in [favoritesFirst] are ordered ahead of the rest, each
+  /// group still in [sort] order.
   Future<List<T>> pageItems<T>({
     required String sourceKey,
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
     CatalogSort sort = CatalogSort.providerOrder,
     Set<int> favoritesFirst = const {},
     required int offset,
     required int limit,
   }) async {
     final query = _db.select(_db.catalogItems)
-      ..where((t) => _itemFilter(t, sourceKey, kind, categoryId, search))
-      ..orderBy([
-        if (favoritesFirst.isNotEmpty)
-          (t) => OrderingTerm(
-            expression: t.streamId.isIn(favoritesFirst),
-            mode: OrderingMode.desc,
-          ),
-        ..._orderingFor(sort),
-      ])
+      ..where(
+        (t) => _itemFilter(t, sourceKey, kind, categoryId, search, ids),
+      )
+      ..orderBy(_orderingWithFavorites(sort, favoritesFirst))
       ..limit(limit, offset: offset);
     final rows = await query.get();
     return rows
         .map((r) => _decodeRow(kind, r.json) as T)
         .toList(growable: false);
   }
+
+  /// The stored ids of the active rows [pageActiveItems] would return for
+  /// the same arguments, in the same order, without decoding a single row:
+  /// for finding where one row sits in a slice.
+  Future<List<int>> activeIdsInOrder({
+    required String kind,
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+    CatalogSort sort = CatalogSort.providerOrder,
+    Set<int> favoritesFirst = const {},
+  }) async {
+    final table = _db.catalogItems;
+    final query = _db.selectOnly(table)
+      ..addColumns([table.streamId])
+      ..where(
+        _itemFilter(table, activeSource, kind, categoryId, search, ids),
+      )
+      ..orderBy([
+        for (final term in _orderingWithFavorites(sort, favoritesFirst))
+          term(table),
+      ]);
+    final rows = await query.get();
+    return [for (final row in rows) row.read(table.streamId)!];
+  }
+
+  List<OrderingTerm Function($CatalogItemsTable)> _orderingWithFavorites(
+    CatalogSort sort,
+    Set<int> favoritesFirst,
+  ) => [
+    if (favoritesFirst.isNotEmpty)
+      (t) => OrderingTerm(
+        expression: t.streamId.isIn(favoritesFirst),
+        mode: OrderingMode.desc,
+      ),
+    ..._orderingFor(sort),
+  ];
 
   /// Ordering terms for [sort], always ending in [CatalogItems.sortIndex] as
   /// a stable tiebreaker. `ratingDesc`/`yearDesc`/`recentDesc` rely on SQLite's default
@@ -352,6 +461,25 @@ class CatalogRepository {
         (t) => OrderingTerm(expression: t.recency, mode: OrderingMode.desc),
         tiebreaker,
       ],
+      CatalogSort.channelNumber => [
+        (t) => OrderingTerm(
+          expression: t.channelNumber,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(expression: t.nameSortKey),
+        tiebreaker,
+      ],
+      CatalogSort.nameNatural => [
+        (t) => OrderingTerm(expression: t.nameSortKey),
+        tiebreaker,
+      ],
+      CatalogSort.nameNaturalDesc => [
+        (t) => OrderingTerm(
+          expression: t.nameSortKey,
+          mode: OrderingMode.desc,
+        ),
+        tiebreaker,
+      ],
     };
   }
 
@@ -360,12 +488,13 @@ class CatalogRepository {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
   }) async {
     final count = _db.catalogItems.streamId.count();
     final query = _db.selectOnly(_db.catalogItems)
       ..addColumns([count])
       ..where(
-        _itemFilter(_db.catalogItems, sourceKey, kind, categoryId, search),
+        _itemFilter(_db.catalogItems, sourceKey, kind, categoryId, search, ids),
       );
     final row = await query.getSingle();
     return row.read(count) ?? 0;
@@ -376,12 +505,14 @@ class CatalogRepository {
     String sourceKey,
     String kind,
     String? categoryId,
-    String? search,
-  ) {
+    String? search, [
+    Set<int>? ids,
+  ]) {
     var predicate = t.sourceKey.equals(sourceKey) & t.kind.equals(kind);
     if (categoryId != null) {
       predicate = predicate & _categoryPredicate(t, categoryId);
     }
+    if (ids != null) predicate = predicate & t.streamId.isIn(ids);
     final trimmed = search?.trim() ?? '';
     if (trimmed.isNotEmpty) {
       predicate = predicate & _likeContains(t.nameFold, trimmed);
@@ -471,12 +602,47 @@ class CatalogRepository {
   // EPG programmes
   // -------------------------------------------------------------------------
 
-  Future<void> upsertProgrammes(List<EpgProgram> programmes) async {
+  Future<void> upsertProgrammes(List<EpgProgram> programmes) {
+    if (programmes.isEmpty) return Future.value();
+    if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
+      return _upsertProgrammesOn(_db, programmes);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _upsertProgrammesOn(db, programmes),
+    );
+  }
+
+  /// Replace the entire programme table with [programmes] (clear + insert),
+  /// matching the "wipe and rewrite" semantics the persisted `epgGuide` blob
+  /// had.
+  Future<void> replaceProgrammes(List<EpgProgram> programmes) {
+    if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
+      return _replaceProgrammesOn(_db, programmes);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _replaceProgrammesOn(db, programmes),
+    );
+  }
+
+  static Future<void> _replaceProgrammesOn(
+    CatalogDatabase db,
+    List<EpgProgram> programmes,
+  ) => db.transaction(() async {
+    await db.delete(db.epgProgrammes).go();
+    await _upsertProgrammesOn(db, programmes);
+  });
+
+  static Future<void> _upsertProgrammesOn(
+    CatalogDatabase db,
+    List<EpgProgram> programmes,
+  ) async {
     if (programmes.isEmpty) return;
-    await _db.batch((batch) {
+    await db.batch((batch) {
       for (final program in programmes) {
         batch.insert(
-          _db.epgProgrammes,
+          db.epgProgrammes,
           EpgProgrammesCompanion.insert(
             channelId: program.channelId,
             startMs: program.start.millisecondsSinceEpoch,
@@ -503,19 +669,41 @@ class CatalogRepository {
     });
   }
 
-  /// Replace the entire programme table with [programmes] (clear + insert),
-  /// matching the "wipe and rewrite" semantics the persisted `epgGuide` blob
-  /// had.
-  Future<void> replaceProgrammes(List<EpgProgram> programmes) async {
-    await _db.transaction(() async {
-      await _db.delete(_db.epgProgrammes).go();
-      await upsertProgrammes(programmes);
-    });
+  /// Every programme ending at or after [cutoff], start-ordered. A full-guide
+  /// read (boot hydration) can be 100k+ rows, so above the offload threshold
+  /// both the query and the row mapping run on a background isolate.
+  Future<List<EpgProgram>> programmesEndingAfter(DateTime cutoff) async {
+    if (_offloadWrites &&
+        await _countProgrammesEndingAfter(cutoff) >= _offloadThresholdRows) {
+      // The computation must capture only sendable values (not `this` or a
+      // drift expression), so it is built apart from the count query.
+      return _db.computeWithDatabase(
+        connect: CatalogDatabase.new,
+        computation: (db) => _programmesEndingAfterOn(db, cutoff),
+      );
+    }
+    return _programmesEndingAfterOn(_db, cutoff);
   }
 
-  Future<List<EpgProgram>> programmesEndingAfter(DateTime cutoff) async {
+  Future<int> _countProgrammesEndingAfter(DateTime cutoff) {
+    final count = _db.epgProgrammes.channelId.count();
+    return (_db.selectOnly(_db.epgProgrammes)
+          ..addColumns([count])
+          ..where(
+            _db.epgProgrammes.endMs.isBiggerOrEqualValue(
+              cutoff.millisecondsSinceEpoch,
+            ),
+          ))
+        .map((row) => row.read(count) ?? 0)
+        .getSingle();
+  }
+
+  static Future<List<EpgProgram>> _programmesEndingAfterOn(
+    CatalogDatabase db,
+    DateTime cutoff,
+  ) async {
     final rows =
-        await (_db.select(_db.epgProgrammes)
+        await (db.select(db.epgProgrammes)
               ..where(
                 (t) => t.endMs.isBiggerOrEqualValue(
                   cutoff.millisecondsSinceEpoch,
@@ -535,7 +723,157 @@ class CatalogRepository {
         .go();
   }
 
-  EpgProgram _programFromRow(EpgProgrammeRow row) => EpgProgram(
+  @override
+  Future<void> applyEpgOps(List<EpgStoreOp> ops) {
+    if (ops.isEmpty) return Future.value();
+    var rows = 0;
+    for (final op in ops) {
+      rows += switch (op) {
+        EpgReplaceChannels(:final byChannel) ||
+        EpgMergeIntoChannels(:final byChannel) => byChannel.values.fold(
+          0,
+          (n, list) => n + list.length,
+        ),
+        EpgPruneBefore() || EpgClearAll() => 0,
+      };
+    }
+    if (!_offloadWrites || rows < _offloadThresholdRows) {
+      return _applyEpgOpsOn(_db, ops);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _applyEpgOpsOn(db, ops),
+    );
+  }
+
+  static Future<void> _applyEpgOpsOn(
+    CatalogDatabase db,
+    List<EpgStoreOp> ops,
+  ) => db.transaction(() async {
+    for (final op in ops) {
+      switch (op) {
+        case EpgReplaceChannels(:final byChannel):
+          if (byChannel.isEmpty) continue;
+          await (db.delete(
+            db.epgProgrammes,
+          )..where((t) => t.channelId.isIn(byChannel.keys))).go();
+          await _upsertProgrammesOn(db, [
+            for (final programmes in byChannel.values) ...programmes,
+          ]);
+        case EpgMergeIntoChannels(:final byChannel):
+          for (final MapEntry(key: channelId, value: programmes)
+              in byChannel.entries) {
+            final sorted = [...programmes]
+              ..sort((a, b) => a.start.compareTo(b.start));
+            for (final (start, end) in epgDisjointSpans(sorted)) {
+              await (db.delete(db.epgProgrammes)..where(
+                    (t) =>
+                        t.channelId.equals(channelId) &
+                        t.startMs.isSmallerThanValue(
+                          end.millisecondsSinceEpoch,
+                        ) &
+                        t.endMs.isBiggerThanValue(start.millisecondsSinceEpoch),
+                  ))
+                  .go();
+            }
+            await _upsertProgrammesOn(db, programmes);
+          }
+        case EpgClearAll():
+          await db.delete(db.epgProgrammes).go();
+        case EpgPruneBefore(:final cutoff):
+          await (db.delete(db.epgProgrammes)..where(
+                (t) =>
+                    t.endMs.isSmallerThanValue(cutoff.millisecondsSinceEpoch),
+              ))
+              .go();
+      }
+    }
+  });
+
+  @override
+  Future<Map<String, List<EpgProgram>>> programmesForChannels(
+    Set<String> channelIds,
+  ) async {
+    if (channelIds.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.epgProgrammes)
+              ..where((t) => t.channelId.isIn(channelIds))
+              ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
+            .get();
+    return _groupByChannel(rows);
+  }
+
+  /// Without [channelIds] this is the cold-start restore of every channel's
+  /// next hours (tens of thousands of rows on a large guide), so above the
+  /// offload threshold the query and the row mapping run on a database
+  /// worker.
+  @override
+  Future<Map<String, List<EpgProgram>>> programmesBetween(
+    DateTime endAfter,
+    DateTime startBefore, {
+    Set<String>? channelIds,
+  }) async {
+    if (channelIds != null && channelIds.isEmpty) return const {};
+    final endAfterMs = endAfter.millisecondsSinceEpoch;
+    final startBeforeMs = startBefore.millisecondsSinceEpoch;
+    if (_offloadWrites &&
+        channelIds == null &&
+        await _countProgrammesBetween(endAfterMs, startBeforeMs) >=
+            _offloadThresholdRows) {
+      return _db.computeWithDatabase(
+        connect: CatalogDatabase.new,
+        computation: (db) =>
+            _programmesBetweenOn(db, endAfterMs, startBeforeMs, null),
+      );
+    }
+    return _programmesBetweenOn(_db, endAfterMs, startBeforeMs, channelIds);
+  }
+
+  Future<int> _countProgrammesBetween(int endAfterMs, int startBeforeMs) {
+    final table = _db.epgProgrammes;
+    final count = table.channelId.count();
+    return (_db.selectOnly(table)
+          ..addColumns([count])
+          ..where(
+            table.endMs.isBiggerThanValue(endAfterMs) &
+                table.startMs.isSmallerThanValue(startBeforeMs),
+          ))
+        .map((row) => row.read(count) ?? 0)
+        .getSingle();
+  }
+
+  static Future<Map<String, List<EpgProgram>>> _programmesBetweenOn(
+    CatalogDatabase db,
+    int endAfterMs,
+    int startBeforeMs,
+    Set<String>? channelIds,
+  ) async {
+    final rows =
+        await (db.select(db.epgProgrammes)
+              ..where((t) {
+                final window =
+                    t.endMs.isBiggerThanValue(endAfterMs) &
+                    t.startMs.isSmallerThanValue(startBeforeMs);
+                return channelIds == null
+                    ? window
+                    : window & t.channelId.isIn(channelIds);
+              })
+              ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
+            .get();
+    return _groupByChannel(rows);
+  }
+
+  static Map<String, List<EpgProgram>> _groupByChannel(
+    List<EpgProgrammeRow> rows,
+  ) {
+    final byChannel = <String, List<EpgProgram>>{};
+    for (final row in rows) {
+      byChannel.putIfAbsent(row.channelId, () => []).add(_programFromRow(row));
+    }
+    return byChannel;
+  }
+
+  static EpgProgram _programFromRow(EpgProgrammeRow row) => EpgProgram(
     channelId: row.channelId,
     title: row.title,
     description: row.description,

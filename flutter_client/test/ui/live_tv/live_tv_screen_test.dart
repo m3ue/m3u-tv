@@ -10,6 +10,8 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 
+import '../../fixtures/seeded_catalog.dart';
+
 void main() {
   testWidgets('long press opens channel menu and favorites explicitly', (
     tester,
@@ -30,7 +32,7 @@ void main() {
           isBootstrappingProvider.overrideWith((_) => false),
           isConfiguredProvider.overrideWith((_) => true),
           isLoadingContentProvider.overrideWith((_) => false),
-          liveChannelsProvider.overrideWith((_) => channels),
+          catalogRepositoryProvider.overrideWith((_) => catalogWith(channels)),
           liveCategoriesProvider.overrideWith((_) => const []),
           epgServiceProvider.overrideWith((_) => epg),
           dvrRecordingsProvider.overrideWith((_) => const []),
@@ -93,7 +95,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -155,7 +159,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -221,7 +227,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -288,7 +296,7 @@ void main() {
           isBootstrappingProvider.overrideWith((_) => false),
           isConfiguredProvider.overrideWith((_) => true),
           isLoadingContentProvider.overrideWith((_) => false),
-          liveChannelsProvider.overrideWith((_) => channels),
+          catalogRepositoryProvider.overrideWith((_) => catalogWith(channels)),
           liveCategoriesProvider.overrideWith((_) => const []),
           epgServiceProvider.overrideWith((_) => epg),
           dvrRecordingsProvider.overrideWith((_) => const []),
@@ -347,7 +355,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -410,7 +420,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -463,7 +475,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),
@@ -521,7 +535,9 @@ void main() {
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
-            liveChannelsProvider.overrideWith((_) => channels),
+            catalogRepositoryProvider.overrideWith(
+              (_) => catalogWith(channels),
+            ),
             liveCategoriesProvider.overrideWith((_) => const []),
             epgServiceProvider.overrideWith((_) => epg),
             dvrRecordingsProvider.overrideWith((_) => const []),

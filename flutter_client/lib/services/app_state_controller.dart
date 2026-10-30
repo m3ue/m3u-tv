@@ -9,8 +9,7 @@ import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
-import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
-    show kCatalogKindSeries, kCatalogKindVod;
+import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
@@ -18,12 +17,15 @@ import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/diagnostics_report.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/dvr_coordinator.dart';
+import 'package:m3u_tv/services/epg_coordinator.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/push_notification_service.dart';
+import 'package:m3u_tv/services/requests_coordinator.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -36,13 +38,10 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
-enum AppSourceType { none, xtream }
+export 'package:m3u_tv/services/dvr_coordinator.dart'
+    show DvrAiringScheduleResult;
 
-/// Which content lists need to be re-fetched after a DVR recording finishes
-/// post-processing so its upserted VOD/episode surfaces in the UI. Private
-/// to this file — only the debounce/coalesce machinery in [AppStateController]
-/// reasons about it.
-enum _DvrContentRefreshTarget { vod, series }
+enum AppSourceType { none, xtream }
 
 typedef MediaRequestOwner = ({
   int sourceGeneration,
@@ -50,24 +49,6 @@ typedef MediaRequestOwner = ({
   AppSourceType sourceType,
   UserCredentials? credentials,
 });
-
-/// Per-episode outcome from [AppStateController.scheduleDvrAirings]. One
-/// entry per input episode, in input order. Per-item failures (e.g.
-/// `XtreamDvrScheduleException` for the 422 concurrent recording limit case)
-/// land here instead of aborting the rest of the batch.
-class DvrAiringScheduleResult {
-  const DvrAiringScheduleResult({
-    required this.episode,
-    required this.success,
-    this.errorMessage,
-  });
-
-  final EpgShowEpisode episode;
-  final bool success;
-
-  /// Server-side error message when [success] is false. Null on success.
-  final String? errorMessage;
-}
 
 class AppStateController extends ChangeNotifier {
   factory AppStateController({
@@ -113,7 +94,9 @@ class AppStateController extends ChangeNotifier {
     // when a caller (chiefly tests) omits it, fall back to a private in-memory
     // database so there is exactly one catalog code path - never a JSON one.
     final resolvedCatalogRepository =
-        catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
+        catalogRepository ??
+        cacheService?.catalogRepository ??
+        CatalogRepository(CatalogDatabase.memory());
     final resolvedCacheService =
         cacheService ??
         CacheService(
@@ -199,7 +182,11 @@ class AppStateController extends ChangeNotifier {
     required this._pushNotificationService,
     required this.viewSettingsService,
   }) {
-    epgService.cacheTtl = cacheService.refreshInterval;
+    epgService
+      ..cacheTtl = cacheService.refreshInterval
+      // SQLite is the guide's store of record; memory keeps now/next for
+      // every channel and full schedules only for recently viewed ones.
+      ..attachStore(_catalogRepository);
     favoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('live', streamId, favorited: favorited);
     vodFavoritesService.onChanged = (streamId, {required favorited}) =>
@@ -281,8 +268,6 @@ class AppStateController extends ChangeNotifier {
   final Set<String> _pendingNotificationActivations = <String>{};
   final StreamController<TvNotificationItem> _tvNotificationController =
       StreamController<TvNotificationItem>.broadcast();
-  final StreamController<EpgSweepProgress?> _epgSweepProgressController =
-      StreamController<EpgSweepProgress?>.broadcast();
   final StreamController<TvNotificationDestination>
   _notificationActivationController =
       StreamController<TvNotificationDestination>.broadcast();
@@ -310,8 +295,7 @@ class AppStateController extends ChangeNotifier {
   /// and must never reach the desktop-notification dispatcher (which would
   /// spam OS notifications); the UI should only ever show them as an in-app
   /// toast.
-  Stream<EpgSweepProgress?> get epgSweepProgress =>
-      _epgSweepProgressController.stream;
+  Stream<EpgSweepProgress?> get epgSweepProgress => _epg.sweepProgress;
 
   Stream<TvNotificationDestination> get notificationActivations =>
       _notificationActivationController.stream;
@@ -501,83 +485,54 @@ class AppStateController extends ChangeNotifier {
   List<Category> _liveCategories = const <Category>[];
   List<Category> _vodCategories = const <Category>[];
   List<Category> _seriesCategories = const <Category>[];
-  List<Channel> _channels = const <Channel>[];
-  List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
-  DvrStorageInfo? _dvrStorageInfo;
-  Set<int> _recordingChannelIds = const <int>{};
-  List<DvrSeriesRule> _dvrSeriesRules = const <DvrSeriesRule>[];
-  List<MediaRequestSummary> _mediaRequests = const <MediaRequestSummary>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
   int? _recentlyWatchedRefreshSourceGeneration;
   int? _recentlyWatchedRefreshViewerGeneration;
-  final Set<int> _pendingEpgChannelIds = <int>{};
-  final Set<int> _pendingForcedEpgChannelIds = <int>{};
-  final Map<String, DateTime> _fetchedEpgRanges = <String, DateTime>{};
-  final Map<int, DateTime> _catchupEpgFetchedAt = <int, DateTime>{};
-  final Map<int, Completer<void>> _inFlightCatchupEpgFetches =
-      <int, Completer<void>>{};
-  Timer? _epgFetchDebounce;
-  DateTime? _pendingEpgStartDate;
-  DateTime? _pendingEpgEndDate;
-  String _activeEpgRangeKey = '';
-  // Deliberately separate from epgService's own source-generation counter:
-  // this one invalidates in-flight per-range/channel-batch fetches (bumped
-  // on every guide range navigation, not just a full source reset), while
-  // epgService's tracks whether the entire EPG source has been swapped.
-  // The two must both advance together in _resetEpgSession — a reset path
-  // that bumps only one would let a stale fetch write into the new source.
-  int _epgRequestGeneration = 0;
-  // Bumped whenever a background full-guide sweep should stop (source reset,
-  // dispose, or a newer sweep superseding this one). The sweep captures this
-  // and bails between chunks once it no longer matches.
-  int _epgSweepGeneration = 0;
-  static const _epgPrimeCount = 90;
-  static const _epgFetchDebounceDelay = Duration(milliseconds: 150);
-  // After priming the first screen's worth of channels, the rest of the guide
-  // is pulled in the background in [_epgSweepChunkSize] batches spaced by
-  // [_epgSweepChunkDelay], so scrolling a large playlist hits already-loaded
-  // EPG instead of waiting on a lazy fetch. [_epgSweepStartDelay] lets the
-  // prime response and first frame settle before the sweep adds load.
-  static const _epgSweepChunkSize = 100;
-  static const _epgSweepStartDelay = Duration(seconds: 2);
-  static const _epgSweepChunkDelay = Duration(milliseconds: 350);
-  // The guide is written to the on-disk cache (debounced) as prime/sweep/lazy
-  // fetches land, so a cold start can paint the last-known EPG before any
-  // network round-trip. Only programmes still airing or upcoming are kept, and
-  // the flat list is capped so the blob stays bounded on huge playlists.
-  Timer? _epgGuidePersistDebounce;
-  // When the last guide prime succeeded, so a resume can tell whether the
-  // guide is older than [EpgService.cacheTtl]. Only set on success: a prime
-  // that fails (waking from standby before Wi-Fi is back) must not count as
-  // fresh, or every resume for the next TTL would skip the refresh.
-  DateTime? _epgGuideRefreshedAt;
-  int _epgPrimesInFlight = 0;
-  Timer? _epgPrimeRetry;
-  static const _epgGuidePersistDelay = Duration(seconds: 12);
-  static const _epgPersistProgramCap = 50000;
-  static const _epgPersistPastSlack = Duration(hours: 2);
-  // Coalesce multiple DVR post-processing pushes that land in quick
-  // succession (e.g. several recordings finishing back-to-back) into a
-  // single re-fetch of VOD/Series. Mirrors the [_epgFetchDebounce] pattern.
-  Timer? _dvrContentRefreshDebounce;
-
-  Set<_DvrContentRefreshTarget> _dvrContentRefreshPending =
-      const <_DvrContentRefreshTarget>{};
-  // Guards against a second flush starting while one is already awaiting its
-  // fetches. Without it, a push landing mid-flush (its debounce timer already
-  // cleared by the in-flight run) would start an independent flush and
-  // duplicate the network call instead of being coalesced into it — see the
-  // while-loop in [_flushDvrContentRefresh].
-  bool _dvrContentRefreshFlushing = false;
-  static const _dvrContentRefreshDebounceDelay = Duration(milliseconds: 1500);
   // Cancelling the debounce timer in [dispose] only helps if it hasn't fired
   // yet. Once [_flushDvrContentRefresh] is in flight its awaits can outlive
   // us, and it runs from a fire-and-forget Timer callback, so a
   // notifyListeners() on a disposed notifier would surface as an unhandled
   // async error rather than being caught anywhere.
   bool _disposed = false;
+
+  /// Owns the guest's media requests list and its server calls.
+  late final RequestsCoordinator _requests = RequestsCoordinator(
+    xtreamService: xtreamService,
+    credentials: () => authNotifier.credentials,
+    captureOwnership: _captureMediaRequestOwnership,
+    hasRequestsFeature: () => hasRequestsFeature,
+    notifyListeners: notifyListeners,
+  );
+
+  /// Owns the DVR recordings/rules/storage state and its server calls.
+  late final DvrCoordinator _dvr = DvrCoordinator(
+    xtreamService: xtreamService,
+    catalogRepository: _catalogRepository,
+    credentials: () => authNotifier.credentials,
+    captureOwnership: _captureDvrOwnership,
+    hasDvrFeature: () => hasDvrFeature,
+    notifyListeners: notifyListeners,
+  );
+
+  /// Owns the guide's fetch, sweep, persist and restore lifecycle.
+  late final EpgCoordinator _epg = EpgCoordinator(
+    epgService: epgService,
+    xtreamService: xtreamService,
+    cacheService: cacheService,
+    sourceOperationGeneration: _sourceOperationGeneration,
+    isXtreamSource: () => _sourceType == AppSourceType.xtream,
+    channelPage: (offset, limit) => _catalogRepository.pageActiveItems<Channel>(
+      kind: kCatalogKindLive,
+      offset: offset,
+      limit: limit,
+    ),
+    channelCount: () =>
+        _catalogRepository.countActiveItems(kind: kCatalogKindLive),
+    isLoadingContent: () => _isLoadingContent,
+    notifyListeners: notifyListeners,
+  );
 
   AppSourceType get sourceType => _sourceType;
   bool get isBootstrapping => _isBootstrapping;
@@ -590,19 +545,16 @@ class AppStateController extends ChangeNotifier {
   List<Category> get liveCategories => _liveCategories;
   List<Category> get vodCategories => _vodCategories;
   List<Category> get seriesCategories => _seriesCategories;
-  List<Channel> get channels => _channels;
 
-  /// SQLite catalog store (always present). VOD/series content lives here
-  /// exclusively now - [channels] is the only full in-memory catalog list
-  /// left (EPG matching needs the whole set of `Channel` objects, and live
-  /// catalogs run far smaller than VOD/series ones).
+  /// SQLite catalog store (always present). Channels, movies and series live
+  /// here exclusively; screens page or look up rows rather than hold lists.
   CatalogRepository get catalogRepository => _catalogRepository;
-  List<DvrRecording> get dvrRecordings => _dvrRecordings;
-  DvrStorageInfo? get dvrStorageInfo => _dvrStorageInfo;
-  Set<int> get recordingChannelIds => _recordingChannelIds;
-  List<DvrSeriesRule> get dvrSeriesRules => _dvrSeriesRules;
+  List<DvrRecording> get dvrRecordings => _dvr.recordings;
+  DvrStorageInfo? get dvrStorageInfo => _dvr.storageInfo;
+  Set<int> get recordingChannelIds => _dvr.recordingChannelIds;
+  List<DvrSeriesRule> get dvrSeriesRules => _dvr.seriesRules;
   List<Progress> get progressList => _progressList;
-  List<MediaRequestSummary> get mediaRequests => _mediaRequests;
+  List<MediaRequestSummary> get mediaRequests => _requests.requests;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
   bool get hasRequestsFeature =>
@@ -674,7 +626,7 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
 
     if (credentials != null) {
-      _resetEpgSession();
+      _epg.resetSession();
       final notificationGeneration = _notificationSessionGeneration.advance();
       final hydrated = await _hydrateCachedXtreamContent(
         sourceGeneration: sourceGeneration,
@@ -1003,15 +955,15 @@ class AppStateController extends ChangeNotifier {
         credentials: credentials,
         onNotification: _onPushNotification,
         onDvrStatus: (recording) =>
-            _onDvrStatusPush(recording, credentials, ownsDvr),
+            _dvr.onStatusPush(recording, credentials, ownsDvr),
         onRequestStatus: (request) =>
-            _onRequestStatusPush(request, ownsRequests),
+            _requests.onStatusPush(request, ownsRequests),
         onFavoriteToggled: _onFavoriteTogglePush,
         onDeviceDeregister: _onDeviceDeregisterPush,
         // Reconciles any status pushes missed while disconnected (app
         // suspended, network drop) — cheap, status-filtered fetch, not a poll.
         onConnected: () => unawaited(
-          _refreshActiveDvrRecordings(credentials, ownsDvr),
+          _dvr.refreshActiveWith(credentials, ownsDvr),
         ),
       );
     } on Object catch (_) {
@@ -1416,227 +1368,6 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  void _onDvrStatusPush(
-    DvrRecording recording,
-    UserCredentials credentials,
-    bool Function() ownsWork,
-  ) {
-    if (!ownsWork()) return;
-    final channelId = recording.channelId;
-    if (channelId != null) {
-      final updated = Set<int>.of(_recordingChannelIds);
-      if (recording.isInProgress) {
-        updated.add(channelId);
-      } else {
-        updated.remove(channelId);
-      }
-      if (!setEquals(_recordingChannelIds, updated)) {
-        if (!ownsWork()) return;
-        _recordingChannelIds = updated;
-        if (!ownsWork()) return;
-        notifyListeners();
-      }
-    }
-
-    if (recording.status == DvrRecordingStatus.deleted) {
-      // The server is the source of truth: a deleted recording has no
-      // get_dvr_recording row left to fetch, so drop it locally instead of
-      // refreshing its detail.
-      final next = _dvrRecordings
-          .where((r) => r.uuid != recording.uuid)
-          .toList(growable: false);
-      if (next.length != _dvrRecordings.length) {
-        if (!ownsWork()) return;
-        _dvrRecordings = next;
-        if (!ownsWork()) return;
-        notifyListeners();
-      }
-      return;
-    }
-
-    // The push payload is a lightweight status ping (no stream_url/live_url —
-    // those need this viewer's Xtream credentials to build). Fetch the full
-    // record so the DVR Recordings screen updates its status label and gets
-    // a playable URL as soon as a recording starts, not just on next reload.
-    //
-    // Toasts for user-facing transitions (started/completed/failed/cancelled)
-    // are no longer sent from here — the server dispatches a persisted
-    // TvNotification on the 'dvr' channel at those points instead, which
-    // arrives through the same _onPushNotification path as every other
-    // notification (unread badge, history, subscription filter all for free).
-    if (!ownsWork()) return;
-    unawaited(
-      _refreshDvrRecordingDetail(
-        recording.uuid,
-        credentials,
-        ownsWork,
-      ),
-    );
-  }
-
-  Future<void> _refreshDvrRecordingDetail(
-    String uuid,
-    UserCredentials credentials,
-    bool Function() ownsWork,
-  ) async {
-    if (!ownsWork()) return;
-    try {
-      final detail = await xtreamService.getDvrRecordingFor(credentials, uuid);
-      if (!ownsWork()) return;
-      final next = [..._dvrRecordings];
-      final index = next.indexWhere((r) => r.uuid == uuid);
-      if (index >= 0) {
-        next[index] = detail;
-      } else {
-        next.insert(0, detail);
-      }
-      if (!ownsWork()) return;
-      _dvrRecordings = next;
-      if (!ownsWork()) return;
-      notifyListeners();
-
-      // When a recording lands in `completed` or `postProcessing`, the server
-      // has just upserted it as a VOD movie or series episode. Re-fetch the
-      // affected list(s) so the new item appears in Movies / Series / Home
-      // without requiring a full reconnect — fixes #179.
-      if (detail.status == DvrRecordingStatus.completed ||
-          detail.status == DvrRecordingStatus.postProcessing) {
-        _scheduleDvrContentRefresh(_classifyContentTargets(detail), ownsWork);
-      }
-    } on Object catch (error) {
-      debugPrint('DVR: refresh recording detail after push failed: $error');
-    }
-  }
-
-  /// Decide which content lists to refresh for a finished recording. A
-  /// recording with both a season and episode number is unambiguously a
-  /// series episode; everything else (movies, one-offs, or server payloads
-  /// that omit season/episode metadata) falls back to refreshing both lists
-  /// — the issue permits over-refresh, never under-refresh.
-  Set<_DvrContentRefreshTarget> _classifyContentTargets(
-    DvrRecording recording,
-  ) {
-    if (recording.seasonNumber != null && recording.episodeNumber != null) {
-      return const <_DvrContentRefreshTarget>{_DvrContentRefreshTarget.series};
-    }
-    return const <_DvrContentRefreshTarget>{
-      _DvrContentRefreshTarget.vod,
-      _DvrContentRefreshTarget.series,
-    };
-  }
-
-  void _scheduleDvrContentRefresh(
-    Set<_DvrContentRefreshTarget> targets,
-    bool Function() ownsWork,
-  ) {
-    if (targets.isEmpty) return;
-    _dvrContentRefreshPending = <_DvrContentRefreshTarget>{
-      ..._dvrContentRefreshPending,
-      ...targets,
-    };
-    _dvrContentRefreshDebounce?.cancel();
-    _dvrContentRefreshDebounce = Timer(
-      _dvrContentRefreshDebounceDelay,
-      () => _flushDvrContentRefresh(ownsWork),
-    );
-  }
-
-  Future<void> _flushDvrContentRefresh(bool Function() ownsWork) async {
-    // A flush is already looping (see below) and will pick up whatever this
-    // call just merged into `_dvrContentRefreshPending` on its next
-    // iteration — starting a second, concurrent flush here would duplicate
-    // the network calls the first one is already making.
-    if (_dvrContentRefreshFlushing) return;
-    _dvrContentRefreshFlushing = true;
-    try {
-      // Loop rather than flushing once: a push that lands while this flush is
-      // awaiting its fetches merges into `_dvrContentRefreshPending` with no
-      // timer to pick it up (this flush already consumed and nulled it), so
-      // it must be handled before this method returns.
-      while (true) {
-        if (_disposed || _dvrContentRefreshPending.isEmpty) return;
-        if (!ownsWork()) return;
-        final targets = _dvrContentRefreshPending;
-        _dvrContentRefreshPending = const <_DvrContentRefreshTarget>{};
-        _dvrContentRefreshDebounce?.cancel();
-        _dvrContentRefreshDebounce = null;
-
-        final results = await Future.wait<bool>(<Future<bool>>[
-          if (targets.contains(_DvrContentRefreshTarget.vod))
-            _refreshContentAfterDvr<VodItem>(
-              fetch: xtreamService.getVodStreams,
-              kind: kCatalogKindVod,
-              ownsWork: ownsWork,
-              label: 'VOD',
-            ),
-          if (targets.contains(_DvrContentRefreshTarget.series))
-            _refreshContentAfterDvr<Series>(
-              fetch: xtreamService.getSeries,
-              kind: kCatalogKindSeries,
-              ownsWork: ownsWork,
-              label: 'series',
-            ),
-        ]);
-        if (_disposed || !ownsWork()) return;
-        if (results.contains(true)) notifyListeners();
-      }
-    } finally {
-      _dvrContentRefreshFlushing = false;
-    }
-  }
-
-  /// Writes straight to the SQLite catalog (unlike the whole-bundle guarded
-  /// replace in `_sourceReplacementQueue`, this is a single-kind partial
-  /// write) so a post-DVR content refresh actually reaches the windowed
-  /// grids. [ownsWork] is re-checked immediately before and after the write
-  /// to keep the stale-ownership window as narrow as possible, though unlike
-  /// the in-memory field this replaced, the write itself is not atomic with
-  /// that check - see the caller's history for why this was a deliberate
-  /// (accepted) trade rather than an oversight.
-  Future<bool> _refreshContentAfterDvr<T extends Object>({
-    required Future<List<T>> Function() fetch,
-    required String kind,
-    required bool Function() ownsWork,
-    required String label,
-  }) async {
-    try {
-      final next = await fetch();
-      if (!ownsWork() || _disposed) return false;
-      await _catalogRepository.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
-        kind: kind,
-        items: next,
-      );
-      if (!ownsWork() || _disposed) return false;
-      return true;
-    } on Object catch (error) {
-      debugPrint('DVR: refresh $label after post-processing failed: $error');
-      return false;
-    }
-  }
-
-  /// Mirrors [_onDvrStatusPush]: updates the local requests list in place
-  /// from the lightweight `request.status` push (approved/rejected/completed
-  /// by MediaRequestStatusEvent on the server) instead of re-polling
-  /// request_history.
-  void _onRequestStatusPush(
-    MediaRequestSummary request,
-    bool Function() ownsWork,
-  ) {
-    if (!ownsWork()) return;
-    final next = [..._mediaRequests];
-    final index = next.indexWhere((r) => r.id == request.id);
-    if (index >= 0) {
-      next[index] = request;
-    } else {
-      next.insert(0, request);
-    }
-    if (!ownsWork()) return;
-    _mediaRequests = next;
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
-
   /// Pushes a local Live/VOD/Series favorite change to the server. No-op
   /// when not connected (nothing to sync to) — mirrors the same
   /// `sourceType == xtream` gate used for progress pushes in app_shell.dart.
@@ -2002,7 +1733,9 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
-    _resetEpgSession();
+    // cacheService.clear() above emptied the stored guide, but a sweep write
+    // can still land during the awaits since; wipe again behind it.
+    _epg.resetSession(wipeStore: true);
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];
     _viewerOperationGeneration.advance();
@@ -2010,12 +1743,8 @@ class AppStateController extends ChangeNotifier {
     _liveCategories = const <Category>[];
     _vodCategories = const <Category>[];
     _seriesCategories = const <Category>[];
-    _channels = const <Channel>[];
-    _dvrRecordings = const <DvrRecording>[];
-    _dvrStorageInfo = null;
-    _recordingChannelIds = const <int>{};
-    _dvrSeriesRules = const <DvrSeriesRule>[];
-    _mediaRequests = const <MediaRequestSummary>[];
+    _dvr.reset();
+    _requests.reset();
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -2043,55 +1772,42 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> refreshDvrSeriesRules() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return;
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      final rules = await xtreamService.listDvrSeriesRulesFor(credentials);
-      if (!ownsWork()) return;
-      _dvrSeriesRules = rules;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: refresh series rules failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
+  /// See [DvrCoordinator.refreshDvrSeriesRules].
+  Future<void> refreshDvrSeriesRules() => _dvr.refreshDvrSeriesRules();
 
-  /// Refreshes the cached DVR recordings list from `get_dvr_recordings`.
-  ///
-  /// Series rules can produce a matching `DvrRecording` synchronously (see
-  /// [scheduleDvrAiring]'s doc comment for the same server-side behaviour on
-  /// one-shot recordings), so the UI agent should call this after a
-  /// successful `createDvrSeriesRule` / `updateDvrSeriesRule` round-trip, not
-  /// just after [refreshDvrSeriesRules]. Otherwise, a newly matched recording
-  /// will not show up in the Recordings tab until the next full reload.
-  Future<void> refreshDvrRecordings() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return;
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return;
-      final recordingChannelIds = _extractRecordingChannelIds(recordings);
-      if (!ownsWork()) return;
-      _dvrRecordings = recordings;
-      if (!ownsWork()) return;
-      _recordingChannelIds = recordingChannelIds;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: refresh recordings failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      return;
-    }
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
+  /// See [DvrCoordinator.refreshDvrRecordings].
+  Future<void> refreshDvrRecordings() => _dvr.refreshDvrRecordings();
+
+  /// See [DvrCoordinator.scheduleDvrAiring].
+  Future<DvrRecording?> scheduleDvrAiring({
+    required int channelId,
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) => _dvr.scheduleDvrAiring(
+    channelId: channelId,
+    title: title,
+    startTime: startTime,
+    endTime: endTime,
+  );
+
+  /// See [DvrCoordinator.scheduleDvrAirings].
+  Future<List<DvrAiringScheduleResult>> scheduleDvrAirings(
+    List<EpgShowEpisode> episodes,
+  ) => _dvr.scheduleDvrAirings(episodes);
+
+  /// See [DvrCoordinator.cancelDvrRecording].
+  Future<void> cancelDvrRecording(String uuid) => _dvr.cancelDvrRecording(uuid);
+
+  /// See [DvrCoordinator.deleteDvrRecording].
+  Future<void> deleteDvrRecording(String uuid) => _dvr.deleteDvrRecording(uuid);
+
+  /// See [DvrCoordinator.refreshActiveDvrRecordings].
+  Future<void> refreshActiveDvrRecordings() =>
+      _dvr.refreshActiveDvrRecordings();
+
+  /// See [DvrCoordinator.refreshDvrStorage].
+  Future<void> refreshDvrStorage() => _dvr.refreshDvrStorage();
 
   Future<void> clearAndRefresh({
     CacheClearScope scope = CacheClearScope.all,
@@ -2101,14 +1817,14 @@ class AppStateController extends ChangeNotifier {
         await _bestEffort(emptyMediaImageCacheIfAvailable);
         return;
       case CacheClearScope.epg:
-        _refreshEpgGuide();
+        _epg.refreshGuide();
         return;
       case CacheClearScope.all:
       case CacheClearScope.content:
         break;
     }
     final sourceGeneration = _sourceOperationGeneration.advance();
-    if (scope == CacheClearScope.all) _resetEpgSession(clearGuide: false);
+    if (scope == CacheClearScope.all) _epg.resetSession(clearGuide: false);
     _isLoadingContent = true;
     _error = null;
     notifyListeners();
@@ -2184,508 +1900,33 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Schedules a one-shot DVR recording and refreshes the local list.
-  ///
-  /// m3u-editor's `schedule_dvr` creates a DVR rule and (when DVR is enabled
-  /// for the playlist) returns synchronously after the rule's scheduler has
-  /// produced the corresponding `DvrRecording` row. We refresh the local list
-  /// from `get_dvr_recordings` so the UI shows the real entry instead of a
-  /// phantom row synthesised from a stale client-side response.
-  ///
-  /// Returns the matching recording if the refresh surfaced one for this
-  /// channel + start time; otherwise null (the scheduler tick may not have
-  /// produced the row yet on slower servers).
-  Future<DvrRecording?> scheduleDvrAiring({
-    required int channelId,
-    required String title,
-    required DateTime startTime,
-    required DateTime endTime,
-  }) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return null;
-    // Optimistically mark the channel as recording *before* the (slow)
-    // network call so the red dot and stop-button appear instantly.
-    final previousRecordingChannelIds = _recordingChannelIds;
-    _recordingChannelIds = {..._recordingChannelIds, channelId};
-    notifyListeners();
-    try {
-      await xtreamService.scheduleDvrFor(
-        credentials,
-        channelId: channelId,
-        title: title,
-        startTime: startTime,
-        endTime: endTime,
-      );
-    } on Object {
-      // Roll back the optimistic channel id on failure so the dot and
-      // stop-button revert immediately - the caller rethrows after this.
-      _recordingChannelIds = previousRecordingChannelIds;
-      notifyListeners();
-      rethrow;
-    }
-    if (!ownsWork()) return null;
-    // Optimistically add a placeholder with 'recording' status so the stop
-    // button works immediately (isInProgress must be true) - before the
-    // (slow) full-list refresh completes.
-    final placeholder = DvrRecording(
-      uuid: 'optimistic-$channelId-${startTime.millisecondsSinceEpoch}',
-      title: title,
-      status: DvrRecordingStatus.recording,
-      channelId: channelId,
-      scheduledStart: startTime,
-      scheduledEnd: endTime,
-    );
-    _dvrRecordings = [..._dvrRecordings, placeholder];
-    notifyListeners();
-    // Now fetch the real list in the background; it will replace the
-    // placeholder. Since the schedule succeeded we know the recording
-    // will appear eventually - always keep the optimistic channel id so
-    // the dot and stop-button stay visible until the push transitions it.
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return null;
-      // If the server list doesn't include this recording yet (still
-      // processing), keep the optimistic placeholder so the stop dialog
-      // can find it.
-      final foundInServer = recordings.any(
-        (r) =>
-            r.channelId == channelId &&
-            r.scheduledStart != null &&
-            startTime.difference(r.scheduledStart!).abs() <=
-                const Duration(minutes: 1),
-      );
-      _dvrRecordings = foundInServer
-          ? recordings
-          : [...recordings, placeholder];
-      _recordingChannelIds = {
-        ..._extractRecordingChannelIds(_dvrRecordings),
-        channelId,
-      };
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return null;
-      debugPrint('DVR: refresh after schedule failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-    if (!ownsWork()) return null;
-    notifyListeners();
-    unawaited(refreshDvrStorage());
-    for (final recording in _dvrRecordings) {
-      if (recording.channelId != channelId) continue;
-      final start = recording.scheduledStart;
-      if (start == null) continue;
-      if (startTime.difference(start).abs() <= const Duration(minutes: 1)) {
-        return recording;
-      }
-    }
-    return null;
-  }
-
-  /// Schedules a batch of one-shot DVR recordings and refreshes the local
-  /// list once, after the whole loop completes. The single-item
-  /// [scheduleDvrAiring] does this per call (applying it per item in a
-  /// batch would mean N `getDvrRecordingsFor` round-trips, N
-  /// `notifyListeners()` rebuilds, and N `refreshDvrStorage()` calls).
-  ///
-  /// Per-item failures (e.g. `XtreamDvrScheduleException` for the 422
-  /// concurrent recording limit case) are captured into each
-  /// [DvrAiringScheduleResult] rather than aborting the rest of the batch.
-  ///
-  /// Throws [StateError] when credentials are not configured (a wholesale
-  /// precondition fail, not a per-item failure). Matches [scheduleDvrAiring].
-  Future<List<DvrAiringScheduleResult>> scheduleDvrAirings(
-    List<EpgShowEpisode> episodes,
-  ) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return const <DvrAiringScheduleResult>[];
-
-    final results = <DvrAiringScheduleResult>[];
-    for (final episode in episodes) {
-      if (!ownsWork()) break;
-      // Optimistically mark the channel as recording before the network
-      // call so the red dot appears instantly.
-      final previousRecordingChannelIds = _recordingChannelIds;
-      _recordingChannelIds = {..._recordingChannelIds, episode.channelId};
-      notifyListeners();
-      try {
-        await xtreamService.scheduleDvrFor(
-          credentials,
-          channelId: episode.channelId,
-          title: episode.displayTitle,
-          startTime: episode.startTime,
-          endTime: episode.endTime,
-        );
-        // Optimistically add a placeholder per successful schedule so the
-        // stop button works immediately. The channel is already in
-        // _recordingChannelIds from the optimistic update above.
-        _dvrRecordings = [
-          ..._dvrRecordings,
-          DvrRecording(
-            uuid:
-                'optimistic-${episode.channelId}-'
-                '${episode.startTime.millisecondsSinceEpoch}',
-            title: episode.displayTitle,
-            status: DvrRecordingStatus.recording,
-            channelId: episode.channelId,
-            scheduledStart: episode.startTime,
-            scheduledEnd: episode.endTime,
-          ),
-        ];
-        notifyListeners();
-        results.add(DvrAiringScheduleResult(episode: episode, success: true));
-      } on XtreamDvrScheduleException catch (error) {
-        // Roll back the optimistic channel id on per-item failure.
-        _recordingChannelIds = previousRecordingChannelIds;
-        notifyListeners();
-        results.add(
-          DvrAiringScheduleResult(
-            episode: episode,
-            success: false,
-            errorMessage: error.message,
-          ),
-        );
-      } on Object catch (error, stackTrace) {
-        debugPrint('DVR: batch schedule item failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-        _recordingChannelIds = previousRecordingChannelIds;
-        notifyListeners();
-        results.add(
-          DvrAiringScheduleResult(
-            episode: episode,
-            success: false,
-            errorMessage: error.toString(),
-          ),
-        );
-      }
-    }
-
-    // Ownership was lost partway through the loop above: report the
-    // untried episodes as failed instead of silently dropping them from
-    // the caller's success/failure count.
-    for (final episode in episodes.skip(results.length)) {
-      results.add(
-        DvrAiringScheduleResult(
-          episode: episode,
-          success: false,
-          errorMessage: 'Cancelled: DVR ownership changed mid-batch',
-        ),
-      );
-    }
-
-    if (!ownsWork()) return results;
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return results;
-      _dvrRecordings = recordings;
-      _recordingChannelIds = _extractRecordingChannelIds(recordings);
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return results;
-      debugPrint('DVR: refresh after batch schedule failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-    if (!ownsWork()) return results;
-    notifyListeners();
-    unawaited(refreshDvrStorage());
-    return results;
-  }
-
-  static Set<int> _extractRecordingChannelIds(List<DvrRecording> recordings) {
-    return recordings
-        .where((recording) => recording.isInProgress)
-        .map((recording) => recording.channelId)
-        .whereType<int>()
-        .toSet();
-  }
-
-  /// Splices freshly-fetched `active` (status=recording) entries into
-  /// `_dvrRecordings` by uuid — inserting one this list doesn't know about
-  /// yet, replacing one whose locally-known status disagrees with the
-  /// server's. Returns null when every entry already matches, so a caller
-  /// that finds nothing new doesn't force a `dvrRecordingsProvider` rebuild.
-  ///
-  /// This exists because [_onDvrStatusPush] is the only other writer of
-  /// `_dvrRecordings`, and it only runs for pushes actually received. A
-  /// `Scheduled -> Recording` push missed while disconnected previously left
-  /// `_dvrRecordings` stuck on `Scheduled` even after `_recordingChannelIds`
-  /// self-healed via this same function — the DVR Recordings screen and EPG
-  /// recording badges (#185) are both backed by `_dvrRecordings`, not
-  /// `_recordingChannelIds`.
-  List<DvrRecording>? _mergeActiveDvrRecordings(List<DvrRecording> active) {
-    List<DvrRecording>? next;
-    for (final recording in active) {
-      final source = next ?? _dvrRecordings;
-      final index = source.indexWhere((r) => r.uuid == recording.uuid);
-      if (index >= 0) {
-        if (source[index].status == recording.status) continue;
-        next ??= [..._dvrRecordings];
-        next[index] = recording;
-      } else {
-        next ??= [..._dvrRecordings];
-        next.insert(0, recording);
-      }
-    }
-    return next;
-  }
-
-  /// Cancels a scheduled or in-progress DVR recording, keeping it in the
-  /// local list with its refreshed (Cancelled) status — the server itself
-  /// only marks the row cancelled and keeps history; deleting it is a
-  /// separate, explicit action (see [deleteDvrRecording]). If the post-cancel
-  /// detail fetch 404s (the row is already gone server-side for some other
-  /// reason), drops it locally instead of leaving a stale pre-cancel row.
-  Future<void> cancelDvrRecording(String uuid) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      await xtreamService.cancelDvrRecordingFor(credentials, uuid);
-      if (!ownsWork()) return;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: cancel failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
-    try {
-      final detail = await xtreamService.getDvrRecordingFor(credentials, uuid);
-      if (!ownsWork()) return;
-      final next = [..._dvrRecordings];
-      final index = next.indexWhere((recording) => recording.uuid == uuid);
-      if (index >= 0) {
-        next[index] = detail;
-      } else {
-        next.insert(0, detail);
-      }
-      _dvrRecordings = next;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: refresh recording detail after cancel failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      _dvrRecordings = _dvrRecordings
-          .where((recording) => recording.uuid != uuid)
-          .toList(growable: false);
-    }
-    if (!ownsWork()) return;
-    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
-
-  /// Deletes a completed/failed/cancelled DVR recording and removes it from
-  /// the local list. Same fail-safe: 404 still drops the row locally.
-  Future<void> deleteDvrRecording(String uuid) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      await xtreamService.deleteDvrRecordingFor(credentials, uuid);
-      if (!ownsWork()) return;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: delete failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
-    _dvrRecordings = _dvrRecordings
-        .where((recording) => recording.uuid != uuid)
-        .toList(growable: false);
-    _recordingChannelIds = _extractRecordingChannelIds(_dvrRecordings);
-    if (!ownsWork()) return;
-    notifyListeners();
-    unawaited(refreshDvrStorage());
-  }
-
-  /// One-shot reconciliation of which channels are currently recording,
-  /// fetched from the server's authoritative `status=recording`/`scheduled`
-  /// lists. DVR status otherwise arrives entirely via WebSocket push (see
-  /// [_onDvrStatusPush]) — there is no background poll — so callers invoke
-  /// this on-demand at the points a push might plausibly have been missed:
-  /// opening the DVR tab (`AppShell.didUpdateWidget`) and an unexpected live
-  /// stream end (`AppShell._handleLiveStreamEnded`), on top of the
-  /// WebSocket's own reconnect-time reconciliation (`onConnected` in
-  /// [_connectTvNotifications]).
-  Future<void> refreshActiveDvrRecordings() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return;
-    final ownsWork = _captureDvrOwnership(credentials);
-    await _refreshActiveDvrRecordings(credentials, ownsWork);
-  }
-
-  Future<void> _refreshActiveDvrRecordings(
-    UserCredentials credentials,
-    bool Function() ownsWork,
-  ) async {
-    if (!ownsWork() || !hasDvrFeature) return;
-    try {
-      final active = await xtreamService.getDvrRecordingsFor(
-        credentials,
-        status: DvrRecordingStatus.recording,
-        limit: 200,
-      );
-      if (!ownsWork()) return;
-
-      // Fetch the server's scheduled list too. Reconcile against BOTH -
-      // otherwise a recording that FAILED while its local row still said
-      // "scheduled" keeps its red dot forever (the active-only poll never
-      // learns the row is gone).
-      final scheduled = await xtreamService.getDvrRecordingsFor(
-        credentials,
-        status: DvrRecordingStatus.scheduled,
-        limit: 200,
-      );
-      if (!ownsWork()) return;
-
-      // _recordingChannelIds drives the "currently recording" indicator, so
-      // it must stay limited to in-progress channels -- a channel with only
-      // a future scheduled recording is not currently recording.
-      final ids = _extractRecordingChannelIds(active);
-      final idsChanged = !setEquals(_recordingChannelIds, ids);
-      // Active entries are authoritative for the same uuid (a recording that
-      // started must not be downgraded back to Scheduled by the stale
-      // scheduled-side row), so the merge processes scheduled first and
-      // lets the active list win for overlapping uuids.
-      final merged = _mergeActiveDvrRecordings([...scheduled, ...active]);
-
-      if (!idsChanged && merged == null) return;
-      if (!ownsWork()) return;
-      if (idsChanged) _recordingChannelIds = ids;
-      if (merged != null) _dvrRecordings = merged;
-      if (!ownsWork()) return;
-      notifyListeners();
-    } on Object catch (error) {
-      debugPrint('DVR: refresh active recordings failed: $error');
-    }
-  }
-
-  /// Refreshes DVR storage usage against quota via `get_dvr_storage`.
-  /// Older m3u-editor servers without this action fail the request, which
-  /// we treat as "unsupported" — the storage display just stays hidden
-  /// rather than surfacing an error.
-  Future<void> refreshDvrStorage() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return;
-    final ownsWork = _captureDvrOwnership(credentials);
-    if (!ownsWork() || !hasDvrFeature) return;
-    try {
-      final storageInfo = await xtreamService.getDvrStorageFor(credentials);
-      if (!ownsWork()) return;
-      _dvrStorageInfo = storageInfo;
-    } on Object catch (error) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: refresh storage failed: $error');
-      if (!ownsWork()) return;
-      _dvrStorageInfo = null;
-    }
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
-
-  /// Searches guest-enabled Arr integrations via `request_search`. Thin
-  /// pass-through — the Requests screen owns its own search-in-flight/error
-  /// state since results aren't part of the app's persistent state.
+  /// See [RequestsCoordinator.searchContentRequests].
   Future<List<ContentRequestSearchResult>> searchContentRequests(
     String query, {
     String? type,
-  }) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return const <ContentRequestSearchResult>[];
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return const <ContentRequestSearchResult>[];
-    final results = await xtreamService.searchContentRequestsFor(
-      credentials,
-      query,
-      type: type,
-    );
-    if (!ownsWork()) return const <ContentRequestSearchResult>[];
-    return results;
-  }
+  }) => _requests.searchContentRequests(query, type: type);
 
-  /// Submits a content request and adds it to the local requests list so it
-  /// shows up immediately, without waiting for a `request.status` push.
+  /// See [RequestsCoordinator.submitContentRequest].
   Future<MediaRequestSummary> submitContentRequest({
     required String type,
     required int integrationId,
     required String externalId,
     List<int>? seasons,
     MediaRequestOwner? requestOwner,
-  }) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureMediaRequestOwnership(
-      credentials,
-      owner: requestOwner,
-    );
-    if (!ownsWork()) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final request = await xtreamService.submitContentRequestFor(
-      credentials,
-      type: type,
-      integrationId: integrationId,
-      externalId: externalId,
-      seasons: seasons,
-    );
-    if (!ownsWork()) return request;
-    final next = [request, ..._mediaRequests];
-    if (!ownsWork()) return request;
-    _mediaRequests = next;
-    if (!ownsWork()) return request;
-    notifyListeners();
-    return request;
-  }
+  }) => _requests.submitContentRequest(
+    type: type,
+    integrationId: integrationId,
+    externalId: externalId,
+    seasons: seasons,
+    requestOwner: requestOwner,
+  );
 
-  /// Dismisses a completed or rejected request and removes it locally.
-  Future<void> dismissMediaRequest(int requestId) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return;
-    await xtreamService.dismissMediaRequest(requestId);
-    if (!ownsWork()) return;
-    final next = _mediaRequests
-        .where((request) => request.id != requestId)
-        .toList(growable: false);
-    if (!ownsWork()) return;
-    _mediaRequests = next;
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
+  /// See [RequestsCoordinator.dismissMediaRequest].
+  Future<void> dismissMediaRequest(int requestId) =>
+      _requests.dismissMediaRequest(requestId);
 
-  /// Refreshes the requesting guest's request history from the server. Used
-  /// when the Requests screen becomes visible, since a push can be missed
-  /// while the app is backgrounded and no other screen holds this list warm.
-  Future<void> refreshMediaRequests() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null || !hasRequestsFeature) return;
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      final requests = await xtreamService.getMediaRequests();
-      if (!ownsWork()) return;
-      _mediaRequests = requests;
-      if (!ownsWork()) return;
-      notifyListeners();
-    } on Object catch (error) {
-      debugPrint('Requests: refresh failed: $error');
-    }
-  }
+  /// See [RequestsCoordinator.refreshMediaRequests].
+  Future<void> refreshMediaRequests() => _requests.refreshMediaRequests();
 
   void updateProgressEntry(Progress updated) {
     bool sameItem(Progress p) {
@@ -2844,12 +2085,13 @@ class AppStateController extends ChangeNotifier {
             'vodStreams': vodItems,
             'seriesStreams': seriesList,
             'viewers': viewers,
-            // replace() wipes every cache key not in this map, so carry the
-            // guide across a same-source refresh; drop it when the EPG source
-            // itself is changing (the reset below clears the in-memory guide).
+            // replace() wipes every cache key not in this map, so keep the
+            // stored guide across a same-source refresh (EpgService writes it
+            // through as it goes); drop it when the EPG source itself is
+            // changing (the reset below clears the in-memory guide).
             'epgGuide': invalidateEpgFreshness
                 ? const <EpgProgram>[]
-                : _epgGuideForPersist(),
+                : CacheService.keepExisting,
           });
           if (_sourceOperationGeneration.isStale(sourceGeneration)) {
             await rollbackSource?.call();
@@ -2909,25 +2151,25 @@ class AppStateController extends ChangeNotifier {
           }
 
           if (invalidateEpgFreshness) {
-            _resetEpgSession(
+            // The replace above already emptied the stored guide; wipe it
+            // again behind any old-source write that landed since.
+            _epg.resetSession(
               clearGuide: _sourceType != AppSourceType.none,
+              wipeStore: true,
             );
           }
           _sourceType = AppSourceType.xtream;
           _liveCategories = liveCategories;
           _vodCategories = vodCategories;
           _seriesCategories = seriesCategories;
-          _channels = channels;
           // DVR recordings/rules and media requests land via
           // [_applyDvrAndRequestExtras] after this commit. On a fresh
           // connection drop the previous account's values now; on a
           // same-account refresh keep them until the refetch resolves so the
           // Home/DVR screens do not flicker to empty.
           if (clearCache) {
-            _dvrRecordings = const <DvrRecording>[];
-            _recordingChannelIds = const <int>{};
-            _dvrSeriesRules = const <DvrSeriesRule>[];
-            _mediaRequests = const <MediaRequestSummary>[];
+            _dvr.reset(clearStorage: false);
+            _requests.reset();
           }
           _viewers = viewers;
           _activeViewer = activeViewer;
@@ -2959,7 +2201,7 @@ class AppStateController extends ChangeNotifier {
           // rest in the background so scrolling a large playlist lands on
           // already-loaded EPG. [ensureEpgForChannels] still fills any gaps the
           // sweep has not reached yet as rows scroll into view.
-          unawaited(_primeAndSweepXtreamEpg(channels));
+          unawaited(_epg.primeAndSweep(lineup: channels));
           return true;
         } on Object {
           await rollbackSource?.call();
@@ -3019,24 +2261,11 @@ class AppStateController extends ChangeNotifier {
     if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
       return;
     }
-    final fetchedDvrRecordings = results[0] as List<DvrRecording>;
-    final fetchedDvrSeriesRules = results[1] as List<DvrSeriesRule>;
-    final mediaRequests = results[2] as List<MediaRequestSummary>;
-    // Keep local DVR state if the server returned nothing (sync lag or a
-    // transient failure swallowed by the catchError on each future), mirroring
-    // the progress-list guard in [_replaceWithXtreamContent].
-    final dvrRecordings =
-        fetchedDvrRecordings.isEmpty && _dvrRecordings.isNotEmpty
-        ? _dvrRecordings
-        : fetchedDvrRecordings;
-    final dvrSeriesRules =
-        fetchedDvrSeriesRules.isEmpty && _dvrSeriesRules.isNotEmpty
-        ? _dvrSeriesRules
-        : fetchedDvrSeriesRules;
-    _dvrRecordings = dvrRecordings;
-    _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
-    _dvrSeriesRules = dvrSeriesRules;
-    _mediaRequests = mediaRequests;
+    _dvr.applyFetched(
+      results[0] as List<DvrRecording>,
+      results[1] as List<DvrSeriesRule>,
+    );
+    _requests.applyFetched(results[2] as List<MediaRequestSummary>);
     notifyListeners();
   }
 
@@ -3055,15 +2284,13 @@ class AppStateController extends ChangeNotifier {
     final seriesCategories =
         (await cacheService.get<List<Category>>('seriesCategories'))?.data ??
         const <Category>[];
-    final channels =
-        (await cacheService.get<List<Channel>>('liveStreams'))?.data ??
-        const <Channel>[];
-    final vodItems =
-        (await cacheService.get<List<VodItem>>('vodStreams'))?.data ??
-        const <VodItem>[];
-    final seriesList =
-        (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
-        const <Series>[];
+    // Counts only: the screens page their rows from SQLite, so decoding
+    // whole catalogs here just to test for content cost seconds of a cold
+    // start on a large library.
+    final itemCounts = await Future.wait([
+      for (final key in const ['liveStreams', 'vodStreams', 'seriesStreams'])
+        cacheService.itemCount(key),
+    ]);
     final viewers =
         (await cacheService.get<List<Viewer>>('viewers'))?.data ??
         const <Viewer>[];
@@ -3071,9 +2298,7 @@ class AppStateController extends ChangeNotifier {
         liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
         seriesCategories.isNotEmpty ||
-        channels.isNotEmpty ||
-        vodItems.isNotEmpty ||
-        seriesList.isNotEmpty;
+        itemCounts.any((count) => (count ?? 0) > 0);
     if (!hasContent) return false;
 
     final viewerGeneration = _viewerOperationGeneration.advance();
@@ -3092,7 +2317,7 @@ class AppStateController extends ChangeNotifier {
         _viewerOperationGeneration.isStale(viewerGeneration)) {
       return false;
     }
-    await _restoreCachedEpgGuide();
+    await _epg.restoreCachedGuide();
     if (_sourceOperationGeneration.isStale(sourceGeneration) ||
         _viewerOperationGeneration.isStale(viewerGeneration)) {
       return false;
@@ -3101,12 +2326,8 @@ class AppStateController extends ChangeNotifier {
     _liveCategories = liveCategories;
     _vodCategories = vodCategories;
     _seriesCategories = seriesCategories;
-    _channels = channels;
-    _dvrRecordings = const <DvrRecording>[];
-    _dvrStorageInfo = null;
-    _recordingChannelIds = const <int>{};
-    _dvrSeriesRules = const <DvrSeriesRule>[];
-    _mediaRequests = const <MediaRequestSummary>[];
+    _dvr.reset();
+    _requests.reset();
     _viewers = viewers;
     _activeViewer = activeViewer;
     _progressList = progress;
@@ -3315,502 +2536,29 @@ class AppStateController extends ChangeNotifier {
       _sourceType == AppSourceType.xtream &&
       _activeViewer?.ulid == viewer.ulid;
 
-  /// Queues [channels] for a lazy, debounced EPG fetch — only channels
+  /// Queues [channels] for a lazy, debounced EPG fetch - only channels
   /// without fresh cached data are requested. Call this from a screen's
   /// `itemBuilder` (list/grid) so only currently visible channels get fetched
-  /// as the user scrolls, instead of fetching the whole channel list upfront.
+  /// as the user scrolls. See [EpgCoordinator.ensureEpgForChannels].
   void ensureEpgForChannels(
     List<Channel> channels, {
     DateTime? startDate,
     DateTime? endDate,
-  }) {
-    if (_sourceType != AppSourceType.xtream) return;
-    final rangeKey = _epgRangeKey(startDate, endDate);
-    final returningToCurrentGuide =
-        rangeKey.isEmpty && _activeEpgRangeKey.isNotEmpty;
-    if (rangeKey != _activeEpgRangeKey) {
-      _activeEpgRangeKey = rangeKey;
-      _pendingEpgStartDate = startDate;
-      _pendingEpgEndDate = endDate;
-      _pendingEpgChannelIds.clear();
-      _pendingForcedEpgChannelIds.clear();
-      _epgFetchDebounce?.cancel();
-      _epgRequestGeneration += 1;
-    }
-    var added = false;
-    for (final channel in channels) {
-      if (rangeKey.isEmpty) {
-        final forceRefresh =
-            returningToCurrentGuide &&
-            epgService.programsForChannel(channel).isEmpty;
-        if (!forceRefresh && !epgService.shouldFetchDataForChannel(channel)) {
-          continue;
-        }
-        if (forceRefresh) _pendingForcedEpgChannelIds.add(channel.id);
-      } else {
-        if (_hasFreshEpgRange(channel.id, rangeKey) ||
-            !epgService.shouldFetchData(_epgRangeFetchId(channel, rangeKey))) {
-          continue;
-        }
-      }
-      if (_pendingEpgChannelIds.add(channel.id)) added = true;
-    }
-    if (!added) return;
-    _epgFetchDebounce?.cancel();
-    _epgFetchDebounce = Timer(_epgFetchDebounceDelay, _flushPendingEpgFetch);
-  }
+  }) => _epg.ensureEpgForChannels(
+    channels,
+    startDate: startDate,
+    endDate: endDate,
+  );
 
-  /// Fetches the full retention window of EPG programs for [channel] so the
-  /// catchup dialog can list history beyond today+tomorrow (which is all
-  /// `ensureEpgForChannels` ever asks the server for).
-  ///
-  /// Deliberately does not read or write `_activeEpgRangeKey`,
-  /// `_pendingEpg*`, or `_epgRequestGeneration`: those gate the default-guide
-  /// range fetches that the list/grid itemBuilders kick off on every rebuild,
-  /// which would race a dialog-open fetch and discard the response. It does
-  /// re-check `_sourceOperationGeneration` after the network round-trips so a
-  /// source switch mid-fetch can't merge stale programs back into a guide
-  /// that `_resetEpgSession` just cleared.
-  ///
-  /// On success it also marks the channel fetched in [EpgService] so the
-  /// itemBuilders' no-date `ensureEpgForChannels` calls stop returning true
-  /// for it until [EpgService.cacheTtl] lapses. Without that, the very
-  /// `notifyListeners` this merge fires would rebuild the list, trigger a
-  /// default-guide fetch, and `replaceExisting` the retention window straight
-  /// back out. The freshness mark and the [_catchupEpgFetchedAt] memo share
-  /// the same TTL, so they lapse together: once the guide is allowed to wipe
-  /// history again, the next dialog open re-fetches it.
-  ///
-  /// Concurrent calls for the same channel await one shared fetch, and
-  /// successes are memoized against [EpgService.cacheTtl] (both the memo and
-  /// the in-flight map are cleared by `_resetEpgSession`).
-  Future<void> ensureCatchupEpgForChannel(Channel channel) async {
-    final existing = _inFlightCatchupEpgFetches[channel.id];
-    if (existing != null) {
-      await existing.future;
-      return;
-    }
-    final completer = Completer<void>();
-    _inFlightCatchupEpgFetches[channel.id] = completer;
-    try {
-      await _fetchCatchupEpgForChannel(channel);
-    } finally {
-      if (identical(_inFlightCatchupEpgFetches[channel.id], completer)) {
-        _inFlightCatchupEpgFetches.remove(channel.id);
-      }
-      completer.complete();
-    }
-  }
+  /// Fetches the full catchup retention window of EPG programs for
+  /// [channel]. See [EpgCoordinator.ensureCatchupEpgForChannel].
+  Future<void> ensureCatchupEpgForChannel(Channel channel) =>
+      _epg.ensureCatchupEpgForChannel(channel);
 
-  Future<void> _fetchCatchupEpgForChannel(Channel channel) async {
-    if (_sourceType != AppSourceType.xtream) return;
-    final retentionDays = EpgService.effectiveCatchupRetentionDays(
-      channel.catchupSupported,
-      channel.catchupDays,
-    );
-    if (retentionDays <= 0) return;
-    final lastSuccess = _catchupEpgFetchedAt[channel.id];
-    final now = DateTime.now();
-    if (lastSuccess != null &&
-        now.difference(lastSuccess) < epgService.cacheTtl) {
-      return;
-    }
-    final sourceGeneration = _sourceOperationGeneration.current;
-    final today = DateTime(now.year, now.month, now.day);
-    // canReplay admits programs starting as far back as now - retentionDays,
-    // a timestamp on calendar day (today - retentionDays), so that partial
-    // day must be fetched too; canReplay filters out its too-old programs.
-    // The final day request also returns tomorrow (the server fetches
-    // date + date+1), so this covers the whole default-guide window too.
-    final start = DateTime.utc(
-      today.year,
-      today.month,
-      today.day - retentionDays,
-    );
-    final end = DateTime.utc(today.year, today.month, today.day);
-    try {
-      final programs = await xtreamService.getEpgBatch(
-        [channel],
-        startDate: start,
-        endDate: end,
-        dropPlaceholders: true,
-      );
-      if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
-        return;
-      }
-      epgService
-        ..markFetched([_epgChannelId(channel)])
-        ..mergePrograms(
-          programs,
-          channelIds: [_epgChannelId(channel)],
-          replaceExisting: false,
-          markFresh: false,
-        );
-      _catchupEpgFetchedAt[channel.id] = DateTime.now();
-    } on Object catch (_) {
-      _catchupEpgFetchedAt.remove(channel.id);
-    }
-  }
-
-  Future<void> _flushPendingEpgFetch() async {
-    if (_pendingEpgChannelIds.isEmpty) return;
-    final ids = _pendingEpgChannelIds.toSet();
-    _pendingEpgChannelIds.clear();
-    final forcedIds = _pendingForcedEpgChannelIds.intersection(ids);
-    _pendingForcedEpgChannelIds.removeAll(ids);
-    final startDate = _pendingEpgStartDate;
-    final endDate = _pendingEpgEndDate;
-    final rangeKey = _activeEpgRangeKey;
-    final generation = _epgRequestGeneration;
-    final channels = _channels
-        .where((channel) => ids.contains(channel.id))
-        .where(
-          (channel) => rangeKey.isEmpty
-              ? forcedIds.contains(channel.id) ||
-                    epgService.shouldFetchDataForChannel(channel)
-              : !_hasFreshEpgRange(channel.id, rangeKey) &&
-                    epgService.shouldFetchData(
-                      _epgRangeFetchId(channel, rangeKey),
-                    ),
-        )
-        .toList(growable: false);
-    if (channels.isEmpty) return;
-    final channelIds = channels.map(_epgChannelId).toList(growable: false);
-    final fetchIds = rangeKey.isEmpty
-        ? channelIds
-        : channels
-              .map((channel) => _epgRangeFetchId(channel, rangeKey))
-              .toList(growable: false);
-    final sourceGeneration = epgService.markFetchStarted(fetchIds);
-    try {
-      final programs = await xtreamService.getEpgBatch(
-        channels,
-        startDate: startDate,
-        endDate: endDate,
-      );
-      if (generation != _epgRequestGeneration ||
-          rangeKey != _activeEpgRangeKey) {
-        epgService.markFetchFailed(
-          fetchIds,
-          sourceGeneration: sourceGeneration,
-        );
-        return;
-      }
-      if (rangeKey.isEmpty) {
-        epgService.applySuccessfulResponse(
-          channelIds,
-          programs,
-          sourceGeneration: sourceGeneration,
-        );
-      } else {
-        _markEpgRangeFetched(channels, rangeKey);
-        epgService
-          ..mergePrograms(
-            programs,
-            channelIds: channelIds,
-            replaceExisting: false,
-            markFresh: false,
-          )
-          ..markFetched(fetchIds);
-      }
-      _scheduleEpgGuidePersist();
-      if (kDebugMode) {
-        debugPrint(
-          '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
-        );
-      }
-    } on Object catch (e) {
-      epgService.markFetchFailed(
-        fetchIds,
-        sourceGeneration: sourceGeneration,
-      );
-      if (generation != _epgRequestGeneration ||
-          rangeKey != _activeEpgRangeKey) {
-        return;
-      }
-      if (kDebugMode) debugPrint('[EPG] lazy fetch failed: $e');
-    }
-  }
-
-  /// Re-fetches the guide for every channel without touching the catalog.
-  /// The in-memory guide is kept so rows stay populated until each channel's
-  /// fresh response replaces them.
-  void _refreshEpgGuide() {
-    if (_sourceType != AppSourceType.xtream) return;
-    _resetEpgSession(clearGuide: false);
-    notifyListeners();
-    unawaited(_primeAndSweepXtreamEpg(_channels));
-  }
-
-  /// Re-primes the guide when the app returns from the background and the
-  /// last successful prime is older than [EpgService.cacheTtl]. TV apps are
-  /// usually resumed rather than relaunched, and only the guide rows a screen
-  /// happens to rebuild refresh lazily, so without this a long-resident app
-  /// keeps showing yesterday's guide until a manual clear.
-  ///
-  /// Unlike a manual clear this keeps the session: only channels whose data
-  /// has outlived the TTL are fetched, and in-flight dated (timeline) and
-  /// catch-up fetches carry on. A failed prime is retried once after
-  /// [EpgService.retryBackoff], the usual case being Wi-Fi still reconnecting
-  /// after standby.
-  void refreshEpgGuideIfStale({bool retryOnFailure = true}) {
-    if (_disposed ||
-        _sourceType != AppSourceType.xtream ||
-        _isLoadingContent ||
-        _epgPrimesInFlight > 0) {
-      return;
-    }
-    final refreshedAt = _epgGuideRefreshedAt;
-    if (refreshedAt != null &&
-        epgService.now.difference(refreshedAt) < epgService.cacheTtl) {
-      return;
-    }
-    _epgPrimeRetry?.cancel();
-    unawaited(
-      _primeAndSweepXtreamEpg(_channels, retryOnFailure: retryOnFailure),
-    );
-  }
-
-  /// Primes EPG for the first [_epgPrimeCount] channels, then - once that
-  /// response and the first frame have settled - sweeps the remaining channels
-  /// in the background so the guide is fully populated without the user having
-  /// to scroll each row into view.
-  Future<void> _primeAndSweepXtreamEpg(
-    List<Channel> channels, {
-    bool retryOnFailure = false,
-  }) async {
-    final generation = _epgRequestGeneration;
-    final primeChannels = channels.take(_epgPrimeCount).toList(growable: false);
-    _epgPrimesInFlight += 1;
-    try {
-      await _loadXtreamEpg(primeChannels);
-    } finally {
-      _epgPrimesInFlight -= 1;
-    }
-    if (_disposed || generation != _epgRequestGeneration) return;
-    // Judged by the result, not the request: a prime that skipped channels
-    // still in their failure backoff (or mid-fetch elsewhere) didn't refresh
-    // them either.
-    final primed = primeChannels.every(epgService.hasFreshDataForChannel);
-    if (primed) {
-      _epgGuideRefreshedAt = epgService.now;
-    } else if (retryOnFailure) {
-      // The retry sweeps too; sweeping now would only fail chunk by chunk.
-      _epgPrimeRetry?.cancel();
-      _epgPrimeRetry = Timer(
-        EpgService.retryBackoff,
-        () => refreshEpgGuideIfStale(retryOnFailure: false),
-      );
-      return;
-    }
-    if (_sourceType != AppSourceType.xtream ||
-        channels.length <= _epgPrimeCount) {
-      return;
-    }
-    unawaited(
-      _sweepXtreamEpgInBackground(
-        channels.skip(_epgPrimeCount).toList(growable: false),
-      ),
-    );
-  }
-
-  /// Walks [channels] in [_epgSweepChunkSize] batches, spaced out so the sweep
-  /// never competes hard with foreground work. Bails between chunks on dispose,
-  /// a source/guide reset, or a newer sweep; yields to in-flight lazy fetches
-  /// (a user actively scrolling the guide) so those stay responsive.
-  Future<void> _sweepXtreamEpgInBackground(List<Channel> channels) async {
-    final sweepGeneration = ++_epgSweepGeneration;
-    final requestGeneration = _epgRequestGeneration;
-    if (channels.isNotEmpty) {
-      _epgSweepProgressController.add(
-        EpgSweepProgress(loaded: 0, total: channels.length),
-      );
-    }
-    await Future<void>.delayed(_epgSweepStartDelay);
-
-    void bail() {
-      if (sweepGeneration == _epgSweepGeneration) {
-        _epgSweepProgressController.add(null);
-      }
-    }
-
-    var start = 0;
-    while (start < channels.length) {
-      if (_disposed ||
-          sweepGeneration != _epgSweepGeneration ||
-          requestGeneration != _epgRequestGeneration ||
-          _sourceType != AppSourceType.xtream) {
-        bail();
-        return;
-      }
-      // A foreground lazy fetch is queued or running - let it go first and
-      // re-check this same window on the next pass.
-      if (_pendingEpgChannelIds.isNotEmpty ||
-          (_epgFetchDebounce?.isActive ?? false)) {
-        await Future<void>.delayed(_epgSweepChunkDelay);
-        continue;
-      }
-      final chunk = channels
-          .skip(start)
-          .take(_epgSweepChunkSize)
-          .toList(growable: false);
-      await _loadXtreamEpg(chunk);
-      start += _epgSweepChunkSize;
-      if (!_disposed && sweepGeneration == _epgSweepGeneration) {
-        _epgSweepProgressController.add(
-          EpgSweepProgress(
-            loaded: start.clamp(0, channels.length),
-            total: channels.length,
-          ),
-        );
-      }
-      await Future<void>.delayed(_epgSweepChunkDelay);
-    }
-    if (kDebugMode) {
-      debugPrint(
-        '[EPG] background sweep complete (${channels.length} channels)',
-      );
-    }
-    if (!_disposed && sweepGeneration == _epgSweepGeneration) {
-      _epgSweepProgressController.add(null);
-    }
-  }
-
-  Future<void> _loadXtreamEpg(List<Channel> channels) async {
-    final generation = _epgRequestGeneration;
-    final channelsToFetch = channels
-        .where(epgService.shouldFetchDataForChannel)
-        .toList(growable: false);
-    if (channelsToFetch.isEmpty) return;
-    final channelIds = channelsToFetch
-        .map(_epgChannelId)
-        .toList(growable: false);
-    final sourceGeneration = epgService.markFetchStarted(channelIds);
-    try {
-      final programs = await xtreamService.getEpgBatch(channelsToFetch);
-      if (generation != _epgRequestGeneration) {
-        epgService.markFetchFailed(
-          channelIds,
-          sourceGeneration: sourceGeneration,
-        );
-        return;
-      }
-      if (kDebugMode) {
-        debugPrint(
-          '[EPG] getEpgBatch → ${programs.length} programs for ${channelsToFetch.length} channels',
-        );
-      }
-      epgService.applySuccessfulResponse(
-        channelIds,
-        programs,
-        sourceGeneration: sourceGeneration,
-      );
-      _scheduleEpgGuidePersist();
-    } on Object catch (e) {
-      epgService.markFetchFailed(
-        channelIds,
-        sourceGeneration: sourceGeneration,
-      );
-      if (kDebugMode) debugPrint('[EPG] getEpgBatch failed: $e');
-      // Don't clear existing EPG data on a batch failure. A transient network
-      // error shouldn't wipe a previously loaded guide.
-    }
-  }
-
-  /// The airing/upcoming slice of the in-memory guide, capped, for the on-disk
-  /// cache. Stale (already-ended) programmes are dropped so an old blob shrinks
-  /// to nothing on its own rather than restoring a guide full of dead air.
-  List<EpgProgram> _epgGuideForPersist() {
-    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
-    final programs = epgService.programsEndingAfter(cutoff);
-    if (programs.length <= _epgPersistProgramCap) return programs;
-    return programs.sublist(0, _epgPersistProgramCap);
-  }
-
-  void _scheduleEpgGuidePersist() {
-    _epgGuidePersistDebounce?.cancel();
-    _epgGuidePersistDebounce = Timer(
-      _epgGuidePersistDelay,
-      () => unawaited(_persistEpgGuide()),
-    );
-  }
-
-  Future<void> _persistEpgGuide() async {
-    if (_disposed || _sourceType != AppSourceType.xtream) return;
-    try {
-      await cacheService.set('epgGuide', _epgGuideForPersist());
-    } on Object catch (e) {
-      if (kDebugMode) debugPrint('[EPG] guide persist failed: $e');
-    }
-  }
-
-  /// Merges the last-persisted guide into [epgService] on a cold start so the
-  /// grids can paint "now/next" before the network prime lands. Marked not
-  /// fresh, so the prime and background sweep still refresh every channel.
-  Future<void> _restoreCachedEpgGuide() async {
-    final cached = await cacheService.get<List<EpgProgram>>('epgGuide');
-    final programs = cached?.data;
-    if (programs == null || programs.isEmpty) return;
-    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
-    final live = programs
-        .where((program) => program.end.isAfter(cutoff))
-        .toList(growable: false);
-    if (live.isEmpty) return;
-    epgService.mergePrograms(
-      live,
-      replaceExisting: false,
-      markFresh: false,
-    );
-  }
-
-  String _epgChannelId(Channel channel) =>
-      channel.epgChannelId ?? channel.tvgName ?? channel.name;
-
-  String _epgRangeFetchId(Channel channel, String rangeKey) =>
-      '${_epgChannelId(channel)}:$rangeKey';
-
-  String _epgRangeKey(DateTime? startDate, DateTime? endDate) {
-    if (startDate == null) return '';
-    String dateKey(DateTime value) =>
-        '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
-    return '${dateKey(startDate)}:${dateKey(endDate ?? startDate)}';
-  }
-
-  bool _hasFreshEpgRange(int channelId, String rangeKey) {
-    final key = '$channelId:$rangeKey';
-    final fetchedAt = _fetchedEpgRanges[key];
-    if (fetchedAt == null) return false;
-    final elapsed = epgService.now.difference(fetchedAt);
-    if (!elapsed.isNegative && elapsed < epgService.cacheTtl) return true;
-    _fetchedEpgRanges.remove(key);
-    return false;
-  }
-
-  void _markEpgRangeFetched(List<Channel> channels, String rangeKey) {
-    final now = epgService.now;
-    for (final channel in channels) {
-      _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
-    }
-  }
-
-  void _resetEpgSession({bool clearGuide = true}) {
-    _epgPrimeRetry?.cancel();
-    _epgRequestGeneration += 1;
-    _epgSweepGeneration += 1;
-    _epgFetchDebounce?.cancel();
-    _epgGuidePersistDebounce?.cancel();
-    _epgFetchDebounce = null;
-    _pendingEpgChannelIds.clear();
-    _pendingForcedEpgChannelIds.clear();
-    _fetchedEpgRanges.clear();
-    _catchupEpgFetchedAt.clear();
-    _inFlightCatchupEpgFetches.clear();
-    _pendingEpgStartDate = null;
-    _pendingEpgEndDate = null;
-    _activeEpgRangeKey = '';
-    epgService.invalidateSourceFetchState();
-    if (clearGuide) epgService.clear();
-  }
+  /// Re-primes the guide on resume when it has outlived
+  /// [EpgService.cacheTtl]. See [EpgCoordinator.refreshEpgGuideIfStale].
+  void refreshEpgGuideIfStale({bool retryOnFailure = true}) =>
+      _epg.refreshEpgGuideIfStale(retryOnFailure: retryOnFailure);
 
   Future<AppSourceType> _readSavedSourceType() async {
     final raw = await secureStorage.read(_sourceKey);
@@ -3872,15 +2620,10 @@ class AppStateController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     authNotifier.removeListener(_registerLogSecrets);
-    _epgRequestGeneration += 1;
-    _epgSweepGeneration += 1;
-    _epgFetchDebounce?.cancel();
-    _epgGuidePersistDebounce?.cancel();
-    _epgPrimeRetry?.cancel();
-    _dvrContentRefreshDebounce?.cancel();
+    _epg.dispose();
+    _dvr.dispose();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());
-    unawaited(_epgSweepProgressController.close());
     unawaited(_notificationActivationController.close());
     unawaited(_pushNotificationService.dispose());
     unawaited(_catalogRepository.close());

@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart' show OptimizeFor;
 import 'package:m3u_tv/shared/app_button.dart' show kStadiumFocusEffects;
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -357,7 +358,9 @@ class _InlineMediaSearchFieldState extends State<InlineMediaSearchField> {
                           onSelect: _clear,
                           effects: kStadiumFocusEffects,
                           child: IconButton(
-                            tooltip: 'Clear search',
+                            tooltip: AppLocalizations.of(
+                              context,
+                            ).mediaClearSearch,
                             icon: Icon(Icons.clear, size: 24 * scale),
                             onPressed: _clear,
                           ),

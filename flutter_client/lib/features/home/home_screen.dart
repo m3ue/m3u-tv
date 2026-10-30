@@ -16,6 +16,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -49,7 +50,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   });
 
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
@@ -494,7 +495,7 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
   }
 }
 
-class _LiveRow extends ConsumerWidget {
+class _LiveRow extends ConsumerStatefulWidget {
   const _LiveRow({
     required this.favoriteChannelIds,
     required this.onChannelSelect,
@@ -508,7 +509,7 @@ class _LiveRow extends ConsumerWidget {
 
   final Set<int> favoriteChannelIds;
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final Future<void> Function(Channel) onToggleFavorite;
   final int rowItemLimit;
   final bool useSidebarLayout;
@@ -516,27 +517,87 @@ class _LiveRow extends ConsumerWidget {
   final HomeSpotlightController? spotlight;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final channels = ref.watch(liveChannelsProvider);
-    final spotlight = this.spotlight;
+  ConsumerState<_LiveRow> createState() => _LiveRowState();
+}
+
+/// The row's channels and what tapping one hands the player: favorites when
+/// any are in the lineup, otherwise the whole lineup.
+typedef _LiveRowSlice = ({
+  List<Channel> rowChannels,
+  bool showsFavorites,
+  ChannelContext Function(int index) contextAt,
+});
+
+class _LiveRowState extends ConsumerState<_LiveRow> {
+  // The row is read from the catalog, refetched when the catalog reloads (a
+  // new category list) or the favorites change.
+  (List<Category>, Set<int>, int)? _fetchedFor;
+  _LiveRowSlice? _windowSlice;
+
+  void _fetch(
+    List<Category> catalog,
+    Set<int> favorites,
+    CatalogRepository repo,
+  ) {
+    final key = (catalog, favorites, widget.rowItemLimit);
+    _fetchedFor = key;
+    unawaited(() async {
+      final favoritesQuery = LiveChannelQuery(ids: favorites);
+      var query = favoritesQuery;
+      var channels = favorites.isEmpty
+          ? const <Channel>[]
+          : await query.page(repo, 0, widget.rowItemLimit);
+      final showsFavorites = channels.isNotEmpty;
+      if (!showsFavorites) {
+        query = const LiveChannelQuery();
+        channels = await query.page(repo, 0, widget.rowItemLimit);
+      }
+      final length = await query.count(repo);
+      if (!mounted || _fetchedFor != key) return;
+      setState(() {
+        _windowSlice = (
+          rowChannels: channels,
+          showsFavorites: showsFavorites,
+          contextAt: (index) => CatalogChannelContext(
+            repository: repo,
+            query: query,
+            length: length,
+            indexHint: index,
+          ),
+        );
+      });
+    }());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = ref.watch(liveCategoriesProvider);
+    if (_fetchedFor !=
+        (catalog, widget.favoriteChannelIds, widget.rowItemLimit)) {
+      _fetch(
+        catalog,
+        widget.favoriteChannelIds,
+        ref.read(catalogRepositoryProvider),
+      );
+    }
+    final slice =
+        _windowSlice ??
+        (
+          rowChannels: const <Channel>[],
+          showsFavorites: false,
+          contextAt: (_) => ListChannelContext.empty,
+        );
+    final rowChannels = slice.rowChannels;
+    final spotlight = widget.spotlight;
     final epgService = ref.watch(epgServiceProvider);
     final l = AppLocalizations.of(context);
-    final favoriteChannels = channels
-        .where((channel) => favoriteChannelIds.contains(channel.id))
-        .toList(growable: false);
-    final liveSectionChannels = favoriteChannels.isEmpty
-        ? channels
-        : favoriteChannels;
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
-    final rowChannels = liveSectionChannels
-        .take(rowItemLimit)
-        .toList(growable: false);
 
     // Same card as Live TV's Grid view (logo, progress, current program and
     // its start/end), so the Home row matches that view.
     return MediaPreviewSection.builder(
-      title: favoriteChannels.isEmpty ? l.navLiveTv : l.homeFavoriteChannels,
-      titleIcon: favoriteChannels.isEmpty ? Icons.live_tv : Icons.star,
+      title: slice.showsFavorites ? l.homeFavoriteChannels : l.navLiveTv,
+      titleIcon: slice.showsFavorites ? Icons.star : Icons.live_tv,
       emptyLabel: l.homeNoLiveTv,
       itemCount: rowChannels.length,
       baseCardWidth: ChannelGridTile.baseWidth,
@@ -548,14 +609,14 @@ class _LiveRow extends ConsumerWidget {
           child: ChannelGridTile(
             channel: channel,
             epg: epgService.lookupForChannel(channel),
-            isFavorite: favoriteChannelIds.contains(channel.id),
+            isFavorite: widget.favoriteChannelIds.contains(channel.id),
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: autofocus,
             onTap: () {
-              onChannelContextChanged?.call(liveSectionChannels);
-              onChannelSelect(channel);
+              widget.onChannelContextChanged?.call(slice.contextAt(index));
+              widget.onChannelSelect(channel);
             },
-            onLongPress: () => onToggleFavorite(channel),
+            onLongPress: () => widget.onToggleFavorite(channel),
           ),
         );
         if (spotlight == null) return tile;
@@ -567,8 +628,8 @@ class _LiveRow extends ConsumerWidget {
           child: tile,
         );
       },
-      useSidebarLayout: useSidebarLayout,
-      onSidebarActivate: onSidebarActivate,
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
     );
   }
 }

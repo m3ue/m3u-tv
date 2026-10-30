@@ -162,6 +162,20 @@ void main() {
     },
   );
 
+  test(
+    'itemCount is null until written, then counts without decoding',
+    () async {
+      final cache = CacheService(catalogRepository: newRepo());
+      expect(await cache.itemCount('vodStreams'), isNull);
+      await cache.set<List<VodItem>>('vodStreams', const [
+        VodItem(id: 1, name: 'One', streamUrl: 'u1', containerExtension: 'mp4'),
+        VodItem(id: 2, name: 'Two', streamUrl: 'u2', containerExtension: 'mp4'),
+      ]);
+      expect(await cache.itemCount('vodStreams'), 2);
+      expect(await cache.itemCount('seriesStreams'), isNull);
+    },
+  );
+
   test('catalogKeys lists only the SQLite-backed blobs, not the scalars', () {
     expect(
       CacheService.catalogKeys.toSet(),

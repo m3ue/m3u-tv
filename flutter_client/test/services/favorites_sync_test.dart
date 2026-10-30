@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -780,19 +782,20 @@ void main() {
           }
           sourceBPublishCaptured = true;
           final sourceType = controller.sourceType;
-          final channelIds = controller.channels
-              .map((channel) => channel.id)
-              .toList();
           unawaited(
             Future.wait<Object>(<Future<Object>>[
               controller.favoritesService.all(),
               controller.vodFavoritesService.all(),
               controller.seriesFavoritesService.all(),
               controller.aioFavoritesService.all(),
+              _liveChannels(controller),
             ]).then((favorites) {
               sourceBPublished.complete(<String, Object?>{
                 'sourceType': sourceType,
-                'channelIds': channelIds,
+                'channelIds': [
+                  for (final channel in favorites[4] as List<Channel>)
+                    channel.id,
+                ],
                 'viewerId': controller.activeViewer?.ulid,
                 'live': favorites[0],
                 'vod': favorites[1],
@@ -815,7 +818,12 @@ void main() {
         await transport.blockedFavoritesStarted.future;
         await pumpEventQueue();
         expect(controller.activeViewer?.ulid, 'viewer-source-a');
-        expect(controller.channels.map((channel) => channel.id), <int>[101]);
+        // The catalog rows swap at the cache write, ahead of this commit (as
+        // movies and series always have); the published state is still A.
+        expect(
+          (await _liveChannels(controller)).map((channel) => channel.id),
+          <int>[202],
+        );
         expect(await controller.favoritesService.all(), contains(101));
         expect(sourceBPublishCaptured, isFalse);
         expect(
@@ -916,7 +924,10 @@ void main() {
         );
 
         expect(controller.activeViewer?.ulid, 'viewer-source-b');
-        expect(controller.channels.map((channel) => channel.id), <int>[202]);
+        expect(
+          (await _liveChannels(controller)).map((channel) => channel.id),
+          <int>[202],
+        );
         expect(await controller.favoritesService.all(), isEmpty);
         expect(await controller.vodFavoritesService.all(), isEmpty);
         expect(await controller.seriesFavoritesService.all(), isEmpty);
@@ -1799,3 +1810,10 @@ Set<Object?> _persistedFavoriteIds(Map<String, Object?> snapshot) =>
 
 Future<List<String>> _favoriteIds(AIOStreamsFavoritesService service) async =>
     (await service.all()).map((favorite) => favorite.id).toList();
+
+/// The live lineup as the catalog holds it.
+Future<List<Channel>> _liveChannels(AppStateController controller) =>
+    controller.catalogRepository.allItems<Channel>(
+      CatalogRepository.activeSource,
+      kCatalogKindLive,
+    );

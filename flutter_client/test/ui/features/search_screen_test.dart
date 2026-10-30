@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -76,6 +77,11 @@ void main() {
         kind: kCatalogKindSeries,
         items: testSeriesList,
       );
+      await testRepo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindLive,
+        items: testChannels,
+      );
     });
 
     tearDown(() => testDb.close());
@@ -83,7 +89,6 @@ void main() {
     testWidgets('renders search field', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -95,7 +100,6 @@ void main() {
     testWidgets('renders All/Live TV/Movies/Series tabs', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -114,7 +118,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -129,7 +132,6 @@ void main() {
     testWidgets('searching filters results case-insensitively', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -148,7 +150,6 @@ void main() {
     testWidgets('Live TV tab shows only channels', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -169,10 +170,33 @@ void main() {
       expect(find.text('The Matrix'), findsNothing);
     });
 
+    testWidgets('channel matches come from the catalog', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: testRepo,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'news');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpadTabBar),
+          matching: find.text('Live TV'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('BBC News'), findsOneWidget);
+      expect(find.text('CNN International'), findsNothing);
+    });
+
     testWidgets('Movies tab shows only VOD items', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -197,7 +221,6 @@ void main() {
     testWidgets('Series tab shows only series', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -224,7 +247,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -246,7 +268,6 @@ void main() {
 
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
           onChannelSelect: (channel) => selectedChannel = channel,
           onVodSelect: (item) => selectedVod = item,
@@ -285,7 +306,6 @@ void main() {
 
         await tester.pumpWidget(
           _TestApp(
-            channels: testChannels,
             catalogRepository: testRepo,
             onChannelContextChanged: (channels) => reportedContext = channels,
           ),
@@ -305,7 +325,6 @@ void main() {
     testWidgets('shows empty state when no results match', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -322,7 +341,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
           isConfigured: false,
         ),
@@ -393,7 +411,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -439,7 +456,6 @@ void main() {
           // would silently render the empty-state.
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: (query) async {
                 return query == 'bear' ? showResults : const [];
@@ -476,7 +492,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -506,7 +521,6 @@ void main() {
           // the "all empty -> show empty state" early-return.
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: (query) async {
                 return query == 'bear' ? showResults : const [];
@@ -534,7 +548,6 @@ void main() {
 
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
               onChannelSelect: (channel) => selectedChannel = channel,
@@ -563,7 +576,6 @@ void main() {
 
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
               onShowSelect: (show) => selectedShow = show,
@@ -589,7 +601,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               // No onSearchShows callback - the screen should behave
               // exactly like pre-#227.
@@ -616,7 +627,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -664,7 +674,6 @@ void main() {
 
 class _TestApp extends StatelessWidget {
   const _TestApp({
-    required this.channels,
     required this.catalogRepository,
     this.isConfigured = true,
     this.onChannelSelect,
@@ -675,7 +684,6 @@ class _TestApp extends StatelessWidget {
     this.onShowSelect,
   });
 
-  final List<Channel> channels;
   final CatalogRepository catalogRepository;
   final bool isConfigured;
   final void Function(Channel)? onChannelSelect;
@@ -691,7 +699,6 @@ class _TestApp extends StatelessWidget {
       overrides: [
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
-        liveChannelsProvider.overrideWith((_) => channels),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
       ],
       child: MaterialApp(
@@ -699,7 +706,11 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         home: SearchScreen(
           onChannelSelect: onChannelSelect ?? (_) {},
-          onChannelContextChanged: onChannelContextChanged,
+          onChannelContextChanged: onChannelContextChanged == null
+              ? null
+              : (context) => onChannelContextChanged!(
+                  (context as ListChannelContext).channels,
+                ),
           onVodSelect: onVodSelect ?? (_) {},
           onSeriesSelect: onSeriesSelect ?? (_) {},
           onSearchShows: onSearchShows,

@@ -308,22 +308,26 @@ class _BlurredArtworkFill extends StatelessWidget {
   Widget build(BuildContext context) {
     // The dimming is drawn atop the image's own pixels only, so while the art
     // loads (or if it fails) the frame keeps the plain placeholder look.
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.mode(Colors.black38, BlendMode.srcATop),
-        child: FittedBox(
+    final dimmed = ColorFiltered(
+      colorFilter: const ColorFilter.mode(Colors.black38, BlendMode.srcATop),
+      child: FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: CachedMediaThumbnail(
+          url: url,
+          width: _decodeSize,
+          height: _decodeSize,
           fit: BoxFit.cover,
-          clipBehavior: Clip.hardEdge,
-          child: CachedMediaThumbnail(
-            url: url,
-            width: _decodeSize,
-            height: _decodeSize,
-            fit: BoxFit.cover,
-            fallback: const SizedBox.square(dimension: _decodeSize),
-          ),
+          fallback: const SizedBox.square(dimension: _decodeSize),
         ),
       ),
+    );
+    // A 48px decode stretched to the panel is already soft; the blur only
+    // smooths it further, at a per-frame cost that scales with the panel.
+    if (!ImageQualityScope.allowsBlurOf(context)) return dimmed;
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: dimmed,
     );
   }
 }

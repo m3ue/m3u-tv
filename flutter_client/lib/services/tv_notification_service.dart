@@ -1,12 +1,8 @@
 // ignore_for_file: sort_constructors_first, prefer_initializing_formals
 
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:http/http.dart' as http;
+import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/host_platform.dart';
 
 enum TvNotificationDestination { notifications, dvr, requests }
 
@@ -171,14 +167,12 @@ final RegExp _uuidPattern = RegExp(
 /// All methods accept [UserCredentials] directly — no session or token needed.
 class TvNotificationService {
   TvNotificationService({
-    HttpClient? httpClient,
+    ApiClient? apiClient,
     DeviceIdentityService? deviceIdentity,
-  }) : _injectedClient = httpClient,
+  }) : _api = apiClient ?? ApiClient(),
        _deviceIdentity = deviceIdentity;
 
-  final HttpClient? _injectedClient;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  late final HttpClient _client = _injectedClient ?? HttpClient();
+  final ApiClient _api;
 
   /// Supplied on the production path so [fetchUnread] can attach this install's
   /// identity to the boot/resume call. Null in tests, where the extra query
@@ -344,54 +338,10 @@ class TvNotificationService {
     return uri.replace(path: path, queryParameters: <String, String>{});
   }
 
-  static const Duration _requestTimeout = Duration(seconds: 15);
+  Future<Object?> _get(Uri uri) => _api.getJson(uri);
 
-  Future<Object?> _get(Uri uri) async {
-    if (HostPlatform.isWeb) return _browserSend(http.Request('GET', uri));
-    final request = await _client.getUrl(uri).timeout(_requestTimeout);
-    final response = await request.close().timeout(_requestTimeout);
-    final text = await utf8.decodeStream(response).timeout(_requestTimeout);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw TvApiException(response.statusCode, text, uri);
-    }
-    return text.isEmpty ? null : jsonDecode(text);
-  }
-
-  Future<Object?> _post(Uri uri, Map<String, String> body) async {
-    if (HostPlatform.isWeb) {
-      return _browserSend(
-        http.Request('POST', uri)
-          ..headers['content-type'] = 'application/json'
-          ..bodyBytes = utf8.encode(jsonEncode(body)),
-      );
-    }
-    final request = await _client.postUrl(uri).timeout(_requestTimeout);
-    final bytes = utf8.encode(jsonEncode(body));
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-    request
-      ..contentLength = bytes.length
-      ..add(bytes);
-    final response = await request.close().timeout(_requestTimeout);
-    final text = await utf8.decodeStream(response).timeout(_requestTimeout);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw TvApiException(response.statusCode, text, uri);
-    }
-    return text.isEmpty ? null : jsonDecode(text);
-  }
-
-  late final http.Client _browserClient = http.Client();
-
-  /// [_get] and [_post] in a web build, through the browser's networking.
-  Future<Object?> _browserSend(http.Request request) async {
-    final response = await http.Response.fromStream(
-      await _browserClient.send(request).timeout(_requestTimeout),
-    ).timeout(_requestTimeout);
-    final text = utf8.decode(response.bodyBytes, allowMalformed: true);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw TvApiException(response.statusCode, text, request.url);
-    }
-    return text.isEmpty ? null : jsonDecode(text);
-  }
+  Future<Object?> _post(Uri uri, Map<String, String> body) =>
+      _api.postJson(uri, body);
 
   /// Converts nested list params to repeated key form for GET queries.
   Map<String, String> _flattenParams(Map<String, dynamic> params) {
@@ -408,17 +358,6 @@ class TvNotificationService {
     }
     return result;
   }
-}
-
-class TvApiException implements Exception {
-  const TvApiException(this.statusCode, this.body, this.uri);
-
-  final int statusCode;
-  final String body;
-  final Uri uri;
-
-  @override
-  String toString() => 'TvApiException($statusCode)';
 }
 
 int _asInt(Object? value, [int fallback = 0]) {

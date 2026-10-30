@@ -2,6 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -33,7 +34,7 @@ class ShowSearchResultsView extends StatefulWidget {
   final String? error;
   final Map<int, Channel> channelsById;
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(EpgShow)? onShowSelect;
 
   /// Prefix for each tab's `DpadRegion` memoryKey (e.g. `live-tv/search-results`

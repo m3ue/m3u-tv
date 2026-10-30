@@ -451,12 +451,13 @@ class _MyRequestCard extends StatelessWidget {
     MediaRequestStatus.unknown => Icons.radio_button_unchecked,
   };
 
-  String? _episodeLabel() {
+  String? _episodeLabel(BuildContext context) {
     final season = request.seasonNumber;
     final episode = request.episodeNumber;
+    final l = AppLocalizations.of(context);
     if (season != null && episode != null) return 'S$season E$episode';
-    if (season != null) return 'Season $season';
-    if (episode != null) return 'Episode $episode';
+    if (season != null) return l.homeSeason(season);
+    if (episode != null) return l.epgEpisodeNumber(episode);
     return null;
   }
 
@@ -464,7 +465,7 @@ class _MyRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = _statusColor(theme.colorScheme);
-    final episodeLabel = _episodeLabel();
+    final episodeLabel = _episodeLabel(context);
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHigh,
