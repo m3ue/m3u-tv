@@ -20,6 +20,7 @@ import 'package:m3u_tv/services/view_settings_service.dart'
     show ChannelColumnLayout, EpgPreviewPlayback, EpgStartView, OptimizeFor;
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
+import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -104,7 +105,7 @@ class TimelineEpgView extends StatefulWidget {
     this.previewDelay = const Duration(seconds: 5),
   });
 
-  final List<Channel> channels;
+  final ChannelRows channels;
   final EpgService epgService;
   final void Function(Channel) onChannelSelect;
   final CatchupProgramSelect? onCatchupProgramSelect;
@@ -421,27 +422,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   DateTime _offsetDate(DateTime value, int days) =>
       DateTime(value.year, value.month, value.day + days);
 
-  List<Channel>? _maxCatchupDaysSource;
-  int _maxCatchupDaysValue = 0;
-
-  /// The deepest catchup retention across [TimelineEpgView.channels]. Read
-  /// from `build()` (via [_canGoPrevious]), so it's computed once per channel
-  /// list rather than walking every channel on each rebuild.
-  int get _maxCatchupDays {
-    final channels = widget.channels;
-    if (!identical(channels, _maxCatchupDaysSource)) {
-      _maxCatchupDaysSource = channels;
-      _maxCatchupDaysValue = channels
-          .map(
-            (channel) => EpgService.effectiveCatchupRetentionDays(
-              channel.catchupSupported,
-              channel.catchupDays,
-            ),
-          )
-          .fold(0, math.max);
-    }
-    return _maxCatchupDaysValue;
-  }
+  /// The deepest catchup retention across [TimelineEpgView.channels].
+  int get _maxCatchupDays => widget.channels.maxCatchupDays;
 
   bool get _canGoPrevious => _selectedDate.isAfter(
     _offsetDate(_dateOnly(widget.clock()), -_maxCatchupDays),
@@ -709,8 +691,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   List<EpgProgram> _rowPrograms(int row) {
     if (row < 0 || row >= widget.channels.length) return const [];
+    final channel = widget.channels[row];
+    if (channel == null) return const [];
     return EpgGuideNavigation.inWindow(
-      widget.epgService.programsForChannel(widget.channels[row]),
+      widget.epgService.programsForChannel(channel),
       _windowStart,
       _windowEnd,
     );
@@ -771,7 +755,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _pageRows(int direction) {
     final m = _metrics;
-    if (m == null || widget.channels.isEmpty) return;
+    if (m == null || widget.channels.length == 0) return;
     final viewport = _vCtrl.hasClients
         ? _vCtrl.position.viewportDimension
         : m.rowHeight * 5;
@@ -808,7 +792,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   /// it without a key press: a day change, a new channel list, or EPG data
   /// arriving for a row the cursor landed on while it was still empty.
   void _revalidateCursor() {
-    if (!mounted || widget.channels.isEmpty) return;
+    if (!mounted || widget.channels.length == 0) return;
     final cursor = _cursor.value;
     final row = cursor.row.clamp(0, widget.channels.length - 1);
     if (cursor.onChannel) {
@@ -857,7 +841,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   bool _moveCursor(TraversalDirection direction) {
-    if (widget.channels.isEmpty) return false;
+    if (widget.channels.length == 0) return false;
     final cursor = _cursor.value;
     switch (direction) {
       case TraversalDirection.left:
@@ -934,9 +918,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   void _activateCursor() {
-    if (widget.channels.isEmpty) return;
+    if (widget.channels.length == 0) return;
     final cursor = _cursor.value;
     final channel = widget.channels[cursor.row];
+    if (channel == null) return;
     final program = cursor.program;
     if (cursor.onChannel || program == null) {
       _selectLive(channel);
@@ -1058,9 +1043,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   void _openCursorOptions() {
-    if (widget.channels.isEmpty) return;
+    if (widget.channels.length == 0) return;
     final cursor = _cursor.value;
     final channel = widget.channels[cursor.row];
+    if (channel == null) return;
     final program = cursor.program;
     if (_usesChannelOptions(cursor) || program == null) {
       widget.onChannelColumnLongPress?.call(channel);
@@ -1071,6 +1057,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   void _onProgramTap(int row, EpgProgram program) {
     final channel = widget.channels[row];
+    if (channel == null) return;
     _anchor = EpgGuideNavigation.anchorFor(
       program,
       now: widget.clock(),
@@ -1096,7 +1083,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   void _onChannelTap(int row) {
     _setCursor(_cursor.value.copyWith(row: row, onChannel: true));
     if (!widget.tapOpensDetails) _gridFocusNode.requestFocus();
-    _selectLive(widget.channels[row]);
+    final channel = widget.channels[row];
+    if (channel != null) _selectLive(channel);
   }
 
   Future<void> _showDetails(Channel channel, EpgProgram program) {
@@ -1123,9 +1111,10 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   EpgGuideSelection? _selectionFor(_GuideCursor cursor) {
-    if (widget.channels.isEmpty) return null;
+    if (widget.channels.length == 0) return null;
     final row = cursor.row.clamp(0, widget.channels.length - 1);
     final channel = widget.channels[row];
+    if (channel == null) return null;
     final now = widget.clock();
     final program = cursor.onChannel
         ? EpgGuideNavigation.at(
@@ -1147,20 +1136,20 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   }
 
   void _ensureEpgAround(BuildContext context, int index) {
-    final onEnsureEpg = widget.onEnsureEpg;
-    if (onEnsureEpg == null) return;
     // Request this row plus a look-ahead window so a downward scroll hits
-    // loaded EPG. The call is debounced and de-duped downstream.
+    // loaded rows and EPG. Both calls are de-duped downstream.
     final isSpeed =
         ImageQualityScope.of(context)?.optimizeFor == OptimizeFor.speed;
-    final end = math.min(
-      widget.channels.length,
-      index +
-          1 +
-          (isSpeed ? _kEpgPrefetchAheadSpeed : _kEpgPrefetchAheadQuality),
-    );
+    final ahead = isSpeed ? _kEpgPrefetchAheadSpeed : _kEpgPrefetchAheadQuality;
+    final rows = widget.channels..ensureLoaded(index, ahead + 1);
+    final onEnsureEpg = widget.onEnsureEpg;
+    if (onEnsureEpg == null) return;
+    final end = math.min(rows.length, index + 1 + ahead);
     onEnsureEpg(
-      widget.channels.sublist(index, end),
+      [
+        for (var i = index; i < end; i++)
+          ?rows[i],
+      ],
       startDate: _selectedDate,
       endDate: _selectedDate,
     );
@@ -1368,6 +1357,12 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   ) {
     final channel = widget.channels[index];
     _ensureEpgAround(context, index);
+    if (channel == null) {
+      return _PlaceholderGuideRow(
+        key: ValueKey('timeline-placeholder-$index'),
+        metrics: m,
+      );
+    }
     return _GuideRow(
       key: ValueKey('timeline-row-${channel.id}'),
       index: index,
@@ -2367,6 +2362,45 @@ class _NewBadge extends StatelessWidget {
 
 /// A row with no programme data: a single cell pinned across the visible
 /// programme area, so the cursor still has somewhere to sit.
+/// A guide row whose channel is still loading: the row's divider and an
+/// empty channel cell at the same geometry as a real row, so the list's
+/// extent and the cursor's position hold steady while the page lands.
+class _PlaceholderGuideRow extends StatelessWidget {
+  const _PlaceholderGuideRow({super.key, required this.metrics});
+
+  final _GuideMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: SizedBox(
+            width: metrics.channelColumnWidth - 6,
+            height: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyRowCell extends StatelessWidget {
   const _EmptyRowCell({required this.focused, required this.compact});
 

@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/shared/channel_rows.dart';
 
 /// Guards the seam between the recording matcher and the grid widget.
 ///
@@ -15,6 +16,13 @@ import 'package:m3u_tv/services/epg_service.dart';
 /// handed both. Nothing in either half's own tests exercises that hand-off,
 /// which is why these go through the real [EpgRecordingIndex] against a real
 /// [DvrRecording] rather than a stub resolver.
+
+/// One [ListChannelRows] per list, so re-pumping the same list doesn't read
+/// as new content to the guide.
+final _rows = Expando<ListChannelRows>();
+ListChannelRows _rowsFor(List<Channel> channels) =>
+    _rows[channels] ??= ListChannelRows(channels);
+
 void main() {
   final now = DateTime(2026, 6, 1, 12);
 
@@ -68,7 +76,7 @@ void main() {
           width: 800,
           height: 400,
           child: TimelineEpgView(
-            channels: const <Channel>[channel],
+            channels: _rowsFor(const <Channel>[channel]),
             epgService: service,
             onChannelSelect: (_) {},
             clock: () => now,

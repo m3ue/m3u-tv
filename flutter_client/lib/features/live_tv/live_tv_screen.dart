@@ -23,6 +23,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
+import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/channel_sort_dialog.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -183,6 +184,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   List<Channel>? _visibleSource;
   Object? _visibleInputs;
   List<Channel> _visibleChannels = const <Channel>[];
+  ChannelRows _visibleRows = ListChannelRows(const <Channel>[]);
   List<Channel>? _channelsByIdSource;
   Map<int, Channel> _channelsById = const <int, Channel>{};
   _ViewMode _viewMode = _ViewMode.list;
@@ -310,17 +312,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   /// remembered so Back from the player resumes it in the preview. When the
   /// preview was already on this channel its proxy stream is left running,
   /// so the full-screen player joins it rather than restarting it.
-  Future<void> _watchLiveFromGuide(
-    Channel channel,
-    List<Channel> channels,
-  ) async {
+  Future<void> _watchLiveFromGuide(Channel channel) async {
     final player = _previewPlayer;
     if (player != null) {
       await player.stop(keepStreamWarm: player.isPlaying(channel));
       _resumePreviewChannel = channel;
     }
     if (!mounted) return;
-    widget.onChannelContextChanged?.call(ListChannelContext(channels));
+    widget.onChannelContextChanged?.call(_channelContext());
     widget.onChannelSelect(channel);
   }
 
@@ -586,12 +585,24 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     }
     _visibleSource = channels;
     _visibleInputs = inputs;
-    return _visibleChannels = sortChannels(
+    _visibleChannels = sortChannels(
       _filteredChannels(channels),
       _sortOption,
       favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
     );
+    _visibleRows = ListChannelRows(_visibleChannels);
+    return _visibleChannels;
   }
+
+  /// The visible channels as [ChannelRows], for the list, grid and guide.
+  ChannelRows _visibleRowsFor(List<Channel> channels) {
+    _visibleChannelsFor(channels);
+    return _visibleRows;
+  }
+
+  /// What the player's channel up/down moves through after a channel is
+  /// opened from this screen: the slice currently on screen.
+  ChannelContext _channelContext() => ListChannelContext(_visibleChannels);
 
   Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
     if (!identical(channels, _channelsByIdSource)) {
@@ -862,7 +873,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       );
     }
 
-    final filtered = _visibleChannelsFor(channels);
+    final filtered = _visibleRowsFor(channels);
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
     // stacking above it) once a qualifying show search is active - mirrors
@@ -940,7 +951,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
               // During a background refresh the populated list stays visible.
               child: isLoading && channels.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : filtered.isEmpty
+                  : filtered.length == 0
                   ? Center(
                       child: Text(
                         AppLocalizations.of(context).liveTvNoChannels,
@@ -1110,7 +1121,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Widget _buildListView(
-    List<Channel> channels,
+    ChannelRows channels,
     EpgService epgService,
     Set<int> recordingChannelIds,
   ) {
@@ -1122,7 +1133,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         key: ValueKey(_selectedCategory),
         itemCount: channels.length,
         itemBuilder: (context, index) {
+          channels.ensureLoaded(index, 1);
           final channel = channels[index];
+          if (channel == null) return const _ChannelRowPlaceholder();
           widget.onEnsureEpg?.call([channel]);
           final epg = epgService.lookupForChannel(channel);
           final isFav = _favoriteIds.contains(channel.id);
@@ -1133,9 +1146,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(
-                ListChannelContext(channels),
-              );
+              widget.onChannelContextChanged?.call(_channelContext());
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(
@@ -1148,7 +1159,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Widget _buildEpgGrid(
-    List<Channel> channels,
+    ChannelRows channels,
     EpgService epgService,
     Set<int> recordingChannelIds,
     EpgRecordingIndex recordingIndex,
@@ -1177,8 +1188,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         previewPlayer: _previewPlayer,
         previewPlayback: _epgPreviewPlayback,
         previewDelay: _epgPreviewDelay,
-        onChannelSelect: (channel) =>
-            unawaited(_watchLiveFromGuide(channel, channels)),
+        onChannelSelect: (channel) => unawaited(_watchLiveFromGuide(channel)),
         onCatchupProgramSelect: widget.onCatchupProgramSelect == null
             ? null
             : (channel, program) =>
@@ -1198,7 +1208,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Widget _buildGridView(
-    List<Channel> channels,
+    ChannelRows channels,
     EpgService epgService,
     Set<int> recordingChannelIds,
   ) {
@@ -1227,7 +1237,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         ),
         itemCount: channels.length,
         itemBuilder: (context, index) {
+          channels.ensureLoaded(index, 1);
           final channel = channels[index];
+          if (channel == null) return const CatalogGridPlaceholder();
           widget.onEnsureEpg?.call([channel]);
           final epg = epgService.lookupForChannel(channel);
           final isFav = _favoriteIds.contains(channel.id);
@@ -1238,9 +1250,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(
-                ListChannelContext(channels),
-              );
+              widget.onChannelContextChanged?.call(_channelContext());
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(
@@ -1308,6 +1318,27 @@ class _ContextMenuOption extends StatelessWidget {
                   : Text(label),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A list row whose channel is still loading, at a real row's geometry.
+class _ChannelRowPlaceholder extends StatelessWidget {
+  const _ChannelRowPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        height: 72 * FontSizeScope.scaleOf(context),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
