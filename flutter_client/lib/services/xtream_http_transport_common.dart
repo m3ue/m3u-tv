@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -11,10 +14,10 @@ Future<Object?> handleXtreamResponse({
   required Uri uri,
   required int statusCode,
   required String? reasonPhrase,
-  required String text,
+  required Uint8List bytes,
 }) async {
   final isError = statusCode >= 400;
-  if (text.isEmpty) {
+  if (bytes.isEmpty) {
     if (isError) {
       throw XtreamHttpException(
         statusCode: statusCode,
@@ -30,14 +33,16 @@ Future<Object?> handleXtreamResponse({
   // isolate. Only for successful responses - an error body still needs
   // decoding here to extract the server message.
   if (request.wantsRawText && !isError) {
-    return XtreamRawResponse(text);
+    return XtreamRawResponse.bytes(bytes);
   }
 
   final Object? body;
   try {
-    body = await decodeJsonOffMainIsolate(text);
+    body = await decodeJsonBytesOffMainIsolate(bytes);
   } on FormatException {
-    final serverMessage = _plainServerMessage(text);
+    final serverMessage = _plainServerMessage(
+      utf8.decode(bytes, allowMalformed: true),
+    );
     if (isError) {
       throw XtreamHttpException(
         statusCode: statusCode,

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -214,14 +215,26 @@ class XtreamRequest {
 }
 
 /// Wraps the raw, still-encoded JSON body of a successful response. Returned by
-/// the default IO transport only when [XtreamRequest.wantsRawText] is set, so
-/// the caller can run `jsonDecode` plus domain-object mapping in a single
-/// background-isolate hop instead of decoding on the transport isolate and
-/// mapping on the UI isolate.
+/// the default transports only when [XtreamRequest.wantsRawText] is set, so
+/// the caller can run the UTF-8 decode, `jsonDecode` and domain-object mapping
+/// in a single background-isolate hop instead of decoding on the UI isolate.
 class XtreamRawResponse {
-  const XtreamRawResponse(this.text);
+  const XtreamRawResponse(String this.text) : bytes = null;
 
-  final String text;
+  /// The undecoded response body, as the real transports hand it over.
+  const XtreamRawResponse.bytes(Uint8List this.bytes) : text = null;
+
+  final String? text;
+  final Uint8List? bytes;
+
+  /// Body size, the offload threshold's measure.
+  int get length => bytes?.length ?? text!.length;
+
+  /// Decodes the body; safe to call from any isolate.
+  Object? decode() {
+    final bytes = this.bytes;
+    return bytes != null ? decodeJsonBytes(bytes) : jsonDecode(text!);
+  }
 }
 
 class AIOStreamsCatalog {
@@ -550,7 +563,7 @@ class XtreamService {
     if (response is XtreamRawResponse) {
       final c = _requireCredentials();
       return _parseLiveStreams(
-        response.text,
+        response,
         c.server,
         c.username,
         c.password,
@@ -573,7 +586,7 @@ class XtreamService {
     );
     if (response is XtreamRawResponse) {
       final c = _requireCredentials();
-      return _parseVodStreams(response.text, c.server, c.username, c.password);
+      return _parseVodStreams(response, c.server, c.username, c.password);
     }
     return _asList(response)
         .map((item) {
@@ -615,7 +628,7 @@ class XtreamService {
       wantsRawText: true,
     );
     if (response is XtreamRawResponse) {
-      return _parseSeries(response.text);
+      return _parseSeries(response);
     }
     return _asList(
       response,
@@ -1188,7 +1201,7 @@ class XtreamService {
     );
     if (response is XtreamRawResponse) {
       return _parseEpgProgramsFromRaw(
-        response.text,
+        response,
         fallbackChannelId: channelId ?? '$streamId',
       );
     }
@@ -1267,7 +1280,7 @@ class XtreamService {
         if (response is XtreamRawResponse) {
           programs.addAll(
             await _parseEpgProgramsFromRaw(
-              response.text,
+              response,
               channelIdsByStream: channelIdsByStream,
               dropPlaceholders: dropPlaceholders,
             ),
@@ -1574,13 +1587,13 @@ int _asInt(Object? value) {
 const int _rawParseOffloadBytes = 32 * 1024;
 
 Future<List<Channel>> _parseLiveStreams(
-  String rawJson,
+  XtreamRawResponse raw,
   String server,
   String username,
   String password,
 ) {
   List<Channel> parse() {
-    final decoded = jsonDecode(rawJson);
+    final decoded = raw.decode();
     if (decoded is! List) return const <Channel>[];
     return decoded
         .map((item) {
@@ -1594,19 +1607,19 @@ Future<List<Channel>> _parseLiveStreams(
         .toList(growable: false);
   }
 
-  return rawJson.length < _rawParseOffloadBytes
+  return raw.length < _rawParseOffloadBytes
       ? Future.value(parse())
       : runOffMainIsolate(parse);
 }
 
 Future<List<VodItem>> _parseVodStreams(
-  String rawJson,
+  XtreamRawResponse raw,
   String server,
   String username,
   String password,
 ) {
   List<VodItem> parse() {
-    final decoded = jsonDecode(rawJson);
+    final decoded = raw.decode();
     if (decoded is! List) return const <VodItem>[];
     return decoded
         .map((item) {
@@ -1621,21 +1634,21 @@ Future<List<VodItem>> _parseVodStreams(
         .toList(growable: false);
   }
 
-  return rawJson.length < _rawParseOffloadBytes
+  return raw.length < _rawParseOffloadBytes
       ? Future.value(parse())
       : runOffMainIsolate(parse);
 }
 
-Future<List<Series>> _parseSeries(String rawJson) {
+Future<List<Series>> _parseSeries(XtreamRawResponse raw) {
   List<Series> parse() {
-    final decoded = jsonDecode(rawJson);
+    final decoded = raw.decode();
     if (decoded is! List) return const <Series>[];
     return decoded
         .map((item) => Series.fromXtream(_asMap(item)))
         .toList(growable: false);
   }
 
-  return rawJson.length < _rawParseOffloadBytes
+  return raw.length < _rawParseOffloadBytes
       ? Future.value(parse())
       : runOffMainIsolate(parse);
 }
@@ -1654,14 +1667,20 @@ Future<List<Series>> _parseSeries(String rawJson) {
 // value, always yields a microtask in Dart, which broke callers relying on
 // that synchronous completion, e.g. `AppStateController`'s unawaited EPG
 // prime finishing before other awaited work in the same call chain).
+// One long-lived worker serves the whole sweep instead of a fresh isolate
+// per batch; it shuts itself down once the sweep goes quiet.
+final BackgroundWorker _epgParseWorker = BackgroundWorker(
+  debugName: 'epg-parse',
+);
+
 Future<List<EpgProgram>> _parseEpgProgramsFromRaw(
-  String rawJson, {
+  XtreamRawResponse raw, {
   String? fallbackChannelId,
   Map<String, String> channelIdsByStream = const <String, String>{},
   bool dropPlaceholders = false,
-}) => runOffMainIsolate(
+}) => _epgParseWorker.run(
   () => _parseEpgPrograms(
-    jsonDecode(rawJson),
+    raw.decode(),
     fallbackChannelId: fallbackChannelId,
     channelIdsByStream: channelIdsByStream,
     dropPlaceholders: dropPlaceholders,

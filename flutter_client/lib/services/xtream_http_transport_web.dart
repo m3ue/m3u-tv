@@ -28,6 +28,6 @@ Future<Object?> _send(http.Client client, XtreamRequest request) async {
     uri: uri,
     statusCode: response.statusCode,
     reasonPhrase: response.reasonPhrase,
-    text: utf8.decode(response.bodyBytes, allowMalformed: true),
+    bytes: response.bodyBytes,
   );
 }
