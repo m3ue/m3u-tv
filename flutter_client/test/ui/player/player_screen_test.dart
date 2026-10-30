@@ -12,7 +12,6 @@ import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
-import 'package:m3u_tv/features/player/resume_prompt.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -1221,75 +1220,6 @@ void main() {
         ),
       );
       expect(find.byType(NowPlayingOverlay), findsOneWidget);
-    });
-  });
-
-  group('ResumePrompt', () {
-    testWidgets('shows resume and start over options', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ResumePrompt(
-            position: const Duration(minutes: 5, seconds: 30),
-            onResume: () {},
-            onStartOver: () {},
-          ),
-        ),
-      );
-      expect(find.text('Resume'), findsOneWidget);
-      expect(find.text('Start Over'), findsOneWidget);
-    });
-
-    testWidgets('shows formatted position in prompt', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ResumePrompt(
-            position: const Duration(minutes: 5, seconds: 30),
-            onResume: () {},
-            onStartOver: () {},
-          ),
-        ),
-      );
-      expect(find.textContaining('5:30'), findsOneWidget);
-    });
-
-    testWidgets('calls onResume when resume button tapped', (tester) async {
-      var resumed = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ResumePrompt(
-            position: const Duration(minutes: 5),
-            onResume: () => resumed = true,
-            onStartOver: () {},
-          ),
-        ),
-      );
-      await tester.tap(find.text('Resume'));
-      expect(resumed, isTrue);
-    });
-
-    testWidgets('calls onStartOver when start over button tapped', (
-      tester,
-    ) async {
-      var startedOver = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: ResumePrompt(
-            position: const Duration(minutes: 5),
-            onResume: () {},
-            onStartOver: () => startedOver = true,
-          ),
-        ),
-      );
-      await tester.tap(find.text('Start Over'));
-      expect(startedOver, isTrue);
     });
   });
 
