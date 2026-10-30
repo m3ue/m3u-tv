@@ -47,14 +47,14 @@ class MyScreen extends ConsumerStatefulWidget { ... }
 class _MyScreenState extends ConsumerState<MyScreen> {
   @override
   Widget build(BuildContext context) {
-    final channels = ref.watch(liveChannelsProvider);   // ✓
-    // NOT: widget.appState.channels                    // ✗
+    final categories = ref.watch(liveCategoriesProvider); // ✓
+    // NOT: widget.appState.liveCategories               // ✗
   }
 }
 ```
 
 **Existing providers** (all in `lib/providers/app_providers.dart`):
-- Data: `liveChannelsProvider`, `liveCategoriesProvider`, `vodItemsProvider`, `vodCategoriesProvider`, `seriesListProvider`, `seriesCategoriesProvider`
+- Data: `liveCategoriesProvider`, `vodCategoriesProvider`, `seriesCategoriesProvider`, and `catalogRepositoryProvider` for catalog rows. Channels, movies and series live in the SQLite catalog, not in memory: page them (`CatalogWindow`, `LiveChannelQuery`) or resolve ids (`activeItemsByIds`). `liveChannelsProvider` is only populated when `windowedLiveTvProvider` is false (the `kWindowedLiveTv` comparison path, due to be removed).
 - Status: `isConfiguredProvider`, `isBootstrappingProvider`, `isLoadingContentProvider`
 - Services (stable, use `ref.read`): `epgServiceProvider`, `liveFavoritesServiceProvider`, `vodFavoritesServiceProvider`, `seriesFavoritesServiceProvider`
 - Home extras: `progressListProvider`, `dvrRecordingsProvider`, `sourceLabelProvider`, `sourceErrorProvider`, `hasDvrFeatureProvider`
@@ -70,10 +70,12 @@ final myNewProvider = Provider<MyType>((ref) {
 
 **Tests** — wrap with `ProviderScope` and override only the providers the screen watches:
 ```dart
+// Seed an in-memory CatalogRepository inside tester.runAsync: drift's real
+// I/O doesn't resolve under the test's fakeAsync zone.
 ProviderScope(
   overrides: [
     isConfiguredProvider.overrideWith((_) => true),
-    liveChannelsProvider.overrideWith((_) => fakeChannels),
+    catalogRepositoryProvider.overrideWith((_) => repo),
   ],
   child: MaterialApp(home: MyScreen(...)),
 )
@@ -83,7 +85,7 @@ ProviderScope(
 - **JSON/HTTP**: REST calls go through `ApiClient` (`lib/services/api_client.dart`) - shared timeout, `ApiException`, web-safe, large bodies decoded off-isolate. Don't hand-roll `HttpClient` + `jsonDecode` in a service or widget. Exceptions: Xtream catalog downloads (their own byte-streaming transport) and the live-stream preflight probes in `PlaybackOrchestrator`, which must abort mid-body.
 - **Big payloads**: use `json_isolate.dart` (`runOffMainIsolate`, `decodeJsonBytesOffMainIsolate`, `BackgroundWorker` for recurring bursts). Pass bytes, not decoded Strings, to an isolate.
 - **SQLite**: bulk catalog/EPG writes and full-guide reads go through `CatalogDatabase.computeWithDatabase` above `_offloadThresholdRows`; closures sent to it must capture only sendable values (static helpers, no `this`).
-- **build()**: never sort, filter or look up per-item data for a whole list in `build()`. Memoize derived lists on their inputs (see `LiveTvScreen._visibleChannelsFor`) and do per-item lookups in the item builder. Sort large lists with `sortByNatural` (precomputed keys), not `list.sort(compareNatural)`.
+- **build()**: never sort, filter or look up per-item data for a whole list in `build()`. Memoize derived lists on their inputs (see `LiveTvScreen._visibleChannelsFor`) and do per-item lookups in the item builder. Large catalogs (channels, movies, series) are paged from SQLite rather than filtered in Dart: sort and filter in the query (`CatalogSort`, `nameSortKey` for natural order). Sort large lists with `sortByNatural` (precomputed keys), not `list.sort(compareNatural)`.
 - **High-frequency state** (playback position, clocks): use a `ValueNotifier` + `ValueListenableBuilder` scoped to the widgets that show it, not `setState` on a large screen.
 
 ### Style
