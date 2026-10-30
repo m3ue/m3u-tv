@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:palette_generator_master/palette_generator_master.dart';
 
@@ -41,32 +46,82 @@ Future<Color?> resolveDominantBackdropColor(String? url) {
 }
 
 Future<Color?> _extractSwatch(String url) async {
+  ui.Image? image;
   try {
     // Decode small: the swatch only needs a thumbnail, and an unsized decode
     // of a 4K backdrop cost ~33MB of GPU memory per title visited.
-    final palette = await PaletteGeneratorMaster.fromImageProvider(
+    image = await _resolveImage(
       ResizeImage(
         CachedNetworkImageProvider(url, cacheManager: mediaImageCacheManager),
         width: 440,
         policy: ResizeImagePolicy.fit,
       ),
-      size: const Size(220, 124),
-      maximumColorCount: 8,
     );
-    final swatch =
-        palette.darkMutedColor ??
-        palette.darkVibrantColor ??
-        palette.dominantColor;
-    _rememberSwatch(url, swatch?.color);
-    return swatch?.color;
+    final bytes = await image.toByteData();
+    if (bytes == null) throw StateError('Failed to read swatch pixels');
+    final width = image.width;
+    final height = image.height;
+    // The quantization is pure Dart and walks every pixel; on the UI isolate
+    // it competed with the spotlight's own transition while D-padding Home.
+    final argb = await runOffMainIsolate(
+      () => _quantizeSwatch(bytes, width, height),
+    );
+    final color = argb == null ? null : Color(argb);
+    _rememberSwatch(url, color);
+    return color;
   } on Object catch (_) {
     _rememberSwatch(url, null);
     return null;
   } finally {
+    image?.dispose();
     // remove() hands back the stored Future; nothing awaits it here.
     // ignore: unawaited_futures
     _pendingSwatches.remove(url);
   }
+}
+
+Future<int?> _quantizeSwatch(ByteData bytes, int width, int height) async {
+  final palette = await PaletteGeneratorMaster.fromByteData(
+    EncodedImageMaster(bytes, width: width, height: height),
+    maximumColorCount: 8,
+  );
+  final swatch =
+      palette.darkMutedColor ??
+      palette.darkVibrantColor ??
+      palette.dominantColor;
+  return swatch?.color.toARGB32();
+}
+
+/// Resolves [provider] to its first frame. The caller owns (and disposes)
+/// the returned handle.
+Future<ui.Image> _resolveImage(ImageProvider provider) {
+  final stream = provider.resolve(ImageConfiguration.empty);
+  final completer = Completer<ui.Image>();
+  late final ImageStreamListener listener;
+  final timeout = Timer(const Duration(seconds: 15), () {
+    stream.removeListener(listener);
+    if (!completer.isCompleted) {
+      completer.completeError(TimeoutException('Swatch image timed out'));
+    }
+  });
+  listener = ImageStreamListener(
+    (info, _) {
+      timeout.cancel();
+      stream.removeListener(listener);
+      if (completer.isCompleted) {
+        info.dispose();
+      } else {
+        completer.complete(info.image);
+      }
+    },
+    onError: (error, stackTrace) {
+      timeout.cancel();
+      stream.removeListener(listener);
+      if (!completer.isCompleted) completer.completeError(error, stackTrace);
+    },
+  );
+  stream.addListener(listener);
+  return completer.future;
 }
 
 void _rememberSwatch(String url, Color? color) {
