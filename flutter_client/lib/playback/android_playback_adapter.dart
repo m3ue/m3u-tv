@@ -50,7 +50,11 @@ class AndroidBackendCapabilities {
 }
 
 class AndroidPlaybackAdapter
-    implements PlayerAdapter, PlatformViewProvider, MultiviewBackend {
+    implements
+        PlayerAdapter,
+        PlatformViewProvider,
+        MultiviewBackend,
+        DisplayModeController {
   AndroidPlaybackAdapter({
     required AndroidPlaybackProbe probe,
     this.playerId = defaultPlayerId,
@@ -264,6 +268,13 @@ class AndroidPlaybackAdapter
   }
 
   @override
+  Future<void> setAllowDisplayModeChanges(bool allowed) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setAllowDisplayModeChanges(allowed);
+    }
+  }
+
+  @override
   Future<void> dispose() async {
     await _eventSubscription?.cancel();
     await _media3Host.dispose();
@@ -384,6 +395,12 @@ abstract class AndroidMedia3Host {
   Future<void> setPlaybackSpeed(double speed);
   Future<void> setVolume(double volume);
 
+  /// See [DisplayModeController].
+  Future<void> setAllowDisplayModeChanges(
+    // ignore: avoid_positional_boolean_parameters
+    bool allowed,
+  );
+
   /// [preserveDisplayMode]: true when this teardown is a mid-playback
   /// backend handoff (see `PlatformViewProvider.releaseNativeView`) rather
   /// than a genuine stop, so a native Auto Frame Rate switch stays applied
@@ -450,6 +467,7 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'headers': source.headers,
         'metadata': source.metadata,
         'matchDisplayRefreshRate': source.matchDisplayRefreshRate,
+        'allowDisplayModeChanges': source.allowDisplayModeChanges,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{
@@ -514,6 +532,13 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'playerId': playerId,
         'volume': volume,
       });
+
+  @override
+  Future<void> setAllowDisplayModeChanges(bool allowed) =>
+      _method.invokeMethod<void>(
+        'setAllowDisplayModeChanges',
+        <String, Object?>{'playerId': playerId, 'allowed': allowed},
+      );
 
   @override
   Future<void> dispose({bool preserveDisplayMode = false}) async {

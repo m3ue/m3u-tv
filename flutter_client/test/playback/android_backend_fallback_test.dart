@@ -566,6 +566,10 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
       commands.add('setVolume:$volume');
 
   @override
+  Future<void> setAllowDisplayModeChanges(bool allowed) async =>
+      commands.add('setAllowDisplayModeChanges:$allowed');
+
+  @override
   Future<void> dispose({bool preserveDisplayMode = false}) async {
     commands.add('dispose:preserveDisplayMode=$preserveDisplayMode');
     await _events.close();

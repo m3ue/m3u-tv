@@ -15,6 +15,7 @@ import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
 import 'package:m3u_tv/features/player/player_shortcuts.dart';
 import 'package:m3u_tv/features/player/player_skip_prompts.dart';
 import 'package:m3u_tv/features/player/player_skip_segments.dart';
+import 'package:m3u_tv/features/player/player_source_settings.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
@@ -98,11 +99,26 @@ class PlayerScreen extends StatefulWidget {
     this.isRecordingCurrentChannel = false,
     this.viewSettingsService,
     this.isHandheld = false,
+    this.adoptsPlayingSession = false,
+    this.surfaceKey,
+    this.releasesOrchestratorOnDispose,
     super.key,
   });
 
   final PlayerArgs args;
   final PlaybackOrchestrator orchestrator;
+
+  /// [orchestrator] is already playing [args] (the EPG preview's player,
+  /// taken over for full screen): carry on with it instead of opening it.
+  final bool adoptsPlayingSession;
+
+  /// See [NativeVideoSurface.surfaceKey]: the EPG preview's key for the
+  /// native view [orchestrator] is already rendering into.
+  final Key? surfaceKey;
+
+  /// Asked on dispose whether to stop [orchestrator]; false when it went
+  /// back to the EPG preview, which keeps playing it. Null stops it.
+  final bool Function()? releasesOrchestratorOnDispose;
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
@@ -384,7 +400,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (HostPlatform.isAndroid) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
     }
-    if (widget.isHandheld) {
+    if (widget.adoptsPlayingSession) {
+      // The native view already exists and is playing: it must mount in
+      // this first frame to move here from the preview (see surfaceKey).
+      _videoSurfaceReady = true;
+      if (widget.isHandheld) {
+        unawaited(
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]),
+        );
+      }
+    } else if (widget.isHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([
           DeviceOrientation.landscapeLeft,
@@ -426,7 +454,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (mounted) setState(() {});
         });
     _resetCatchupTimeline(widget.args);
-    _openInitialSource();
+    if (widget.adoptsPlayingSession) {
+      // onState doesn't replay, so start from where the session already is.
+      final state = widget.orchestrator.lastState;
+      if (state != null) _handleState(state);
+    } else {
+      _openInitialSource();
+    }
     _startLoadingTimeout();
     _scheduleOverlayHide();
     _loadSkipSegments(widget.args);
@@ -877,7 +911,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(_errorSubscription?.cancel());
     unawaited(_nativePlaneSubscription?.cancel());
     unawaited(widget.wakelockController.disable());
-    unawaited(widget.orchestrator.stop());
+    if (widget.releasesOrchestratorOnDispose?.call() ?? true) {
+      unawaited(widget.orchestrator.stop());
+    }
     super.dispose();
   }
 
@@ -900,12 +936,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _openSource(PlayerArgs args) {
     return _openAndSeek(
-      args.toPlaybackSource().copyWith(
+      applyPlayerSourceSettings(
+        args.toPlaybackSource(),
+        widget.viewSettingsService,
         hdrEnabled: _hdrEnabled,
-        matchDisplayRefreshRate:
-            widget.viewSettingsService?.matchRefreshRateSync ?? false,
-        deinterlace: widget.viewSettingsService?.deinterlaceSync ?? false,
-        prebufferLive: widget.viewSettingsService?.prebufferLiveSync ?? false,
       ),
     );
   }
@@ -927,17 +961,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _openAndSeek(PlaybackSource source) async {
     try {
       await widget.orchestrator.open(source);
-      // Native backends default to HDR on; only push an explicit call when
-      // the persisted setting disagrees, so backends without the capability
-      // (and the common case of it already being on) skip the round trip.
-      if (!_hdrEnabled) {
-        unawaited(
-          widget.orchestrator.activeHdrToggleProvider?.setHdrEnabled(false),
-        );
-      }
-      if (_isDesktop) {
-        unawaited(widget.orchestrator.activeVolumeProvider?.setVolume(_volume));
-      }
+      applyPlayerOpenedSettings(
+        widget.orchestrator,
+        hdrEnabled: _hdrEnabled,
+        volume: _volume,
+      );
       if (_disposed || !mounted || source.isLive) return;
       // A non-recoverable load failure lets open() return normally (the
       // failure is reported asynchronously via onError/_handleError instead
@@ -1887,6 +1915,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     Positioned.fill(
                       child: _videoSurfaceReady
                           ? NativeVideoSurface(
+                              surfaceKey: widget.surfaceKey,
                               textureId: widget.orchestrator.activeTextureId,
                               platformView:
                                   widget

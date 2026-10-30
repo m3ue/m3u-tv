@@ -34,7 +34,8 @@ class DesktopLibmpvBackend
         NativePlaneProvider,
         HdrToggleProvider,
         SeekWindowProvider,
-        MultiviewBackend {
+        MultiviewBackend,
+        DisplayModeController {
   DesktopLibmpvBackend({MethodChannel? channel, EventChannel? eventChannel})
     : _channel = channel ?? const MethodChannel(_methodChannelName),
       _eventChannel = eventChannel ?? const EventChannel(_eventChannelName) {
@@ -152,6 +153,8 @@ class DesktopLibmpvBackend
         // round trip would lose the race with the first-frame display switch.
         'hdrEnabled': source.hdrEnabled,
         'matchRefreshRate': source.matchDisplayRefreshRate,
+        // Read by Windows only, like `matchRefreshRate`.
+        'allowDisplayModeChanges': source.allowDisplayModeChanges,
         'deinterlace': source.deinterlace,
         'prebufferLive': source.prebufferLive,
         'externalSubtitles': source.externalSubtitles
@@ -315,6 +318,13 @@ class DesktopLibmpvBackend
   Future<void> setHdrEnabled(bool enabled) async {
     await _invokeControl('setHdrEnabled', <String, Object?>{
       'enabled': enabled,
+    });
+  }
+
+  @override
+  Future<void> setAllowDisplayModeChanges(bool allowed) async {
+    await _invokeControl('setAllowDisplayModeChanges', <String, Object?>{
+      'allowed': allowed,
     });
   }
 

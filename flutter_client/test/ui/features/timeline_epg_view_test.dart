@@ -1796,7 +1796,7 @@ double _horizontalScrollOffset(WidgetTester tester) {
 
 /// Records what the guide asks the preview to play; never builds a player.
 class _FakePreviewPlayer extends EpgPreviewPlayerController {
-  _FakePreviewPlayer() : super(buildPlayer: (_) => throw UnimplementedError());
+  _FakePreviewPlayer() : super(buildPlayer: () => throw UnimplementedError());
 
   final played = <Channel>[];
   Channel? _playing;

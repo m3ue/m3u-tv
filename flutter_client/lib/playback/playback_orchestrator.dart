@@ -182,6 +182,8 @@ class PlaybackOrchestrator {
   bool _recovering = false;
   bool _disposed = false;
   bool _nativePlaneActive = false;
+  PlaybackState? _lastState;
+  bool? _allowDisplayModeChanges;
 
   Stream<PlaybackState> get onState => _stateController.stream;
   Stream<PlaybackError> get onError => _errorController.stream;
@@ -239,6 +241,29 @@ class PlaybackOrchestrator {
 
   List<String> get diagnostics => List<String>.unmodifiable(_diagnostics);
 
+  /// The most recent state [onState] emitted, which a listener that joins a
+  /// session already playing (the full-screen player taking over the EPG
+  /// preview's orchestrator) seeds itself from, since [onState] doesn't
+  /// replay.
+  PlaybackState? get lastState => _lastState;
+
+  /// See [DisplayModeController]. Once set, it overrides
+  /// [PlaybackSource.allowDisplayModeChanges] for every later [open] (a
+  /// channel change) too.
+  Future<void> setAllowDisplayModeChanges(
+    // ignore: avoid_positional_boolean_parameters
+    bool allowed,
+  ) async {
+    if (_disposed || _allowDisplayModeChanges == allowed) return;
+    _allowDisplayModeChanges = allowed;
+    final adapter = _activeAdapter;
+    if (adapter is DisplayModeController) {
+      await (adapter! as DisplayModeController).setAllowDisplayModeChanges(
+        allowed,
+      );
+    }
+  }
+
   Future<void> open(PlaybackSource source) async {
     _ensureNotDisposed();
     // Assigned synchronously, before any await, so this call's generation is
@@ -256,7 +281,13 @@ class PlaybackOrchestrator {
     await _cleanupSessions();
     if (!_isCurrentGeneration(generation)) return;
     _clearActiveAdapter();
-    final sessionSource = _beginStreamSession(source);
+    final allowDisplayModeChanges = _allowDisplayModeChanges;
+    final sessionSource = _beginStreamSession(
+      allowDisplayModeChanges == null ||
+              source.allowDisplayModeChanges == allowDisplayModeChanges
+          ? source
+          : source.copyWith(allowDisplayModeChanges: allowDisplayModeChanges),
+    );
 
     if (sessionSource.isLive) {
       final rejection = await _preflightLiveStream(sessionSource.uri);
@@ -429,7 +460,7 @@ class PlaybackOrchestrator {
       // no other rebuild trigger during that window, so without this the
       // platform view never mounts and load() times out waiting for a
       // native side that was never given the chance to attach.
-      _stateController.add(
+      _addState(
         PlaybackState.idle(
           backend: backend,
         ).copyWith(status: PlaybackStatus.loading, source: source),
@@ -855,7 +886,7 @@ class PlaybackOrchestrator {
   void _handleAdapterState(PlaybackState state) {
     if (_disposed) return;
     _syncNativePlaneComposition();
-    _stateController.add(state);
+    _addState(state);
     if (state.status == PlaybackStatus.buffering &&
         state.backend == _activeBackend) {
       _startBufferingTimer(state.backend);
@@ -1065,6 +1096,11 @@ class PlaybackOrchestrator {
       throw StateError('PlaybackOrchestrator has no active backend');
     }
     return adapter;
+  }
+
+  void _addState(PlaybackState state) {
+    _lastState = state;
+    _stateController.add(state);
   }
 
   void _emitError(PlaybackError error) {

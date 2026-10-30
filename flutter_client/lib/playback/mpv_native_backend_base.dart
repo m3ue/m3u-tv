@@ -18,7 +18,7 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 /// consumers of this FSM, differing only in their method/event channel
 /// names, [PlaybackCapabilities], error codes, and (macOS only) `setVolume`.
 abstract class MpvNativeBackendBase
-    implements PlayerAdapter, SeekWindowProvider {
+    implements PlayerAdapter, SeekWindowProvider, DisplayModeController {
   MpvNativeBackendBase({
     required this.viewId,
     required this._channel,
@@ -94,9 +94,11 @@ abstract class MpvNativeBackendBase
         'isCatchup': source.isCatchup,
         'userAgent': source.userAgent,
         'headers': source.headers,
-        // Read only by the Android mpv core (FrameRateManager) -- inert on
-        // iOS/macOS, whose mpv plugins don't read this key.
+        // Read by the Android mpv core (FrameRateManager) and the tvOS core
+        // (display criteria) -- inert on iOS/macOS.
         'matchRefreshRate': source.matchDisplayRefreshRate,
+        // Read by the Android and tvOS cores, same as `matchRefreshRate`.
+        'allowDisplayModeChanges': source.allowDisplayModeChanges,
         // Read only by the Android mpv core's native poster overlay (see
         // `PosterLoader.kt`) -- inert on iOS/macOS/web, whose mpv/video
         // plugins render through a Texture and get the backdrop from
@@ -291,6 +293,19 @@ abstract class MpvNativeBackendBase
 
     await _stateController.close();
     await _errorController.close();
+  }
+
+  /// Only the Android and tvOS cores change the display's mode; the others
+  /// don't implement this and have nothing to turn on or off.
+  @override
+  Future<void> setAllowDisplayModeChanges(bool allowed) async {
+    try {
+      await _invokeControl('setAllowDisplayModeChanges', <String, Object?>{
+        'allowed': allowed,
+      });
+    } on MissingPluginException {
+      // macOS/iOS: no display mode to change.
+    }
   }
 
   Future<void> _invokeControl(

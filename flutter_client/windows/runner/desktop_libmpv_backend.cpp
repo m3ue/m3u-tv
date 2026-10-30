@@ -718,6 +718,12 @@ struct PlayerInstance {
   // MaybeMatchRefreshRate may switch the monitor to the source's frame rate;
   // defaults off because that mode switch briefly blanks the whole display.
   bool refresh_rate_match_user_enabled = false;
+  // False while this player is embedded (the EPG guide preview): neither
+  // the OS HDR switch nor the refresh-rate match may fire, so browsing the
+  // guide never blanks the display. Set from the `allowDisplayModeChanges`
+  // load arg and the control method of the same name (the preview going
+  // full screen, and back).
+  bool allow_display_mode_changes = true;
 };
 
 LibmpvApi g_api;
@@ -980,7 +986,8 @@ void ApplyHdrForVideoParams(PlayerInstance* player, const mpv_node* params) {
   // sufficient and simpler gate than also checking using_gpu_window/
   // using_gpu_texture individually.
   if (player == nullptr || player->display_mode_manager == nullptr) return;
-  const bool is_hdr_source = player->hdr_user_enabled && ParseVideoParamsIsHdr(params);
+  const bool is_hdr_source =
+      player->hdr_user_enabled && player->allow_display_mode_changes && ParseVideoParamsIsHdr(params);
   if (is_hdr_source == player->hdr_requested) return;
   player->hdr_requested = is_hdr_source;
 
@@ -1067,6 +1074,7 @@ void MaybeMatchRefreshRate(PlayerInstance* player) {
   // second or two, which is jarring on a desktop and was reported as "my
   // whole screen goes blank before playback starts" for ~30fps sources.
   if (!player->refresh_rate_match_user_enabled) return;
+  if (!player->allow_display_mode_changes) return;
   if (player->refresh_rate_matched) return;
   player->refresh_rate_matched = true;
   double fps = 0.0;
@@ -1211,6 +1219,7 @@ bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
   // StartEventThread below wires up the video-params/container-fps observers.
   player->hdr_user_enabled = BoolArg(args, "hdrEnabled", true);
   player->refresh_rate_match_user_enabled = BoolArg(args, "matchRefreshRate", false);
+  player->allow_display_mode_changes = BoolArg(args, "allowDisplayModeChanges", true);
 
   auto ctx = player->copy_context;
   ctx->gpu_descriptor.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
@@ -1375,6 +1384,7 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
               std::make_unique<PlayerInstance>(&api, dispatcher, event_sink_state, gpu_handle, video_hwnd, hwnd, id);
           player->hdr_user_enabled = BoolArg(args, "hdrEnabled", true);
           player->refresh_rate_match_user_enabled = BoolArg(args, "matchRefreshRate", false);
+          player->allow_display_mode_changes = BoolArg(args, "allowDisplayModeChanges", true);
           player->StartEventThread();
           AddExternalSubtitles(api, gpu_handle, args);
           if (api.command(gpu_handle, load_args) >= 0) {
@@ -1877,6 +1887,19 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
   } else if (method == "setHdrEnabled") {
     player->hdr_user_enabled = BoolArg(args, "enabled", true);
     ReapplyHdrForCurrentSource(player);
+  } else if (method == "setAllowDisplayModeChanges") {
+    // The playing stream's display decisions, made or undone without a
+    // reload: off restores the mode and HDR state, on applies them now.
+    const bool allowed = BoolArg(args, "allowed", true);
+    if (allowed != player->allow_display_mode_changes) {
+      player->allow_display_mode_changes = allowed;
+      player->refresh_rate_matched = false;
+      if (!allowed && player->display_mode_manager != nullptr) {
+        player->display_mode_manager->RestoreOriginalMode(player->top_level_hwnd);
+      }
+      ReapplyHdrForCurrentSource(player);
+      if (allowed) MaybeMatchRefreshRate(player);
+    }
   } else if (method == "dispose") {
     g_players.erase(it);
   }

@@ -12,6 +12,7 @@ import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
+import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/home/home_screen.dart';
 import 'package:m3u_tv/features/live_tv/live_tv_screen.dart';
 import 'package:m3u_tv/features/notifications/notifications_screen.dart';
@@ -189,6 +190,17 @@ class AppShellState extends ConsumerState<AppShell>
   // so back handling dismisses the dialog instead of closing the player.
   bool _playerModalDialogVisible = false;
   FocusNode? _focusBeforePlayer;
+
+  // Set while the player runs on the EPG preview's own player (see
+  // LiveTvScreen.onPreviewHandoff): its native view and the callback that
+  // gives it back to the preview on close, plus the live channel playing
+  // now (channel up/down changes it), which the preview carries on with.
+  EpgPreviewLease? _playerLease;
+  bool Function(EpgPreviewLease lease)? _playerLeaseAdoptBack;
+  Channel? _playerLiveChannel;
+  // Read by PlayerScreen as it unmounts: false when its orchestrator went
+  // back to the preview, which keeps playing it.
+  bool _playerReleasesOnDispose = true;
 
   // Bumped only when a brand-new player session starts (not on in-session
   // source switches, e.g. skip-previous/skip-next), so PlayerScreen's key
@@ -835,7 +847,9 @@ class AppShellState extends ConsumerState<AppShell>
     _focusBeforePlayer = _isInContentScope(focus) ? focus : null;
 
     _playerSessionId += 1;
+    _playerReleasesOnDispose = true;
     final newOrch =
+        _playerLease?.orchestrator ??
         widget.playbackOrchestratorBuilder?.call() ??
         buildPlaybackOrchestrator(
           streamSessionGateway: ref.read(streamSessionGatewayProvider),
@@ -867,6 +881,40 @@ class AppShellState extends ConsumerState<AppShell>
   Future<void> _closePlayer() async {
     final orch = _playerOrchestrator;
     final args = _playerArgs;
+    final lease = _playerLease;
+    final adoptBack = _playerLeaseAdoptBack;
+    final liveChannel = _playerLiveChannel;
+    final nativePlaneSub = _playerNativePlaneSub;
+    final savedFocus = _focusBeforePlayer;
+    _focusBeforePlayer = null;
+    if (lease != null &&
+        adoptBack != null &&
+        orch != null &&
+        identical(orch, lease.orchestrator) &&
+        args?.type == 'live' &&
+        !_playerHasFailed) {
+      // Back on the guide the player came from: give it back to the
+      // preview, still playing (on whatever channel it zapped to). The
+      // preview takes the native view in the same frame the setState in
+      // _finishClosePlayer drops it, so nothing awaits in between.
+      _playerReleasesOnDispose = false;
+      if (adoptBack(lease.withChannel(liveChannel ?? lease.channel))) {
+        unawaited(orch.setAllowDisplayModeChanges(false));
+        unawaited(_systemUiPolicy.applyBrowsing());
+        _finishClosePlayer(
+          nativePlaneSub: nativePlaneSub,
+          savedFocus: savedFocus,
+        );
+        return;
+      }
+      _playerReleasesOnDispose = true;
+    }
+    if (lease != null && liveChannel != null && !_playerHasFailed) {
+      // The preview couldn't take the player back right now: fall back to
+      // resuming this channel in it once the player is gone, as for a
+      // player that never came from the preview.
+      ref.read(epgPreviewHandoffProvider.notifier).state = liveChannel;
+    }
     final handoff = ref.read(epgPreviewHandoffProvider);
     if (handoff != null &&
         args != null &&
@@ -876,9 +924,6 @@ class AppShellState extends ConsumerState<AppShell>
       // proxy stream warm for it instead of stopping it.
       orch?.detachStreamSession();
     }
-    final nativePlaneSub = _playerNativePlaneSub;
-    final savedFocus = _focusBeforePlayer;
-    _focusBeforePlayer = null;
     unawaited(_systemUiPolicy.applyBrowsing());
     // Stop (and fully dispose) the active adapter BEFORE removing
     // PlayerScreen's native view (Texture/PlatformView) from the widget
@@ -896,6 +941,15 @@ class AppShellState extends ConsumerState<AppShell>
       // Fall through and close anyway -- better to leak a not-fully-disposed
       // adapter than leave the user stuck on a dead player screen.
     }
+    _finishClosePlayer(nativePlaneSub: nativePlaneSub, savedFocus: savedFocus);
+  }
+
+  /// The part of [_closePlayer] after its orchestrator is dealt with
+  /// (disposed, or handed back to the EPG preview).
+  void _finishClosePlayer({
+    StreamSubscription<bool>? nativePlaneSub,
+    FocusNode? savedFocus,
+  }) {
     // Only after native teardown, so a listener can start its own player
     // (the EPG preview) without two native players alive at once.
     ref.read(playerOverlayActiveProvider.notifier).state = false;
@@ -904,6 +958,12 @@ class AppShellState extends ConsumerState<AppShell>
     setState(() {
       _playerArgs = null;
       _playerOrchestrator = null;
+      // Cleared only now, with PlayerScreen leaving the tree: until then its
+      // native view must keep the lease's key, or a rebuild mid-dispose
+      // would recreate the view under a player still tearing down.
+      _playerLease = null;
+      _playerLeaseAdoptBack = null;
+      _playerLiveChannel = null;
       _playerNativePlaneSub = null;
       _playerNativePlaneActive = false;
       _playerHasFailed = false;
@@ -964,20 +1024,29 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   void _openChannel(Channel channel) {
-    unawaited(
-      _openPlayer(
-        context,
-        PlayerArgs(
-          streamUrl: channel.streamUrl,
-          title: channel.name,
-          type: 'live',
-          streamId: channel.id,
-          epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
-          logoUrl: channel.logoUrl,
-          headers: channel.headers,
-        ),
-      ),
-    );
+    _playerLiveChannel = channel;
+    unawaited(_openPlayer(context, PlayerArgs.liveChannel(channel)));
+  }
+
+  /// Opens the EPG preview's playing channel full screen on the preview's
+  /// own player (see [LiveTvScreen.onPreviewHandoff]). Synchronous: the
+  /// preview has just stopped rendering the native view, and the player
+  /// must mount it in this same frame.
+  void _openPreviewHandoff(
+    EpgPreviewLease lease,
+    bool Function(EpgPreviewLease lease) adoptBack,
+  ) {
+    if (_playerOrchestrator != null) {
+      // Can't happen from the guide (it's beneath the open player), but the
+      // lease must go somewhere: back where it came from.
+      if (!adoptBack(lease)) unawaited(lease.orchestrator.dispose());
+      return;
+    }
+    _playerLease = lease;
+    _playerLeaseAdoptBack = adoptBack;
+    _playerLiveChannel = lease.channel;
+    unawaited(lease.orchestrator.setAllowDisplayModeChanges(true));
+    _openPlayerDirect(PlayerArgs.liveChannel(lease.channel));
   }
 
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
@@ -1522,6 +1591,7 @@ class AppShellState extends ConsumerState<AppShell>
             _registerContentBackHandler(RouteNames.liveTv, handler),
         onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
+        onPreviewHandoff: _openPreviewHandoff,
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
@@ -1732,22 +1802,19 @@ class AppShellState extends ConsumerState<AppShell>
 
     final args = _playerArgs;
     final orch = _playerOrchestrator;
-    if (args == null || orch == null) {
-      return NotificationToastOverlay(
-        key: _toastKey,
-        onNotificationTap: _onToastTap,
-        swipeToDismiss: isTouchDeviceType(widget.deviceType),
-        child: backAwareShell,
-      );
-    }
-
+    final playerOpen = args != null && orch != null;
     final viewerId = _appState.activeViewer?.ulid ?? '';
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
     final suppressBrowsingComposition =
-        _playerNativePlaneActive && !_playerHasFailed;
+        playerOpen && _playerNativePlaneActive && !_playerHasFailed;
 
+    // The same Stack whether or not the player is open, so the browsing
+    // shell is never reparented when it opens or closes: the EPG preview's
+    // native video view moves between the shell and the player in that
+    // same frame (see EpgPreviewPlayerController.lend).
     return NotificationToastOverlay(
       key: _toastKey,
+      onNotificationTap: playerOpen ? null : _onToastTap,
       swipeToDismiss: isTouchDeviceType(widget.deviceType),
       child: Stack(
         children: [
@@ -1761,175 +1828,185 @@ class AppShellState extends ConsumerState<AppShell>
               ),
             ),
           ),
-          Positioned.fill(
-            child:
-                widget.playerRouteBuilder?.call(args) ??
-                PlayerScreen(
-                  key: ValueKey(_playerSessionId),
-                  args: args,
-                  orchestrator: orch,
-                  isHandheld:
-                      widget.deviceType == DeviceType.phone ||
-                      widget.deviceType == DeviceType.tablet,
-                  epgService: _appState.epgService,
-                  xtreamService: _appState.xtreamService,
-                  comskipSettings: _appState.comskipSettings,
-                  introDbSettings: _appState.introDbSettings,
-                  hasDvrFeature: _appState.hasDvrFeature,
-                  viewerId: viewerId,
-                  viewSettingsService: _appState.viewSettingsService,
-                  onLiveStreamEnded: args.type == 'live'
-                      ? _handleLiveStreamEnded
-                      : null,
-                  onNextChannel: args.type == 'live' ? _openNextChannel : null,
-                  onPreviousChannel: args.type == 'live'
-                      ? _openPreviousChannel
-                      : null,
-                  onReplaceItem: args.type == 'series'
-                      ? _openPlayerDirect
-                      : null,
-                  onRecordProgram:
-                      args.type == 'live' && _appState.hasDvrFeature
-                      ? _handleRecordButtonTap
-                      : null,
-                  onTrackDialogVisibilityChanged: _setPlayerModalDialogVisible,
-                  isRecordingCurrentChannel:
-                      args.type == 'live' &&
-                      recordingChannelIds.contains(args.streamId),
-                  progressReporter: (progress) {
-                    final aioLookupId = args.metadata['aio_item_id'] as String?;
-                    final existing = _appState.progressList.firstWhereOrNull(
-                      (p) =>
-                          p.contentType == progress.contentType &&
-                          (p.contentType == ContentType.aiostreams
-                              ? p.aioItemId == aioLookupId
-                              : p.streamId == progress.streamId),
-                    );
-                    final toSave = Progress(
-                      viewerId: progress.viewerId,
-                      contentType: progress.contentType,
-                      streamId: progress.streamId,
-                      positionSeconds: progress.positionSeconds,
-                      durationSeconds:
-                          progress.durationSeconds ?? existing?.durationSeconds,
-                      completed: progress.completed,
-                      seriesId: progress.seriesId ?? existing?.seriesId,
-                      seasonNumber:
-                          progress.seasonNumber ??
-                          (args.metadata['season_number'] as int?) ??
-                          existing?.seasonNumber,
-                      episodeNumber:
-                          progress.episodeNumber ??
-                          (args.metadata['episode_number'] as int?) ??
-                          existing?.episodeNumber,
-                      title:
-                          progress.title ??
-                          args.metadata['title'] as String? ??
-                          args.title,
-                      episodeTitle:
-                          progress.episodeTitle ??
-                          args.metadata['episode_title'] as String? ??
-                          existing?.episodeTitle,
-                      seriesName:
-                          progress.seriesName ??
-                          args.metadata['series_name'] as String? ??
-                          existing?.seriesName,
-                      thumbnailUrl:
-                          progress.thumbnailUrl ??
-                          args.metadata['thumbnail_url'] as String? ??
-                          existing?.thumbnailUrl,
-                      backdropUrl:
-                          progress.backdropUrl ??
-                          args.metadata['backdrop_url'] as String? ??
-                          existing?.backdropUrl,
-                      rating:
-                          progress.rating ??
-                          args.metadata['rating'] as String? ??
-                          existing?.rating,
-                      runtime:
-                          progress.runtime ??
-                          args.metadata['duration'] as String? ??
-                          existing?.runtime,
-                      plot:
-                          progress.plot ??
-                          args.metadata['plot'] as String? ??
-                          existing?.plot,
-                      genre: progress.genre ?? existing?.genre,
-                      year:
-                          progress.year ??
-                          args.metadata['year'] as String? ??
-                          existing?.year,
-                    );
-                    final aioItemId = args.metadata['aio_item_id'] as String?;
-                    final aioIntegrationId =
-                        args.metadata['aio_integration_id'] as int?;
-                    final aioToSave = aioItemId != null
-                        ? Progress(
-                            viewerId: toSave.viewerId,
-                            contentType: ContentType.aiostreams,
-                            streamId: 0,
-                            positionSeconds: toSave.positionSeconds,
-                            durationSeconds: toSave.durationSeconds,
-                            completed: toSave.completed,
-                            seasonNumber: toSave.seasonNumber,
-                            episodeNumber: toSave.episodeNumber,
-                            title: toSave.title,
-                            episodeTitle: toSave.episodeTitle,
-                            thumbnailUrl: toSave.thumbnailUrl,
-                            backdropUrl: toSave.backdropUrl,
-                            rating: toSave.rating,
-                            runtime: toSave.runtime,
-                            plot: toSave.plot,
-                            genre: toSave.genre,
-                            year: toSave.year,
-                            aioItemId: aioItemId,
-                            aioIntegrationId: aioIntegrationId,
-                          )
-                        : null;
-                    if (aioToSave != null) {
-                      if (_appState.sourceType == AppSourceType.xtream) {
+          if (args != null && orch != null)
+            Positioned.fill(
+              child:
+                  widget.playerRouteBuilder?.call(args) ??
+                  PlayerScreen(
+                    key: ValueKey(_playerSessionId),
+                    args: args,
+                    orchestrator: orch,
+                    adoptsPlayingSession: _playerLease != null,
+                    surfaceKey: _playerLease?.surfaceKey,
+                    releasesOrchestratorOnDispose: () =>
+                        _playerReleasesOnDispose,
+                    isHandheld:
+                        widget.deviceType == DeviceType.phone ||
+                        widget.deviceType == DeviceType.tablet,
+                    epgService: _appState.epgService,
+                    xtreamService: _appState.xtreamService,
+                    comskipSettings: _appState.comskipSettings,
+                    introDbSettings: _appState.introDbSettings,
+                    hasDvrFeature: _appState.hasDvrFeature,
+                    viewerId: viewerId,
+                    viewSettingsService: _appState.viewSettingsService,
+                    onLiveStreamEnded: args.type == 'live'
+                        ? _handleLiveStreamEnded
+                        : null,
+                    onNextChannel: args.type == 'live'
+                        ? _openNextChannel
+                        : null,
+                    onPreviousChannel: args.type == 'live'
+                        ? _openPreviousChannel
+                        : null,
+                    onReplaceItem: args.type == 'series'
+                        ? _openPlayerDirect
+                        : null,
+                    onRecordProgram:
+                        args.type == 'live' && _appState.hasDvrFeature
+                        ? _handleRecordButtonTap
+                        : null,
+                    onTrackDialogVisibilityChanged:
+                        _setPlayerModalDialogVisible,
+                    isRecordingCurrentChannel:
+                        args.type == 'live' &&
+                        recordingChannelIds.contains(args.streamId),
+                    progressReporter: (progress) {
+                      final aioLookupId =
+                          args.metadata['aio_item_id'] as String?;
+                      final existing = _appState.progressList.firstWhereOrNull(
+                        (p) =>
+                            p.contentType == progress.contentType &&
+                            (p.contentType == ContentType.aiostreams
+                                ? p.aioItemId == aioLookupId
+                                : p.streamId == progress.streamId),
+                      );
+                      final toSave = Progress(
+                        viewerId: progress.viewerId,
+                        contentType: progress.contentType,
+                        streamId: progress.streamId,
+                        positionSeconds: progress.positionSeconds,
+                        durationSeconds:
+                            progress.durationSeconds ??
+                            existing?.durationSeconds,
+                        completed: progress.completed,
+                        seriesId: progress.seriesId ?? existing?.seriesId,
+                        seasonNumber:
+                            progress.seasonNumber ??
+                            (args.metadata['season_number'] as int?) ??
+                            existing?.seasonNumber,
+                        episodeNumber:
+                            progress.episodeNumber ??
+                            (args.metadata['episode_number'] as int?) ??
+                            existing?.episodeNumber,
+                        title:
+                            progress.title ??
+                            args.metadata['title'] as String? ??
+                            args.title,
+                        episodeTitle:
+                            progress.episodeTitle ??
+                            args.metadata['episode_title'] as String? ??
+                            existing?.episodeTitle,
+                        seriesName:
+                            progress.seriesName ??
+                            args.metadata['series_name'] as String? ??
+                            existing?.seriesName,
+                        thumbnailUrl:
+                            progress.thumbnailUrl ??
+                            args.metadata['thumbnail_url'] as String? ??
+                            existing?.thumbnailUrl,
+                        backdropUrl:
+                            progress.backdropUrl ??
+                            args.metadata['backdrop_url'] as String? ??
+                            existing?.backdropUrl,
+                        rating:
+                            progress.rating ??
+                            args.metadata['rating'] as String? ??
+                            existing?.rating,
+                        runtime:
+                            progress.runtime ??
+                            args.metadata['duration'] as String? ??
+                            existing?.runtime,
+                        plot:
+                            progress.plot ??
+                            args.metadata['plot'] as String? ??
+                            existing?.plot,
+                        genre: progress.genre ?? existing?.genre,
+                        year:
+                            progress.year ??
+                            args.metadata['year'] as String? ??
+                            existing?.year,
+                      );
+                      final aioItemId = args.metadata['aio_item_id'] as String?;
+                      final aioIntegrationId =
+                          args.metadata['aio_integration_id'] as int?;
+                      final aioToSave = aioItemId != null
+                          ? Progress(
+                              viewerId: toSave.viewerId,
+                              contentType: ContentType.aiostreams,
+                              streamId: 0,
+                              positionSeconds: toSave.positionSeconds,
+                              durationSeconds: toSave.durationSeconds,
+                              completed: toSave.completed,
+                              seasonNumber: toSave.seasonNumber,
+                              episodeNumber: toSave.episodeNumber,
+                              title: toSave.title,
+                              episodeTitle: toSave.episodeTitle,
+                              thumbnailUrl: toSave.thumbnailUrl,
+                              backdropUrl: toSave.backdropUrl,
+                              rating: toSave.rating,
+                              runtime: toSave.runtime,
+                              plot: toSave.plot,
+                              genre: toSave.genre,
+                              year: toSave.year,
+                              aioItemId: aioItemId,
+                              aioIntegrationId: aioIntegrationId,
+                            )
+                          : null;
+                      if (aioToSave != null) {
+                        if (_appState.sourceType == AppSourceType.xtream) {
+                          unawaited(
+                            _appState.xtreamService
+                                .reportPlaybackProgress(aioToSave)
+                                .catchError((_) => false),
+                          );
+                        }
                         unawaited(
-                          _appState.xtreamService
-                              .reportPlaybackProgress(aioToSave)
-                              .catchError((_) => false),
+                          _appState.resumeService.save(aioToSave).then((_) {
+                            if (mounted) {
+                              _appState.updateProgressEntry(aioToSave);
+                            }
+                          }),
+                        );
+                      } else {
+                        if (_appState.sourceType == AppSourceType.xtream) {
+                          unawaited(
+                            _appState.xtreamService
+                                .reportPlaybackProgress(toSave)
+                                .catchError((_) => false),
+                          );
+                        }
+                        unawaited(
+                          _appState.resumeService.save(toSave).then((_) {
+                            if (mounted) _appState.updateProgressEntry(toSave);
+                          }),
                         );
                       }
-                      unawaited(
-                        _appState.resumeService.save(aioToSave).then((_) {
-                          if (mounted) {
-                            _appState.updateProgressEntry(aioToSave);
-                          }
-                        }),
-                      );
-                    } else {
-                      if (_appState.sourceType == AppSourceType.xtream) {
-                        unawaited(
-                          _appState.xtreamService
-                              .reportPlaybackProgress(toSave)
-                              .catchError((_) => false),
-                        );
-                      }
-                      unawaited(
-                        _appState.resumeService.save(toSave).then((_) {
-                          if (mounted) _appState.updateProgressEntry(toSave);
-                        }),
-                      );
-                    }
-                  },
-                  traktService: _appState.traktService,
-                  onPlaybackFailure: () {
-                    if (!mounted) return;
-                    setState(() => _playerHasFailed = true);
-                    unawaited(_systemUiPolicy.applyBrowsing());
-                  },
-                  onClose: _closePlayer,
-                  backController: _playerBackController,
-                  // Through the shared echo guard: the player handles the key
-                  // and the platform popRoute that follows it would otherwise
-                  // close the player right after the key hid its OSD.
-                  onBackKey: _handleShortcutBack,
-                ),
-          ),
+                    },
+                    traktService: _appState.traktService,
+                    onPlaybackFailure: () {
+                      if (!mounted) return;
+                      setState(() => _playerHasFailed = true);
+                      unawaited(_systemUiPolicy.applyBrowsing());
+                    },
+                    onClose: _closePlayer,
+                    backController: _playerBackController,
+                    // Through the shared echo guard: the player handles the key
+                    // and the platform popRoute that follows it would otherwise
+                    // close the player right after the key hid its OSD.
+                    onBackKey: _handleShortcutBack,
+                  ),
+            ),
         ],
       ),
     );
