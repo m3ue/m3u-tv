@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,15 +33,31 @@ class _DisplayModeAdapter extends FakePlayerAdapter
   }
 }
 
+/// Holds each load() open until [finishLoad], like a native load that is
+/// still waiting on its stream.
+class _SlowLoadDisplayModeAdapter extends _DisplayModeAdapter {
+  Completer<void>? _pendingLoad;
+
+  @override
+  Future<void> load(PlaybackSource source) async {
+    await super.load(source);
+    _pendingLoad = Completer<void>();
+    await _pendingLoad!.future;
+  }
+
+  void finishLoad() => _pendingLoad?.complete();
+}
+
 ({PlaybackOrchestrator orchestrator, _DisplayModeAdapter adapter})
-_buildPlayer() {
-  final adapter = _DisplayModeAdapter();
+_buildPlayer({_DisplayModeAdapter? adapter}) {
+  adapter ??= _DisplayModeAdapter();
   final orchestrator = PlaybackOrchestrator(
     platform: PlaybackPlatform.desktop,
     adapters: <PlaybackBackend, PlayerAdapter>{
       PlaybackBackend.desktopLibmpv: adapter,
     },
     transcodeGateway: FakeTranscodeGateway(),
+    retryDelay: Duration.zero,
   );
   return (orchestrator: orchestrator, adapter: adapter);
 }
@@ -165,6 +183,48 @@ void main() {
         );
       },
     );
+
+    test('re-sends a toggle that arrived while the stream loaded', () async {
+      final adapter = _SlowLoadDisplayModeAdapter();
+      final built = _buildPlayer(adapter: adapter);
+      addTearDown(built.orchestrator.dispose);
+      final opening = built.orchestrator.open(
+        _sourceFor(_channel).copyWith(allowDisplayModeChanges: false),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await built.orchestrator.setAllowDisplayModeChanges(true);
+      adapter.finishLoad();
+      await opening;
+
+      expect(adapter.loadCalls.single.allowDisplayModeChanges, isFalse);
+      expect(adapter.displayModeCalls, [true, true]);
+    });
+
+    test('a retry reloads with the current toggle', () async {
+      final built = _buildPlayer();
+      addTearDown(built.orchestrator.dispose);
+      await built.orchestrator.open(
+        _sourceFor(_channel).copyWith(allowDisplayModeChanges: false),
+      );
+      await built.orchestrator.setAllowDisplayModeChanges(true);
+
+      built.adapter.emitError(
+        const PlaybackError(
+          backend: PlaybackBackend.desktopLibmpv,
+          message: 'network dropped',
+          code: 'network',
+          recoverable: true,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        built.adapter.loadCalls.map((source) => source.allowDisplayModeChanges),
+        [false, true],
+      );
+    });
 
     test('lastState is the latest state emitted', () async {
       final built = _buildPlayer();

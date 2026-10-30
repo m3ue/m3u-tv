@@ -703,7 +703,9 @@ struct PlayerInstance {
   // ApplyHdrForVideoParams/MatchRefreshRate against firing repeatedly for
   // every video-params tick of a source that has not actually changed.
   bool hdr_requested = false;
-  bool refresh_rate_matched = false;
+  // Atomic: written by the `setAllowDisplayModeChanges` control method on
+  // the platform thread and read by MaybeMatchRefreshRate on the event thread.
+  std::atomic<bool> refresh_rate_matched{false};
   // User-facing override, mirrored from the `enableHDR` app setting via the
   // `setHdrEnabled` control method. Gates whether ApplyHdrForVideoParams may
   // switch the OS display into HDR mode at all; defaults on so playback
@@ -723,7 +725,7 @@ struct PlayerInstance {
   // guide never blanks the display. Set from the `allowDisplayModeChanges`
   // load arg and the control method of the same name (the preview going
   // full screen, and back).
-  bool allow_display_mode_changes = true;
+  std::atomic<bool> allow_display_mode_changes{true};
 };
 
 LibmpvApi g_api;
@@ -1076,11 +1078,13 @@ void MaybeMatchRefreshRate(PlayerInstance* player) {
   if (!player->refresh_rate_match_user_enabled) return;
   if (!player->allow_display_mode_changes) return;
   if (player->refresh_rate_matched) return;
-  player->refresh_rate_matched = true;
+  // Only counts as matched once there is a rate to match: a call before
+  // MPV_EVENT_FILE_LOADED (display mode changes allowed mid-load) has none
+  // yet and must leave the FILE_LOADED call free to match.
   double fps = 0.0;
-  if (DoubleProperty(player, "container-fps", &fps) && fps > 0.0) {
-    player->display_mode_manager->MatchRefreshRate(player->top_level_hwnd, fps);
-  }
+  if (!DoubleProperty(player, "container-fps", &fps) || fps <= 0.0) return;
+  if (player->refresh_rate_matched.exchange(true)) return;
+  player->display_mode_manager->MatchRefreshRate(player->top_level_hwnd, fps);
 }
 
 ProbeMap LoadFailure(const char* code, const std::string& error) {

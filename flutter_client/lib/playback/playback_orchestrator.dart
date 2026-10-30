@@ -264,6 +264,39 @@ class PlaybackOrchestrator {
     }
   }
 
+  /// [source] with the [setAllowDisplayModeChanges] override applied. Every
+  /// load goes through this, not just [open]: a retry or backend fallback
+  /// reloads [_activeSource], which still carries the value it was first
+  /// opened with (the preview's "off" after it has gone full screen).
+  PlaybackSource _withDisplayModePolicy(PlaybackSource source) {
+    final allowed = _allowDisplayModeChanges;
+    if (allowed == null || source.allowDisplayModeChanges == allowed) {
+      return source;
+    }
+    return source.copyWith(allowDisplayModeChanges: allowed);
+  }
+
+  /// Loads [source] on [adapter], then re-sends the display-mode override if
+  /// it changed while the load was in flight: the native load applies the
+  /// value it was given, overwriting a toggle that reached it first.
+  Future<void> _loadWithDisplayModePolicy(
+    PlayerAdapter adapter,
+    PlaybackSource source,
+  ) async {
+    await adapter.load(source);
+    final allowed = _allowDisplayModeChanges;
+    if (_disposed ||
+        allowed == null ||
+        allowed == source.allowDisplayModeChanges ||
+        !identical(adapter, _activeAdapter) ||
+        adapter is! DisplayModeController) {
+      return;
+    }
+    await (adapter as DisplayModeController).setAllowDisplayModeChanges(
+      allowed,
+    );
+  }
+
   Future<void> open(PlaybackSource source) async {
     _ensureNotDisposed();
     // Assigned synchronously, before any await, so this call's generation is
@@ -281,13 +314,7 @@ class PlaybackOrchestrator {
     await _cleanupSessions();
     if (!_isCurrentGeneration(generation)) return;
     _clearActiveAdapter();
-    final allowDisplayModeChanges = _allowDisplayModeChanges;
-    final sessionSource = _beginStreamSession(
-      allowDisplayModeChanges == null ||
-              source.allowDisplayModeChanges == allowDisplayModeChanges
-          ? source
-          : source.copyWith(allowDisplayModeChanges: allowDisplayModeChanges),
-    );
+    final sessionSource = _beginStreamSession(source);
 
     if (sessionSource.isLive) {
       final rejection = await _preflightLiveStream(sessionSource.uri);
@@ -350,7 +377,7 @@ class PlaybackOrchestrator {
       if (!_isCurrentGeneration(generation)) return;
       final failure = await _tryLoadBackend(
         backend: backend,
-        source: source,
+        requestedSource: source,
         successDiagnostic: attempt == 0
             ? 'direct:${backend.name}:ready'
             : 'fallback:${backend.name}:preferred ${priorBackend?.name ?? 'none'} unsupported',
@@ -440,12 +467,13 @@ class PlaybackOrchestrator {
 
   Future<PlaybackException?> _tryLoadBackend({
     required PlaybackBackend backend,
-    required PlaybackSource source,
+    required PlaybackSource requestedSource,
     required String successDiagnostic,
     required int generation,
   }) async {
     final adapter = _adapters[backend];
     if (adapter == null) return null;
+    final source = _withDisplayModePolicy(requestedSource);
     _bind(adapter);
     _setActiveAdapter(adapter, backend, source);
     if (adapter is PlatformViewProvider) {
@@ -469,7 +497,7 @@ class PlaybackOrchestrator {
     var streamUnavailableAttempt = 0;
     while (true) {
       try {
-        await adapter.load(source);
+        await _loadWithDisplayModePolicy(adapter, source);
         _syncNativePlaneComposition();
         break;
       } on PlaybackException catch (error) {
@@ -707,23 +735,26 @@ class PlaybackOrchestrator {
       );
     }
 
-    final transcodedSource = PlaybackSource(
-      uri: broadcast?.playlistUrl ?? response.streamUrl,
-      title: source.title,
-      startPosition: source.startPosition,
-      isLive: source.isLive,
-      userAgent: source.userAgent,
-      headers: source.headers,
-      hdrEnabled: source.hdrEnabled,
-      matchDisplayRefreshRate: source.matchDisplayRefreshRate,
-      deinterlace: source.deinterlace,
-      prebufferLive: source.prebufferLive,
-      metadata: <String, Object?>{
-        ...source.metadata,
-        'transcode_stream_id': response.streamId,
-        if (response.sessionId != null)
-          'transcode_session_id': response.sessionId,
-      },
+    final transcodedSource = _withDisplayModePolicy(
+      PlaybackSource(
+        uri: broadcast?.playlistUrl ?? response.streamUrl,
+        title: source.title,
+        startPosition: source.startPosition,
+        isLive: source.isLive,
+        userAgent: source.userAgent,
+        headers: source.headers,
+        hdrEnabled: source.hdrEnabled,
+        matchDisplayRefreshRate: source.matchDisplayRefreshRate,
+        allowDisplayModeChanges: source.allowDisplayModeChanges,
+        deinterlace: source.deinterlace,
+        prebufferLive: source.prebufferLive,
+        metadata: <String, Object?>{
+          ...source.metadata,
+          'transcode_stream_id': response.streamId,
+          if (response.sessionId != null)
+            'transcode_session_id': response.sessionId,
+        },
+      ),
     );
 
     _bind(adapter);
@@ -733,7 +764,7 @@ class PlaybackOrchestrator {
       transcodedSource,
     );
     try {
-      await adapter.load(transcodedSource);
+      await _loadWithDisplayModePolicy(adapter, transcodedSource);
       if (!_isCurrentGeneration(generation)) {
         // Same reasoning as _tryLoadBackend: the server-transcode adapter is
         // also a single shared instance, so adapter/backend identity alone
@@ -977,7 +1008,9 @@ class PlaybackOrchestrator {
       if (_disposed || generation != _playbackGeneration) return;
       await adapter.stop();
       if (_disposed || generation != _playbackGeneration) return;
-      await adapter.load(source);
+      final retrySource = _withDisplayModePolicy(source);
+      _activeSource = retrySource;
+      await _loadWithDisplayModePolicy(adapter, retrySource);
     } on PlaybackException catch (retryError) {
       if (_disposed || generation != _playbackGeneration) return;
       _beginGeneration();

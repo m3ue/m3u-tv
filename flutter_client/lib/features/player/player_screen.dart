@@ -621,7 +621,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// new stream has opened, for the same reason as a catchup reopen (see
   /// [_reopenPlatformView]).
   Future<void> _openSwitchedSource(PlayerArgs args) async {
-    final generation = _catchupReopenGeneration;
+    final generation = ++_catchupReopenGeneration;
     await _openSource(args);
     if (_disposed || !mounted || generation != _catchupReopenGeneration) {
       return;
