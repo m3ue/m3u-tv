@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
@@ -35,13 +35,12 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/desktop_notification_presenter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
-import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
-import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -86,23 +85,6 @@ String notificationRouteFor(
   _ => RouteNames.notifications,
 };
 
-String _routeLabel(BuildContext context, String route) {
-  final l = AppLocalizations.of(context);
-  return switch (route) {
-    RouteNames.home => l.navHome,
-    RouteNames.search => l.navSearch,
-    RouteNames.liveTv => l.navLiveTv,
-    RouteNames.vod => l.navVod,
-    RouteNames.series => l.navSeries,
-    RouteNames.aiostreams => l.navAioStreams,
-    RouteNames.dvr => l.navDvr,
-    RouteNames.requests => l.navRequests,
-    RouteNames.notifications => l.navNotifications,
-    RouteNames.settings => l.navSettings,
-    _ => RouteNames.routeLabels[route] ?? route,
-  };
-}
-
 /// Root shell with adaptive scaffold: sidebar for TV/desktop, bottom nav for
 /// phone/tablet. Includes TV focus traversal, D-pad/keyboard shortcuts, back
 /// handling, and focus restoration.
@@ -141,6 +123,7 @@ class AppShellState extends ConsumerState<AppShell>
   int _fullScreenDetailDepth = 0;
   bool get _fullScreenDetailActive => _fullScreenDetailDepth > 0;
   late final AppStateController _appState;
+  late final DvrActions _dvrActions = DvrActions(_appState);
   late final bool _ownsAppState;
   final MemoryWatchdog _memoryWatchdog = MemoryWatchdog();
   late final SystemUiPolicy _systemUiPolicy;
@@ -1084,7 +1067,7 @@ class AppShellState extends ConsumerState<AppShell>
         context,
         recording: recording,
         onCancel: _appState.cancelDvrRecording,
-        onCancelAndDelete: _cancelAndDeleteRecording,
+        onCancelAndDelete: _dvrActions.cancelAndDeleteRecording,
       );
     } finally {
       _setPlayerModalDialogVisible(false);
@@ -1141,147 +1124,6 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
-  /// Schedules a single DVR airing for one Shows-search episode. No
-  /// SnackBar here: the screen owns success/failure feedback (mirroring
-  /// how the live-tv `_scheduleDvr` keeps it out of the scheduling call).
-  Future<DvrRecording?> _scheduleDvrAiring(EpgShowEpisode episode) {
-    return _appState.scheduleDvrAiring(
-      channelId: episode.channelId,
-      title: episode.displayTitle,
-      startTime: episode.startTime,
-      endTime: episode.endTime,
-    );
-  }
-
-  /// Schedules a batch of DVR airings for one Shows-search selection.
-  /// Per-item failures land inside the returned list (the screen turns that
-  /// into a single summary SnackBar), no per-item SnackBars here, mirroring
-  /// the single-item `_scheduleDvrAiring`'s "screen owns feedback" rule.
-  Future<List<DvrAiringScheduleResult>> _scheduleDvrAirings(
-    List<EpgShowEpisode> episodes,
-  ) {
-    return _appState.scheduleDvrAirings(episodes);
-  }
-
-  /// Calls the foundation-agent-owned `XtreamService.createDvrSeriesRule`
-  /// and refreshes the cached series rules list so the DVR screen's new
-  /// "Series Rules" section reflects the addition immediately.
-  ///
-  /// Returns a [CreateDvrSeriesRuleOutcome] so the UI can tell
-  /// "rule created" / "duplicate of existing rule" / "failed" apart and
-  /// show the right SnackBar without losing the A3-409 distinction that
-  /// `XtreamService.createDvrSeriesRule` throws as
-  /// `DvrSeriesRuleExistsException`. The `on Object { return false; }`
-  /// blanket from earlier releases would have collapsed the duplicate case
-  /// into a generic failure - B2 surfaces it instead.
-  Future<CreateDvrSeriesRuleOutcome> _createDvrSeriesRule({
-    int? channelId,
-    required String title,
-    DvrMatchMode? matchMode,
-    DvrSeriesMode? seriesMode,
-    int? keepLast,
-    int? priority,
-    int? startEarlySeconds,
-    int? endLateSeconds,
-  }) async {
-    try {
-      final id = await _appState.xtreamService.createDvrSeriesRule(
-        channelId: channelId,
-        title: title,
-        matchMode: matchMode,
-        seriesMode: seriesMode,
-        keepLast: keepLast,
-        priority: priority,
-        startEarlySeconds: startEarlySeconds,
-        endLateSeconds: endLateSeconds,
-      );
-      await _appState.refreshDvrSeriesRules();
-      // The rule's `created` hook may have already matched and scheduled a
-      // recording server-side (see AppStateController.refreshDvrRecordings
-      // doc comment) - refresh so it shows up in the Recordings tab without
-      // waiting for the next full app reload.
-      unawaited(_appState.refreshDvrRecordings());
-      return id == 0
-          ? CreateDvrSeriesRuleOutcome.failed
-          : CreateDvrSeriesRuleOutcome.created;
-    } on DvrSeriesRuleExistsException {
-      try {
-        await _appState.refreshDvrSeriesRules();
-      } on Object catch (error, stackTrace) {
-        debugPrint('DVR: refresh after duplicate create failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-      return CreateDvrSeriesRuleOutcome.duplicate;
-    } on Object catch (error, stackTrace) {
-      debugPrint('DVR: create series rule failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      return CreateDvrSeriesRuleOutcome.failed;
-    }
-  }
-
-  /// Deletes a DVR series rule and refreshes the cached list.
-  Future<void> _deleteDvrSeriesRule(DvrSeriesRule rule) async {
-    await _appState.xtreamService.deleteDvrSeriesRule(rule.id);
-    await _appState.refreshDvrSeriesRules();
-  }
-
-  /// Updates an existing DVR series rule in place (never delete-and-recreate —
-  /// deleting cascades to the rule's recordings and would destroy history) and
-  /// refreshes the cached list. `updateDvrSeriesRule` applies only the fields
-  /// the sheet returned; absent fields keep their current server values.
-  Future<void> _updateDvrSeriesRule(
-    DvrSeriesRule rule,
-    DvrSeriesRuleOptions options,
-  ) async {
-    await _appState.xtreamService.updateDvrSeriesRule(
-      ruleId: rule.id,
-      // Only send a channel when the user actually changed it, so an edit to
-      // padding or priority can never move the rule's channel scope.
-      channel: DvrRuleChannelChange.between(
-        current: rule.channelId,
-        selected: options.channelId,
-      ),
-      matchMode: options.matchMode,
-      seriesMode: options.seriesMode,
-      keepLast: options.keepLast,
-      priority: options.priority,
-      startEarlySeconds: options.startEarlySeconds,
-      endLateSeconds: options.endLateSeconds,
-    );
-    await _appState.refreshDvrSeriesRules();
-    unawaited(_appState.refreshDvrRecordings());
-  }
-
-  /// Proxies the Shows screen's search through the foundation-agent-owned
-  /// `XtreamService.searchEpgShows`.
-  Future<List<EpgShow>> _searchEpgShows(String query) {
-    return _appState.xtreamService.searchEpgShows(query);
-  }
-
-  /// Stops a scheduled or in-progress recording and deletes the row from the
-  /// editor - the "Delete recording" choice on the Recordings screen's stop
-  /// dialog (see DvrRecordingsScreen._confirmCancel). m3u-editor's
-  /// `cancel_dvr_recording` only marks the recording `cancelled` (a stop +
-  /// history-keep operation), so this chains a follow-up `delete_dvr_recording`
-  /// once the row is in a deletable state. The "Keep recording" choice instead
-  /// calls `AppStateController.cancelDvrRecording` directly and stops here.
-  ///
-  /// If the cancel succeeds but the delete fails (e.g. transient server
-  /// hiccup), the recording is still stopped and stays in the local list with
-  /// its Cancelled status - the user can retry Delete from there. The delete
-  /// failure is rethrown (not swallowed) so DvrRecordingsScreen's
-  /// _runWithFeedback shows the "could not delete" SnackBar instead of a
-  /// false "deleted" success message for a recording that's still there.
-  Future<void> _cancelAndDeleteRecording(String uuid) async {
-    await _appState.cancelDvrRecording(uuid);
-    try {
-      await _appState.deleteDvrRecording(uuid);
-    } on Object catch (error) {
-      debugPrint('DVR: post-cancel delete failed: $error');
-      rethrow;
-    }
-  }
-
   /// Pushes a detail route. When [fullScreen] is true, the sidebar-hide
   /// transition is tied directly to this call's own push/pop - flipped
   /// synchronously right before `context.push` and unwound in `finally`
@@ -1333,10 +1175,10 @@ class AppShellState extends ConsumerState<AppShell>
     onVodSelect: _openVod,
     onSeriesSelect: _openSeries,
     onMarkEpisodeWatched: _markEpisodeWatched,
-    onRecordSeries: _createDvrSeriesRule,
-    onDeleteSeriesRule: _deleteDvrSeriesRule,
-    onScheduleEpisode: _scheduleDvrAiring,
-    onScheduleEpisodes: _scheduleDvrAirings,
+    onRecordSeries: _dvrActions.createSeriesRule,
+    onDeleteSeriesRule: _dvrActions.deleteSeriesRule,
+    onScheduleEpisode: _dvrActions.scheduleAiring,
+    onScheduleEpisodes: _dvrActions.scheduleAirings,
   );
 
   /// Same `GlobalKey` reach-through as [actionsForTopLevelRoutes], for
@@ -1636,7 +1478,7 @@ class AppShellState extends ConsumerState<AppShell>
         onVodSelect: _openVod,
         onSeriesSelect: _openSeries,
         onSidebarActivate: _activateSidebar,
-        onSearchShows: _searchEpgShows,
+        onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
       ),
       RouteNames.liveTv => LiveTvScreen(
@@ -1652,8 +1494,8 @@ class AppShellState extends ConsumerState<AppShell>
         onEnsureEpg: _appState.ensureEpgForChannels,
         onCatchupEpgRequested: _appState.ensureCatchupEpgForChannel,
         onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
-        onCancelAndDeleteRecording: _cancelAndDeleteRecording,
-        onRecordSeries: (channel, program) => _createDvrSeriesRule(
+        onCancelAndDeleteRecording: _dvrActions.cancelAndDeleteRecording,
+        onRecordSeries: (channel, program) => _dvrActions.createSeriesRule(
           channelId: channel.id,
           title: program.title,
         ),
@@ -1663,7 +1505,7 @@ class AppShellState extends ConsumerState<AppShell>
             _registerContentEntryFocus(RouteNames.liveTv, node),
         onBackHandlerReady: (handler) =>
             _registerContentBackHandler(RouteNames.liveTv, handler),
-        onSearchShows: _searchEpgShows,
+        onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
       ),
       RouteNames.vod => VodScreen(
@@ -1719,12 +1561,12 @@ class AppShellState extends ConsumerState<AppShell>
             storageInfo: ref.watch(dvrStorageInfoProvider),
             onPlay: _openPlayerDirect,
             onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
-            onCancelAndDeleteRecording: _cancelAndDeleteRecording,
+            onCancelAndDeleteRecording: _dvrActions.cancelAndDeleteRecording,
             onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
             seriesRules: ref.watch(dvrSeriesRulesProvider),
-            onDeleteSeriesRule: _deleteDvrSeriesRule,
-            onUpdateSeriesRule: _updateDvrSeriesRule,
-            onSearchShows: _searchEpgShows,
+            onDeleteSeriesRule: _dvrActions.deleteSeriesRule,
+            onUpdateSeriesRule: _dvrActions.updateSeriesRule,
+            onSearchShows: _dvrActions.searchEpgShows,
             onOpenShowDetail: _openShow,
             onHandleTopLevelBack: handleBackFromTopLevelRoute,
             onSidebarActivate: _activateSidebar,
@@ -1818,10 +1660,10 @@ class AppShellState extends ConsumerState<AppShell>
       onSeriesSelect: _openSeries,
       onProgressSelect: _openProgress,
       onSidebarActivate: _activateSidebar,
-      onRecordSeries: _createDvrSeriesRule,
-      onDeleteSeriesRule: _deleteDvrSeriesRule,
-      onScheduleEpisode: _scheduleDvrAiring,
-      onScheduleEpisodes: _scheduleDvrAirings,
+      onRecordSeries: _dvrActions.createSeriesRule,
+      onDeleteSeriesRule: _dvrActions.deleteSeriesRule,
+      onScheduleEpisode: _dvrActions.scheduleAiring,
+      onScheduleEpisodes: _dvrActions.scheduleAirings,
       onMarkEpisodeWatched: _markEpisodeWatched,
       onHandleTopLevelBack: handleBackFromTopLevelRoute,
       buildTabScreen: _buildTabScreen,
@@ -2226,7 +2068,7 @@ class AppShellState extends ConsumerState<AppShell>
                 ...routes.take(primaryCount).map((route) {
                   return BottomNavigationBarItem(
                     icon: Icon(_routeIcon(route)),
-                    label: _routeLabel(context, route),
+                    label: navigationRouteLabel(context, route),
                   );
                 }),
                 if (overflowRoutes.isNotEmpty)
@@ -2267,7 +2109,9 @@ class AppShellState extends ConsumerState<AppShell>
                   label: Text('$unreadCount'),
                   child: Icon(_routeIcon(overflowRoutes[i])),
                 ),
-                title: Text(_routeLabel(sheetContext, overflowRoutes[i])),
+                title: Text(
+                  navigationRouteLabel(sheetContext, overflowRoutes[i]),
+                ),
                 selected: _currentIndex == primaryCount + i,
                 onTap: () => Navigator.of(sheetContext).pop(primaryCount + i),
               ),
@@ -2291,440 +2135,6 @@ class AppShellState extends ConsumerState<AppShell>
     RouteNames.settings => Icons.settings,
     _ => Icons.circle,
   };
-}
-
-/// Sidebar navigation for TV/desktop. Shows a vertical list of destinations
-/// with focus support and D-pad traversal.
-class NavigationSidebar extends StatelessWidget {
-  const NavigationSidebar({
-    super.key,
-    required this.currentIndex,
-    required this.routes,
-    required this.sidebarActive,
-    required this.focusNodes,
-    required this.scopeNode,
-    this.unreadNotificationCount = 0,
-    required this.onNavigate,
-    required this.onActivateSidebar,
-    required this.onDeactivateSidebar,
-  });
-
-  final int currentIndex;
-  final List<String> routes;
-  final bool sidebarActive;
-  final List<FocusNode> focusNodes;
-  final FocusScopeNode scopeNode;
-  final int unreadNotificationCount;
-  final ValueChanged<int> onNavigate;
-  final VoidCallback onActivateSidebar;
-  final VoidCallback onDeactivateSidebar;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final expanded = sidebarActive;
-    final scale = FontSizeScope.scaleOf(context);
-    final width = (expanded ? 200.0 : kSidebarRailInset) * scale;
-
-    return MouseRegion(
-      onEnter: (_) => onActivateSidebar(),
-      onExit: (_) => onDeactivateSidebar(),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        width: width,
-        clipBehavior: Clip.hardEdge,
-        // Expanded: a card-coloured panel with a hairline edge and a soft,
-        // wide shadow over the content. Collapsed: no panel, no edge.
-        decoration: BoxDecoration(
-          color: expanded
-              ? theme.colorScheme.surfaceContainerLow
-              : Colors.transparent,
-          border: Border(
-            right: BorderSide(
-              color: expanded
-                  ? theme.colorScheme.onSurface.withValues(alpha: 0.07)
-                  : Colors.transparent,
-            ),
-          ),
-          boxShadow: expanded
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 32,
-                    offset: const Offset(8, 0),
-                  ),
-                ]
-              : null,
-        ),
-        child: FocusScope(
-          node: scopeNode,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.arrowRight) {
-              onDeactivateSidebar();
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-          },
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 72 * scale,
-                  child: Padding(
-                    // Horizontal (14) scales to keep the logo centered in
-                    // the collapsed rail, matching how SidebarDestinationItem
-                    // centers its icons (outer + inner padding + icon size
-                    // summing symmetrically around the rail's midpoint) - at
-                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
-                    // = 14, so left inset equals right space. Leaving this
-                    // unscaled while the logo itself scaled was the bug: the
-                    // logo drifted off-center as scale grew.
-                    padding: EdgeInsets.fromLTRB(
-                      14 * scale,
-                      20,
-                      14 * scale,
-                      16,
-                    ),
-                    child: OverflowBox(
-                      maxWidth: 200 * scale,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/logo.svg',
-                            width: 36 * scale,
-                            height: 36 * scale,
-                          ),
-                          if (expanded) ...[
-                            const SizedBox(width: 12),
-                            Text(
-                              'M3U TV',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                for (var index = 0; index < footerStart; index++)
-                  _destination(context, index, expanded, scale),
-                // A hairline sets Notifications and Settings apart from
-                // the content destinations.
-                if (footerStart < routes.length)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16 * scale,
-                      vertical: 6 * scale,
-                    ),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.07,
-                      ),
-                    ),
-                  ),
-                for (var index = footerStart; index < routes.length; index++)
-                  _destination(context, index, expanded, scale),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Index of the first trailing Notifications/Settings destination, which
-  /// sit below a divider; the length of [routes] when there are none.
-  int get footerStart {
-    var start = routes.length;
-    while (start > 0 &&
-        (routes[start - 1] == RouteNames.settings ||
-            routes[start - 1] == RouteNames.notifications)) {
-      start--;
-    }
-    return start;
-  }
-
-  Widget _destination(
-    BuildContext context,
-    int index,
-    bool expanded,
-    double scale,
-  ) {
-    final route = routes[index];
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
-      child: SidebarDestinationItem(
-        // Keyed by route: gated destinations (DVR, Requests, ...) appear
-        // after the first build, and without a key Flutter would hand an
-        // existing item's state (and its focus listener) to a different
-        // destination.
-        key: ValueKey(route),
-        label: _routeLabel(context, route),
-        icon: _routeIcon(route),
-        selected: index == currentIndex,
-        expanded: expanded,
-        focusNode: focusNodes[index],
-        badgeCount: route == RouteNames.notifications
-            ? unreadNotificationCount
-            : 0,
-        onTap: () => onNavigate(index),
-      ),
-    );
-  }
-
-  IconData _routeIcon(String route) => switch (route) {
-    RouteNames.home => Icons.home_rounded,
-    RouteNames.search => Icons.search_rounded,
-    RouteNames.liveTv => Icons.live_tv_rounded,
-    RouteNames.vod => Icons.movie_rounded,
-    RouteNames.series => Icons.tv_rounded,
-    RouteNames.aiostreams => Icons.subscriptions_rounded,
-    RouteNames.dvr => Icons.video_library_rounded,
-    RouteNames.requests => Icons.playlist_add_rounded,
-    RouteNames.notifications => Icons.notifications_rounded,
-    RouteNames.settings => Icons.settings_rounded,
-    _ => Icons.circle,
-  };
-}
-
-/// A single sidebar destination item with focus highlight.
-class SidebarDestinationItem extends StatefulWidget {
-  const SidebarDestinationItem({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.focusNode,
-    required this.onTap,
-    this.expanded = true,
-    this.badgeCount = 0,
-  });
-
-  final String label;
-  final IconData icon;
-
-  final bool selected;
-  final FocusNode focusNode;
-  final VoidCallback onTap;
-  final bool expanded;
-  final int badgeCount;
-
-  @override
-  State<SidebarDestinationItem> createState() => _SidebarDestinationItemState();
-}
-
-class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
-  bool _focused = false;
-  bool _hovered = false;
-  // Timestamp debounce: prevents double-fire when a platform (e.g. tvOS Siri
-  // Remote, desktop Enter key) generates both a KeyDownEvent (onKeyEvent) AND
-  // a synthesized pointer tap (InkWell.onTap) for the same physical press.
-  // Order-independent: works whether key arrives before or after pointer.
-  int _lastActivationMs = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.focusNode.addListener(_onFocusChange);
-  }
-
-  @override
-  void didUpdateWidget(SidebarDestinationItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      oldWidget.focusNode.removeListener(_onFocusChange);
-      widget.focusNode.addListener(_onFocusChange);
-      _focused = widget.focusNode.hasFocus;
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.focusNode.removeListener(_onFocusChange);
-    super.dispose();
-  }
-
-  void _onFocusChange() {
-    setState(() {
-      _focused = widget.focusNode.hasFocus;
-    });
-  }
-
-  void _setHovered(bool v) {
-    if (_hovered == v) return;
-    setState(() => _hovered = v);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    // Current destination: brand colour on a soft neutral tint, with the
-    // brand gradient as a short bar on the leading edge (as in the editor's
-    // sidebar). Idle destinations are muted; focus and hover lift them to
-    // full strength on the same neutral tint.
-    final activeColor = colorScheme.primary;
-    final Color backgroundColor;
-    final Color foregroundColor;
-    if (widget.selected) {
-      backgroundColor = colorScheme.onSurface.withValues(alpha: 0.08);
-      foregroundColor = activeColor;
-    } else if (_focused || _hovered) {
-      backgroundColor = colorScheme.onSurface.withValues(alpha: 0.06);
-      foregroundColor = colorScheme.onSurface;
-    } else {
-      backgroundColor = colorScheme.onSurface.withValues(alpha: 0);
-      foregroundColor = colorScheme.onSurface.withValues(alpha: 0.68);
-    }
-
-    final scale = FontSizeScope.scaleOf(context);
-    final hPad = 12.0 * scale;
-    final itemHeight = 48.0 * scale;
-    return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: Focus(
-        focusNode: widget.focusNode,
-        onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.select ||
-              event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.enter) {
-            final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - _lastActivationMs < 350) return KeyEventResult.handled;
-            _lastActivationMs = now;
-            widget.onTap();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: InkWell(
-          onTap: () {
-            final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - _lastActivationMs < 350) return;
-            _lastActivationMs = now;
-            widget.focusNode.requestFocus();
-            widget.onTap();
-          },
-          customBorder: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                height: itemHeight,
-                padding: EdgeInsets.symmetric(horizontal: hPad),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: OverflowBox(
-                  maxWidth: 200 * scale,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Badge(
-                        isLabelVisible: widget.badgeCount > 0,
-                        label: Text('${widget.badgeCount}'),
-                        child: Icon(
-                          widget.icon,
-                          color: foregroundColor,
-                          size: 24 * scale,
-                        ),
-                      ),
-                      if (widget.expanded) ...[
-                        SizedBox(width: hPad),
-                        Flexible(
-                          child: Text(
-                            widget.label,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: foregroundColor,
-                              fontWeight: widget.selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                top: itemHeight * 0.28,
-                bottom: itemHeight * 0.28,
-                width: 3,
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: widget.selected ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 150),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.horizontal(
-                          right: Radius.circular(3),
-                        ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [colorScheme.secondary, colorScheme.primary],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // D-pad/keyboard focus ring, also on the current destination
-              // so focus stays visible when it lands there. Mouse hover only
-              // gets the tint: on desktop the pointer can rest over one item
-              // while the keyboard moves focus to another, and two rings would
-              // make it unclear which one is focused.
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _focused ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 150),
-                    child: CustomPaint(
-                      painter: GradientBorderPainter(
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(8),
-                        ),
-                        width: 2.5,
-                        gradient: LinearGradient(
-                          begin: Alignment.topRight,
-                          end: Alignment.bottomLeft,
-                          colors: [
-                            colorScheme.primary,
-                            colorScheme.secondary,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 extension _FirstWhereOrNull<T> on Iterable<T> {
