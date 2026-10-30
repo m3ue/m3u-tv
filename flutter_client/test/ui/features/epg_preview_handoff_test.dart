@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
@@ -117,9 +118,23 @@ void main() {
       },
     );
 
+    test('does not start another player while one is lent', () async {
+      await controller.play(_channel);
+      final lease = controller.lend()!;
+
+      await controller.play(_otherChannel);
+      expect(adapters, hasLength(1));
+
+      controller.forgetLent();
+      await controller.play(_otherChannel);
+      expect(adapters, hasLength(2));
+      await lease.orchestrator.dispose();
+    });
+
     test('adoptBack refuses while the preview plays something else', () async {
       await controller.play(_channel);
       final lease = controller.lend()!;
+      controller.forgetLent();
       await controller.play(_otherChannel);
 
       expect(controller.canAdoptBack, isFalse);
@@ -283,4 +298,101 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     expect(built.adapter.stopCallCount, 0);
   });
+
+  testWidgets('a channel change keeps the native view mounted', (
+    tester,
+  ) async {
+    // Remounting it makes the mpv cores re-create themselves, tearing down
+    // the core the new channel's load was already sent to.
+    final viewCalls = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform_views,
+      (call) async {
+        viewCalls.add(call.method);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform_views,
+        null,
+      ),
+    );
+    final adapter = _PlatformViewAdapter();
+    final orchestrator = PlaybackOrchestrator(
+      platform: PlaybackPlatform.desktop,
+      adapters: <PlaybackBackend, PlayerAdapter>{
+        PlaybackBackend.desktopLibmpv: adapter,
+      },
+      transcodeGateway: FakeTranscodeGateway(),
+      streamSessionGateway: _SlowReleaseGateway(),
+    );
+    final surfaceKey = GlobalKey();
+    Widget player(Channel channel) => MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: PlayerScreen(
+        key: const ValueKey('player'),
+        // VOD args: no live preflight HTTP probe in tests.
+        args: PlayerArgs(
+          streamUrl: channel.streamUrl,
+          title: channel.name,
+          type: 'vod',
+          streamId: channel.id,
+        ),
+        orchestrator: orchestrator,
+        surfaceKey: surfaceKey,
+        epgService: EpgService(clock: () => DateTime.utc(2026)),
+      ),
+    );
+
+    await tester.pumpWidget(player(_channel));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    viewCalls.clear();
+
+    await tester.pumpWidget(player(_otherChannel));
+    // Frames keep building while the old session's release is in flight
+    // and open() has no active adapter.
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    expect(adapter.loadCalls, hasLength(2));
+    expect(viewCalls, isNot(contains('create')));
+    expect(viewCalls, isNot(contains('dispose')));
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 3));
+    await tester.runAsync(orchestrator.dispose);
+  });
+}
+
+class _PlatformViewAdapter extends FakePlayerAdapter
+    implements PlatformViewProvider {
+  _PlatformViewAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv);
+
+  @override
+  String get platformViewType => 'm3u_tv/test_player_view';
+
+  @override
+  Map<String, dynamic>? get platformViewCreationParams => <String, dynamic>{
+    'viewId': 1,
+  };
+
+  @override
+  Future<void> releaseNativeView() async {}
+}
+
+/// Takes as long to release a session as the editor's stop call does.
+class _SlowReleaseGateway implements PlaybackStreamSessionGateway {
+  @override
+  PlaybackSource attachClientId(PlaybackSource source, String clientId) =>
+      source.copyWith(uri: '${source.uri}?client_id=$clientId');
+
+  @override
+  Future<void> releaseStream(PlaybackSource source, String clientId) =>
+      Future<void>.delayed(const Duration(milliseconds: 150));
 }

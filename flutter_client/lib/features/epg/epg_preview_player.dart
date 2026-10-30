@@ -120,6 +120,9 @@ class EpgPreviewPlayerController extends ChangeNotifier {
   /// still waiting on teardown wins.
   Future<void> play(Channel channel) async {
     if (_disposed || (isPlaying(channel) && !_hasError)) return;
+    // Lent to the full-screen player: the guide is hidden beneath it, and a
+    // second player must not start until that one comes back or is gone.
+    if (_lentOrchestrator != null) return;
     final generation = ++_generation;
     await _teardown();
     if (_disposed || generation != _generation) return;
@@ -183,6 +186,11 @@ class EpgPreviewPlayerController extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  /// Forgets a player [lend] handed out that won't come back through
+  /// [adoptBack] (the full-screen player disposed it instead), so the
+  /// preview can play again.
+  void forgetLent() => _lentOrchestrator = null;
 
   /// Stops the preview. Completes once the native player is fully torn
   /// down, so callers can safely open the full-screen player afterwards.

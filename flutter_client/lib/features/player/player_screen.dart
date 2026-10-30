@@ -572,6 +572,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgTimer?.cancel();
     _epgFetch = null;
     _liveEndHoldTimer?.cancel();
+    // Read before _openSource clears the active adapter.
+    final keptView =
+        widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
 
     setState(() {
       _status = PlaybackStatus.idle;
@@ -599,10 +602,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _upNextSeries = null;
       _seriesInfo = null;
       _resetCatchupTimeline(widget.args);
+      _reopenPlatformView = keptView;
     });
 
     _initialOpenPending = false;
-    unawaited(_openSource(widget.args));
+    unawaited(_openSwitchedSource(widget.args));
     _startLoadingTimeout();
     _scheduleOverlayHide();
     _loadSkipSegments(widget.args);
@@ -610,6 +614,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _focusControlsOrScreen();
     });
+  }
+
+  /// Opens [args] on the player already showing something else (a channel
+  /// change, the next episode), keeping its native view mounted until the
+  /// new stream has opened, for the same reason as a catchup reopen (see
+  /// [_reopenPlatformView]).
+  Future<void> _openSwitchedSource(PlayerArgs args) async {
+    final generation = _catchupReopenGeneration;
+    await _openSource(args);
+    if (_disposed || !mounted || generation != _catchupReopenGeneration) {
+      return;
+    }
+    setState(() => _reopenPlatformView = null);
   }
 
   // Two channels can share a stream URL while differing in stream ID,

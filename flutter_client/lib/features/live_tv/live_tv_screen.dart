@@ -418,6 +418,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (wasActive != true || isActive) return;
     final channel = _resumePreviewChannel;
     final player = _previewPlayer;
+    // A player handed back has already been adopted; one that wasn't is
+    // gone, and the preview may play again.
+    player?.forgetLent();
     _resumePreviewChannel = null;
     if (channel == null ||
         player == null ||
