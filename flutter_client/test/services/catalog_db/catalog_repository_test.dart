@@ -3,6 +3,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_store.dart';
 
 VodItem _vod(
   int id,
@@ -465,6 +466,108 @@ void main() {
       DateTime.utc(2000),
     )).map((p) => p.title);
     expect(titles, unorderedEquals(['A new 14:00', 'B keep 13:00']));
+  });
+
+  group('EpgProgrammeStore', () {
+    final base = DateTime.utc(2026, 4, 1, 12);
+    EpgProgram show(
+      String channel,
+      String title,
+      int startHour, [
+      int? endHour,
+    ]) => EpgProgram(
+      channelId: channel,
+      title: title,
+      description: '',
+      start: base.add(Duration(hours: startHour)),
+      end: base.add(Duration(hours: endHour ?? startHour + 1)),
+    );
+    Future<List<String>> titles(String channel) async =>
+        ((await repo.programmesForChannels({channel}))[channel] ?? const [])
+            .map((p) => p.title)
+            .toList();
+
+    test(
+      'merge drops only stored programmes overlapping incoming ones',
+      () async {
+        await repo.applyEpgOps([
+          EpgReplaceChannels({
+            'a': [
+              show('a', 'A 12', 0),
+              show('a', 'A 13', 1),
+              show('a', 'A 15', 3),
+            ],
+          }),
+        ]);
+        await repo.applyEpgOps([
+          // A rescheduled 13:30-14:30 slot replaces 13:00 but not 12:00/15:00.
+          EpgMergeIntoChannels({
+            'a': [
+              EpgProgram(
+                channelId: 'a',
+                title: 'A 13:30',
+                description: '',
+                start: base.add(const Duration(minutes: 90)),
+                end: base.add(const Duration(minutes: 150)),
+              ),
+            ],
+          }),
+        ]);
+        expect(await titles('a'), ['A 12', 'A 13:30', 'A 15']);
+      },
+    );
+
+    test('ops apply in order: replace, then merge, then prune', () async {
+      await repo.applyEpgOps([
+        EpgReplaceChannels({
+          'b': [show('b', 'B old', -3), show('b', 'B 14', 2)],
+        }),
+        EpgMergeIntoChannels({
+          'b': [show('b', 'B 16', 4)],
+        }),
+        EpgPruneBefore(base),
+      ]);
+      expect(await titles('b'), ['B 14', 'B 16']);
+
+      await repo.applyEpgOps([
+        const EpgReplaceChannels({'b': []}),
+      ]);
+      expect(await titles('b'), isEmpty);
+    });
+
+    test(
+      'programmesBetween returns the window, optionally per channel',
+      () async {
+        await repo.applyEpgOps([
+          EpgReplaceChannels({
+            'c': [show('c', 'C 12', 0), show('c', 'C 20', 8)],
+            'd': [show('d', 'D 13', 1)],
+          }),
+        ]);
+        final window = await repo.programmesBetween(
+          base,
+          base.add(const Duration(hours: 4)),
+        );
+        expect(window.keys, unorderedEquals(['c', 'd']));
+        expect(window['c']!.map((p) => p.title), ['C 12']);
+        final onlyD = await repo.programmesBetween(
+          base,
+          base.add(const Duration(hours: 4)),
+          channelIds: {'d'},
+        );
+        expect(onlyD.keys, ['d']);
+      },
+    );
+
+    test('a large batch applies on the database worker', () async {
+      await repo.applyEpgOps([
+        EpgReplaceChannels({
+          for (var c = 0; c < 70; c++)
+            'ch$c': [for (var h = 0; h < 8; h++) show('ch$c', 'P$h', h)],
+        }),
+      ]);
+      expect(await titles('ch69'), [for (var h = 0; h < 8; h++) 'P$h']);
+    });
   });
 
   group('large writes and reads run on a database worker isolate', () {

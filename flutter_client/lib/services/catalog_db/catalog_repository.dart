@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_store.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 
 /// Which promoted column (if any) a windowed page/count query orders by,
@@ -27,7 +28,7 @@ enum CatalogSort {
 /// `catalog_codec`, keeps the promoted columns in sync, and exposes both the
 /// full-list reads the app still relies on and the windowed page/count reads
 /// the grids will move to.
-class CatalogRepository {
+class CatalogRepository implements EpgProgrammeStore {
   CatalogRepository(this._db);
 
   final CatalogDatabase _db;
@@ -657,6 +658,118 @@ class CatalogRepository {
           ),
         ))
         .go();
+  }
+
+  @override
+  Future<void> applyEpgOps(List<EpgStoreOp> ops) {
+    if (ops.isEmpty) return Future.value();
+    var rows = 0;
+    for (final op in ops) {
+      rows += switch (op) {
+        EpgReplaceChannels(:final byChannel) ||
+        EpgMergeIntoChannels(:final byChannel) => byChannel.values.fold(
+          0,
+          (n, list) => n + list.length,
+        ),
+        EpgPruneBefore() => 0,
+      };
+    }
+    if (!_offloadWrites || rows < _offloadThresholdRows) {
+      return _applyEpgOpsOn(_db, ops);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _applyEpgOpsOn(db, ops),
+    );
+  }
+
+  static Future<void> _applyEpgOpsOn(
+    CatalogDatabase db,
+    List<EpgStoreOp> ops,
+  ) => db.transaction(() async {
+    for (final op in ops) {
+      switch (op) {
+        case EpgReplaceChannels(:final byChannel):
+          if (byChannel.isEmpty) continue;
+          await (db.delete(
+            db.epgProgrammes,
+          )..where((t) => t.channelId.isIn(byChannel.keys))).go();
+          await _upsertProgrammesOn(db, [
+            for (final programmes in byChannel.values) ...programmes,
+          ]);
+        case EpgMergeIntoChannels(:final byChannel):
+          for (final MapEntry(key: channelId, value: programmes)
+              in byChannel.entries) {
+            final sorted = [...programmes]
+              ..sort((a, b) => a.start.compareTo(b.start));
+            for (final (start, end) in epgDisjointSpans(sorted)) {
+              await (db.delete(db.epgProgrammes)..where(
+                    (t) =>
+                        t.channelId.equals(channelId) &
+                        t.startMs.isSmallerThanValue(
+                          end.millisecondsSinceEpoch,
+                        ) &
+                        t.endMs.isBiggerThanValue(start.millisecondsSinceEpoch),
+                  ))
+                  .go();
+            }
+            await _upsertProgrammesOn(db, programmes);
+          }
+        case EpgPruneBefore(:final cutoff):
+          await (db.delete(db.epgProgrammes)..where(
+                (t) =>
+                    t.endMs.isSmallerThanValue(cutoff.millisecondsSinceEpoch),
+              ))
+              .go();
+      }
+    }
+  });
+
+  @override
+  Future<Map<String, List<EpgProgram>>> programmesForChannels(
+    Set<String> channelIds,
+  ) async {
+    if (channelIds.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.epgProgrammes)
+              ..where((t) => t.channelId.isIn(channelIds))
+              ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
+            .get();
+    return _groupByChannel(rows);
+  }
+
+  @override
+  Future<Map<String, List<EpgProgram>>> programmesBetween(
+    DateTime endAfter,
+    DateTime startBefore, {
+    Set<String>? channelIds,
+  }) async {
+    if (channelIds != null && channelIds.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.epgProgrammes)
+              ..where((t) {
+                final window =
+                    t.endMs.isBiggerThanValue(endAfter.millisecondsSinceEpoch) &
+                    t.startMs.isSmallerThanValue(
+                      startBefore.millisecondsSinceEpoch,
+                    );
+                return channelIds == null
+                    ? window
+                    : window & t.channelId.isIn(channelIds);
+              })
+              ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
+            .get();
+    return _groupByChannel(rows);
+  }
+
+  static Map<String, List<EpgProgram>> _groupByChannel(
+    List<EpgProgrammeRow> rows,
+  ) {
+    final byChannel = <String, List<EpgProgram>>{};
+    for (final row in rows) {
+      byChannel.putIfAbsent(row.channelId, () => []).add(_programFromRow(row));
+    }
+    return byChannel;
   }
 
   static EpgProgram _programFromRow(EpgProgrammeRow row) => EpgProgram(
