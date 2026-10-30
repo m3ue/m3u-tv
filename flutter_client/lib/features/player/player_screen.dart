@@ -14,6 +14,7 @@ import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
 import 'package:m3u_tv/features/player/player_shortcuts.dart';
 import 'package:m3u_tv/features/player/player_skip_prompts.dart';
+import 'package:m3u_tv/features/player/player_skip_segments.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
@@ -28,7 +29,6 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
-import 'package:m3u_tv/services/introdb_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -48,13 +48,6 @@ const bool _showPlaybackDiagnostics = bool.fromEnvironment(
 /// volume through this app.
 bool get _isDesktop =>
     HostPlatform.isMacOS || HostPlatform.isWindows || HostPlatform.isLinux;
-
-/// Which TheIntroDB segment a skip prompt refers to.
-enum _IntroDbSegmentKind { intro, credits }
-
-/// How long TheIntroDB's skip prompt stays up before fading (with a
-/// countdown bar showing the time remaining).
-const _kIntroDbPromptCountdown = Duration(seconds: 15);
 
 /// How far past the credits mark to wait before raising the "up next" card,
 /// so it doesn't fight the skip-credits prompt for the screen (and focus).
@@ -238,50 +231,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   EpgCurrentNext? _epgData;
 
-  // Comskip (commercial-skip) state — only populated when args.metadata
-  // carries an 'edl_url' (completed DVR recordings with comskip enabled).
-  List<ComskipSegment> _comskipSegments = const [];
-  ({double start, double end})? _activeComskipSegment;
-  bool _showComskipSkippedBadge = false;
-  Timer? _comskipBadgeTimer;
-  // Set while an auto-skip seek is in flight so orchestrator position
-  // reports that lag/oscillate behind the optimistic bump can't clobber
-  // _currentPosition backward into the segment. Cleared the moment the
-  // orchestrator genuinely reports a position at or past the target.
-  Duration? _pendingComskipSeekTarget;
-  // Safety net: if the orchestrator never confirms the seek (player stuck,
-  // decode failure, etc.), auto-clear after a few seconds so we don't hold
-  // _currentPosition hostage indefinitely and silently break future skips.
-  Timer? _pendingComskipSeekTimer;
-
-  // TheIntroDB (skip intro/credits) state — populated when the currently
-  // playing VOD/series item resolves to a tmdb_id (or, for AIOStreams, an
-  // imdb-style aio_item_id) with community-submitted timestamps.
-  final IntroDbService _introDbService = IntroDbService();
-  late final ComskipService _comskipService =
-      widget.comskipService ?? ComskipService();
-  IntroDbSegments? _introDbSegments;
-  // The segment kind the play-head is currently inside, independent of
-  // whether the prompt is actually on screen right now.
-  _IntroDbSegmentKind? _introDbMatchedKind;
-  // True only during the one-time 5s countdown window that plays the moment
-  // a segment is entered. Once it elapses this goes false for good (for that
-  // segment) — the prompt then only shows/hides in lockstep with the OSD via
-  // `_introDbPromptVisible` below, with no further auto-hide timer.
-  bool _introDbCountdownActive = false;
-  DateTime? _introDbCountdownShownAt;
-  Timer? _introDbPromptTimer;
-  // Segments are matched purely by current position, not remembered forever
-  // — scrubbing back into an already-watched (or already-skipped) segment's
-  // range re-offers its prompt. The one exception is right after the user
-  // taps Skip: the orchestrator's seek is async, so `_currentPosition` can
-  // still read as "inside the segment" for a tick or two afterward. This
-  // guard excludes that one kind from matching until the seek's target
-  // position is actually reached (or, as a safety net if it never confirms,
-  // until this timer fires) — mirrors comskip's `_pendingComskipSeekTarget`.
-  _IntroDbSegmentKind? _introDbPendingSkipKind;
-  int? _introDbPendingSkipEndMs;
-  Timer? _introDbPendingSkipTimer;
+  late final PlayerSkipSegments _skips = PlayerSkipSegments(
+    position: () => _currentPosition,
+    duration: () => _duration,
+    bumpPosition: (position) => _currentPosition = position,
+    seek: widget.orchestrator.seek,
+    comskipService: widget.comskipService ?? ComskipService(),
+    autoSkipEnabled: () => widget.comskipSettings?.autoSkipEnabled ?? false,
+    introDbEnabled: () => widget.introDbSettings?.enabled != false,
+  );
 
   // ── Up next (series only) ──────────────────────────────────────────────
   // Populated once per episode from get_series_info: the next episode to roll
@@ -301,15 +259,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// here the moment the card appears so the remote lands on it, not the
   /// transport bar.
   final FocusNode _upNextFocusNode = FocusNode(debugLabel: 'playerUpNext');
-
-  /// Whether the skip prompt should be on screen right now: either the
-  /// one-time countdown is still running, or the OSD is up and the play-head
-  /// is still inside an unskipped segment. Purely derived — bringing the OSD
-  /// back up after the countdown has already elapsed re-shows the prompt
-  /// without restarting the countdown, and hiding the OSD hides it again.
-  bool get _introDbPromptVisible =>
-      _introDbMatchedKind != null &&
-      (_introDbCountdownActive || _overlayVisible);
 
   bool _overlayVisible = true;
   bool _trackDialogVisible = false;
@@ -461,6 +410,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _focusControlsOrScreen();
       }
     });
+    _skips.addListener(_onSkipSegmentsChanged);
     _stateSubscription = widget.orchestrator.onState.listen(_handleState);
     _errorSubscription = widget.orchestrator.onError.listen(_handleError);
     // `_isNativePlaneActive` reads the orchestrator directly rather than
@@ -479,8 +429,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _openInitialSource();
     _startLoadingTimeout();
     _scheduleOverlayHide();
-    unawaited(_initComskip(widget.args));
-    unawaited(_initIntroDb(widget.args));
+    _loadSkipSegments(widget.args);
     unawaited(_initUpNext(widget.args));
   }
 
@@ -588,9 +537,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer?.cancel();
     _epgTimer?.cancel();
     _epgFetch = null;
-    _comskipBadgeTimer?.cancel();
-    _introDbPromptTimer?.cancel();
-    _introDbPendingSkipTimer?.cancel();
     _liveEndHoldTimer?.cancel();
 
     setState(() {
@@ -612,15 +558,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _selectedSubtitleTrackId = null;
       _epgData = null;
       _overlayVisible = true;
-      _comskipSegments = const [];
-      _activeComskipSegment = null;
-      _showComskipSkippedBadge = false;
-      _introDbSegments = null;
-      _introDbMatchedKind = null;
-      _introDbCountdownActive = false;
-      _introDbCountdownShownAt = null;
-      _introDbPendingSkipKind = null;
-      _introDbPendingSkipEndMs = null;
+      _skips.reset();
       _upNextVisible = false;
       _upNextDismissed = false;
       _nextEpisode = null;
@@ -633,8 +571,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(_openSource(widget.args));
     _startLoadingTimeout();
     _scheduleOverlayHide();
-    unawaited(_initComskip(widget.args));
-    unawaited(_initIntroDb(widget.args));
+    _loadSkipSegments(widget.args);
     unawaited(_initUpNext(widget.args));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _overlayVisible) _focusControlsOrScreen();
@@ -670,8 +607,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _currentPosition = (_duration > Duration.zero && next > _duration)
           ? _duration
           : next;
-      _checkComskip();
-      _checkIntroDb();
+      _skips.check();
       _checkUpNext();
     });
   }
@@ -681,265 +617,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer = null;
   }
 
-  // ── Comskip (commercial-skip) ──────────────────────────────────────────
+  void _onSkipSegmentsChanged() {
+    if (mounted) setState(() {});
+  }
 
-  /// Fetches the comskip EDL segment list for completed DVR recordings.
-  /// Fire-and-forget: an older server, a recording with comskip disabled, or
-  /// any fetch failure just leaves [_comskipSegments] empty, so the rest of
-  /// the player behaves exactly as if this recording had no EDL at all.
-  Future<void> _initComskip(PlayerArgs args) async {
-    final segments = await _comskipService.segmentsFor(
-      edlUrl: args.metadata['edl_url'] as String?,
-      type: args.type,
-      streamId: args.streamId,
-      seriesId: args.seriesId,
-      xtreamService: widget.xtreamService,
-      canLookUp: widget.hasDvrFeature,
+  /// Fetches comskip and TheIntroDB segments for [args]. Both are
+  /// fire-and-forget: a miss just leaves the player without skip prompts.
+  void _loadSkipSegments(PlayerArgs args) {
+    bool isCurrent() => mounted && identical(args, widget.args);
+    unawaited(
+      _skips.loadComskip(
+        args,
+        xtreamService: widget.xtreamService,
+        hasDvrFeature: widget.hasDvrFeature,
+        isCurrent: isCurrent,
+      ),
     );
-    if (segments.isEmpty || !mounted || !identical(args, widget.args)) return;
-    setState(() => _comskipSegments = segments);
-  }
-
-  /// Checks whether the current playback position has entered a commercial
-  /// segment and reacts per the user's auto-skip/prompt preference. Called
-  /// after every position update, mirroring the web player's
-  /// timeupdate-driven `_checkComskip`.
-  void _checkComskip() {
-    if (_comskipSegments.isEmpty || _disposed || !mounted) return;
-
-    final positionSeconds = _currentPosition.inMilliseconds / 1000.0;
-    ({double start, double end})? current;
-    for (final segment in _comskipSegments) {
-      if (positionSeconds >= segment.start && positionSeconds < segment.end) {
-        current = segment;
-        break;
-      }
-    }
-
-    if (current == null) {
-      if (_activeComskipSegment != null) {
-        setState(() => _activeComskipSegment = null);
-      }
-      return;
-    }
-
-    final autoSkip = widget.comskipSettings?.autoSkipEnabled ?? false;
-    if (autoSkip) {
-      _fireComskipSeek(current);
-      _flashComskipSkippedBadge();
-    } else if (_activeComskipSegment?.end != current.end) {
-      setState(() => _activeComskipSegment = current);
-    }
-  }
-
-  /// Seeks past the end of a commercial segment using sub-second EDL
-  /// precision, with the optimistic `_currentPosition` bump and
-  /// `_pendingComskipSeekTarget` guard required to keep the seek-storm
-  /// regression from coming back. Shared by the auto-skip branch above
-  /// and the prompt-mode confirm button so the two paths can't drift
-  /// out of sync again (which previously left the prompt flickering).
-  void _fireComskipSeek(({double start, double end}) segment) {
-    // ceil() past the segment's actual end so sub-second EDL precision
-    // (e.g. end=2284.08) doesn't leave us inside the half-open interval
-    // after rounding to whole seconds. The same value is used for the
-    // optimistic bump and the real seek so they stay in lockstep.
-    final seekTargetMs = (segment.end * 1000).ceil();
-    final seekTarget = Duration(milliseconds: seekTargetMs);
-    // Optimistically bump the local position past the segment's end so
-    // the very next tick no longer matches it — the manually-incremented
-    // _currentPosition otherwise lags the orchestrator's true position
-    // until onState confirms the seek asynchronously, which would
-    // re-match and re-fire on the next tick. _pendingComskipSeekTarget
-    // then prevents `_handleState` from clobbering the bump backward
-    // (the orchestrator's mid-seek position reports can lag/oscillate
-    // behind the optimistic value, which previously caused a re-fire
-    // loop). There's deliberately no persistent already-skipped
-    // tracking, since that would (and did) suppress a legitimate
-    // re-skip on scrub-back, replay, or restart-from-0.
-    _currentPosition = seekTarget;
-    _pendingComskipSeekTarget = seekTarget;
-    _pendingComskipSeekTimer?.cancel();
-    _pendingComskipSeekTimer = Timer(const Duration(seconds: 5), () {
-      if (_disposed || !mounted) return;
-      // Real seek never confirmed — give up holding position hostage so
-      // future comskip seeks aren't silently broken.
-      _pendingComskipSeekTarget = null;
-      _pendingComskipSeekTimer = null;
-    });
-    unawaited(widget.orchestrator.seek(seekTarget));
-  }
-
-  void _flashComskipSkippedBadge() {
-    _comskipBadgeTimer?.cancel();
-    setState(() => _showComskipSkippedBadge = true);
-    _comskipBadgeTimer = Timer(const Duration(seconds: 3), () {
-      if (!_disposed && mounted) {
-        setState(() => _showComskipSkippedBadge = false);
-      }
-    });
-  }
-
-  /// Confirms the prompt-mode skip control, jumping to the active segment's
-  /// end the same way auto-skip would.
-  void _confirmComskipSkip() {
-    final segment = _activeComskipSegment;
-    if (segment == null) return;
-    _fireComskipSeek(segment);
-    setState(() => _activeComskipSegment = null);
-  }
-
-  // ── TheIntroDB (skip intro/credits) ─────────────────────────────────────
-
-  static final RegExp _imdbIdPattern = RegExp(r'^tt[0-9]{7,8}$');
-
-  /// Fetches intro/credits timestamps for the currently playing VOD/series
-  /// item. Fire-and-forget, mirroring `_initComskip`: TheIntroDB disabled in
-  /// settings, no tmdb_id/imdb_id, an older/unlisted title, or any fetch
-  /// failure just leaves
-  /// `_introDbSegments` null, so the rest of the player behaves exactly as
-  /// if this title had no TheIntroDB data at all.
-  Future<void> _initIntroDb(PlayerArgs args) async {
-    if (args.type != 'vod' && args.type != 'series') return;
-    if (widget.introDbSettings?.enabled == false) return;
-
-    final tmdbId = args.metadata['tmdb_id'] as int?;
-    final aioItemId = args.metadata['aio_item_id'] as String?;
-    final imdbId =
-        tmdbId == null &&
-            aioItemId != null &&
-            _imdbIdPattern.hasMatch(aioItemId)
-        ? aioItemId
-        : null;
-    if (tmdbId == null && imdbId == null) return;
-
-    final segments = await _introDbService.getSegments(
-      tmdbId: tmdbId,
-      imdbId: imdbId,
-      isSeries: args.type == 'series',
-      season: args.seasonNumber ?? args.metadata['season_number'] as int?,
-      episode: args.metadata['episode_number'] as int?,
-    );
-    if (!mounted || !identical(args, widget.args)) return;
-    setState(() => _introDbSegments = segments);
-  }
-
-  /// True when [positionMs] falls within [segment]'s effective range. A
-  /// missing `endMs` means "end of media" (credits only), so it falls back
-  /// to the known stream duration; until duration is known this can't match.
-  bool _isWithinIntroDbSegment(IntroDbSegment segment, int positionMs) {
-    final start = segment.startMs ?? 0;
-    final end = segment.endMs ?? _duration.inMilliseconds;
-    if (end <= 0) return false;
-    return positionMs >= start && positionMs < end;
-  }
-
-  /// Picks whichever segment kind (intro takes priority over credits, since
-  /// their windows never overlap in practice) the current position falls
-  /// inside. Purely position-based — scrubbing back into a segment you've
-  /// already watched through (or already tapped Skip on) re-matches it, so
-  /// its prompt is offered again, not just on the way forward. The one
-  /// exception is `_introDbPendingSkipKind`, a short-lived guard (see its
-  /// field doc) for the moment right after tapping Skip.
-  _IntroDbSegmentKind? _matchingIntroDbSegment(int positionMs) {
-    final segments = _introDbSegments;
-    if (segments == null) return null;
-    if (_introDbPendingSkipKind != _IntroDbSegmentKind.intro &&
-        segments.intro != null &&
-        _isWithinIntroDbSegment(segments.intro!, positionMs)) {
-      return _IntroDbSegmentKind.intro;
-    }
-    if (_introDbPendingSkipKind != _IntroDbSegmentKind.credits &&
-        segments.credits != null &&
-        _isWithinIntroDbSegment(segments.credits!, positionMs)) {
-      return _IntroDbSegmentKind.credits;
-    }
-    return null;
-  }
-
-  /// Checks the current position against the fetched intro/credits ranges.
-  /// Called after every position update, mirroring `_checkComskip`. Entering
-  /// a segment (from outside it, in either direction) starts its one-time
-  /// countdown; `_overlayVisible` changes alone are handled entirely by the
-  /// `_introDbPromptVisible` getter, not here.
-  void _checkIntroDb() {
-    if (_introDbSegments == null || _disposed || !mounted) return;
-
-    final pendingEnd = _introDbPendingSkipEndMs;
-    if (pendingEnd != null && _currentPosition.inMilliseconds >= pendingEnd) {
-      _introDbPendingSkipTimer?.cancel();
-      _introDbPendingSkipTimer = null;
-      _introDbPendingSkipKind = null;
-      _introDbPendingSkipEndMs = null;
-    }
-
-    final matched = _matchingIntroDbSegment(_currentPosition.inMilliseconds);
-    if (matched == null) {
-      if (_introDbMatchedKind != null) _resetIntroDbPromptState();
-      return;
-    }
-
-    if (_introDbMatchedKind != matched) _startIntroDbCountdown(matched);
-  }
-
-  /// Enters a new segment kind and plays its one-time 15s countdown. After it
-  /// elapses, `_introDbCountdownActive` simply goes false — the prompt then
-  /// only shows/hides in lockstep with the OSD (`_introDbPromptVisible`),
-  /// with no further timer and no restart on subsequent OSD toggles.
-  void _startIntroDbCountdown(_IntroDbSegmentKind kind) {
-    _introDbPromptTimer?.cancel();
-    setState(() {
-      _introDbMatchedKind = kind;
-      _introDbCountdownActive = true;
-      _introDbCountdownShownAt = DateTime.now();
-    });
-    _introDbPromptTimer = Timer(_kIntroDbPromptCountdown, () {
-      if (_disposed || !mounted) return;
-      setState(() {
-        _introDbCountdownActive = false;
-        _introDbCountdownShownAt = null;
-      });
-    });
-  }
-
-  void _resetIntroDbPromptState() {
-    _introDbPromptTimer?.cancel();
-    _introDbPromptTimer = null;
-    if (_introDbMatchedKind == null && !_introDbCountdownActive) return;
-    setState(() {
-      _introDbMatchedKind = null;
-      _introDbCountdownActive = false;
-      _introDbCountdownShownAt = null;
-    });
-  }
-
-  void _confirmIntroDbSkip() {
-    final kind = _introDbMatchedKind;
-    final segments = _introDbSegments;
-    if (kind == null || segments == null) return;
-    final segment = kind == _IntroDbSegmentKind.intro
-        ? segments.intro
-        : segments.credits;
-    if (segment == null) return;
-    final endMs = segment.endMs ?? _duration.inMilliseconds;
-
-    _introDbPendingSkipKind = kind;
-    _introDbPendingSkipEndMs = endMs;
-    _introDbPendingSkipTimer?.cancel();
-    _introDbPendingSkipTimer = Timer(const Duration(seconds: 5), () {
-      if (_disposed || !mounted) return;
-      _introDbPendingSkipKind = null;
-      _introDbPendingSkipEndMs = null;
-    });
-
-    _resetIntroDbPromptState();
-    unawaited(widget.orchestrator.seek(Duration(milliseconds: endMs)));
+    unawaited(_skips.loadIntroDb(args, isCurrent: isCurrent));
   }
 
   // ── Up next (series only) ──────────────────────────────────────────────
 
   /// Resolves the next episode for the currently playing series episode from
   /// `get_series_info` (already cached client-side). Fire-and-forget, like
-  /// `_initIntroDb`: a missing series id, a non-series item, or any fetch
+  /// the skip-segment loads: a missing series id, a non-series item, or any fetch
   /// failure just leaves `_nextEpisode` null and the overlay never appears.
   Future<void> _initUpNext(PlayerArgs args) async {
     if (args.type != 'series') return;
@@ -980,7 +681,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _nextEpisode == null) {
       return;
     }
-    final creditsStartMs = _introDbSegments?.credits?.startMs;
+    final creditsStartMs = _skips.introDbSegments?.credits?.startMs;
     final shouldShow = creditsStartMs != null
         // Hold off until the skip-credits prompt has had its moment.
         ? _currentPosition.inMilliseconds >=
@@ -1074,25 +775,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// or null when neither is active. `context` is only needed for
   /// localized labels.
   Widget? _buildSkipPrompt(BuildContext context) {
-    if (_activeComskipSegment != null) {
+    final skips = _skips;
+    if (skips.activeComskipSegment != null) {
       return SkipSegmentPrompt(
         label: AppLocalizations.of(context).playerSkipCommercial,
-        onSkip: _confirmComskipSkip,
+        onSkip: skips.confirmComskipSkip,
       );
     }
     // Once the "up next" card is up it takes over the end-of-episode moment;
     // a redundant "skip credits" button beside it just competes for focus.
-    if (_introDbPromptVisible && !_upNextVisible) {
+    if (skips.introDbPromptVisible(overlayVisible: _overlayVisible) &&
+        !_upNextVisible) {
       return SkipSegmentPrompt(
-        label: _introDbMatchedKind == _IntroDbSegmentKind.intro
+        label: skips.introDbMatchedKind == IntroDbSegmentKind.intro
             ? AppLocalizations.of(context).playerSkipIntro
             : AppLocalizations.of(context).playerSkipCredits,
-        onSkip: _confirmIntroDbSkip,
-        countdownShownAt: _introDbCountdownActive
-            ? _introDbCountdownShownAt
+        onSkip: skips.confirmIntroDbSkip,
+        countdownShownAt: skips.introDbCountdownActive
+            ? skips.introDbCountdownShownAt
             : null,
-        countdownDuration: _introDbCountdownActive
-            ? _kIntroDbPromptCountdown
+        countdownDuration: skips.introDbCountdownActive
+            ? kIntroDbPromptCountdown
             : null,
       );
     }
@@ -1163,11 +866,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _positionTimer?.cancel();
     _epgTimer?.cancel();
     _liveEndHoldTimer?.cancel();
-    _comskipBadgeTimer?.cancel();
-    _pendingComskipSeekTimer?.cancel();
-    _introDbPromptTimer?.cancel();
-    _introDbPendingSkipTimer?.cancel();
     _skipCommitTimer?.cancel();
+    _skips.dispose();
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
@@ -1343,7 +1043,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // the segment (orchestrator onState can lag/oscillate during the real
     // seek's buffering). Accept state.position only once it's at or past
     // the pending target — that proves the real seek genuinely caught up.
-    final pendingTarget = _pendingComskipSeekTarget;
+    final pendingTarget = _skips.pendingComskipSeekTarget;
     final catchup = _catchup;
     final Duration acceptedPosition;
     if (catchup != null) {
@@ -1441,12 +1141,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // seek target, the real seek has landed — release the guard so the
     // next segment / next scrub-back can fire normally.
     if (pendingTarget != null && state.position >= pendingTarget) {
-      _pendingComskipSeekTarget = null;
-      _pendingComskipSeekTimer?.cancel();
-      _pendingComskipSeekTimer = null;
+      _skips.clearPendingComskipSeek();
     }
-    _checkComskip();
-    _checkIntroDb();
+    _skips.check();
     _checkUpNext();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
@@ -1733,9 +1430,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // buffering) would be rejected as a stale regression and the
     // player would hold _currentPosition at the auto-skip's target
     // until the 5s safety-net timer cleared the guard.
-    _pendingComskipSeekTarget = null;
-    _pendingComskipSeekTimer?.cancel();
-    _pendingComskipSeekTimer = null;
+    _skips.clearPendingComskipSeek();
     final clamped = position < Duration.zero
         ? Duration.zero
         : (position > _duration ? _duration : position);
@@ -1946,8 +1641,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _showOverlay() {
     // Transport controls are unusable at PiP's tiny window size.
     if (_isInPictureInPicture) return;
-    // No extra intro-db handling needed here — `_introDbPromptVisible` is
-    // derived from `_overlayVisible`, so this setState alone re-shows the
+    // No extra intro-db handling needed here - the intro-db prompt's
+    // visibility is derived from `_overlayVisible`, so this setState alone re-shows the
     // prompt (without restarting its countdown) if one is still pending.
     setState(() => _overlayVisible = true);
     _scheduleOverlayHide();
@@ -2534,7 +2229,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
 
                     // Comskip: brief auto-skip indicator (DVR recordings only)
-                    if (_showComskipSkippedBadge)
+                    if (_skips.showComskipSkippedBadge)
                       Positioned(
                         top: edgePadding,
                         left: edgePadding,
