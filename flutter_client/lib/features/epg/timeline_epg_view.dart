@@ -421,14 +421,27 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   DateTime _offsetDate(DateTime value, int days) =>
       DateTime(value.year, value.month, value.day + days);
 
-  int get _maxCatchupDays => widget.channels
-      .map(
-        (channel) => EpgService.effectiveCatchupRetentionDays(
-          channel.catchupSupported,
-          channel.catchupDays,
-        ),
-      )
-      .fold(0, math.max);
+  List<Channel>? _maxCatchupDaysSource;
+  int _maxCatchupDaysValue = 0;
+
+  /// The deepest catchup retention across [TimelineEpgView.channels]. Read
+  /// from `build()` (via [_canGoPrevious]), so it's computed once per channel
+  /// list rather than walking every channel on each rebuild.
+  int get _maxCatchupDays {
+    final channels = widget.channels;
+    if (!identical(channels, _maxCatchupDaysSource)) {
+      _maxCatchupDaysSource = channels;
+      _maxCatchupDaysValue = channels
+          .map(
+            (channel) => EpgService.effectiveCatchupRetentionDays(
+              channel.catchupSupported,
+              channel.catchupDays,
+            ),
+          )
+          .fold(0, math.max);
+    }
+    return _maxCatchupDaysValue;
+  }
 
   bool get _canGoPrevious => _selectedDate.isAfter(
     _offsetDate(_dateOnly(widget.clock()), -_maxCatchupDays),
