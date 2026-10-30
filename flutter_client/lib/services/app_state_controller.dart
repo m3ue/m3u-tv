@@ -24,6 +24,7 @@ import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/push_notification_service.dart';
+import 'package:m3u_tv/services/requests_coordinator.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -40,11 +41,6 @@ export 'package:m3u_tv/services/dvr_coordinator.dart'
     show DvrAiringScheduleResult;
 
 enum AppSourceType { none, xtream }
-
-/// Which content lists need to be re-fetched after a DVR recording finishes
-/// post-processing so its upserted VOD/episode surfaces in the UI. Private
-/// to this file — only the debounce/coalesce machinery in [AppStateController]
-/// reasons about it.
 
 typedef MediaRequestOwner = ({
   int sourceGeneration,
@@ -483,7 +479,6 @@ class AppStateController extends ChangeNotifier {
   List<Category> _vodCategories = const <Category>[];
   List<Category> _seriesCategories = const <Category>[];
   List<Channel> _channels = const <Channel>[];
-  List<MediaRequestSummary> _mediaRequests = const <MediaRequestSummary>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -495,6 +490,15 @@ class AppStateController extends ChangeNotifier {
   // notifyListeners() on a disposed notifier would surface as an unhandled
   // async error rather than being caught anywhere.
   bool _disposed = false;
+
+  /// Owns the guest's media requests list and its server calls.
+  late final RequestsCoordinator _requests = RequestsCoordinator(
+    xtreamService: xtreamService,
+    credentials: () => authNotifier.credentials,
+    captureOwnership: _captureMediaRequestOwnership,
+    hasRequestsFeature: () => hasRequestsFeature,
+    notifyListeners: notifyListeners,
+  );
 
   /// Owns the DVR recordings/rules/storage state and its server calls.
   late final DvrCoordinator _dvr = DvrCoordinator(
@@ -541,7 +545,7 @@ class AppStateController extends ChangeNotifier {
   Set<int> get recordingChannelIds => _dvr.recordingChannelIds;
   List<DvrSeriesRule> get dvrSeriesRules => _dvr.seriesRules;
   List<Progress> get progressList => _progressList;
-  List<MediaRequestSummary> get mediaRequests => _mediaRequests;
+  List<MediaRequestSummary> get mediaRequests => _requests.requests;
   bool get hasDvrFeature =>
       authNotifier.authResponse?.hasFeature('dvr') ?? false;
   bool get hasRequestsFeature =>
@@ -944,7 +948,7 @@ class AppStateController extends ChangeNotifier {
         onDvrStatus: (recording) =>
             _dvr.onStatusPush(recording, credentials, ownsDvr),
         onRequestStatus: (request) =>
-            _onRequestStatusPush(request, ownsRequests),
+            _requests.onStatusPush(request, ownsRequests),
         onFavoriteToggled: _onFavoriteTogglePush,
         onDeviceDeregister: _onDeviceDeregisterPush,
         // Reconciles any status pushes missed while disconnected (app
@@ -1355,28 +1359,6 @@ class AppStateController extends ChangeNotifier {
     }
   }
 
-  /// Mirrors [DvrCoordinator.onStatusPush]: updates the local requests list in place
-  /// from the lightweight `request.status` push (approved/rejected/completed
-  /// by MediaRequestStatusEvent on the server) instead of re-polling
-  /// request_history.
-  void _onRequestStatusPush(
-    MediaRequestSummary request,
-    bool Function() ownsWork,
-  ) {
-    if (!ownsWork()) return;
-    final next = [..._mediaRequests];
-    final index = next.indexWhere((r) => r.id == request.id);
-    if (index >= 0) {
-      next[index] = request;
-    } else {
-      next.insert(0, request);
-    }
-    if (!ownsWork()) return;
-    _mediaRequests = next;
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
-
   /// Pushes a local Live/VOD/Series favorite change to the server. No-op
   /// when not connected (nothing to sync to) — mirrors the same
   /// `sourceType == xtream` gate used for progress pushes in app_shell.dart.
@@ -1752,7 +1734,7 @@ class AppStateController extends ChangeNotifier {
     _seriesCategories = const <Category>[];
     _channels = const <Channel>[];
     _dvr.reset();
-    _mediaRequests = const <MediaRequestSummary>[];
+    _requests.reset();
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
@@ -1908,99 +1890,33 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Searches guest-enabled Arr integrations via `request_search`. Thin
-  /// pass-through — the Requests screen owns its own search-in-flight/error
-  /// state since results aren't part of the app's persistent state.
+  /// See [RequestsCoordinator.searchContentRequests].
   Future<List<ContentRequestSearchResult>> searchContentRequests(
     String query, {
     String? type,
-  }) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) return const <ContentRequestSearchResult>[];
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return const <ContentRequestSearchResult>[];
-    final results = await xtreamService.searchContentRequestsFor(
-      credentials,
-      query,
-      type: type,
-    );
-    if (!ownsWork()) return const <ContentRequestSearchResult>[];
-    return results;
-  }
+  }) => _requests.searchContentRequests(query, type: type);
 
-  /// Submits a content request and adds it to the local requests list so it
-  /// shows up immediately, without waiting for a `request.status` push.
+  /// See [RequestsCoordinator.submitContentRequest].
   Future<MediaRequestSummary> submitContentRequest({
     required String type,
     required int integrationId,
     required String externalId,
     List<int>? seasons,
     MediaRequestOwner? requestOwner,
-  }) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureMediaRequestOwnership(
-      credentials,
-      owner: requestOwner,
-    );
-    if (!ownsWork()) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final request = await xtreamService.submitContentRequestFor(
-      credentials,
-      type: type,
-      integrationId: integrationId,
-      externalId: externalId,
-      seasons: seasons,
-    );
-    if (!ownsWork()) return request;
-    final next = [request, ..._mediaRequests];
-    if (!ownsWork()) return request;
-    _mediaRequests = next;
-    if (!ownsWork()) return request;
-    notifyListeners();
-    return request;
-  }
+  }) => _requests.submitContentRequest(
+    type: type,
+    integrationId: integrationId,
+    externalId: externalId,
+    seasons: seasons,
+    requestOwner: requestOwner,
+  );
 
-  /// Dismisses a completed or rejected request and removes it locally.
-  Future<void> dismissMediaRequest(int requestId) async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null) {
-      throw StateError('Xtream credentials not configured');
-    }
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return;
-    await xtreamService.dismissMediaRequest(requestId);
-    if (!ownsWork()) return;
-    final next = _mediaRequests
-        .where((request) => request.id != requestId)
-        .toList(growable: false);
-    if (!ownsWork()) return;
-    _mediaRequests = next;
-    if (!ownsWork()) return;
-    notifyListeners();
-  }
+  /// See [RequestsCoordinator.dismissMediaRequest].
+  Future<void> dismissMediaRequest(int requestId) =>
+      _requests.dismissMediaRequest(requestId);
 
-  /// Refreshes the requesting guest's request history from the server. Used
-  /// when the Requests screen becomes visible, since a push can be missed
-  /// while the app is backgrounded and no other screen holds this list warm.
-  Future<void> refreshMediaRequests() async {
-    final credentials = authNotifier.credentials;
-    if (credentials == null || !hasRequestsFeature) return;
-    final ownsWork = _captureMediaRequestOwnership(credentials);
-    if (!ownsWork()) return;
-    try {
-      final requests = await xtreamService.getMediaRequests();
-      if (!ownsWork()) return;
-      _mediaRequests = requests;
-      if (!ownsWork()) return;
-      notifyListeners();
-    } on Object catch (error) {
-      debugPrint('Requests: refresh failed: $error');
-    }
-  }
+  /// See [RequestsCoordinator.refreshMediaRequests].
+  Future<void> refreshMediaRequests() => _requests.refreshMediaRequests();
 
   void updateProgressEntry(Progress updated) {
     bool sameItem(Progress p) {
@@ -2240,7 +2156,7 @@ class AppStateController extends ChangeNotifier {
           // Home/DVR screens do not flicker to empty.
           if (clearCache) {
             _dvr.reset(clearStorage: false);
-            _mediaRequests = const <MediaRequestSummary>[];
+            _requests.reset();
           }
           _viewers = viewers;
           _activeViewer = activeViewer;
@@ -2332,12 +2248,11 @@ class AppStateController extends ChangeNotifier {
     if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
       return;
     }
-    final mediaRequests = results[2] as List<MediaRequestSummary>;
     _dvr.applyFetched(
       results[0] as List<DvrRecording>,
       results[1] as List<DvrSeriesRule>,
     );
-    _mediaRequests = mediaRequests;
+    _requests.applyFetched(results[2] as List<MediaRequestSummary>);
     notifyListeners();
   }
 
@@ -2404,7 +2319,7 @@ class AppStateController extends ChangeNotifier {
     _seriesCategories = seriesCategories;
     _channels = channels;
     _dvr.reset();
-    _mediaRequests = const <MediaRequestSummary>[];
+    _requests.reset();
     _viewers = viewers;
     _activeViewer = activeViewer;
     _progressList = progress;

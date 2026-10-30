@@ -26,6 +26,10 @@ class DvrAiringScheduleResult {
   final String? errorMessage;
 }
 
+/// Which content lists need to be re-fetched after a DVR recording finishes
+/// post-processing so its upserted VOD/episode surfaces in the UI. Private
+/// to this file - only the debounce/coalesce machinery in [DvrCoordinator]
+/// reasons about it.
 enum _DvrContentRefreshTarget { vod, series }
 
 /// DVR state (recordings, series rules, storage, which channels are

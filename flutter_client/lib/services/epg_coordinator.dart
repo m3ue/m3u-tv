@@ -397,8 +397,7 @@ class EpgCoordinator {
       );
       return;
     }
-    if (!_isXtream ||
-        channels.length <= _epgPrimeCount) {
+    if (!_isXtream || channels.length <= _epgPrimeCount) {
       return;
     }
     unawaited(
